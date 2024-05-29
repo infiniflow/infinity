@@ -134,7 +134,9 @@ TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) { return txn_store
 void Txn::CheckTxnStatus() {
     TxnState txn_state = txn_context_.GetTxnState();
     if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction isn't started.");
+        String error_message = "Transaction isn't started.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -489,7 +491,9 @@ void Txn::Rollback() {
     } else if (state == TxnState::kCommitting) {
         abort_ts = txn_context_.GetCommitTS();
     } else {
-        UnrecoverableError(fmt::format("Transaction {} state is {}.", txn_id_, ToString(state)));
+        String error_message = fmt::format("Transaction {} state is {}.", txn_id_, ToString(state));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     txn_context_.SetTxnRollbacking(abort_ts);
 

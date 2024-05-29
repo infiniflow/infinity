@@ -49,7 +49,9 @@ namespace infinity {
 Vector<std::string_view> SegmentEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
-        UnrecoverableError(fmt::format("Invalid segment entry encode: {}", encode));
+        String error_message = fmt::format("Invalid segment entry encode: {}", encode);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto decodes = TableEntry::DecodeIndex(encode.substr(0, delimiter_i));
     decodes.push_back(encode.substr(delimiter_i + 1));
@@ -138,7 +140,9 @@ void SegmentEntry::AddBlockReplay(SharedPtr<BlockEntry> block_entry) {
         block_entries_.resize(block_id + 1);
     }
     if (block_entries_[block_id].get() != nullptr) {
-        UnrecoverableError(fmt::format("BlockEntry {} already exists in SegmentEntry {}", block_id, segment_id_));
+        String error_message = fmt::format("BlockEntry {} already exists in SegmentEntry {}", block_id, segment_id_);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     block_entries_[block_id] = std::move(block_entry);
 }
@@ -146,7 +150,9 @@ void SegmentEntry::AddBlockReplay(SharedPtr<BlockEntry> block_entry) {
 void SegmentEntry::UpdateBlockReplay(SharedPtr<BlockEntry> new_block, String block_filter_binary_data) {
     BlockID block_id = new_block->block_id();
     if (block_id >= block_entries_.size() || block_entries_[block_id].get() == nullptr) {
-        UnrecoverableError(fmt::format("BlockEntry {} does not exist in SegmentEntry {}", block_id, segment_id_));
+        String error_message = fmt::format("BlockEntry {} does not exist in SegmentEntry {}", block_id, segment_id_);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     block_entries_[block_id]->UpdateBlockReplay(new_block, std::move(block_filter_binary_data));
 }
@@ -164,7 +170,9 @@ bool SegmentEntry::TrySetCompacting(CompactStateData *compact_state_data) {
 bool SegmentEntry::SetNoDelete() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert: kNoDelete is only allowed to set on compacting segment.");
+        String error_message = "Assert: kNoDelete is only allowed to set on compacting segment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     status_ = SegmentStatus::kNoDelete;
     if (!delete_txns_.empty()) {
@@ -182,7 +190,9 @@ bool SegmentEntry::SetNoDelete() {
 void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert: kDeprecated is only allowed to set on kNoDelete segment.");
+        String error_message = "Assert: kDeprecated is only allowed to set on compacting segment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     status_ = SegmentStatus::kDeprecated;
     deprecate_ts_ = deprecate_ts;
@@ -191,7 +201,9 @@ void SegmentEntry::SetDeprecated(TxnTimeStamp deprecate_ts) {
 void SegmentEntry::RollbackCompact() {
     std::unique_lock lock(rw_locker_);
     if (status_ != SegmentStatus::kNoDelete) {
-        UnrecoverableError("Assert: Rollbacked segment should be in No Delete state.");
+        String error_message = "Assert: Rollbacked segment should be in No Delete state.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     status_ = SegmentStatus::kSealed;
     deprecate_ts_ = UNCOMMIT_TS;
@@ -284,11 +296,15 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
 
     std::unique_lock lck(this->rw_locker_); // FIXME: lock scope too large
     if (this->status_ != SegmentStatus::kUnsealed) {
-        UnrecoverableError("AppendData to sealed/compacting/no_delete/deprecated segment");
+        String error_message = "AppendData to sealed/compacting/no_delete/deprecated segment";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     if (this->row_capacity_ <= this->row_count_) {
-        UnrecoverableError(fmt::format("Segment {} error, row_count {}, capacity {}", segment_id_, row_count_, row_capacity_));
+        String error_message = fmt::format("Segment {} error, row_count {}, capacity {}", segment_id_, row_count_, row_capacity_);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     //    SizeT start_row = this->row_count_;
@@ -318,7 +334,9 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
             u16 actual_appended =
                 last_block_entry->AppendData(txn_id, commit_ts, input_block, append_state_ptr->current_block_offset_, to_append_rows, buffer_mgr);
             if (to_append_rows < actual_appended) {
-                UnrecoverableError(fmt::format("Attempt to append rows: {}, but rows: {} are appended", to_append_rows, actual_appended));
+                String error_message = fmt::format("Attempt to append rows: {}, but rows: {} are appended", to_append_rows, actual_appended);
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             append_state_ptr->append_ranges_.emplace_back(range_segment_id, range_block_id, range_block_start_row, actual_appended);
@@ -335,7 +353,9 @@ u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, Appen
             }
 
             if (this->row_count_ > this->row_capacity_) {
-                UnrecoverableError("Not implemented: append data exceed segment row capacity");
+                String error_message = "Not implemented: append data exceed segment row capacity";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
         if (to_append_rows == 0) {
@@ -368,7 +388,9 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
         delete_row_n += block_entry->DeleteData(txn_id, commit_ts, delete_rows);
         txn_store->AddBlockStore(this, block_entry);
         if (delete_rows.size() > block_entry->row_capacity()) {
-            UnrecoverableError("Delete rows exceed block capacity");
+            String error_message = "Delete rows exceed block capacity";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     this->DecreaseRemainRow(delete_row_n);
@@ -387,7 +409,9 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
                                  const DeleteState *delete_state) {
     std::unique_lock w_lock(rw_locker_);
     if (status_ == SegmentStatus::kDeprecated) {
-        UnrecoverableError("Assert: Should not commit delete to deprecated segment.");
+        String error_message = "Assert: Should not commit delete to deprecated segment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     if (delete_state != nullptr) {
@@ -401,7 +425,9 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
 
             if (compact_state_data_ != nullptr) {
                 if (status_ != SegmentStatus::kCompacting && status_ != SegmentStatus::kNoDelete) {
-                    UnrecoverableError("Assert: compact_task is not nullptr means segment is being compacted");
+                    String error_message = "Assert: compact_task is not nullptr means segment is being compacted";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 Vector<SegmentOffset> segment_offsets;
                 for (const auto &[block_id, block_offsets] : block_row_hashmap) {
@@ -417,7 +443,9 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
 
     min_row_ts_ = std::min(min_row_ts_, commit_ts);
     if (commit_ts < max_row_ts_) {
-        UnrecoverableError(fmt::format("SegmentEntry commit_ts {} is less than max_row_ts {}", commit_ts, max_row_ts_));
+        String error_message = fmt::format("SegmentEntry commit_ts {} is less than max_row_ts {}", commit_ts, max_row_ts_);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     max_row_ts_ = commit_ts;
     if (!this->Committed()) {
@@ -436,7 +464,9 @@ void SegmentEntry::RollbackBlocks(TxnTimeStamp commit_ts, const HashMap<BlockID,
     for (auto [block_id, block_entry] : rollback_blocks) {
         if (!block_entry->Committed()) {
             if (block_entries_.empty() || block_entries_.back()->block_id() != block_entry->block_id()) {
-                UnrecoverableError("BlockEntry rollback order is not correct");
+                String error_message = "BlockEntry rollback order is not correct";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             auto &rollback_block = block_entries_.back();
             rollback_block->Cleanup();
@@ -559,7 +589,9 @@ void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}
 void SegmentEntry::LoadFilterBinaryData(const String &segment_filter_data) {
     std::unique_lock lock(rw_locker_);
     if (status_ == SegmentStatus::kUnsealed) {
-        UnrecoverableError("should not call LoadFilterBinaryData from Unsealed segment");
+        String error_message = "Should not call LoadFilterBinaryData from Unsealed segment";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     fast_rough_filter_.DeserializeFromString(segment_filter_data);
 }

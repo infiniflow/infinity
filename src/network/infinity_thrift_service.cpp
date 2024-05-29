@@ -90,7 +90,7 @@ void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &respons
 
         auto [expected_version_ptr, status2] = client_version_.GetVersionByIndex(current_version_index_);
         if(!status2.ok()) {
-            LOG_ERROR(status2.message());
+            LOG_CRITICAL(status2.message());
             UnrecoverableError(status2.message());
         }
 
@@ -829,7 +829,9 @@ void InfinityThriftService::ShowDatabase(infinity_thrift_rpc::ShowDatabaseRespon
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 3) {
-            UnrecoverableError("ShowDatabase: query result is invalid.");
+            String error_message = "ShowDatabase: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -865,7 +867,9 @@ void InfinityThriftService::ShowTable(infinity_thrift_rpc::ShowTableResponse &re
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 6) {
-            UnrecoverableError("ShowTable: query result is invalid.");
+            String error_message = "ShowTable: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -1089,7 +1093,9 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 10) {
-            UnrecoverableError("ShowIndex: query result is invalid.");
+            String error_message = "ShowIndex: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -1177,7 +1183,9 @@ void InfinityThriftService::ShowSegment(infinity_thrift_rpc::ShowSegmentResponse
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 1) {
-            UnrecoverableError("ShowSegment: query result is invalid.");
+            String error_message = "ShowSegment: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -1260,7 +1268,9 @@ void InfinityThriftService::ShowBlock(infinity_thrift_rpc::ShowBlockResponse &re
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 1) {
-            UnrecoverableError("ShowSegment: query result is invalid.");
+            String error_message = "ShowBlock: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -1318,7 +1328,9 @@ void InfinityThriftService::ShowBlockColumn(infinity_thrift_rpc::ShowBlockColumn
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 6) {
-            UnrecoverableError("ShowIndex: query result is invalid.");
+            String error_message = "ShowBlockColumn: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -1755,8 +1767,11 @@ infinity_thrift_rpc::ColumnType::type InfinityThriftService::DataTypeToProtoColu
             return infinity_thrift_rpc::ColumnType::ColumnEmbedding;
         case LogicalType::kRowID:
             return infinity_thrift_rpc::ColumnType::ColumnRowID;
-        default:
-            UnrecoverableError("Invalid data type");
+        default: {
+            String error_message = fmt::format("Invalid logical data type: {}", data_type->ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
     }
     return infinity_thrift_rpc::ColumnType::ColumnInvalid;
 }
@@ -1819,9 +1834,10 @@ UniquePtr<infinity_thrift_rpc::DataType> InfinityThriftService::DataTypeToProtoD
             data_type_proto->__set_physical_type(physical_type);
             return data_type_proto;
         }
-        case LogicalType::kInvalid:
         default: {
-            UnrecoverableError("Invalid data type");
+            String error_message = fmt::format("Invalid logical data type: {}", data_type->ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return nullptr;
@@ -1844,7 +1860,9 @@ infinity_thrift_rpc::ElementType::type InfinityThriftService::EmbeddingDataTypeT
         case EmbeddingDataType::kElemDouble:
             return infinity_thrift_rpc::ElementType::ElementFloat64;
         case EmbeddingDataType::kElemInvalid: {
-            UnrecoverableError("Invalid embedding element data type");
+            String error_message = fmt::format("Invalid embedding element data type: {}", embedding_info.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return infinity_thrift_rpc::ElementType::ElementFloat32;

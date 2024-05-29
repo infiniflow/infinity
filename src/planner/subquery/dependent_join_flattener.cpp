@@ -293,13 +293,19 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
             RecoverableError(status);
         }
         case LogicalNodeType::kInvalid: {
-            UnrecoverableError("Invalid logical operator node");
+            String error_message = "Invalid logical operator node";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         default: {
-            UnrecoverableError("Unsupported logical operator node");
+            String error_message = "Unsupported logical operator node";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
-    UnrecoverableError("Unreachable");
+    String error_message = "Unreachable";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return nullptr;
 }
 

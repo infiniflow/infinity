@@ -87,7 +87,9 @@ void PhysicalFusion::Init() {
         (*output_types_)[output_types_->size() - 2] = MakeShared<DataType>(LogicalType::kFloat);
     }
     if (output_names_->size() != output_types_->size()) {
-        UnrecoverableError(fmt::format("output_names_ size {} is not equal to output_types_ size {}.", output_names_->size(), output_types_->size()));
+        String error_message = fmt::format("output_names_ size {} is not equal to output_types_ size {}.", output_names_->size(), output_types_->size());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -113,9 +115,11 @@ void PhysicalFusion::ExecuteRRF(const Map<u64, Vector<UniquePtr<DataBlock>>> &in
         SizeT base_rank = 1;
         for (const UniquePtr<DataBlock> &input_data_block : input_blocks) {
             if (input_data_block->column_count() != GetOutputTypes()->size()) {
-                UnrecoverableError(fmt::format("input_data_block column count {} is incorrect, expect {}.",
-                                               input_data_block->column_count(),
-                                               GetOutputTypes()->size()));
+                String error_message = fmt::format("input_data_block column count {} is incorrect, expect {}.",
+                                                   input_data_block->column_count(),
+                                                   GetOutputTypes()->size());
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
@@ -166,12 +170,16 @@ void PhysicalFusion::ExecuteRRF(const Map<u64, Vector<UniquePtr<DataBlock>>> &in
         while (fragment_idx < doc.ranks.size() && doc.ranks[fragment_idx] == 0)
             fragment_idx++;
         if (fragment_idx >= doc.ranks.size()) {
-            UnrecoverableError(fmt::format("Cannot find fragment_idx"));
+            String error_message = "Cannot find fragment_idx";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         u64 fragment_id = fragment_ids[fragment_idx];
         const auto &input_blocks = input_data_blocks.at(fragment_id);
         if (input_blocks.size() == 0) {
-            UnrecoverableError(fmt::format("input_data_blocks_[{}] is empty.", fragment_id));
+            String error_message = fmt::format("input_data_blocks_[{}] is empty.", fragment_id);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         SizeT block_idx = 0;
         SizeT row_idx = doc.ranks[fragment_idx] - 1;
@@ -180,7 +188,9 @@ void PhysicalFusion::ExecuteRRF(const Map<u64, Vector<UniquePtr<DataBlock>>> &in
             block_idx++;
         }
         if (block_idx >= input_blocks.size()) {
-            UnrecoverableError(fmt::format("Cannot find block_idx"));
+            String error_message = "Cannot find block_idx";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         SizeT column_n = GetOutputTypes()->size() - 2;
@@ -338,9 +348,11 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
         for (u32 block_id = 0; block_id < input_blocks.size(); ++block_id) {
             const UniquePtr<DataBlock> &input_data_block = input_blocks[block_id];
             if (input_data_block->column_count() != GetOutputTypes()->size()) {
-                UnrecoverableError(fmt::format("input_data_block column count {} is incorrect, expect {}.",
-                                               input_data_block->column_count(),
-                                               GetOutputTypes()->size()));
+                String error_message = fmt::format("input_data_block column count {} is incorrect, expect {}.",
+                                                   input_data_block->column_count(),
+                                                   GetOutputTypes()->size());
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
             auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
@@ -462,7 +474,9 @@ bool PhysicalFusion::ExecuteFirstOp(QueryContext *query_context, FusionOperatorS
 bool PhysicalFusion::ExecuteNotFirstOp(QueryContext *query_context, OperatorState *operator_state) const {
     // this op has prev fusion op
     if (!operator_state->prev_op_state_->Complete()) {
-        UnrecoverableError("Fusion with previous fusion op, but prev_op_state_ is not complete.");
+        String error_message = "Fusion with previous fusion op, but prev_op_state_ is not complete.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
     if (to_lower_method_.compare("match_tensor") == 0) {

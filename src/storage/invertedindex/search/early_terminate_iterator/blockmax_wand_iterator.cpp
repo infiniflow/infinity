@@ -206,7 +206,10 @@ bool BlockMaxWandIterator::Next(RowID doc_id){
             sorted_iterators_[smallest_df_idx]->Next(new_candidate);
         }
     }
-    UnrecoverableError("Should not reach here!");
+
+    String error_message = "Should not reach here!";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 

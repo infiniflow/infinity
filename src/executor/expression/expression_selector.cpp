@@ -29,6 +29,7 @@ import expression_evaluator;
 import internal_types;
 import third_party;
 import data_type;
+import logger;
 
 import infinity_exception;
 
@@ -63,10 +64,14 @@ void ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
         return; // All data are false;
     }
     if (output_true_select.get() == nullptr && output_false_select.get() == nullptr) {
-        UnrecoverableError("No output select column vector is given");
+        String error_message = "No output select column vector is given";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (expr->Type().type() != LogicalType::kBoolean) {
-        UnrecoverableError("Attempting to select non-boolean expression");
+        String error_message = "Attempting to select non-boolean expression";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     Select(expr, state, count, output_true_select);
 }
@@ -87,7 +92,9 @@ void ExpressionSelector::Select(const SharedPtr<BaseExpression> &expr,
 
 void ExpressionSelector::Select(const SharedPtr<ColumnVector> &bool_column, SizeT count, SharedPtr<Selection> &output_true_select, bool nullable) {
     if (bool_column->vector_type() != ColumnVectorType::kCompactBit || bool_column->data_type()->type() != LogicalType::kBoolean) {
-        UnrecoverableError("Attempting to select non-boolean expression");
+        String error_message = "Attempting to select non-boolean expression";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     const auto &boolean_buffer = *(bool_column->buffer_);
     const auto &null_mask = bool_column->nulls_ptr_;

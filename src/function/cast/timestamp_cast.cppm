@@ -25,6 +25,7 @@ import column_vector;
 import third_party;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -46,7 +47,9 @@ export inline BoundCastFunc BindTimestampCast(DataType &target) {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<TimestampT, VarcharT, TimestampTryCastToVarlen>);
         }
         default: {
-            UnrecoverableError(fmt::format("Can't cast from Timestamp type to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast from Timestamp type to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return BoundCastFunc(nullptr);
@@ -55,8 +58,9 @@ export inline BoundCastFunc BindTimestampCast(DataType &target) {
 struct TimestampTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        UnrecoverableError(
-                fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };
@@ -64,33 +68,42 @@ struct TimestampTryCastToFixlen {
 struct TimestampTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector*) {
-        UnrecoverableError(
-                fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , DateT &) {
-    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
+    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , TimeT &) {
-    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
+    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , DateTimeT &) {
-    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
+    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 template <>
 inline bool TimestampTryCastToVarlen::Run(TimestampT , VarcharT &, ColumnVector*) {
-    UnrecoverableError("Not implement: TimestampTryCastToFixlen::Run");
+    String error_message = "Not implement: TimestampTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 

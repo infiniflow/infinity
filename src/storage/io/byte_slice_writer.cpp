@@ -1,12 +1,13 @@
 module;
 
+module byte_slice_writer;
+
+import logger;
 import stl;
 import byte_slice;
 import file_writer;
 import file_reader;
 import infinity_exception;
-
-module byte_slice_writer;
 
 namespace infinity {
 
@@ -83,7 +84,9 @@ void ByteSliceWriter::Write(ByteSliceList &src) { slice_list_->MergeWith(src); }
 
 void ByteSliceWriter::Write(const ByteSliceList &src, u32 start, u32 end) {
     if (start >= end || end > src.GetTotalSize()) {
-        UnrecoverableError("Write past EOF ");
+        String error_message = "Write past EOF";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     ByteSlice *curr_slice = nullptr;

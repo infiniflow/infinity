@@ -37,6 +37,7 @@ import infinity_exception;
 import third_party;
 import status;
 import physical_top;
+import logger;
 
 namespace infinity {
 
@@ -152,7 +153,9 @@ void CopyWithIndexes(const Vector<UniquePtr<DataBlock>> &input_blocks,
 void PhysicalSort::Init() {
     auto sort_expr_count = order_by_types_.size();
     if (sort_expr_count != expressions_.size()) {
-        UnrecoverableError("order_by_types_.size() != expressions_.size()");
+        String error_message = "order_by_types_.size() != expressions_.size()";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
     sort_functions.reserve(sort_expr_count);

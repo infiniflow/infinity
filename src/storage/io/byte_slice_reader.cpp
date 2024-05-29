@@ -6,6 +6,7 @@ import stl;
 import byte_slice;
 import status;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
@@ -24,7 +25,9 @@ void ByteSliceReader::Open(ByteSliceList *slice_list) {
     current_slice_offset_ = 0;
 
     if (current_slice_ == nullptr) {
-        UnrecoverableError("Read past EOF");
+        String error_message = "Read past EOF";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -35,7 +38,9 @@ void ByteSliceReader::Open(ByteSlice *slice) {
     current_slice_offset_ = 0;
 
     if (current_slice_ == nullptr) {
-        UnrecoverableError("Read past EOF");
+        String error_message = "Read past EOF";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -107,7 +112,9 @@ SizeT ByteSliceReader::ReadMayCopy(void *&value, SizeT len) {
 SizeT ByteSliceReader::Seek(SizeT offset) {
     if (offset < global_offset_) {
         // fmt::format("invalid offset value: seek offset = {}, State: list length = {}, offset = {}", offset, GetSize(), global_offset_));
-        UnrecoverableError("Invalide offset value");
+        String error_message = "Invalid offset value";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     SizeT len = offset - global_offset_;

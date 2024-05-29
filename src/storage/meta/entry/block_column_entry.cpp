@@ -42,7 +42,9 @@ namespace infinity {
 Vector<std::string_view> BlockColumnEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
-        UnrecoverableError(fmt::format("Invalid block column entry encode: {}", encode));
+        String error_message = fmt::format("Invalid block column entry encode: {}", encode);
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     auto decodes = BlockEntry::DecodeIndex(encode.substr(0, delimiter_i));
     decodes.push_back(encode.substr(delimiter_i + 1));
@@ -122,7 +124,9 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
         if (column_type->type() == LogicalType::kTensorArray) {
             buffer_size = DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE;
         } else {
-            UnrecoverableError("unexpected data type");
+            String error_message = "unexpected data type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto outline_buffer_file_worker =
             MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(1, outline_idx), buffer_size);
@@ -153,7 +157,9 @@ SharedPtr<String> BlockColumnEntry::OutlineFilename(const u32 buffer_group_id, c
     } else if (buffer_group_id == 1) {
         return MakeShared<String>(fmt::format("col_{}_out1_{}", column_id_, file_idx));
     } else {
-        UnrecoverableError("Invalid buffer group id");
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return nullptr;
     }
 }
@@ -165,7 +171,9 @@ void BlockColumnEntry::AppendOutlineBuffer(const u32 buffer_group_id, BufferObj 
     } else if (buffer_group_id == 1) {
         outline_buffers_group_1_.push_back(buffer);
     } else {
-        UnrecoverableError("Invalid buffer group id");
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -176,7 +184,9 @@ BufferObj *BlockColumnEntry::GetOutlineBuffer(const u32 buffer_group_id, const S
     } else if (buffer_group_id == 1) {
         return outline_buffers_group_1_[idx];
     } else {
-        UnrecoverableError("Invalid buffer group id");
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return nullptr;
     }
 }
@@ -188,7 +198,9 @@ SizeT BlockColumnEntry::OutlineBufferCount(const u32 buffer_group_id) const {
     } else if (buffer_group_id == 1) {
         return outline_buffers_group_1_.size();
     } else {
-        UnrecoverableError("Invalid buffer group id");
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return 0;
     }
 }
@@ -199,7 +211,9 @@ u64 BlockColumnEntry::LastChunkOff(const u32 buffer_group_id) const {
     } else if (buffer_group_id == 1) {
         return last_chunk_offset_1_;
     } else {
-        UnrecoverableError("Invalid buffer group id");
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return 0;
     }
 }
@@ -210,13 +224,17 @@ void BlockColumnEntry::SetLastChunkOff(const u32 buffer_group_id, const u64 offs
     } else if (buffer_group_id == 1) {
         last_chunk_offset_1_ = offset;
     } else {
-        UnrecoverableError("Invalid buffer group id");
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
 void BlockColumnEntry::Append(const ColumnVector *input_column_vector, u16 input_column_vector_offset, SizeT append_rows, BufferManager *buffer_mgr) {
     if (buffer_ == nullptr) {
-        UnrecoverableError("Not initialize buffer handle");
+        String error_message = "Not initialize buffer handle";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     ColumnVector &&column_vector = GetColumnVector(buffer_mgr);
     column_vector.AppendWith(*input_column_vector, input_column_vector_offset, append_rows);
@@ -287,12 +305,16 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
         case kMixed:
         case kNull: {
             LOG_ERROR(fmt::format("{} isn't supported", column_type->ToString()));
-            UnrecoverableError("Not implement: Invalid data type.");
+            String error_message = "Not implement: Invalid data type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case kMissing:
         case kInvalid: {
             LOG_ERROR(fmt::format("Invalid data type {}", column_type->ToString()));
-            UnrecoverableError("Invalid data type.");
+            String error_message = "Invalid data type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -360,7 +382,9 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
 
 void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts) {
     if (this->Committed()) {
-        UnrecoverableError("Column already committed");
+        String error_message = "Column already committed";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     this->txn_id_ = txn_id;
     this->Commit(commit_ts);

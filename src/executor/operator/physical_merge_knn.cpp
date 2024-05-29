@@ -56,12 +56,18 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
     auto &merge_knn_data = *merge_knn_op_state->merge_knn_function_data_;
     switch (merge_knn_data.elem_type_) {
         case kElemInvalid: {
-            UnrecoverableError("Invalid elem type");
+            String error_message = "Invalid elem type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kElemFloat: {
             switch (merge_knn_data.heap_type_) {
                 case MergeKnnHeapType::kInvalid: {
-                    UnrecoverableError("Invalid heap type");
+                    String error_message = "Invalid heap type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    break;
                 }
                 case MergeKnnHeapType::kMaxHeap: {
                     ExecuteInner<f32, CompareMax>(query_context, merge_knn_op_state);
@@ -89,15 +95,20 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
     auto &input_data = *merge_knn_state->input_data_block_;
     if (!input_data.Finalized()) {
-        UnrecoverableError("Input data block is not finalized");
+        String error_message = "Input data block is not finalized";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
 
     int column_n = input_data.column_count() - 2;
     if (column_n < 0) {
-        UnrecoverableError("Input data block is invalid");
+        String error_message = "Input data block is invalid";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
+
     auto &dist_column = *input_data.column_vectors[column_n];
     auto &row_id_column = *input_data.column_vectors[column_n + 1];
 
@@ -126,7 +137,9 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    UnrecoverableError(fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id));
+                    String error_message = fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id);
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
 
                 DataBlock *output_data_block = merge_knn_state->data_block_array_.back().get();

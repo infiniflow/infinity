@@ -38,7 +38,9 @@ void ScalarFunction::CastArgumentTypes(Vector<BaseExpression> &input_arguments) 
     // Check and add a cast function to cast the input arguments expression type to target type
     auto arguments_count = input_arguments.size();
     if (input_arguments.size() == arguments_count) {
-        UnrecoverableError(fmt::format("Function: {} arguments number isn't matched.", name_));
+        String error_message = fmt::format("Function: {} arguments number isn't matched.", name_);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < arguments_count; ++idx) {
         if (parameter_types_[idx] != input_arguments[idx].Type()) {

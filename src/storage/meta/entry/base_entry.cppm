@@ -25,6 +25,7 @@ import txn_manager;
 import infinity_exception;
 import third_party;
 import txn_state;
+import logger;
 
 namespace infinity {
 
@@ -77,11 +78,13 @@ public:
         }
         TxnManager *txn_mgr = txn->txn_mgr();
         if (txn_mgr == nullptr) { // when replay
-            UnrecoverableError(fmt::format("Replay should not reach here. begin_ts: {}, commit_ts_: {} txn_id: {}, txn_id_: {}",
-                                           begin_ts,
-                                           commit_ts_,
-                                           txn->TxnID(),
-                                           txn_id_));
+            String error_message = fmt::format("Replay should not reach here. begin_ts: {}, commit_ts_: {} txn_id: {}, txn_id_: {}",
+                                                                              begin_ts,
+                                                                              commit_ts_,
+                                                                              txn->TxnID(),
+                                                                              txn_id_);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         // Check if the entry is in committing process, because commit_ts of the base_entry is set in the Txn::CommitBottom
         return txn_mgr->CheckIfCommitting(txn_id_, begin_ts);

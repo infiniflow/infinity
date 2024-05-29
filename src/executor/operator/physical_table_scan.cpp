@@ -126,7 +126,9 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTableScan::PlanBlockEntries(i64
 
 void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOperatorState *table_scan_operator_state) {
     if (!table_scan_operator_state->data_block_array_.empty()) {
-        UnrecoverableError("Table scan output data block array should be empty");
+        String error_message = "Table scan output data block array should be empty";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     table_scan_operator_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());

@@ -69,7 +69,9 @@ protected:
             // wait for at most 10s
             time_t end = time(nullptr);
             if (end - start > 10) {
-                UnrecoverableError("WaitFlushDeltaOp timeout");
+                String error_message = "WaitFlushDeltaOp timeout";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }

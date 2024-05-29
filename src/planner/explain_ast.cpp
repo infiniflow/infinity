@@ -92,7 +92,9 @@ void ExplainAST::Explain(const BaseStatement *statement, SharedPtr<Vector<Shared
             break;
         }
         default: {
-            UnrecoverableError("Unexpected statement type");
+            String error_message = "Unexpected statement type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return;
@@ -102,7 +104,9 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
 
     switch (create_statement->ddl_type()) {
         case DDLType::kInvalid: {
-            UnrecoverableError("Invalid DDL type.");
+            String error_message = "Invalid DDL type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case DDLType::kDatabase: {
             String create_schema = String(intent_size, ' ') + "CREATE SCHEMA: ";
@@ -130,7 +134,9 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
 
             SizeT column_count = table_info->column_defs_.size();
             if (column_count == 0) {
-                UnrecoverableError("Table definition without any columns");
+                String error_message = "Table definition without any columns";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             for (SizeT idx = 0; idx < column_count - 1; ++idx) {
@@ -183,7 +189,9 @@ void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<
     String values = String(intent_size, ' ') + "values: ";
     SizeT value_count = insert_statement->values_->size();
     if (value_count == 0) {
-        UnrecoverableError("Insert value list is empty");
+        String error_message = "Insert value list is empty";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < value_count - 1; ++idx) {
         if (idx != 0)
@@ -206,7 +214,9 @@ void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<
 void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (drop_statement->ddl_type()) {
         case DDLType::kInvalid: {
-            UnrecoverableError("Invalid DDL type.");
+            String error_message = "Invalid DDL type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case DDLType::kDatabase: {
             String drop_schema = String(intent_size, ' ') + "DROP SCHEMA: ";
@@ -288,7 +298,9 @@ void ExplainAST::BuildSelect(const SelectStatement *select_statement,
         String projection_str = String(intent_size, ' ') + "projection: ";
         SizeT select_count = select_statement->select_list_->size();
         if (select_count == 0) {
-            UnrecoverableError("No select list");
+            String error_message = "No select list";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         for (SizeT idx = 0; idx < select_count - 1; ++idx) {
             ParsedExpr *expr = select_statement->select_list_->at(idx);
@@ -652,7 +664,9 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
             break;
         }
         case CopyFileType::kInvalid: {
-            UnrecoverableError("Invalid file type");
+            String error_message = "Invalid file type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }

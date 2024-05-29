@@ -296,6 +296,7 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     String column_length_file = index_prefix + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : "");
     auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 
@@ -334,6 +335,7 @@ void MemoryIndexer::Load() {
     String column_length_file = index_prefix + LENGTH_SUFFIX + SPILL_SUFFIX;
     auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 
@@ -478,6 +480,7 @@ void MemoryIndexer::OfflineDump() {
     String column_length_file = index_prefix + LENGTH_SUFFIX;
     auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 

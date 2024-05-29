@@ -28,6 +28,7 @@ import scalar_function_set;
 import third_party;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -39,7 +40,9 @@ struct NotFunction {
         } else if constexpr (std::is_same_v<std::remove_cv_t<TA>, BooleanT> && std::is_same_v<std::remove_cv_t<TB>, BooleanT>) {
             result = !input;
         } else {
-            UnrecoverableError("NOT function accepts only u8 and BooleanT.");
+            String error_message = "NOT function accepts only u8 and BooleanT.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 };

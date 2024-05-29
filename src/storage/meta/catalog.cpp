@@ -181,6 +181,7 @@ void Catalog::DropDatabaseReplay(const String &db_name,
                                  TxnTimeStamp begin_ts) {
     auto [db_meta, status] = db_meta_map_.GetExistMetaNoLock(db_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     db_meta->DropEntryReplay([&](TransactionID txn_id, TxnTimeStamp begin_ts) { return init_entry(db_meta, db_meta->db_name(), txn_id, begin_ts); },
@@ -191,6 +192,7 @@ void Catalog::DropDatabaseReplay(const String &db_name,
 DBEntry *Catalog::GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [db_meta, status] = db_meta_map_.GetExistMetaNoLock(db_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return db_meta->GetEntryReplay(txn_id, begin_ts);
@@ -424,7 +426,9 @@ void Catalog::AddFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &fun
     String name = function_set->name();
     StringToLower(name);
     if (catalog->function_sets_.contains(name)) {
-        UnrecoverableError(fmt::format("Trying to add duplicated function table_name into catalog: {}", name));
+        String error_message = fmt::format("Trying to add duplicated function table_name into catalog: {}", name);
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     catalog->function_sets_.emplace(name, function_set);
 }
@@ -433,7 +437,9 @@ void Catalog::AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFuncti
     String name = special_function->name();
     StringToLower(name);
     if (catalog->special_functions_.contains(name)) {
-        UnrecoverableError(fmt::format("Trying to add duplicated special function into catalog: {}", name));
+        String error_message = fmt::format("Trying to add duplicated special function into catalog: {}", name);
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     catalog->special_functions_.emplace(name, special_function);
 }
@@ -513,6 +519,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
     LocalFileSystem fs;
     auto [catalog_file_handler, status] = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     i32 file_size = fs.GetFileSize(*catalog_file_handler);
@@ -522,7 +529,9 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
     char *ptr = buf.data();
     auto catalog_delta_entry = CatalogDeltaEntry::ReadAdv(ptr, file_size);
     if (catalog_delta_entry.get() == nullptr) {
-        UnrecoverableError(fmt::format("Load catalog delta entry failed: {}", catalog_path));
+        String error_message = fmt::format("Load catalog delta entry failed: {}", catalog_path);
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     i32 n_bytes = catalog_delta_entry->GetSizeInBytes();
     if (file_size != n_bytes) {
@@ -577,7 +586,9 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                         txn_id,
                         begin_ts);
                 } else if (merge_flag == MergeFlag::kUpdate) {
-                    UnrecoverableError("Update database entry is not supported.");
+                    String error_message = "Update database entry is not supported.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 break;
             }
@@ -678,7 +689,9 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 } else if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kUpdate) {
                     table_entry->UpdateSegmentReplay(segment_entry, std::move(segment_filter_binary_data));
                 } else {
-                    UnrecoverableError(fmt::format("Unsupported merge flag {} for segment entry", (i8)merge_flag));
+                    String error_message = fmt::format("Unsupported merge flag {} for segment entry", (i8)merge_flag);
+                    LOG_ERROR(error_message);
+                    UnrecoverableError(error_message);
                 }
                 break;
             }
@@ -723,7 +736,9 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 } else if (merge_flag == MergeFlag::kUpdate) {
                     segment_entry->UpdateBlockReplay(std::move(new_block), std::move(block_filter_binary_data));
                 } else {
-                    UnrecoverableError(fmt::format("Unsupported merge flag {} for block entry", (i8)merge_flag));
+                    String error_message = fmt::format("Unsupported merge flag {} for block entry", (i8)merge_flag);
+                    LOG_ERROR(error_message);
+                    UnrecoverableError(error_message);
                 }
                 break;
             }
@@ -814,7 +829,9 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     auto *table_index_entry = table_entry->GetIndexReplay(index_name, txn_id, begin_ts);
                     auto *segment_entry = iter->second.get();
                     if (segment_entry->status() == SegmentStatus::kDeprecated) {
-                        UnrecoverableError(fmt::format("Segment {} is deprecated", segment_id));
+                        String error_message = fmt::format("Segment {} is deprecated", segment_id);
+                        LOG_ERROR(error_message);
+                        UnrecoverableError(error_message);
                     }
                     auto segment_index_entry = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
                                                                                              table_entry,
@@ -828,7 +845,9 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                                              commit_ts);
                     bool insert_ok = table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)}).second;
                     if (!insert_ok) {
-                        UnrecoverableError(fmt::format("Segment index {} is already in the catalog", segment_id));
+                        String error_message = fmt::format("Segment index {} is already in the catalog", segment_id);
+                        LOG_ERROR(error_message);
+                        UnrecoverableError(error_message);
                     }
                 }
                 break;
@@ -856,11 +875,15 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     auto *table_index_entry = table_entry->GetIndexReplay(index_name, txn_id, begin_ts);
                     auto *segment_entry = iter->second.get();
                     if (segment_entry->status() == SegmentStatus::kDeprecated) {
-                        UnrecoverableError(fmt::format("Segment {} is deprecated", segment_id));
+                        String error_message = fmt::format("Segment {} is deprecated", segment_id);
+                        LOG_ERROR(error_message);
+                        UnrecoverableError(error_message);
                     }
                     auto iter2 = table_index_entry->index_by_segment().find(segment_id);
                     if (iter2 == table_index_entry->index_by_segment().end()) {
-                        UnrecoverableError(fmt::format("Segment index {} is not found", segment_id));
+                        String error_message = fmt::format("Segment index {} is not found", segment_id);
+                        LOG_ERROR(error_message);
+                        UnrecoverableError(error_message);
                     }
                     auto *segment_index_entry = iter2->second.get();
                     segment_index_entry
@@ -869,7 +892,9 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 break;
             }
             default:
-                UnrecoverableError(fmt::format("Unknown catalog delta op type: {}", op->GetTypeStr()));
+                String error_message = fmt::format("Unknown catalog delta op type: {}", op->GetTypeStr());
+                LOG_ERROR(error_message);
+                UnrecoverableError(error_message);
         }
     }
 }
@@ -880,6 +905,7 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
     LocalFileSystem fs;
     auto [catalog_file_handler, status] = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     SizeT file_size = fs.GetFileSize(*catalog_file_handler);
@@ -928,6 +954,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 
     auto [catalog_file_handler, status] = fs.OpenFile(catalog_tmp_path, fileflags, FileLockType::kWriteLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 
@@ -989,7 +1016,9 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     flush_delta_entry->WriteAdv(ptr);
     i32 act_size = ptr - buf.data();
     if (exp_size != act_size) {
-        UnrecoverableError(fmt::format("Save delta catalog failed, exp_size: {}, act_size: {}", exp_size, act_size));
+        String error_message = fmt::format("Save delta catalog failed, exp_size: {}, act_size: {}", exp_size, act_size);
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
 
     std::ofstream outfile;

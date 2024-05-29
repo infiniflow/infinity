@@ -33,7 +33,9 @@ FileWorker::~FileWorker() = default;
 
 void FileWorker::WriteToFile(bool to_spill) {
     if (data_ == nullptr) {
-        UnrecoverableError("No data will be written.");
+        String error_message = "No data will be written.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     LocalFileSystem fs;
 
@@ -46,6 +48,7 @@ void FileWorker::WriteToFile(bool to_spill) {
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
     auto [file_handler, status] = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     file_handler_ = std::move(file_handler);
@@ -77,6 +80,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
     u8 flags = FileFlags::READ_FLAG;
     auto [file_handler, status] = fs.OpenFile(read_path, flags, FileLockType::kReadLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     file_handler_ = std::move(file_handler);
@@ -127,7 +131,9 @@ void FileWorker::CleanupTempFile() const {
         fs.DeleteFile(path);
         LOG_INFO(fmt::format("Cleaned file: {}", path));
     } else {
-        UnrecoverableError(fmt::format("Cleanup: File {} not found for deletion", path));
+        String error_message = fmt::format("Cleanup: File {} not found for deletion", path);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 

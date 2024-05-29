@@ -97,7 +97,9 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
             break;
         }
         case CopyFileType::kInvalid: {
-            UnrecoverableError("Invalid file type");
+            String error_message = "Invalid file type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     import_op_state->SetComplete();
@@ -156,7 +158,9 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
     if (file_size % row_size != 0) {
-        UnrecoverableError("Weird file size.");
+        String error_message = "Weird file size.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     SizeT vector_n = file_size / row_size;
 
@@ -211,7 +215,9 @@ UniquePtr<char[]> ConvertCSRIndice(const i32 *tmp_indice_ptr, SizeT nnz) {
     auto *ptr = reinterpret_cast<IdxT *>(res.get());
     for (SizeT i = 0; i < nnz; ++i) {
         if (tmp_indice_ptr[i] < 0 || tmp_indice_ptr[i] > std::numeric_limits<IdxT>::max()) {
-            UnrecoverableError(fmt::format("In compactible idx {} in csr file.", tmp_indice_ptr[i]));
+            String error_message = fmt::format("In compactible idx {} in csr file.", tmp_indice_ptr[i]);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         ptr[i] = tmp_indice_ptr[i];
     }
@@ -233,7 +239,9 @@ UniquePtr<char[]> ConvertCSRIndice(UniquePtr<char[]> tmp_indice_ptr, SparseInfo 
             return ConvertCSRIndice<BigIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
         }
         default: {
-            UnrecoverableError(fmt::format("Unsupported index type {}.", sparse_info->IndexType()));
+            String error_message = fmt::format("Unsupported index type {}.", sparse_info->IndexType());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return {};
@@ -270,20 +278,26 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
 
     SizeT file_size = fs.GetFileSize(*file_handler);
     if (file_size != 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32) + nnz * sizeof(FloatT)) {
-        UnrecoverableError("Invalid CSR file format.");
+        String error_message = "Invalid CSR file format.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     i64 prev_off = 0;
     file_handler->Read(&prev_off, sizeof(i64));
     if (prev_off != 0) {
-        UnrecoverableError("Invalid CSR file format.");
+        String error_message = "Invalid CSR file format.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto [idx_reader, idx_status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
     if (!idx_status.ok()) {
+        LOG_CRITICAL(idx_status.message());
         UnrecoverableError(idx_status.message());
     }
     fs.Seek(*idx_reader, 3 * sizeof(i64) + (nrow + 1) * sizeof(i64));
     auto [data_reader, data_status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
     if (!data_status.ok()) {
+        LOG_CRITICAL(data_status.message());
         UnrecoverableError(data_status.message());
     }
     fs.Seek(*data_reader, 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32));
@@ -426,7 +440,9 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
     String jsonl_str(file_size + 1, 0);
     SizeT read_n = file_handler->Read(jsonl_str.data(), file_size);
     if (read_n != file_size) {
-        UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+        String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     if (read_n == 0) {
@@ -509,7 +525,9 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
         String json_str(file_size, 0);
         SizeT read_n = file_handler->Read(json_str.data(), file_size);
         if (read_n != file_size) {
-            UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+            String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         if (read_n == 0) {
@@ -938,7 +956,10 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                             break;
                         }
                         default: {
-                            UnrecoverableError("Not implement: Embedding type.");
+                            String error_message = "Not implement: Embedding type.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                            break;
                         }
                     }
                     break;
@@ -963,7 +984,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                     break;
                 }
                 default: {
-                    UnrecoverableError("Not implement: Invalid data type.");
+                    String error_message = "Not implement: Invalid data type.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
         } else if (column_def->has_default_value()) {

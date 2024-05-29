@@ -17,7 +17,7 @@ module;
 export module secondary_index_pgm;
 
 import stl;
-
+import logger;
 import third_party;
 import file_system;
 import infinity_exception;
@@ -149,14 +149,18 @@ public:
 
     void SaveIndex(FileHandler &file_handler) const final {
         if (!initialized_) {
-            UnrecoverableError("Not initialized yet.");
+            String error_message = "Not initialized yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         pgm_index_->Save(file_handler);
     }
 
     void LoadIndex(FileHandler &file_handler) final {
         if (initialized_) {
-            UnrecoverableError("Already initialized.");
+            String error_message = "Already initialized.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         pgm_index_ = MakeUnique<PGMWithExtraFunction<IndexValueType>>();
         pgm_index_->Load(file_handler);
@@ -165,7 +169,9 @@ public:
 
     void BuildIndex(SizeT data_cnt, const void *data_ptr) final {
         if (initialized_) {
-            UnrecoverableError("Already initialized.");
+            String error_message = "Already initialized.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto typed_data_ptr = static_cast<const IndexValueType *>(data_ptr);
         pgm_index_ = MakeUnique<PGMWithExtraFunction<IndexValueType>>(typed_data_ptr, typed_data_ptr + data_cnt);
@@ -174,7 +180,9 @@ public:
 
     SecondaryIndexApproxPos SearchIndex(const void *val_ptr) const final {
         if (!initialized_) {
-            UnrecoverableError("Not initialized yet.");
+            String error_message = "Not initialized yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto val = *(static_cast<const IndexValueType *>(val_ptr));
         auto [pos, lo, hi] = pgm_index_->search(val);

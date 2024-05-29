@@ -65,7 +65,9 @@ SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, Bind
 
 void WhereBinder::CheckFuncType(FunctionType func_type) const {
     if (func_type != FunctionType::kScalar) {
-        UnrecoverableError("Only scalar function are allowed in where clause");
+        String error_message = "Only scalar function are allowed in where clause";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
 }

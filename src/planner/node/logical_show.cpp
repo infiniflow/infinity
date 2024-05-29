@@ -22,7 +22,7 @@ import stl;
 import internal_types;
 import infinity_exception;
 import column_binding;
-
+import logger;
 
 namespace infinity {
 
@@ -69,7 +69,9 @@ String ToString(ShowType type) {
         case ShowType::kShowConfig:
             return "Show config";
         case ShowType::kInvalid: {
-            UnrecoverableError("Invalid chunk scan type");
+            String error_message = "Invalid chunk scan type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return {};

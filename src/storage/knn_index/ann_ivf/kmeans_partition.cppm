@@ -77,16 +77,24 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
                                      u32 max_points_per_centroid = 256) {
     constexpr int default_iteration_max = 10;
     if (metric != MetricType::kMetricL2 && metric != MetricType::kMetricInnerProduct) {
-        UnrecoverableError("metric type not implemented");
+        String error_message = "Metric type not implemented";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (dimension <= 0 || vector_count <= 0) {
-        UnrecoverableError("dimension and vector_count must be positive");
+        String error_message = "Dimension and vector_count must be positive";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (vectors_ptr == nullptr) {
-        UnrecoverableError("vectors_ptr cannot be nullptr");
+        String error_message = "vectors_ptr cannot be nullptr";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (partition_num > vector_count) {
-        UnrecoverableError("partition_num cannot be greater than vector_count");
+        String error_message = "partition_num cannot be greater than vector_count";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (partition_num <= 0) {
         partition_num = (int)sqrt(vector_count);

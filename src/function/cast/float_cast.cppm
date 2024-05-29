@@ -37,7 +37,9 @@ export struct FloatTryCastToVarlen;
 export template <class SourceType>
 inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &target) {
     if (source.type() == target.type()) {
-        UnrecoverableError("Can't cast from the same type");
+        String error_message = "Can't cast from the same type";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     switch (target.type()) {
         case LogicalType::kTinyInt: {
@@ -62,7 +64,9 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, DoubleT, FloatTryCastToFixlen>);
         }
         case LogicalType::kDecimal: {
-            UnrecoverableError(fmt::format("Not implement cast from numeric to decimal128 type.", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Not implement cast from numeric to decimal128 type.", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case LogicalType::kVarchar: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorToVarlen<SourceType, VarcharT, FloatTryCastToVarlen>);
@@ -74,7 +78,9 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
             RecoverableError(status);
         }
         default: {
-            UnrecoverableError(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return BoundCastFunc(nullptr);
@@ -83,8 +89,9 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
 struct FloatTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        UnrecoverableError(
-            fmt::format("Not implemented to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        String error_message = fmt::format("Not implemented to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };
@@ -92,8 +99,9 @@ struct FloatTryCastToFixlen {
 struct FloatTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector*) {
-        UnrecoverableError(
-            fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };
@@ -141,7 +149,9 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, BigIntT &target) {
 // TODO: Cast from float to hugeint
 template <>
 inline bool FloatTryCastToFixlen::Run(FloatT, HugeIntT &) {
-    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
+    String error_message = "Not implement: FloatTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -154,7 +164,9 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, DoubleT &target) {
 // TODO
 template <>
 inline bool FloatTryCastToFixlen::Run(FloatT, DecimalT &) {
-    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
+    String error_message = "Not implement: FloatTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -170,7 +182,9 @@ inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, ColumnVec
     } else {
         std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            UnrecoverableError("Varchar column vector should use MemoryVectorBuffer. ");
+            String error_message = "Varchar column vector should use MemoryVectorBuffer.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
         target.vector_.chunk_id_ = chunk_id;
@@ -223,7 +237,9 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, BigIntT &target) {
 // TODO: Cast from double to hugeint
 template <>
 inline bool FloatTryCastToFixlen::Run(DoubleT, HugeIntT &) {
-    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
+    String error_message = "Not implement: FloatTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -236,7 +252,9 @@ inline bool FloatTryCastToFixlen::Run(DoubleT source, FloatT &target) {
 // TODO
 template <>
 inline bool FloatTryCastToFixlen::Run(DoubleT, DecimalT &) {
-    UnrecoverableError("Not implement: FloatTryCastToFixlen::Run");
+    String error_message = "Not implement: FloatTryCastToFixlen::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -253,7 +271,9 @@ inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, ColumnVe
     } else {
         std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            UnrecoverableError("Varchar column vector should use MemoryVectorBuffer. ");
+            String error_message = "Varchar column vector should use MemoryVectorBuffer. ";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
         target.vector_.chunk_id_ = chunk_id;

@@ -48,7 +48,9 @@ BufferObj *BufferManager::AllocateBufferObject(UniquePtr<FileWorker> file_worker
     {
         std::unique_lock lock(w_locker_);
         if (auto iter = buffer_map_.find(file_path); iter != buffer_map_.end()) {
-            UnrecoverableError(fmt::format("BufferManager::Allocate: file {} already exists.", file_path.c_str()));
+            String error_message = fmt::format("BufferManager::Allocate: file {} already exists.", file_path.c_str());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         buffer_map_.emplace(file_path, std::move(buffer_obj));
     }
@@ -107,7 +109,9 @@ void BufferManager::RemoveClean() {
             auto file_path = buffer_obj->GetFilename();
             size_t remove_n = buffer_map_.erase(file_path);
             if (remove_n != 1) {
-                UnrecoverableError(fmt::format("BufferManager::RemoveClean: file {} not found.", file_path.c_str()));
+                String error_message = fmt::format("BufferManager::RemoveClean: file {} not found.", file_path.c_str());
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }
@@ -135,7 +139,9 @@ void BufferManager::RequestSpace(SizeT need_size) {
         }
     }
     if (current_memory_size_ + need_size > memory_limit_) {
-        UnrecoverableError("Out of memory.");
+        String error_message = "Out of memory.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     current_memory_size_ += need_size;
 }
@@ -164,7 +170,9 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
         std::unique_lock lock(gc_locker_);
         current_memory_size_ -= buffer_obj->GetBufferSize();
         if (!RemoveFromGCQueueInner(buffer_obj)) {
-            UnrecoverableError(fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", buffer_obj->GetFilename()));
+            String error_message = fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", buffer_obj->GetFilename());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -173,7 +181,9 @@ void BufferManager::AddTemp(BufferObj *buffer_obj) {
     std::unique_lock lock(temp_locker_);
     auto [iter, insert_ok] = temp_set_.emplace(buffer_obj);
     if (!insert_ok) {
-        UnrecoverableError(fmt::format("BufferManager::AddTemp: file {} already exists.", buffer_obj->GetFilename()));
+        String error_message = fmt::format("BufferManager::AddTemp: file {} already exists.", buffer_obj->GetFilename());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     clean_temp_set_.erase(buffer_obj);
 }
@@ -182,11 +192,15 @@ void BufferManager::RemoveTemp(BufferObj *buffer_obj) {
     std::unique_lock lock(temp_locker_);
     auto remove_n = temp_set_.erase(buffer_obj);
     if (remove_n != 1) {
-        UnrecoverableError(fmt::format("BufferManager::RemoveTemp: file {} not found.", buffer_obj->GetFilename()));
+        String error_message = fmt::format("BufferManager::RemoveTemp: file {} not found.", buffer_obj->GetFilename());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto [iter, insert_ok] = clean_temp_set_.emplace(buffer_obj);
     if (!insert_ok) {
-        UnrecoverableError(fmt::format("BufferManager::RemoveTemp: file {} already exists in clean temp set.", buffer_obj->GetFilename()));
+        String error_message = fmt::format("BufferManager::RemoveTemp: file {} already exists in clean temp set.", buffer_obj->GetFilename());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -194,7 +208,9 @@ void BufferManager::MoveTemp(BufferObj *buffer_obj) {
     std::unique_lock lock(temp_locker_);
     auto remove_n = temp_set_.erase(buffer_obj);
     if (remove_n != 1) {
-        UnrecoverableError(fmt::format("BufferManager::RemoveTemp: file {} not found.", buffer_obj->GetFilename()));
+        String error_message = fmt::format("BufferManager::RemoveTemp: file {} not found.", buffer_obj->GetFilename());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 

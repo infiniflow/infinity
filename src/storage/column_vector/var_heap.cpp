@@ -29,6 +29,7 @@ namespace infinity {
 Pair<u64, u64> VarHeapManager::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
         UnrecoverableError(fmt::format("Attempt to allocate memory with size: {} as the string heap", nbytes));
+
     }
 
     u64 start_chunk_id = INITIAL_VECTOR_CHUNK_ID;

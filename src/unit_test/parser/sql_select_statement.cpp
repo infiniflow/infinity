@@ -1489,7 +1489,9 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
             } else if (vec4[i * 8 + bit_idx] == 0) {
                 // no-op
             } else {
-                UnrecoverableError("bit value should be 0 or 1");
+                String error_message = "bit value should be 0 or 1";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
         EXPECT_EQ(((char *)knn_expr4->embedding_data_ptr_)[i], static_cast<char>(embedding_unit));

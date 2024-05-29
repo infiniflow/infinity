@@ -15,17 +15,20 @@
 module;
 
 #include <sstream>
-import stl;
-
-import infinity_exception;
 
 module heap_chunk;
+
+import logger;
+import stl;
+import infinity_exception;
 
 namespace infinity {
 
 ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
-        UnrecoverableError("Attempt to allocate zero size memory.");
+        String error_message = "Attempt to allocate zero size memory.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (current_chunk_idx_ == std::numeric_limits<u64>::max()) {
         // First chunk
@@ -44,7 +47,9 @@ ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
             ++current_chunk_idx_;
         }
         if (chunks_[current_chunk_idx_]->current_offset_ + nbytes > current_chunk_size_) {
-            UnrecoverableError("Unexpected string chunk error");
+            String error_message = "Unexpected string chunk error";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 

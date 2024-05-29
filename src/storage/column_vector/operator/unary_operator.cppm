@@ -20,7 +20,7 @@ export module unary_operator;
 
 import stl;
 import column_vector;
-
+import logger;
 import infinity_exception;
 import bitmask;
 import bitmask_buffer;
@@ -42,14 +42,20 @@ public:
 
         switch (input->vector_type()) {
             case ColumnVectorType::kInvalid: {
-                UnrecoverableError("Invalid column vector type.");
+                String error_message = "Invalid column vector type.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             case ColumnVectorType::kCompactBit: {
                 if (result->vector_type() != ColumnVectorType::kCompactBit) {
-                    UnrecoverableError("Target vector type isn't kCompactBit.");
+                    String error_message = "Target vector type isn't kCompactBit.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 if constexpr (!std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || !std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
-                    UnrecoverableError("kCompactBit should match with BooleanT.");
+                    String error_message = "kCompactBit should match with BooleanT.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 if (nullable && !(input_null->IsAllTrue())) {
                     ExecuteBooleanWithNull<Operator>(input, result, count, state_ptr);
@@ -62,10 +68,14 @@ public:
             }
             case ColumnVectorType::kFlat: {
                 if (result->vector_type() != ColumnVectorType::kFlat) {
-                    UnrecoverableError("Target vector type isn't flat.");
+                    String error_message = "Target vector type isn't flat.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 if constexpr (std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
-                    UnrecoverableError("BooleanT type should not be kFlat.");
+                    String error_message = "BooleanT type should not be kFlat.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 if (nullable) {
                     ExecuteFlatWithNull<InputType, ResultType, Operator>(input_ptr, input_null, result_ptr, result_null, count, state_ptr);
@@ -79,7 +89,9 @@ public:
             }
             case ColumnVectorType::kConstant: {
                 if (count != 1) {
-                    UnrecoverableError("Attempting to execute more than one row of the constant column vector.");
+                    String error_message = "Attempting to execute more than one row of the constant column vector.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 if (nullable && !(input_null->IsAllTrue())) {
                     result_null->SetFalse(0);
@@ -104,8 +116,9 @@ public:
                 return ExecuteHeterogeneous<InputType, ResultType, Operator>(input_ptr, result_ptr, result_null, count, state_ptr);
             }
         }
-
-        UnrecoverableError("Unexpected error.");
+        String error_message = "Unexpected error.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
 private:

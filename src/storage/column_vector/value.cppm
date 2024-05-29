@@ -25,6 +25,7 @@ import sparse_info;
 import data_type;
 import knn_expr;
 import third_party;
+import logger;
 import status;
 
 namespace infinity {
@@ -60,7 +61,9 @@ public:
     template <class T>
     T &Get() {
         if (type_ != T::TYPE) {
-            UnrecoverableError("ExtraValueInfo type mismatch");
+            String error_message = "ExtraValueInfo type mismatch";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return (T &)*this;
     }
@@ -250,7 +253,6 @@ public:
         auto embedding_info_ptr = EmbeddingInfo::Make(ToEmbeddingDataType<T>(), vec.size());
         Value value(LogicalType::kEmbedding, embedding_info_ptr);
         value.value_info_ = MakeShared<EmbeddingValueInfo>(vec);
-
         return value;
     }
 
@@ -316,7 +318,9 @@ public:
     // Value getter template for all types in union
     template <class T>
     T GetValue() const {
-        UnrecoverableError("Not implemented value getter.");
+        String error_message = "Not implemented value getter.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return T();
     }
 

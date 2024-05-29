@@ -30,6 +30,7 @@ import column_def;
 import index_hnsw;
 import infinity_exception;
 import index_base;
+import logger;
 
 namespace infinity {
 
@@ -54,7 +55,9 @@ public:
                         break;
                     }
                     default: {
-                        UnrecoverableError("HNSW supports inner product and L2 distance.");
+                        String error_message = "HNSW supports inner product and L2 distance.";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                     }
                 }
                 break;
@@ -70,13 +73,17 @@ public:
                         break;
                     }
                     default: {
-                        UnrecoverableError("HNSW supports inner product and L2 distance.");
+                        String error_message = "HNSW supports inner product and L2 distance.";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                     }
                 }
                 break;
             }
             default: {
-                UnrecoverableError("Invalid metric type");
+                String error_message = "Invalid metric type";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }

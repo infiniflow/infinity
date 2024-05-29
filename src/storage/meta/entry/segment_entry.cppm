@@ -30,6 +30,7 @@ import fast_rough_filter;
 import value;
 import meta_entry_interface;
 import cleanup_scanner;
+import logger;
 
 namespace infinity {
 
@@ -206,7 +207,9 @@ protected: // protected for unit test
     // called when lock held
     void DecreaseRemainRow(SizeT decrease_row_count) {
         if (decrease_row_count > actual_row_count_) {
-            UnrecoverableError("Decrease row count exceed actual row count");
+            String error_message = "Decrease row count exceed actual row count";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         actual_row_count_ -= decrease_row_count;
     }

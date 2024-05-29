@@ -14,8 +14,7 @@
 
 import infinity
 import infinity.index as index
-from infinity.common import REMOTE_HOST
-from infinity.common import ConflictType
+from infinity.common import REMOTE_HOST, NetworkAddress, ConflictType
 import pandas as pds
 
 
@@ -138,4 +137,4 @@ def test_chinese():
 
 if __name__ == '__main__':
     test_english()
-    test_chinese()
+    # test_chinese()

@@ -35,6 +35,7 @@ FileReader::FileReader(FileSystem &fs, const String &path, SizeT buffer_size)
     }
     auto [file_handler, status] = fs_.OpenFile(path, flags, FileLockType::kReadLock);
     if(!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 

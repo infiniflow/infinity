@@ -24,7 +24,7 @@ import status;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
-
+import logger;
 import third_party;
 import logical_type;
 import internal_types;
@@ -55,7 +55,9 @@ struct ColumnValueReaderTypeGreaterEqualsFunction {
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, BigIntT, bool &) {
-    UnrecoverableError("Not implement: GreaterEqualsFunction::Run");
+    String error_message = "Not implement: GreaterEqualsFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 template <>
@@ -65,7 +67,9 @@ inline void GreaterEqualsFunction::Run(BigIntT left, MixedT right, bool &result)
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, DoubleT, bool &) {
-    UnrecoverableError("Not implement: GreaterEqualsFunction::Run");
+    String error_message = "Not implement: GreaterEqualsFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 template <>
@@ -75,7 +79,9 @@ inline void GreaterEqualsFunction::Run(DoubleT left, MixedT right, bool &result)
 
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, VarcharT, bool &) {
-    UnrecoverableError("Not implement: GreaterEqualsFunction::Run");
+    String error_message = "Not implement: GreaterEqualsFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 template <>

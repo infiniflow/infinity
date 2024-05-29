@@ -200,14 +200,18 @@ Value Value::MakeVarchar(const VarcharT &input) {
         String tmp_str(input.short_.data_, input.length_);
         value.value_info_ = MakeShared<StringValueInfo>(std::move(tmp_str));
     } else {
-        UnrecoverableError("Value::MakeVarchar(VectorVarchar) is unsupported!");
+        String error_message = "Value::MakeVarchar(VectorVarchar) is unsupported!";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value;
 }
 
 Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        UnrecoverableError(fmt::format("Value::MakeEmbedding(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
+        String error_message = fmt::format("Value::MakeEmbedding(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
     SizeT len = embedding_info->Size();
@@ -219,7 +223,9 @@ Value Value::MakeEmbedding(ptr_t ptr, SharedPtr<TypeInfo> type_info_ptr) {
 
 Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        UnrecoverableError(fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
+        String error_message = fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
     if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
@@ -234,7 +240,9 @@ Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_i
 
 Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
-        UnrecoverableError(fmt::format("Value::MakeTensorArray(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString()));
+        String error_message = fmt::format("Value::MakeTensorArray(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
     if (const SizeT len = embedding_info->Size(); len == 0) {
@@ -249,7 +257,9 @@ Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
 
 void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
     if (type_.type() != LogicalType::kTensorArray) {
-        UnrecoverableError(fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString()));
+        String error_message = fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
     if (const SizeT len = embedding_info->Size(); len == 0 or bytes % len != 0) {
@@ -266,7 +276,9 @@ void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
 template <>
 BooleanT Value::GetValue() const {
     if (type_.type() != LogicalType::kBoolean) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.boolean;
 }
@@ -274,7 +286,9 @@ BooleanT Value::GetValue() const {
 template <>
 TinyIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kTinyInt) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.tiny_int;
 }
@@ -282,7 +296,9 @@ TinyIntT Value::GetValue() const {
 template <>
 SmallIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kSmallInt) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.small_int;
 }
@@ -290,7 +306,9 @@ SmallIntT Value::GetValue() const {
 template <>
 IntegerT Value::GetValue() const {
     if (type_.type() != LogicalType::kInteger) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.integer;
 }
@@ -298,7 +316,9 @@ IntegerT Value::GetValue() const {
 template <>
 BigIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kBigInt) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.big_int;
 }
@@ -306,7 +326,9 @@ BigIntT Value::GetValue() const {
 template <>
 HugeIntT Value::GetValue() const {
     if (type_.type() != LogicalType::kHugeInt) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.huge_int;
 }
@@ -314,7 +336,9 @@ HugeIntT Value::GetValue() const {
 template <>
 FloatT Value::GetValue() const {
     if (type_.type() != LogicalType::kFloat) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.float32;
 }
@@ -322,7 +346,9 @@ FloatT Value::GetValue() const {
 template <>
 DoubleT Value::GetValue() const {
     if (type_.type() != LogicalType::kDouble) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.float64;
 }
@@ -330,7 +356,9 @@ DoubleT Value::GetValue() const {
 template <>
 DecimalT Value::GetValue() const {
     if (type_.type() != LogicalType::kDecimal) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.decimal;
 }
@@ -338,7 +366,9 @@ DecimalT Value::GetValue() const {
 template <>
 DateT Value::GetValue() const {
     if (type_.type() != LogicalType::kDate) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.date;
 }
@@ -346,7 +376,9 @@ DateT Value::GetValue() const {
 template <>
 TimeT Value::GetValue() const {
     if (type_.type() != LogicalType::kTime) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.time;
 }
@@ -354,7 +386,9 @@ TimeT Value::GetValue() const {
 template <>
 DateTimeT Value::GetValue() const {
     if (type_.type() != LogicalType::kDateTime) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.datetime;
 }
@@ -362,7 +396,9 @@ DateTimeT Value::GetValue() const {
 template <>
 TimestampT Value::GetValue() const {
     if (type_.type() != LogicalType::kTimestamp) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.timestamp;
 }
@@ -370,7 +406,9 @@ TimestampT Value::GetValue() const {
 template <>
 IntervalT Value::GetValue() const {
     if (type_.type() != LogicalType::kInterval) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.interval;
 }
@@ -378,7 +416,9 @@ IntervalT Value::GetValue() const {
 template <>
 PointT Value::GetValue() const {
     if (type_.type() != LogicalType::kPoint) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.point;
 }
@@ -386,7 +426,9 @@ PointT Value::GetValue() const {
 template <>
 LineT Value::GetValue() const {
     if (type_.type() != LogicalType::kLine) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.line;
 }
@@ -394,7 +436,9 @@ LineT Value::GetValue() const {
 template <>
 LineSegT Value::GetValue() const {
     if (type_.type() != LogicalType::kLineSeg) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.line_segment;
 }
@@ -402,7 +446,9 @@ LineSegT Value::GetValue() const {
 template <>
 BoxT Value::GetValue() const {
     if (type_.type() != LogicalType::kBox) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.box;
 }
@@ -410,7 +456,9 @@ BoxT Value::GetValue() const {
 template <>
 CircleT Value::GetValue() const {
     if (type_.type() != LogicalType::kCircle) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.circle;
 }
@@ -418,7 +466,9 @@ CircleT Value::GetValue() const {
 template <>
 UuidT Value::GetValue() const {
     if (type_.type() != LogicalType::kUuid) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.uuid;
 }
@@ -426,7 +476,9 @@ UuidT Value::GetValue() const {
 template <>
 RowID Value::GetValue() const {
     if (type_.type() != LogicalType::kRowID) {
-        UnrecoverableError(fmt::format("Not matched type: {}", type_.ToString()));
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return value_.row;
 }
@@ -559,12 +611,16 @@ bool Value::operator==(const Value &other) const {
         }
         case kTensorArray: {
             // TODO
-            UnrecoverableError("Not implemented yet.");
+            String error_message = "Not implemented yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case kSparse: {
             // TODO
-            UnrecoverableError("Not implemented yet.");
+            String error_message = "Not implemented yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case kInterval:
@@ -573,7 +629,9 @@ bool Value::operator==(const Value &other) const {
         case kMixed:
         case kMissing:
         case kInvalid: {
-            UnrecoverableError("Unhandled cases.");
+            String error_message = "Unhandled cases.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return false;
         }
     }
@@ -684,7 +742,9 @@ void Value::CopyUnionValue(const Value &other) {
         case kMixed:
         case kMissing:
         case kInvalid: {
-            UnrecoverableError("Unhandled case!");
+            String error_message = "Unhandled cases.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
     }
@@ -794,7 +854,9 @@ void Value::MoveUnionValue(Value &&other) noexcept {
         case kMixed:
         case kMissing:
         case kInvalid: {
-            UnrecoverableError("Unhandled case!");
+            String error_message = "Unhandled cases.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
     }
@@ -856,7 +918,9 @@ String Value::ToString() const {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
             Span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
-                UnrecoverableError("Embedding data size mismatch.");
+                String error_message = "Embedding data size mismatch.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
             return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
@@ -867,19 +931,25 @@ String Value::ToString() const {
             SizeT data_bytes = data_span.size();
             const auto basic_embedding_bytes = embedding_info->Size();
             if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
-                UnrecoverableError("Tensor data size mismatch.");
+                String error_message = "Tensor data size mismatch.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             const auto embedding_num = data_bytes / basic_embedding_bytes;
             return TensorT::Tensor2String(const_cast<char *>(data_span.data()), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
         }
         case LogicalType::kTensorArray: {
             // TODO
-            UnrecoverableError("Not implemented yet.");
+            String error_message = "Not implemented yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return {};
         }
         case LogicalType::kSparse: {
             // TODO
-            UnrecoverableError("Not implemented yet.");
+            String error_message = "Not implemented yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case LogicalType::kDecimal:
@@ -895,7 +965,9 @@ String Value::ToString() const {
         case LogicalType::kNull:
         case LogicalType::kMissing:
         case LogicalType::kInvalid: {
-            UnrecoverableError(fmt::format("Value::ToString() not implemented for type {}", type_.ToString()));
+            String error_message = fmt::format("Value::ToString() not implemented for type {}", type_.ToString());
+            LOG_ERROR(error_message);
+            UnrecoverableError(error_message);
             return {};
         }
     }
@@ -964,7 +1036,9 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
             EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
             Span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
-                UnrecoverableError("Embedding data size mismatch.");
+                String error_message = "Embedding data size mismatch.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
             json[name] = EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
@@ -976,7 +1050,9 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
             SizeT data_bytes = data_span.size();
             const auto basic_embedding_bytes = embedding_info->Size();
             if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
-                UnrecoverableError("Tensor data size mismatch.");
+                String error_message = "Tensor data size mismatch.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             const auto embedding_num = data_bytes / basic_embedding_bytes;
             json[name] =
@@ -985,17 +1061,23 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
         }
         case LogicalType::kTensorArray: {
             // TODO
-            UnrecoverableError("Not implemented yet.");
+            String error_message = "Not implemented yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         default: {
-            UnrecoverableError(fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString()));
+            String error_message = fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString());
+            LOG_ERROR(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
 
 SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const_ptr_t ptr, SizeT bytes) {
     if (bytes == 0) {
-        UnrecoverableError("EmbeddingValueInfo::MakeTensorValueInfo(bytes=0) is invalid.");
+        String error_message = "EmbeddingValueInfo::MakeTensorValueInfo(bytes=0) is invalid.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
         Status status = Status::SyntaxError(fmt::format("EmbeddingValueInfo::MakeTensorValueInfo(bytes={}) is larger than the maximum tensor size={}",

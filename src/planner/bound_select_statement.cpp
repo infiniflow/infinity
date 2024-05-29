@@ -71,6 +71,7 @@ import knn_expression;
 import third_party;
 import table_reference;
 import common_query_filter;
+import logger;
 
 namespace infinity {
 
@@ -106,7 +107,9 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         if (!order_by_expressions_.empty()) {
             if (order_by_expressions_.size() != order_by_types_.size()) {
-                UnrecoverableError("Unknown error on order by expression");
+                String error_message = "Unknown error on order by expression";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             if (limit_expression_.get() == nullptr) {
@@ -134,7 +137,9 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         root = project;
 
         if (!pruned_expression_.empty()) {
-            UnrecoverableError("Projection method changed!");
+            String error_message = "Projection method changed!";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), pruned_expression_, result_index_);
             pruned_project->set_left_node(root);
             root = pruned_project;
@@ -145,12 +150,18 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         SharedPtr<LogicalNode> root = nullptr;
         const SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size() + search_expr_->match_tensor_exprs_.size();
         if (num_children <= 0) {
-            UnrecoverableError("SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR expression");
+            String error_message = "SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR expression";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         } else if (num_children >= 3) {
-            UnrecoverableError("SEARCH shall have at max two MATCH TEXT or MATCH VECTOR expression");
+            String error_message = "SEARCH shall have at max two MATCH TEXT or MATCH VECTOR expression";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (table_ref_ptr_->type() != TableRefType::kTable) {
-            UnrecoverableError("Not base table reference");
+            String error_message = "Not base table reference";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
         // FIXME: need check if there is subquery inside the where conditions
@@ -207,15 +218,21 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
                                                                     QueryContext *query_context,
                                                                     const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr) {
-        UnrecoverableError("Attempt to do KNN scan without table");
+        String error_message = "Attempt to do KNN scan without table";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     switch (table_ref->type_) {
         case TableRefType::kCrossProduct: {
-            UnrecoverableError("KNN is not supported on CROSS PRODUCT relation, now.");
+            String error_message = "KNN is not supported on CROSS PRODUCT relation, now.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case TableRefType::kJoin: {
-            UnrecoverableError("KNN is not supported on JOIN relation, now.");
+            String error_message = "KNN is not supported on JOIN relation, now.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case TableRefType::kTable: {
             auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
@@ -228,11 +245,15 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
             return knn_scan_node;
         }
         case TableRefType::kSubquery: {
-            UnrecoverableError("KNN is not supported on a SUBQUERY, now.");
+            String error_message = "KNN is not supported on a SUBQUERY, now.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         default: {
-            UnrecoverableError("Unexpected table type");
+            String error_message = "Unexpected table type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -259,7 +280,9 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *qu
                 return BuildDummyTable(table_ref, query_context, bind_context);
             }
             default: {
-                UnrecoverableError("Unknown table reference type.");
+                String error_message = "Unknown table reference type.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     } else {
@@ -360,7 +383,9 @@ void BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
             // nested subquery
-            UnrecoverableError("Nested subquery detected");
+            String error_message = "Nested subquery detected";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);
     }

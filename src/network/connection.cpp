@@ -140,7 +140,9 @@ void Connection::HandleRequest() {
             break;
         }
         default: {
-            UnrecoverableError("Unknown PG command type");
+            String error_message = "Unknown PG command type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -255,7 +257,9 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
             case LogicalType::kTensorArray:
             case LogicalType::kEmbedding: {
                 if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
-                    UnrecoverableError("Not embedding type");
+                    String error_message = "Not embedding type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
 
                 EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
@@ -297,14 +301,18 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         break;
                     }
                     case kElemInvalid: {
-                        UnrecoverableError("Invalid embedding data type");
+                        String error_message = "Invalid embedding data type";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                     }
                 }
                 break;
             }
             case LogicalType::kSparse: {
                 if (column_type->type_info()->type() != TypeInfoType::kSparse) {
-                    UnrecoverableError("Not sparse type");
+                    String error_message = "Not sparse type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
                 const auto *sparse_info = static_cast<SparseInfo *>(column_type->type_info().get());
                 switch (sparse_info->DataType()) {
@@ -344,13 +352,17 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         break;
                     }
                     default: {
-                        UnrecoverableError("Should not reach here");
+                        String error_message = "Should not reach here";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                     }
                 }
                 break;
             }
             default: {
-                UnrecoverableError("Unexpected type");
+                String error_message = "Unexpected type";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
 

@@ -20,6 +20,7 @@ import stl;
 import file_worker;
 import block_version;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
@@ -35,10 +36,14 @@ VersionFileWorker::~VersionFileWorker() {
 
 void VersionFileWorker::AllocateInMemory() {
     if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
+        String error_message = "Data is already allocated.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (capacity_ == 0) {
-        UnrecoverableError("Capacity is 0.");
+        String error_message = "Capacity is 0.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *data = new BlockVersion(capacity_);
     data_ = static_cast<void *>(data);
@@ -46,7 +51,9 @@ void VersionFileWorker::AllocateInMemory() {
 
 void VersionFileWorker::FreeInMemory() {
     if (data_ == nullptr) {
-        UnrecoverableError("Data is already freed.");
+        String error_message = "Data is already freed.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *data = static_cast<BlockVersion *>(data_);
     delete data;
@@ -58,7 +65,9 @@ SizeT VersionFileWorker::GetMemoryCost() const { return capacity_ * sizeof(TxnTi
 
 void VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     if (data_ == nullptr) {
-        UnrecoverableError("Data is not allocated.");
+        String error_message = "Data is not allocated.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *data = static_cast<BlockVersion *>(data_);
     if (to_spill) {
@@ -70,7 +79,9 @@ void VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
 
 void VersionFileWorker::ReadFromFileImpl() {
     if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
+        String error_message = "Data is already allocated.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *data = BlockVersion::LoadFromFile(*file_handler_).release();
     data_ = static_cast<void *>(data);

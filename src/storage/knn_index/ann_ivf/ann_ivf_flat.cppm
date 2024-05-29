@@ -29,6 +29,7 @@ import knn_result_handler;
 import bitmask;
 import knn_expr;
 import internal_types;
+import logger;
 
 namespace infinity {
 
@@ -42,7 +43,9 @@ class AnnIVFFlat final : public KnnDistance<typename Compare::DistanceType> {
         } else if constexpr (metric == MetricType::kMetricInnerProduct) {
             return IPDistance<DistType>(x, y, dimension);
         } else {
-            UnrecoverableError("Metric type is invalid");
+            String error_message = "Metric type is invalid";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -81,17 +84,29 @@ public:
         begin_ = true;
     }
 
-    void Search(const DistType *, u16, u32, u16) final { UnrecoverableError("Unsupported search function"); }
+    void Search(const DistType *, u16, u32, u16) final {
+        String error_message = "Unsupported search function";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 
-    void Search(const DistType *, u16, u32, u16, Bitmask &) final { UnrecoverableError("Unsupported search function"); }
+    void Search(const DistType *, u16, u32, u16, Bitmask &) final {
+        String error_message = "Unsupported search function";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 
     void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes) {
         // check metric type
         if (base_ivf->metric_ != metric) {
-            UnrecoverableError("Metric type is invalid");
+            String error_message = "Metric type is invalid";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (!begin_) {
-            UnrecoverableError("IVFFlat isn't begin");
+            String error_message = "IVFFlat isn't begin";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         n_probes = std::min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -147,10 +162,14 @@ public:
     void Search(const AnnIVFFlatIndexData<DistType> *base_ivf, u32 segment_id, u32 n_probes, Filter &filter) {
         // check metric type
         if (base_ivf->metric_ != metric) {
-            UnrecoverableError("Metric type is invalid");
+            String error_message = "Metric type is invalid";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (!begin_) {
-            UnrecoverableError("IVFFlat isn't begin");
+            String error_message = "IVFFlat isn't begin";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         n_probes = std::min(n_probes, base_ivf->partition_num_);
         if ((n_probes == 0) || (base_ivf->data_num_ == 0)) {
@@ -230,14 +249,18 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            UnrecoverableError("Query index exceeds the limit");
+            String error_message = "Query index exceeds the limit";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            UnrecoverableError("Query index exceeds the limit");
+            String error_message = "Query index exceeds the limit";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return id_array_.get() + idx * this->top_k_;
     }

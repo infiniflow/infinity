@@ -13,20 +13,22 @@
 // limitations under the License.
 module;
 
-import stl;
+export module selection;
 
+import stl;
+import logger;
 import infinity_exception;
 import global_resource_usage;
 import default_values;
-
-export module selection;
 
 namespace infinity {
 
 struct SelectionData {
     explicit SelectionData(SizeT count) : capacity_(count) {
         if (count > std::numeric_limits<u16>::max()) {
-            UnrecoverableError("Too large size for selection data.");
+            String error_message = "Too large size for selection data.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         data_ = MakeUnique<u16[]>(count);
 #ifdef INFINITY_DEBUG
@@ -65,10 +67,14 @@ public:
 
     inline void Set(SizeT selection_idx, SizeT row_idx) {
         if (selection_vector == nullptr) {
-            UnrecoverableError("Selection container isn't initialized");
+            String error_message = "Selection container isn't initialized";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (selection_idx >= storage_->capacity_) {
-            UnrecoverableError("Exceed the selection vector capacity.");
+            String error_message = "Exceed the selection vector capacity.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         selection_vector[selection_idx] = row_idx;
     }
@@ -83,28 +89,36 @@ public:
             return idx;
         }
         if (idx >= latest_selection_idx_) {
-            UnrecoverableError("Exceed the last row of the selection vector.");
+            String error_message = "Exceed the last row of the selection vector.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return selection_vector[idx];
     }
 
     inline u16 &operator[](SizeT idx) const {
         if (idx >= latest_selection_idx_) {
-            UnrecoverableError("Exceed the last row of the selection vector.");
+            String error_message = "Exceed the last row of the selection vector.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return selection_vector[idx];
     }
 
     inline SizeT Capacity() const {
         if (selection_vector == nullptr) {
-            UnrecoverableError("Selection container isn't initialized");
+            String error_message = "Selection container isn't initialized";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return storage_->capacity_;
     }
 
     inline SizeT Size() const {
         if (selection_vector == nullptr) {
-            UnrecoverableError("Selection container isn't initialized");
+            String error_message = "Selection container isn't initialized";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return latest_selection_idx_;
     }

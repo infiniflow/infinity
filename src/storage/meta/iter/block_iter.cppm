@@ -25,6 +25,7 @@ import block_entry;
 import block_column_iter;
 import buffer_manager;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
@@ -46,14 +47,18 @@ public:
                 if (rets.empty()) {
                     return None;
                 }
-                UnrecoverableError("ColumnIter return None, but other columns have data");
+                String error_message = "ColumnIter return None, but other columns have data";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             auto [ret, cur_offset] = *ret_opt;
             if (offset != cur_offset) {
                 if (rets.empty()) {
                     offset = cur_offset;
                 } else {
-                    UnrecoverableError("ColumnIter return different offset");
+                    String error_message = "ColumnIter return different offset";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
             rets.emplace_back(ret);

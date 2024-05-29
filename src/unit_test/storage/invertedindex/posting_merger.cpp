@@ -27,6 +27,7 @@ import internal_types;
 import logical_type;
 import infinity_exception;
 import vector_with_lock;
+import logger;
 
 using namespace infinity;
 
@@ -146,7 +147,9 @@ TEST_F(PostingMergerTest, Basic) {
             u32 id_offset = base_row_id - merge_base_rowid;
             auto [file_handler, status] = fs.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
             if(!status.ok()) {
-                UnrecoverableError(status.message());
+                String error_message = status.message();
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             const u32 file_size = fs.GetFileSize(*file_handler);
             u32 file_read_array_len = file_size / sizeof(u32);
@@ -154,7 +157,9 @@ TEST_F(PostingMergerTest, Basic) {
             const i64 read_count = fs.Read(*file_handler, unsafe_column_length_array.data() + id_offset, file_size);
             file_handler->Close();
             if (read_count != file_size) {
-                UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
+                String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }

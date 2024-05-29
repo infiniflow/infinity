@@ -19,7 +19,7 @@ import stl;
 import expression_type;
 
 import scalar_function;
-
+import logger;
 import infinity_exception;
 import third_party;
 import statement_common;
@@ -31,7 +31,9 @@ namespace infinity {
 String KnnExpression::KnnDistanceType2Str(KnnDistanceType type) {
     switch (type) {
         case KnnDistanceType::kInvalid: {
-            UnrecoverableError("Invalid KNN distance type");
+            String error_message = "Invalid KNN distance type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case KnnDistanceType::kL2: {
             return "L2";

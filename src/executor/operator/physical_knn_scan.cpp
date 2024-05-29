@@ -328,7 +328,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         SegmentEntry *segment_entry = nullptr;
         const auto &segment_index_hashmap = base_table_ref_->block_index_->segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
-            UnrecoverableError(fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id));
+            String error_message = fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         } else {
             segment_entry = iter->second.segment_entry_;
         }
@@ -463,12 +465,16 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                             if (result_n < 0) {
                                 result_n = result_n1;
                             } else if (result_n != (i64)result_n1) {
-                                UnrecoverableError("KnnScan: result_n mismatch");
+                                String error_message = "KnnScan: result_n mismatch";
+                                LOG_CRITICAL(error_message);
+                                UnrecoverableError(error_message);
                             }
 
                             switch (knn_scan_shared_data->knn_distance_type_) {
                                 case KnnDistanceType::kInvalid: {
-                                    UnrecoverableError("Invalid distance type");
+                                    String error_message = "Invalid distance type";
+                                    LOG_CRITICAL(error_message);
+                                    UnrecoverableError(error_message);
                                 }
                                 case KnnDistanceType::kL2:
                                 case KnnDistanceType::kHamming: {
@@ -490,8 +496,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 BlockID block_id = l_ptr[i] / DEFAULT_BLOCK_CAPACITY;
                                 auto *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                                 if (block_entry == nullptr) {
-                                    UnrecoverableError(
-                                        fmt::format("Cannot find segment id: {}, block id: {}, index chunk is {}", segment_id, block_id, chunk_id));
+                                    String error_message = fmt::format("Cannot find segment id: {}, block id: {}, index chunk is {}", segment_id, block_id, chunk_id);
+                                    LOG_CRITICAL(error_message);
+                                    UnrecoverableError(error_message);
                                 } // this is for debug
                             }
                             merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
@@ -529,7 +536,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         i64 result_n = std::min(knn_scan_shared_data->topk_, merge_heap->total_count());
 
         if (!operator_state->data_block_array_.empty()) {
-            UnrecoverableError("In physical_knn_scan : operator_state->data_block_array_ is not empty.");
+            String error_message = "In physical_knn_scan : operator_state->data_block_array_ is not empty.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         {
             SizeT total_data_row_count = knn_scan_shared_data->query_count_ * result_n;
@@ -559,7 +568,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
                 BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 if (block_entry == nullptr) {
-                    UnrecoverableError(fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id));
+                    String error_message = fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id);
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
 
                 if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {

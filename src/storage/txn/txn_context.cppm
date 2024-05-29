@@ -14,12 +14,13 @@
 
 module;
 
+export module txn_context;
+
 import stl;
 import txn_state;
 import third_party;
 import infinity_exception;
-
-export module txn_context;
+import logger;
 
 namespace infinity {
 
@@ -51,7 +52,9 @@ public:
     inline void SetTxnRollbacking(TxnTimeStamp rollback_ts) {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kCommitting && state_ != TxnState::kStarted) {
-            UnrecoverableError("Transaction isn't in TO_ROLLBACK status.");
+            String error_message = "Transaction isn't in TO_ROLLBACK status.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         state_ = TxnState::kRollbacking;
         commit_ts_ = rollback_ts; // update commit_ts ?
@@ -68,7 +71,9 @@ public:
     inline void SetTxnCommitted(TxnTimeStamp committed_ts) {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kCommitting) {
-            UnrecoverableError("Transaction isn't in COMMITTING status.");
+            String error_message = "Transaction isn't in COMMITTING status.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         state_ = TxnState::kCommitted;
         committed_ts_ = committed_ts;
@@ -77,7 +82,9 @@ public:
     inline void SetTxnCommitting(TxnTimeStamp commit_ts) {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kStarted) {
-            UnrecoverableError("Transaction isn't in STARTED status.");
+            String error_message = "Transaction isn't in STARTED status.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         state_ = TxnState::kCommitting;
         commit_ts_ = commit_ts;
