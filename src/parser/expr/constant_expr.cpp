@@ -123,31 +123,18 @@ std::string ConstantExpr::ToString() const {
             return ss.str();
         }
         case LiteralType::kLongSparseArray: {
-            std::stringstream ss;
-            size_t len = long_sparse_array_.first.size();
-            if (len <= 0) {
-                ParserError("Invalid long sparse array length");
-            }
-            for (size_t i = 0; i < len - 1; ++i) {
-                ss << long_sparse_array_.second[i] << ':' << long_sparse_array_.first[i] << ',';
-            }
-            ss << long_sparse_array_.second.back() << ':' << long_sparse_array_.first.back();
-            return ss.str();
+            size_t nnz = long_sparse_array_.first.size();
+            return SparseT::Sparse2StringT2(long_sparse_array_.first.data(), long_sparse_array_.first.data(), nnz);
         }
         case LiteralType::kDoubleSparseArray: {
-            std::stringstream ss;
-            size_t len = double_sparse_array_.first.size();
-            if (len <= 0) {
-                ParserError("Invalid long sparse array length");
-            }
-            for (size_t i = 0; i < len - 1; ++i) {
-                ss << double_sparse_array_.second[i] << ':' << double_sparse_array_.first[i] << ',';
-            }
-            ss << double_sparse_array_.second.back() << ':' << double_sparse_array_.first.back();
-            return ss.str();
+            size_t nnz = double_sparse_array_.first.size();
+            return SparseT::Sparse2StringT2(double_sparse_array_.first.data(), double_sparse_array_.second.data(), nnz);
+        }
+        default: {
+            ParserError("Unexpected branch");
+            return {};
         }
     }
-    ParserError("Unexpected branch");
 }
 
 int32_t ConstantExpr::GetSizeInBytes() const {
@@ -197,13 +184,13 @@ int32_t ConstantExpr::GetSizeInBytes() const {
             break;
         }
         case LiteralType::kLongSparseArray: {
-            size += sizeof(int64_t);
-            size += (sizeof(int64_t) + sizeof(int64_t)) * long_sparse_array_.first.size();
+            size += sizeof(int64_t) + sizeof(int64_t) * long_sparse_array_.first.size();
+            size += sizeof(int64_t) + sizeof(int64_t) * long_sparse_array_.second.size();
             break;
         }
         case LiteralType::kDoubleSparseArray: {
-            size += sizeof(int64_t);
-            size += (sizeof(double) + sizeof(int64_t)) * long_sparse_array_.first.size();
+            size += sizeof(int64_t) + sizeof(int64_t) * double_sparse_array_.first.size();
+            size += sizeof(int64_t) + sizeof(double) * double_sparse_array_.second.size();
             break;
         }
         case LiteralType::kInterval: {
@@ -275,18 +262,20 @@ void ConstantExpr::WriteAdv(char *&ptr) const {
             for (size_t i = 0; i < long_sparse_array_.first.size(); ++i) {
                 WriteBufAdv<int64_t>(ptr, long_sparse_array_.first[i]);
             }
+            WriteBufAdv<int64_t>(ptr, long_sparse_array_.second.size());
             for (size_t i = 0; i < long_sparse_array_.second.size(); ++i) {
-                WriteBufAdv<uint64_t>(ptr, long_sparse_array_.second[i]);
+                WriteBufAdv<int64_t>(ptr, long_sparse_array_.second[i]);
             }
             break;
         }
         case LiteralType::kDoubleSparseArray: {
             WriteBufAdv<int64_t>(ptr, double_sparse_array_.first.size());
             for (size_t i = 0; i < double_sparse_array_.first.size(); ++i) {
-                WriteBufAdv<double>(ptr, double_sparse_array_.first[i]);
+                WriteBufAdv<int64_t>(ptr, double_sparse_array_.first[i]);
             }
+            WriteBufAdv<int64_t>(ptr, double_sparse_array_.second.size());
             for (size_t i = 0; i < double_sparse_array_.second.size(); ++i) {
-                WriteBufAdv<uint64_t>(ptr, double_sparse_array_.second[i]);
+                WriteBufAdv<double>(ptr, double_sparse_array_.second[i]);
             }
             break;
         }
@@ -363,24 +352,26 @@ std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(char *&ptr, int32_t maxbytes) 
         case LiteralType::kLongSparseArray: {
             size_t len = ReadBufAdv<int64_t>(ptr);
             const_expr->long_sparse_array_.first.resize(len);
-            const_expr->long_sparse_array_.second.resize(len);
             for (size_t i = 0; i < len; ++i) {
                 const_expr->long_sparse_array_.first[i] = ReadBufAdv<int64_t>(ptr);
             }
+            len = ReadBufAdv<int64_t>(ptr);
+            const_expr->long_sparse_array_.second.resize(len);
             for (size_t i = 0; i < len; ++i) {
-                const_expr->long_sparse_array_.second[i] = ReadBufAdv<uint64_t>(ptr);
+                const_expr->long_sparse_array_.second[i] = ReadBufAdv<int64_t>(ptr);
             }
             break;
         }
         case LiteralType::kDoubleSparseArray: {
             size_t len = ReadBufAdv<int64_t>(ptr);
             const_expr->double_sparse_array_.first.resize(len);
+            for (size_t i = 0; i < len; ++i) {
+                const_expr->double_sparse_array_.first[i] = ReadBufAdv<int64_t>(ptr);
+            }
+            len = ReadBufAdv<int64_t>(ptr);
             const_expr->double_sparse_array_.second.resize(len);
             for (size_t i = 0; i < len; ++i) {
-                const_expr->double_sparse_array_.first[i] = ReadBufAdv<double>(ptr);
-            }
-            for (size_t i = 0; i < len; ++i) {
-                const_expr->double_sparse_array_.second[i] = ReadBufAdv<uint64_t>(ptr);
+                const_expr->double_sparse_array_.second[i] = ReadBufAdv<double>(ptr);
             }
             break;
         }
