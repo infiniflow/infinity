@@ -165,7 +165,9 @@ void TensorArrayTryCastToTensorArrayFun(const u32 basic_embedding_dim,
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(dst_type)));
+            String error_message = fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(dst_type));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -200,7 +202,9 @@ bool TensorArrayTryCastToTensorArray::Run<TensorArrayT, TensorArrayT>(const Tens
         RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
     }
     if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-        UnrecoverableError(fmt::format("TensorArray column vector should use kHeap VectorBuffer."));
+        String error_message = fmt::format("TensorArray column vector should use kHeap VectorBuffer.");
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     TensorArrayTryCastToTensorArrayFun(source_embedding_dim,
                                        source,

@@ -106,7 +106,9 @@ private:
                 return;
             }
             default: {
-                UnrecoverableError("SaveToResult(): compare type error.");
+                String error_message = "SaveToResult(): compare type error.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 return;
             }
         }
@@ -117,7 +119,9 @@ private:
     // case 2. two intervals of same ColumnID
     inline bool TryCompactNearbyFilterAnd() {
         if (result_.size() < 2) {
-            UnrecoverableError("FilterCommandBuilder::TryCompactNearbyFilter(): result size < 2.");
+            String error_message = "FilterCommandBuilder::TryCompactNearbyFilter(): result size < 2.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return false;
         }
         auto &last_elem_variant = result_[result_.size() - 1];
@@ -150,7 +154,9 @@ private:
             []<typename T1, typename T2>
                 requires IncompatibleFilterIntervalRangePair<T1, T2>
             (T1 & x, T2 & y) -> bool {
-                UnrecoverableError("FilterCommandBuilder::TryCompactNearbyFilterAnd(): Unreachable branch! Type mismatch.");
+                String error_message = "FilterCommandBuilder::TryCompactNearbyFilterAnd(): Unreachable branch! Type mismatch.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 return false;
             }},
             second_last_interval,
@@ -167,7 +173,9 @@ private:
     // case 1. one kEmpty range and another range
     inline bool TryCompactNearbyFilterOr() {
         if (result_.size() < 2) {
-            UnrecoverableError("FilterCommandBuilder::TryCompactNearbyFilter(): result size < 2.");
+            String error_message = "FilterCommandBuilder::TryCompactNearbyFilter(): result size < 2.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return false;
         }
         auto &last_elem_variant = result_[result_.size() - 1];
@@ -210,21 +218,27 @@ public:
         for (auto &elem : filter_evaluator_) {
             if (std::holds_alternative<ColumnID>(elem)) {
                 if (progress != Progress::kSavedToResult) {
-                    UnrecoverableError("FilterCommandBuilder::Build(): progress error.");
+                    String error_message = "FilterCommandBuilder::Build(): progress error.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     return false;
                 }
                 column_id = std::get<ColumnID>(elem);
                 progress = Progress::kColumnID;
             } else if (std::holds_alternative<Value>(elem)) {
                 if (progress != Progress::kColumnID) {
-                    UnrecoverableError("FilterCommandBuilder::Build(): progress error.");
+                    String error_message = "FilterCommandBuilder::Build(): progress error.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     return false;
                 }
                 value_ptr = &std::get<Value>(elem);
                 progress = Progress::kValuePtr;
             } else if (std::holds_alternative<FilterCompareType>(elem)) {
                 if (progress != Progress::kValuePtr) {
-                    UnrecoverableError("FilterCommandBuilder::Build(): progress error.");
+                    String error_message = "FilterCommandBuilder::Build(): progress error.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     return false;
                 }
                 compare_type = std::get<FilterCompareType>(elem);
@@ -233,7 +247,9 @@ public:
                 progress = Progress::kSavedToResult;
             } else if (std::holds_alternative<BooleanCombineType>(elem)) {
                 if (progress != Progress::kSavedToResult) {
-                    UnrecoverableError("FilterCommandBuilder::Build(): progress error.");
+                    String error_message = "FilterCommandBuilder::Build(): progress error.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     return false;
                 }
                 auto combine_type = std::get<BooleanCombineType>(elem);
@@ -256,19 +272,25 @@ public:
                         break;
                     }
                     default: {
-                        UnrecoverableError("FilterCommandBuilder::Build(): combine type error.");
+                        String error_message = "FilterCommandBuilder::Build(): combine type error.";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                         return false;
                     }
                 }
             } else {
-                UnrecoverableError("FilterCommandBuilder::Build(): filter evaluator elem error.");
+                String error_message = "FilterCommandBuilder::Build(): filter evaluator elem error.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 return false;
             }
         }
         if (progress == Progress::kSavedToResult) {
             return true;
         } else {
-            UnrecoverableError("FilterCommandBuilder::Build(): progress error.");
+            String error_message = "FilterCommandBuilder::Build(): progress error.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return false;
         }
     }
@@ -289,7 +311,9 @@ Vector<FilterExecuteElem> BuildSecondaryIndexScanCommand(SharedPtr<BaseExpressio
     if (filter_command_builder.Build()) {
         filter_execute_command = std::move(filter_command_builder.GetResult());
     } else {
-        UnrecoverableError("PhysicalIndexScan::Init(): filter command builder error.");
+        String error_message = "PhysicalIndexScan::Init(): filter command builder error.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return filter_execute_command;
 }

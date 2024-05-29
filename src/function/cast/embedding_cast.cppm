@@ -196,7 +196,9 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           const DataType &target_type,
                                           ColumnVector *vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
-        UnrecoverableError(fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
+        String error_message = fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     EmbeddingInfo *embedding_info = (EmbeddingInfo *)(source_type.type_info().get());
@@ -211,7 +213,9 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         std::memcpy(target.short_.data_, res.c_str(), target.length_);
     } else {
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            UnrecoverableError(fmt::format("Varchar column vector should use MemoryVectorBuffer."));
+            String error_message = fmt::format("Varchar column vector should use MemoryVectorBuffer.");
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         // Set varchar prefix
@@ -254,9 +258,11 @@ void EmbeddingTryCastToTensorImpl(const EmbeddingT &source, const SizeT source_e
         if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceValueType *>(source.ptr),
                                            reinterpret_cast<TargetValueType *>(target_tmp_ptr.get()),
                                            source_embedding_dim)) {
-            UnrecoverableError(fmt::format("Failed to cast from embedding with type {} to tensor with type {}",
-                                           DataType::TypeToString<SourceValueType>(),
-                                           DataType::TypeToString<TargetValueType>()));
+            String error_message = fmt::format("Failed to cast from embedding with type {} to tensor with type {}",
+                                               DataType::TypeToString<SourceValueType>(),
+                                               DataType::TypeToString<TargetValueType>());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         const auto [chunk_id, chunk_offset] =
             target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
@@ -301,7 +307,9 @@ void EmbeddingTryCastToTensorImpl(const EmbeddingT &source,
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(src_type)));
+            String error_message = fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(src_type));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -342,7 +350,9 @@ void EmbeddingTryCastToTensor(const EmbeddingT &source,
             break;
         }
         default: {
-            UnrecoverableError(fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(dst_type)));
+            String error_message = fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(dst_type));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -354,7 +364,9 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           const DataType &target_type,
                                           ColumnVector *target_vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
-        UnrecoverableError(fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString()));
+        String error_message = fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     const EmbeddingInfo *embedding_info = (EmbeddingInfo *)(source_type.type_info().get());
     const EmbeddingInfo *target_embedding_info = (EmbeddingInfo *)(target_type.type_info().get());
@@ -376,7 +388,9 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
     }
     target.embedding_num_ = target_tensor_num;
     if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kTensorHeap) {
-        UnrecoverableError(fmt::format("Tensor column vector should use kTensorHeap VectorBuffer."));
+        String error_message = fmt::format("Tensor column vector should use kTensorHeap VectorBuffer.");
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     EmbeddingTryCastToTensor(source, embedding_info->Type(), source_embedding_dim, target, target_embedding_info->Type(), target_vector_ptr);
     return true;

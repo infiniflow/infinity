@@ -89,7 +89,9 @@ UniquePtr<OperatorState> MakeTableScanState(PhysicalTableScan *physical_table_sc
     SourceState *source_state = task->source_state_.get();
 
     if (source_state->state_type_ != SourceStateType::kTableScan) {
-        UnrecoverableError("Expect table scan source state");
+        String error_message = "Expect table scan source state";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     auto *table_scan_source_state = static_cast<TableScanSourceState *>(source_state);
@@ -105,7 +107,9 @@ UniquePtr<OperatorState> MakeTableScanState(PhysicalTableScan *physical_table_sc
 UniquePtr<OperatorState> MakeMatchTensorScanState(const PhysicalMatchTensorScan *physical_match_tensor_scan, FragmentTask *task) {
     SourceState *source_state = task->source_state_.get();
     if (source_state->state_type_ != SourceStateType::kMatchTensorScan) {
-        UnrecoverableError("Expect MatchTensorScan source state");
+        String error_message = "Expect MatchTensorScan source state";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *match_tensor_scan_source_state = static_cast<MatchTensorScanSourceState *>(source_state);
     auto operator_state = MakeUnique<MatchTensorScanOperatorState>();
@@ -123,7 +127,9 @@ UniquePtr<OperatorState> MakeMergeMatchTensorState(PhysicalOperator *physical_op
 UniquePtr<OperatorState> MakeIndexScanState(PhysicalIndexScan *physical_index_scan, FragmentTask *task) {
     SourceState *source_state = task->source_state_.get();
     if (source_state->state_type_ != SourceStateType::kIndexScan) {
-        UnrecoverableError("Expect index scan source state");
+        String error_message = "Expect index scan source state";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *index_scan_source_state = static_cast<IndexScanSourceState *>(source_state);
     return MakeUnique<IndexScanOperatorState>(std::move(index_scan_source_state->segment_ids_));
@@ -132,7 +138,9 @@ UniquePtr<OperatorState> MakeIndexScanState(PhysicalIndexScan *physical_index_sc
 UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, FragmentTask *task, FragmentContext *fragment_ctx) {
     SourceState *source_state = task->source_state_.get();
     if (source_state->state_type_ != SourceStateType::kKnnScan) {
-        UnrecoverableError("Expect knn scan source state");
+        String error_message = "Expect knn scan source state";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     UniquePtr<OperatorState> operator_state = MakeUnique<KnnScanOperatorState>();
@@ -152,7 +160,9 @@ UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, Fr
             break;
         }
         default: {
-            UnrecoverableError("Invalid fragment type.");
+            String error_message = "Invalid fragment type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -162,12 +172,16 @@ UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, Fr
 UniquePtr<OperatorState> MakeCompactState(PhysicalCompact *physical_compact, FragmentTask *task, FragmentContext *fragment_ctx) {
     SourceState *source_state = task->source_state_.get();
     if (source_state->state_type_ != SourceStateType::kCompact) {
-        UnrecoverableError("Expect compact source state");
+        String error_message = "Expect compact source state";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *compact_source_state = static_cast<CompactSourceState *>(source_state);
 
     if (fragment_ctx->ContextType() != FragmentType::kParallelMaterialize) {
-        UnrecoverableError("Compact operator should be in parallel materialized fragment.");
+        String error_message = "Compact operator should be in parallel materialized fragment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
     auto compact_operator_state =
@@ -178,7 +192,9 @@ UniquePtr<OperatorState> MakeCompactState(PhysicalCompact *physical_compact, Fra
 UniquePtr<OperatorState>
 MakeCompactIndexPrepareState(PhysicalCompactIndexPrepare *physical_compact_index_prepare, FragmentTask *task, FragmentContext *fragment_ctx) {
     if (fragment_ctx->ContextType() != FragmentType::kSerialMaterialize) {
-        UnrecoverableError("Compact index prepare operator should be in parallel materialized fragment.");
+        String error_message = "Compact index prepare operator should be in parallel materialized fragment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_ctx);
     auto compact_index_prepare_operator_state =
@@ -190,7 +206,9 @@ MakeCompactIndexPrepareState(PhysicalCompactIndexPrepare *physical_compact_index
 UniquePtr<OperatorState>
 MakeCompactIndexDoState(PhysicalCompactIndexDo *physical_compact_index_do, FragmentTask *task, FragmentContext *fragment_ctx) {
     if (fragment_ctx->ContextType() != FragmentType::kParallelMaterialize) {
-        UnrecoverableError("Compact index do operator should be in parallel materialized fragment.");
+        String error_message = "Compact index do operator should be in parallel materialized fragment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
     auto compact_index_do_operator_state =
@@ -201,7 +219,9 @@ MakeCompactIndexDoState(PhysicalCompactIndexDo *physical_compact_index_do, Fragm
 
 UniquePtr<OperatorState> MakeCompactFinishState(PhysicalCompactFinish *physical_compact_finish, FragmentContext *fragment_ctx) {
     if (fragment_ctx->ContextType() != FragmentType::kSerialMaterialize) {
-        UnrecoverableError("Compact finish operator should be in serial materialized fragment.");
+        String error_message = "Compact finish operator should be in serial materialized fragment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_ctx);
     auto compact_finish_operator_state = MakeUnique<CompactFinishOperatorState>(serial_materialize_fragment_ctx->compact_state_data_);
@@ -268,16 +288,22 @@ UniquePtr<OperatorState>
 MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops, FragmentTask *task, FragmentContext *fragment_ctx) {
     switch (physical_ops[operator_id]->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
-            UnrecoverableError("Invalid physical operator type");
+            String error_message = "Invalid physical operator type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case PhysicalOperatorType::kTableScan: {
             if (operator_id != physical_ops.size() - 1) {
-                UnrecoverableError("Table scan operator must be the first operator of the fragment.");
+                String error_message = "Table scan operator must be the first operator of the fragment.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             if (operator_id == 0) {
-                UnrecoverableError("Table scan shouldn't be the last operator of the fragment.");
+                String error_message = "Table scan shouldn't be the last operator of the fragment.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             auto physical_table_scan = static_cast<PhysicalTableScan *>(physical_ops[operator_id]);
             return MakeTableScanState(physical_table_scan, task);
@@ -304,11 +330,15 @@ MakeTaskState(SizeT operator_id, const Vector<PhysicalOperator *> &physical_ops,
         }
         case PhysicalOperatorType::kIndexScan: {
             if (operator_id != physical_ops.size() - 1) {
-                UnrecoverableError("Table scan operator must be the first operator of the fragment.");
+                String error_message = "Table scan operator must be the first operator of the fragment.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             if (operator_id == 0) {
-                UnrecoverableError("Table scan shouldn't be the last operator of the fragment.");
+                String error_message = "Table scan shouldn't be the last operator of the fragment.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             auto physical_index_scan = static_cast<PhysicalIndexScan *>(physical_ops[operator_id]);
             return MakeIndexScanState(physical_index_scan, task);
@@ -481,13 +511,17 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
     Vector<PhysicalOperator *> &fragment_operators = fragment_ptr->GetOperators();
     i64 operator_count = fragment_operators.size();
     if (operator_count < 1) {
-        UnrecoverableError("No operators in the fragment.");
+        String error_message = "No operators in the fragment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     UniquePtr<FragmentContext> fragment_context = nullptr;
     switch (fragment_ptr->GetFragmentType()) {
         case FragmentType::kInvalid: {
-            UnrecoverableError("Invalid fragment type");
+            String error_message = "Invalid fragment type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case FragmentType::kSerialMaterialize: {
             fragment_context = MakeUnique<SerialMaterializedFragmentCtx>(fragment_ptr, query_context, notifier);
@@ -551,7 +585,9 @@ void FragmentContext::BuildTask(QueryContext *query_context, FragmentContext *pa
                             break;
                         }
                         case SinkStateType::kInvalid: {
-                            UnrecoverableError("Invalid sink operator state type.");
+                            String error_message = "Invalid sink operator state type.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
                         }
                         default: {
                             break;
@@ -667,7 +703,9 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
             break;
         }
         default: {
-            UnrecoverableError("Invalid fragment type.");
+            String error_message = "Invalid fragment type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -687,11 +725,15 @@ SizeT InitCreateIndexDoFragmentContext(const PhysicalCreateIndexDo *create_index
 SizeT InitCompactFragmentContext(PhysicalCompact *compact_operator, FragmentContext *fragment_context, FragmentContext *parent_context) {
     SizeT task_n = compact_operator->TaskletCount();
     if (fragment_context->ContextType() != FragmentType::kParallelMaterialize) {
-        UnrecoverableError("Compact operator should be in parallel materialized fragment.");
+        String error_message = "Compact operator should be in parallel materialized fragment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
     if (parent_context->ContextType() != FragmentType::kSerialMaterialize) {
-        UnrecoverableError("Compact operator parent should be in serial materialized fragment.");
+        String error_message = "Compact operator parent should be in serial materialized fragment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *parent_serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(parent_context);
 
@@ -705,7 +747,9 @@ SizeT InitCompactIndexPrepareFragmentContext(PhysicalCompactIndexPrepare *compac
                                              FragmentContext *parent_context) {
     SizeT task_n = compact_index_prepare_operator->TaskletCount();
     if (fragment_context->ContextType() != FragmentType::kSerialMaterialize) {
-        UnrecoverableError("Compact index prepare operator should be in parallel materialized fragment.");
+        String error_message = "Compact index prepare operator should be in parallel materialized fragment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
     if (parent_context->ContextType() == FragmentType::kSerialMaterialize) {
@@ -724,11 +768,15 @@ void InitCompactIndexDoFragmentContext(PhysicalCompactIndexDo *compact_index_do_
                                        FragmentContext *fragment_context,
                                        FragmentContext *parent_context) {
     if (fragment_context->ContextType() != FragmentType::kParallelMaterialize) {
-        UnrecoverableError("Compact index do operator should be in parallel materialized fragment.");
+        String error_message = "Compact index do operator should be in parallel materialized fragment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_context);
     if (parent_context->ContextType() != FragmentType::kSerialMaterialize) {
-        UnrecoverableError("Compact index do operator parent should be in serial materialized fragment.");
+        String error_message = "Compact index do operator parent should be in serial materialized fragment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *parent_serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(parent_context);
     parallel_materialize_fragment_ctx->compact_state_data_ = parent_serial_materialize_fragment_ctx->compact_state_data_;
@@ -743,7 +791,9 @@ void InitCompactIndexDoFragmentContext(PhysicalCompactIndexDo *compact_index_do_
 
 void InitCompactFinishFragmentContext(PhysicalCompactFinish *compact_finish_operator, FragmentContext *fragment_context) {
     if (fragment_context->ContextType() != FragmentType::kSerialMaterialize) {
-        UnrecoverableError("Compact finish operator should be in serial materialized fragment.");
+        String error_message = "Compact finish operator should be in serial materialized fragment.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_context);
     TableEntry *table_entry = compact_finish_operator->base_table_ref_->table_entry_ptr_;
@@ -754,7 +804,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
     PhysicalOperator *first_operator = this->GetOperators().back();
     switch (first_operator->operator_type()) {
         case PhysicalOperatorType::kInvalid: {
-            UnrecoverableError("Unexpected operator type");
+            String error_message = "Unexpected operator type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case PhysicalOperatorType::kAggregate: {
             if (fragment_type_ != FragmentType::kParallelMaterialize) {
@@ -781,7 +833,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
                 // Only one operator and it's project
                 tasks_[0]->source_state_ = MakeUnique<EmptySourceState>();
             } else {
-                UnrecoverableError("Project shouldn't be the first operator of the fragment");
+                String error_message = "Project shouldn't be the first operator of the fragment";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             break;
         }
@@ -970,7 +1024,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
     switch (last_operator->operator_type()) {
 
         case PhysicalOperatorType::kInvalid: {
-            UnrecoverableError("Unexpected operator type");
+            String error_message = "Unexpected operator type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case PhysicalOperatorType::kAggregate: {
             if (fragment_type_ != FragmentType::kParallelMaterialize) {
@@ -978,7 +1034,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             if ((i64)tasks_.size() != parallel_count) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
@@ -995,7 +1053,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             if ((i64)tasks_.size() != parallel_count) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
@@ -1013,7 +1073,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             if ((i64)tasks_.size() != parallel_count) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
@@ -1037,7 +1099,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             if (tasks_.size() != 1) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             tasks_[0]->sink_state_ = MakeUnique<QueueSinkState>(fragment_ptr_->FragmentID(), 0);
@@ -1052,7 +1116,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             if (tasks_.size() != 1) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             tasks_[0]->sink_state_ = MakeUnique<MaterializeSinkState>(fragment_ptr_->FragmentID(), 0);
@@ -1077,7 +1143,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             if ((i64)tasks_.size() != parallel_count) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
@@ -1094,7 +1162,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             if ((i64)tasks_.size() != parallel_count) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
@@ -1108,7 +1178,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
         case PhysicalOperatorType::kProjection: {
             if (fragment_type_ == FragmentType::kSerialMaterialize) {
                 if (tasks_.size() != 1) {
-                    UnrecoverableError("SerialMaterialize type fragment should only have 1 task.");
+                    String error_message = "SerialMaterialize type fragment should only have 1 task.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
 
                 tasks_[0]->sink_state_ = MakeUnique<MaterializeSinkState>(fragment_ptr_->FragmentID(), 0);
@@ -1117,7 +1189,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
                 sink_state_ptr->column_names_ = last_operator->GetOutputNames();
             } else {
                 if ((i64)tasks_.size() != parallel_count) {
-                    UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+                    String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type()));
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
 
                 for (u64 task_id = 0; (i64)task_id < parallel_count; ++task_id) {
@@ -1166,7 +1240,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             if (tasks_.size() != 1) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             tasks_[0]->sink_state_ = MakeUnique<MessageSinkState>();
@@ -1204,7 +1280,9 @@ void FragmentContext::MakeSinkState(i64 parallel_count) {
             }
 
             if (tasks_.size() != 1) {
-                UnrecoverableError(fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type())));
+                String error_message = fmt::format("{} task count isn't correct.", PhysicalOperatorToString(last_operator->operator_type()));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             tasks_[0]->sink_state_ = MakeUnique<ResultSinkState>();
@@ -1304,7 +1382,9 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count, FragmentCon
 
     switch (fragment_type_) {
         case FragmentType::kInvalid: {
-            UnrecoverableError("Invalid fragment type");
+            String error_message = "Invalid fragment type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case FragmentType::kSerialMaterialize: {
             parallel_count = 1;
@@ -1334,7 +1414,9 @@ void FragmentContext::CreateTasks(i64 cpu_count, i64 operator_count, FragmentCon
 SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
     // Only one sink state
     if (tasks_.size() != 1) {
-        UnrecoverableError("There should be one sink state in serial materialized fragment");
+        String error_message = "There should be one sink state in serial materialized fragment";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     if (tasks_[0]->sink_state_->Ignore()) {
@@ -1348,7 +1430,9 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
 
     switch (tasks_[0]->sink_state_->state_type()) {
         case SinkStateType::kInvalid: {
-            UnrecoverableError("Invalid sink state type");
+            String error_message = "Invalid sink state type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case SinkStateType::kMaterialize: {
@@ -1380,7 +1464,9 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
         case SinkStateType::kMessage: {
             auto *message_sink_state = static_cast<MessageSinkState *>(tasks_[0]->sink_state_.get());
             if (message_sink_state->message_.get() == nullptr) {
-                UnrecoverableError("No response message");
+                String error_message = "No response message";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             SharedPtr<DataTable> result_table = DataTable::MakeEmptyResultTable();
@@ -1398,7 +1484,9 @@ SharedPtr<DataTable> SerialMaterializedFragmentCtx::GetResultInternal() {
             return result_table;
         }
         case SinkStateType::kQueue: {
-            UnrecoverableError("Can't get result from Queue sink type.");
+            String error_message = "Can't get result from Queue sink type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     String error_message = "Unreachable";
@@ -1438,7 +1526,9 @@ SharedPtr<DataTable> ParallelMaterializedFragmentCtx::GetResultInternal() {
 
     for (const auto &task : tasks_) {
         if (task->sink_state_->state_type() != SinkStateType::kMaterialize) {
-            UnrecoverableError("Parallel materialized fragment will only have common sink stte");
+            String error_message = "Parallel materialized fragment will only have common sink state";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         auto *materialize_sink_state = static_cast<MaterializeSinkState *>(task->sink_state_.get());
@@ -1485,7 +1575,9 @@ SharedPtr<DataTable> ParallelStreamFragmentCtx::GetResultInternal() {
 
     for (const auto &task : tasks_) {
         if (task->sink_state_->state_type() != SinkStateType::kMaterialize) {
-            UnrecoverableError("Parallel materialized fragment will only have common sink state");
+            String error_message = "Parallel materialized fragment will only have common sink state";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         auto *materialize_sink_state = static_cast<MaterializeSinkState *>(task->sink_state_.get());

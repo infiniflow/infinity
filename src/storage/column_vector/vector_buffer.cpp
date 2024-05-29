@@ -110,7 +110,6 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
 }
 
 void VectorBuffer::InitializeCompactBit(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT capacity) {
-    // UnrecoverableError("Not implemented.");
     if (initialized_) {
         String error_message = "Vector buffer is already initialized.";
         LOG_CRITICAL(error_message);
