@@ -69,7 +69,7 @@ void WrapInsert(Infinity& instance,
 }
 
 
-NB_MODULE(embedded_infinity, m) {
+NB_MODULE(embedded_infinity_ext, m) {
     m.def("add", &add);
     m.def("mul", &mul);
     m.def("hello", &infinity::Infinity::Hello);

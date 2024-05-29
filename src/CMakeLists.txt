@@ -286,24 +286,24 @@ target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 
-add_library(embedded_infinity MODULE
-        embedded_infinity.cpp
+add_library(embedded_infinity_ext MODULE
+        embedded_infinity_ext.cpp
 )
 
-target_sources(embedded_infinity
+target_sources(embedded_infinity_ext
         PRIVATE
         FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
 )
 
-nanobind_compile_options(embedded_infinity)
-nanobind_link_options(embedded_infinity)
-set_target_properties(embedded_infinity PROPERTIES LINKER_LANGUAGE CXX)
+nanobind_compile_options(embedded_infinity_ext)
+nanobind_link_options(embedded_infinity_ext)
+set_target_properties(embedded_infinity_ext PROPERTIES LINKER_LANGUAGE CXX)
 set(libname "nanobind")
 nanobind_build_library(${libname})
-nanobind_extension(embedded_infinity)
-add_dependencies(embedded_infinity oatpp)
+nanobind_extension(embedded_infinity_ext)
+add_dependencies(embedded_infinity_ext oatpp)
 
-target_link_libraries(embedded_infinity PRIVATE
+target_link_libraries(embedded_infinity_ext PRIVATE
         ${libname}
         infinity_core
         sql_parser
@@ -319,10 +319,10 @@ target_link_libraries(embedded_infinity PRIVATE
         jma
 )
 
-target_link_directories(embedded_infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(embedded_infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
+target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 
-install(TARGETS embedded_infinity LIBRARY DESTINATION infinity)
+install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity)
 
 ### unit test
 
