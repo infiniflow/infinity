@@ -17,13 +17,17 @@ statement error
 INSERT INTO test_insert_sparse VALUES (3, [3000:3.0, 3000:4.0]);
 
 statement ok
-INSERT INTO test_insert_sparse VALUES (4, [4000:4.0]);
+INSERT INTO test_insert_sparse VALUES (3, [3000:3.0]);
+
+statement ok
+INSERT INTO test_insert_sparse VALUES (0, []);
 
 query I
 SELECT * FROM test_insert_sparse;
 ----
 1 10000: 1.000000, 20000: 2.000000
-4 4000: 4.000000
+3 3000: 3.000000
+0 (empty)
 
 #######################################
 
@@ -78,10 +82,14 @@ statement error
 INSERT INTO test_insert_sparse VALUES (3, [3000, 3000]);
 
 statement ok
-INSERT INTO test_insert_sparse VALUES (4, [4000]);
+INSERT INTO test_insert_sparse VALUES (3, [3000]);
+
+statement ok
+INSERT INTO test_insert_sparse VALUES (0, []);
 
 query I
 SELECT * FROM test_insert_sparse;
 ----
 1 10000, 20000
-4 4000
+3 3000
+0 (empty)

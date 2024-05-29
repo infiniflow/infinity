@@ -23,6 +23,9 @@ namespace infinity {
 
 template <typename DataType, typename IndiceType>
 std::string Sparse2StringT2(const DataType *data_ptr, const IndiceType *indice_ptr, size_t nnz) {
+    if (nnz == 0) {
+        return "(empty)";
+    }
     std::stringstream ss;
     if constexpr (std::is_same_v<DataType, bool>) {
         for (size_t i = 0; i < nnz; ++i) {

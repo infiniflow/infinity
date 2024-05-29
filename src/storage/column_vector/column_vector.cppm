@@ -316,6 +316,12 @@ private:
         SizeT total_element_count = ele_str_views.size();
         target_sparse.nnz_ = total_element_count;
 
+        if (total_element_count == 0) {
+            target_sparse.chunk_id_ = -1;
+            target_sparse.chunk_offset_ = 0;
+            return;
+        }
+
         auto tmp_indices = MakeUniqueForOverwrite<IdxT[]>(total_element_count);
         HashSet<IdxT> index_set;
         if constexpr (std::is_same_v<T, BooleanT>) {

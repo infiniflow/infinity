@@ -44,9 +44,6 @@ public:
     }
 
     static std::shared_ptr<SparseInfo> Make(EmbeddingDataType data_type, EmbeddingDataType idx_type, size_t dimension) {
-        if (dimension == 0) {
-            ParserError("Dimension of sparse should not be 0 and should not be negative.");
-        }
         return std::make_shared<SparseInfo>(data_type, idx_type, dimension);
     }
 
