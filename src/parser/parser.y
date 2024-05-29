@@ -2695,7 +2695,10 @@ sparse_array_expr: long_sparse_array_expr {
 
 long_sparse_array_expr: unclosed_long_sparse_array_expr ']' {
     $$ = $1;
-};
+}
+| '[' ']' {
+    $$ = new infinity::ConstantExpr(infinity::LiteralType::kLongSparseArray);
+}
 
 unclosed_long_sparse_array_expr: '[' int_sparse_ele {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kLongSparseArray);
@@ -2711,7 +2714,10 @@ unclosed_long_sparse_array_expr: '[' int_sparse_ele {
 
 double_sparse_array_expr: unclosed_double_sparse_array_expr ']' {
     $$ = $1;
-};
+}
+| '[' ']' {
+    $$ = new infinity::ConstantExpr(infinity::LiteralType::kDoubleSparseArray);
+}
 
 unclosed_double_sparse_array_expr: '[' float_sparse_ele {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDoubleSparseArray);

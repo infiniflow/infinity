@@ -65,6 +65,11 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
                                    FixHeapManager *target_fix_heap_mgr) {
     const auto &[source_nnz, source_chunk_id, source_chunk_offset] = source;
     target.nnz_ = source_nnz;
+    if (source_nnz == 0) {
+        target.chunk_id_ = -1;
+        target.chunk_offset_ = 0;
+        return;
+    }
     const_ptr_t source_ptr = source_fix_heap_mgr->GetRawPtrFromChunk(source_chunk_id, source_chunk_offset);
     SizeT sparse_bytes = source_info->SparseSize(source_nnz);
     if constexpr (std::is_same_v<TargetValueType, SourceValueType>) {
@@ -93,6 +98,7 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
         const SizeT source_indice_size = source_info->IndiceSize(source_nnz);
         Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
         UniquePtr<TargetIndiceType[]> target_indice_tmp_ptr;
+        UniquePtr<TargetValueType[]> target_value_tmp_ptr;
         if constexpr (std::is_same_v<TargetIndiceType, SourceIndiceType>) {
             data_ptrs.emplace_back(reinterpret_cast<const char *>(source_ptr), source_indice_size);
         } else {
@@ -107,16 +113,19 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
             }
             data_ptrs.emplace_back(reinterpret_cast<const char *>(target_indice_tmp_ptr.get()), target_indice_size);
         }
-        auto target_value_tmp_ptr = MakeUniqueForOverwrite<TargetValueType[]>(source_nnz);
-        const SizeT target_data_size = target_info->DataSize(source_nnz);
-        if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceValueType *>(source_ptr + source_indice_size),
-                                           reinterpret_cast<TargetValueType *>(target_value_tmp_ptr.get()),
-                                           source_nnz)) {
-            UnrecoverableError(fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
-                                           DataType::TypeToString<SourceValueType>(),
-                                           DataType::TypeToString<TargetValueType>()));
+
+        if constexpr (!std::is_same_v<TargetValueType, BooleanT>) {
+            target_value_tmp_ptr = MakeUniqueForOverwrite<TargetValueType[]>(source_nnz);
+            const SizeT target_data_size = target_info->DataSize(source_nnz);
+            if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceValueType *>(source_ptr + source_indice_size),
+                                            reinterpret_cast<TargetValueType *>(target_value_tmp_ptr.get()),
+                                            source_nnz)) {
+                UnrecoverableError(fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
+                                            DataType::TypeToString<SourceValueType>(),
+                                            DataType::TypeToString<TargetValueType>()));
+            }
+            data_ptrs.emplace_back(reinterpret_cast<const char *>(target_value_tmp_ptr.get()), target_data_size);
         }
-        data_ptrs.emplace_back(reinterpret_cast<const char *>(target_value_tmp_ptr.get()), target_data_size);
         std::tie(target.chunk_id_, target.chunk_offset_) = target_fix_heap_mgr->AppendToHeap(data_ptrs);
     }
 }
@@ -296,7 +305,8 @@ void SparseTryCastToSparseFun(const SparseInfo *source_info,
                               ColumnVector *target_vector_ptr) {
     switch (target_info->DataType()) {
         case kElemBit: {
-            UnrecoverableError("Unimplemented type");
+            SparseTryCastToSparseFunT1<BooleanT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
+            break;
         }
         case kElemInt8: {
             SparseTryCastToSparseFunT1<TinyIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);

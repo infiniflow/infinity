@@ -752,41 +752,97 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_obj
                 }
             }
         }
+        default: {
+            const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
+            LOG_ERROR(error_info);
+            RecoverableError(Status::ImportFileFormatError(error_info));
+            return nullptr;
+        }
+    }
+}
+
+SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &json_object, const SparseInfo *sparse_info) {
+    SharedPtr<ConstantExpr> res = nullptr;
+    switch (sparse_info->DataType()) {
+        case kElemBit:
+        case kElemInt8:
+        case kElemInt16:
+        case kElemInt32:
+        case kElemInt64: {
+            res = MakeShared<ConstantExpr>(LiteralType::kLongSparseArray);
+            break;
+        }
+        case kElemFloat:
+        case kElemDouble: {
+            res = MakeShared<ConstantExpr>(LiteralType::kDoubleSparseArray);
+            break;
+        }
+        default: {
+            const auto error_info = fmt::format("Unsupported sparse data type: {}", sparse_info->DataType());
+            RecoverableError(Status::ImportFileFormatError(error_info));
+            return nullptr;
+        }
+    }
+    if (json_object.size() == 0) {
+        return res;
+    }
+    switch (json_object.type()) {
+        case nlohmann::json::value_t::array: {
+            const u32 array_size = json_object.size();
+            switch (json_object[0].type()) {
+                case nlohmann::json::value_t::number_unsigned:
+                case nlohmann::json::value_t::number_integer: {
+                    res->long_sparse_array_.first.resize(array_size);
+                    for (u32 i = 0; i < array_size; ++i) {
+                        res->long_sparse_array_.first[i] = json_object[i].get<i64>();
+                    }
+                    return res;
+                }
+                default: {
+                    const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
+                    RecoverableError(Status::ImportFileFormatError(error_info));
+                    return nullptr;
+                }
+            }
+        }
         case nlohmann::json::value_t::object: {
-            SharedPtr<ConstantExpr> res = nullptr;
+            HashSet<i64> key_set;
             for (auto iter = json_object.begin(); iter != json_object.end(); ++iter) {
                 i64 key = std::stoll(iter.key());
-                const auto &value_obj = iter.value();
-                switch(value_obj.type()) {
-                    case nlohmann::json::value_t::number_unsigned:
-                    case nlohmann::json::value_t::number_integer: {
-                        if (res.get() == nullptr) {
-                            res = MakeShared<ConstantExpr>(LiteralType::kLongSparseArray);
-                        } else if (res->literal_type_ != LiteralType::kLongSparseArray) {
-                            const auto error_info = "Invalid json object type in sparse array!";
+                auto [_, insert_ok] = key_set.insert(key);
+                if (!insert_ok) {
+                    const auto error_info = fmt::format("Duplicate key {} in sparse array!", key);
+                    RecoverableError(Status::ImportFileFormatError(error_info));
+                    return nullptr;
+                }
+                if (res->literal_type_ == LiteralType::kLongSparseArray) {
+                    const auto &value_obj = iter.value();
+                    switch(value_obj.type()) {
+                        case nlohmann::json::value_t::number_unsigned:
+                        case nlohmann::json::value_t::number_integer: {
+                            res->long_sparse_array_.first.push_back(key);
+                            res->long_sparse_array_.second.push_back(value_obj.get<i64>());
+                            break;
+                        }
+                        default: {
+                            const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
                             RecoverableError(Status::ImportFileFormatError(error_info));
                             return nullptr;
                         }
-                        res->long_sparse_array_.first.push_back(key);
-                        res->long_sparse_array_.second.push_back(value_obj.get<i64>());
-                        break;
                     }
-                    case nlohmann::json::value_t::number_float: {
-                        if (res.get() == nullptr) {
-                            res = MakeShared<ConstantExpr>(LiteralType::kDoubleSparseArray);
-                        } else if (res->literal_type_ != LiteralType::kDoubleSparseArray) {
-                            const auto error_info = "Invalid json object type in sparse array!";
+                } else {
+                    const auto &value_obj = iter.value();
+                    switch(value_obj.type()) {
+                        case nlohmann::json::value_t::number_float: {
+                            res->double_sparse_array_.first.push_back(key);
+                            res->double_sparse_array_.second.push_back(value_obj.get<double>());
+                            break;
+                        }
+                        default: {
+                            const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
                             RecoverableError(Status::ImportFileFormatError(error_info));
                             return nullptr;
                         }
-                        res->double_sparse_array_.first.push_back(key);
-                        res->double_sparse_array_.second.push_back(value_obj.get<double>());
-                        break;
-                    }
-                    default: {
-                        const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
-                        RecoverableError(Status::ImportFileFormatError(error_info));
-                        return nullptr;
                     }
                 }
             }
@@ -888,10 +944,21 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                     break;
                 }
                 case kTensor:
-                case kTensorArray:
-                case kSparse: {
+                case kTensorArray: {
                     // build ConstantExpr
                     SharedPtr<ConstantExpr> const_expr = BuildConstantExprFromJson(line_json[column_def->name_]);
+                    if (const_expr.get() == nullptr) {
+                        RecoverableError(Status::ImportFileFormatError("Invalid json object."));
+                    }
+                    column_vector.AppendByConstantExpr(const_expr.get());
+                    break;
+                }
+                case kSparse: {
+                    const auto *sparse_info = static_cast<SparseInfo *>(column_vector.data_type()->type_info().get());
+                    SharedPtr<ConstantExpr> const_expr = BuildConstantSparseExprFromJson(line_json[column_def->name_], sparse_info);
+                    if (const_expr.get() == nullptr) {
+                        RecoverableError(Status::ImportFileFormatError("Invalid json object."));
+                    }
                     column_vector.AppendByConstantExpr(const_expr.get());
                     break;
                 }

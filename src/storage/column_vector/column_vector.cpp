@@ -824,6 +824,9 @@ String ColumnVector::ToString(SizeT row_index) const {
             }
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
             const auto &[nnz, chunk_id, chunk_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[row_index];
+            if (nnz == 0) {
+                return SparseT::Sparse2String(nullptr, nullptr, sparse_info->DataType(), sparse_info->IndexType(), 0);
+            }
             const char *raw_data_ptr = buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
             const char *indice_ptr = raw_data_ptr;
             const char *data_ptr = indice_ptr + nnz * EmbeddingType::EmbeddingDataWidth(sparse_info->IndexType());
@@ -1177,7 +1180,12 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
             data_ptrs.emplace_back(source_indice_ptr, indice_bytes);
             data_ptrs.emplace_back(source_data_ptr, data_bytes);
-            std::tie(target_chunk_id, target_chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(data_ptrs);
+            if (source_nnz == 0) {
+                target_chunk_id = -1;
+                target_chunk_offset = 0;
+            } else {
+                std::tie(target_chunk_id, target_chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(data_ptrs);
+            }
             break;
         }
         case kEmbedding: {
@@ -1646,7 +1654,8 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
             switch(sparse_info->DataType()) {
                 case kElemBit: {
-                    UnrecoverableError("Unimplemented yet");
+                    AppendSparse<BooleanT>(ele_str_views, index);
+                    break;
                 }
                 case kElemInt8: {
                     AppendSparse<TinyIntT>(ele_str_views, index);
@@ -2172,6 +2181,11 @@ void CopySparse(SparseT &dst_sparse,
                 FixHeapManager *src_fix_heap_mgr,
                 SizeT sparse_bytes) {
     dst_sparse.nnz_ = src_sparse.nnz_;
+    if (src_sparse.nnz_ == 0) {
+        dst_sparse.chunk_id_ = -1;
+        dst_sparse.chunk_offset_ = 0;
+        return;
+    }
     std::tie(dst_sparse.chunk_id_, dst_sparse.chunk_offset_) =
         dst_fix_heap_mgr->AppendToHeap(src_fix_heap_mgr, src_sparse.chunk_id_, src_sparse.chunk_offset_, sparse_bytes);
 }
