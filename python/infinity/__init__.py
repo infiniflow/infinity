@@ -12,18 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import importlib.metadata
-
-__version__ = importlib.metadata.version("infinity_sdk")
+# import importlib.metadata
+#
+# __version__ = importlib.metadata.version("infinity_sdk")
 
 from infinity.common import URI, NetworkAddress, LOCAL_HOST
-from infinity.infinity import InfinityConnection
-from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
-
-def connect(
-        uri: URI = LOCAL_HOST
-) -> InfinityConnection:
-    if isinstance(uri, NetworkAddress) and (uri.port == 9090 or uri.port == 23817 or uri.port == 9070):
-        return RemoteThriftInfinityConnection(uri)
-    else:
-        raise Exception(f"unknown uri: {uri}")
+# from infinity.infinity import InfinityConnection
+# from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
+#
+# def connect(
+#         uri: URI = LOCAL_HOST
+# ) -> InfinityConnection:
+#     if isinstance(uri, NetworkAddress) and (uri.port == 9090 or uri.port == 23817 or uri.port == 9070):
+#         return RemoteThriftInfinityConnection(uri)
+#     else:
+#         raise Exception(f"unknown uri: {uri}")

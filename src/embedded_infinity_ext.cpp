@@ -21,6 +21,7 @@ import status;
 import base_table;
 import data_table;
 import table_entry_type;
+import table_def;
 
 class SayHello{
 public:
@@ -49,6 +50,22 @@ void print_str(infinity::String str) {
     std::cout << str << std::endl;
 }
 
+const char* get_hello() {
+    const static char hello[] = "hello";
+    std::cout << "get hello func: " << hello << std::endl;
+    return hello;
+}
+
+void test_shared(infinity::SharedPtr<infinity::String> ptr) {
+    std::cout << ptr.get() << std::endl;
+}
+
+void test_shared_wrap(infinity::String str) {
+    auto str_ptr = infinity::MakeShared<infinity::String>(str);
+    test_shared(str_ptr);
+}
+
+
 // using infinity::Infinity;
 using namespace infinity;
 namespace nb = nanobind;
@@ -74,7 +91,8 @@ NB_MODULE(embedded_infinity_ext, m) {
     m.def("mul", &mul);
     m.def("hello", &infinity::Infinity::Hello);
     m.def("print_str", &print_str);
-
+    m.def("get_hello", &get_hello);
+    m.def("test_shared", &test_shared_wrap);
     // infinity
     nb::class_<Infinity>(m, "Infinity")
         .def(nb::init<>())  // bind constructor
@@ -127,7 +145,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def("ShowBlocks", &Infinity::ShowBlocks)
         .def("ShowBlockColumn", &Infinity::ShowBlockColumn)
 
-        //        .def("Insert", &WrapInsert)
+        .def("Insert", &WrapInsert)
         .def("Import", &Infinity::Import)
         .def("Delete", &Infinity::Delete)
         .def("Update", &Infinity::Update)
@@ -277,6 +295,7 @@ NB_MODULE(embedded_infinity_ext, m) {
 
     nb::class_<QueryResult, BaseResult>(m, "QueryResult")
         .def(nb::init<>())
+        .def_rw("root_operator_type", &QueryResult::root_operator_type_)
         .def("ToString", &QueryResult::ToString)
         .def_static("UnusedResult", &QueryResult::UnusedResult);
 
@@ -488,26 +507,26 @@ NB_MODULE(embedded_infinity_ext, m) {
         .export_values();
 
     // base_table
-//    nb::class_<BaseTable>(m, "BaseTable")
+    nb::class_<BaseTable>(m, "BaseTable")
 //        .def(nb::init<TableEntryType, std::shared_ptr<std::string>, std::shared_ptr<std::string>>())
-//        .def("kind", &BaseTable::kind)
+        .def("kind", &BaseTable::kind);
 //        .def("schema_name", &BaseTable::schema_name)
 //        .def("table_name", &BaseTable::table_name);
 
     // data_table
-//    nb::class_<DataTable, BaseTable>(m, "DataTable")
-//        .def(nb::init<std::shared_ptr<TableDef>, TableType>(),
-//             nb::arg("table_def_ptr"), nb::arg("type"))
-//
-//        .def_static("Make", &DataTable::Make,
-//                    nb::arg("table_def_ptr"), nb::arg("type"))
-//        .def_static("MakeResultTable", &DataTable::MakeResultTable,
-//                    nb::arg("column_defs"))
-//        .def_static("MakeEmptyResultTable", &DataTable::MakeEmptyResultTable)
-//        .def_static("MakeSummaryResultTable", &DataTable::MakeSummaryResultTable,
-//                    nb::arg("counter"), nb::arg("sum"))
-//
-//        .def("ColumnCount", &DataTable::ColumnCount)
+    nb::class_<DataTable, BaseTable>(m, "DataTable")
+        .def(nb::init<std::shared_ptr<TableDef>, TableType>(),
+             nb::arg("table_def_ptr"), nb::arg("type"))
+
+        .def_static("Make", &DataTable::Make,
+                    nb::arg("table_def_ptr"), nb::arg("type"))
+        .def_static("MakeResultTable", &DataTable::MakeResultTable,
+                    nb::arg("column_defs"))
+        .def_static("MakeEmptyResultTable", &DataTable::MakeEmptyResultTable)
+        .def_static("MakeSummaryResultTable", &DataTable::MakeSummaryResultTable,
+                    nb::arg("counter"), nb::arg("sum"))
+
+        .def("ColumnCount", &DataTable::ColumnCount);
 //        .def("TableName", &DataTable::TableName)
 //        .def("SchemaName", &DataTable::SchemaName)
 //        .def("GetColumnIdByName", &DataTable::GetColumnIdByName, nb::arg("column_name"))
@@ -530,4 +549,6 @@ NB_MODULE(embedded_infinity_ext, m) {
 //        .def_rw("type_", &DataTable::type_)
 //        .def_rw("data_blocks_", &DataTable::data_blocks_)
 //        .def_rw("result_msg_", &DataTable::result_msg_);
+    // table_def
+
 }

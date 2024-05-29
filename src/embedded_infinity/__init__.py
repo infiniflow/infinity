@@ -4,10 +4,10 @@
 import os
 import sys
 
-# current_dir = os.path.dirname(__file__)
-# build_dir = os.path.join(current_dir, '..', '..', 'build', 'src')
-# print(build_dir)
-# sys.path.insert(0, os.path.abspath(build_dir))
+# current_dir = os.path.dirname(os.path.abspath(__file__))
+# build_dir = os.path.join(current_dir, '..', '..', 'build', 'cp311-cp311-linux_x86_64', 'src')
+# sys.path.append(os.path.abspath(build_dir))
+# print(os.path.abspath(build_dir))
 sys.path.append(os.path.abspath("/home/weilongma/Project/infinity/build/cp311-cp311-linux_x86_64/src"))
 
 try:
