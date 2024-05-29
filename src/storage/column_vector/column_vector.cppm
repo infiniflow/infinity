@@ -318,14 +318,20 @@ private:
 
         auto tmp_indices = MakeUniqueForOverwrite<IdxT[]>(total_element_count);
         auto tmp_data = MakeUniqueForOverwrite<T[]>(total_element_count);
+        HashSet<IdxT> index_set;
         for (u32 i = 0; i < total_element_count; ++i) {
             auto [index, value] = DataType::StringToSparseValue<T, IdxT>(ele_str_views[i]);
             tmp_indices[i] = index;
             tmp_data[i] = value;
+            auto [iter, insert_ok] = index_set.insert(index);
+            if (!insert_ok) {
+                RecoverableError(Status::InvalidDataType());
+            }
         }
-        std::tie(target_sparse.chunk_id_, target_sparse.chunk_offset_) =
-            buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_indices.get()), total_element_count * sizeof(IdxT));
-        buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), total_element_count * sizeof(T));
+        Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
+        data_ptrs.emplace_back(reinterpret_cast<const char *>(tmp_indices.get()), total_element_count * sizeof(IdxT));
+        data_ptrs.emplace_back(reinterpret_cast<const char *>(tmp_data.get()), total_element_count * sizeof(T));
+        std::tie(target_sparse.chunk_id_, target_sparse.chunk_offset_) = buffer_->fix_heap_mgr_->AppendToHeap(data_ptrs);
     }
 
     // Used by Append by Ptr

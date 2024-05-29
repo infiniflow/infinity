@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "unit_test/base_test.h"
+#include <cassert>
 
 import stl;
 import linscan_alg;
@@ -27,7 +28,7 @@ protected:
 
     void TearDown() override {}
 
-    SparseMatrix GenerateDataset(u32 nrow, u32 ncol, f32 sparsity = 0.05, f32 data_min = -10.0, f32 data_max = 10.0) {
+    SparseMatrix GenerateDataset(u32 nrow, u32 ncol, f32 sparsity = 0.01, f32 data_min = -10.0, f32 data_max = 10.0) {
         if (sparsity < 0.0 || sparsity > 1.0) {
             throw std::runtime_error("Invalid sparsity.");
         }
@@ -47,7 +48,7 @@ protected:
                 data[i] = distrib(rng_);
             }
         }
-        {
+        while (true) {
             indptr[0] = 0;
             indptr[nrow] = nnz;
             // get nrow - 1 random number between 0 and nnz
@@ -55,16 +56,34 @@ protected:
                 indptr[i] = rng_() % (nnz + 1);
             }
             std::sort(indptr.get(), indptr.get() + nrow);
+            bool check = true;
+            for (u32 i = 0; i < nrow; ++i) {
+                if (indptr[i + 1] - indptr[i] > ncol) {
+                    check = false;
+                    break;
+                }
+            }
+            if (check) {
+                break;
+            }
         }
         {
             i64 start = indptr[0];
             for (u32 i = 0; i < nrow; ++i) {
                 i64 end = indptr[i + 1];
-                for (i64 j = start; j < end; ++j) {
-                    indices[j] = rng_() % ncol;
+                assert(end - start <= ncol);
+                HashSet<i32> indice_set;
+                for (i64 j = start; j < end;) {
+                    i32 r = rng_() % ncol;
+                    if (auto [iter, insert_ok] = indice_set.emplace(r); insert_ok) {
+                        ++j;
+                    }
                 }
-                std::sort(indices.get() + start, indices.get() + end);
-                start = end;
+                assert((i64)indice_set.size() == end - start);
+                for (i32 indice : indice_set) {
+                    indices[start] = indice;
+                    ++start;
+                }
             }
         }
         return SparseMatrix{std::move(data), std::move(indices), std::move(indptr), nrow, ncol, nnz};
@@ -143,7 +162,7 @@ protected:
 
         u32 nrow_{1000};
         u32 ncol_{1000};
-        f32 sparsity_{0.05};
+        f32 sparsity_{0.01};
         u32 query_n_{50};
         u32 topk_{10};
         f32 error_bound_{1e-6};

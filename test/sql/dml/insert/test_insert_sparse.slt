@@ -7,11 +7,11 @@ CREATE TABLE test_insert_sparse (col1 INT, col2 SPARSE(DOUBLE, 30000));
 statement ok
 INSERT INTO test_insert_sparse VALUES (1, [10000:1.0, 20000:2.0]);
 
-# statement error
-# INSERT INTO test_insert_sparse VALUES (3, [30000:3.0]);
+statement error
+INSERT INTO test_insert_sparse VALUES (3, [30000:3.0]);
 
-# statement error
-# INSERT INTO test_insert_sparse VALUES (3, [3000:3.0, 3000:4.0]);
+statement error
+INSERT INTO test_insert_sparse VALUES (3, [3000:3.0, 3000:4.0]);
 
 statement ok
 INSERT INTO test_insert_sparse VALUES (4, [4000:4.0]);
@@ -21,3 +21,35 @@ SELECT * FROM test_insert_sparse;
 ----
 1 10000: 1.000000, 20000: 2.000000
 4 4000: 4.000000
+
+#######################################
+
+statement ok
+DROP TABLE test_insert_sparse;
+
+statement ok
+CREATE TABLE test_insert_sparse (col1 INT, col2 SPARSE(FLOAT, 30000));
+
+statement ok
+INSERT INTO test_insert_sparse VALUES (1, [10000:1.0, 20000:2.0]);
+
+query I
+SELECT * FROM test_insert_sparse;
+----
+1 10000: 1.000000, 20000: 2.000000
+
+#######################################
+
+statement ok
+DROP TABLE test_insert_sparse;
+
+statement ok
+CREATE TABLE test_insert_sparse (col1 INT, col2 SPARSE(INT, 30000));
+
+statement ok
+INSERT INTO test_insert_sparse VALUES (1, [10000:1, 20000:2]);
+
+query I
+SELECT * FROM test_insert_sparse;
+----
+1 10000: 1, 20000: 2

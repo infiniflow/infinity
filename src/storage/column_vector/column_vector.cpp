@@ -88,7 +88,10 @@ Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVe
             vector_buffer_type = VectorBufferType::kCompactBit;
             break;
         }
-        case LogicalType::kSparse:
+        case LogicalType::kSparse: {
+            vector_buffer_type = VectorBufferType::kSparseHeap;
+            break;
+        }
         case LogicalType::kVarchar: {
             vector_buffer_type = VectorBufferType::kHeap;
             break;
@@ -1130,7 +1133,9 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         }
         case kTensor: {
             const auto embedding_size_unit = data_type_->type_info()->Size();
-            const auto [src_ptr, src_size] = value.GetEmbedding();
+            Span<char> data_span = value.GetEmbedding();
+            const_ptr_t src_ptr = data_span.data();
+            SizeT src_size = data_span.size();
             if (src_size == 0 or (src_size % embedding_size_unit) != 0) {
                 UnrecoverableError(fmt::format("Attempt to store a tensor with total size {} which is not a multiple of embedding size {}",
                                                src_size,
@@ -1149,7 +1154,9 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             Vector<TensorT> tensor_array_data(tensor_num);
             for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
                 auto &[embedding_num, tensor_chunk_id, tensor_chunk_offset] = tensor_array_data[tensor_id];
-                const auto [tensor_data_ptr, tensor_data_bytes] = value_tensor_array[tensor_id]->GetData();
+                Span<char> tensor_data_span = value_tensor_array[tensor_id]->GetData();
+                const_ptr_t tensor_data_ptr = tensor_data_span.data();
+                SizeT tensor_data_bytes = tensor_data_span.size();
                 if (tensor_data_bytes == 0 or (tensor_data_bytes % embedding_size_unit) != 0) {
                     UnrecoverableError(fmt::format("Attempt to store a tensor with total size {} which is not a multiple of embedding size {}",
                                                    tensor_data_bytes,
@@ -1167,15 +1174,16 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             auto [source_nnz, source_indice_ptr, source_data_ptr, indice_bytes, data_bytes] = value.GetSparse();
             target_nnz = source_nnz;
 
-            // Warning: has bug here when has across chunk. fix it.
-            std::tie(target_chunk_id, target_chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(source_indice_ptr, indice_bytes);
-            buffer_->fix_heap_mgr_->AppendToHeap(source_data_ptr, data_bytes);
+            Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
+            data_ptrs.emplace_back(source_indice_ptr, indice_bytes);
+            data_ptrs.emplace_back(source_data_ptr, data_bytes);
+            std::tie(target_chunk_id, target_chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(data_ptrs);
             break;
         }
         case kEmbedding: {
-            const_ptr_t src_ptr;
-            SizeT src_size;
-            std::tie(src_ptr, src_size) = value.GetEmbedding();
+            Span<char> data_span = value.GetEmbedding();
+            const_ptr_t src_ptr = data_span.data();
+            SizeT src_size = data_span.size();
             if (src_size != data_type_->Size()) {
                 UnrecoverableError(fmt::format("Attempt to store a value with different size than column vector type, want {}, got {}",
                                                data_type_->Size(),
@@ -1320,6 +1328,9 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         }
         case kTensorArray: {
             UnrecoverableError("Cannot SetByRawPtr to TensorArray.");
+        }
+        case kSparse: {
+            UnrecoverableError("Cannot SetByRawPtr to sparse");
         }
         case kEmbedding: {
             //            auto *embedding_ptr = (EmbeddingT *)(value_ptr);
@@ -1634,6 +1645,29 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
             switch(sparse_info->DataType()) {
+                case kElemBit: {
+                    UnrecoverableError("Unimplemented yet");
+                }
+                case kElemInt8: {
+                    AppendSparse<TinyIntT>(ele_str_views, index);
+                    break;
+                }
+                case kElemInt16: {
+                    AppendSparse<SmallIntT>(ele_str_views, index);
+                    break;
+                }
+                case kElemInt32: {
+                    AppendSparse<IntegerT>(ele_str_views, index);
+                    break;
+                }
+                case kElemInt64: {
+                    AppendSparse<BigIntT>(ele_str_views, index);
+                    break;
+                }
+                case kElemFloat: {
+                    AppendSparse<FloatT>(ele_str_views, index);
+                    break;
+                }
                 case kElemDouble: {
                     AppendSparse<DoubleT>(ele_str_views, index);
                     break;
