@@ -149,7 +149,7 @@ psql -h 0.0.0.0 -p 5432 -c "SELECT doctitle, ROW_ID(), SCORE() FROM infinity_enw
 |                   | Time to insert & build index | Time to import & build index | P95 Latency(ms)| QPS (16 python clients) |  Memory | vCPU  |
 | ----------------- | ---------------------------- | ---------------------------- | ---------------| ------------------------| --------| ----- |
 | **Elasticsearch** | 2289 s                       | N/A                          | 14.75          | 1340                    | 21.0GB  | 10.6  |
-| **Infinity**      | 2321 s                       | 2890 s                       | 1.86           | 12328                   | 10.0GB  | 11.0  |
+| **Infinity**      | 1562 s                       | 2244 s                       | 1.86           | 12328                   | 10.0GB  | 11.0  |
 
 ---
 
