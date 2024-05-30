@@ -64,6 +64,7 @@ namespace infinity {
 
 ClientVersions::ClientVersions() {
     client_version_map_[1] = String("0.2.0.dev2");
+    client_version_map_[2] = String("0.2.0.dev3");
 }
 
 Pair<const char*, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
