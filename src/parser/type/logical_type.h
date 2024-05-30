@@ -107,6 +107,7 @@ enum LogicalType : int8_t {
     // composed of two embedding, one for index, one for value
     kSparse,
 
+    kEmptyArray,
     kInvalid,
 };
 

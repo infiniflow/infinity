@@ -99,4 +99,6 @@ using SparseT = SparseType;
 // tensor-array
 using TensorArrayT = TensorArrayType;
 
+using EmptyArrayT = std::nullptr_t;
+
 }

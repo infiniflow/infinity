@@ -25,6 +25,7 @@ import embedding_cast;
 import varchar_cast;
 import tensor_cast;
 import tensor_array_cast;
+import empty_array_cast;
 import logger;
 import stl;
 import sparse_cast;
@@ -248,6 +249,9 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
+        }
+        case kEmptyArray: {
+            return BindEmptyArrayCast(source, target);
         }
         default:
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());

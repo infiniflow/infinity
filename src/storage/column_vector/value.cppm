@@ -169,10 +169,10 @@ export struct SparseValueInfo : public ExtraValueInfo {
         : ExtraValueInfo(ExtraValueInfoType::SPARSE_VALUE_INFO), nnz_(nnz), indices_(EmbeddingValueInfo(std::move(indice_ptr), indice_len)),
           data_(EmbeddingValueInfo(std::move(data_ptr), data_len)) {}
 
-    Tuple<SizeT, const_ptr_t, const_ptr_t, SizeT, SizeT> GetData() const {
+    Tuple<SizeT, Span<char>, Span<char>> GetData() const {
         Span<char> indice_span = indices_.GetData();
         Span<char> data_span = data_.GetData();
-        return {nnz_, indice_span.data(), data_span.data(), indice_span.size(), data_span.size()};
+        return {nnz_, indice_span, data_span};
     }
 
     SizeT nnz_{};
@@ -187,6 +187,8 @@ public:
     static Value MakeValue(DataType type);
 
     static Value MakeNull();
+
+    static Value MakeEmptyArray();
 
     static Value MakeInvalid();
 
@@ -331,7 +333,7 @@ public:
 
     const Vector<SharedPtr<EmbeddingValueInfo>> &GetTensorArray() const { return this->value_info_->Get<TensorArrayValueInfo>().member_tensor_data_; }
 
-    Tuple<SizeT, const_ptr_t, const_ptr_t, SizeT, SizeT> GetSparse() const { return this->value_info_->Get<SparseValueInfo>().GetData(); }
+    Tuple<SizeT, Span<char>, Span<char>> GetSparse() const { return this->value_info_->Get<SparseValueInfo>().GetData(); }
 
     [[nodiscard]] const DataType &type() const { return type_; }
 
