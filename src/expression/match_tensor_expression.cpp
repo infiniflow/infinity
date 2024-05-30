@@ -44,10 +44,7 @@ MatchTensorExpression::MatchTensorExpression(Vector<SharedPtr<BaseExpression>> s
 
 LogicalType GetCommonLogicalType(const EmbeddingDataType query_data_type, const EmbeddingDataType column_type);
 
-DataType MatchTensorExpression::Type() const {
-    auto *embedding_info = static_cast<const EmbeddingInfo *>(column_expr_->Type().type_info().get());
-    return DataType(GetCommonLogicalType(embedding_data_type_, embedding_info->Type()));
-}
+DataType MatchTensorExpression::Type() const { return DataType(LogicalType::kFloat); }
 
 String MatchTensorExpression::MethodToString(const MatchTensorSearchMethod method) { return MatchTensorExpr::SearchMethodToString(method); }
 
@@ -61,92 +58,6 @@ String MatchTensorExpression::ToString() const {
         return fmt::format("MATCH TENSOR ({}, [{}], {})", column_expr_->Name(), tensor_str, MethodToString(search_method_));
     }
     return fmt::format("MATCH TENSOR ({}, [{}], {}, '{}')", column_expr_->Name(), tensor_str, MethodToString(search_method_), options_text_);
-}
-
-template <typename T, typename U>
-LogicalType GetCommonLogicalType() {
-    using CommonType = std::common_type_t<T, U>;
-    if constexpr (std::is_same_v<CommonType, i8>) {
-        return LogicalType::kTinyInt;
-    } else if constexpr (std::is_same_v<CommonType, i16>) {
-        return LogicalType::kSmallInt;
-    } else if constexpr (std::is_same_v<CommonType, i32>) {
-        return LogicalType::kInteger;
-    } else if constexpr (std::is_same_v<CommonType, i64>) {
-        return LogicalType::kBigInt;
-    } else if constexpr (std::is_same_v<CommonType, f32>) {
-        return LogicalType::kFloat;
-    } else if constexpr (std::is_same_v<CommonType, f64>) {
-        return LogicalType::kDouble;
-    } else {
-        static_assert(false, "Unsupported common data type!");
-        Status status = Status::NotSupport("Unsupported common data type!");
-        LOG_ERROR(status.message());
-        RecoverableError(std::move(status));
-        return LogicalType::kInvalid;
-    }
-}
-
-template <typename T>
-LogicalType GetCommonLogicalType(const EmbeddingDataType column_type) {
-    switch (column_type) {
-        case EmbeddingDataType::kElemInt8: {
-            return GetCommonLogicalType<T, i8>();
-        }
-        case EmbeddingDataType::kElemInt16: {
-            return GetCommonLogicalType<T, i16>();
-        }
-        case EmbeddingDataType::kElemInt32: {
-            return GetCommonLogicalType<T, i32>();
-        }
-        case EmbeddingDataType::kElemInt64: {
-            return GetCommonLogicalType<T, i64>();
-        }
-        case EmbeddingDataType::kElemFloat: {
-            return GetCommonLogicalType<T, f32>();
-        }
-        case EmbeddingDataType::kElemDouble: {
-            return GetCommonLogicalType<T, f64>();
-        }
-        case EmbeddingDataType::kElemBit:
-        case EmbeddingDataType::kElemInvalid: {
-            Status status = Status::NotSupport(fmt::format("Unsupported column data type: {}", EmbeddingT::EmbeddingDataType2String(column_type)));
-            LOG_ERROR(status.message());
-            RecoverableError(std::move(status));
-            return LogicalType::kInvalid;
-        }
-    }
-}
-
-LogicalType GetCommonLogicalType(const EmbeddingDataType query_data_type, const EmbeddingDataType column_type) {
-    switch (query_data_type) {
-        case EmbeddingDataType::kElemInt8: {
-            return GetCommonLogicalType<i8>(column_type);
-        }
-        case EmbeddingDataType::kElemInt16: {
-            return GetCommonLogicalType<i16>(column_type);
-        }
-        case EmbeddingDataType::kElemInt32: {
-            return GetCommonLogicalType<i32>(column_type);
-        }
-        case EmbeddingDataType::kElemInt64: {
-            return GetCommonLogicalType<i64>(column_type);
-        }
-        case EmbeddingDataType::kElemFloat: {
-            return GetCommonLogicalType<f32>(column_type);
-        }
-        case EmbeddingDataType::kElemDouble: {
-            return GetCommonLogicalType<f64>(column_type);
-        }
-        case EmbeddingDataType::kElemBit:
-        case EmbeddingDataType::kElemInvalid: {
-            Status status =
-                Status::NotSupport(fmt::format("Unsupported query tensor data type: {}", EmbeddingT::EmbeddingDataType2String(query_data_type)));
-            LOG_ERROR(status.message());
-            RecoverableError(std::move(status));
-            return LogicalType::kInvalid;
-        }
-    }
 }
 
 } // namespace infinity
