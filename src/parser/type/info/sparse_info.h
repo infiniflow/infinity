@@ -26,7 +26,7 @@ class SparseInfo : public TypeInfo {
 public:
     static std::shared_ptr<SparseInfo> Make(EmbeddingDataType data_type, size_t dimension) {
         if (dimension == 0) {
-            ParserError("dimension of sparse should not be 0");
+            return nullptr;
         }
         EmbeddingDataType index_type = EmbeddingDataType::kElemInvalid;
         if (dimension <= std::numeric_limits<int8_t>::max() + 1) {

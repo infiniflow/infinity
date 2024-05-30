@@ -74,6 +74,7 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
             break;
         }
         case kNull:
+        case kEmptyArray:
         case kMissing: {
             plain_type_ = true;
             break;
@@ -194,7 +195,7 @@ int32_t DataType::GetSizeInBytes() const {
                 break;
             case LogicalType::kSparse: {
                 size += sizeof(EmbeddingDataType) * 2;
-                size += sizeof(int32_t);
+                size += sizeof(int64_t);
                 break;
             }
             default:
@@ -247,7 +248,8 @@ void DataType::WriteAdv(char *&ptr) const {
             const auto *sparse_info = static_cast<SparseInfo *>(this->type_info().get());
             WriteBufAdv<EmbeddingDataType>(ptr, sparse_info->DataType());
             WriteBufAdv<EmbeddingDataType>(ptr, sparse_info->IndexType());
-            WriteBufAdv<int32_t>(ptr, int32_t(sparse_info->Dimension()));
+            WriteBufAdv<int64_t>(ptr, sparse_info->Dimension());
+            break;
         }
         default:
             // There's no type_info for other types
@@ -286,7 +288,7 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
         case LogicalType::kSparse: {
             EmbeddingDataType data_type = ReadBufAdv<EmbeddingDataType>(ptr);
             EmbeddingDataType index_type = ReadBufAdv<EmbeddingDataType>(ptr);
-            int32_t dimension = ReadBufAdv<int32_t>(ptr);
+            int64_t dimension = ReadBufAdv<int64_t>(ptr);
             auto sparse_info = SparseInfo::Make(data_type, dimension);
             if (index_type != sparse_info->IndexType()) {
                 ParserError("Sparse index type is not consistent.");
