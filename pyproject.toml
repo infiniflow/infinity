@@ -1,41 +1,9 @@
-#[build-system]
-#requires = ["setuptools", "wheel", "scikit-build-core", "nanobind"]
-#build-backend = "setuptools.build_meta"
-#
-#[project]
-#name = "embedded_infinity"
-#version = "0.2.0.dev2"
-#requires-python = ">=3.10"
-#dependencies = [
-#    "sqlglot~=11.7.1",
-#    "pydantic~=2.7.1",
-#    "thrift~=0.20.0",
-#    "setuptools~=69.5.1",
-#    "pytest~=8.2.0",
-#    "pandas~=2.2.2",
-#    "numpy~=1.26.4",
-#    "pyarrow~=16.0.0",
-#    "polars~=0.20.23",
-#    "openpyxl~=3.1.2"
-#]
-#
-#[tool.scikit-build]
-#minimum-version = "0.4"
-#build-dir = "build/{wheel_tag}"
-#wheel.py-api = "cp312"
-#
-#[tool.cibuildwheel]
-#build-verbosity = 1
-#
-#[tool.cibuildwheel.macos.environment]
-#MACOSX_DEPLOYMENT_TARGET = "10.14"
-
 [build-system]
 requires = ["scikit-build-core", "setuptools", "wheel", "nanobind"]
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "embedded_infinity"
+name = "infinity_sdk"
 version = "0.2.0.dev2"
 requires-python = ">=3.10"
 dependencies = [
@@ -61,7 +29,8 @@ build-dir = "build/{wheel_tag}"
 #[tool.scikit-build.wheel]
 # Build stable ABI wheels for CPython 3.12+
 wheel.py-api = "cp312"
-wheel.packages = ["src/embedded_infinity", "python/infinity", "python/infinity/remote_thrift", "python/infinity/remote_thrift/infinity_thrift_rpc"]
+#wheel.packages = ["src/embedded_infinity", "python/infinity", "python/infinity/remote_thrift", "python/infinity/remote_thrift/infinity_thrift_rpc"]
+wheel.packages = ["src/embedded_infinity", "python/infinity"]
 
 [tool.cibuildwheel]
 # Necessary to see build output from the actual compilation

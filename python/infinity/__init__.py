@@ -16,14 +16,20 @@
 #
 # __version__ = importlib.metadata.version("infinity_sdk")
 
-from infinity.common import URI, NetworkAddress, LOCAL_HOST
-# from infinity.infinity import InfinityConnection
-# from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
-#
-# def connect(
-#         uri: URI = LOCAL_HOST
-# ) -> InfinityConnection:
-#     if isinstance(uri, NetworkAddress) and (uri.port == 9090 or uri.port == 23817 or uri.port == 9070):
-#         return RemoteThriftInfinityConnection(uri)
-#     else:
-#         raise Exception(f"unknown uri: {uri}")
+import pkg_resources
+__version__ = pkg_resources.get_distribution("infinity_sdk").version
+
+from infinity.common import URI, NetworkAddress, LOCAL_HOST, EMBEDDED_HOST
+from infinity.infinity import InfinityConnection
+from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
+from infinity.embedded_infinity.infinity import EmbeddedInfinityConnection
+
+def connect(
+        uri: URI = LOCAL_HOST
+) -> InfinityConnection:
+    if isinstance(uri, NetworkAddress) and (uri.port == 9090 or uri.port == 23817 or uri.port == 9070):
+        return RemoteThriftInfinityConnection(uri)
+    elif isinstance(uri, NetworkAddress) and uri == EMBEDDED_HOST:
+        return EmbeddedInfinityConnection(uri)
+    else:
+        raise Exception(f"unknown uri: {uri}")
