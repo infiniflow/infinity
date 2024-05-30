@@ -198,8 +198,6 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         result->column_ = field;
         return result;
     } else {
-        /*
-        fmt::print("Create Or Query Node\n");
         auto result = std::make_unique<OrQueryNode>();
         for (auto &term : terms) {
             auto subquery = std::make_unique<TermQueryNode>();
@@ -208,14 +206,13 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
             result->Add(std::move(subquery));
         }
         return result;
-        */
         // create phrase query node
-        auto result = std::make_unique<PhraseQueryNode>();
-        for (auto term : terms) {
-            result->AddTerm(term.Text());
-        }
-        result->column_ = field;
-        return result;
+        // auto result = std::make_unique<PhraseQueryNode>();
+        // for (auto term : terms) {
+        //     result->AddTerm(term.Text());
+        // }
+        // result->column_ = field;
+        // return result;
     }
 }
 
