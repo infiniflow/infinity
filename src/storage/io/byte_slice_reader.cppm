@@ -11,7 +11,7 @@ namespace infinity {
 
 export class ByteSliceReader {
 public:
-    static const int BYTE_SLICE_EOF = -1;
+    static const SizeT BYTE_SLICE_EOF = -1;
 
 public:
     ByteSliceReader();

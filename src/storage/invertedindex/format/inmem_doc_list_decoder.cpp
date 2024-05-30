@@ -34,7 +34,9 @@ bool InMemDocListDecoder::DecodeSkipList(docid_t start_doc_id, docid_t &prev_las
     if (skiplist_reader_ == nullptr) {
         prev_last_doc_id = 0;
         current_ttf = 0;
-        return DecodeSkipListWithoutSkipList(0, 0, start_doc_id, last_doc_id);
+        // If skiplist is absent, we allow doc_id buffer be decoded only once.
+        // So here we pass zero as the encoded doc_id buffer offset.
+        return DecodeSkipListWithoutSkipList(last_doc_id_in_prev_record_, 0, start_doc_id, last_doc_id);
     }
     auto ret = skiplist_reader_->SkipTo((u32)start_doc_id, last_doc_id_, last_doc_id_in_prev_record_, offset_, record_len_);
     if (!ret) {
@@ -53,16 +55,18 @@ bool InMemDocListDecoder::DecodeSkipList(docid_t start_doc_id, docid_t &prev_las
 }
 
 bool InMemDocListDecoder::DecodeSkipListWithoutSkipList(docid_t last_doc_id_in_prev_record, u32 offset, docid_t start_doc_id, docid_t &last_doc_id) {
-    if (finish_decoded_) {
+    // allocate space
+    if (doc_buffer_to_copy_ == nullptr)
+        doc_buffer_to_copy_ = new docid_t[MAX_DOC_PER_RECORD];
+
+    finish_decoded_ = false;
+    if (!doc_list_reader_.Seek(offset)) {
         return false;
     }
-    // allocate space
-    doc_buffer_to_copy_ = new docid_t[MAX_DOC_PER_RECORD];
-
-    doc_list_reader_.Seek(offset);
     if (!doc_list_reader_.Decode(doc_buffer_to_copy_, MAX_DOC_PER_RECORD, decode_count_)) {
         return false;
     }
+    finish_decoded_ = true;
     last_doc_id = last_doc_id_in_prev_record;
     for (SizeT i = 0; i < decode_count_; ++i) {
         last_doc_id += doc_buffer_to_copy_[i];
@@ -70,7 +74,6 @@ bool InMemDocListDecoder::DecodeSkipListWithoutSkipList(docid_t last_doc_id_in_p
     if (start_doc_id > last_doc_id) {
         return false;
     }
-    finish_decoded_ = true;
     return true;
 }
 

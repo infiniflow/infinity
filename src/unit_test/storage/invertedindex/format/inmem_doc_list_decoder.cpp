@@ -218,7 +218,7 @@ TEST_F(InMemDocListDecoderTest, test1) {
     ASSERT_EQ(doc1, doc_buffer[0]);
     ASSERT_EQ(doc2 - doc1, doc_buffer[1]);
 
-    ASSERT_TRUE(!doc_list_decoder.DecodeSkipList(doc2, prev_last_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder.DecodeSkipList(doc2, prev_last_doc_id, last_doc_id, current_ttf));
 }
 
 TEST_F(InMemDocListDecoderTest, test2) {
@@ -300,7 +300,7 @@ TEST_F(InMemDocListDecoderTest, test3) {
     ASSERT_EQ((ttf_t)0, current_ttf);
     ASSERT_EQ((u32)490, doc_buffer[0]);
 
-    ASSERT_TRUE(!doc_list_decoder_->DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
+    ASSERT_TRUE(doc_list_decoder_->DecodeSkipList(last_doc_id, prev_last_doc_id, last_doc_id, current_ttf));
 
     delete doc_list_decoder_;
 }
