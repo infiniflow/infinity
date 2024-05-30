@@ -44,6 +44,11 @@ Value Value::MakeNull() {
     return value;
 }
 
+Value Value::MakeEmptyArray() {
+    Value value(LogicalType::kEmptyArray);
+    return value;
+}
+
 Value Value::MakeInvalid() {
     Value value(LogicalType::kInvalid);
     return value;
@@ -595,6 +600,7 @@ bool Value::operator==(const Value &other) const {
         case kRowID: {
             return value_.row == other.value_.row;
         }
+        case kEmptyArray:
         case kNull: {
             return true;
         }
@@ -725,6 +731,7 @@ void Value::CopyUnionValue(const Value &other) {
             value_.row = other.value_.row;
             break;
         }
+        case kEmptyArray:
         case kNull: {
             // No value for null value.
             break;
@@ -837,6 +844,7 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             value_.row = other.value_.row;
             break;
         }
+        case kEmptyArray:
         case kNull: {
             // No value for null type
             break;
@@ -844,7 +852,7 @@ void Value::MoveUnionValue(Value &&other) noexcept {
         case kVarchar:
         case kTensor:
         case kTensorArray:
-        case kEmbedding: 
+        case kEmbedding:
         case kSparse: {
             this->value_info_ = std::move(other.value_info_);
             break;
@@ -946,11 +954,12 @@ String Value::ToString() const {
             return {};
         }
         case LogicalType::kSparse: {
-            // TODO
-            String error_message = "Not implemented yet.";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
-            break;
+            auto *sparse_info = static_cast<SparseInfo *>(type_.type_info().get());
+            auto [nnz, indice_span, data_span] = this->GetSparse();
+            return SparseT::Sparse2String(data_span.data(), indice_span.data(), sparse_info->DataType(), sparse_info->IndexType(), nnz);
+        }
+        case LogicalType::kEmptyArray: {
+            return "[]";
         }
         case LogicalType::kDecimal:
         case LogicalType::kArray:
@@ -974,7 +983,7 @@ String Value::ToString() const {
     return {};
 }
 
-void Value::AppendToJson(const String& name, nlohmann::json& json) {
+void Value::AppendToJson(const String &name, nlohmann::json &json) {
     switch (type_.type()) {
         case LogicalType::kBoolean: {
             json[name] = value_.boolean;
@@ -1064,6 +1073,10 @@ void Value::AppendToJson(const String& name, nlohmann::json& json) {
             String error_message = "Not implemented yet.";
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
+        }
+        case LogicalType::kEmptyArray: {
+            json[name] = "[]";
+            return;
         }
         default: {
             String error_message = fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString());

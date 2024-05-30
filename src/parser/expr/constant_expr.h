@@ -41,6 +41,7 @@ enum class LiteralType : int32_t {
     kInterval,
     kLongSparseArray,
     kDoubleSparseArray,
+    kEmptyArray,
 };
 
 class ConstantExpr : public ParsedExpr {

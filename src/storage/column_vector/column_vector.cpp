@@ -311,6 +311,7 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 CopyFrom<MixedT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
+            case kEmptyArray:
             case kNull: {
                 Status status = Status::NotSupport("Not implemented");
                 LOG_ERROR(status.message());
@@ -476,6 +477,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
                 LOG_ERROR(status.message());
                 RecoverableError(status);
             }
+            case kEmptyArray:
             case kNull: {
                 Status status = Status::NotSupport("Not implemented");
                 LOG_ERROR(status.message());
@@ -660,6 +662,7 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             CopyRowFrom<MixedT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
+        case kEmptyArray:
         case kNull: {
             Status status = Status::NotSupport("Not implemented");
             LOG_ERROR(status.message());
@@ -1235,12 +1238,12 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         }
         case kSparse: {
             auto &[target_nnz, target_chunk_id, target_chunk_offset] = reinterpret_cast<SparseT *>(data_ptr_)[index];
-            auto [source_nnz, source_indice_ptr, source_data_ptr, indice_bytes, data_bytes] = value.GetSparse();
+            auto [source_nnz, source_indice, source_data] = value.GetSparse();
             target_nnz = source_nnz;
 
             Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
-            data_ptrs.emplace_back(source_indice_ptr, indice_bytes);
-            data_ptrs.emplace_back(source_data_ptr, data_bytes);
+            data_ptrs.emplace_back(source_indice.data(), source_indice.size());
+            data_ptrs.emplace_back(source_data.data(), source_data.size());
             if (source_nnz == 0) {
                 target_chunk_id = -1;
                 target_chunk_offset = 0;
@@ -1262,6 +1265,9 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             }
             ptr_t dst_ptr = data_ptr_ + index * data_type_->Size();
             std::memcpy(dst_ptr, src_ptr, src_size);
+            break;
+        }
+        case kEmptyArray: {
             break;
         }
         default: {

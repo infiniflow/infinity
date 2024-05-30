@@ -74,6 +74,7 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
             break;
         }
         case kNull:
+        case kEmptyArray:
         case kMissing: {
             plain_type_ = true;
             break;

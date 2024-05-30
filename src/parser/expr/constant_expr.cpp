@@ -130,8 +130,7 @@ std::string ConstantExpr::ToString() const {
             size_t nnz = double_sparse_array_.first.size();
             return SparseT::Sparse2StringT2(double_sparse_array_.first.data(), double_sparse_array_.second.data(), nnz);
         }
-        default: {
-            ParserError("Unexpected branch");
+        case LiteralType::kEmptyArray: {
             return {};
         }
     }
@@ -156,6 +155,7 @@ int32_t ConstantExpr::GetSizeInBytes() const {
             size += sizeof(int64_t);
             break;
         }
+        case LiteralType::kEmptyArray:
         case LiteralType::kNull: {
             break;
         }
@@ -221,6 +221,7 @@ void ConstantExpr::WriteAdv(char *&ptr) const {
             WriteBufAdv<int64_t>(ptr, integer_value_);
             break;
         }
+        case LiteralType::kEmptyArray:
         case LiteralType::kNull: {
             break;
         }
@@ -307,6 +308,7 @@ std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(char *&ptr, int32_t maxbytes) 
             const_expr->integer_value_ = integer_value;
             break;
         }
+        case LiteralType::kEmptyArray:
         case LiteralType::kNull: {
             break;
         }
@@ -401,6 +403,7 @@ nlohmann::json ConstantExpr::Serialize() const {
             j["value"] = integer_value_;
             break;
         }
+        case LiteralType::kEmptyArray:
         case LiteralType::kNull: {
             break;
         }
@@ -468,6 +471,7 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(const nlohmann::json &cons
             const_expr->integer_value_ = constant_expr["value"].get<int64_t>();
             break;
         }
+        case LiteralType::kEmptyArray:
         case LiteralType::kNull: {
             break;
         }

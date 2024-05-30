@@ -302,6 +302,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
             //        case kPath:
             //        case kPolygon:
             //        case kBlob:
+        case kEmptyArray:
         case kMixed:
         case kNull: {
             LOG_ERROR(fmt::format("{} isn't supported", column_type->ToString()));

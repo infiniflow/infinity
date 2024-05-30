@@ -438,6 +438,7 @@ struct SQL_LTYPE {
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
 %type <const_expr_t>            common_array_expr subarray_array_expr unclosed_subarray_array_expr
 %type <const_expr_t>            sparse_array_expr long_sparse_array_expr unclosed_long_sparse_array_expr double_sparse_array_expr unclosed_double_sparse_array_expr
+%type <const_expr_t>            empty_array_expr
 %type <int_sparse_ele_t>        int_sparse_ele
 %type <float_sparse_ele_t>      float_sparse_ele
 %type <expr_array_t>            expr_array group_by_clause sub_search_array
@@ -2669,6 +2670,9 @@ common_array_expr: array_expr {
 | sparse_array_expr {
     $$ = $1;
 }
+| empty_array_expr {
+    $$ = $1;
+}
 
 subarray_array_expr: unclosed_subarray_array_expr ']' {
     $$ = $1;
@@ -2694,9 +2698,6 @@ sparse_array_expr: long_sparse_array_expr {
 long_sparse_array_expr: unclosed_long_sparse_array_expr ']' {
     $$ = $1;
 }
-| '[' ']' {
-    $$ = new infinity::ConstantExpr(infinity::LiteralType::kLongSparseArray);
-}
 
 unclosed_long_sparse_array_expr: '[' int_sparse_ele {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kLongSparseArray);
@@ -2713,9 +2714,6 @@ unclosed_long_sparse_array_expr: '[' int_sparse_ele {
 double_sparse_array_expr: unclosed_double_sparse_array_expr ']' {
     $$ = $1;
 }
-| '[' ']' {
-    $$ = new infinity::ConstantExpr(infinity::LiteralType::kDoubleSparseArray);
-}
 
 unclosed_double_sparse_array_expr: '[' float_sparse_ele {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDoubleSparseArray);
@@ -2727,6 +2725,10 @@ unclosed_double_sparse_array_expr: '[' float_sparse_ele {
     $1->double_sparse_array_.first.emplace_back($3->first);
     $1->double_sparse_array_.second.emplace_back($3->second);
     $$ = $1;
+}
+
+empty_array_expr: '[' ']' {
+    $$ = new infinity::ConstantExpr(infinity::LiteralType::kEmptyArray);
 }
 
 int_sparse_ele: LONG_VALUE ':' LONG_VALUE {

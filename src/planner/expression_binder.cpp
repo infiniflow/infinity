@@ -368,6 +368,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             Value value = Value::MakeNull();
             return MakeShared<ValueExpression>(value);
         }
+        case LiteralType::kEmptyArray: {
+            Value value = Value::MakeEmptyArray();
+            return MakeShared<ValueExpression>(value);
+        }
     }
 
     String error_message = "Unreachable";
