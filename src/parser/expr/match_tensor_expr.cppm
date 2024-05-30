@@ -20,6 +20,8 @@ export module match_tensor_expr;
 
 namespace infinity {
 
+export using infinity::MatchTensorSearchMethod;
+
 export using infinity::MatchTensorExpr;
 
 }

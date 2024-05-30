@@ -194,6 +194,24 @@ class RemoteTable(Table, ABC):
                     elif isinstance(value[0], float):
                         constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
                                                                   f64_array_value=value)
+                    elif isinstance(value[0], list):
+                        if isinstance(value[0][0], int):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.IntegerArray,
+                                i64_array_value=[x for xs in value for x in xs])
+                        elif isinstance(value[0][0], float):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.DoubleArray,
+                                f64_array_value=[x for xs in value for x in xs])
+                        elif isinstance(value[0][0], list):
+                            if isinstance(value[0][0][0], int):
+                                constant_expression = ttypes.ConstantExpr(
+                                    literal_type=ttypes.LiteralType.IntegerTensorArray,
+                                    i64_tensor_array_value=value)
+                            elif isinstance(value[0][0][0], float):
+                                constant_expression = ttypes.ConstantExpr(
+                                    literal_type=ttypes.LiteralType.DoubleTensorArray,
+                                    f64_tensor_array_value=value)
                 else:
                     raise InfinityException(3069, "Invalid constant expression")
 
@@ -330,8 +348,15 @@ class RemoteTable(Table, ABC):
         return self
 
     @params_type_check
-    def fusion(self, method: str, options_text: str = ''):
-        self.query_builder.fusion(method, options_text)
+    def match_tensor(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, method_type: str,
+                     extra_option: str):
+        self.query_builder.match_tensor(vector_column_name, embedding_data, embedding_data_type, method_type,
+                                        extra_option)
+        return self
+
+    @params_type_check
+    def fusion(self, method: str, options_text: str = '', match_tensor_expr: ttypes.MatchTensorExpr = None):
+        self.query_builder.fusion(method, options_text, match_tensor_expr)
         return self
 
     def output(self, columns: Optional[List[str]]):

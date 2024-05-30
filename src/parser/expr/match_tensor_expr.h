@@ -20,16 +20,28 @@
 
 namespace infinity {
 
+enum class MatchTensorSearchMethod : uint8_t {
+    kInvalid,
+    kMaxSim,
+};
+
 class MatchTensorExpr final : public ParsedExpr {
 public:
     explicit MatchTensorExpr(bool own_memory = true) : ParsedExpr(ParsedExprType::kMatchTensor), own_memory_(own_memory) {}
     [[nodiscard]] std::string ToString() const override;
-
+    void SetSearchMethod(char *&raw_search_method);
+    void SetSearchMethodStr(std::string search_method);
+    void SetSearchColumn(ParsedExpr *&column_expr) noexcept;
+    void SetExtraOptions(char *&raw_options_text);
+    void SetQueryTensor(char *&raw_embedding_data_type, ConstantExpr *&raw_tensor_expr);
+    void SetQueryTensorStr(std::string embedding_data_type, const ConstantExpr *tensor_expr);
+    static std::string SearchMethodToString(MatchTensorSearchMethod method);
     const bool own_memory_;
-    std::string search_method_;
+    MatchTensorSearchMethod search_method_enum_ = MatchTensorSearchMethod::kInvalid;
     std::unique_ptr<ParsedExpr> column_expr_;
-    std::unique_ptr<ConstantExpr> tensor_expr_;
-    std::string embedding_data_type_;
+    EmbeddingDataType embedding_data_type_ = EmbeddingDataType::kElemInvalid;
+    std::unique_ptr<char[]> query_tensor_data_ptr_;
+    uint32_t dimension_ = 0;
     std::string options_text_;
 };
 
