@@ -343,6 +343,7 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
             }
             case LogicalType::kSparse: {
                 type_info = SparseInfo::Deserialize(type_info_json);
+                break;
             }
             default:
                 // There's no type_info for other types
