@@ -114,7 +114,9 @@ struct LiteralType {
     Int64 = 3,
     Null = 4,
     IntegerArray = 5,
-    DoubleArray = 6
+    DoubleArray = 6,
+    IntegerTensorArray = 7,
+    DoubleTensorArray = 8
   };
 };
 
@@ -1079,7 +1081,7 @@ void swap(InitParameter &a, InitParameter &b);
 std::ostream& operator<<(std::ostream& out, const InitParameter& obj);
 
 typedef struct _ConstantExpr__isset {
-  _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false) {}
+  _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false), i64_tensor_array_value(false), f64_tensor_array_value(false) {}
   bool literal_type :1;
   bool bool_value :1;
   bool i64_value :1;
@@ -1087,6 +1089,8 @@ typedef struct _ConstantExpr__isset {
   bool str_value :1;
   bool i64_array_value :1;
   bool f64_array_value :1;
+  bool i64_tensor_array_value :1;
+  bool f64_tensor_array_value :1;
 } _ConstantExpr__isset;
 
 class ConstantExpr : public virtual ::apache::thrift::TBase {
@@ -1114,6 +1118,8 @@ class ConstantExpr : public virtual ::apache::thrift::TBase {
   std::string str_value;
   std::vector<int64_t>  i64_array_value;
   std::vector<double>  f64_array_value;
+  std::vector<std::vector<std::vector<int64_t> > >  i64_tensor_array_value;
+  std::vector<std::vector<std::vector<double> > >  f64_tensor_array_value;
 
   _ConstantExpr__isset __isset;
 
@@ -1130,6 +1136,10 @@ class ConstantExpr : public virtual ::apache::thrift::TBase {
   void __set_i64_array_value(const std::vector<int64_t> & val);
 
   void __set_f64_array_value(const std::vector<double> & val);
+
+  void __set_i64_tensor_array_value(const std::vector<std::vector<std::vector<int64_t> > > & val);
+
+  void __set_f64_tensor_array_value(const std::vector<std::vector<std::vector<double> > > & val);
 
   bool operator == (const ConstantExpr & rhs) const
   {
@@ -1158,6 +1168,14 @@ class ConstantExpr : public virtual ::apache::thrift::TBase {
     if (__isset.f64_array_value != rhs.__isset.f64_array_value)
       return false;
     else if (__isset.f64_array_value && !(f64_array_value == rhs.f64_array_value))
+      return false;
+    if (__isset.i64_tensor_array_value != rhs.__isset.i64_tensor_array_value)
+      return false;
+    else if (__isset.i64_tensor_array_value && !(i64_tensor_array_value == rhs.i64_tensor_array_value))
+      return false;
+    if (__isset.f64_tensor_array_value != rhs.__isset.f64_tensor_array_value)
+      return false;
+    else if (__isset.f64_tensor_array_value && !(f64_tensor_array_value == rhs.f64_tensor_array_value))
       return false;
     return true;
   }

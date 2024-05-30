@@ -1597,8 +1597,45 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
             }
             return parsed_expr;
         }
+        case infinity_thrift_rpc::LiteralType::IntegerTensorArray: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
+            parsed_expr->sub_array_array_.reserve(expr.i64_tensor_array_value.size());
+            for (auto &value_1 : expr.i64_tensor_array_value) {
+                auto parsed_expr_1 = new ConstantExpr(LiteralType::kSubArrayArray);
+                parsed_expr_1->sub_array_array_.reserve(value_1.size());
+                for (auto &value_2 : value_1) {
+                    auto parsed_expr_2 = new ConstantExpr(LiteralType::kIntegerArray);
+                    parsed_expr_2->long_array_.reserve(value_2.size());
+                    for (auto &value_3 : value_2) {
+                        parsed_expr_2->long_array_.emplace_back(value_3);
+                    }
+                    parsed_expr_1->sub_array_array_.emplace_back(parsed_expr_2);
+                }
+                parsed_expr->sub_array_array_.emplace_back(parsed_expr_1);
+            }
+            return parsed_expr;
+        }
+        case infinity_thrift_rpc::LiteralType::DoubleTensorArray: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
+            parsed_expr->sub_array_array_.reserve(expr.f64_tensor_array_value.size());
+            for (auto &value_1 : expr.f64_tensor_array_value) {
+                auto parsed_expr_1 = new ConstantExpr(LiteralType::kSubArrayArray);
+                parsed_expr_1->sub_array_array_.reserve(value_1.size());
+                for (auto &value_2 : value_1) {
+                    auto parsed_expr_2 = new ConstantExpr(LiteralType::kDoubleArray);
+                    parsed_expr_2->double_array_.reserve(value_2.size());
+                    for (auto &value_3 : value_2) {
+                        parsed_expr_2->double_array_.emplace_back(value_3);
+                    }
+                    parsed_expr_1->sub_array_array_.emplace_back(parsed_expr_2);
+                }
+                parsed_expr->sub_array_array_.emplace_back(parsed_expr_1);
+            }
+            return parsed_expr;
+        }
         default: {
             status = Status::InvalidConstantType();
+            return nullptr;
         }
     }
 }

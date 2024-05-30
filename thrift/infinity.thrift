@@ -90,6 +90,8 @@ Int64,
 Null,
 IntegerArray,
 DoubleArray,
+IntegerTensorArray,
+DoubleTensorArray,
 }
 
 union ParsedExprType {
@@ -143,6 +145,8 @@ struct ConstantExpr {
 5: optional string str_value,
 6: optional list<i64> i64_array_value,
 7: optional list<double> f64_array_value,
+8: optional list<list<list<i64>>> i64_tensor_array_value,
+9: optional list<list<list<double>>> f64_tensor_array_value,
 }
 
 struct KnnExpr {

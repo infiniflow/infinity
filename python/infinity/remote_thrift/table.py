@@ -194,6 +194,24 @@ class RemoteTable(Table, ABC):
                     elif isinstance(value[0], float):
                         constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
                                                                   f64_array_value=value)
+                    elif isinstance(value[0], list):
+                        if isinstance(value[0][0], int):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.IntegerArray,
+                                i64_array_value=[x for xs in value for x in xs])
+                        elif isinstance(value[0][0], float):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.DoubleArray,
+                                f64_array_value=[x for xs in value for x in xs])
+                        elif isinstance(value[0][0], list):
+                            if isinstance(value[0][0][0], int):
+                                constant_expression = ttypes.ConstantExpr(
+                                    literal_type=ttypes.LiteralType.IntegerTensorArray,
+                                    i64_tensor_array_value=value)
+                            elif isinstance(value[0][0][0], float):
+                                constant_expression = ttypes.ConstantExpr(
+                                    literal_type=ttypes.LiteralType.DoubleTensorArray,
+                                    f64_tensor_array_value=value)
                 else:
                     raise InfinityException(3069, "Invalid constant expression")
 

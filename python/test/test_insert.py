@@ -211,7 +211,7 @@ class TestInsert(TestSdk):
         assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [4, 5, 6]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [7, 8, 9, -7, -8, -9]}])
+        res = table_obj.insert([{"c1": [[7, 8, 9], [-7, -8, -9]]}])
         assert res.error_code == ErrorCode.OK
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
@@ -244,6 +244,33 @@ class TestInsert(TestSdk):
         res = db_obj.drop_table("test_insert_tensor_2", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    def test_insert_tensor_array(self):
+        """
+        target: test insert tensor_array column
+        method: create table with tensor_array column
+        expected: ok
+        """
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert_tensor_array", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_tensor_array", {"c1": {"type": "tensorarray,2,int"}},
+                                        ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": [[[1, 2], [3, 4]], [[5, 6]]]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [[[7, 8]], [[9, 10], [11, 12]]]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": [[[13, 14], [15, 16], [17, 18]]]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': ([[[1, 2], [3, 4]], [[5, 6]]], [[[7, 8]], [[9, 10], [11, 12]]], [[[13, 14], [15, 16], [17, 18]]])}))
+        res = db_obj.drop_table("test_insert_tensor_array", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 

@@ -626,7 +626,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
         tensor_column_basic_embedding_dim = embedding_info->Dimension();
         if (tensor_column_basic_embedding_dim == 0) {
-            UnrecoverableError("The tensor column basic embedding dimension should be greater than 0");
+            const auto error_info = "The tensor column basic embedding dimension should be greater than 0";
+            LOG_CRITICAL(error_info);
+            UnrecoverableError(error_info);
         }
     } else {
         const auto error_info = fmt::format("Expect the column search is an tensor column, but got: {}", column_data_type.ToString());
@@ -706,11 +708,15 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             return subquery_expr;
         }
         case SubqueryType::kAny: {
-            UnrecoverableError("Not implement: Any");
+            const auto error_info = "Not implement: Any";
+            LOG_CRITICAL(error_info);
+            UnrecoverableError(error_info);
         }
     }
 
-    UnrecoverableError("Unreachable");
+    const auto error_info = "Unreachable";
+    LOG_CRITICAL(error_info);
+    UnrecoverableError(error_info);
     return nullptr;
 }
 
@@ -755,13 +761,6 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         return None;
     }
 }
-
-//
-//// Bind window function.
-// SharedPtr<BaseExpression>
-// ExpressionBinder::BuildWindow(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
-//     PlannerError("ExpressionBinder::BuildWindow");
-// }
 
 template <typename T, typename U>
 void FillConcatenatedTensorData(T *output_ptr, const Vector<U> &data_array, const u32 expect_dim) {
