@@ -73,6 +73,8 @@ public:
 
     [[nodiscard]] nlohmann::json Serialize() const override;
 
+    static std::unique_ptr<SparseInfo> Deserialize(const nlohmann::json &json);
+
     inline EmbeddingDataType DataType() const noexcept { return data_type_; }
 
     inline EmbeddingDataType IndexType() const noexcept { return index_type_; }
