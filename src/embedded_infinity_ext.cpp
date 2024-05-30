@@ -1,16 +1,16 @@
 #include <nanobind/nanobind.h>
-#include <nanobind/stl/string.h>
-#include <nanobind/stl/shared_ptr.h>
-#include <nanobind/stl/vector.h>
-#include <nanobind/stl/unique_ptr.h>
 #include <nanobind/stl/set.h>
+#include <nanobind/stl/shared_ptr.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/unique_ptr.h>
+#include <nanobind/stl/vector.h>
 
-#include "parser/statement/command_statement.h"
+#include "parser/definition/column_def.h"
 #include "parser/expr/parsed_expr.h"
+#include "parser/statement/command_statement.h"
+#include "parser/statement/extra/create_index_info.h"
 #include "parser/statement/extra/extra_ddl_info.h"
 #include "parser/statement/statement_common.h"
-#include "parser/statement/extra/create_index_info.h"
-#include "parser/definition/column_def.h"
 
 import infinity;
 import stl;
@@ -22,8 +22,9 @@ import base_table;
 import data_table;
 import table_entry_type;
 import table_def;
+import wrap_infinity;
 
-class SayHello{
+class SayHello {
 public:
     void hello() {
         std::cout << "say hello success" << std::endl;
@@ -42,49 +43,56 @@ int add(int a, int b) {
     return a + b;
 }
 
-int mul(int a, int b) {
-    return a * b;
-}
+int mul(int a, int b) { return a * b; }
 
-void print_str(infinity::String str) {
-    std::cout << str << std::endl;
-}
+void print_str(infinity::String str) { std::cout << str << std::endl; }
 
-const char* get_hello() {
+const char *get_hello() {
     const static char hello[] = "hello";
     std::cout << "get hello func: " << hello << std::endl;
     return hello;
 }
 
-void test_shared(infinity::SharedPtr<infinity::String> ptr) {
-    std::cout << ptr.get() << std::endl;
-}
+void test_shared(infinity::SharedPtr<infinity::String> ptr) { std::cout << ptr.get() << std::endl; }
 
 void test_shared_wrap(infinity::String str) {
     auto str_ptr = infinity::MakeShared<infinity::String>(str);
     test_shared(str_ptr);
 }
 
-
 // using infinity::Infinity;
 using namespace infinity;
 namespace nb = nanobind;
 
 namespace infinity {
+//
+// struct WrapQueryResult {
+//    ErrorCode error_code;
+//    String message;
+//};
+//
+// WrapQueryResult WrapCreateDatabase(Infinity& instance,
+//                                   const String& db_name,
+//                                   const CreateDatabaseOptions& options) {
+//    WrapQueryResult result;
+//    auto query_result = instance.CreateDatabase(db_name, options);
+//    result.error_code = query_result.ErrorCode();
+//    result.message = query_result.ErrorMsg();
+//    return result;
+//}
 
-void WrapInsert(Infinity& instance,
-                const String& db_name,
-                const String& table_name,
-                Vector<String> columns,
-                Vector<Vector<ParsedExpr*>> values) {
-    Vector<Vector<ParsedExpr*>*> value_ptr;
-    for (auto& value : values) {
-        value_ptr.push_back(&value);
-    }
-    instance.Insert(db_name, table_name, &columns, &value_ptr);
-}
-}
-
+// void WrapInsert(Infinity& instance,
+//                 const String& db_name,
+//                 const String& table_name,
+//                 Vector<String> columns,
+//                 Vector<Vector<ParsedExpr*>> values) {
+//     Vector<Vector<ParsedExpr*>*> value_ptr;
+//     for (auto& value : values) {
+//         value_ptr.push_back(&value);
+//     }
+//     instance.Insert(db_name, table_name, &columns, &value_ptr);
+// }
+} // namespace infinity
 
 NB_MODULE(embedded_infinity_ext, m) {
     m.def("add", &add);
@@ -93,9 +101,14 @@ NB_MODULE(embedded_infinity_ext, m) {
     m.def("print_str", &print_str);
     m.def("get_hello", &get_hello);
     m.def("test_shared", &test_shared_wrap);
+    nb::class_<WrapQueryResult>(m, "WrapQueryResult")
+        .def(nb::init<>())
+        .def_rw("error_code", &WrapQueryResult::error_code)
+        .def_rw("message", &WrapQueryResult::message);
+
     // infinity
     nb::class_<Infinity>(m, "Infinity")
-        .def(nb::init<>())  // bind constructor
+        .def(nb::init<>()) // bind constructor
 
         .def("GetSessionId", &Infinity::GetSessionId)
 
@@ -108,50 +121,50 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_static("LocalConnect", &Infinity::LocalConnect)
         .def("LocalDisconnect", &Infinity::LocalDisconnect)
 
-        .def("CreateDatabase", &Infinity::CreateDatabase)
-        .def("DropDatabase", &Infinity::DropDatabase)
-        .def("ListDatabases", &Infinity::ListDatabases)
-        .def("GetDatabase", &Infinity::GetDatabase)
-        .def("ShowDatabase", &Infinity::ShowDatabase)
-        .def("Flush", &Infinity::Flush)
+        .def("CreateDatabase", &WrapCreateDatabase)
+        .def("DropDatabase", &WrapDropDatabase)
+        .def("ListDatabases", &WrapListDatabases)
+        .def("GetDatabase", &WrapGetDatabase)
+        .def("ShowDatabase", &WrapShowDatabase)
+        .def("Flush", &WrapFlush)
 
-        .def("SetVariableOrConfig", nb::overload_cast<const infinity::String&, bool, infinity::SetScope>(&Infinity::SetVariableOrConfig))
-        .def("SetVariableOrConfig", nb::overload_cast<const infinity::String&, infinity::i64, infinity::SetScope>(&Infinity::SetVariableOrConfig))
-        .def("SetVariableOrConfig", nb::overload_cast<const infinity::String&, double, infinity::SetScope>(&Infinity::SetVariableOrConfig))
-        .def("SetVariableOrConfig", nb::overload_cast<const infinity::String&, infinity::String, infinity::SetScope>(&Infinity::SetVariableOrConfig))
+        .def("SetVariableOrConfig", nb::overload_cast<Infinity &, const String &, bool, SetScope>(&WrapSetVariableOrConfig))
+        .def("SetVariableOrConfig", nb::overload_cast<Infinity &, const String &, i64, SetScope>(&WrapSetVariableOrConfig))
+        .def("SetVariableOrConfig", nb::overload_cast<Infinity &, const String &, double, SetScope>(&WrapSetVariableOrConfig))
+        .def("SetVariableOrConfig", nb::overload_cast<Infinity &, const String &, String, SetScope>(&WrapSetVariableOrConfig))
 
-        .def("ShowVariable", &Infinity::ShowVariable)
-        .def("ShowVariables", &Infinity::ShowVariables)
-        .def("ShowConfig", &Infinity::ShowConfig)
-        .def("ShowConfigs", &Infinity::ShowConfigs)
+        .def("ShowVariable", &WrapShowVariable)
+        .def("ShowVariables", &WrapShowVariables)
+        .def("ShowConfig", &WrapShowConfig)
+        .def("ShowConfigs", &WrapShowConfigs)
 
-        .def("Query", &Infinity::Query)
+        .def("Query", &WrapQuery)
 
-        .def("CreateTable", &Infinity::CreateTable)
-        .def("DropTable", &Infinity::DropTable)
-        .def("ListTables", &Infinity::ListTables)
-        .def("ShowTable", &Infinity::ShowTable)
-        .def("ShowColumns", &Infinity::ShowColumns)
-        .def("ListTableIndexes", &Infinity::ListTableIndexes)
-        .def("ShowTables", &Infinity::ShowTables)
-        .def("GetTable", &Infinity::GetTable)
+        .def("CreateTable", &WrapCreateTable)
+        .def("DropTable", &WrapDropTable)
+        .def("ListTables", &WrapListTables)
+        .def("ShowTable", &WrapShowTable)
+        .def("ShowColumns", &WrapShowColumns)
+        .def("ListTableIndexes", &WrapListTableIndexes)
+        .def("ShowTables", &WrapShowTables)
+        .def("GetTable", &WrapGetTable)
 
-        .def("CreateIndex", &Infinity::CreateIndex)
-        .def("DropIndex", &Infinity::DropIndex)
-        .def("ShowIndex", &Infinity::ShowIndex)
-        .def("ShowSegment", &Infinity::ShowSegment)
-        .def("ShowSegments", &Infinity::ShowSegments)
-        .def("ShowBlock", &Infinity::ShowBlock)
-        .def("ShowBlocks", &Infinity::ShowBlocks)
-        .def("ShowBlockColumn", &Infinity::ShowBlockColumn)
+        .def("CreateIndex", &WrapCreateIndex)
+        .def("DropIndex", &WrapDropIndex)
+        .def("ShowIndex", &WrapShowIndex)
+        .def("ShowSegment", &WrapShowSegment)
+        .def("ShowSegments", &WrapShowSegments)
+        .def("ShowBlock", &WrapShowBlock)
+        .def("ShowBlocks", &WrapShowBlocks)
+        .def("ShowBlockColumn", &WrapShowBlockColumn)
 
         .def("Insert", &WrapInsert)
-        .def("Import", &Infinity::Import)
-        .def("Delete", &Infinity::Delete)
-        .def("Update", &Infinity::Update)
-        .def("Explain", &Infinity::Explain)
-        .def("Search", &Infinity::Search)
-        .def("Optimize", &Infinity::Optimize);
+        .def("Import", &WrapImport)
+        .def("Delete", &WrapDelete)
+        .def("Update", &WrapUpdate)
+        .def("Explain", &WrapExplain)
+        .def("Search", &WrapSearch)
+        .def("Optimize", &WrapOptimize);
 
     // extra_ddl_info
     nb::enum_<ConflictType>(m, "ConflictType")
@@ -176,30 +189,20 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kInvalid", SetScope::kInvalid);
 
     // query_options
-    nb::class_<CreateDatabaseOptions>(m, "CreateDatabaseOptions")
-        .def(nb::init<>())
-        .def_rw("conflict_type", &CreateDatabaseOptions::conflict_type_);
+    nb::class_<CreateDatabaseOptions>(m, "CreateDatabaseOptions").def(nb::init<>()).def_rw("conflict_type", &CreateDatabaseOptions::conflict_type_);
 
-    nb::class_<DropDatabaseOptions>(m, "DropDatabaseOptions")
-        .def(nb::init<>())
-        .def_rw("conflict_type", &DropDatabaseOptions::conflict_type_);
+    nb::class_<DropDatabaseOptions>(m, "DropDatabaseOptions").def(nb::init<>()).def_rw("conflict_type", &DropDatabaseOptions::conflict_type_);
 
     nb::class_<CreateTableOptions>(m, "CreateTableOptions")
         .def(nb::init<>())
         .def_rw("conflict_type", &CreateTableOptions::conflict_type_)
         .def_rw("properties", &CreateTableOptions::properties_);
 
-    nb::class_<DropTableOptions>(m, "DropTableOptions")
-        .def(nb::init<>())
-        .def_rw("conflict_type", &DropTableOptions::conflict_type_);
+    nb::class_<DropTableOptions>(m, "DropTableOptions").def(nb::init<>()).def_rw("conflict_type", &DropTableOptions::conflict_type_);
 
-    nb::class_<CreateIndexOptions>(m, "CreateIndexOptions")
-        .def(nb::init<>())
-        .def_rw("conflict_type", &CreateIndexOptions::conflict_type_);
+    nb::class_<CreateIndexOptions>(m, "CreateIndexOptions").def(nb::init<>()).def_rw("conflict_type", &CreateIndexOptions::conflict_type_);
 
-    nb::class_<DropIndexOptions>(m, "DropIndexOptions")
-        .def(nb::init<>())
-        .def_rw("conflict_type", &DropIndexOptions::conflict_type_);
+    nb::class_<DropIndexOptions>(m, "DropIndexOptions").def(nb::init<>()).def_rw("conflict_type", &DropIndexOptions::conflict_type_);
 
     nb::class_<ImportOptions>(m, "ImportOptions")
         .def(nb::init<>())
@@ -225,15 +228,17 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kFusion", ParsedExprType::kFusion)
         .value("kSearch", ParsedExprType::kSearch)
         .export_values();
-//    abstract class how to bind?
-//    nb::class_<ParsedExpr>(m, "ParsedExpr")
-//        .def(nb::init<ParsedExprType>())
-//        .def("GetName", &ParsedExpr::GetName)
-//        .def("GetAlias", &ParsedExpr::GetAlias)
-//        .def("HasAlias", &ParsedExpr::HasAlias)
-//        .def("ToString", &ParsedExpr::ToString)
-//        .def_rw("type", &ParsedExpr::type_)
-//        .def_rw("alias", &ParsedExpr::alias_);
+
+    //    abstract class how to bind?
+    //    nb::class_<ParsedExpr>(m, "ParsedExpr")
+    //        .def(nb::init<ParsedExprType>())
+    //        .def("GetName", &ParsedExpr::GetName)
+    //        .def("GetAlias", &ParsedExpr::GetAlias)
+    //        .def("HasAlias", &ParsedExpr::HasAlias)
+    //        .def("ToString", &ParsedExpr::ToString)
+    //        .def_rw("type", &ParsedExpr::type_)
+    //        .def_rw("alias", &ParsedExpr::alias_);
+
     // logical_node_type
     nb::enum_<LogicalNodeType>(m, "LogicalNodeType")
         .value("kInvalid", LogicalNodeType::kInvalid)
@@ -283,22 +288,6 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kCompactFinish", LogicalNodeType::kCompactFinish)
         .export_values();
 
-    // query_result
-    nb::class_<BaseResult>(m, "BaseResult")
-        .def(nb::init<>())
-        .def(nb::init<BaseResult&>())
-        .def("IsOk", &BaseResult::IsOk)
-        .def("ErrorCode", &BaseResult::ErrorCode)
-        .def("ResultTable", &BaseResult::ResultTable, nb::rv_policy::reference_internal)
-        .def("ErrorMsg", &BaseResult::ErrorMsg)
-        .def("ErrorStr", &BaseResult::ErrorStr, nb::rv_policy::reference_internal);
-
-    nb::class_<QueryResult, BaseResult>(m, "QueryResult")
-        .def(nb::init<>())
-        .def_rw("root_operator_type", &QueryResult::root_operator_type_)
-        .def("ToString", &QueryResult::ToString)
-        .def_static("UnusedResult", &QueryResult::UnusedResult);
-
     // column_def
     nb::enum_<TableElementType>(m, "TableElementType")
         .value("kConstraint", TableElementType::kConstraint)
@@ -313,9 +302,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kInvalid", ConstraintType::kInvalid)
         .export_values();
 
-    nb::class_<TableElement>(m, "TableElement")
-        .def(nb::init<TableElementType>())
-        .def_rw("type", &TableElement::type_);
+    nb::class_<TableElement>(m, "TableElement").def(nb::init<TableElementType>()).def_rw("type", &TableElement::type_);
 
     nb::class_<TableConstraint, TableElement>(m, "TableConstraint")
         .def(nb::init<>())
@@ -323,15 +310,15 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("names_ptr", &TableConstraint::names_ptr_)
         .def_rw("constraint", &TableConstraint::constraint_);
 
-//    nb::class_<ColumnDef, TableElement>(m, "ColumnDef")
-//        .def(nb::init<int64_t, std::shared_ptr<DataType>, std::string, std::set<ConstraintType>, std::shared_ptr<ParsedExpr>>())
-//        .def(nb::init<LogicalType, const std::shared_ptr<TypeInfo>&, std::shared_ptr<ParsedExpr>>())
-//        .def("__eq__", &ColumnDef::operator==)
-//        .def("ToString", &ColumnDef::ToString)
-//        .def("name", &ColumnDef::name)
-//        .def("id", &ColumnDef::id)
-//        .def("type", &ColumnDef::type)
-//        .def("has_default_value", &ColumnDef::has_default_value);
+    //    nb::class_<ColumnDef, TableElement>(m, "ColumnDef")
+    //        .def(nb::init<int64_t, std::shared_ptr<DataType>, std::string, std::set<ConstraintType>, std::shared_ptr<ParsedExpr>>())
+    //        .def(nb::init<LogicalType, const std::shared_ptr<TypeInfo>&, std::shared_ptr<ParsedExpr>>())
+    //        .def("__eq__", &ColumnDef::operator==)
+    //        .def("ToString", &ColumnDef::ToString)
+    //        .def("name", &ColumnDef::name)
+    //        .def("id", &ColumnDef::id)
+    //        .def("type", &ColumnDef::type)
+    //        .def("has_default_value", &ColumnDef::has_default_value);
 
     // create_index_info
     nb::enum_<IndexType>(m, "IndexType")
@@ -342,14 +329,14 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kInvalid", IndexType::kInvalid)
         .export_values();
 
-//    nb::class_<IndexInfo>(m, "IndexInfo")
-//        .def(nb::init<>())
-//        .def_rw("index_type", &IndexInfo::index_type_)
-//        .def_rw("column_name", &IndexInfo::column_name_)
-//        .def_rw("index_param_list", &IndexInfo::index_param_list_)
-//        .def_static("IndexTypeToString", &IndexInfo::IndexTypeToString)
-//        .def_static("StringToIndexType", &IndexInfo::StringToIndexType);
-//
+    //    nb::class_<IndexInfo>(m, "IndexInfo")
+    //        .def(nb::init<>())
+    //        .def_rw("index_type", &IndexInfo::index_type_)
+    //        .def_rw("column_name", &IndexInfo::column_name_)
+    //        .def_rw("index_param_list", &IndexInfo::index_param_list_)
+    //        .def_static("IndexTypeToString", &IndexInfo::IndexTypeToString)
+    //        .def_static("StringToIndexType", &IndexInfo::StringToIndexType);
+    //
     // status
     nb::enum_<ErrorCode>(m, "ErrorCode")
         .value("kOk", ErrorCode::kOk)
@@ -482,73 +469,9 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kEmptyEntryList", ErrorCode::kEmptyEntryList)
         .export_values();
 
-    nb::class_<Status>(m, "Status")
-        .def(nb::init<>())
-        .def(nb::init<ErrorCode>())
-//        .def(nb::init<ErrorCode, UniquePtr<String>>())
-        .def(nb::init<ErrorCode, const char *>())
-
-        .def_static("OK", &Status::OK)
-        .def_static("Ignore", &Status::Ignore)
-
-        .def("ok", &Status::ok)
-        .def("code", &Status::code)
-        .def("Init", &Status::Init)
-        .def("message", &Status::message)
-        .def("MoveStatus", nb::overload_cast<Status&>(&Status::MoveStatus))
-        .def("MoveStatus", nb::overload_cast<Status&&>(&Status::MoveStatus))
-        .def("AppendMessage", &Status::AppendMessage)
-        .def("clone", &Status::clone);
-
     // table_entry_type
     nb::enum_<TableEntryType>(m, "TableEntryType")
         .value("kTableEntry", TableEntryType::kTableEntry)
         .value("kCollectionEntry", TableEntryType::kCollectionEntry)
         .export_values();
-
-    // base_table
-    nb::class_<BaseTable>(m, "BaseTable")
-//        .def(nb::init<TableEntryType, std::shared_ptr<std::string>, std::shared_ptr<std::string>>())
-        .def("kind", &BaseTable::kind);
-//        .def("schema_name", &BaseTable::schema_name)
-//        .def("table_name", &BaseTable::table_name);
-
-    // data_table
-    nb::class_<DataTable, BaseTable>(m, "DataTable")
-        .def(nb::init<std::shared_ptr<TableDef>, TableType>(),
-             nb::arg("table_def_ptr"), nb::arg("type"))
-
-        .def_static("Make", &DataTable::Make,
-                    nb::arg("table_def_ptr"), nb::arg("type"))
-        .def_static("MakeResultTable", &DataTable::MakeResultTable,
-                    nb::arg("column_defs"))
-        .def_static("MakeEmptyResultTable", &DataTable::MakeEmptyResultTable)
-        .def_static("MakeSummaryResultTable", &DataTable::MakeSummaryResultTable,
-                    nb::arg("counter"), nb::arg("sum"))
-
-        .def("ColumnCount", &DataTable::ColumnCount);
-//        .def("TableName", &DataTable::TableName)
-//        .def("SchemaName", &DataTable::SchemaName)
-//        .def("GetColumnIdByName", &DataTable::GetColumnIdByName, nb::arg("column_name"))
-//        .def("row_count", &DataTable::row_count)
-//        .def("type", &DataTable::type)
-//        .def("DataBlockCount", &DataTable::DataBlockCount)
-//        .def("GetDataBlockById", &DataTable::GetDataBlockById, nb::arg("idx"))
-//        .def("GetColumnNameById", &DataTable::GetColumnNameById, nb::arg("idx"))
-//        .def("GetColumnTypeById", &DataTable::GetColumnTypeById, nb::arg("idx"))
-//        .def("Append", &DataTable::Append, nb::arg("data_block"))
-//        .def("UpdateRowCount", &DataTable::UpdateRowCount, nb::arg("row_count"))
-//        .def("SetResultMsg", &DataTable::SetResultMsg, nb::arg("result_msg"))
-//        .def("result_msg", &DataTable::result_msg)
-//        .def("ToString", &DataTable::ToString)
-//        .def("GetRowIDVector", &DataTable::GetRowIDVector)
-//        .def("UnionWith", &DataTable::UnionWith, nb::arg("other"))
-//
-//        .def_rw("definition_ptr_", &DataTable::definition_ptr_)
-//        .def_rw("row_count_", &DataTable::row_count_)
-//        .def_rw("type_", &DataTable::type_)
-//        .def_rw("data_blocks_", &DataTable::data_blocks_)
-//        .def_rw("result_msg_", &DataTable::result_msg_);
-    // table_def
-
 }

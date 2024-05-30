@@ -24,6 +24,8 @@ class EmbeddedInfinityConnection(InfinityConnection, ABC):
         else:
             raise Exception(f"ERROR:3066, Invalid conflict type")
         self._client.create_database(db_name, create_database_conflict)
+        print("EmbeddedInfinityConnection, Database created successfully")
+
         # if res.error_code == 0:
         #     return res
         # else:
