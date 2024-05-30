@@ -195,7 +195,7 @@ class RemoteTable(Table, ABC):
                         constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
                                                                   f64_array_value=value)
                 else:
-                    raise InfinityException(3069, "Invalid constant expression")
+                    raise InfinityException(3069, f"Invalid constant expression: {type(value)}")
 
                 expr_type = ttypes.ParsedExprType(
                     constant_expr=constant_expression)

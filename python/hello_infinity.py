@@ -18,61 +18,103 @@ from infinity.common import REMOTE_HOST, NetworkAddress, ConflictType
 import pandas as pds
 
 
-def test_english():
+# def test_english():
+#     try:
+#         infinity_obj = infinity.connect(REMOTE_HOST)
+#         db = infinity_obj.get_database("default_db")
+#         # Drop my_table if it already exists
+#         db.drop_table("my_table", ConflictType.Ignore)
+#         # Create a table named "my_table"
+#         table = db.create_table(
+#             "my_table", {
+#                 "num": {"type": "integer"},
+#                 "body": {"type": "varchar"},
+#                 "vec": {"type": "vector, 4, float"}
+#             })
+#         table.insert(
+#             [{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+#         table.insert(
+#             [{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+#
+#         # `create_index()` is required before match() or fusion()
+#         res = table.create_index("my_index",
+#                                  [index.IndexInfo("body",
+#                                                   index.IndexType.FullText,
+#                                                   []),
+#                                   ], ConflictType.Error)
+#         # assert res.success
+#
+#         res = table.output(["num", "body"]).knn(
+#             "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
+#
+#         pds_df = pds.DataFrame(res)
+#         json_data = pds_df.to_json()
+#         print("------json-------")
+#         print(json_data)
+#
+#         table_obj = db.get_table("my_table")
+#         qb_result = table_obj.output(["num", "body"]).knn(
+#             "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).to_pl()
+#         print("------tabular -------")
+#         print("------knn-------")
+#         print(qb_result)
+#
+#         qb_result1 = table_obj.match(
+#             "body", "blooms", "topn=1").output(["num", "body"]).to_pl()
+#         print("------match-------")
+#         print(qb_result1)
+#
+#         qb_result2 = table_obj.output(["num", "body"]).knn(
+#             "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).match(
+#             "body", "blooms", "topn=1").fusion('rrf').to_pl()
+#         print("------knn+match-------")
+#         print(qb_result2)
+#
+#     except Exception as e:
+#         print(str(e))
+
+
+def test_test():
     try:
         infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj.create_database("default_db", ConflictType.Ignore)
         db = infinity_obj.get_database("default_db")
         # Drop my_table if it already exists
         db.drop_table("my_table", ConflictType.Ignore)
         # Create a table named "my_table"
         table = db.create_table(
             "my_table", {
-                "num": {"type": "integer"},
-                "body": {"type": "varchar"},
-                "vec": {"type": "vector, 4, float"}
+                "text": {"type": "varchar"}
             })
         table.insert(
-            [{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-        table.insert(
-            [{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
-
+            [{"text": "会徽整体形似运动中的羽毛球，球头绑带部分演化为“城墙的图形元素，极具南京的地域特征，凸显出举办地的历史底蕴和人文气息。尾羽部分图形则巧妙融入了举办年份“2018和南京的首字母“NJ，结合中国传统书法笔触的表现形式，传递出羽毛球运动的速度感。会徽红黑配色鲜艳明快，契合了体育运动的活力与朝气[3]2018年世界羽毛球锦标赛吉祥物南京羽毛球世锦赛吉祥物2018年道达尔羽毛球世锦赛吉祥物在南京发布。造型简洁、形态生动、富有亲和力的“羽宝拔得头筹，成为2018年世界羽毛球锦标赛吉祥物。比赛将于7月30日在宁举行，赛程7天，预计近340名顶尖运动员参赛。吉祥物“羽宝头部由羽毛球外形变化而来，手持球拍，拟人化的设计再现了羽毛球运动员比赛时的接击球动作，胸前佩戴的梅花造型的金牌，代表着在南京举办的世锦赛将向世界献上精彩的羽毛球盛宴。同时黄蓝两色为主色调，在视觉冲击中体现了羽毛球运动动静转换的速度感和竞技魅力[6]2018年世界羽毛球锦标赛抽签结果7月17日，2018年南京羽毛球世锦赛抽签出炉。男单中国获得满额席位，石宇奇、谌龙、林丹和黄宇翔全部被分到了上半区。"}])
         # `create_index()` is required before match() or fusion()
         res = table.create_index("my_index",
-                                 [index.IndexInfo("body",
+                                 [index.IndexInfo("text",
                                                   index.IndexType.FullText,
-                                                  []),
+                                                  [index.InitParameter("ANALYZER", "chinese")]),
                                   ], ConflictType.Error)
-        # assert res.success
-
-        res = table.output(["num", "body"]).knn(
-            "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
-
-        pds_df = pds.DataFrame(res)
-        json_data = pds_df.to_json()
-        print("------json-------")
-        print(json_data)
 
         table_obj = db.get_table("my_table")
-        qb_result = table_obj.output(["num", "body"]).knn(
-            "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).to_pl()
-        print("------tabular -------")
-        print("------knn-------")
-        print(qb_result)
 
-        qb_result1 = table_obj.match(
-            "body", "blooms", "topn=1").output(["num", "body"]).to_pl()
-        print("------match-------")
-        print(qb_result1)
+        # qb_result1 = table_obj.match("text", "羽毛", "topn=3").output(["text", "_score"]).to_pl()
+        # print("------match 羽毛 -------")
+        # print(qb_result1)
 
-        qb_result2 = table_obj.output(["num", "body"]).knn(
-            "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).match(
-            "body", "blooms", "topn=1").fusion('rrf').to_pl()
-        print("------knn+match-------")
+        qb_result2 = table_obj.match("text", "羽毛球", "topn=1").output(["text", "_score"]).to_pl()
+        print("------match 羽毛球 -------")
         print(qb_result2)
+
+        # qb_result2 = table_obj.match("text", "会徽", "topn=1").output(["text", "_score"]).to_pl()
+        # print("------match 会徽 -------")
+        # print(qb_result2)
+        #
+        # qb_result2 = table_obj.match("text", "2018年世界羽毛球锦标赛在哪个城市举办？", "topn=3").output(["text", "_score"]).to_pl()
+        # print("------match 2018年世界羽毛球锦标赛在哪个城市举办？ -------")
+        # print(qb_result2)
 
     except Exception as e:
         print(str(e))
-
 
 def test_chinese():
     """
@@ -106,7 +148,7 @@ def test_chinese():
         # assert res.success
 
         res = table.output(["num", "body"]).knn(
-            "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
+            "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 100).to_pl()
 
         pds_df = pds.DataFrame(res)
         json_data = pds_df.to_json()
@@ -115,13 +157,13 @@ def test_chinese():
 
         table_obj = db.get_table("my_table")
         qb_result = table_obj.output(["num", "body"]).knn(
-            "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).to_pl()
+            "vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 4).to_pl()
         print("------tabular -------")
         print("------knn-------")
         print(qb_result)
 
         qb_result1 = table_obj.match(
-            "body", "芯片", "topn=1").output(["num", "body"]).to_pl()
+            "body", "苹果", "topn=1").output(["num", "body"]).to_pl()
         print("------match-------")
         print(qb_result1)
 
@@ -136,5 +178,5 @@ def test_chinese():
 
 
 if __name__ == '__main__':
-    test_english()
-    # test_chinese()
+    # test_english()
+    test_chinese()

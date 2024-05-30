@@ -35,6 +35,9 @@ SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_l2 SEARCH MATCH VECTOR (c2, [0.3, 
 6 2 0.060000
 4 1 0.100000
 
+statement error
+SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3);
+
 # copy to create another new block
 # there will has 2 knn_scan operator to scan the blocks, and one merge_knn to merge
 statement ok

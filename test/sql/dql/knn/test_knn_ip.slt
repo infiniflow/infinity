@@ -29,11 +29,14 @@ SELECT c2 FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float
 0.2,0.1,0.3,0.4
 
 query II
-SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
+SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
 8 3 0.270000
 6 2 0.250000
 4 1 0.230000
+
+statement error
+SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 
 # copy to create another new block
 # there will has 2 knn_scan operator to scan the blocks, and one merge_knn to merge
