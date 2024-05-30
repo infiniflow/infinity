@@ -21,9 +21,10 @@ from common import common_values
 import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
-from infinity.common import ConflictType
+from infinity.common import ConflictType, EMBEDDED_INFINITY_PATH
 from utils import copy_data
 from test_sdkbase import TestSdk
+
 
 test_csv_file = "embedding_int_dim3.csv"
 
@@ -44,6 +45,10 @@ class TestCase(TestSdk):
             infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
             assert infinity_obj
             assert infinity_obj.disconnect()
+
+        embedded_infinity_obj = infinity.connect(uri=None, path=EMBEDDED_INFINITY_PATH)
+        assert embedded_infinity_obj
+        embedded_infinity_obj.disconnect()
 
     def test_create_db_with_invalid_name(self):
         """

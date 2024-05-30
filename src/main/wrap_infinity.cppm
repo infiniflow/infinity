@@ -26,7 +26,7 @@ namespace infinity {
 
 export struct WrapQueryResult {
     ErrorCode error_code;
-    String message;
+    String error_msg;
 };
 
 export WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options);

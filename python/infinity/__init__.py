@@ -23,7 +23,7 @@ __version__ = pkg_resources.get_distribution("infinity_sdk").version
 from infinity.common import URI, NetworkAddress, LOCAL_HOST, EMBEDDED_INFINITY_PATH
 from infinity.infinity import InfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
-from infinity.embedded_infinity.infinity import EmbeddedInfinityConnection
+from infinity.local_infinity.infinity import EmbeddedInfinityConnection
 
 def connect(
         uri: URI = LOCAL_HOST,

@@ -68,7 +68,7 @@ namespace infinity {
 //
 // struct WrapQueryResult {
 //    ErrorCode error_code;
-//    String message;
+//    String error_msg;
 //};
 //
 // WrapQueryResult WrapCreateDatabase(Infinity& instance,
@@ -77,7 +77,7 @@ namespace infinity {
 //    WrapQueryResult result;
 //    auto query_result = instance.CreateDatabase(db_name, options);
 //    result.error_code = query_result.ErrorCode();
-//    result.message = query_result.ErrorMsg();
+//    result.error_msg = query_result.ErrorMsg();
 //    return result;
 //}
 
@@ -101,10 +101,11 @@ NB_MODULE(embedded_infinity_ext, m) {
     m.def("print_str", &print_str);
     m.def("get_hello", &get_hello);
     m.def("test_shared", &test_shared_wrap);
+
     nb::class_<WrapQueryResult>(m, "WrapQueryResult")
         .def(nb::init<>())
         .def_rw("error_code", &WrapQueryResult::error_code)
-        .def_rw("message", &WrapQueryResult::message);
+        .def_rw("error_msg", &WrapQueryResult::error_msg);
 
     // infinity
     nb::class_<Infinity>(m, "Infinity")

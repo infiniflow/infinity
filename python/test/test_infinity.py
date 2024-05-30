@@ -27,6 +27,7 @@ class TestInfinity(TestSdk):
     def test_get_database(self):
         infinity_obj = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
         database_res = infinity_obj.get_database("default_db")
+        print(type(database_res))
         assert database_res.error_code == ErrorCode.OK
         # disconnect
         res = infinity_obj.disconnect()
