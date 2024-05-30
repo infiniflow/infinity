@@ -58,8 +58,8 @@ def test_english():
 
         res = (
             table.output(["num", "body"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
-            .to_pl()
+                .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
+                .to_pl()
         )
 
         pds_df = pds.DataFrame(res)
@@ -70,8 +70,8 @@ def test_english():
         table_obj = db.get_table("my_table")
         qb_result = (
             table_obj.output(["num", "body"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3)
-            .to_pl()
+                .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3)
+                .to_pl()
         )
         print("------tabular -------")
         print("------vector-------")
@@ -85,10 +85,10 @@ def test_english():
 
         qb_result2 = (
             table_obj.output(["num", "body"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3)
-            .match("body", "blooms", "topn=1")
-            .fusion("rrf")
-            .to_pl()
+                .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3)
+                .match("body", "blooms", "topn=1")
+                .fusion("rrf")
+                .to_pl()
         )
         print("------vector+fulltext-------")
         print(qb_result2)
@@ -171,8 +171,8 @@ def test_chinese():
         print("------json-------")
         res = (
             table.output(["num", "body"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
-            .to_pl()
+                .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
+                .to_pl()
         )
         pds_df = pds.DataFrame(res)
         json_data = pds_df.to_json()
@@ -183,8 +183,8 @@ def test_chinese():
         print("------vector-------")
         qb_result = (
             table_obj.output(["num", "body"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3)
-            .to_pl()
+                .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3)
+                .to_pl()
         )
         print(qb_result)
 
@@ -199,8 +199,8 @@ def test_chinese():
         for question in questions:
             qb_result = (
                 table_obj.output(["num", "body", "_score"])
-                .match("body", question, "topn=10")
-                .to_pl()
+                    .match("body", question, "topn=10")
+                    .to_pl()
             )
             print(f"question: {question}")
             print(qb_result)
@@ -209,10 +209,10 @@ def test_chinese():
         for question in questions:
             qb_result = (
                 table_obj.output(["num", "body", "_score"])
-                .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10)
-                .match("body", question, "topn=10")
-                .fusion("rrf")
-                .to_pl()
+                    .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10)
+                    .match("body", question, "topn=10")
+                    .fusion("rrf")
+                    .to_pl()
             )
             print(f"question: {question}")
             print(qb_result)

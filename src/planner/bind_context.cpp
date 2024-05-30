@@ -29,6 +29,7 @@ import column_identifer;
 import block_index;
 import column_expr;
 import logger;
+import knn_expr;
 
 namespace infinity {
 
@@ -366,6 +367,44 @@ const Binding *BindContext::GetBindingFromCurrentOrParentByName(const String &bi
         return nullptr;
     }
     return binding_iter->second.get();
+}
+
+void BindContext::BoundSearch(ParsedExpr *expr) {
+    if (expr == nullptr) {
+        return;
+    }
+    auto search_expr = (SearchExpr *)expr;
+
+    if(!search_expr->knn_exprs_.empty() && search_expr->fusion_exprs_.empty()) {
+        SizeT expr_count = search_expr->knn_exprs_.size();
+        KnnExpr* first_knn = search_expr->knn_exprs_[0];
+        KnnDistanceType first_distance_type = first_knn->distance_type_;
+        for(SizeT idx = 1; idx < expr_count; ++ idx) {
+            if(search_expr->knn_exprs_[idx]->distance_type_ != first_distance_type) {
+                // Mixed distance type
+                return ;
+            }
+        }
+        switch(first_distance_type) {
+            case KnnDistanceType::kL2:
+            case KnnDistanceType::kHamming: {
+                allow_distance = true;
+                break;
+            }
+            case KnnDistanceType::kInnerProduct:
+            case KnnDistanceType::kCosine: {
+                allow_similarity = true;
+                break;
+            }
+            default: {
+                String error_message = "Invalid KNN metric type";
+                LOG_ERROR(error_message);
+                UnrecoverableError(error_message);
+            }
+        }
+    }
+
+    allow_score = !search_expr->match_exprs_.empty() || !search_expr->match_tensor_exprs_.empty() || !(search_expr->fusion_exprs_.empty());
 }
 
 // void

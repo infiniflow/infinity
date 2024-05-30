@@ -213,7 +213,7 @@ class RemoteTable(Table, ABC):
                                     literal_type=ttypes.LiteralType.DoubleTensorArray,
                                     f64_tensor_array_value=value)
                 else:
-                    raise InfinityException(3069, "Invalid constant expression")
+                    raise InfinityException(3069, f"Invalid constant expression: {type(value)}")
 
                 expr_type = ttypes.ParsedExprType(
                     constant_expr=constant_expression)

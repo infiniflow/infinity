@@ -152,7 +152,7 @@ class TestKnn(TestSdk):
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
-        res = table_obj.output(["variant_id", "_row_id", "_distance"]).knn(
+        res = table_obj.output(["variant_id", "_row_id", "_similarity"]).knn(
             column_name, [1.0] * 4, "float", "ip", 2).to_pl()
         print(res)
 
@@ -302,12 +302,12 @@ class TestKnn(TestSdk):
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
         if embedding_data_type[1]:
-            res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+            res = table_obj.output(["variant_id", "_distance"]).knn("gender_vector", embedding_data, embedding_data_type[0],
                                                        "l2",
                                                        2).to_pl()
             print(res)
         else:
-            res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+            res = table_obj.output(["variant_id", "_similarity"]).knn("gender_vector", embedding_data, embedding_data_type[0],
                                                        "ip",
                                                        2).to_pl()
 

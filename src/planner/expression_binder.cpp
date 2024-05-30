@@ -730,7 +730,15 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         switch (special_function_ptr->special_type()) {
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {
-                    Status status = Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR");
+                    Status status = Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
+                }
+                break;
+            }
+            case SpecialType::kSimilarity: {
+                if (!bind_context_ptr->allow_similarity) {
+                    Status status = Status::SyntaxError("SIMILARITY() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product");
                     LOG_ERROR(status.message());
                     RecoverableError(status);
                 }

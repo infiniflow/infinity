@@ -80,6 +80,7 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
                                                  column_cnt_ - 1);
             }
             case SpecialType::kScore:
+            case SpecialType::kSimilarity:
             case SpecialType::kDistance: {
                 return ReferenceExpression::Make(expression->Type(),
                                                  expression->table_name(),
