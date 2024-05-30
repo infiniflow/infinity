@@ -341,6 +341,9 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
                 type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
                 break;
             }
+            case LogicalType::kSparse: {
+                type_info = SparseInfo::Deserialize(type_info_json);
+            }
             default:
                 // There's no type_info for other types
                 break;

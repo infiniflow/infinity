@@ -32,4 +32,8 @@ nlohmann::json SparseInfo::Serialize() const {
     return res;
 }
 
+std::unique_ptr<SparseInfo> SparseInfo::Deserialize(const nlohmann::json &json) {
+    return std::make_unique<SparseInfo>(json["data_type"], json["index_type"], json["dimension"]);
+}
+
 } // namespace infinity
