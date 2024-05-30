@@ -11,7 +11,8 @@ import sys
 sys.path.append(os.path.abspath("/home/weilongma/Project/infinity/build/cp311-cp311-linux_x86_64/src"))
 
 try:
-    from embedded_infinity_ext import Infinity
+    # from embedded_infinity_ext import Infinity
+    from embedded_infinity_ext import *
 except ImportError as e:
     raise ImportError(f"Could not import the embedded_infinity_ext module: {e}")
 

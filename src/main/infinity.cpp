@@ -107,7 +107,7 @@ void Infinity::RemoteDisconnect() {
 }
 
 QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabaseOptions &create_db_options) {
-//    std::cout << "Infinity::CreateDatabase begin" << std::endl;
+    std::cout << "Infinity::CreateDatabase begin" << std::endl;
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
 //    std::cout << "Infinity::CreateDatabase query_context_ptr create success" << std::endl;
     query_context_ptr->Init(InfinityContext::instance().config(),
@@ -123,7 +123,7 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
     create_statement->create_info_->conflict_type_ = create_db_options.conflict_type_;
     QueryResult query_result = query_context_ptr->QueryStatement(create_statement.get());
 //    std::cout << "Infinity::CreateDatabase query result = " << query_result.ToString() << "is ok = " << query_result.IsOk() << std::endl;
-//    std::cout << "Infinity::CreateDatabase finish" << std::endl;
+    std::cout << "Infinity::CreateDatabase finish" << std::endl;
     return query_result;
 }
 
