@@ -689,7 +689,7 @@ IDENTIFIER column_type default_expr {
             type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
             if(type_info_ptr == nullptr) {
                 yyerror(&yyloc, scanner, result, "Fail to create decimal info.");
-                delete $1;
+                free($1);
                 YYERROR;
             }
             break;
@@ -706,6 +706,11 @@ IDENTIFIER column_type default_expr {
         }
         case infinity::LogicalType::kSparse: {
             type_info_ptr = infinity::SparseInfo::Make($2.embedding_type_, $2.width);
+            if (type_info_ptr == nullptr) {
+                yyerror(&yyloc, scanner, result, "Fail to create sparse info.");
+                free($1);
+                YYERROR;
+            }
             break;
         }
         default: {
@@ -2581,11 +2586,13 @@ unclosed_long_sparse_array_expr: '[' int_sparse_ele {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kLongSparseArray);
     const_expr->long_sparse_array_.first.emplace_back($2->first);
     const_expr->long_sparse_array_.second.emplace_back($2->second);
+    delete $2;
     $$ = const_expr;
 }
 | unclosed_long_sparse_array_expr ',' int_sparse_ele {
     $1->long_sparse_array_.first.emplace_back($3->first);
     $1->long_sparse_array_.second.emplace_back($3->second);
+    delete $3;
     $$ = $1;
 }
 
@@ -2597,11 +2604,13 @@ unclosed_double_sparse_array_expr: '[' float_sparse_ele {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDoubleSparseArray);
     const_expr->double_sparse_array_.first.emplace_back($2->first);
     const_expr->double_sparse_array_.second.emplace_back($2->second);
+    delete $2;
     $$ = const_expr;
 }
 | unclosed_double_sparse_array_expr ',' float_sparse_ele {
     $1->double_sparse_array_.first.emplace_back($3->first);
     $1->double_sparse_array_.second.emplace_back($3->second);
+    delete $3;
     $$ = $1;
 }
 
