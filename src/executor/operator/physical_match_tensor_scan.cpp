@@ -97,7 +97,7 @@ void PhysicalMatchTensorScan::Init() {
         UnrecoverableError(error_message);
     }
     // TODO: now only support MaxSim
-    if (match_tensor_expr_->search_method_ != MatchTensorMethod::kMaxSim) {
+    if (match_tensor_expr_->search_method_ != MatchTensorSearchMethod::kMaxSim) {
         String error_message = "Now only support MaxSim search.";
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);

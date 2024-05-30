@@ -156,6 +156,46 @@ class TestTable(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    def test_create_tensor_table(self):
+        """
+        target: test create table with tensor column
+        method: create table with tensor column
+        expected: ok
+        """
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_create_tensor_table", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_create_tensor_table", {
+            "c1": {"type": "tensor,128,float"}}, ConflictType.Error)
+        assert table_obj
+
+        res = db_obj.drop_table("test_create_tensor_table")
+        assert res.error_code == ErrorCode.OK
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    def test_create_tensorarray_table(self):
+        """
+        target: test create table with tensorarray column
+        method: create table with tensorarray column
+        expected: ok
+        """
+        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        db_obj = infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_create_tensorarray_table", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_create_tensorarray_table", {
+            "c1": {"type": "tensorarray,128,float"}}, ConflictType.Error)
+        assert table_obj
+
+        res = db_obj.drop_table("test_create_tensorarray_table")
+        assert res.error_code == ErrorCode.OK
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     def test_create_table_with_invalid_column_name(self):
         infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
         with pytest.raises(Exception):

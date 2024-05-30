@@ -26,7 +26,7 @@ from sqlglot import condition, maybe_parse
 
 from infinity.common import VEC, InfinityException
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
-from infinity.remote_thrift.types import logic_type_to_dtype
+from infinity.remote_thrift.types import logic_type_to_dtype, make_match_tensor_expr
 from infinity.remote_thrift.utils import traverse_conditions, parse_expr
 
 '''FIXME: How to disable validation of only the search field?'''
@@ -154,13 +154,29 @@ class InfinityThriftQueryBuilder(ABC):
         self._search.match_exprs.append(match_expr)
         return self
 
-    def fusion(self, method: str, options_text: str = '') -> InfinityThriftQueryBuilder:
+    def match_tensor(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, method_type: str,
+                     extra_option: str) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
+        if self._search.match_tensor_exprs is None:
+            self._search.match_tensor_exprs = list()
+        match_tensor_expr = make_match_tensor_expr(vector_column_name, embedding_data, embedding_data_type,
+                                                   method_type, extra_option)
+        self._search.match_tensor_exprs.append(match_tensor_expr)
+        return self
+
+    def fusion(self, method: str, options_text: str = '',
+               match_tensor_expr: MatchTensorExpr = None) -> InfinityThriftQueryBuilder:
+        if self._search is None:
+            self._search = SearchExpr()
+        if self._search.fusion_exprs is None:
+            self._search.fusion_exprs = list()
         fusion_expr = FusionExpr()
         fusion_expr.method = method
         fusion_expr.options_text = options_text
-        self._search.fusion_expr = fusion_expr
+        if match_tensor_expr is not None:
+            fusion_expr.optional_match_tensor_expr = match_tensor_expr
+        self._search.fusion_exprs.append(fusion_expr)
         return self
 
     def filter(self, where: Optional[str]) -> InfinityThriftQueryBuilder:

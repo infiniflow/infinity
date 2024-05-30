@@ -18,6 +18,7 @@ export module fusion_expression;
 
 import stl;
 import base_expression;
+import match_tensor_expression;
 import data_type;
 import logical_type;
 import internal_types;
@@ -36,6 +37,7 @@ public:
 public:
     String method_{};
     SharedPtr<SearchOptions> options_{};
+    SharedPtr<MatchTensorExpression> match_tensor_expr_;
 };
 
 } // namespace infinity

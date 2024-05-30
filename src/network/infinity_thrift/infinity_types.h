@@ -34,7 +34,9 @@ struct LogicType {
     Double = 8,
     Varchar = 9,
     Embedding = 10,
-    Invalid = 11
+    Tensor = 11,
+    TensorArray = 12,
+    Invalid = 13
   };
 };
 
@@ -112,7 +114,9 @@ struct LiteralType {
     Int64 = 3,
     Null = 4,
     IntegerArray = 5,
-    DoubleArray = 6
+    DoubleArray = 6,
+    IntegerTensorArray = 7,
+    DoubleTensorArray = 8
   };
 };
 
@@ -163,8 +167,10 @@ struct ColumnType {
     ColumnFloat64 = 6,
     ColumnVarchar = 7,
     ColumnEmbedding = 8,
-    ColumnRowID = 9,
-    ColumnInvalid = 10
+    ColumnTensor = 9,
+    ColumnTensorArray = 10,
+    ColumnRowID = 11,
+    ColumnInvalid = 12
   };
 };
 
@@ -233,15 +239,17 @@ class EmbeddingData;
 
 class InitParameter;
 
+class ConstantExpr;
+
 class KnnExpr;
+
+class MatchTensorExpr;
 
 class MatchExpr;
 
 class FusionExpr;
 
 class SearchExpr;
-
-class ConstantExpr;
 
 class FunctionExpr;
 
@@ -1072,6 +1080,121 @@ void swap(InitParameter &a, InitParameter &b);
 
 std::ostream& operator<<(std::ostream& out, const InitParameter& obj);
 
+typedef struct _ConstantExpr__isset {
+  _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false), i64_tensor_array_value(false), f64_tensor_array_value(false) {}
+  bool literal_type :1;
+  bool bool_value :1;
+  bool i64_value :1;
+  bool f64_value :1;
+  bool str_value :1;
+  bool i64_array_value :1;
+  bool f64_array_value :1;
+  bool i64_tensor_array_value :1;
+  bool f64_tensor_array_value :1;
+} _ConstantExpr__isset;
+
+class ConstantExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  ConstantExpr(const ConstantExpr&);
+  ConstantExpr& operator=(const ConstantExpr&);
+  ConstantExpr() noexcept
+               : literal_type(static_cast<LiteralType::type>(0)),
+                 bool_value(0),
+                 i64_value(0),
+                 f64_value(0),
+                 str_value() {
+  }
+
+  virtual ~ConstantExpr() noexcept;
+  /**
+   * 
+   * @see LiteralType
+   */
+  LiteralType::type literal_type;
+  bool bool_value;
+  int64_t i64_value;
+  double f64_value;
+  std::string str_value;
+  std::vector<int64_t>  i64_array_value;
+  std::vector<double>  f64_array_value;
+  std::vector<std::vector<std::vector<int64_t> > >  i64_tensor_array_value;
+  std::vector<std::vector<std::vector<double> > >  f64_tensor_array_value;
+
+  _ConstantExpr__isset __isset;
+
+  void __set_literal_type(const LiteralType::type val);
+
+  void __set_bool_value(const bool val);
+
+  void __set_i64_value(const int64_t val);
+
+  void __set_f64_value(const double val);
+
+  void __set_str_value(const std::string& val);
+
+  void __set_i64_array_value(const std::vector<int64_t> & val);
+
+  void __set_f64_array_value(const std::vector<double> & val);
+
+  void __set_i64_tensor_array_value(const std::vector<std::vector<std::vector<int64_t> > > & val);
+
+  void __set_f64_tensor_array_value(const std::vector<std::vector<std::vector<double> > > & val);
+
+  bool operator == (const ConstantExpr & rhs) const
+  {
+    if (!(literal_type == rhs.literal_type))
+      return false;
+    if (__isset.bool_value != rhs.__isset.bool_value)
+      return false;
+    else if (__isset.bool_value && !(bool_value == rhs.bool_value))
+      return false;
+    if (__isset.i64_value != rhs.__isset.i64_value)
+      return false;
+    else if (__isset.i64_value && !(i64_value == rhs.i64_value))
+      return false;
+    if (__isset.f64_value != rhs.__isset.f64_value)
+      return false;
+    else if (__isset.f64_value && !(f64_value == rhs.f64_value))
+      return false;
+    if (__isset.str_value != rhs.__isset.str_value)
+      return false;
+    else if (__isset.str_value && !(str_value == rhs.str_value))
+      return false;
+    if (__isset.i64_array_value != rhs.__isset.i64_array_value)
+      return false;
+    else if (__isset.i64_array_value && !(i64_array_value == rhs.i64_array_value))
+      return false;
+    if (__isset.f64_array_value != rhs.__isset.f64_array_value)
+      return false;
+    else if (__isset.f64_array_value && !(f64_array_value == rhs.f64_array_value))
+      return false;
+    if (__isset.i64_tensor_array_value != rhs.__isset.i64_tensor_array_value)
+      return false;
+    else if (__isset.i64_tensor_array_value && !(i64_tensor_array_value == rhs.i64_tensor_array_value))
+      return false;
+    if (__isset.f64_tensor_array_value != rhs.__isset.f64_tensor_array_value)
+      return false;
+    else if (__isset.f64_tensor_array_value && !(f64_tensor_array_value == rhs.f64_tensor_array_value))
+      return false;
+    return true;
+  }
+  bool operator != (const ConstantExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ConstantExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ConstantExpr &a, ConstantExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const ConstantExpr& obj);
+
 typedef struct _KnnExpr__isset {
   _KnnExpr__isset() : column_expr(false), embedding_data(false), embedding_data_type(false), distance_type(false), topn(false), opt_params(true) {}
   bool column_expr :1;
@@ -1156,6 +1279,79 @@ void swap(KnnExpr &a, KnnExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const KnnExpr& obj);
 
+typedef struct _MatchTensorExpr__isset {
+  _MatchTensorExpr__isset() : search_method(false), column_expr(false), embedding_data_type(false), embedding_data(false), extra_options(false) {}
+  bool search_method :1;
+  bool column_expr :1;
+  bool embedding_data_type :1;
+  bool embedding_data :1;
+  bool extra_options :1;
+} _MatchTensorExpr__isset;
+
+class MatchTensorExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  MatchTensorExpr(const MatchTensorExpr&);
+  MatchTensorExpr& operator=(const MatchTensorExpr&);
+  MatchTensorExpr() noexcept
+                  : search_method(),
+                    embedding_data_type(static_cast<ElementType::type>(0)),
+                    extra_options() {
+  }
+
+  virtual ~MatchTensorExpr() noexcept;
+  std::string search_method;
+  ColumnExpr column_expr;
+  /**
+   * 
+   * @see ElementType
+   */
+  ElementType::type embedding_data_type;
+  EmbeddingData embedding_data;
+  std::string extra_options;
+
+  _MatchTensorExpr__isset __isset;
+
+  void __set_search_method(const std::string& val);
+
+  void __set_column_expr(const ColumnExpr& val);
+
+  void __set_embedding_data_type(const ElementType::type val);
+
+  void __set_embedding_data(const EmbeddingData& val);
+
+  void __set_extra_options(const std::string& val);
+
+  bool operator == (const MatchTensorExpr & rhs) const
+  {
+    if (!(search_method == rhs.search_method))
+      return false;
+    if (!(column_expr == rhs.column_expr))
+      return false;
+    if (!(embedding_data_type == rhs.embedding_data_type))
+      return false;
+    if (!(embedding_data == rhs.embedding_data))
+      return false;
+    if (!(extra_options == rhs.extra_options))
+      return false;
+    return true;
+  }
+  bool operator != (const MatchTensorExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const MatchTensorExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(MatchTensorExpr &a, MatchTensorExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const MatchTensorExpr& obj);
+
 typedef struct _MatchExpr__isset {
   _MatchExpr__isset() : fields(false), matching_text(false), options_text(false) {}
   bool fields :1;
@@ -1214,9 +1410,10 @@ void swap(MatchExpr &a, MatchExpr &b);
 std::ostream& operator<<(std::ostream& out, const MatchExpr& obj);
 
 typedef struct _FusionExpr__isset {
-  _FusionExpr__isset() : method(false), options_text(false) {}
+  _FusionExpr__isset() : method(false), options_text(false), optional_match_tensor_expr(false) {}
   bool method :1;
   bool options_text :1;
+  bool optional_match_tensor_expr :1;
 } _FusionExpr__isset;
 
 class FusionExpr : public virtual ::apache::thrift::TBase {
@@ -1232,6 +1429,7 @@ class FusionExpr : public virtual ::apache::thrift::TBase {
   virtual ~FusionExpr() noexcept;
   std::string method;
   std::string options_text;
+  MatchTensorExpr optional_match_tensor_expr;
 
   _FusionExpr__isset __isset;
 
@@ -1239,11 +1437,17 @@ class FusionExpr : public virtual ::apache::thrift::TBase {
 
   void __set_options_text(const std::string& val);
 
+  void __set_optional_match_tensor_expr(const MatchTensorExpr& val);
+
   bool operator == (const FusionExpr & rhs) const
   {
     if (!(method == rhs.method))
       return false;
     if (!(options_text == rhs.options_text))
+      return false;
+    if (__isset.optional_match_tensor_expr != rhs.__isset.optional_match_tensor_expr)
+      return false;
+    else if (__isset.optional_match_tensor_expr && !(optional_match_tensor_expr == rhs.optional_match_tensor_expr))
       return false;
     return true;
   }
@@ -1264,10 +1468,11 @@ void swap(FusionExpr &a, FusionExpr &b);
 std::ostream& operator<<(std::ostream& out, const FusionExpr& obj);
 
 typedef struct _SearchExpr__isset {
-  _SearchExpr__isset() : match_exprs(false), knn_exprs(false), fusion_expr(false) {}
+  _SearchExpr__isset() : match_exprs(false), knn_exprs(false), match_tensor_exprs(false), fusion_exprs(false) {}
   bool match_exprs :1;
   bool knn_exprs :1;
-  bool fusion_expr :1;
+  bool match_tensor_exprs :1;
+  bool fusion_exprs :1;
 } _SearchExpr__isset;
 
 class SearchExpr : public virtual ::apache::thrift::TBase {
@@ -1281,7 +1486,8 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
   virtual ~SearchExpr() noexcept;
   std::vector<MatchExpr>  match_exprs;
   std::vector<KnnExpr>  knn_exprs;
-  FusionExpr fusion_expr;
+  std::vector<MatchTensorExpr>  match_tensor_exprs;
+  std::vector<FusionExpr>  fusion_exprs;
 
   _SearchExpr__isset __isset;
 
@@ -1289,7 +1495,9 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
 
   void __set_knn_exprs(const std::vector<KnnExpr> & val);
 
-  void __set_fusion_expr(const FusionExpr& val);
+  void __set_match_tensor_exprs(const std::vector<MatchTensorExpr> & val);
+
+  void __set_fusion_exprs(const std::vector<FusionExpr> & val);
 
   bool operator == (const SearchExpr & rhs) const
   {
@@ -1301,9 +1509,13 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
       return false;
     else if (__isset.knn_exprs && !(knn_exprs == rhs.knn_exprs))
       return false;
-    if (__isset.fusion_expr != rhs.__isset.fusion_expr)
+    if (__isset.match_tensor_exprs != rhs.__isset.match_tensor_exprs)
       return false;
-    else if (__isset.fusion_expr && !(fusion_expr == rhs.fusion_expr))
+    else if (__isset.match_tensor_exprs && !(match_tensor_exprs == rhs.match_tensor_exprs))
+      return false;
+    if (__isset.fusion_exprs != rhs.__isset.fusion_exprs)
+      return false;
+    else if (__isset.fusion_exprs && !(fusion_exprs == rhs.fusion_exprs))
       return false;
     return true;
   }
@@ -1322,105 +1534,6 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
 void swap(SearchExpr &a, SearchExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const SearchExpr& obj);
-
-typedef struct _ConstantExpr__isset {
-  _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false) {}
-  bool literal_type :1;
-  bool bool_value :1;
-  bool i64_value :1;
-  bool f64_value :1;
-  bool str_value :1;
-  bool i64_array_value :1;
-  bool f64_array_value :1;
-} _ConstantExpr__isset;
-
-class ConstantExpr : public virtual ::apache::thrift::TBase {
- public:
-
-  ConstantExpr(const ConstantExpr&);
-  ConstantExpr& operator=(const ConstantExpr&);
-  ConstantExpr() noexcept
-               : literal_type(static_cast<LiteralType::type>(0)),
-                 bool_value(0),
-                 i64_value(0),
-                 f64_value(0),
-                 str_value() {
-  }
-
-  virtual ~ConstantExpr() noexcept;
-  /**
-   * 
-   * @see LiteralType
-   */
-  LiteralType::type literal_type;
-  bool bool_value;
-  int64_t i64_value;
-  double f64_value;
-  std::string str_value;
-  std::vector<int64_t>  i64_array_value;
-  std::vector<double>  f64_array_value;
-
-  _ConstantExpr__isset __isset;
-
-  void __set_literal_type(const LiteralType::type val);
-
-  void __set_bool_value(const bool val);
-
-  void __set_i64_value(const int64_t val);
-
-  void __set_f64_value(const double val);
-
-  void __set_str_value(const std::string& val);
-
-  void __set_i64_array_value(const std::vector<int64_t> & val);
-
-  void __set_f64_array_value(const std::vector<double> & val);
-
-  bool operator == (const ConstantExpr & rhs) const
-  {
-    if (!(literal_type == rhs.literal_type))
-      return false;
-    if (__isset.bool_value != rhs.__isset.bool_value)
-      return false;
-    else if (__isset.bool_value && !(bool_value == rhs.bool_value))
-      return false;
-    if (__isset.i64_value != rhs.__isset.i64_value)
-      return false;
-    else if (__isset.i64_value && !(i64_value == rhs.i64_value))
-      return false;
-    if (__isset.f64_value != rhs.__isset.f64_value)
-      return false;
-    else if (__isset.f64_value && !(f64_value == rhs.f64_value))
-      return false;
-    if (__isset.str_value != rhs.__isset.str_value)
-      return false;
-    else if (__isset.str_value && !(str_value == rhs.str_value))
-      return false;
-    if (__isset.i64_array_value != rhs.__isset.i64_array_value)
-      return false;
-    else if (__isset.i64_array_value && !(i64_array_value == rhs.i64_array_value))
-      return false;
-    if (__isset.f64_array_value != rhs.__isset.f64_array_value)
-      return false;
-    else if (__isset.f64_array_value && !(f64_array_value == rhs.f64_array_value))
-      return false;
-    return true;
-  }
-  bool operator != (const ConstantExpr &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const ConstantExpr & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(ConstantExpr &a, ConstantExpr &b);
-
-std::ostream& operator<<(std::ostream& out, const ConstantExpr& obj);
 
 typedef struct _FunctionExpr__isset {
   _FunctionExpr__isset() : function_name(false), arguments(false) {}

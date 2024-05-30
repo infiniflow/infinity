@@ -84,8 +84,18 @@ u64 LogicalMatchTensorScan::TableIndex() const { return base_table_ref_->table_i
 void LogicalMatchTensorScan::InitExtraOptions() {
     SearchOptions options(match_tensor_expr_->options_text_);
     // topn option
-    if (const auto it = options.options_.find("topn"); it != options.options_.end()) {
-        const int top_n_option = std::stoi(it->second);
+    auto top_n_it = options.options_.find("topn");
+    if (top_n_it == options.options_.end()) {
+        top_n_it = options.options_.find("top_n");
+        if (top_n_it == options.options_.end()) {
+            top_n_it = options.options_.find("topk");
+            if (top_n_it == options.options_.end()) {
+                top_n_it = options.options_.find("top_k");
+            }
+        }
+    }
+    if (top_n_it != options.options_.end()) {
+        const int top_n_option = std::stoi(top_n_it->second);
         if (top_n_option <= 0) {
             Status status = Status::SyntaxError("topn must be a positive integer");
             LOG_ERROR(status.message());

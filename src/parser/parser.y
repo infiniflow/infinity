@@ -1968,25 +1968,20 @@ extra_match_tensor_option : ',' STRING {
 //                                       4                   6               8          10              11
 //                  MATCH TENSOR  (  column_name,     search_tensor, tensor_data_type, search_method, extra_match_tensor_option(including topn))
 match_tensor_expr : MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRING ',' STRING extra_match_tensor_option ')' {
-    infinity::MatchTensorExpr* match_tensor_expr = new infinity::MatchTensorExpr();
-    $$ = match_tensor_expr;
+    auto match_tensor_expr = std::make_unique<infinity::MatchTensorExpr>();
     // search column
-    match_tensor_expr->column_expr_.reset($4);
+    match_tensor_expr->SetSearchColumn($4);
     // search tensor
-    match_tensor_expr->tensor_expr_.reset($6);
-    // tensor data type
     ParserHelper::ToLower($8);
-    match_tensor_expr->embedding_data_type_ = $8;
-    free($8);
+    match_tensor_expr->SetQueryTensor($8, $6);
     // search method
     ParserHelper::ToLower($10);
-    match_tensor_expr->search_method_ = $10;
-    free($10);
+    match_tensor_expr->SetSearchMethod($10);
     // search options
     if ($11) {
-        match_tensor_expr->options_text_ = $11;
-        free($11);
+        match_tensor_expr->SetExtraOptions($11);
     }
+    $$ = match_tensor_expr.release();
 }
 
 match_vector_expr : MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' with_index_param_list {
@@ -2196,12 +2191,15 @@ fusion_expr : FUSION '(' STRING ')' {
     $$ = fusion_expr;
 }
 | FUSION '(' STRING ',' STRING ')' {
-    infinity::FusionExpr* fusion_expr = new infinity::FusionExpr();
+    auto fusion_expr = std::make_unique<infinity::FusionExpr>();
     fusion_expr->method_ = std::string($3);
     free($3);
+    $3 = nullptr;
     fusion_expr->SetOptions($5);
     free($5);
-    $$ = fusion_expr;
+    $5 = nullptr;
+    fusion_expr->JobAfterParser();
+    $$ = fusion_expr.release();
 }
 
 
