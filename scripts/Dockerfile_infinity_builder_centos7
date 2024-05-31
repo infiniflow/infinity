@@ -4,7 +4,7 @@
 # bison-3.8.2.tar.xz
 # binutils-2.41.tar.xz
 # gcc-13.2.0.tar.xz
-# cmake-3.29.2-linux-x86_64.tar.gz
+# cmake-3.29.3-linux-x86_64.tar.gz
 # ninja-linux.zip
 # llvm-project-17.0.6.src.tar.xz
 # boost_1_81_0.tar.bz2
@@ -52,14 +52,14 @@ RUN --mount=type=bind,source=gcc-13.2.0.tar.xz,target=/root/gcc-13.2.0.tar.xz \
 
 ENV LIBRARY_PATH=/usr/local/lib:/usr/local/lib64
 
-# Install cmake-3.29.2
-RUN --mount=type=bind,source=cmake-3.29.2-linux-x86_64.tar.gz,target=/root/cmake-3.29.2-linux-x86_64.tar.gz \
-    cd /root && tar xf cmake-3.29.2-linux-x86_64.tar.gz \
-    && cp -rf cmake-3.29.2-linux-x86_64/bin/* /usr/local/bin \
-    && cp -rf cmake-3.29.2-linux-x86_64/share/* /usr/local/share \
-    && rm -rf cmake-3.29.2-linux-x86_64
+# Install cmake-3.29.3
+RUN --mount=type=bind,source=cmake-3.29.3-linux-x86_64.tar.gz,target=/root/cmake-3.29.3-linux-x86_64.tar.gz \
+    cd /root && tar xf cmake-3.29.3-linux-x86_64.tar.gz \
+    && cp -rf cmake-3.29.3-linux-x86_64/bin/* /usr/local/bin \
+    && cp -rf cmake-3.29.3-linux-x86_64/share/* /usr/local/share \
+    && rm -rf cmake-3.29.3-linux-x86_64
 
-# Install ninja-1.11.1
+# Install ninja-1.12.1
 RUN --mount=type=bind,source=ninja-linux.zip,target=/root/ninja-linux.zip \
     cd /root && unzip ninja-linux.zip \
     && cp ninja /usr/local/bin && rm ninja
