@@ -290,28 +290,14 @@ public:
         return value;
     }
 
-    static Value MakeSparse(const char *raw_ptr, SizeT nnz, const SharedPtr<TypeInfo> type_info) {
-        const auto *sparse_info = static_cast<const SparseInfo *>(type_info.get());
-
-        const char *raw_indice_ptr = raw_ptr;
-        SizeT raw_indice_len = sparse_info->IndiceSize(nnz);
-        const char *raw_data_ptr = raw_ptr + raw_indice_len;
-        SizeT raw_data_len = sparse_info->DataSize(nnz);
-        Value value(LogicalType::kSparse, type_info);
-        value.value_info_ = MakeShared<SparseValueInfo>(nnz, raw_indice_ptr, raw_indice_len, raw_data_ptr, raw_data_len);
-        return value;
-    }
+    static Value MakeSparse(const char *raw_ptr, SizeT nnz, const SharedPtr<TypeInfo> type_info);
 
     static Value MakeSparse(SizeT nnz,
                             UniquePtr<char[]> indice_ptr,
                             SizeT indice_len,
                             UniquePtr<char[]> data_ptr,
                             SizeT data_len,
-                            const SharedPtr<TypeInfo> type_info) {
-        Value value(LogicalType::kSparse, type_info);
-        value.value_info_ = MakeShared<SparseValueInfo>(nnz, std::move(indice_ptr), indice_len, std::move(data_ptr), data_len);
-        return value;
-    }
+                            const SharedPtr<TypeInfo> type_info);
 
     void AppendToTensorArray(const_ptr_t ptr, SizeT bytes);
 

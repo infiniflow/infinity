@@ -3,6 +3,7 @@
 #include "knn_expr.h"
 #include "match_expr.h"
 #include "match_tensor_expr.h"
+#include "match_sparse_expr.h"
 #include "spdlog/fmt/fmt.h"
 #include <cmath>
 #include <sstream>
@@ -46,6 +47,12 @@ std::string SearchExpr::ToString() const {
         oss << expr->ToString();
         is_first = false;
     }
+    for (auto &expr : match_sparse_exprs_) {
+        if (!is_first)
+            oss << ", ";
+        oss << expr->ToString();
+        is_first = false;
+    }
     for (auto &expr : fusion_exprs_) {
         if (!is_first)
             oss << ", ";
@@ -70,12 +77,12 @@ void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
 }
 
 void SearchExpr::Validate() const {
-    size_t num_sub_expr = knn_exprs_.size() + match_exprs_.size() + match_tensor_exprs_.size();
+    size_t num_sub_expr = knn_exprs_.size() + match_exprs_.size() + match_tensor_exprs_.size() + match_sparse_exprs_.size();
     if (num_sub_expr <= 0) {
-        ParserError("Need at least one MATCH VECTOR / MATCH TENSOR / MATCH TEXT / QUERY expression");
+        ParserError("Need at least one MATCH VECTOR / MATCH TENSOR / MATCH TEXT / MATCH SPARSE / QUERY expression");
     } else if (num_sub_expr >= 2) {
         if (fusion_exprs_.empty()) {
-            ParserError("Need FUSION expr since there are multiple MATCH VECTOR / MATCH TENSOR / MATCH TEXT / QUERY expressions");
+            ParserError("Need FUSION expr since there are multiple MATCH VECTOR / MATCH TENSOR / MATCH TEXT / MATCH SPARSE / QUERY expressions");
         }
     }
 }
@@ -94,6 +101,10 @@ void SearchExpr::AddExpr(infinity::ParsedExpr *expr) {
         case ParsedExprType::kFusion:
             fusion_exprs_.push_back(static_cast<FusionExpr *>(expr));
             break;
+        case ParsedExprType::kMatchSparse: {
+            match_sparse_exprs_.push_back(static_cast<MatchSparseExpr *>(expr));
+            break;
+        }
         default:
             ParserError("Invalid expr type for SEARCH");
     }
