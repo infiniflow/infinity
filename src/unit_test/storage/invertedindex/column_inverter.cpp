@@ -37,6 +37,7 @@ using namespace infinity;
 class ColumnInverterTest : public BaseTest {
 protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
+    PostingFormat posting_format_{PostingFormatOption(flag_)};
     Map<String, SharedPtr<PostingWriter>> postings_;
     VectorWithLock<u32> column_lengths_;
 
@@ -57,7 +58,7 @@ public:
         if (it != postings_.end()) {
             return it->second;
         }
-        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(PostingFormatOption(flag_), column_lengths_);
+        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(posting_format_, column_lengths_);
         postings_[term] = posting;
         return posting;
     }

@@ -32,7 +32,7 @@ public:
     u32 GetTotalTF();
 
 private:
-    PostingFormatOption format_option_;
+    PostingFormat posting_format_;
     SharedPtr<PostingDumper> posting_dumper_;
     df_t df_;
     ttf_t ttf_;

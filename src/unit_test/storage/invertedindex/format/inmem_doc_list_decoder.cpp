@@ -20,8 +20,8 @@ public:
     }
 
     void SetUp() override {
-        DocListFormatOption doc_list_format_option(OPTION_FLAG_NONE);
-        doc_list_encoder_ = new DocListEncoder(doc_list_format_option);
+        doc_list_format_ptr_.reset(new DocListFormat(DocListFormatOption(OPTION_FLAG_NONE)));
+        doc_list_encoder_ = new DocListEncoder(doc_list_format_ptr_.get());
 
         for (SizeT i = 0; i < 128; ++i) {
             doc_list_encoder_->AddPosition();
@@ -106,7 +106,7 @@ protected:
         DocListFormatOption format_option(op_flag);
         doc_list_format_ptr_.reset(new DocListFormat(format_option));
 
-        doc_list_encoder_ptr_.reset(new DocListEncoder(format_option, doc_list_format_ptr_.get()));
+        doc_list_encoder_ptr_.reset(new DocListEncoder(doc_list_format_ptr_.get()));
         for (uint32_t i = 0; i < doc_count; ++i) {
             doc_list_encoder_ptr_->AddPosition();
             doc_list_encoder_ptr_->AddPosition();

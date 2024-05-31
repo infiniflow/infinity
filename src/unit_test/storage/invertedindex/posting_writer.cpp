@@ -40,6 +40,7 @@ public:
 protected:
     String file_;
     optionflag_t flag_{OPTION_FLAG_ALL};
+    PostingFormat posting_format_{flag_};
     LocalFileSystem fs_;
 };
 
@@ -47,7 +48,7 @@ TEST_F(PostingWriterTest, test1) {
     Vector<docid_t> expected = {1, 3, 5, 7, 9};
     VectorWithLock<u32> column_length_array(20, 10);
     {
-        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(PostingFormatOption(flag_), column_length_array);
+        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(posting_format_, column_length_array);
 
         for (u32 i = 0; i < expected.size(); ++i) {
             posting->AddPosition(1);
@@ -62,7 +63,7 @@ TEST_F(PostingWriterTest, test1) {
         file_writer->Sync();
     }
     {
-        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(PostingFormatOption(flag_), column_length_array);
+        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(posting_format_, column_length_array);
         SharedPtr<FileReader> file_reader = MakeShared<FileReader>(fs_, file_, 128000);
         posting->Load(file_reader);
 
