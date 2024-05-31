@@ -57,6 +57,8 @@ import physical_merge_parallel_aggregate;
 import physical_merge_sort;
 import physical_merge_top;
 import physical_merge_match_tensor;
+import physical_merge_match_sparse;
+import physical_merge_match_sparse;
 import physical_nested_loop_join;
 import physical_parallel_aggregate;
 import physical_prepared_plan;
@@ -78,6 +80,7 @@ import physical_compact_index_do;
 import physical_compact_finish;
 import physical_match;
 import physical_match_tensor_scan;
+import physical_match_sparse_scan;
 import physical_fusion;
 import physical_create_index_prepare;
 import physical_create_index_do;
@@ -122,11 +125,13 @@ import logical_compact_index;
 import logical_compact_finish;
 import logical_match;
 import logical_match_tensor_scan;
+import logical_match_sparse_scan;
 import logical_fusion;
 
 import value;
 import value_expression;
 import match_tensor_expression;
+import match_sparse_expression;
 import explain_physical_plan;
 import third_party;
 import status;
@@ -223,6 +228,10 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
         }
         case LogicalNodeType::kMatchTensorScan: {
             result = BuildMatchTensorScan(logical_operator);
+            break;
+        }
+        case LogicalNodeType::kMatchSparseScan: {
+            result = BuildMatchSparseScan(logical_operator);
             break;
         }
         case LogicalNodeType::kFusion: {
@@ -923,13 +932,14 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPtr<LogicalNode> &logical_operator) const {
     const auto logical_match_tensor = static_pointer_cast<LogicalMatchTensorScan>(logical_operator);
-    if (auto match_tensor_scan_op = MakeUnique<PhysicalMatchTensorScan>(logical_match_tensor->node_id(),
-                                                                        logical_match_tensor->TableIndex(),
-                                                                        logical_match_tensor->base_table_ref_,
-                                                                        std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
-                                                                        logical_match_tensor->common_query_filter_,
-                                                                        logical_match_tensor->topn_,
-                                                                        logical_operator->load_metas());
+    if (auto match_tensor_scan_op =
+            MakeUnique<PhysicalMatchTensorScan>(logical_match_tensor->node_id(),
+                                                logical_match_tensor->TableIndex(),
+                                                logical_match_tensor->base_table_ref_,
+                                                std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
+                                                logical_match_tensor->common_query_filter_,
+                                                logical_match_tensor->topn_,
+                                                logical_operator->load_metas());
         match_tensor_scan_op->TaskletCount() == 1) {
         return match_tensor_scan_op;
     } else {
@@ -941,6 +951,28 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
                                                     logical_match_tensor->topn_,
                                                     MakeShared<Vector<LoadMeta>>());
     }
+}
+
+UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const SharedPtr<LogicalNode> &logical_operator) const {
+    const auto logical_match_sparse = std::static_pointer_cast<LogicalMatchSparseScan>(logical_operator);
+    auto match_sparse_scan_op =
+        MakeUnique<PhysicalMatchSparseScan>(logical_match_sparse->node_id(),
+                                            logical_match_sparse->TableIndex(),
+                                            logical_match_sparse->base_table_ref_,
+                                            std::static_pointer_cast<MatchSparseExpression>(logical_match_sparse->query_expression_),
+                                            logical_match_sparse->common_query_filter_,
+                                            logical_operator->load_metas());
+    if (match_sparse_scan_op->TaskletCount() == 1) {
+        return match_sparse_scan_op;
+    }
+    auto merge_match_sparse_op =
+        MakeUnique<PhysicalMergeMatchSparse>(query_context_ptr_->GetNextNodeID(),
+                                             std::move(match_sparse_scan_op),
+                                             logical_match_sparse->TableIndex(),
+                                             logical_match_sparse->base_table_ref_,
+                                             std::static_pointer_cast<MatchSparseExpression>(logical_match_sparse->query_expression_),
+                                             MakeShared<Vector<LoadMeta>>());
+    return match_sparse_scan_op;
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const {

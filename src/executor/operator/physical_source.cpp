@@ -45,6 +45,7 @@ bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
             break;
         }
         case SourceStateType::kMatchTensorScan:
+        case SourceStateType::kMatchSparseScan:
         case SourceStateType::kKnnScan:
         case SourceStateType::kTableScan:
         case SourceStateType::kIndexScan:

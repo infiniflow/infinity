@@ -71,9 +71,8 @@ PhysicalMatchTensorScan::PhysicalMatchTensorScan(const u64 id,
                                                  const SharedPtr<CommonQueryFilter> &common_query_filter,
                                                  const u32 topn,
                                                  SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kMatchTensorScan, nullptr, nullptr, id, load_metas), table_index_(table_index),
-      base_table_ref_(std::move(base_table_ref)), match_tensor_expr_(std::move(match_tensor_expr)), common_query_filter_(common_query_filter),
-      topn_(topn) {
+    : PhysicalScanBase(id, PhysicalOperatorType::kMatchTensorScan, nullptr, nullptr, base_table_ref, load_metas), table_index_(table_index),
+      match_tensor_expr_(std::move(match_tensor_expr)), common_query_filter_(common_query_filter), topn_(topn) {
     search_column_id_ = std::numeric_limits<ColumnID>::max();
 }
 
@@ -94,7 +93,8 @@ void PhysicalMatchTensorScan::Init() {
     }
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
     if (embedding_info->Dimension() != match_tensor_expr_->tensor_basic_embedding_dimension_) {
-        String error_message = fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), match_tensor_expr_->ToString());
+        String error_message =
+            fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), match_tensor_expr_->ToString());
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
@@ -122,8 +122,6 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchTensorScan::GetOutputTypes()
     return result_types;
 }
 
-SizeT PhysicalMatchTensorScan::TaskletCount() { return base_table_ref_->block_index_->BlockCount(); }
-
 BlockIndex *PhysicalMatchTensorScan::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
 
 ColumnID PhysicalMatchTensorScan::SearchColumnID() const {
@@ -133,33 +131,6 @@ ColumnID PhysicalMatchTensorScan::SearchColumnID() const {
         UnrecoverableError(error_message);
     }
     return search_column_id_;
-}
-
-Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalMatchTensorScan::PlanBlockEntries(i64 parallel_count) const {
-    BlockIndex *block_index = base_table_ref_->block_index_.get();
-
-    u64 all_block_count = block_index->BlockCount();
-    u64 block_per_task = all_block_count / parallel_count;
-    u64 residual = all_block_count % parallel_count;
-
-    Vector<GlobalBlockID> global_blocks;
-    for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
-        for (const auto *block_entry : segment_info.block_map_) {
-            global_blocks.emplace_back(segment_id, block_entry->block_id());
-        }
-    }
-    Vector<SharedPtr<Vector<GlobalBlockID>>> result(parallel_count, nullptr);
-    for (SizeT task_id = 0, global_block_id = 0, residual_idx = 0; (i64)task_id < parallel_count; ++task_id) {
-        result[task_id] = MakeShared<Vector<GlobalBlockID>>();
-        for (u64 block_id_in_task = 0; block_id_in_task < block_per_task; ++block_id_in_task) {
-            result[task_id]->push_back(global_blocks[global_block_id++]);
-        }
-        if (residual_idx < residual) {
-            result[task_id]->push_back(global_blocks[global_block_id++]);
-            ++residual_idx;
-        }
-    }
-    return result;
 }
 
 bool PhysicalMatchTensorScan::Execute(QueryContext *query_context, OperatorState *operator_state) {

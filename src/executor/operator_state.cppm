@@ -53,7 +53,7 @@ export struct OperatorState {
     // Output status
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     Vector<UniquePtr<DataBlock>> data_block_array_{};
-//    UniquePtr<String> error_message_{};
+    //    UniquePtr<String> error_message_{};
     Status status_{};
     bool empty_source_{false};
 
@@ -119,6 +119,16 @@ export struct MergeMatchTensorOperatorState : public OperatorState {
     u32 middle_result_count_{};
     Vector<UniquePtr<DataBlock>> input_data_blocks_;
     bool input_complete_{false};
+};
+
+// MatchSparseScan
+export struct MatchSparseScanOperatorState : public OperatorState {
+    inline explicit MatchSparseScanOperatorState() : OperatorState(PhysicalOperatorType::kMatchSparseScan) {}
+};
+
+// MergeMatchSparse
+export struct MergeMatchSparseOperatorState : public OperatorState {
+    inline explicit MergeMatchSparseOperatorState() : OperatorState(PhysicalOperatorType::kMergeMatchSparse) {}
 };
 
 // KnnScan
@@ -429,6 +439,7 @@ export enum class SourceStateType {
     kIndexScan,
     kKnnScan,
     kMatchTensorScan,
+    kMatchSparseScan,
     kCompact,
     kEmpty,
 };
@@ -445,7 +456,7 @@ export struct SourceState {
     bool complete_{false};
     OperatorState *next_op_state_{};
     SourceStateType state_type_{SourceStateType::kInvalid};
-//    UniquePtr<String> error_message_{};
+    //    UniquePtr<String> error_message_{};
     Status status_{};
 };
 
@@ -473,7 +484,7 @@ export struct AggregateSourceState : public SourceState {
     i64 hash_start_{};
     i64 hash_end_{};
 
-//    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
+    //    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
 };
 
 export struct TableScanSourceState : public SourceState {
@@ -486,6 +497,13 @@ export struct TableScanSourceState : public SourceState {
 export struct MatchTensorScanSourceState : public SourceState {
     explicit MatchTensorScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
         : SourceState(SourceStateType::kMatchTensorScan), global_ids_(std::move(global_ids)) {}
+
+    SharedPtr<Vector<GlobalBlockID>> global_ids_;
+};
+
+export struct MatchSparseScanSourceState : public SourceState {
+    explicit MatchSparseScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
+        : SourceState(SourceStateType::kMatchSparseScan), global_ids_(std::move(global_ids)) {}
 
     SharedPtr<Vector<GlobalBlockID>> global_ids_;
 };
@@ -539,7 +557,7 @@ export struct SinkState {
     u64 task_id_{};
     OperatorState *prev_op_state_{};
     SinkStateType state_type_{SinkStateType::kInvalid};
-//    UniquePtr<String> error_message_{};
+    //    UniquePtr<String> error_message_{};
     Status status_{};
 };
 

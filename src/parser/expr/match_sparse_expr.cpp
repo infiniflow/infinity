@@ -25,8 +25,8 @@ void SetQuerySparseT2(const std::vector<int64_t> &source_idx,
                       std::unique_ptr<char[]> &target_data,
                       int64_t &max_indice) {
     size_t nnz = source_idx.size();
-    target_idx = std::make_unique<char[]>(nnz);
-    target_data = std::make_unique<char[]>(nnz);
+    target_idx = std::make_unique<char[]>(nnz * sizeof(int64_t));
+    target_data = std::make_unique<char[]>(nnz * sizeof(TargetType));
     auto *target_idx_ptr = reinterpret_cast<int64_t *>(target_idx.get());
     auto *target_data_ptr = reinterpret_cast<TargetType *>(target_data.get());
     for (size_t i = 0; i < nnz; ++i) {
