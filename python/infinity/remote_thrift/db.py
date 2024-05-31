@@ -206,7 +206,6 @@ class RemoteDatabase(Database, ABC):
             column_big_info = [item.strip() for item in column_info["type"].split(",")]
             if column_big_info[0] == "vector":
                 get_embedding_info(column_info, column_defs, column_name, index)
-
             else:  # numeric or varchar
                 get_ordinary_info(column_info, column_defs, column_name, index)
 
@@ -219,7 +218,8 @@ class RemoteDatabase(Database, ABC):
             create_table_conflict = ttypes.CreateConflict.Replace
         else:
             raise Exception(f"ERROR:3066, Invalid conflict type")
-
+        print(column_defs)
+        print(type(column_defs))
         res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                       column_defs=column_defs,
                                       conflict_type=create_table_conflict)

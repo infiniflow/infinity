@@ -350,6 +350,16 @@ QueryResult Infinity::CreateTable(const String &db_name,
                                   Vector<ColumnDef *> column_defs,
                                   Vector<TableConstraint *> constraints,
                                   const CreateTableOptions &create_table_options) {
+    std::cout << "begin create table,  column size: " << column_defs.size() << std::endl;
+    for (SizeT i = 0; i < column_defs.size(); ++i) {
+        std::cout << "column name: " << column_defs[i]->name_ << std::endl;
+        std::cout << "column id: " << column_defs[i]->id_ << std::endl;
+        std::cout << "data type: " << column_defs[i]->column_type_.get() << std::endl;
+        std::cout << "data type logic type: " << int(column_defs[i]->column_type_->type()) << std::endl;
+        std::cout << "data type to str: " << column_defs[i]->column_type_->ToString() << std::endl;
+        std::cout << "column def to_str" << column_defs[i]->ToString() << std::endl;
+    }
+
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -366,6 +376,7 @@ QueryResult Infinity::CreateTable(const String &db_name,
     create_table_info->properties_ = create_table_options.properties_;
     create_statement->create_info_ = std::move(create_table_info);
     QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
+    std::cout << "create table success" << std::endl;
     return result;
 }
 

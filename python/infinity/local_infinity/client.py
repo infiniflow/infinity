@@ -60,13 +60,15 @@ class LocalInfinityClient:
     def get_database(self, db_name: str):
         return self.convert_res(self.client.GetDatabase(db_name))
 
-    def create_table(self, db_name: str, table_name: str, column_defs,
-                     constraints, create_table_options):
+    def create_table(self, db_name: str, table_name: str, column_defs: list[WrapColumnDef],
+                     conflict_type: ConflictType = ConflictType.kError, properties: list = None):
+        create_table_options = CreateTableOptions()
+        create_table_options.conflict_type = conflict_type
+        print("py client create_table column_defs: ", column_defs)
         return self.convert_res(self.client.CreateTable(db_name,
-                                       table_name,
-                                       column_defs,
-                                       constraints,
-                                       create_table_options))
+                                                        table_name,
+                                                        column_defs,
+                                                        create_table_options))
 
     def drop_table(self, db_name: str, table_name: str, conflict_type: ConflictType = ConflictType.kError):
         drop_table_options = DropTableOptions()
@@ -74,7 +76,7 @@ class LocalInfinityClient:
         return self.convert_res(self.client.DropTable(db_name, table_name, drop_table_options))
 
     def list_tables(self, db_name: str):
-        return self.convert_res(self.client.ListTable(db_name), has_table_name=True)
+        return self.convert_res(self.client.ListTables(db_name), has_table_name=True)
 
     def show_table(self, db_name: str, table_name: str):
         return self.convert_res(self.client.ShowTable(db_name, table_name))

@@ -23,6 +23,8 @@ import data_table;
 import table_entry_type;
 import table_def;
 import wrap_infinity;
+import logical_type;
+import constant_expr;
 
 class SayHello {
 public:
@@ -107,6 +109,28 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("error_code", &WrapQueryResult::error_code)
         .def_rw("error_msg", &WrapQueryResult::error_msg)
         .def_rw("names", &WrapQueryResult::names);
+
+    nb::class_<WrapDataType>(m, "WrapDataType")
+        .def(nb::init<>())
+        .def_rw("logical_type", &WrapDataType::logical_type);
+
+    nb::class_<WrapConstantExpr>(m, "WrapConstantExpr")
+        .def(nb::init<>())
+        .def_rw("literal_type", &WrapConstantExpr::literal_type)
+        .def_rw("bool_value", &WrapConstantExpr::bool_value)
+        .def_rw("i64_value", &WrapConstantExpr::i64_value)
+        .def_rw("f64_value", &WrapConstantExpr::f64_value)
+        .def_rw("str_value", &WrapConstantExpr::str_value)
+        .def_rw("i64_array_value", &WrapConstantExpr::i64_array_value)
+        .def_rw("f64_array_value", &WrapConstantExpr::f64_array_value);
+
+    nb::class_<WrapColumnDef>(m, "WrapColumnDef")
+        .def(nb::init<>())
+        .def_rw("id", &WrapColumnDef::id)
+        .def_rw("column_type", &WrapColumnDef::column_type)
+        .def_rw("column_name", &WrapColumnDef::column_name)
+        .def_rw("constraints", &WrapColumnDef::constraints)
+        .def_rw("constant_expr", &WrapColumnDef::constant_expr);
 
     // infinity
     nb::class_<Infinity>(m, "Infinity")
@@ -476,4 +500,56 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kTableEntry", TableEntryType::kTableEntry)
         .value("kCollectionEntry", TableEntryType::kCollectionEntry)
         .export_values();
+
+    // logical_type
+    nb::enum_<LogicalType>(m, "LogicalType")
+        .value("kBoolean", LogicalType::kBoolean)
+        .value("kTinyInt", LogicalType::kTinyInt)
+        .value("kSmallInt", LogicalType::kSmallInt)
+        .value("kInteger", LogicalType::kInteger)
+        .value("kBigInt", LogicalType::kBigInt)
+        .value("kHugeInt", LogicalType::kHugeInt)
+        .value("kDecimal", LogicalType::kDecimal)
+        .value("kFloat", LogicalType::kFloat)
+        .value("kDouble", LogicalType::kDouble)
+        .value("kVarchar", LogicalType::kVarchar)
+        .value("kDate", LogicalType::kDate)
+        .value("kTime", LogicalType::kTime)
+        .value("kDateTime", LogicalType::kDateTime)
+        .value("kTimestamp", LogicalType::kTimestamp)
+        .value("kInterval", LogicalType::kInterval)
+        .value("kArray", LogicalType::kArray)
+        .value("kTuple", LogicalType::kTuple)
+        .value("kPoint", LogicalType::kPoint)
+        .value("kLine", LogicalType::kLine)
+        .value("kLineSeg", LogicalType::kLineSeg)
+        .value("kBox", LogicalType::kBox)
+        .value("kCircle", LogicalType::kCircle)
+        .value("kUuid", LogicalType::kUuid)
+        .value("kEmbedding", LogicalType::kEmbedding)
+        .value("kRowID", LogicalType::kRowID)
+        .value("kMixed", LogicalType::kMixed)
+        .value("kNull", LogicalType::kNull)
+        .value("kMissing", LogicalType::kMissing)
+        .value("kTensor", LogicalType::kTensor)
+        .value("kTensorArray", LogicalType::kTensorArray)
+        .value("kInvalid", LogicalType::kInvalid)
+        .export_values();
+
+    // constant_expr
+    nb::enum_<LiteralType>(m, "LiteralType")
+        .value("kBoolean", LiteralType::kBoolean)
+        .value("kDouble", LiteralType::kDouble)
+        .value("kString", LiteralType::kString)
+        .value("kInteger", LiteralType::kInteger)
+        .value("kNull", LiteralType::kNull)
+        .value("kDate", LiteralType::kDate)
+        .value("kTime", LiteralType::kTime)
+        .value("kDateTime", LiteralType::kDateTime)
+        .value("kTimestamp", LiteralType::kTimestamp)
+        .value("kIntegerArray", LiteralType::kIntegerArray)
+        .value("kDoubleArray", LiteralType::kDoubleArray)
+        .value("kSubArrayArray", LiteralType::kSubArrayArray)
+        .value("kInterval", LiteralType::kInterval);
+
 }

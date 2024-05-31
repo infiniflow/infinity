@@ -95,18 +95,20 @@ class TestCase(TestSdk):
         res = infinity_obj.drop_database("my_db", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # db_obj = infinity_obj.get_database("default_db")
-        # db_obj.drop_table("my_table1", ConflictType.Ignore)
-        # table_obj = db_obj.create_table(
-        #     "my_table1", {"c1": {"type": "int", "constraints": ["primary key"]}}, ConflictType.Error)
-        # assert table_obj is not None
-        #
+        db_obj = infinity_obj.get_database("default_db")
+        db_obj.drop_table("my_table1", ConflictType.Ignore)
+
+        table_obj = db_obj.create_table(
+            "my_table1", {"c1": {"type": "int", "constraints": ["primary key"]}}, ConflictType.Error)
+        assert table_obj is not None
+
         # res = db_obj.list_tables()
         # assert res.error_code == ErrorCode.OK
+        # print(res)
         #
         # res = db_obj.drop_table("my_table1")
         # assert res.error_code == ErrorCode.OK
-        #
+
         # # index
         # db_obj.drop_table("my_table2", ConflictType.Ignore)
         # table_obj = db_obj.create_table(

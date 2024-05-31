@@ -1,5 +1,6 @@
 module;
 
+
 export module wrap_infinity;
 
 import stl;
@@ -20,6 +21,10 @@ import update_statement;
 import explain_statement;
 import command_statement;
 import infinity;
+import data_type;
+import type_info;
+import logical_type;
+import constant_expr;
 
 // wrap Infinity function for nanobind infinity
 namespace infinity {
@@ -37,6 +42,31 @@ export struct WrapQueryResult {
         }
     }
 };
+
+export struct WrapDataType {
+    LogicalType logical_type;
+};
+
+export struct WrapConstantExpr {
+    LiteralType literal_type;
+    bool bool_value;
+    i64 i64_value;
+    f64 f64_value;
+    String str_value;
+    Vector<i64> i64_array_value;
+    Vector<f64> f64_array_value;
+};
+
+export struct WrapColumnDef {
+    i64 id;
+    WrapDataType column_type;
+    String column_name;
+    Set<ConstraintType> constraints;
+    WrapConstantExpr constant_expr;
+
+    // ParsedExpr* default_expr;
+};
+
 
 export WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options);
 
@@ -73,8 +103,8 @@ export WrapQueryResult WrapQuery(Infinity &instance, const String &query_text);
 export WrapQueryResult WrapCreateTable(Infinity &instance,
                                        const String &db_name,
                                        const String &table_name,
-                                       Vector<ColumnDef *> column_defs,
-                                       Vector<TableConstraint *> constraints,
+                                       Vector<WrapColumnDef> column_defs,
+//                                       Vector<TableConstraint *> constraints,
                                        const CreateTableOptions &create_table_options);
 
 export WrapQueryResult WrapDropTable(Infinity &instance, const String &db_name, const String &table_name, const DropTableOptions &drop_table_options);

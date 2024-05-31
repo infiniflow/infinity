@@ -23,6 +23,10 @@ import infinity;
 import third_party;
 import data_block;
 import value;
+import data_type;
+import type_info;
+import logical_type;
+import constant_expr;
 
 namespace infinity {
 WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options) {
@@ -116,10 +120,20 @@ WrapQueryResult WrapQuery(Infinity &instance, const String &query_text) {
 WrapQueryResult WrapCreateTable(Infinity &instance,
                                 const String &db_name,
                                 const String &table_name,
-                                Vector<ColumnDef *> column_defs,
-                                Vector<TableConstraint *> constraints,
+                                Vector<WrapColumnDef> column_defs,
+                                // Vector<TableConstraint *> constraints,
                                 const CreateTableOptions &create_table_options) {
-    auto query_result = instance.CreateTable(db_name, table_name, column_defs, constraints, create_table_options);
+    // std::cout << "receive CreateTable success, column size: " << column_defs.size() << std::endl;
+    // return WrapQueryResult{ErrorCode::kOk, ""};
+    Vector<TableConstraint *> constraints;
+    Vector<ColumnDef *> column_defs_ptr;
+    for (SizeT i = 0; i < column_defs.size(); ++i) {
+        auto& wrap_column_def = column_defs[i];
+        auto column_type = MakeShared<DataType>(wrap_column_def.column_type.logical_type);
+        auto column_def = new ColumnDef(wrap_column_def.id, column_type, wrap_column_def.column_name, wrap_column_def.constraints);
+        column_defs_ptr.push_back(column_def);
+    }
+    auto query_result = instance.CreateTable(db_name, table_name, std::move(column_defs_ptr), constraints, create_table_options);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
