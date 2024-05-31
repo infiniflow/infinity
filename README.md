@@ -31,7 +31,7 @@ Infinity comes with high performance, flexibility, ease-of-use, and many feature
 ### ⚡️ Incredibly fast
 
 - Achieves 0.1 milliseconds query latency and 15K+ QPS on million-scale vector datasets.
-- Achieves 1 millisecond query latency and 12K+ QPS on 33M data full text dataset.
+- Achieves 1 millisecond latency and 12K+ QPS in full-text search on 33M documents.
 
 > See the [Benchmark report](https://infiniflow.org/docs/dev/benchmark) for more information.
 
