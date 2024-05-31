@@ -105,7 +105,8 @@ NB_MODULE(embedded_infinity_ext, m) {
     nb::class_<WrapQueryResult>(m, "WrapQueryResult")
         .def(nb::init<>())
         .def_rw("error_code", &WrapQueryResult::error_code)
-        .def_rw("error_msg", &WrapQueryResult::error_msg);
+        .def_rw("error_msg", &WrapQueryResult::error_msg)
+        .def_rw("names", &WrapQueryResult::names);
 
     // infinity
     nb::class_<Infinity>(m, "Infinity")

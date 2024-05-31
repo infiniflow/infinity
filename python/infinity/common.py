@@ -34,7 +34,7 @@ REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)
 LOCAL_HOST = NetworkAddress("0.0.0.0", 23817)
 
 # test embedded_infinity
-EMBEDDED_INFINITY_PATH = "/var/infinity"
+LOCAL_INFINITY_PATH = "/var/infinity"
 
 class ConflictType(object):
     Ignore = 0

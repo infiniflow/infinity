@@ -1,17 +1,3 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from abc import ABC
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
@@ -21,7 +7,7 @@ from infinity.errors import ErrorCode
 from infinity.local_infinity.table import LocalTable
 from infinity.remote_thrift.utils import check_valid_name, name_validity_check, select_res_to_polars
 from infinity.common import ConflictType
-
+from embedded_infinity import ConflictType as LocalConflictType
 
 def get_ordinary_info(column_info, column_defs, column_name, index):
     # "c1": {"type": "int", "constraints":["primary key", ...], "default": 1/"asdf"/[1,2]/...}
@@ -209,13 +195,13 @@ class LocalDatabase(Database, ABC):
             else:  # numeric or varchar
                 get_ordinary_info(column_info, column_defs, column_name, index)
 
-        create_table_conflict: ttypes.CreateConflict
+        create_table_conflict: LocalConflictType
         if conflict_type == ConflictType.Error:
-            create_table_conflict = ttypes.CreateConflict.Error
+            create_table_conflict = LocalConflictType.kError
         elif conflict_type == ConflictType.Ignore:
-            create_table_conflict = ttypes.CreateConflict.Ignore
+            create_table_conflict = LocalConflictType.kIgnore
         elif conflict_type == ConflictType.Replace:
-            create_table_conflict = ttypes.CreateConflict.Replace
+            create_table_conflict = LocalConflictType.kReplace
         else:
             raise Exception(f"ERROR:3066, Invalid conflict type")
 
@@ -230,14 +216,14 @@ class LocalDatabase(Database, ABC):
 
     @name_validity_check("table_name", "Table")
     def drop_table(self, table_name, conflict_type: ConflictType = ConflictType.Error):
+        drop_table_conflict: LocalConflictType
         if conflict_type == ConflictType.Error:
-            return self._conn.drop_table(db_name=self._db_name, table_name=table_name,
-                                         conflict_type=ttypes.DropConflict.Error)
+            drop_table_conflict = LocalConflictType.kError
         elif conflict_type == ConflictType.Ignore:
-            return self._conn.drop_table(db_name=self._db_name, table_name=table_name,
-                                         conflict_type=ttypes.DropConflict.Ignore)
+            drop_table_conflict = LocalConflictType.kIgnore
         else:
-            raise Exception(f"ERROR:3066, invalid conflict type")
+            raise Exception(f"ERROR:3066, Invalid conflict type")
+        self._conn.drop_table(db_name=self._db_name, table_name=table_name, conflict_type=conflict_type)
 
     def list_tables(self):
         res = self._conn.list_tables(self._db_name)
@@ -248,8 +234,7 @@ class LocalDatabase(Database, ABC):
 
     @name_validity_check("table_name", "Table")
     def show_table(self, table_name):
-        res = self._conn.show_table(
-            db_name=self._db_name, table_name=table_name)
+        res = self._conn.show_table(db_name=self._db_name, table_name=table_name)
         if res.error_code == ErrorCode.OK:
             return res
         else:
@@ -257,8 +242,7 @@ class LocalDatabase(Database, ABC):
 
     @name_validity_check("table_name", "Table")
     def show_columns(self, table_name):
-        res = self._conn.show_columns(
-            db_name=self._db_name, table_name=table_name)
+        res = self._conn.show_columns(db_name=self._db_name, table_name=table_name)
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
@@ -266,8 +250,7 @@ class LocalDatabase(Database, ABC):
 
     @name_validity_check("table_name", "Table")
     def get_table(self, table_name):
-        res = self._conn.get_table(
-            db_name=self._db_name, table_name=table_name)
+        res = self._conn.get_table(db_name=self._db_name, table_name=table_name)
         if res.error_code == ErrorCode.OK:
             return LocalTable(self._conn, self._db_name, table_name)
         else:

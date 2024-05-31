@@ -29,10 +29,9 @@ from infinity.remote_thrift.types import build_result
 from infinity.remote_thrift.utils import traverse_conditions, name_validity_check, select_res_to_polars
 from infinity.table import Table, ExplainType
 from infinity.common import ConflictType
-
+from embedded_infinity import ConflictType as LocalConflictType
 
 class LocalTable(Table, ABC):
-
     def __init__(self, conn, db_name, table_name):
         self._conn = conn
         self._db_name = db_name
@@ -70,13 +69,13 @@ class LocalTable(Table, ABC):
 
             index_info_list_to_use.append(index_info_to_use)
 
-        create_index_conflict: ttypes.CreateConflict
+        create_index_conflict: LocalConflictType
         if conflict_type == ConflictType.Error:
-            create_index_conflict = ttypes.CreateConflict.Error
+            create_index_conflict = LocalConflictType.kError
         elif conflict_type == ConflictType.Ignore:
-            create_index_conflict = ttypes.CreateConflict.Ignore
+            create_index_conflict = LocalConflictType.kIgnore
         elif conflict_type == ConflictType.Replace:
-            create_index_conflict = ttypes.CreateConflict.Replace
+            create_index_conflict = LocalConflictType.kReplace
         else:
             raise Exception(f"ERROR:3066, Invalid conflict type")
 
@@ -93,11 +92,11 @@ class LocalTable(Table, ABC):
 
     @name_validity_check("index_name", "Index")
     def drop_index(self, index_name: str, conflict_type: ConflictType = ConflictType.Error):
-        drop_index_conflict: ttypes.DropConflict
+        drop_index_conflict: LocalConflictType
         if conflict_type == ConflictType.Error:
-            drop_index_conflict = ttypes.DropConflict.Error
+            drop_index_conflict = LocalConflictType.kError
         elif conflict_type == ConflictType.Ignore:
-            drop_index_conflict = ttypes.DropConflict.Ignore
+            drop_index_conflict = LocalConflictType.kIgnore
         else:
             raise Exception(f"ERROR:3066, invalid conflict type")
 
@@ -197,8 +196,7 @@ class LocalTable(Table, ABC):
                 else:
                     raise Exception("Invalid constant expression")
 
-                expr_type = ttypes.ParsedExprType(
-                    constant_expr=constant_expression)
+                expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
                 paser_expr = ttypes.ParsedExpr(type=expr_type)
 
                 parse_exprs.append(paser_expr)

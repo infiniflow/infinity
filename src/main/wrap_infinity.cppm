@@ -27,6 +27,15 @@ namespace infinity {
 export struct WrapQueryResult {
     ErrorCode error_code;
     String error_msg;
+    Vector<String> names;
+    WrapQueryResult() = default;
+    WrapQueryResult(ErrorCode error_code, const char *error_msg) : error_code(error_code) {
+        if (error_msg != nullptr) {
+            this->error_msg = String(error_msg);
+        } else {
+            this->error_msg = "";
+        }
+    }
 };
 
 export WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options);

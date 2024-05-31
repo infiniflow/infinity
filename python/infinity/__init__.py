@@ -20,18 +20,18 @@ import os
 import pkg_resources
 __version__ = pkg_resources.get_distribution("infinity_sdk").version
 
-from infinity.common import URI, NetworkAddress, LOCAL_HOST, EMBEDDED_INFINITY_PATH
+from infinity.common import URI, NetworkAddress, LOCAL_HOST, LOCAL_INFINITY_PATH
 from infinity.infinity import InfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
-from infinity.local_infinity.infinity import EmbeddedInfinityConnection
+from infinity.local_infinity.infinity import LocalInfinityConnection
 
 def connect(
         uri: URI = LOCAL_HOST,
-        path: str = EMBEDDED_INFINITY_PATH
+        path: str = LOCAL_INFINITY_PATH
 ) -> InfinityConnection:
     if isinstance(uri, NetworkAddress) and (uri.port == 9090 or uri.port == 23817 or uri.port == 9070):
         return RemoteThriftInfinityConnection(uri)
     elif len(path) != 0 and os.path.exists(path) and os.path.isdir(path):
-        return EmbeddedInfinityConnection(path=path)
+        return LocalInfinityConnection(path=path)
     else:
         raise Exception(f"unknown uri: {uri}")

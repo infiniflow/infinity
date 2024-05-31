@@ -13,22 +13,33 @@
 # limitations under the License.
 
 from infinity.errors import ErrorCode as PyErrorCode
-from infinity.common import EMBEDDED_INFINITY_PATH
+from infinity.common import LOCAL_INFINITY_PATH
 from embedded_infinity import *
 
-class EmbeddedInfinityClient:
-    def __init__(self, path: str = EMBEDDED_INFINITY_PATH):
+class LocalQueryResult:
+    def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None):
+        self.error_code = error_code
+        self.error_msg = error_msg
+        self.db_names = db_names
+        self.table_names = table_names
+
+class LocalInfinityClient:
+    def __init__(self, path: str = LOCAL_INFINITY_PATH):
         self.path = path
         Infinity.LocalInit(path)
         self.client = Infinity.LocalConnect()
 
     def disconnect(self):
         Infinity.LocalUnInit()
+        return LocalQueryResult(PyErrorCode.OK, "")
 
     # convert embedded_error code to python error code
-    def convert_res(self, res):
-        res.error_code = PyErrorCode(res.error_code.value)
-        return res
+    def convert_res(self, res, has_db_name=False, has_table_name=False):
+        if has_db_name:
+            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, db_names=res.names)
+        if has_table_name:
+            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, table_names=res.names)
+        return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg)
 
     def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError):
         create_database_options = CreateDatabaseOptions()
@@ -41,7 +52,7 @@ class EmbeddedInfinityClient:
         return self.convert_res(self.client.DropDatabase(db_name, drop_database_options))
 
     def list_databases(self):
-        return self.convert_res(self.client.ListDatabase())
+        return self.convert_res(self.client.ListDatabases(), has_db_name=True)
 
     def show_database(self, db_name: str):
         return self.convert_res(self.client.ShowDatabase(db_name))
@@ -63,7 +74,7 @@ class EmbeddedInfinityClient:
         return self.convert_res(self.client.DropTable(db_name, table_name, drop_table_options))
 
     def list_tables(self, db_name: str):
-        return self.convert_res(self.client.ListTable(db_name))
+        return self.convert_res(self.client.ListTable(db_name), has_table_name=True)
 
     def show_table(self, db_name: str, table_name: str):
         return self.convert_res(self.client.ShowTable(db_name, table_name))
