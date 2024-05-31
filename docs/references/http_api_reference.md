@@ -1,6 +1,6 @@
 ---
 sidebar_position: 3
-slug: /html_api_reference
+slug: /http_api_reference
 ---
 
 # HTTP API Reference

@@ -33,7 +33,7 @@ Infinity comes with high performance, flexibility, ease-of-use, and many feature
 - Achieves 0.1 milliseconds query latency on million-scale vector datasets.
 - Up to 15K QPS on million-scale vector datasets.
 
-> See the [Benchmark report](./docs/references/benchmark.md) for more information.
+> See the [Benchmark report](https://infiniflow.org/docs/dev/benchmark) for more information.
 
 
 ### 🔮 Fused search
@@ -46,7 +46,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ### 🎁 Ease-of-use
 
-- Intuitive Python API. See the [Python API](docs/references/pysdk_api_reference.md)
+- Intuitive Python API. See the [Python API](https://infiniflow.org/docs/dev/python_api_reference)
 - A single-binary architecture with no dependencies, making deployment a breeze.
 
 ## 🎮 Get Started
@@ -78,7 +78,7 @@ sudo systemctl start infinity
 ```
 #### 🛠️ Build from Source
 
-See [Build from Source](docs/getstarted/build_from_source.md).
+See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
 
 ### Install Infinity's Python client
 
@@ -119,12 +119,7 @@ db = infinity_obj.get_database("default_db")
 # Drop my_table if it already exists
 db.drop_table("my_table", ConflictType.Ignore)
 # Create a table named "my_table"
-table = db.create_table(
-          "my_table", {
-            "num": {"type": "integer"}, 
-            "body": {"type": "varchar"},
-            "vec": {"type": "vector, 4, float"}
-          })
+table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
 ```
 
 
@@ -143,12 +138,13 @@ res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_
 print(res)
 ```
 
-> 💡 For more information about the Python API, see the [Python API Reference](docs/references/pysdk_api_reference.md).
+> 💡 For more information about the Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/python_api_reference).
 
 ## Document
 
 - [Quickstart](https://infiniflow.org/docs/dev/)
-- [User Guide](https://ragflow.io/docs/dev/category/user-guides)
+- [Python API](https://infiniflow.org/docs/dev/python_api_reference)
+- [HTTP API](https://infiniflow.org/docs/dev/http_api_reference)
 - [Reference](https://ragflow.io/docs/dev/category/references)
 - [FAQ](https://ragflow.io/docs/dev/faq)
 
