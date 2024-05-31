@@ -22,4 +22,6 @@ namespace infinity {
 
 export using infinity::MatchSparseExpr;
 
+export using infinity::SparseMetricType;
+
 }

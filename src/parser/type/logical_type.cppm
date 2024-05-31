@@ -22,4 +22,6 @@ namespace infinity {
 
 export using infinity::LogicalType;
 
+export using infinity::GetCommonLogicalType;
+
 }

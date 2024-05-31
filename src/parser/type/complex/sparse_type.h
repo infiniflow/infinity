@@ -104,6 +104,12 @@ struct SparseType {
     }
 };
 
+struct SparseRefType {
+    char *raw_data_ptr_;
+    char *raw_indice_ptr_;
+    size_t nnz_;
+};
+
 #pragma pack()
 
 } // namespace infinity

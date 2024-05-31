@@ -41,6 +41,7 @@ import fusion_expression;
 import search_expression;
 import match_expression;
 import match_tensor_expression;
+import match_sparse_expression;
 import function;
 import aggregate_function;
 import aggregate_function_set;
@@ -59,6 +60,7 @@ import status;
 import query_context;
 import logger;
 import embedding_info;
+import sparse_info;
 import parsed_expr;
 import function_expr;
 import constant_expr;
@@ -72,6 +74,7 @@ import between_expr;
 import subquery_expr;
 import match_expr;
 import match_tensor_expr;
+import match_sparse_expr;
 import fusion_expr;
 import data_type;
 
@@ -653,10 +656,43 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
     return bound_match_tensor_expr;
 }
 
+SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSparseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
+    if (expr.column_expr_->type_ != ParsedExprType::kColumn) {
+        UnrecoverableError("MatchSparse expression expect a column expression");
+    }
+    auto expr_ptr = BuildColExpr(static_cast<ColumnExpr &>(*expr.column_expr_), bind_context_ptr, depth, false);
+    auto column_data_type = expr_ptr->Type();
+    TypeInfo *type_info = column_data_type.type_info().get();
+    if (column_data_type.type() != LogicalType::kSparse or type_info == nullptr or type_info->type() != TypeInfoType::kSparse) {
+        const auto error_info = fmt::format("Expect the column search is a sparse column, but got: {}", column_data_type.ToString());
+        LOG_ERROR(error_info);
+        RecoverableError(Status::SyntaxError(error_info));
+    }
+    // TODO: check query sparse here
+    auto *sparse_info = static_cast<SparseInfo *>(type_info);
+
+    Vector<SharedPtr<BaseExpression>> arguments;
+    arguments.emplace_back(expr_ptr);
+
+    if (expr.max_indice_ + 1 > static_cast<int64_t>(sparse_info->Dimension())) {
+        const auto error_info =
+            fmt::format("The query sparse indice is out of range, max indice: {}, dimension: {}", expr.max_indice_, sparse_info->Dimension());
+        LOG_ERROR(error_info);
+        RecoverableError(Status::SyntaxError(error_info));
+    }
+    auto sparse_info2 = SparseInfo::Make(expr.embedding_data_type_, expr.embedding_indice_type_, sparse_info->Dimension());
+    auto sparse_ref = SparseRefT{expr.query_sparse_indice_ptr_.get(), expr.query_sparse_data_ptr_.get(), expr.nnz_};
+
+    auto bound_match_sparse_expr =
+        MakeShared<MatchSparseExpression>(std::move(arguments), sparse_ref, sparse_info2, expr.metric_type_, expr.topn_, std::move(expr.opt_params_));
+    return bound_match_sparse_expr;
+}
+
 SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     Vector<SharedPtr<MatchExpression>> match_exprs;
     Vector<SharedPtr<KnnExpression>> knn_exprs;
     Vector<SharedPtr<MatchTensorExpression>> match_tensor_exprs;
+    Vector<SharedPtr<MatchSparseExpression>> match_sparse_exprs;
     Vector<SharedPtr<FusionExpression>> fusion_exprs;
     for (MatchExpr *match_expr : expr.match_exprs_) {
         match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
@@ -668,6 +704,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
         match_tensor_exprs.push_back(
             static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*match_tensor_expr, bind_context_ptr, depth, false)));
     }
+    for (MatchSparseExpr *match_sparse_expr : expr.match_sparse_exprs_) {
+        match_sparse_exprs.push_back(
+            static_pointer_cast<MatchSparseExpression>(BuildMatchSparseExpr(std::move(*match_sparse_expr), bind_context_ptr, depth, false)));
+    }
     for (FusionExpr *fusion_expr : expr.fusion_exprs_) {
         auto output_expr = MakeShared<FusionExpression>(fusion_expr->method_, fusion_expr->options_);
         if (fusion_expr->match_tensor_expr_) {
@@ -676,7 +716,8 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
         }
         fusion_exprs.push_back(std::move(output_expr));
     }
-    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, knn_exprs, match_tensor_exprs, fusion_exprs);
+    SharedPtr<SearchExpression> bound_search_expr =
+        MakeShared<SearchExpression>(match_exprs, knn_exprs, match_tensor_exprs, match_sparse_exprs, fusion_exprs);
     return bound_search_expr;
 }
 

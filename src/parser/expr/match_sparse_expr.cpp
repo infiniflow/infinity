@@ -22,7 +22,8 @@ template <typename SourceType, typename TargetType>
 void SetQuerySparseT2(const std::vector<int64_t> &source_idx,
                       const std::vector<SourceType> &source_data,
                       std::unique_ptr<char[]> &target_idx,
-                      std::unique_ptr<char[]> &target_data) {
+                      std::unique_ptr<char[]> &target_data,
+                      int64_t &max_indice) {
     size_t nnz = source_idx.size();
     target_idx = std::make_unique<char[]>(nnz);
     target_data = std::make_unique<char[]>(nnz);
@@ -31,11 +32,16 @@ void SetQuerySparseT2(const std::vector<int64_t> &source_idx,
     for (size_t i = 0; i < nnz; ++i) {
         target_idx_ptr[i] = source_idx[i];
         target_data_ptr[i] = static_cast<TargetType>(source_data[i]);
+        max_indice = std::max(max_indice, source_idx[i]);
     }
 }
 
 template <typename TargetType>
-void SetQuerySparseT(ConstantExpr *raw_sparse_expr, uint32_t &nnz_ref, std::unique_ptr<char[]> &target_idx, std::unique_ptr<char[]> &target_data) {
+void SetQuerySparseT(ConstantExpr *raw_sparse_expr,
+                     uint32_t &nnz_ref,
+                     std::unique_ptr<char[]> &target_idx,
+                     std::unique_ptr<char[]> &target_data,
+                     int64_t &max_indice) {
     uint32_t nnz = 0;
     switch (raw_sparse_expr->literal_type_) {
         case LiteralType::kLongSparseArray: {
@@ -43,7 +49,8 @@ void SetQuerySparseT(ConstantExpr *raw_sparse_expr, uint32_t &nnz_ref, std::uniq
             SetQuerySparseT2<int64_t, TargetType>(raw_sparse_expr->long_sparse_array_.first,
                                                   raw_sparse_expr->long_sparse_array_.second,
                                                   target_idx,
-                                                  target_data);
+                                                  target_data,
+                                                  max_indice);
             break;
         }
         case LiteralType::kDoubleSparseArray: {
@@ -51,7 +58,8 @@ void SetQuerySparseT(ConstantExpr *raw_sparse_expr, uint32_t &nnz_ref, std::uniq
             SetQuerySparseT2<double, TargetType>(raw_sparse_expr->double_sparse_array_.first,
                                                  raw_sparse_expr->double_sparse_array_.second,
                                                  target_idx,
-                                                 target_data);
+                                                 target_data,
+                                                 max_indice);
             break;
         }
         // TODO: bit type sparse, empty sparse
@@ -74,31 +82,31 @@ void MatchSparseExpr::SetQuerySparse(char *&raw_data_type, ConstantExpr *raw_spa
     embedding_data_type_ = EmbeddingT::String2EmbeddingDataType(data_type);
     switch (embedding_data_type_) {
         case kElemBit: {
-            SetQuerySparseT<bool>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_);
+            SetQuerySparseT<bool>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_, max_indice_);
             break;
         }
         case kElemInt8: {
-            SetQuerySparseT<uint8_t>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_);
+            SetQuerySparseT<uint8_t>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_, max_indice_);
             break;
         }
         case kElemInt16: {
-            SetQuerySparseT<uint16_t>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_);
+            SetQuerySparseT<uint16_t>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_, max_indice_);
             break;
         }
         case kElemInt32: {
-            SetQuerySparseT<uint32_t>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_);
+            SetQuerySparseT<uint32_t>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_, max_indice_);
             break;
         }
         case kElemInt64: {
-            SetQuerySparseT<uint64_t>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_);
+            SetQuerySparseT<uint64_t>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_, max_indice_);
             break;
         }
         case kElemFloat: {
-            SetQuerySparseT<float>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_);
+            SetQuerySparseT<float>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_, max_indice_);
             break;
         }
         case kElemDouble: {
-            SetQuerySparseT<double>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_);
+            SetQuerySparseT<double>(raw_sparse_expr, nnz_, query_sparse_indice_ptr_, query_sparse_data_ptr_, max_indice_);
             break;
         }
         default: {

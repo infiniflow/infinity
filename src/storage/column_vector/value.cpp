@@ -272,13 +272,11 @@ Value Value::MakeSparse(const char *raw_ptr, SizeT nnz, const SharedPtr<TypeInfo
     return value;
 }
 
-Value Value::MakeSparse(SizeT nnz,
-                        UniquePtr<char[]> indice_ptr,
-                        SizeT indice_len,
-                        UniquePtr<char[]> data_ptr,
-                        SizeT data_len,
-                        const SharedPtr<TypeInfo> type_info) {
+Value Value::MakeSparse(SizeT nnz, UniquePtr<char[]> indice_ptr, UniquePtr<char[]> data_ptr, const SharedPtr<TypeInfo> type_info) {
     Value value(LogicalType::kSparse, type_info);
+    const auto *sparse_info = static_cast<const SparseInfo *>(type_info.get());
+    SizeT indice_len = sparse_info->IndiceSize(nnz);
+    SizeT data_len = sparse_info->DataSize(nnz);
     value.value_info_ = MakeShared<SparseValueInfo>(nnz, std::move(indice_ptr), indice_len, std::move(data_ptr), data_len);
     return value;
 }

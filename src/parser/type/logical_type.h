@@ -116,4 +116,6 @@ extern LogicalType Str2LogicalType(const std::string &string);
 
 extern int64_t LogicalTypeWidth(LogicalType logical_type);
 
+extern LogicalType GetCommonLogicalType(const EmbeddingDataType type1, const EmbeddingDataType type2);
+
 } // namespace infinity

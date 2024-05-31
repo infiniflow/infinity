@@ -66,6 +66,7 @@ export using infinity::TensorArrayT;
 
 // sparse
 export using infinity::SparseT;
+export using infinity::SparseRefT;
 
 export using infinity::EmptyArrayT;
 

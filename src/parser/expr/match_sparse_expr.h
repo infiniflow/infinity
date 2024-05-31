@@ -50,6 +50,7 @@ public:
     std::unique_ptr<char[]> query_sparse_indice_ptr_;
     std::unique_ptr<char[]> query_sparse_data_ptr_;
     uint32_t nnz_ = 0;
+    int64_t max_indice_ = 0;
 
     SparseMetricType metric_type_;
     size_t topn_;

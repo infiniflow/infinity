@@ -318,14 +318,13 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
         file_handler->Read(&off, sizeof(i64));
         i64 nnz = off - prev_off;
         SizeT data_len = sparse_info->DataSize(nnz);
-        SizeT indice_len = sparse_info->IndiceSize(nnz);
         auto tmp_indice_ptr = MakeUnique<char[]>(sizeof(i32) * nnz);
         auto data_ptr = MakeUnique<char[]>(data_len);
         idx_reader->Read(tmp_indice_ptr.get(), sizeof(i32) * nnz);
         data_reader->Read(data_ptr.get(), data_len);
         auto indice_ptr = ConvertCSRIndice(std::move(tmp_indice_ptr), sparse_info.get(), nnz);
 
-        auto value = Value::MakeSparse(nnz, std::move(indice_ptr), indice_len, std::move(data_ptr), data_len, sparse_info);
+        auto value = Value::MakeSparse(nnz, std::move(indice_ptr), std::move(data_ptr), sparse_info);
         column_vector->AppendValue(value);
 
         block_entry->IncreaseRowCount(1);

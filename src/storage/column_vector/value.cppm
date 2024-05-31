@@ -292,12 +292,7 @@ public:
 
     static Value MakeSparse(const char *raw_ptr, SizeT nnz, const SharedPtr<TypeInfo> type_info);
 
-    static Value MakeSparse(SizeT nnz,
-                            UniquePtr<char[]> indice_ptr,
-                            SizeT indice_len,
-                            UniquePtr<char[]> data_ptr,
-                            SizeT data_len,
-                            const SharedPtr<TypeInfo> type_info);
+    static Value MakeSparse(SizeT nnz, UniquePtr<char[]> indice_ptr, UniquePtr<char[]> data_ptr, const SharedPtr<TypeInfo> type_info);
 
     void AppendToTensorArray(const_ptr_t ptr, SizeT bytes);
 
