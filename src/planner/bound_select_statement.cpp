@@ -44,6 +44,7 @@ import logical_filter;
 import logical_table_scan;
 import logical_knn_scan;
 import logical_match_tensor_scan;
+import logical_match_sparse_scan;
 import logical_aggregate;
 import logical_sort;
 import logical_limit;
@@ -148,9 +149,10 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         return root;
     } else {
         SharedPtr<LogicalNode> root = nullptr;
-        const SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size() + search_expr_->match_tensor_exprs_.size();
+        const SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size() + search_expr_->match_tensor_exprs_.size() +
+                                   search_expr_->match_sparse_exprs_.size();
         if (num_children <= 0) {
-            String error_message = "SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR expression";
+            String error_message = "SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR expression or MATCH SPARSE expression";
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         } else if (num_children >= 3) {
@@ -181,6 +183,10 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             match_tensor_node->common_query_filter_ = common_query_filter;
             match_tensor_node->InitExtraOptions();
             match_knn_nodes.push_back(std::move(match_tensor_node));
+        }
+        for (auto &match_sparse_expr : search_expr_->match_sparse_exprs_) {
+            auto match_sparse_node = MakeShared<LogicalMatchSparseScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_sparse_expr);
+            match_knn_nodes.push_back(std::move(match_sparse_node));
         }
         bind_context->GenerateTableIndex();
         for (auto &knn_expr : search_expr_->knn_exprs_) {

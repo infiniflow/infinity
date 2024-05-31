@@ -126,6 +126,7 @@ import logical_fusion;
 
 import value;
 import value_expression;
+import match_tensor_expression;
 import explain_physical_plan;
 import third_party;
 import status;
@@ -925,7 +926,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
     if (auto match_tensor_scan_op = MakeUnique<PhysicalMatchTensorScan>(logical_match_tensor->node_id(),
                                                                         logical_match_tensor->TableIndex(),
                                                                         logical_match_tensor->base_table_ref_,
-                                                                        logical_match_tensor->match_tensor_expr_,
+                                                                        std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
                                                                         logical_match_tensor->common_query_filter_,
                                                                         logical_match_tensor->topn_,
                                                                         logical_operator->load_metas());
@@ -936,7 +937,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
                                                     std::move(match_tensor_scan_op),
                                                     logical_match_tensor->TableIndex(),
                                                     logical_match_tensor->base_table_ref_,
-                                                    logical_match_tensor->match_tensor_expr_,
+                                                    std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
                                                     logical_match_tensor->topn_,
                                                     MakeShared<Vector<LoadMeta>>());
     }
