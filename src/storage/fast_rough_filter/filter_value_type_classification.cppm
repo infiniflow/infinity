@@ -44,7 +44,7 @@ struct AddTypeListT<TypeList<Arg1...>, TypeList<Arg2...>> {
     using Type = TypeList<Arg1..., Arg2...>;
 };
 
-template <typename... L>
+export template <typename... L>
 using AddTypeList = typename AddTypeListT<L...>::Type;
 
 template <typename T, typename U>

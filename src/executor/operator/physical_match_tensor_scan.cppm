@@ -90,4 +90,13 @@ private:
     void ExecuteInner(QueryContext *query_context, MatchTensorScanOperatorState *operator_state) const;
 };
 
+struct MatchTensorRerankDoc;
+class BufferManager;
+export void CalculateFusionMatchTensorRerankerScores(Vector<MatchTensorRerankDoc> &rerank_docs,
+                                                     BufferManager *buffer_mgr,
+                                                     const DataType *column_data_type,
+                                                     ColumnID column_id,
+                                                     const BlockIndex *block_index,
+                                                     const MatchTensorExpression &match_tensor_expr);
+
 } // namespace infinity

@@ -59,6 +59,8 @@ import embedding_info;
 import buffer_manager;
 import match_tensor_scan_function_data;
 import mlas_matrix_multiply;
+import physical_fusion;
+import filter_value_type_classification;
 
 namespace infinity {
 
@@ -79,8 +81,8 @@ void PhysicalMatchTensorScan::Init() {
     search_column_id_ = match_tensor_expr_->column_expr_->binding().column_idx;
     const ColumnDef *column_def = base_table_ref_->table_entry_ptr_->GetColumnDefByID(search_column_id_);
     const auto &column_type_ptr = column_def->type();
-    if (column_type_ptr->type() != LogicalType::kTensor) {
-        String error_message = fmt::format("Column {} is not a tensor column", column_def->name());
+    if (const auto l_type = column_type_ptr->type(); l_type != LogicalType::kTensor and l_type != LogicalType::kTensorArray) {
+        String error_message = fmt::format("Column {} is not a tensor or tensorarray column", column_def->name());
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
@@ -93,24 +95,6 @@ void PhysicalMatchTensorScan::Init() {
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
     if (embedding_info->Dimension() != match_tensor_expr_->tensor_basic_embedding_dimension_) {
         String error_message = fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), match_tensor_expr_->ToString());
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
-    }
-    // TODO: now only support MaxSim
-    if (match_tensor_expr_->search_method_ != MatchTensorSearchMethod::kMaxSim) {
-        String error_message = "Now only support MaxSim search.";
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
-    }
-    // TODO: now only support search on float32 tensor column
-    if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
-        String error_message = "Now only support tensor search on float column.";
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
-    }
-    // TODO: now only support float32 tensor query
-    if (match_tensor_expr_->embedding_data_type_ != EmbeddingDataType::kElemFloat) {
-        String error_message = "Now only support float32 tensor query.";
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
@@ -184,6 +168,14 @@ bool PhysicalMatchTensorScan::Execute(QueryContext *query_context, OperatorState
     return true;
 }
 
+void CalculateScoreOnColumnVector(ColumnVector &column_vector,
+                                  SegmentID segment_id,
+                                  BlockID block_id,
+                                  u32 row_count,
+                                  const Bitmask &bitmask,
+                                  const MatchTensorExpression &match_tensor_expr,
+                                  MatchTensorScanFunctionData &function_data);
+
 void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTensorScanOperatorState *operator_state) const {
     if (!operator_state->data_block_array_.empty()) {
         String error_message = "TensorScan output data block array should be empty";
@@ -211,11 +203,11 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         ++block_ids_idx;
         const auto [segment_id, block_id] = block_ids[task_id];
         const BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-        if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
+        if (auto it_filter = common_query_filter_->filter_result_.find(segment_id); it_filter != common_query_filter_->filter_result_.end()) {
             // not skipped after common_query_filter
-            const auto row_count = block_entry->row_count();
+            const u32 row_count = block_entry->row_count();
             // filter for segment
-            const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
+            const std::variant<Vector<u32>, Bitmask> &filter_result = it_filter->second;
             Bitmask bitmask;
             bitmask.Initialize(std::bit_ceil(row_count));
             const u32 block_start_offset = block_id * DEFAULT_BLOCK_CAPACITY;
@@ -242,38 +234,8 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             block_entry->SetDeleteBitmask(begin_ts, bitmask);
             auto *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id);
             auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
-            auto tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
-            FixHeapManager *fix_heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
-            // query tensor
-            const char *query_tensor_ptr = match_tensor_expr_->query_embedding_.ptr;
-            const u32 query_embedding_num = match_tensor_expr_->num_of_embedding_in_query_tensor_;
-            const u32 basic_embedding_dimension = match_tensor_expr_->tensor_basic_embedding_dimension_;
-            const u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
-            for (u32 i = 0; i < row_count; ++i) {
-                if (bitmask.IsTrue(i)) {
-                    const auto [embedding_num, chunk_id, chunk_offset] = tensor_ptr[i];
-                    const char *tensor_data_ptr = fix_heap_mgr->GetRawPtrFromChunk(chunk_id, chunk_offset);
-                    // TODO: now only support MaxSim on float32 tensor (check Init())
-                    // use mlas
-                    auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * embedding_num);
-                    matrixA_multiply_transpose_matrixB_output_to_C(reinterpret_cast<const float *>(query_tensor_ptr),
-                                                                   reinterpret_cast<const float *>(tensor_data_ptr),
-                                                                   query_embedding_num,
-                                                                   embedding_num,
-                                                                   basic_embedding_dimension,
-                                                                   output_ptr.get());
-                    float maxsim_score = 0.0f;
-                    for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
-                        const float *query_ip_ptr = output_ptr.get() + query_i * embedding_num;
-                        float max_score = std::numeric_limits<float>::lowest();
-                        for (u32 k = 0; k < embedding_num; ++k) {
-                            max_score = std::max(max_score, query_ip_ptr[k]);
-                        }
-                        maxsim_score += max_score;
-                    }
-                    function_data.result_handler_->AddResult(0, maxsim_score, RowID(segment_id, segment_offset_start + i));
-                }
-            }
+            // output score will always be float type
+            CalculateScoreOnColumnVector(column_vector, segment_id, block_id, row_count, bitmask, *match_tensor_expr_, function_data);
         }
     }
     if (block_ids_idx >= block_ids.size()) {
@@ -328,6 +290,436 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         output_block_ptr->Finalize();
         operator_state->SetComplete();
     }
+}
+
+template <typename TensorElemT, typename QueryElemT>
+struct MaxSimOp;
+
+template <>
+struct MaxSimOp<float, float> {
+    static float Score(const char *query_tensor_ptr,
+                       const char *target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * target_embedding_num);
+        matrixA_multiply_transpose_matrixB_output_to_C(reinterpret_cast<const float *>(query_tensor_ptr),
+                                                       reinterpret_cast<const float *>(target_tensor_ptr),
+                                                       query_embedding_num,
+                                                       target_embedding_num,
+                                                       basic_embedding_dimension,
+                                                       output_ptr.get());
+        float maxsim_score = 0.0f;
+        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            const float *query_ip_ptr = output_ptr.get() + query_i * target_embedding_num;
+            float max_score_i = std::numeric_limits<float>::lowest();
+            for (u32 k = 0; k < target_embedding_num; ++k) {
+                max_score_i = std::max(max_score_i, query_ip_ptr[k]);
+            }
+            maxsim_score += max_score_i;
+        }
+        return maxsim_score;
+    }
+};
+
+template <typename TensorElemT, typename QueryElemT>
+    requires(!std::is_same_v<TensorElemT, bool> && !std::is_same_v<QueryElemT, bool>)
+struct MaxSimOp<TensorElemT, QueryElemT> {
+    static float Score(const char *raw_query_tensor_ptr,
+                       const char *raw_target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        const auto query_tensor_ptr = reinterpret_cast<const QueryElemT *>(raw_query_tensor_ptr);
+        const auto target_tensor_ptr = reinterpret_cast<const TensorElemT *>(raw_target_tensor_ptr);
+        auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * target_embedding_num);
+        float maxsim_score = 0.0f;
+        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            float max_score_i = std::numeric_limits<float>::lowest();
+            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
+                const auto query_ptr = query_tensor_ptr + query_i * basic_embedding_dimension;
+                const auto target_ptr = target_tensor_ptr + target_j * basic_embedding_dimension;
+                float score_ij = 0.0f;
+                for (u32 k = 0; k < basic_embedding_dimension; ++k) {
+                    score_ij += static_cast<float>(query_ptr[k]) * static_cast<float>(target_ptr[k]);
+                }
+                max_score_i = std::max(max_score_i, score_ij);
+            }
+            maxsim_score += max_score_i;
+        }
+        return maxsim_score;
+    }
+};
+
+template <>
+struct MaxSimOp<bool, bool> {
+    static float Score(const char *raw_query_tensor_ptr,
+                       const char *raw_target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        const auto query_tensor_ptr = reinterpret_cast<const u8 *>(raw_query_tensor_ptr);
+        const auto target_tensor_ptr = reinterpret_cast<const u8 *>(raw_target_tensor_ptr);
+        const auto unit_embedding_bytes = basic_embedding_dimension / 8;
+        auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * target_embedding_num);
+        float maxsim_score = 0.0f;
+        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            u32 max_score_i = 0;
+            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
+                const auto query_ptr = query_tensor_ptr + query_i * unit_embedding_bytes;
+                const auto target_ptr = target_tensor_ptr + target_j * unit_embedding_bytes;
+                u32 score_ij = 0;
+                auto is_true = [](const u8 *ptr, const u32 k) -> bool { return ptr[k / 8] & (1u << (k % 8)); };
+                for (u32 k = 0; k < basic_embedding_dimension; ++k) {
+                    if (is_true(query_ptr, k) && is_true(target_ptr, k)) {
+                        ++score_ij;
+                    }
+                }
+                max_score_i = std::max(max_score_i, score_ij);
+            }
+            maxsim_score += max_score_i;
+        }
+        return maxsim_score;
+    }
+};
+
+template <typename QueryElemT>
+struct MaxSimOp<bool, QueryElemT> {
+    static float Score(const char *raw_query_tensor_ptr,
+                       const char *raw_target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        const auto query_tensor_ptr = reinterpret_cast<const QueryElemT *>(raw_query_tensor_ptr);
+        const auto target_tensor_ptr = reinterpret_cast<const u8 *>(raw_target_tensor_ptr);
+        const auto unit_embedding_bytes = basic_embedding_dimension / 8;
+        auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * target_embedding_num);
+        float maxsim_score = 0.0f;
+        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            float max_score_i = std::numeric_limits<float>::lowest();
+            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
+                const auto query_ptr = query_tensor_ptr + query_i * basic_embedding_dimension;
+                const auto target_ptr = target_tensor_ptr + target_j * unit_embedding_bytes;
+                float score_ij = 0.0f;
+                auto is_true = [](const u8 *ptr, const u32 k) -> bool { return ptr[k / 8] & (1u << (k % 8)); };
+                for (u32 k = 0; k < basic_embedding_dimension; ++k) {
+                    if (is_true(target_ptr, k)) {
+                        score_ij += static_cast<float>(query_ptr[k]);
+                    }
+                }
+                max_score_i = std::max(max_score_i, score_ij);
+            }
+            maxsim_score += max_score_i;
+        }
+        return maxsim_score;
+    }
+};
+
+template <typename TensorElemT>
+struct MaxSimOp<TensorElemT, bool> {
+    static float Score(const char *raw_query_tensor_ptr,
+                       const char *raw_target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        const auto query_tensor_ptr = reinterpret_cast<const u8 *>(raw_query_tensor_ptr);
+        const auto target_tensor_ptr = reinterpret_cast<const TensorElemT *>(raw_target_tensor_ptr);
+        const auto unit_embedding_bytes = basic_embedding_dimension / 8;
+        auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * target_embedding_num);
+        float maxsim_score = 0.0f;
+        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            float max_score_i = std::numeric_limits<float>::lowest();
+            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
+                const auto query_ptr = query_tensor_ptr + query_i * unit_embedding_bytes;
+                const auto target_ptr = target_tensor_ptr + target_j * basic_embedding_dimension;
+                float score_ij = 0.0f;
+                auto is_true = [](const u8 *ptr, const u32 k) -> bool { return ptr[k / 8] & (1u << (k % 8)); };
+                for (u32 k = 0; k < basic_embedding_dimension; ++k) {
+                    if (is_true(query_ptr, k)) {
+                        score_ij += static_cast<float>(target_ptr[k]);
+                    }
+                }
+                max_score_i = std::max(max_score_i, score_ij);
+            }
+            maxsim_score += max_score_i;
+        }
+        return maxsim_score;
+    }
+};
+
+template <typename Op>
+struct CalcutateScoreOfTensorRow {
+    static float Execute(ColumnVector &column_vector,
+                         const u32 block_offset,
+                         const char *query_tensor_ptr,
+                         const u32 query_embedding_num,
+                         const u32 basic_embedding_dimension) {
+        auto tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
+        FixHeapManager *tensor_heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
+        const auto [embedding_num, chunk_id, chunk_offset] = tensor_ptr[block_offset];
+        const char *tensor_data_ptr = tensor_heap_mgr->GetRawPtrFromChunk(chunk_id, chunk_offset);
+        return Op::Score(query_tensor_ptr, tensor_data_ptr, query_embedding_num, embedding_num, basic_embedding_dimension);
+    }
+};
+
+template <typename Op>
+struct CalcutateScoreOfTensorArrayRow {
+    static float Execute(ColumnVector &column_vector,
+                         const u32 block_offset,
+                         const char *query_tensor_ptr,
+                         const u32 query_embedding_num,
+                         const u32 basic_embedding_dimension) {
+        auto tensor_array_ptr = reinterpret_cast<const TensorArrayT *>(column_vector.data());
+        FixHeapManager *tensor_array_heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
+        FixHeapManager *tensor_heap_mgr = column_vector.buffer_->fix_heap_mgr_1_.get();
+        const auto [tensor_num, tensor_array_chunk_id, tensor_array_chunk_offset] = tensor_array_ptr[block_offset];
+        Vector<TensorT> tensors(tensor_num);
+        tensor_array_heap_mgr->ReadFromHeap(reinterpret_cast<char *>(tensors.data()),
+                                            tensor_array_chunk_id,
+                                            tensor_array_chunk_offset,
+                                            tensor_num * sizeof(TensorT));
+        float maxsim_score = std::numeric_limits<float>::lowest();
+        for (const auto [embedding_num, tensor_chunk_id, tensor_chunk_offset] : tensors) {
+            const char *tensor_data_ptr = tensor_heap_mgr->GetRawPtrFromChunk(tensor_chunk_id, tensor_chunk_offset);
+            const float tensor_score = Op::Score(query_tensor_ptr, tensor_data_ptr, query_embedding_num, embedding_num, basic_embedding_dimension);
+            maxsim_score = std::max(maxsim_score, tensor_score);
+        }
+        return maxsim_score;
+    }
+};
+
+template <typename CalcutateScoreOfRowOp>
+void ExecuteScanOnColumn(ColumnVector &column_vector,
+                         const SegmentID segment_id,
+                         const BlockID block_id,
+                         const u32 row_count,
+                         const Bitmask &bitmask,
+                         const MatchTensorExpression &match_tensor_expr,
+                         MatchTensorScanFunctionData &function_data) {
+    const char *query_tensor_ptr = match_tensor_expr.query_embedding_.ptr;
+    const u32 query_embedding_num = match_tensor_expr.num_of_embedding_in_query_tensor_;
+    const u32 basic_embedding_dimension = match_tensor_expr.tensor_basic_embedding_dimension_;
+    const u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
+    for (u32 i = 0; i < row_count; ++i) {
+        if (bitmask.IsTrue(i)) {
+            const float maxsim_score =
+                CalcutateScoreOfRowOp::Execute(column_vector, i, query_tensor_ptr, query_embedding_num, basic_embedding_dimension);
+            function_data.result_handler_->AddResult(0, maxsim_score, RowID(segment_id, segment_offset_start + i));
+        }
+    }
+}
+
+struct TensorScanParameterPack {
+    ColumnVector &column_vector_;
+    const SegmentID segment_id_;
+    const BlockID block_id_;
+    const u32 row_count_;
+    const Bitmask &bitmask_;
+    const MatchTensorExpression &match_tensor_expr_;
+    MatchTensorScanFunctionData &function_data_;
+    TensorScanParameterPack(ColumnVector &column_vector,
+                            const SegmentID segment_id,
+                            const BlockID block_id,
+                            const u32 row_count,
+                            const Bitmask &bitmask,
+                            const MatchTensorExpression &match_tensor_expr,
+                            MatchTensorScanFunctionData &function_data)
+        : column_vector_(column_vector), segment_id_(segment_id), block_id_(block_id), row_count_(row_count), bitmask_(bitmask),
+          match_tensor_expr_(match_tensor_expr), function_data_(function_data) {}
+};
+
+template <template <typename> typename CalcutateScoreOfRow, typename ColumnElemT, typename QueryElemT>
+void CalculateScoreOnColumnVectorT(TensorScanParameterPack &parameter_pack) {
+    switch (parameter_pack.match_tensor_expr_.search_method_) {
+        case MatchTensorSearchMethod::kMaxSim: {
+            return ExecuteScanOnColumn<CalcutateScoreOfRow<MaxSimOp<ColumnElemT, QueryElemT>>>(parameter_pack.column_vector_,
+                                                                                               parameter_pack.segment_id_,
+                                                                                               parameter_pack.block_id_,
+                                                                                               parameter_pack.row_count_,
+                                                                                               parameter_pack.bitmask_,
+                                                                                               parameter_pack.match_tensor_expr_,
+                                                                                               parameter_pack.function_data_);
+        }
+        case MatchTensorSearchMethod::kInvalid: {
+            const auto error_message = "Invalid search method!";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
+        }
+    }
+}
+
+template <typename... T>
+struct ExecuteMatchTensorScanTypes {
+    static void Execute(TensorScanParameterPack &parameter_pack) {
+        switch (parameter_pack.column_vector_.data_type()->type()) {
+            case LogicalType::kTensor: {
+                return CalculateScoreOnColumnVectorT<CalcutateScoreOfTensorRow, T...>(parameter_pack);
+            }
+            case LogicalType::kTensorArray: {
+                return CalculateScoreOnColumnVectorT<CalcutateScoreOfTensorArrayRow, T...>(parameter_pack);
+            }
+            default: {
+                const auto error_message = "Invalid column type! target column is not Tensor or TensorArray type.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+        }
+    }
+};
+
+template <template <typename...> typename T, typename U>
+struct ExecuteHelper;
+
+template <template <typename...> typename ExecuteT, typename... T>
+struct ExecuteHelper<ExecuteT, TypeList<T...>> {
+    template <typename Params>
+    static void Execute(Params &parameter_pack) {
+        ExecuteT<T...>::Execute(parameter_pack);
+    }
+};
+
+template <template <typename...> typename ExecuteT, typename Typelist, typename Params>
+void ElemTypeDispatch(Params &parameter_pack) {
+    ExecuteHelper<ExecuteT, Typelist>::Execute(parameter_pack);
+}
+
+template <template <typename...> typename ExecuteT, typename Typelist, typename Params, typename... Args>
+void ElemTypeDispatch(Params &parameter_pack, EmbeddingDataType type_enum, Args... extra_types) {
+    switch (type_enum) {
+        case EmbeddingDataType::kElemBit: {
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<bool>>>(parameter_pack, extra_types...);
+        }
+        case EmbeddingDataType::kElemInt8: {
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<i8>>>(parameter_pack, extra_types...);
+        }
+        case EmbeddingDataType::kElemInt16: {
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<i16>>>(parameter_pack, extra_types...);
+        }
+        case EmbeddingDataType::kElemInt32: {
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<i32>>>(parameter_pack, extra_types...);
+        }
+        case EmbeddingDataType::kElemInt64: {
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<i64>>>(parameter_pack, extra_types...);
+        }
+        case EmbeddingDataType::kElemFloat: {
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<float>>>(parameter_pack, extra_types...);
+        }
+        case EmbeddingDataType::kElemDouble: {
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<double>>>(parameter_pack, extra_types...);
+        }
+        case EmbeddingDataType::kElemInvalid: {
+            const auto error_message = "Invalid embedding data type!";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+    }
+}
+
+void CalculateScoreOnColumnVector(ColumnVector &column_vector,
+                                  const SegmentID segment_id,
+                                  const BlockID block_id,
+                                  const u32 row_count,
+                                  const Bitmask &bitmask,
+                                  const MatchTensorExpression &match_tensor_expr,
+                                  MatchTensorScanFunctionData &function_data) {
+    TensorScanParameterPack parameter_pack(column_vector, segment_id, block_id, row_count, bitmask, match_tensor_expr, function_data);
+    auto column_elem_type = static_cast<const EmbeddingInfo *>(parameter_pack.column_vector_.data_type()->type_info().get())->Type();
+    auto query_elem_type = parameter_pack.match_tensor_expr_.embedding_data_type_;
+    ElemTypeDispatch<ExecuteMatchTensorScanTypes, TypeList<>>(parameter_pack, column_elem_type, query_elem_type);
+}
+
+struct RerankerParameterPack {
+    Vector<MatchTensorRerankDoc> &rerank_docs_;
+    BufferManager *buffer_mgr_;
+    const DataType *column_data_type_;
+    const ColumnID column_id_;
+    const BlockIndex *block_index_;
+    const MatchTensorExpression &match_tensor_expr_;
+    RerankerParameterPack(Vector<MatchTensorRerankDoc> &rerank_docs,
+                          BufferManager *buffer_mgr,
+                          const DataType *column_data_type,
+                          const ColumnID column_id,
+                          const BlockIndex *block_index,
+                          const MatchTensorExpression &match_tensor_expr)
+        : rerank_docs_(rerank_docs), buffer_mgr_(buffer_mgr), column_data_type_(column_data_type), column_id_(column_id), block_index_(block_index),
+          match_tensor_expr_(match_tensor_expr) {}
+};
+
+template <typename CalcutateScoreOfRowOp>
+void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
+                      BufferManager *buffer_mgr,
+                      const ColumnID column_id,
+                      const BlockIndex *block_index,
+                      const char *query_tensor_ptr,
+                      const u32 query_embedding_num,
+                      const u32 basic_embedding_dimension) {
+    for (auto &doc : rerank_docs) {
+        const RowID row_id = doc.row_id_;
+        const SegmentID segment_id = row_id.segment_id_;
+        const SegmentOffset segment_offset = row_id.segment_offset_;
+        const BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
+        const BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
+        BlockColumnEntry *block_column_entry =
+            block_index->segment_block_index_.at(segment_id).block_map_.at(block_id)->GetColumnBlockEntry(column_id);
+        auto column_vec = block_column_entry->GetColumnVector(buffer_mgr);
+        doc.score_ = CalcutateScoreOfRowOp::Execute(column_vec, block_offset, query_tensor_ptr, query_embedding_num, basic_embedding_dimension);
+    }
+}
+
+template <template <typename> typename CalcutateScoreOfRow, typename ColumnElemT, typename QueryElemT>
+void RerankerScoreT(RerankerParameterPack &parameter_pack) {
+    const char *query_tensor_ptr = parameter_pack.match_tensor_expr_.query_embedding_.ptr;
+    const u32 query_embedding_num = parameter_pack.match_tensor_expr_.num_of_embedding_in_query_tensor_;
+    const u32 basic_embedding_dimension = parameter_pack.match_tensor_expr_.tensor_basic_embedding_dimension_;
+    switch (parameter_pack.match_tensor_expr_.search_method_) {
+        case MatchTensorSearchMethod::kMaxSim: {
+            return GetRerankerScore<CalcutateScoreOfRow<MaxSimOp<ColumnElemT, QueryElemT>>>(parameter_pack.rerank_docs_,
+                                                                                            parameter_pack.buffer_mgr_,
+                                                                                            parameter_pack.column_id_,
+                                                                                            parameter_pack.block_index_,
+                                                                                            query_tensor_ptr,
+                                                                                            query_embedding_num,
+                                                                                            basic_embedding_dimension);
+        }
+        case MatchTensorSearchMethod::kInvalid: {
+            const auto error_message = "Invalid search method!";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
+        }
+    }
+}
+
+template <typename... T>
+struct ExecuteMatchTensorRerankerTypes {
+    static void Execute(RerankerParameterPack &parameter_pack) {
+        switch (parameter_pack.column_data_type_->type()) {
+            case LogicalType::kTensor: {
+                return RerankerScoreT<CalcutateScoreOfTensorRow, T...>(parameter_pack);
+            }
+            case LogicalType::kTensorArray: {
+                return RerankerScoreT<CalcutateScoreOfTensorArrayRow, T...>(parameter_pack);
+            }
+            default: {
+                const auto error_message = "Invalid column type! target column is not Tensor or TensorArray type.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+        }
+    }
+};
+
+void CalculateFusionMatchTensorRerankerScores(Vector<MatchTensorRerankDoc> &rerank_docs,
+                                              BufferManager *buffer_mgr,
+                                              const DataType *column_data_type,
+                                              const ColumnID column_id,
+                                              const BlockIndex *block_index,
+                                              const MatchTensorExpression &match_tensor_expr) {
+    RerankerParameterPack parameter_pack(rerank_docs, buffer_mgr, column_data_type, column_id, block_index, match_tensor_expr);
+    auto column_elem_type = static_cast<const EmbeddingInfo *>(column_data_type->type_info().get())->Type();
+    auto query_elem_type = parameter_pack.match_tensor_expr_.embedding_data_type_;
+    ElemTypeDispatch<ExecuteMatchTensorRerankerTypes, TypeList<>>(parameter_pack, column_elem_type, query_elem_type);
 }
 
 } // namespace infinity
