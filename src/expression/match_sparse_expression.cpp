@@ -31,8 +31,7 @@ import infinity_exception;
 namespace infinity {
 
 DataType MatchSparseExpression::Type() const {
-    const auto *column_expr = static_cast<const ColumnExpression *>(arguments_[0].get());
-    const auto *col_sparse_info = static_cast<const SparseInfo *>(column_expr->Type().type_info().get());
+    const auto *col_sparse_info = static_cast<const SparseInfo *>(column_expr_->Type().type_info().get());
     auto logical_type = GetCommonLogicalType(sparse_info_->DataType(), col_sparse_info->DataType());
     if (logical_type == LogicalType::kInvalid) {
         Status status =
@@ -44,7 +43,6 @@ DataType MatchSparseExpression::Type() const {
 }
 
 String MatchSparseExpression::ToString() const {
-    const auto *column_expr = static_cast<const ColumnExpression *>(arguments_[0].get());
 
     String sparse_str = SparseT::Sparse2String(query_sparse_.raw_data_ptr_,
                                                query_sparse_.raw_indice_ptr_,
@@ -63,7 +61,7 @@ String MatchSparseExpression::ToString() const {
     String opt_str = ss.str();
 
     return fmt::format("MATCH SPARSE ({}, [{}], {}, {}) WITH ({})",
-                       column_expr->Name(),
+                       column_expr_->Name(),
                        sparse_str,
                        MatchSparseExpr::MetricTypeToString(metric_type_),
                        topn_,

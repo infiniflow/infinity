@@ -65,4 +65,6 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 
 
 SizeT PhysicalScanBase::TaskletCount() { return base_table_ref_->block_index_->BlockCount(); }
 
+BlockIndex *PhysicalScanBase::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
+
 } // namespace infinity

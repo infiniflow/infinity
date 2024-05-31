@@ -30,6 +30,11 @@ import data_type;
 import common_query_filter;
 import default_values;
 import logical_type;
+import match_sparse_scan_function_data;
+import block_entry;
+import logger;
+import third_party;
+import buffer_manager;
 
 namespace infinity {
 
@@ -43,7 +48,7 @@ PhysicalMatchSparseScan::PhysicalMatchSparseScan(u64 id,
       match_sparse_expr_(std::move(match_sparse_expression)), common_query_filter_(common_query_filter) {}
 
 void PhysicalMatchSparseScan::Init() {
-    //
+    search_column_id_ = match_sparse_expr_->column_expr_->binding().column_idx;
 }
 
 SharedPtr<Vector<String>> PhysicalMatchSparseScan::GetOutputNames() const {
@@ -69,8 +74,30 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchSparseScan::GetOutputTypes()
 }
 
 bool PhysicalMatchSparseScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
+    BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
+
     auto *match_sparse_scan_state = static_cast<MatchSparseScanOperatorState *>(operator_state);
-    match_sparse_scan_state->SetComplete();
+
+    MatchSparseScanFunctionData &function_data = *match_sparse_scan_state->match_sparse_scan_function_data_;
+    const Vector<GlobalBlockID> &block_ids = *function_data.global_block_ids_;
+    auto &block_ids_idx = function_data.current_block_ids_idx_;
+    const BlockIndex *block_index = function_data.block_index_;
+
+    if (auto task_id = block_ids_idx; task_id < block_ids.size()) {
+        ++block_ids_idx;
+        const auto [segment_id, block_id] = block_ids[task_id];
+        
+        // BlockOffset row_cnt = block_index->GetBlockOffset(segment_id, block_id);
+        const BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
+        LOG_DEBUG(fmt::format("MatchSparseScan: segment_id: {}, block_id: {}", segment_id, block_id));
+
+        auto *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id_);
+        auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+    }
+    if (block_ids_idx >= block_ids.size()) {
+        LOG_DEBUG(fmt::format("MatchSparseScan: {} task finished", block_ids_idx));
+        match_sparse_scan_state->SetComplete();
+    }
     return true;
 }
 

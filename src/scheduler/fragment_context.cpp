@@ -29,6 +29,7 @@ import physical_operator_type;
 
 import table_scan_function_data;
 import match_tensor_scan_function_data;
+import match_sparse_scan_function_data;
 import knn_scan_data;
 import physical_table_scan;
 import physical_index_scan;
@@ -126,12 +127,16 @@ UniquePtr<OperatorState> MakeMergeMatchTensorState(PhysicalOperator *physical_op
 }
 
 UniquePtr<OperatorState> MakeMatchSparseScanState(const PhysicalMatchSparseScan *physical_match_sparse_scan, FragmentTask *task) {
-    auto operator_state = MakeUnique<MergeMatchSparseOperatorState>();
+    SourceState *source_state = task->source_state_.get();
+    auto operator_state = MakeUnique<MatchSparseScanOperatorState>();
+    auto *match_sparse_scan_source_state = static_cast<MatchSparseScanSourceState *>(source_state);
+    operator_state->match_sparse_scan_function_data_ =
+        MakeUnique<MatchSparseScanFunctionData>(physical_match_sparse_scan->GetBlockIndex(), match_sparse_scan_source_state->global_ids_);
     return operator_state;
 }
 
 UniquePtr<OperatorState> MakeMergeMatchSparseState(PhysicalOperator *physical_op) {
-    auto operator_state = MakeUnique<MatchSparseScanOperatorState>();
+    auto operator_state = MakeUnique<MergeMatchSparseOperatorState>();
     return operator_state;
 }
 

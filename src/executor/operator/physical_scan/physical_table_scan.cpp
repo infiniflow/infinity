@@ -83,8 +83,6 @@ TableEntry *PhysicalTableScan::TableEntry() const { return base_table_ref_->tabl
 
 SizeT PhysicalTableScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
-BlockIndex *PhysicalTableScan::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
-
 Vector<SizeT> &PhysicalTableScan::ColumnIDs() const {
     if (!add_row_id_)
         return base_table_ref_->column_ids_;

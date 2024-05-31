@@ -14,35 +14,30 @@
 
 module;
 
-export module physical_scan_base;
+export module match_sparse_scan_function_data;
 
 import stl;
-import physical_operator;
-import physical_operator_type;
+// import function_data;
+import table_function;
 import global_block_id;
-import base_table_ref;
 import block_index;
-import load_meta;
+// import internal_types;
+// import knn_result_handler;
+// import infinity_exception;
+// import logger;
 
 namespace infinity {
 
-export class PhysicalScanBase : public PhysicalOperator {
+export class MatchSparseScanFunctionData : public TableFunctionData {
 public:
-    PhysicalScanBase(u64 id,
-                     PhysicalOperatorType type,
-                     UniquePtr<PhysicalOperator> left,
-                     UniquePtr<PhysicalOperator> right,
-                     SharedPtr<BaseTableRef> base_table_ref,
-                     SharedPtr<Vector<LoadMeta>> load_metas);
+    MatchSparseScanFunctionData(const BlockIndex *block_index, const SharedPtr<Vector<GlobalBlockID>> &global_block_ids)
+        : block_index_(block_index), global_block_ids_(global_block_ids) {}
 
-    virtual Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const;
+public:
+    const BlockIndex *block_index_;
+    const SharedPtr<Vector<GlobalBlockID>> &global_block_ids_;
 
-    SizeT TaskletCount() override;
-
-    virtual BlockIndex *GetBlockIndex() const;
-
-protected:
-    SharedPtr<BaseTableRef> base_table_ref_{};
+    u32 current_block_ids_idx_ = 0;
 };
 
 } // namespace infinity

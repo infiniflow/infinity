@@ -122,8 +122,6 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchTensorScan::GetOutputTypes()
     return result_types;
 }
 
-BlockIndex *PhysicalMatchTensorScan::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
-
 ColumnID PhysicalMatchTensorScan::SearchColumnID() const {
     if (search_column_id_ == std::numeric_limits<ColumnID>::max()) {
         String error_message = "Search column id is not set. Init() error.";

@@ -63,8 +63,6 @@ public:
 
     SizeT BlockEntryCount() const;
 
-    BlockIndex *GetBlockIndex() const;
-
     Vector<SizeT> &ColumnIDs() const;
 
     bool ParallelExchange() const override { return true; }

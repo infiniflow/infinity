@@ -55,6 +55,7 @@ SizeT PhysicalMergeMatchSparse::TaskletCount() {
 
 bool PhysicalMergeMatchSparse::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto* merge_match_sparse_state = static_cast<MergeMatchSparseOperatorState *>(operator_state);
+    UnrecoverableError("Not implemented");
     merge_match_sparse_state->SetComplete();
     return true;
 }

@@ -24,6 +24,7 @@ import internal_types;
 import statement_common;
 import match_sparse_expr;
 import sparse_info;
+import column_expression;
 
 namespace infinity {
 
@@ -36,13 +37,16 @@ public:
                           SizeT topn,
                           const Vector<UniquePtr<InitParameter>> &opt_params)
         : BaseExpression(ExpressionType::kMatchSparse, std::move(search_column)), query_sparse_(query_sparse), sparse_info_(sparse_info),
-          metric_type_(metric_type), topn_(topn), opt_params_(opt_params) {}
+          metric_type_(metric_type), topn_(topn), opt_params_(opt_params) {
+        column_expr_ = static_cast<const ColumnExpression *>(arguments_[0].get());
+    }
 
     DataType Type() const override;
 
     String ToString() const override;
 
 public:
+    const ColumnExpression *column_expr_;
     SparseRefT query_sparse_;
     SharedPtr<SparseInfo> sparse_info_;
 

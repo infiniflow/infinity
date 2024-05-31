@@ -24,6 +24,7 @@ import data_block;
 import table_scan_function_data;
 import knn_scan_data;
 import match_tensor_scan_function_data;
+import match_sparse_scan_function_data;
 import compact_state_data;
 import table_def;
 
@@ -124,6 +125,8 @@ export struct MergeMatchTensorOperatorState : public OperatorState {
 // MatchSparseScan
 export struct MatchSparseScanOperatorState : public OperatorState {
     inline explicit MatchSparseScanOperatorState() : OperatorState(PhysicalOperatorType::kMatchSparseScan) {}
+
+    UniquePtr<MatchSparseScanFunctionData> match_sparse_scan_function_data_{};
 };
 
 // MergeMatchSparse

@@ -50,8 +50,6 @@ public:
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
 
-    BlockIndex *GetBlockIndex() const;
-
     ColumnID SearchColumnID() const;
 
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
