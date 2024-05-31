@@ -8,10 +8,10 @@
 </p>
 
 <h4 align="center">
-  <a href="https://github.com/infiniflow/infinity/issues/338">Roadmap 2024</a> |
+  <a href="https://infiniflow.org/docs/dev/category/get-started">Document</a> |
+  <a href="https://infiniflow.org/docs/dev/benchmark">Benchmark</a> |
   <a href="https://twitter.com/infiniflowai">Twitter</a> |
-  <a href="https://discord.gg/jEfRUwEYEV">Discord</a> |
-  <a href="https://www.youtube.com/@InfiniFlow-AI">YouTube</a> |
+  <a href="https://discord.gg/jEfRUwEYEV">Discord</a>
 </h4>
 
 
@@ -19,6 +19,7 @@ Infinity is a cutting-edge AI-native database that provides a wide range of sear
 
 - [Key Features](#-key-features)
 - [Get Started](#-get-started)
+- [Document](#-document)
 - [Roadmap](#-roadmap)
 - [Community](#-community)
 
@@ -144,6 +145,12 @@ print(res)
 
 > 💡 For more information about the Python API, see the [Python API Reference](docs/references/pysdk_api_reference.md).
 
+## Document
+
+- [Quickstart](https://infiniflow.org/docs/dev/)
+- [User Guide](https://ragflow.io/docs/dev/category/user-guides)
+- [Reference](https://ragflow.io/docs/dev/category/references)
+- [FAQ](https://ragflow.io/docs/dev/faq)
 
 ## 📜 Roadmap
 
@@ -154,4 +161,4 @@ See the [Infinity Roadmap 2024](https://github.com/infiniflow/infinity/issues/33
 - [Discord](https://discord.gg/jEfRUwEYEV)
 - [Twitter](https://twitter.com/infiniflowai)
 - [GitHub Discussions](https://github.com/infiniflow/infinity/discussions)
-- [YouTube](https://www.youtube.com/@InfiniFlow-AI)
+
