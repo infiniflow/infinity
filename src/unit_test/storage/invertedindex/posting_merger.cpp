@@ -47,8 +47,6 @@ protected:
     void CreateIndex();
 
 protected:
-    ThreadPool inverting_thread_pool_{4};
-    ThreadPool commiting_thread_pool_{4};
     optionflag_t flag_{OPTION_FLAG_ALL};
     static constexpr SizeT BUFFER_SIZE_ = 1024;
 };
@@ -69,13 +67,12 @@ void PostingMergerTest::CreateIndex() {
     }
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
-    MemoryIndexer indexer1(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard", inverting_thread_pool_, commiting_thread_pool_);
+    MemoryIndexer indexer1(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column, 0, 1);
     indexer1.Dump();
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
 
-    auto indexer2 =
-        MakeUnique<MemoryIndexer>(GetTmpDir(), "chunk2", RowID(0U, 1U), flag_, "standard", inverting_thread_pool_, commiting_thread_pool_);
+    auto indexer2 = MakeUnique<MemoryIndexer>(GetTmpDir(), "chunk2", RowID(0U, 1U), flag_, "standard");
     indexer2->Insert(column, 1, 1);
     indexer2->Dump();
 }

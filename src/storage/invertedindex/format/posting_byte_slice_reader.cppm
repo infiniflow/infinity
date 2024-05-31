@@ -27,10 +27,13 @@ public:
         posting_fields_ = posting_byte_slice_->GetPostingFields();
     }
 
-    void Seek(u32 pos) {
-        byte_slice_reader_.Seek(pos);
+    bool Seek(u32 pos) {
+        SizeT ret = byte_slice_reader_.Seek(pos);
         location_cursor_ = 0;
         posting_buffer_cursor_ = 0;
+        if (ret == ByteSliceReader::BYTE_SLICE_EOF)
+            return false;
+        return true;
     }
 
     u32 Tell() const { return byte_slice_reader_.Tell(); }

@@ -59,6 +59,7 @@ import mmap;
 import buf_writer;
 import profiler;
 import third_party;
+import infinity_context;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -69,15 +70,10 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
 
 MemoryIndexer::PostingTable::PostingTable() {}
 
-MemoryIndexer::MemoryIndexer(const String &index_dir,
-                             const String &base_name,
-                             RowID base_row_id,
-                             optionflag_t flag,
-                             const String &analyzer,
-                             ThreadPool &inverting_thread_pool,
-                             ThreadPool &commiting_thread_pool)
+MemoryIndexer::MemoryIndexer(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag, const String &analyzer)
     : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), analyzer_(analyzer),
-      inverting_thread_pool_(inverting_thread_pool), commiting_thread_pool_(commiting_thread_pool), ring_inverted_(15UL), ring_sorted_(13UL) {
+      inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
+      commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_inverted_(15UL), ring_sorted_(13UL) {
     posting_table_ = MakeShared<PostingTable>();
     prepared_posting_ = MakeShared<PostingWriter>(PostingFormatOption(flag_), column_lengths_);
     Path path = Path(index_dir) / (base_name + ".tmp.merge");

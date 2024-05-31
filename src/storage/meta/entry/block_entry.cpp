@@ -124,6 +124,8 @@ void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String blo
 
 SizeT BlockEntry::row_count(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
+    if (check_ts >= max_row_ts_)
+        return row_count_;
 
     auto block_version_handle = this->block_version_->Load();
     const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());

@@ -61,7 +61,7 @@ Pair<UniquePtr<FileHandler>, Status> LocalFileSystem::OpenFile(const String &pat
     if (read_flag && write_flag) {
         file_flags = O_RDWR;
     } else if (read_flag) {
-        file_flags = O_RDONLY;
+        file_flags = O_RDONLY | O_NOATIME;
     } else if (write_flag) {
         file_flags = O_WRONLY;
     } else {
@@ -369,7 +369,7 @@ int LocalFileSystem::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &dat
     long len_f = fs::file_size(file_path);
     if (len_f == 0)
         return -1;
-    int f = open(file_path.c_str(), O_RDONLY);
+    int f = open(file_path.c_str(), O_RDONLY | O_NOATIME);
     void *tmpd = mmap(NULL, len_f, PROT_READ, MAP_SHARED, f, 0);
     if (tmpd == MAP_FAILED)
         return -1;
