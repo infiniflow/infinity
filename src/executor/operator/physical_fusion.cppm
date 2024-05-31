@@ -82,4 +82,14 @@ private:
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_;
 };
 
+export struct MatchTensorRerankDoc {
+    RowID row_id_;
+    u64 from_input_data_block_id_;
+    u32 from_block_idx_;
+    u32 from_row_idx_;
+    float score_ = 0.0f;
+    MatchTensorRerankDoc(const RowID row_id, const u64 from_input_data_block_id, const u32 from_block_idx, const u32 from_row_idx)
+        : row_id_(row_id), from_input_data_block_id_(from_input_data_block_id), from_block_idx_(from_block_idx), from_row_idx_(from_row_idx) {}
+};
+
 } // namespace infinity
