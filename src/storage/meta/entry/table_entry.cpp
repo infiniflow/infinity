@@ -706,6 +706,9 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
         if ((i == dump_idx && segment_index_entry->MemIndexRowCount() >= infinity::InfinityContext::instance().config()->MemIndexCapacity()) ||
             (i == num_ranges - 1 && segment_entry->Room() <= 0)) {
             SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
+            String *index_name = index_base->index_name_.get();
+            String message = fmt::format("Table {}.{} index {} segment {} MemIndex dumped.", *GetDBName(), *table_name_, *index_name, seg_id);
+            LOG_INFO(message);
             if (chunk_index_entry.get() != nullptr) {
                 chunk_index_entry->Commit(txn->CommitTS());
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
@@ -747,7 +750,7 @@ void TableEntry::MemIndexCommit() {
 
 void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
-    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+    for (auto &[index_name, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
         if (!status.ok())
             continue;
@@ -791,20 +794,30 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
                 }
             }
 
-            // Insert block entries into MemIndexer
             SizeT num_ranges = append_ranges.size();
-            for (SizeT i = 0; i < num_ranges; i++) {
-                AppendRange &range = append_ranges[i];
-                segment_index_entry->MemIndexInsert(block_entries[range.block_id_],
-                                                    range.start_offset_,
-                                                    range.row_count_,
-                                                    segment_index_entry->max_ts(),
-                                                    buffer_manager);
+            if (num_ranges > 0) {
+                assert(segment_entry->Room() > 0);
+                // Insert block entries into MemIndexer
+                String message = fmt::format("Table {}.{} index {} segment {} MemIndex recovering from {} block entries.",
+                                             *GetDBName(),
+                                             *table_name_,
+                                             index_name,
+                                             segment_id,
+                                             num_ranges);
+                LOG_INFO(message);
+                for (SizeT i = 0; i < num_ranges; i++) {
+                    AppendRange &range = append_ranges[i];
+                    segment_index_entry->MemIndexInsert(block_entries[range.block_id_],
+                                                        range.start_offset_,
+                                                        range.row_count_,
+                                                        segment_index_entry->max_ts(),
+                                                        buffer_manager);
+                }
+                message = fmt::format("Table {}.{} index {} segment {} MemIndex recovered.", *GetDBName(), *table_name_, index_name, segment_id);
+                LOG_INFO(message);
             }
             if (segment_id == unsealed_id_) {
                 table_index_entry->last_segment_ = segment_index_entry;
-            } else {
-                segment_index_entry->MemIndexDump();
             }
         }
     }
