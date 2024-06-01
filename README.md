@@ -145,8 +145,8 @@ print(res)
 - [Quickstart](https://infiniflow.org/docs/dev/)
 - [Python API](https://infiniflow.org/docs/dev/python_api_reference)
 - [HTTP API](https://infiniflow.org/docs/dev/http_api_reference)
-- [Reference](https://ragflow.io/docs/dev/category/references)
-- [FAQ](https://ragflow.io/docs/dev/faq)
+- [References](https://infiniflow.org/docs/dev/category/references)
+- [FAQ](https://infiniflow.org/docs/dev/FAQ)
 
 ## 📜 Roadmap
 
