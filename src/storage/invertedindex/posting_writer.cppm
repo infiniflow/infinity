@@ -17,7 +17,7 @@ import vector_with_lock;
 namespace infinity {
 export class PostingWriter {
 public:
-    PostingWriter(PostingFormatOption posting_option, VectorWithLock<u32> &column_lengths);
+    PostingWriter(const PostingFormat &posting_format, VectorWithLock<u32> &column_lengths);
 
     ~PostingWriter();
 
@@ -48,8 +48,7 @@ public:
     u32 GetDocColumnLength(docid_t doc_id) { return column_lengths_.Get(doc_id); }
 
 private:
-    PostingFormatOption posting_option_;
-    PostingFormat *posting_format_{nullptr};
+    const PostingFormat &posting_format_;
     DocListEncoder *doc_list_encoder_{nullptr};
     PositionListEncoder *position_list_encoder_{nullptr};
     // for column length info

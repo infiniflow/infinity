@@ -26,7 +26,7 @@ namespace infinity {
 
 export class DocListFormatOption {
 public:
-    explicit DocListFormatOption(optionflag_t option_flag) { Init(option_flag); }
+    explicit DocListFormatOption(optionflag_t option_flag = OPTION_FLAG_ALL) { Init(option_flag); }
 
     ~DocListFormatOption() = default;
 
@@ -70,10 +70,14 @@ private:
 
 export class DocSkipListFormat : public PostingFields {
 public:
-    DocSkipListFormat() = default;
+    explicit DocSkipListFormat(const DocListFormatOption &option) { Init(option); }
 
     ~DocSkipListFormat() = default;
 
+    bool HasTfList() const { return has_tf_list_; }
+    bool HasBlockMax() const { return has_block_max_; }
+
+private:
     void Init(const DocListFormatOption &option) {
         u8 row_count = 0;
         u32 offset = 0;
@@ -121,9 +125,6 @@ public:
         }
     }
 
-    bool HasTfList() const { return has_tf_list_; }
-    bool HasBlockMax() const { return has_block_max_; }
-
 private:
     bool has_tf_list_ = false;
     bool has_block_max_ = false;
@@ -131,8 +132,7 @@ private:
 
 export class DocListFormat : public PostingFields {
 public:
-    DocListFormat(const DocListFormatOption &option) : skiplist_format_(nullptr) { Init(option); }
-    DocListFormat() : skiplist_format_(nullptr) {}
+    explicit DocListFormat(const DocListFormatOption &option) : option_(option), skiplist_format_(nullptr) { Init(option_); }
 
     ~DocListFormat() {
         if (skiplist_format_) {
@@ -141,6 +141,10 @@ public:
         }
     };
 
+    const DocSkipListFormat *GetDocSkipListFormat() const { return skiplist_format_; }
+    const DocListFormatOption GetOption() const { return option_; }
+
+private:
     void Init(const DocListFormatOption &option) {
         u8 row_count = 0;
         u32 offset = 0;
@@ -166,11 +170,15 @@ public:
             doc_payload_value->offset_ = offset;
             values_.push_back(doc_payload_value);
         }
-        skiplist_format_ = new DocSkipListFormat;
-        skiplist_format_->Init(option);
+        if (skiplist_format_) {
+            delete skiplist_format_;
+            skiplist_format_ = nullptr;
+        }
+        skiplist_format_ = new DocSkipListFormat(option);
     }
 
-    const DocSkipListFormat *GetDocSkipListFormat() const { return skiplist_format_; }
+public:
+    const DocListFormatOption option_{OPTION_FLAG_ALL};
 
 private:
     DocSkipListFormat *skiplist_format_;

@@ -17,17 +17,17 @@ RUN apt install -y wget curl emacs-nox vim git build-essential ninja-build bison
 RUN apt install -y liblz4-dev zlib1g-dev libboost1.81-dev liburing-dev libgflags-dev libevent-dev libjemalloc-dev
 
 # CMake 3.28+ is requrired for C++20 modules.
-# download https://github.com/Kitware/CMake/releases/download/v3.29.2/cmake-3.29.2-linux-x86_64.tar.gz
-RUN --mount=type=bind,source=cmake-3.29.2-linux-x86_64.tar.gz,target=/root/cmake-3.29.2-linux-x86_64.tar.gz \
-    cd /root && tar xzf cmake-3.29.2-linux-x86_64.tar.gz && cp -rf cmake-3.29.2-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.29.2-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.29.2-linux-x86_64
+# download https://github.com/Kitware/CMake/releases/download/v3.29.3/cmake-3.29.3-linux-x86_64.tar.gz
+RUN --mount=type=bind,source=cmake-3.29.3-linux-x86_64.tar.gz,target=/root/cmake-3.29.3-linux-x86_64.tar.gz \
+    cd /root && tar xzf cmake-3.29.3-linux-x86_64.tar.gz && cp -rf cmake-3.29.3-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.29.3-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.29.3-linux-x86_64
 
 # download https://github.com/gperftools/gperftools/releases/download/gperftools-2.15/gperftools-2.15.tar.gz
 RUN --mount=type=bind,source=gperftools-2.15.tar.gz,target=/root/gperftools-2.15.tar.gz \
     cd /root && tar xzf gperftools-2.15.tar.gz && cd gperftools-2.15 && ./configure && make -j 8 && make install && rm -fr /root/gperftools-2.15
 
-# download https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.20.1/sqllogictest-bin-v0.20.1-x86_64-unknown-linux-musl.tar.gz
-RUN --mount=type=bind,source=sqllogictest-bin-v0.20.1-x86_64-unknown-linux-musl.tar.gz,target=/root/sqllogictest-bin-v0.20.1-x86_64-unknown-linux-musl.tar.gz \
-    cd /tmp && tar xzf /root/sqllogictest-bin-v0.20.1-x86_64-unknown-linux-musl.tar.gz && cp -rf sqllogictest /usr/local/bin && rm -fr /tmp/*
+# download https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.20.2/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz
+RUN --mount=type=bind,source=sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz,target=/root/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz \
+    cd /tmp && tar xzf /root/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz && cp -rf sqllogictest /usr/local/bin && rm -fr /tmp/*
 
 # Create a python virtual environment. Set PATH so that the shell activate this virtual environment automatically when entering a container from this image.
 RUN python3 -m venv /usr/local/venv

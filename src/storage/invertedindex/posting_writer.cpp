@@ -18,18 +18,15 @@ module posting_writer;
 
 namespace infinity {
 
-PostingWriter::PostingWriter(PostingFormatOption posting_option, VectorWithLock<u32> &column_lengths)
-    : posting_option_(posting_option), posting_format_(new PostingFormat(posting_option)), column_lengths_(column_lengths) {
-    if (posting_option.HasPositionList()) {
-        position_list_encoder_ = new PositionListEncoder(posting_option_, posting_format_->GetPositionListFormat());
+PostingWriter::PostingWriter(const PostingFormat &posting_format, VectorWithLock<u32> &column_lengths)
+    : posting_format_(posting_format), column_lengths_(column_lengths) {
+    if (posting_format.GetOption().HasPositionList()) {
+        position_list_encoder_ = new PositionListEncoder(posting_format.GetOption(), posting_format.GetPositionListFormat());
     }
-    doc_list_encoder_ = new DocListEncoder(posting_option_.GetDocListFormatOption(), posting_format_->GetDocListFormat());
+    doc_list_encoder_ = new DocListEncoder(posting_format.GetDocListFormat());
 }
 
 PostingWriter::~PostingWriter() {
-    if (posting_format_) {
-        delete posting_format_;
-    }
     if (position_list_encoder_) {
         delete position_list_encoder_;
     }

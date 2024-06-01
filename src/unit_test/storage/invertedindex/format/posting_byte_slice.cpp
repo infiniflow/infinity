@@ -16,8 +16,7 @@ public:
     ~PostingByteSliceTest() {}
     void SetUp() override {
         DocListFormatOption option(NO_TERM_FREQUENCY);
-        doc_list_format_.reset(new DocListFormat());
-        doc_list_format_->Init(option);
+        doc_list_format_.reset(new DocListFormat(option));
         posting_byte_slice_.reset(new PostingByteSlice());
         posting_byte_slice_->Init(doc_list_format_.get());
     }

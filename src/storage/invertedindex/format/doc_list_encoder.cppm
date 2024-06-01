@@ -6,9 +6,9 @@ import file_writer;
 import file_reader;
 import posting_byte_slice;
 import skiplist_writer;
-import doc_list_format_option;
 import inmem_doc_list_decoder;
 import index_defines;
+import doc_list_format_option;
 
 export module doc_list_encoder;
 
@@ -16,8 +16,7 @@ namespace infinity {
 
 export class DocListEncoder {
 public:
-    DocListEncoder(const DocListFormatOption &format_option,
-                   DocListFormat *doc_list_format = nullptr);
+    DocListEncoder(const DocListFormat *doc_list_format);
 
     ~DocListEncoder();
 
@@ -64,8 +63,7 @@ private:
 private:
     PostingByteSlice doc_list_buffer_;
     bool own_doc_list_format_;
-    DocListFormatOption format_option_;
-    DocListFormat *doc_list_format_;
+    const DocListFormat *doc_list_format_;
 
     docid_t last_doc_id_;
     docpayload_t last_doc_payload_;

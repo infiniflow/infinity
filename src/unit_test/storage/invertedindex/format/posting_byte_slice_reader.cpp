@@ -17,8 +17,7 @@ public:
 
     void SetUp() override {
         DocListFormatOption option(NO_TERM_FREQUENCY);
-        doc_list_format_.reset(new DocListFormat());
-        doc_list_format_->Init(option);
+        doc_list_format_.reset(new DocListFormat(option));
         posting_byte_slice_.reset(new PostingByteSlice());
         posting_byte_slice_->Init(doc_list_format_.get());
     }
@@ -109,8 +108,7 @@ protected:
 TEST_F(PostingByteSliceReaderTest, test1) {
     using namespace infinity;
     DocListFormatOption option(of_none);
-    DocListFormat doc_list_format;
-    doc_list_format.Init(option);
+    DocListFormat doc_list_format(option);
     {
         // empty posting buffer
         PostingByteSlice posting_buffer;

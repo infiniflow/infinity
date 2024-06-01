@@ -71,11 +71,11 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
 MemoryIndexer::PostingTable::PostingTable() {}
 
 MemoryIndexer::MemoryIndexer(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag, const String &analyzer)
-    : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), analyzer_(analyzer),
-      inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
+    : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), posting_format_(PostingFormatOption(flag_)),
+      analyzer_(analyzer), inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
       commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_inverted_(15UL), ring_sorted_(13UL) {
     posting_table_ = MakeShared<PostingTable>();
-    prepared_posting_ = MakeShared<PostingWriter>(PostingFormatOption(flag_), column_lengths_);
+    prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
     Path path = Path(index_dir) / (base_name + ".tmp.merge");
     spill_full_path_ = path.string();
 }
@@ -351,7 +351,7 @@ SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
     PostingPtr posting;
     bool found = posting_store.GetOrAdd(term, posting, prepared_posting_);
     if (!found) {
-        prepared_posting_ = MakeShared<PostingWriter>(PostingFormatOption(flag_), column_lengths_);
+        prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
     }
     return posting;
 }
@@ -438,7 +438,7 @@ void MemoryIndexer::OfflineDump() {
                 term_meta_dumpler.Dump(dict_file_writer, term_meta);
                 fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
             }
-            posting = MakeUnique<PostingWriter>(PostingFormatOption(flag_), column_lengths_);
+            posting = MakeUnique<PostingWriter>(posting_format_, column_lengths_);
             last_term_str = String(term);
             last_term = std::string_view(last_term_str);
             last_doc_id = INVALID_DOCID;

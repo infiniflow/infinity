@@ -31,6 +31,7 @@ import internal_types;
 import map_with_lock;
 import vector_with_lock;
 import buf_writer;
+import posting_list_format;
 
 namespace infinity {
 
@@ -118,6 +119,7 @@ private:
     String base_name_;
     RowID base_row_id_{INVALID_ROWID};
     optionflag_t flag_;
+    PostingFormat posting_format_;
     String analyzer_;
     ThreadPool &inverting_thread_pool_;
     ThreadPool &commiting_thread_pool_;

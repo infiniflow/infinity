@@ -9,32 +9,22 @@ import file_reader;
 import posting_byte_slice;
 import skiplist_writer;
 import skiplist_reader;
-import doc_list_format_option;
 import inmem_doc_list_decoder;
 import index_defines;
 import vbyte_compressor;
 import logger;
+import doc_list_format_option;
 
 namespace infinity {
 
-DocListEncoder::DocListEncoder(const DocListFormatOption &format_option, DocListFormat *doc_list_format)
-    : doc_list_buffer_(), own_doc_list_format_(false), format_option_(format_option), doc_list_format_(doc_list_format), last_doc_id_(0),
-      current_tf_(0), total_tf_(0), df_(0), doc_skiplist_writer_(nullptr) {
-    if (!doc_list_format) {
-        doc_list_format_ = new DocListFormat;
-        doc_list_format_->Init(format_option);
-        own_doc_list_format_ = true;
-    }
+DocListEncoder::DocListEncoder(const DocListFormat *doc_list_format)
+    : doc_list_buffer_(), doc_list_format_(doc_list_format), last_doc_id_(0), current_tf_(0), total_tf_(0), df_(0), doc_skiplist_writer_(nullptr) {
+    assert(doc_list_format != nullptr);
     doc_list_buffer_.Init(doc_list_format_);
     CreateDocSkipListWriter();
 }
 
-DocListEncoder::~DocListEncoder() {
-    if (own_doc_list_format_) {
-        delete doc_list_format_;
-        doc_list_format_ = nullptr;
-    }
-}
+DocListEncoder::~DocListEncoder() {}
 
 void DocListEncoder::AddPosition() {
     current_tf_++;
@@ -57,10 +47,10 @@ void DocListEncoder::Flush() {
 void DocListEncoder::AddDocument(docid_t doc_id, docpayload_t doc_payload, tf_t tf, u32 doc_len) {
     doc_list_buffer_.PushBack(0, doc_id - last_doc_id_);
     int n = 1;
-    if (format_option_.HasTfList()) {
+    if (doc_list_format_->GetOption().HasTfList()) {
         doc_list_buffer_.PushBack(n++, tf);
     }
-    if (format_option_.HasDocPayload()) {
+    if (doc_list_format_->GetOption().HasDocPayload()) {
         doc_list_buffer_.PushBack(n++, doc_payload);
     }
     doc_list_buffer_.EndPushBack();
@@ -163,14 +153,14 @@ InMemDocListDecoder *DocListEncoder::GetInMemDocListDecoder() const {
     df_t df = df_;
     SkipListReaderPostingByteSlice *skiplist_reader = nullptr;
     if (doc_skiplist_writer_) {
-        skiplist_reader = new SkipListReaderPostingByteSlice(format_option_);
+        skiplist_reader = new SkipListReaderPostingByteSlice(doc_list_format_->GetOption());
         skiplist_reader->Load(doc_skiplist_writer_.get());
     }
 
     PostingByteSlice *doc_list_buffer = new PostingByteSlice();
     doc_list_buffer_.SnapShot(doc_list_buffer);
 
-    InMemDocListDecoder *decoder = new InMemDocListDecoder(format_option_);
+    InMemDocListDecoder *decoder = new InMemDocListDecoder(doc_list_format_->GetOption());
     decoder->Init(df, skiplist_reader, doc_list_buffer);
 
     return decoder;
