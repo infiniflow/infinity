@@ -124,6 +124,7 @@ export enum class ErrorCode : long {
     kInvalidAnalyzerName = 3079,
     kInvalidAnalyzerFile = 3080,
     kInvalidExplainType = 3081,
+    kChunkNotExist = 3082,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -258,14 +259,15 @@ public:
     static Status InvalidJsonFormat(const String& invalid_json);
     static Status DuplicateColumnName(const String& column_name);
     static Status InvalidExpression(const String& expr_str);
-    static Status SegmentNotExist(const SegmentID &segment_id);
-    static Status BlockNotExist(const BlockID &block_id);
+    static Status SegmentNotExist(SegmentID segment_id);
+    static Status BlockNotExist(BlockID block_id);
     static Status AggregateFunctionWithEmptyArgs();
     static Status InvalidCommand(const String& detailed_error);
     static Status AnalyzerNotFound(const String& name);
     static Status NotSupportedAnalyzer(const String& name);
     static Status InvalidAnalyzerName(const String& name);
     static Status InvalidAnalyzerFile(const String& detailed_info);
+    static Status ChunkNotExist(ChunkID chunk_id);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);

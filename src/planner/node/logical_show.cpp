@@ -36,6 +36,8 @@ String ToString(ShowType type) {
             return "Show index";
         case ShowType::kShowIndexSegment:
             return "Show index segment";
+        case ShowType::kShowIndexChunk:
+            return "Show index chunk";
         case ShowType::kShowTables:
             return "Show tables";
         case ShowType::kShowViews:

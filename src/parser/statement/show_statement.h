@@ -42,6 +42,7 @@ enum class ShowStmtType {
     kGlobalVariables,
     kConfig,
     kIndexSegment,
+    kIndexChunk,
 };
 
 class ShowStatement : public BaseStatement {
@@ -56,6 +57,7 @@ public:
     std::optional<std::string> index_name_{};
     std::optional<int64_t> segment_id_{};
     std::optional<int64_t> block_id_{};
+    std::optional<int64_t> chunk_id_{};
     std::optional<u_int64_t> column_id_{};
     std::string var_name_{};
 };

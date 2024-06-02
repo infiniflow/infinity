@@ -42,13 +42,14 @@ public:
                           String db_name,
                           String object_name,
                           u64 table_index,
-                          Optional<u32> segment_id,
-                          Optional<u16> block_id,
-                          Optional<u32> column_id,
+                          Optional<SegmentID> segment_id,
+                          Optional<BlockID> block_id,
+                          Optional<ChunkID> chunk_id,
+                          Optional<ColumnID> column_id,
                           Optional<String> index_name,
                           SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), scan_type_(type), db_name_(std::move(db_name)),
-          object_name_(std::move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id), column_id_(column_id),
+          object_name_(std::move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id),
           index_name_(index_name) {}
 
     ~PhysicalShow() override = default;
@@ -86,6 +87,8 @@ private:
     void ExecuteShowIndex(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowIndexSegment(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowIndexChunk(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState *operator_state);
 
@@ -127,9 +130,10 @@ private:
     String object_name_{};
     u64 table_index_{};
 
-    Optional<u32> segment_id_{};
-    Optional<u16> block_id_{};
-    Optional<u64> column_id_{};
+    Optional<SegmentID> segment_id_{};
+    Optional<BlockID> block_id_{};
+    Optional<ChunkID> chunk_id_{};
+    Optional<ColumnID> column_id_{};
     Optional<String> index_name_{};
 
     SharedPtr<Vector<String>> output_names_{};

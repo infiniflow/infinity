@@ -363,10 +363,11 @@ Status Status::DuplicateColumnName(const String &column_name) {
 
 Status Status::InvalidExpression(const String &expr_str) { return Status(ErrorCode::kInvalidExpression, MakeUnique<String>(expr_str)); }
 
-Status Status::SegmentNotExist(const SegmentID &segment_id) {
+Status Status::SegmentNotExist(SegmentID segment_id) {
     return Status(ErrorCode::kSegmentNotExist, MakeUnique<String>(fmt::format("Segment: {} doesn't exist", segment_id)));
 }
-Status Status::BlockNotExist(const BlockID &block_id) {
+
+Status Status::BlockNotExist(BlockID block_id) {
     return Status(ErrorCode::kBlockNotExist, MakeUnique<String>(fmt::format("Block: {} doesn't exist", block_id)));
 }
 
@@ -392,6 +393,10 @@ Status Status::InvalidAnalyzerName(const String& name) {
 
 Status Status::InvalidAnalyzerFile(const String& detailed_info) {
     return Status(ErrorCode::kInvalidAnalyzerName, MakeUnique<String>(fmt::format("Invalid analyzer file path: {}", detailed_info)));
+}
+
+Status Status::ChunkNotExist(ChunkID chunk_id) {
+    return Status(ErrorCode::kChunkNotExist, MakeUnique<String>(fmt::format("Index chunk: {} doesn't exist", chunk_id)));
 }
 
 // 4. TXN fail

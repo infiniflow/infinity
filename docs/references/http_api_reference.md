@@ -500,6 +500,76 @@ curl --request GET \
 }
 ```
 
+## Show index segment
+
+Show detailed information of a specified index segment.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code":0,
+    "chunk_count":"1",
+    "index_segment_size":"290.41MB",
+    "segment_id":"0",
+    "storage_path":"/var/infinity/data/XScyuGgMEf_db_default_db/X7Ilrg2jG1_table_sift_benchmark/gWao7rl6u4_index_hnsw_index"
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 3018,
+    "error_message": "Index {index_name} doesn't exist in {table_name}."
+}
+```
+
+## Show index chunk
+
+Show detailed information of a index chunk of specified index chunk.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code":0,
+    "deprecate_timestamp":"18446744073709551615",
+    "file_name":"",
+    "row_count":"1000000",
+    "start_row":"0"
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 3018,
+    "error_message": "Index {index_name} doesn't exist in {table_name}."
+}
+```
+
 ## List indexes
 
 Lists all indexes of a specified table.
