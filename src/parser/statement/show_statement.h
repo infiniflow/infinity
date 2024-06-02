@@ -41,6 +41,7 @@ enum class ShowStmtType {
     kGlobalVariable,
     kGlobalVariables,
     kConfig,
+    kIndexSegment,
 };
 
 class ShowStatement : public BaseStatement {

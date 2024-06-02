@@ -1727,6 +1727,22 @@ show_statement: SHOW DATABASES {
     $$->index_name_ = $5;
     free($5);
 };
+| SHOW TABLE table_name INDEX IDENTIFIER SEGMENT LONG_VALUE {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kIndexSegment;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
+
+    $$->index_name_ = $5;
+    free($5);
+
+    $$->segment_id_ = $7;
+};
 
 /*
  * FLUSH STATEMENT

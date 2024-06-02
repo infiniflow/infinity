@@ -509,6 +509,19 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(index_name));
             break;
         }
+        case ShowStmtType::kIndexSegment: {
+            result->emplace_back(MakeShared<String>("SHOW INDEX SEGMENT: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String index_name = String(intent_size, ' ') + "index: " + show_statement->index_name_.value();
+            result->emplace_back(MakeShared<String>(index_name));
+            String index_segment = String(intent_size, ' ') + "index: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(index_segment));
+            break;
+        }
         case ShowStmtType::kColumns: {
             result->emplace_back(MakeShared<String>("SHOW COLUMNS: "));
             intent_size += 2;
@@ -539,22 +552,61 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
         }
         case ShowStmtType::kSegments: {
             result->emplace_back(MakeShared<String>("SHOW SEGMENTS: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
             break;
         }
         case ShowStmtType::kSegment: {
             result->emplace_back(MakeShared<String>("SHOW SEGMENT: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String segment_info = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(segment_info));
             break;
         }
         case ShowStmtType::kBlocks: {
             result->emplace_back(MakeShared<String>("SHOW BLOCKS: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String segment_info = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(segment_info));
             break;
         }
         case ShowStmtType::kBlock: {
             result->emplace_back(MakeShared<String>("SHOW BLOCK: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String segment_info = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(segment_info));
+            String block_info = String(intent_size, ' ') + "block: " + std::to_string(show_statement->block_id_.value());
+            result->emplace_back(MakeShared<String>(block_info));
             break;
         }
         case ShowStmtType::kBlockColumn: {
             result->emplace_back(MakeShared<String>("SHOW BLOCK COLUMN: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String segment_info = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(segment_info));
+            String block_info = String(intent_size, ' ') + "block: " + std::to_string(show_statement->block_id_.value());
+            result->emplace_back(MakeShared<String>(block_info));
+            String column_info = String(intent_size, ' ') + "column: " + std::to_string(show_statement->column_id_.value());
+            result->emplace_back(MakeShared<String>(column_info));
             break;
         }
         case ShowStmtType::kIndexes: {
@@ -562,6 +614,8 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
             break;
         }
         case ShowStmtType::kConfigs: {

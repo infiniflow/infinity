@@ -30,6 +30,7 @@ export enum class ShowType {
     kShowDatabase,
     kShowTable,
     kShowIndex,
+    kShowIndexSegment,
     kShowDatabases,
     kShowTables,
     kShowViews,
