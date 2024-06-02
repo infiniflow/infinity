@@ -1471,6 +1471,86 @@ public:
     }
 };
 
+class ShowTableIndexSegmentHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto index_name = request->getPathVariable("index_name");
+        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+
+        auto result = infinity->ShowIndexSegment(database_name, table_name, index_name, segment_id);
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        if (result.IsOk()) {
+
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                auto row_count = data_block->row_count();
+                for (int row = 0; row < row_count; ++row) {
+                    auto field_name = data_block->GetValue(0, row).ToString();
+                    auto field_value = data_block->GetValue(1, row).ToString();
+                    json_response[field_name] = field_value;
+                }
+            }
+
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowTableIndexChunkHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto index_name = request->getPathVariable("index_name");
+        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+        auto chunk_id = std::strtoll(request->getPathVariable("chunk_id").get()->c_str(), nullptr, 0);
+        auto result = infinity->ShowIndexChunk(database_name, table_name, index_name, segment_id, chunk_id);
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        if (result.IsOk()) {
+
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                auto row_count = data_block->row_count();
+                for (int row = 0; row < row_count; ++row) {
+                    auto field_name = data_block->GetValue(0, row).ToString();
+                    auto field_value = data_block->GetValue(1, row).ToString();
+                    json_response[field_name] = field_value;
+                }
+            }
+
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class DropIndexHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -2164,6 +2244,8 @@ void HTTPServer::Start(u16 port) {
     // index
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", MakeShared<ListTableIndexesHandler>());
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<ShowTableIndexDetailHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}", MakeShared<ShowTableIndexSegmentHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id}", MakeShared<ShowTableIndexChunkHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<DropIndexHandler>());
     router->route("POST", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<CreateIndexHandler>());
 
