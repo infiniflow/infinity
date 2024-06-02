@@ -518,10 +518,26 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(table_name));
             String index_name = String(intent_size, ' ') + "index: " + show_statement->index_name_.value();
             result->emplace_back(MakeShared<String>(index_name));
-            String index_segment = String(intent_size, ' ') + "index: " + std::to_string(show_statement->segment_id_.value());
+            String index_segment = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
             result->emplace_back(MakeShared<String>(index_segment));
             break;
         }
+        case ShowStmtType::kIndexChunk: {
+            result->emplace_back(MakeShared<String>("SHOW INDEX CHUNK: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String index_name = String(intent_size, ' ') + "index: " + show_statement->index_name_.value();
+            result->emplace_back(MakeShared<String>(index_name));
+            String index_segment = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(index_segment));
+            String index_chunk = String(intent_size, ' ') + "chunk: " + std::to_string(show_statement->chunk_id_.value());
+            result->emplace_back(MakeShared<String>(index_chunk));
+            break;
+        }
+
         case ShowStmtType::kColumns: {
             result->emplace_back(MakeShared<String>("SHOW COLUMNS: "));
             intent_size += 2;

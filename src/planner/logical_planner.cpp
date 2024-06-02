@@ -1040,6 +1040,9 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kIndexSegment: {
             return BuildShowIndexSegment(statement, bind_context_ptr);
         }
+        case ShowStmtType::kIndexChunk: {
+            return BuildShowIndexChunk(statement, bind_context_ptr);
+        }
         case ShowStmtType::kDatabases: {
             return BuildShowDatabases(statement, bind_context_ptr);
         }
@@ -1259,6 +1262,7 @@ Status LogicalPlanner::BuildShowIndex(const ShowStatement *statement, SharedPtr<
                                                                   None,
                                                                   None,
                                                                   None,
+                                                                  None,
                                                                   statement->index_name_);
     this->logical_plan_ = logical_show;
     return Status::OK();
@@ -1272,6 +1276,22 @@ Status LogicalPlanner::BuildShowIndexSegment(const ShowStatement *statement, Sha
                                                                   bind_context_ptr->GenerateTableIndex(),
                                                                   statement->segment_id_,
                                                                   None,
+                                                                  None,
+                                                                  None,
+                                                                  statement->index_name_);
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowIndexChunk(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowIndexChunk,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_,
+                                                                  None,
+                                                                  statement->chunk_id_,
                                                                   None,
                                                                   statement->index_name_);
     this->logical_plan_ = logical_show;

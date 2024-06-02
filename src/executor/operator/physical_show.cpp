@@ -64,6 +64,7 @@ import catalog;
 import txn_manager;
 import wal_manager;
 import logger;
+import chunk_index_entry;
 
 namespace infinity {
 
@@ -103,6 +104,15 @@ void PhysicalShow::Init() {
             break;
         }
         case ShowType::kShowIndexSegment: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("name");
+            output_types_->emplace_back(varchar_type);
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowType::kShowIndexChunk: {
             output_names_->reserve(2);
             output_types_->reserve(2);
             output_names_->emplace_back("name");
@@ -391,6 +401,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowIndexSegment: {
             ExecuteShowIndexSegment(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowIndexChunk: {
+            ExecuteShowIndexChunk(query_context, show_operator_state);
             break;
         }
         case ShowType::kShowDatabases: {
@@ -897,7 +911,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     {
         SizeT column_id = 0;
         {
-            Value value = Value::MakeVarchar("segment id");
+            Value value = Value::MakeVarchar("segment_id");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1001,6 +1015,153 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     show_operator_state->output_.emplace_back(std::move(output_block_ptr));
 }
 
+void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperatorState *show_operator_state) {
+    // Define output table detailed info
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+
+    // Get tables from catalog
+    Txn *txn = query_context->GetTxn();
+
+    auto [table_entry, status1] = txn->GetTableByName(db_name_, object_name_);
+    if (!status1.ok()) {
+        LOG_ERROR(status1.message());
+        RecoverableError(status1);
+        return;
+    }
+
+    auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, object_name_, index_name_.value());
+    if (!status2.ok()) {
+        LOG_ERROR(status2.message());
+        RecoverableError(status2);
+        return;
+    }
+
+    Map<SegmentID, SharedPtr<SegmentIndexEntry>> segment_map = table_index_entry->GetIndexBySegmentSnapshot(table_entry, txn);
+    auto iter = segment_map.find(segment_id_.value());
+    if(iter == segment_map.end()) {
+        show_operator_state->status_ = Status::SegmentNotExist(segment_id_.value());
+        LOG_ERROR(show_operator_state->status_.message());
+        RecoverableError(show_operator_state->status_);
+    }
+
+    SegmentIndexEntry* segment_index_entry = iter->second.get();
+    IndexBase* index_base = table_index_entry->table_index_def().get();
+    String index_type_name = IndexInfo::IndexTypeToString(index_base->index_type_);
+
+    Vector<SharedPtr<ChunkIndexEntry>> chunk_indexes;
+    switch(index_base->index_type_) {
+        case IndexType::kIVFFlat: {
+            Status status3 = Status::InvalidIndexName(index_type_name);
+            show_operator_state->status_ = status3;
+            LOG_ERROR(fmt::format("{} isn't implemented.", index_type_name));
+            RecoverableError(status3);
+            break;
+        }
+        case IndexType::kHnsw: {
+            auto [chunk_index_entries, _] = segment_index_entry->GetHnswIndexSnapshot();
+            chunk_indexes = chunk_index_entries;
+            break;
+        }
+        case IndexType::kFullText: {
+            auto [chunk_index_entries, _] = segment_index_entry->GetFullTextIndexSnapshot();
+            chunk_indexes = chunk_index_entries;
+            break;
+        }
+        case IndexType::kSecondary: {
+            auto [chunk_index_entries, _] = segment_index_entry->GetSecondaryIndexSnapshot();
+            chunk_indexes = chunk_index_entries;
+            break;
+        }
+        case IndexType::kInvalid: {
+            Status status3 = Status::InvalidIndexName(index_type_name);
+            LOG_ERROR(fmt::format("{} is invalid.", index_type_name));
+            RecoverableError(status3);
+            break;
+        }
+    }
+
+    ChunkID chunk_id = chunk_id_.value();
+    if(chunk_id >= chunk_indexes.size()) {
+        show_operator_state->status_ = Status::ChunkNotExist(chunk_id);
+        LOG_ERROR(show_operator_state->status_.message());
+        RecoverableError(show_operator_state->status_);
+    }
+
+    ChunkIndexEntry* chunk_index_entry = chunk_indexes[chunk_id].get();
+
+    // Prepare the output data block
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
+
+    output_block_ptr->Init(column_types);
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("file_name");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(chunk_index_entry->base_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("start_row");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(chunk_index_entry->base_rowid_.ToString());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("row_count");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(chunk_index_entry->row_count_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("deprecate_timestamp");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(chunk_index_entry->deprecate_ts_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    show_operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
 
 /**
  * @brief Execute show table

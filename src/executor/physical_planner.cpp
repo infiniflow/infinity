@@ -858,6 +858,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildShow(const SharedPtr<LogicalNo
                                     logical_show->table_index(),
                                     logical_show->segment_id(),
                                     logical_show->block_id(),
+                                    logical_show->chunk_id(),
                                     logical_show->column_id(),
                                     logical_show->index_name(),
                                     logical_operator->load_metas());
