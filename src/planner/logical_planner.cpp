@@ -1037,6 +1037,9 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kIndex: {
             return BuildShowIndex(statement, bind_context_ptr);
         }
+        case ShowStmtType::kIndexSegment: {
+            return BuildShowIndexSegment(statement, bind_context_ptr);
+        }
         case ShowStmtType::kDatabases: {
             return BuildShowDatabases(statement, bind_context_ptr);
         }
@@ -1254,6 +1257,20 @@ Status LogicalPlanner::BuildShowIndex(const ShowStatement *statement, SharedPtr<
                                                                   statement->table_name_,
                                                                   bind_context_ptr->GenerateTableIndex(),
                                                                   None,
+                                                                  None,
+                                                                  None,
+                                                                  statement->index_name_);
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowIndexSegment(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowIndexSegment,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  statement->segment_id_,
                                                                   None,
                                                                   None,
                                                                   statement->index_name_);

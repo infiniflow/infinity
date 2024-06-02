@@ -120,6 +120,8 @@ public:
 
     QueryResult ShowIndex(const String &db_name, const String &table_name, const String &index_name);
 
+    QueryResult ShowIndexSegment(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+
     QueryResult ShowSegment(const String &db_name, const String &table_name, const SegmentID &segment_id);
 
     QueryResult ShowSegments(const String &db_name, const String &table_name);
