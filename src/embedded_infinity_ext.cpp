@@ -25,6 +25,9 @@ import table_def;
 import wrap_infinity;
 import logical_type;
 import constant_expr;
+import embedding_info;
+import statement_common;
+
 
 class SayHello {
 public:
@@ -112,7 +115,8 @@ NB_MODULE(embedded_infinity_ext, m) {
 
     nb::class_<WrapDataType>(m, "WrapDataType")
         .def(nb::init<>())
-        .def_rw("logical_type", &WrapDataType::logical_type);
+        .def_rw("logical_type", &WrapDataType::logical_type)
+        .def_rw("embedding_type", &WrapDataType::embedding_type);
 
     nb::class_<WrapConstantExpr>(m, "WrapConstantExpr")
         .def(nb::init<>())
@@ -131,6 +135,17 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("column_name", &WrapColumnDef::column_name)
         .def_rw("constraints", &WrapColumnDef::constraints)
         .def_rw("constant_expr", &WrapColumnDef::constant_expr);
+
+    nb::class_<WrapEmbeddingType>(m, "WrapEmbeddingType")
+        .def(nb::init<>())
+        .def_rw("element_type", &WrapEmbeddingType::element_type)
+        .def_rw("dimension", &WrapEmbeddingType::dimension);
+
+    nb::class_<WrapIndexInfo>(m, "WrapIndexInfo")
+        .def(nb::init<>())
+        .def_rw("index_type", &WrapIndexInfo::index_type)
+        .def_rw("column_name", &WrapIndexInfo::column_name)
+        .def_rw("index_param_list", &WrapIndexInfo::index_param_list);
 
     // infinity
     nb::class_<Infinity>(m, "Infinity")
@@ -206,6 +221,11 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kJSONL", CopyFileType::kJSONL)
         .value("kFVECS", CopyFileType::kFVECS)
         .value("kInvalid", CopyFileType::kInvalid);
+
+    nb::class_<InitParameter>(m, "InitParameter")
+        .def(nb::init<>())
+        .def_rw("param_name", &InitParameter::param_name_)
+        .def_rw("param_value", &InitParameter::param_value_);
 
     // command_statement
     nb::enum_<SetScope>(m, "SetScope")
@@ -550,6 +570,18 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kIntegerArray", LiteralType::kIntegerArray)
         .value("kDoubleArray", LiteralType::kDoubleArray)
         .value("kSubArrayArray", LiteralType::kSubArrayArray)
-        .value("kInterval", LiteralType::kInterval);
+        .value("kInterval", LiteralType::kInterval)
+        .export_values();
 
+    // embedding_info
+    nb::enum_<EmbeddingDataType>(m, "EmbeddingDataType")
+        .value("kElemBit", EmbeddingDataType::kElemBit)
+        .value("kElemInt8", EmbeddingDataType::kElemInt8)
+        .value("kElemInt16", EmbeddingDataType::kElemInt16)
+        .value("kElemInt32", EmbeddingDataType::kElemInt32)
+        .value("kElemInt64", EmbeddingDataType::kElemInt64)
+        .value("kElemFloat", EmbeddingDataType::kElemFloat)
+        .value("kElemDouble", EmbeddingDataType::kElemDouble)
+        .value("kElemInvalid", EmbeddingDataType::kElemInvalid)
+        .export_values();
 }

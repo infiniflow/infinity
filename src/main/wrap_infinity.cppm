@@ -1,5 +1,6 @@
 module;
 
+#include <cstring>
 
 export module wrap_infinity;
 
@@ -25,6 +26,9 @@ import data_type;
 import type_info;
 import logical_type;
 import constant_expr;
+import knn_expr;
+import embedding_info;
+import statement_common;
 
 // wrap Infinity function for nanobind infinity
 namespace infinity {
@@ -43,8 +47,14 @@ export struct WrapQueryResult {
     }
 };
 
+export struct WrapEmbeddingType {
+    EmbeddingDataType element_type;
+    size_t dimension;
+};
+
 export struct WrapDataType {
     LogicalType logical_type;
+    WrapEmbeddingType embedding_type;
 };
 
 export struct WrapConstantExpr {
@@ -65,6 +75,12 @@ export struct WrapColumnDef {
     WrapConstantExpr constant_expr;
 
     // ParsedExpr* default_expr;
+};
+
+export struct WrapIndexInfo {
+    IndexType index_type;
+    String column_name;
+    Vector<InitParameter> index_param_list;
 };
 
 
@@ -126,7 +142,7 @@ export WrapQueryResult WrapCreateIndex(Infinity &instance,
                                        const String &db_name,
                                        const String &table_name,
                                        const String &index_name,
-                                       Vector<IndexInfo *> *index_info_list,
+                                       Vector<WrapIndexInfo> &wrap_index_info_list,
                                        const CreateIndexOptions &create_index_options);
 
 export WrapQueryResult WrapDropIndex(Infinity &instance,

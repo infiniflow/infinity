@@ -30,8 +30,10 @@ from infinity.remote_thrift.utils import traverse_conditions, name_validity_chec
 from infinity.table import Table, ExplainType
 from infinity.common import ConflictType
 from embedded_infinity import ConflictType as LocalConflictType
+from embedded_infinity import WrapIndexInfo
 
 class LocalTable(Table, ABC):
+
     def __init__(self, conn, db_name, table_name):
         self._conn = conn
         self._db_name = db_name
@@ -59,16 +61,6 @@ class LocalTable(Table, ABC):
                      conflict_type: ConflictType = ConflictType.Error):
         index_name = index_name.strip()
 
-        index_info_list_to_use: list[ttypes.IndexInfo] = []
-
-        for index_info in index_infos:
-            index_info_to_use = ttypes.IndexInfo(column_name=index_info.column_name.strip(),
-                                                 index_type=index_info.index_type.to_ttype(),
-                                                 index_param_list=[init_param.to_ttype() for init_param in
-                                                                   index_info.params])
-
-            index_info_list_to_use.append(index_info_to_use)
-
         create_index_conflict: LocalConflictType
         if conflict_type == ConflictType.Error:
             create_index_conflict = LocalConflictType.kError
@@ -78,6 +70,16 @@ class LocalTable(Table, ABC):
             create_index_conflict = LocalConflictType.kReplace
         else:
             raise Exception(f"ERROR:3066, Invalid conflict type")
+
+        index_info_list_to_use: list[WrapIndexInfo] = []
+
+        for index_info in index_infos:
+            index_info_to_use = WrapIndexInfo()
+            index_info_to_use.index_type = index_info.index_type.to_local_type()
+            index_info_to_use.column_name = index_info.column_name.strip()
+            index_info_to_use.index_param_list = [init_param.to_local_type() for init_param in index_info.params]
+
+            index_info_list_to_use.append(index_info_to_use)
 
         res = self._conn.create_index(db_name=self._db_name,
                                       table_name=self._table_name,

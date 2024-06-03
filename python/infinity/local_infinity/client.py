@@ -75,17 +75,30 @@ class LocalInfinityClient:
         drop_table_options.conflict_type = conflict_type
         return self.convert_res(self.client.DropTable(db_name, table_name, drop_table_options))
 
+    def get_table(self, db_name: str, table_name: str):
+        return self.convert_res(self.client.GetTable(db_name, table_name))
+
     def list_tables(self, db_name: str):
         return self.convert_res(self.client.ListTables(db_name), has_table_name=True)
 
     def show_table(self, db_name: str, table_name: str):
         return self.convert_res(self.client.ShowTable(db_name, table_name))
 
+    def create_index(self, db_name: str, table_name: str, index_name: str, index_info_list: list[WrapIndexInfo], conflict_type: ConflictType = ConflictType.kError):
+        create_index_options = CreateIndexOptions()
+        create_index_options.conflict_type = conflict_type
+        return self.convert_res(self.client.CreateIndex(db_name, table_name, index_name, index_info_list, create_index_options))
+
     def show_index(self, db_name: str, table_name: str, index_name: str):
         return self.convert_res(self.client.ShowIndex(db_name, table_name, index_name))
 
     def list_indexes(self, db_name: str, table_name: str):
         return self.convert_res(self.client.ListIndex(db_name, table_name))
+
+    def drop_index(self, db_name: str, table_name: str, index_name: str, conflict_type: ConflictType = ConflictType.kError):
+        drop_index_options = DropIndexOptions()
+        drop_index_options.conflict_type = conflict_type
+        return self.convert_res(self.client.DropIndex(db_name, table_name, index_name, drop_index_options))
 
     # todo fields : list[ParsedExpr], ParsedExpr is abstract class, all sub class need to bind
     def insert(self, db_name: str, table_name: str, column_names: list[str], fields):

@@ -102,45 +102,45 @@ class TestCase(TestSdk):
             "my_table1", {"c1": {"type": "int", "constraints": ["primary key"]}}, ConflictType.Error)
         assert table_obj is not None
 
-        # res = db_obj.list_tables()
-        # assert res.error_code == ErrorCode.OK
-        # print(res)
-        #
-        # res = db_obj.drop_table("my_table1")
-        # assert res.error_code == ErrorCode.OK
+        res = db_obj.list_tables()
+        assert res.error_code == ErrorCode.OK
+        print(res)
 
-        # # index
-        # db_obj.drop_table("my_table2", ConflictType.Ignore)
-        # table_obj = db_obj.create_table(
-        #     "my_table2", {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
-        # assert table_obj is not None
-        #
-        # table_obj = db_obj.get_table("my_table2")
-        # assert table_obj
-        #
-        # res = table_obj.create_index("my_index",
-        #                              [index.IndexInfo("c1",
-        #                                               index.IndexType.IVFFlat,
-        #                                               [index.InitParameter("centroids_count", "128"),
-        #                                                index.InitParameter("metric", "l2")])], ConflictType.Error)
-        # assert res.error_code == ErrorCode.OK
-        #
-        # res = table_obj.drop_index("my_index")
-        # assert res.error_code == ErrorCode.OK
-        #
-        # res = db_obj.drop_table("my_table2")
-        # assert res.error_code == ErrorCode.OK
-        #
-        # # insert
-        # db_obj.drop_table("my_table3", ConflictType.Ignore)
-        # table_obj = db_obj.create_table(
-        #     "my_table3", {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}},
-        #     ConflictType.Error)
-        # assert table_obj is not None
-        #
-        # table_obj = db_obj.get_table("my_table3")
-        # assert table_obj
-        #
+        res = db_obj.drop_table("my_table1")
+        assert res.error_code == ErrorCode.OK
+
+        # index
+        db_obj.drop_table("my_table2", ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            "my_table2", {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
+        assert table_obj is not None
+
+        table_obj = db_obj.get_table("my_table2")
+        assert table_obj
+
+        res = table_obj.create_index("my_index",
+                                     [index.IndexInfo("c1",
+                                                      index.IndexType.IVFFlat,
+                                                      [index.InitParameter("centroids_count", "128"),
+                                                       index.InitParameter("metric", "l2")])], ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.drop_index("my_index")
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("my_table2")
+        assert res.error_code == ErrorCode.OK
+
+        # insert
+        db_obj.drop_table("my_table3", ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            "my_table3", {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}},
+            ConflictType.Error)
+        assert table_obj is not None
+
+        table_obj = db_obj.get_table("my_table3")
+        assert table_obj
+
         # res = table_obj.insert(
         #     [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
         # assert res.error_code == ErrorCode.OK
