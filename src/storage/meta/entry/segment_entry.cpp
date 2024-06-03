@@ -96,6 +96,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_en
                                                             TxnTimeStamp min_row_ts,
                                                             TxnTimeStamp max_row_ts,
                                                             TxnTimeStamp commit_ts,
+                                                            TxnTimeStamp first_delete_ts,
                                                             TxnTimeStamp deprecate_ts,
                                                             TxnTimeStamp begin_ts,
                                                             TransactionID txn_id) {
@@ -104,6 +105,7 @@ SharedPtr<SegmentEntry> SegmentEntry::NewReplaySegmentEntry(TableEntry *table_en
     segment_entry->min_row_ts_ = min_row_ts;
     segment_entry->max_row_ts_ = max_row_ts;
     segment_entry->commit_ts_ = commit_ts;
+    segment_entry->first_delete_ts_ = first_delete_ts;
     segment_entry->deprecate_ts_ = deprecate_ts;
     segment_entry->begin_ts_ = begin_ts;
     segment_entry->row_count_ = row_count;
@@ -498,6 +500,7 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
         json_res["min_row_ts"] = this->min_row_ts_;
         json_res["max_row_ts"] = std::min(this->max_row_ts_, max_commit_ts);
+        json_res["first_delete_ts"] = this->first_delete_ts_;
         json_res["deleted"] = this->deleted_;
         json_res["actual_row_count"] = this->actual_row_count_;
 
@@ -534,6 +537,9 @@ SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_
                                                                      segment_status);
     segment_entry->min_row_ts_ = segment_entry_json["min_row_ts"];
     segment_entry->max_row_ts_ = segment_entry_json["max_row_ts"];
+    if (const auto fd_iter = segment_entry_json.find("first_delete_ts"); fd_iter != segment_entry_json.end()) {
+        segment_entry->first_delete_ts_ = *fd_iter;
+    }
     segment_entry->row_count_ = segment_entry_json["row_count"];
     segment_entry->actual_row_count_ = segment_entry_json["actual_row_count"];
     segment_entry->checkpoint_row_count_ = 0;

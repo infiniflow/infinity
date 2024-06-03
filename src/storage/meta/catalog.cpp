@@ -661,6 +661,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto row_capacity = add_segment_entry_op->row_capacity_;
                 auto min_row_ts = add_segment_entry_op->min_row_ts_;
                 auto max_row_ts = add_segment_entry_op->max_row_ts_;
+                auto first_delete_ts = add_segment_entry_op->first_delete_ts_;
                 auto deprecate_ts = add_segment_entry_op->deprecate_ts_;
                 auto segment_filter_binary_data = add_segment_entry_op->segment_filter_binary_data_;
 
@@ -677,6 +678,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                          min_row_ts,
                                                                          max_row_ts,
                                                                          commit_ts,
+                                                                         first_delete_ts,
                                                                          deprecate_ts,
                                                                          begin_ts,
                                                                          txn_id);

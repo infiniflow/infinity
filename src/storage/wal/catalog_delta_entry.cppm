@@ -186,6 +186,7 @@ public:
     SizeT row_capacity_{0};
     TxnTimeStamp min_row_ts_{0};
     TxnTimeStamp max_row_ts_{0};
+    TxnTimeStamp first_delete_ts_{UNCOMMIT_TS};
     TxnTimeStamp deprecate_ts_{0};
     String segment_filter_binary_data_{};
 };

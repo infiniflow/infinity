@@ -83,6 +83,7 @@ public:
                                                          TxnTimeStamp min_row_ts,
                                                          TxnTimeStamp max_row_ts,
                                                          TxnTimeStamp commit_ts,
+                                                         TxnTimeStamp first_delete_ts,
                                                          TxnTimeStamp deprecate_ts,
                                                          TxnTimeStamp begin_ts,
                                                          TransactionID txn_id);
@@ -170,6 +171,11 @@ public:
     TxnTimeStamp max_row_ts() const {
         std::shared_lock lock(rw_locker_);
         return max_row_ts_;
+    }
+
+    TxnTimeStamp first_delete_ts() const {
+        std::shared_lock lock(rw_locker_);
+        return first_delete_ts_;
     }
 
     TxnTimeStamp deprecate_ts() const {

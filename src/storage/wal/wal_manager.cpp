@@ -730,6 +730,7 @@ WalManager::ReplaySegment(TableEntry *table_entry, const WalSegmentInfo &segment
                                                              commit_ts, /*min_row_ts*/
                                                              commit_ts, /*max_row_ts*/
                                                              commit_ts, /*commit_ts*/
+                                                             UNCOMMIT_TS /*first_delete_ts*/,
                                                              UNCOMMIT_TS /*deprecate_ts*/,
                                                              0 /*begin_ts*/, // FIXME
                                                              txn_id);
