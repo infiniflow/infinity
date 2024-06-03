@@ -24,11 +24,13 @@ import table_entry;
 import match_sparse_expression;
 import base_table_ref;
 import data_type;
+import physical_scan_base;
+import match_sparse_expr;
 
 namespace infinity {
 struct LoadMeta;
 
-export class PhysicalMergeMatchSparse final : public PhysicalOperator {
+export class PhysicalMergeMatchSparse final : public PhysicalScanBase {
 public:
     PhysicalMergeMatchSparse(u64 id,
                              UniquePtr<PhysicalOperator> left,
@@ -48,8 +50,14 @@ public:
     SizeT TaskletCount() override;
 
 private:
+    template <typename DataType>
+    void ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state, const SparseMetricType &metric_type);
+
+    template <typename DataType, template <typename, typename> typename C>
+    void ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state);
+
+private:
     u64 table_index_ = 0;
-    SharedPtr<BaseTableRef> base_table_ref_;
     SharedPtr<MatchSparseExpression> match_sparse_expr_;
 };
 

@@ -262,7 +262,7 @@ UniquePtr<OperatorState> MakeMergeKnnState(PhysicalMergeKnn *physical_merge_knn,
                                                                                         knn_expr->topn_,
                                                                                         knn_expr->embedding_data_type_,
                                                                                         knn_expr->distance_type_,
-                                                                                        physical_merge_knn->table_ref_);
+                                                                                        physical_merge_knn->base_table_ref_);
 
     return operator_state;
 }

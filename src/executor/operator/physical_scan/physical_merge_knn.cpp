@@ -119,54 +119,16 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
 
     if (merge_knn_state->input_complete_) {
         merge_knn->End(); // reorder the heap
-        BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
-
-        BlockIndex *block_index = merge_knn_data.table_ref_->block_index_.get();
-
-        u64 output_row_count{0};
         i64 result_n = std::min(merge_knn_data.topk_, merge_knn->total_count());
-        for (i64 query_idx = 0; query_idx < merge_knn_data.query_count_; ++query_idx) {
-            DataType *result_dists = merge_knn->GetDistancesByIdx(query_idx);
-            RowID *result_row_ids = merge_knn->GetIDsByIdx(query_idx);
-            for (i64 top_idx = 0; top_idx < result_n; ++top_idx) {
-                u32 segment_id = result_row_ids[top_idx].segment_id_;
-                u32 segment_offset = result_row_ids[top_idx].segment_offset_;
-                u16 block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
-                u16 block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-                // LOG_TRACE(fmt::format("Row offset: {}: {}: {}, distance: {}", segment_id, block_id, block_offset, result_dists[top_idx]));
 
-                BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-                if (block_entry == nullptr) {
-                    String error_message = fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id);
-                    LOG_CRITICAL(error_message);
-                    UnrecoverableError(error_message);
-                }
-
-                DataBlock *output_data_block = merge_knn_state->data_block_array_.back().get();
-                if (output_row_count == DEFAULT_BLOCK_CAPACITY) {
-                    output_data_block->Finalize();
-                    merge_knn_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
-                    merge_knn_state->data_block_array_.back()->Init(*GetOutputTypes());
-                    output_data_block = merge_knn_state->data_block_array_.back().get();
-                    output_row_count -= DEFAULT_BLOCK_CAPACITY;
-                }
-
-                SizeT column_n = table_ref_->column_ids_.size();
-                for (SizeT i = 0; i < column_n; ++i) {
-                    SizeT column_id = table_ref_->column_ids_[i];
-                    ColumnVector &&column_vector = block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
-                    output_data_block->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
-                }
-                output_data_block->AppendValueByPtr(column_n, (ptr_t)&result_dists[top_idx]);
-                output_data_block->AppendValueByPtr(column_n + 1, (ptr_t)&result_row_ids[top_idx]);
-                ++output_row_count;
-            }
-            // for (SizeT i = 0; i < column_n; ++i) {
-            //  LOG_TRACE(fmt::format("Output Column ID: {}, Name: {}", merge_knn_data.table_ref_->column_ids_[i], output_names_->at(i)));
-            //}
+        SizeT query_n = merge_knn_data.query_count_;
+        Vector<char *> result_dists_list;
+        Vector<RowID *> row_ids_list;
+        for (SizeT query_id = 0; query_id < query_n; ++query_id) {
+            result_dists_list.emplace_back(reinterpret_cast<char *>(merge_knn->GetDistancesByIdx(query_id)));
+            row_ids_list.emplace_back(merge_knn->GetIDsByIdx(query_id));
         }
-
-        merge_knn_state->data_block_array_.back()->Finalize();
+        this->SetOutput(result_dists_list, row_ids_list, sizeof(DataType), result_n, query_context, merge_knn_state);
         merge_knn_state->SetComplete();
     }
 }

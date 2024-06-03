@@ -35,10 +35,11 @@ import infinity_exception;
 import internal_types;
 import data_type;
 import common_query_filter;
+import physical_scan_base;
 
 namespace infinity {
 
-export class PhysicalKnnScan final : public PhysicalOperator {
+export class PhysicalKnnScan final : public PhysicalScanBase {
 public:
     explicit PhysicalKnnScan(u64 id,
                              SharedPtr<BaseTableRef> base_table_ref,
@@ -48,7 +49,7 @@ public:
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                              u64 knn_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kKnnScan, nullptr, nullptr, id, load_metas), base_table_ref_(std::move(base_table_ref)),
+        : PhysicalScanBase(id, PhysicalOperatorType::kKnnScan, nullptr, nullptr, base_table_ref, load_metas),
           knn_expression_(std::move(knn_expression)), common_query_filter_(common_query_filter), output_names_(std::move(output_names)),
           output_types_(std::move(output_types)), knn_table_index_(knn_table_index) {}
 
@@ -66,8 +67,6 @@ public:
 
     [[nodiscard]] String TableAlias() const;
 
-    BlockIndex *GetBlockIndex() const;
-
     Vector<SizeT> &ColumnIDs() const;
 
     SizeT BlockEntryCount() const;
@@ -81,8 +80,6 @@ public:
     }
 
 public:
-    SharedPtr<BaseTableRef> base_table_ref_{};
-
     SharedPtr<KnnExpression> knn_expression_{};
 
     SharedPtr<CommonQueryFilter> common_query_filter_;

@@ -74,22 +74,6 @@ public:
     MatchSparseScanFunctionData(const BlockIndex *block_index, const SharedPtr<Vector<GlobalBlockID>> &global_block_ids)
         : block_index_(block_index), global_block_ids_(global_block_ids), query_data_(DataBlock::Make()) {}
 
-    template <typename DataType, typename IndexType>
-    void Init(const MatchSparseExpression *query_expr) {
-        switch (query_expr->metric_type_) {
-            case SparseMetricType::kInnerProduct: {
-                auto merge_knn = MakeUnique<MergeKnn<DataType, CompareMin>>(query_expr->query_n_, query_expr->topn_);
-                merge_knn->Begin();
-                merge_knn_base_ = std::move(merge_knn);
-                break;
-            }
-            default: {
-                UnrecoverableError(fmt::format("SparseMetricType: {} is not supported.", (i8)query_expr->metric_type_));
-            }
-        }
-        sparse_distance_ = MakeUnique<SparseDistance<DataType, IndexType>>(query_expr->metric_type_);
-    }
-
 public:
     const BlockIndex *block_index_{};
     SharedPtr<Vector<GlobalBlockID>> global_block_ids_;
@@ -100,6 +84,11 @@ public:
     u32 current_block_ids_idx_ = 0;
     UniquePtr<MergeKnnBase> merge_knn_base_{};
     UniquePtr<SparseDistanceBase> sparse_distance_{};
+};
+
+export class MergeSparseFunctionData : public TableFunctionData {
+public:
+    UniquePtr<MergeKnnBase> merge_knn_base_{};
 };
 
 } // namespace infinity

@@ -972,7 +972,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const SharedPt
                                              logical_match_sparse->base_table_ref_,
                                              std::static_pointer_cast<MatchSparseExpression>(logical_match_sparse->query_expression_),
                                              MakeShared<Vector<LoadMeta>>());
-    return match_sparse_scan_op;
+    return merge_match_sparse_op;
 }
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const {

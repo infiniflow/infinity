@@ -52,7 +52,7 @@ protected:
                    QueryContext *query_context,
                    OperatorState *operator_state);
 
-protected:
+public:
     SharedPtr<BaseTableRef> base_table_ref_{};
 };
 

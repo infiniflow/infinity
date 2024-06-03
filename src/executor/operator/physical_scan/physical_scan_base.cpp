@@ -141,7 +141,6 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
         }
     }
     output_block_ptr->Finalize();
-    operator_state->SetComplete();
 }
 
 } // namespace infinity

@@ -31,10 +31,11 @@ import infinity_exception;
 import internal_types;
 import data_type;
 import logger;
+import physical_scan_base;
 
 namespace infinity {
 
-export class PhysicalMergeKnn final : public PhysicalOperator {
+export class PhysicalMergeKnn final : public PhysicalScanBase {
 public:
     explicit PhysicalMergeKnn(u64 id,
                               SharedPtr<BaseTableRef> table_ref,
@@ -44,8 +45,9 @@ public:
                               SharedPtr<KnnExpression> knn_expr,
                               u64 knn_table_index,
                               SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kMergeKnn, std::move(left), nullptr, id, load_metas), output_names_(std::move(output_names)),
-          output_types_(std::move(output_types)), knn_table_index_(knn_table_index), knn_expression_(std::move(knn_expr)), table_ref_(table_ref) {}
+        : PhysicalScanBase(id, PhysicalOperatorType::kMergeKnn, std::move(left), nullptr, table_ref, load_metas),
+          output_names_(std::move(output_names)), output_types_(std::move(output_types)), knn_table_index_(knn_table_index),
+          knn_expression_(std::move(knn_expr)) {}
 
     ~PhysicalMergeKnn() override = default;
 
@@ -77,8 +79,6 @@ private:
 
 public:
     SharedPtr<KnnExpression> knn_expression_{};
-    SharedPtr<BaseExpression> limit_expression_{};
-    SharedPtr<BaseTableRef> table_ref_{};
 };
 
 } // namespace infinity

@@ -40,27 +40,27 @@ SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0
 
 # copy to create another new block
 # there will has 2 knn_scan operator to scan the blocks, and one merge_knn to merge
-# statement ok
-# COPY test_knn_sparse FROM '/var/infinity/test_data/sparse_knn.csv' WITH (DELIMITER ',');
+statement ok
+COPY test_knn_sparse FROM '/var/infinity/test_data/sparse_knn.csv' WITH (DELIMITER ',');
 
 # the query will return block 1 row 4, block 2 row 4 and a row 3
-# query I
-# SELECT c1 FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
-# ----
-# 4
-# 4
-# 2
+query I
+SELECT c1 FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+4
+2
 
 # copy to create another new block
-# statement ok
-# COPY test_knn_sparse FROM '/var/infinity/test_data/sparse_knn.csv' WITH (DELIMITER ',');
+statement ok
+COPY test_knn_sparse FROM '/var/infinity/test_data/sparse_knn.csv' WITH (DELIMITER ',');
 
 # the query will return row 4 from block 1, 2 and 3
-# query I
-# SELECT c1 FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
-# ----
-# 4
-# 4
-# 4
+query I
+SELECT c1 FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+4
+4
 
 

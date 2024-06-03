@@ -168,8 +168,16 @@ void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context,
 
 template <typename DataType, typename IdxType, template <typename, typename> typename C>
 void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state) {
+    SizeT query_n = match_sparse_expr_->query_n_;
+    SizeT topn = match_sparse_expr_->topn_;
+
     MatchSparseScanFunctionData &function_data = match_sparse_scan_state->match_sparse_scan_function_data_;
-    function_data.Init<DataType, IdxType>(match_sparse_expr_.get());
+    if (function_data.merge_knn_base_.get() == nullptr) {
+        auto merge_knn = MakeUnique<MergeKnn<DataType, C>>(query_n, topn);
+        merge_knn->Begin();
+        function_data.merge_knn_base_ = std::move(merge_knn);
+        function_data.sparse_distance_ = MakeUnique<SparseDistance<DataType, IdxType>>(match_sparse_expr_->metric_type_);
+    }
 
     BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
     const Vector<GlobalBlockID> &block_ids = *function_data.global_block_ids_;
@@ -194,9 +202,8 @@ void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSpa
 
         auto *merge_heap = static_cast<MergeKnn<DataType, C> *>(function_data.merge_knn_base_.get());
         merge_heap->End();
-        i64 result_n = std::min(match_sparse_expr_->topn_, (SizeT)merge_heap->total_count());
+        i64 result_n = std::min(topn, (SizeT)merge_heap->total_count());
 
-        SizeT query_n = match_sparse_expr_->query_n_;
         Vector<char *> result_dists_list;
         Vector<RowID *> row_ids_list;
         for (SizeT query_id = 0; query_id < query_n; ++query_id) {

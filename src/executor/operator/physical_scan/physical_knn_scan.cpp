@@ -179,8 +179,6 @@ TableEntry *PhysicalKnnScan::table_collection_ptr() const { return base_table_re
 
 String PhysicalKnnScan::TableAlias() const { return base_table_ref_->alias_; }
 
-BlockIndex *PhysicalKnnScan::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
-
 Vector<SizeT> &PhysicalKnnScan::ColumnIDs() const { return base_table_ref_->column_ids_; }
 
 void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return base entry vector
@@ -535,66 +533,15 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         merge_heap->End();
         i64 result_n = std::min(knn_scan_shared_data->topk_, merge_heap->total_count());
 
-        if (!operator_state->data_block_array_.empty()) {
-            String error_message = "In physical_knn_scan : operator_state->data_block_array_ is not empty.";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
-        }
-        {
-            SizeT total_data_row_count = knn_scan_shared_data->query_count_ * result_n;
-            SizeT row_idx = 0;
-            do {
-                auto data_block = DataBlock::MakeUniquePtr();
-                data_block->Init(*GetOutputTypes());
-                operator_state->data_block_array_.emplace_back(std::move(data_block));
-                row_idx += DEFAULT_BLOCK_CAPACITY;
-            } while (row_idx < total_data_row_count);
+        SizeT query_n = knn_scan_shared_data->query_count_;
+        Vector<char *> result_dists_list;
+        Vector<RowID *> row_ids_list;
+        for (SizeT query_id = 0; query_id < query_n; ++query_id) {
+            result_dists_list.emplace_back(reinterpret_cast<char *>(merge_heap->GetDistancesByIdx(query_id)));
+            row_ids_list.emplace_back(merge_heap->GetIDsByIdx(query_id));
         }
 
-        SizeT output_block_row_id = 0;
-        SizeT output_block_idx = 0;
-        DataBlock *output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
-        for (u64 query_idx = 0; query_idx < knn_scan_shared_data->query_count_; ++query_idx) {
-            DataType *result_dists = merge_heap->GetDistancesByIdx(query_idx);
-            RowID *row_ids = merge_heap->GetIDsByIdx(query_idx);
-
-            for (i64 top_idx = 0; top_idx < result_n; ++top_idx) {
-                SizeT id = query_idx * knn_scan_shared_data->query_count_ + top_idx;
-
-                SegmentID segment_id = row_ids[top_idx].segment_id_;
-                SegmentOffset segment_offset = row_ids[top_idx].segment_offset_;
-                BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
-                BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
-
-                BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-                if (block_entry == nullptr) {
-                    String error_message = fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id);
-                    LOG_CRITICAL(error_message);
-                    UnrecoverableError(error_message);
-                }
-
-                if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
-                    output_block_ptr->Finalize();
-                    ++output_block_idx;
-                    output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
-                    output_block_row_id = 0;
-                }
-
-                SizeT column_n = base_table_ref_->column_ids_.size();
-                for (SizeT i = 0; i < column_n; ++i) {
-                    SizeT column_id = base_table_ref_->column_ids_[i];
-                    auto *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                    ColumnVector &&column_vector = block_column_entry->GetColumnVector(query_context->storage()->buffer_manager());
-
-                    output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
-                }
-                output_block_ptr->AppendValueByPtr(column_n, (ptr_t)&result_dists[id]);
-                output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&row_ids[id]);
-
-                ++output_block_row_id;
-            }
-        }
-        output_block_ptr->Finalize();
+        this->SetOutput(result_dists_list, row_ids_list, sizeof(DataType), result_n, query_context, operator_state);
         operator_state->SetComplete();
     }
 }

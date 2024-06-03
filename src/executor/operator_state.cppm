@@ -132,6 +132,10 @@ export struct MatchSparseScanOperatorState : public OperatorState {
 // MergeMatchSparse
 export struct MergeMatchSparseOperatorState : public OperatorState {
     inline explicit MergeMatchSparseOperatorState() : OperatorState(PhysicalOperatorType::kMergeMatchSparse) {}
+
+    UniquePtr<DataBlock> input_data_block_{nullptr};
+    bool input_complete_{false};
+    MergeSparseFunctionData merge_sparse_function_data_{};
 };
 
 // KnnScan
