@@ -28,6 +28,8 @@ import table_entry;
 import internal_types;
 import data_type;
 import common_query_filter;
+import column_index_reader;
+import query_node;
 
 namespace infinity {
 
@@ -54,6 +56,9 @@ public:
     SharedPtr<BaseTableRef> base_table_ref_{};
     SharedPtr<MatchExpression> match_expr_{};
     SharedPtr<BaseExpression> filter_expression_{};
+    IndexReader index_reader_;
+    UniquePtr<QueryNode> query_tree_;
+    float begin_threshold_;
 
     SharedPtr<CommonQueryFilter> common_query_filter_{};
 };

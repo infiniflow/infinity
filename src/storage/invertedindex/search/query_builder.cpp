@@ -37,10 +37,11 @@ import third_party;
 
 namespace infinity {
 
-QueryBuilder::QueryBuilder(Txn *txn, SharedPtr<BaseTableRef> &base_table_ref)
-    : table_entry_(base_table_ref->table_entry_ptr_), index_reader_(table_entry_->GetFullTextIndexReader(txn)) {
+void QueryBuilder::Init(IndexReader index_reader) {
+    index_reader_ = index_reader;
+
     u64 total_row_count = 0;
-    for (const auto &[segment_id, segment_info] : base_table_ref->block_index_->segment_block_index_) {
+    for (const auto &[segment_id, segment_info] : base_table_ref_->block_index_->segment_block_index_) {
         total_row_count += segment_info.segment_offset_;
     }
 
@@ -55,7 +56,7 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
         context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
     }
     // Create the iterator from the query tree.
-    UniquePtr<DocIterator> result = context.optimized_query_tree_->CreateSearch(table_entry_, index_reader_, &scorer_);
+    UniquePtr<DocIterator> result = context.optimized_query_tree_->CreateSearch(base_table_ref_->table_entry_ptr_, index_reader_, &scorer_);
 #ifdef INFINITY_DEBUG
     {
         OStringStream oss;
@@ -78,7 +79,7 @@ UniquePtr<EarlyTerminateIterator> QueryBuilder::CreateEarlyTerminateSearch(FullT
     }
     // Create the iterator from the query tree.
     UniquePtr<EarlyTerminateIterator> result =
-        context.optimized_query_tree_->CreateEarlyTerminateSearch(table_entry_, index_reader_, &scorer_, early_term_alg);
+        context.optimized_query_tree_->CreateEarlyTerminateSearch(base_table_ref_->table_entry_ptr_, index_reader_, &scorer_, early_term_alg);
 #ifdef INFINITY_DEBUG
     {
         OStringStream oss;

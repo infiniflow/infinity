@@ -15,6 +15,7 @@
 module;
 
 #include <vector>
+#include <cstdlib>
 
 module bound_select_statement;
 
@@ -73,6 +74,11 @@ import third_party;
 import table_reference;
 import common_query_filter;
 import logger;
+
+import search_options;
+import search_driver;
+import query_node;
+import status;
 
 namespace infinity {
 
@@ -172,10 +178,33 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         Vector<SharedPtr<LogicalNode>> match_knn_nodes;
         match_knn_nodes.reserve(num_children);
         for (auto &match_expr : search_expr_->match_exprs_) {
-            SharedPtr<LogicalMatch> matchNode = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_expr);
-            matchNode->filter_expression_ = filter_expr;
-            matchNode->common_query_filter_ = common_query_filter;
-            match_knn_nodes.push_back(std::move(matchNode));
+            SharedPtr<LogicalMatch> match_node = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_expr);
+            match_node->filter_expression_ = filter_expr;
+            match_node->common_query_filter_ = common_query_filter;
+            match_node->index_reader_ = base_table_ref->table_entry_ptr_->GetFullTextIndexReader(query_context->GetTxn());
+
+            const Map<String, String> &column2analyzer = match_node->index_reader_.GetColumn2Analyzer();
+            SearchOptions search_ops(match_node->match_expr_->options_text_);
+
+            const String &threshold = search_ops.options_["threshold"];
+            match_node->begin_threshold_ = strtof(threshold.c_str(), nullptr);
+
+            auto iter = search_ops.options_.find("default_field");
+            String default_field;
+            if(iter != search_ops.options_.end()) {
+                default_field = iter->second;
+            }
+
+            SearchDriver search_driver(column2analyzer, default_field);
+            UniquePtr<QueryNode> query_tree = search_driver.ParseSingleWithFields(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
+            if (query_tree.get() == nullptr) {
+                Status status = Status::ParseMatchExprFailed(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
+                LOG_ERROR(status.message());
+                RecoverableError(status);
+            }
+
+            match_node->query_tree_ = std::move(query_tree);
+            match_knn_nodes.push_back(std::move(match_node));
         }
         for (auto &match_tensor_expr : search_expr_->match_tensor_exprs_) {
             auto match_tensor_node = MakeShared<LogicalMatchTensorScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_tensor_expr);

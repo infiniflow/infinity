@@ -15,7 +15,6 @@
 module;
 
 #include <cassert>
-#include <cstdlib>
 #include <chrono>
 #include <iostream>
 #include <memory>
@@ -50,7 +49,7 @@ import logical_type;
 import search_options;
 import status;
 import index_defines;
-import search_driver;
+
 import query_node;
 import query_builder;
 import doc_iterator;
@@ -619,20 +618,19 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     auto execute_start_time = std::chrono::high_resolution_clock::now();
     // 1. build QueryNode tree
     // 1.1 populate column2analyzer
-    Txn *txn = query_context->GetTxn();
-    QueryBuilder query_builder(txn, base_table_ref_);
+//    Txn *txn = query_context->GetTxn();
+    QueryBuilder query_builder(base_table_ref_.get());
+    query_builder.Init(index_reader_);
     auto finish_init_query_builder_time = std::chrono::high_resolution_clock::now();
     TimeDurationType query_builder_init_duration = finish_init_query_builder_time - execute_start_time;
     LOG_DEBUG(fmt::format("PhysicalMatch 0: Init QueryBuilder time: {} ms", query_builder_init_duration.count()));
-    const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer();
+
     // 1.2 parse options into map, populate default_field
     SearchOptions search_ops(match_expr_->options_text_);
-    const String &default_field = search_ops.options_["default_field"];
-    const String &block_max_option = search_ops.options_["block_max"];
+    const String &block_max_option = search_ops.options_["block_max"];  // search method => enumerate method, BMW, BMM, Naive
     bool use_ordinary_iter = false;
     bool use_block_max_iter = false;
-    const String &threshold = search_ops.options_["threshold"];
-    const float begin_threshold = strtof(threshold.c_str(), nullptr);
+
     EarlyTermAlg early_term_alg = EarlyTermAlg::kBMW;
     if (block_max_option.empty() or block_max_option == "true" or block_max_option == "bmw") {
         use_block_max_iter = true;
@@ -647,14 +645,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
         use_block_max_iter = true;
     } else {
         Status status = Status::SyntaxError("block_max option must be empty, true, false or compare");
-        LOG_ERROR(status.message());
-        RecoverableError(status);
-    }
-    // 1.3 build filter
-    SearchDriver driver(column2analyzer, default_field);
-    UniquePtr<QueryNode> query_tree = driver.ParseSingleWithFields(match_expr_->fields_, match_expr_->matching_text_);
-    if (query_tree == nullptr) {
-        Status status = Status::ParseMatchExprFailed(match_expr_->fields_, match_expr_->matching_text_);
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
@@ -692,13 +682,13 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     TimeDurationType blockmax_duration_2 = {};
     TimeDurationType blockmax_duration_3 = {};
     assert(common_query_filter_);
-    full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree));
+    full_text_query_context.query_tree_ = MakeUnique<FilterQueryNode>(common_query_filter_.get(), std::move(query_tree_));
 
     if (use_block_max_iter) {
         et_iter = query_builder.CreateEarlyTerminateSearch(full_text_query_context, early_term_alg);
         // et_iter is nullptr if fulltext index is present but there's no data
-        if (et_iter != nullptr && begin_threshold > 0.0f)
-            et_iter->UpdateScoreThreshold(begin_threshold);
+        if (et_iter != nullptr && begin_threshold_ > 0.0f)
+            et_iter->UpdateScoreThreshold(begin_threshold_);
     }
     if (use_ordinary_iter) {
         doc_iterator = query_builder.CreateSearch(full_text_query_context);
@@ -706,10 +696,10 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     if (use_block_max_iter and use_ordinary_iter) {
         et_iter_2 = query_builder.CreateEarlyTerminateSearch(full_text_query_context, early_term_alg);
         et_iter_3 = query_builder.CreateEarlyTerminateSearch(full_text_query_context, early_term_alg);
-        if (et_iter_2 != nullptr && begin_threshold > 0.0f)
-            et_iter_2->UpdateScoreThreshold(begin_threshold);
-        if (et_iter_3 != nullptr && begin_threshold > 0.0f)
-            et_iter_3->UpdateScoreThreshold(begin_threshold);
+        if (et_iter_2 != nullptr && begin_threshold_ > 0.0f)
+            et_iter_2->UpdateScoreThreshold(begin_threshold_);
+        if (et_iter_3 != nullptr && begin_threshold_ > 0.0f)
+            et_iter_3->UpdateScoreThreshold(begin_threshold_);
     }
 
     // 3 full text search
@@ -915,11 +905,15 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
 PhysicalMatch::PhysicalMatch(u64 id,
                              SharedPtr<BaseTableRef> base_table_ref,
                              SharedPtr<MatchExpression> match_expr,
+                             IndexReader index_reader,
+                             UniquePtr<QueryNode>&& query_tree,
+                             float begin_threshold,
                              const SharedPtr<CommonQueryFilter> &common_query_filter,
                              u64 match_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
     : PhysicalOperator(PhysicalOperatorType::kMatch, nullptr, nullptr, id, load_metas), table_index_(match_table_index),
-      base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)), common_query_filter_(common_query_filter) {}
+      base_table_ref_(std::move(base_table_ref)), match_expr_(std::move(match_expr)), index_reader_(index_reader), query_tree_(std::move(query_tree)),
+      begin_threshold_(begin_threshold), common_query_filter_(common_query_filter) {}
 
 PhysicalMatch::~PhysicalMatch() = default;
 
