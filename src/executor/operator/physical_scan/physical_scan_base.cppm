@@ -23,6 +23,9 @@ import global_block_id;
 import base_table_ref;
 import block_index;
 import load_meta;
+import internal_types;
+import operator_state;
+import query_context;
 
 namespace infinity {
 
@@ -40,6 +43,14 @@ public:
     SizeT TaskletCount() override;
 
     virtual BlockIndex *GetBlockIndex() const;
+
+protected:
+    void SetOutput(const Vector<char *> &raw_result_dists_list,
+                   const Vector<RowID *> &row_ids_list,
+                   SizeT result_size,
+                   i64 result_n,
+                   QueryContext *query_context,
+                   OperatorState *operator_state);
 
 protected:
     SharedPtr<BaseTableRef> base_table_ref_{};

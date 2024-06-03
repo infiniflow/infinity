@@ -675,6 +675,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSpar
     auto bound_match_sparse_expr = MakeShared<MatchSparseExpression>(std::move(arguments),
                                                                      expr.query_sparse_expr_.get(),
                                                                      expr.metric_type_,
+                                                                     expr.query_n_,
                                                                      expr.topn_,
                                                                      std::move(expr.opt_params_));
     return bound_match_sparse_expr;

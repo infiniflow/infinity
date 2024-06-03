@@ -25,15 +25,25 @@ import global_block_id;
 import base_table_ref;
 import table_entry;
 import block_index;
+import data_block;
+import operator_state;
+import default_values;
+import third_party;
+import infinity_exception;
+import block_entry;
+import block_column_entry;
+import logger;
+import column_vector;
+import query_context;
 
 namespace infinity {
 
 PhysicalScanBase::PhysicalScanBase(u64 id,
-                 PhysicalOperatorType type,
-                 UniquePtr<PhysicalOperator> left,
-                 UniquePtr<PhysicalOperator> right,
-                 SharedPtr<BaseTableRef> base_table_ref,
-                 SharedPtr<Vector<LoadMeta>> load_metas)
+                                   PhysicalOperatorType type,
+                                   UniquePtr<PhysicalOperator> left,
+                                   UniquePtr<PhysicalOperator> right,
+                                   SharedPtr<BaseTableRef> base_table_ref,
+                                   SharedPtr<Vector<LoadMeta>> load_metas)
     : PhysicalOperator(type, std::move(left), std::move(right), id, load_metas), base_table_ref_(base_table_ref) {}
 
 Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 parallel_count) const {
@@ -66,5 +76,72 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 
 SizeT PhysicalScanBase::TaskletCount() { return base_table_ref_->block_index_->BlockCount(); }
 
 BlockIndex *PhysicalScanBase::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
+
+void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
+                                 const Vector<RowID *> &row_ids_list,
+                                 SizeT result_size,
+                                 i64 result_n,
+                                 QueryContext *query_context,
+                                 OperatorState *operator_state) {
+    BlockIndex *block_index = base_table_ref_->block_index_.get();
+    SizeT query_n = raw_result_dists_list.size();
+
+    {
+        SizeT total_data_row_count = query_n * result_n;
+        SizeT row_idx = 0;
+        do {
+            auto data_block = DataBlock::MakeUniquePtr();
+            data_block->Init(*GetOutputTypes());
+            operator_state->data_block_array_.emplace_back(std::move(data_block));
+            row_idx += DEFAULT_BLOCK_CAPACITY;
+        } while (row_idx < total_data_row_count);
+    }
+    auto *buffer_mgr = query_context->storage()->buffer_manager();
+
+    SizeT output_block_row_id = 0;
+    SizeT output_block_idx = 0;
+    DataBlock *output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
+    for (SizeT query_idx = 0; query_idx < query_n; ++query_idx) {
+        char *raw_result_dists = raw_result_dists_list[query_idx];
+        RowID *row_ids = row_ids_list[query_idx];
+        for (i64 top_idx = 0; top_idx < result_n; ++top_idx) {
+            SizeT id = query_n * query_idx + top_idx;
+
+            SegmentID segment_id = row_ids[top_idx].segment_id_;
+            SegmentOffset segment_offset = row_ids[top_idx].segment_offset_;
+            BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
+            BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
+
+            BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
+            if (block_entry == nullptr) {
+                String error_message = fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id);
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+
+            if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
+                output_block_ptr->Finalize();
+                ++output_block_idx;
+                output_block_ptr = operator_state->data_block_array_[output_block_idx].get();
+                output_block_row_id = 0;
+            }
+
+            SizeT column_n = base_table_ref_->column_ids_.size();
+            for (SizeT i = 0; i < column_n; ++i) {
+                SizeT column_id = base_table_ref_->column_ids_[i];
+                auto *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+                ColumnVector &&column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+
+                output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
+            }
+            output_block_ptr->AppendValueByPtr(column_n, raw_result_dists + id * result_size);
+            output_block_ptr->AppendValueByPtr(column_n + 1, (ptr_t)&row_ids[id]);
+
+            ++output_block_row_id;
+        }
+    }
+    output_block_ptr->Finalize();
+    operator_state->SetComplete();
+}
 
 } // namespace infinity

@@ -26,11 +26,14 @@ import base_table_ref;
 import data_type;
 import common_query_filter;
 import physical_scan_base;
+import sparse_info;
+import match_sparse_expr;
+import match_sparse_scan_function_data;
 
 namespace infinity {
 struct LoadMeta;
-struct GlobalBlockID;
 struct BlockIndex;
+class ColumnVector;
 
 export class PhysicalMatchSparseScan final : public PhysicalScanBase {
 public:
@@ -48,6 +51,19 @@ public:
     SharedPtr<Vector<String>> GetOutputNames() const override;
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
+
+private:
+    template <typename DataType>
+    void ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *operator_state, const SparseInfo *sparse_info, const SparseMetricType &metric_type);
+
+    template <typename DataType, typename IdxType>
+    void ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *operator_state, const SparseMetricType &metric_type);
+
+    template <typename DataType, typename IdxType, template <typename, typename> typename C>
+    void ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *operator_state);
+
+    template <typename DataType, typename IdxType, template <typename, typename> typename C>
+    void CalculateOnColumnVector(const ColumnVector &column_vector, SegmentID segment_id, BlockID block_id, BlockOffset row_cnt, MatchSparseScanFunctionData &function_data);
 
 private:
     u64 table_index_ = 0;

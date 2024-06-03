@@ -24,6 +24,7 @@ import knn_expr;
 import match_expr;
 import match_tensor_expr;
 import infinity;
+import internal_types;
 
 namespace infinity {
 

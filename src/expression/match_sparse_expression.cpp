@@ -40,9 +40,11 @@ namespace infinity {
 MatchSparseExpression::MatchSparseExpression(Vector<SharedPtr<BaseExpression>> search_column,
                                              const ConstantExpr *query_sparse_expr,
                                              SparseMetricType metric_type,
+                                             SizeT query_n,
                                              SizeT topn,
                                              const Vector<UniquePtr<InitParameter>> &opt_params)
-    : BaseExpression(ExpressionType::kMatchSparse, std::move(search_column)), metric_type_(metric_type), topn_(topn), opt_params_(opt_params) {
+    : BaseExpression(ExpressionType::kMatchSparse, std::move(search_column)), metric_type_(metric_type), query_n_(query_n), topn_(topn),
+      opt_params_(opt_params) {
     column_expr_ = static_cast<const ColumnExpression *>(arguments_[0].get());
     this->MakeQuery(query_sparse_expr);
 }

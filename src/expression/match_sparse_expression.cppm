@@ -35,6 +35,7 @@ public:
     MatchSparseExpression(Vector<SharedPtr<BaseExpression>> search_column,
                           const ConstantExpr *query_sparse_expr,
                           SparseMetricType metric_type,
+                          SizeT query_n,
                           SizeT topn,
                           const Vector<UniquePtr<InitParameter>> &opt_params);
 
@@ -50,6 +51,7 @@ public:
     SharedPtr<BaseExpression> query_sparse_expr_;
 
     SparseMetricType metric_type_;
+    SizeT query_n_;
     SizeT topn_;
 
     const Vector<UniquePtr<InitParameter>> &opt_params_;

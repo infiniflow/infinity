@@ -30,6 +30,7 @@ import block_index;
 import column_expr;
 import logger;
 import knn_expr;
+import match_sparse_expr;
 
 namespace infinity {
 
@@ -398,6 +399,28 @@ void BindContext::BoundSearch(ParsedExpr *expr) {
             }
             default: {
                 String error_message = "Invalid KNN metric type";
+                LOG_ERROR(error_message);
+                UnrecoverableError(error_message);
+            }
+        }
+    }
+    if (!search_expr->match_sparse_exprs_.empty() && search_expr->fusion_exprs_.empty()) {
+        SizeT expr_count = search_expr->match_sparse_exprs_.size();
+        MatchSparseExpr *first_sparse = search_expr->match_sparse_exprs_[0];
+        SparseMetricType first_metric_type = first_sparse->metric_type_;
+        for (SizeT idx = 1; idx < expr_count; ++idx) {
+            if (search_expr->match_sparse_exprs_[idx]->metric_type_ != first_metric_type) {
+                // Mixed distance type
+                return;
+            }
+        }
+        switch (first_metric_type) {
+            case SparseMetricType::kInnerProduct: {
+                allow_similarity = true;
+                break;
+            }
+            default: {
+                String error_message = "Invalid sparse metric type";
                 LOG_ERROR(error_message);
                 UnrecoverableError(error_message);
             }

@@ -66,7 +66,6 @@ export using infinity::TensorArrayT;
 
 // sparse
 export using infinity::SparseT;
-export using infinity::SparseRefT;
 
 export using infinity::EmptyArrayT;
 
@@ -86,6 +85,7 @@ export using infinity::TupleMixedType;
 
 export using infinity::EmbeddingType;
 export using infinity::ToEmbeddingDataType;
+export using infinity::EmbeddingDataType;
 
 export constexpr uint64_t VARCHAR_PREFIX_LEN = VARCHAR_PREFIX_LENGTH;
 export constexpr uint64_t VARCHAR_INLINE_LEN = VARCHAR_INLINE_LENGTH;

@@ -49,6 +49,7 @@ public:
     uint32_t nnz_ = 0;
 
     SparseMetricType metric_type_;
+    size_t query_n_ = 1; // TODO: support multiple queries
     size_t topn_;
 
     std::vector<std::unique_ptr<InitParameter>> opt_params_{};

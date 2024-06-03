@@ -41,6 +41,7 @@ import bg_task;
 import txn_store;
 import wal_manager;
 import buffer_manager;
+import internal_types;
 
 using namespace infinity;
 

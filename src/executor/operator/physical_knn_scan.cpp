@@ -61,7 +61,7 @@ import buffer_obj;
 import create_index_info;
 import knn_expr;
 import chunk_index_entry;
-
+import internal_types;
 import block_entry;
 import segment_index_entry;
 import segment_entry;

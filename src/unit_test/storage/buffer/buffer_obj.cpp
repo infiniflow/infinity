@@ -50,6 +50,7 @@ import bg_task;
 import physical_import;
 import chunk_index_entry;
 import wal_manager;
+import internal_types;
 
 using namespace infinity;
 

@@ -95,7 +95,6 @@ using TensorT = TensorType;
 
 // sparse
 using SparseT = SparseType;
-using SparseRefT = SparseRefType;
 
 // tensor-array
 using TensorArrayT = TensorArrayType;
