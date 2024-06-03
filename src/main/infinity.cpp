@@ -637,6 +637,7 @@ QueryResult Infinity::ShowBlockColumn(const String &db_name,
 }
 
 QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values) {
+    std::cout << "begin insert, db name = " << db_name << ", table_name = " << table_name << std::endl;
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -650,7 +651,20 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
     insert_statement->columns_ = columns;
     insert_statement->values_ = values;
 
+    for (SizeT i = 0; i < columns->size(); ++i) {
+        std::cout << (*columns)[i] << std::endl;
+    }
+
+    for (SizeT i = 0; i < values->size(); ++i) {
+        auto parse_list = (*values)[i];
+        for (SizeT j = 0; j < (*parse_list).size(); ++j) {
+            auto parse_expr = (*parse_list)[j];
+            std::cout << "parse expr: " << parse_expr->ToString() << std::endl;
+        }
+    }
+
     QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
+    std::cout << "finish insert, db name = " << db_name << ", table_name = " << table_name << std::endl;
     return result;
 }
 
@@ -779,14 +793,3 @@ QueryResult Infinity::Optimize(const String &db_name, const String &table_name) 
 }
 
 } // namespace infinity
-
-//int add(int a, int b) {
-//    return a + b;
-//}
-//
-//NB_MODULE(infinity, m) {
-//    m.def("add", &add);
-////    m.def("hello", &infinity::Infinity::Hello);
-//////    m.def("add", &add);
-//////    m.def("mul", &mul);
-//}

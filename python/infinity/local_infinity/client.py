@@ -106,6 +106,8 @@ class LocalInfinityClient:
         inner_ex = None
         while retry <= 2:
             try:
+                print("type(fields): ", type(fields))
+                print("fields: ", fields)
                 res = self.client.Insert(db_name, table_name, column_names, fields)
                 return self.convert_res(res)
             except Exception as ex:
@@ -119,7 +121,7 @@ class LocalInfinityClient:
     def select(self, db_name: str, table_name: str, select_list, search_expr,
                where_expr, group_by_list, limit_expr, offset_expr):
         return self.convert_res(self.client.Select(db_name, table_name, select_list,
-                                  search_expr, where_expr, group_by_list, limit_expr, offset_expr))
+                                search_expr, where_expr, group_by_list, limit_expr, offset_expr))
 
     def explain(self, db_name: str, table_name: str, select_list, search_expr,
                 where_expr, group_by_list, limit_expr, offset_expr, explain_type):

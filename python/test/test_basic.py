@@ -141,11 +141,11 @@ class TestCase(TestSdk):
         table_obj = db_obj.get_table("my_table3")
         assert table_obj
 
-        # res = table_obj.insert(
-        #     [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
-        # assert res.error_code == ErrorCode.OK
-        # # search
-        # res = table_obj.output(["c1 + 0.1"]).to_df()
+        res = table_obj.insert(
+            [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
+        assert res.error_code == ErrorCode.OK
+        # search
+        res = table_obj.output(["c1 + 0.1"]).to_df()
         # pd.testing.assert_frame_equal(res,
         #                               pd.DataFrame({'(c1 + 0.100000)': (1.1, 2.1)}).astype(
         #                                   {'(c1 + 0.100000)': dtype('float64')}))

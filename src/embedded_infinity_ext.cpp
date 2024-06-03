@@ -275,16 +275,6 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kSearch", ParsedExprType::kSearch)
         .export_values();
 
-    //    abstract class how to bind?
-    //    nb::class_<ParsedExpr>(m, "ParsedExpr")
-    //        .def(nb::init<ParsedExprType>())
-    //        .def("GetName", &ParsedExpr::GetName)
-    //        .def("GetAlias", &ParsedExpr::GetAlias)
-    //        .def("HasAlias", &ParsedExpr::HasAlias)
-    //        .def("ToString", &ParsedExpr::ToString)
-    //        .def_rw("type", &ParsedExpr::type_)
-    //        .def_rw("alias", &ParsedExpr::alias_);
-
     // logical_node_type
     nb::enum_<LogicalNodeType>(m, "LogicalNodeType")
         .value("kInvalid", LogicalNodeType::kInvalid)
@@ -356,16 +346,6 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("names_ptr", &TableConstraint::names_ptr_)
         .def_rw("constraint", &TableConstraint::constraint_);
 
-    //    nb::class_<ColumnDef, TableElement>(m, "ColumnDef")
-    //        .def(nb::init<int64_t, std::shared_ptr<DataType>, std::string, std::set<ConstraintType>, std::shared_ptr<ParsedExpr>>())
-    //        .def(nb::init<LogicalType, const std::shared_ptr<TypeInfo>&, std::shared_ptr<ParsedExpr>>())
-    //        .def("__eq__", &ColumnDef::operator==)
-    //        .def("ToString", &ColumnDef::ToString)
-    //        .def("name", &ColumnDef::name)
-    //        .def("id", &ColumnDef::id)
-    //        .def("type", &ColumnDef::type)
-    //        .def("has_default_value", &ColumnDef::has_default_value);
-
     // create_index_info
     nb::enum_<IndexType>(m, "IndexType")
         .value("kIVFFlat", IndexType::kIVFFlat)
@@ -375,14 +355,6 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kInvalid", IndexType::kInvalid)
         .export_values();
 
-    //    nb::class_<IndexInfo>(m, "IndexInfo")
-    //        .def(nb::init<>())
-    //        .def_rw("index_type", &IndexInfo::index_type_)
-    //        .def_rw("column_name", &IndexInfo::column_name_)
-    //        .def_rw("index_param_list", &IndexInfo::index_param_list_)
-    //        .def_static("IndexTypeToString", &IndexInfo::IndexTypeToString)
-    //        .def_static("StringToIndexType", &IndexInfo::StringToIndexType);
-    //
     // status
     nb::enum_<ErrorCode>(m, "ErrorCode")
         .value("kOk", ErrorCode::kOk)

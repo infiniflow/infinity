@@ -1,4 +1,5 @@
 module;
+#include <cstring>
 
 module wrap_infinity;
 
@@ -29,6 +30,51 @@ import logical_type;
 import constant_expr;
 
 namespace infinity {
+
+ParsedExpr* WrapConstantExpr::GetParsedExpr() {
+    auto constant_expr = new ConstantExpr(literal_type);
+    switch (literal_type) {
+        case LiteralType::kBoolean: {
+            constant_expr->bool_value_ = bool_value;
+            return constant_expr;
+        }
+        case LiteralType::kDouble: {
+            constant_expr->double_value_ = f64_value;
+            return constant_expr;
+        }
+        case LiteralType::kString: {
+            constant_expr->str_value_ = strdup(str_value.c_str());
+            return constant_expr;
+        }
+        case LiteralType::kInteger: {
+            constant_expr->integer_value_ = i64_value;
+            return constant_expr;
+        }
+        case LiteralType::kNull: {
+            return constant_expr;
+        }
+        case LiteralType::kIntegerArray: {
+            constant_expr->long_array_.reserve(i64_array_value.size());
+            for (SizeT i = 0; i < i64_array_value.size(); ++i) {
+                constant_expr->long_array_.emplace_back(i64_array_value[i]);
+            }
+            return constant_expr;
+        }
+        case LiteralType::kDoubleArray: {
+            constant_expr->double_array_.reserve(f64_array_value.size());
+            for (SizeT i = 0; i < f64_array_value.size(); ++i) {
+                constant_expr->double_array_.emplace_back(f64_array_value[i]);
+            }
+            return constant_expr;
+        }
+        default: {
+            return new ConstantExpr(LiteralType::kNull);
+        }
+    }
+    return constant_expr;
+
+}
+
 WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options) {
     auto query_result = instance.CreateDatabase(db_name, options);
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
@@ -135,7 +181,10 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
             type_info_ptr = MakeShared<EmbeddingInfo>(embedding_type.element_type, embedding_type.dimension);
         }
         auto column_type = MakeShared<DataType>(wrap_column_def.column_type.logical_type, type_info_ptr);
-        auto column_def = new ColumnDef(wrap_column_def.id, column_type, wrap_column_def.column_name, wrap_column_def.constraints);
+
+        SharedPtr<ParsedExpr> default_expr(wrap_column_def.constant_expr.GetParsedExpr());
+
+        auto column_def = new ColumnDef(wrap_column_def.id, column_type, wrap_column_def.column_name, wrap_column_def.constraints, default_expr);
         column_defs_ptr.push_back(column_def);
     }
     auto query_result = instance.CreateTable(db_name, table_name, std::move(column_defs_ptr), constraints, create_table_options);
@@ -249,12 +298,20 @@ WrapQueryResult WrapShowBlockColumn(Infinity &instance,
 }
 
 WrapQueryResult
-WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<String> columns, Vector<Vector<ParsedExpr *>> values) {
-    Vector<Vector<ParsedExpr *> *> value_ptr;
+WrapInsert(Infinity& instance, const String& db_name, const String& table_name, Vector<String>& columns, Vector<Vector<WrapConstantExpr>>& values) {
+    Vector<Vector<ParsedExpr *> *> *value_ptr = new Vector<Vector<ParsedExpr *> *>(values.size());
     for (SizeT i = 0; i < values.size(); ++i) {
-        value_ptr.push_back(&values[i]);
+        auto value_list = new Vector<ParsedExpr *>(values[i].size());
+        for (SizeT j = 0; j < values[i].size(); ++j) {
+            auto& wrap_constant_expr = values[i][j];
+            (*value_list)[j] = wrap_constant_expr.GetParsedExpr();
+        }
+        (*value_ptr)[i] = value_list;
     }
-    auto query_result = instance.Insert(db_name, table_name, &columns, &value_ptr);
+    Vector<String> *insert_columns = new Vector<String>(columns);
+
+    auto query_result = instance.Insert(db_name, table_name, insert_columns, value_ptr);
+    std::cout << "Wrap Insert success" << std::endl;
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 

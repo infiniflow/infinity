@@ -30,7 +30,7 @@ from infinity.remote_thrift.utils import traverse_conditions, name_validity_chec
 from infinity.table import Table, ExplainType
 from infinity.common import ConflictType
 from embedded_infinity import ConflictType as LocalConflictType
-from embedded_infinity import WrapIndexInfo
+from embedded_infinity import WrapIndexInfo, WrapConstantExpr, LiteralType
 
 class LocalTable(Table, ABC):
 
@@ -167,7 +167,7 @@ class LocalTable(Table, ABC):
         db_name = self._db_name
         table_name = self._table_name
         column_names: list[str] = []
-        fields: list[ttypes.Field] = []
+        fields = []
 
         if isinstance(data, dict):
             data = [data]
@@ -176,35 +176,34 @@ class LocalTable(Table, ABC):
             column_names = list(row.keys())
             parse_exprs = []
             for column_name, value in row.items():
-                constant_expression = None
+                constant_expression = WrapConstantExpr()
                 if isinstance(value, str):
-                    constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String,
-                                                              str_value=value)
-
+                    constant_expression.literal_type = LiteralType.kString
+                    constant_expression.str_value = value
                 elif isinstance(value, int):
-                    constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
-                                                              i64_value=value)
-
+                    constant_expression.literal_type = LiteralType.kInteger
+                    constant_expression.i64_value = value
                 elif isinstance(value, float) or isinstance(value, np.float32):
-                    constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
-                                                              f64_value=value)
+                    constant_expression.literal_type = LiteralType.kDouble
+                    constant_expression.f64_value = value
                 elif isinstance(value, list):
                     if isinstance(value[0], int):
-                        constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
-                                                                  i64_array_value=value)
+                        constant_expression.literal_type = LiteralType.kIntegerArray
+                        constant_expression.i64_array_value = value
                     elif isinstance(value[0], float):
-                        constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
-                                                                  f64_array_value=value)
+                        constant_expression.literal_type = LiteralType.kDoubleArray
+                        constant_expression.f64_array_value = value
                 else:
                     raise Exception("Invalid constant expression")
 
-                expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
-                paser_expr = ttypes.ParsedExpr(type=expr_type)
+                # expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
+                # paser_expr = ttypes.ParsedExpr(type=expr_type)
+                print("value = ", value, "type = ", constant_expression.literal_type)
 
-                parse_exprs.append(paser_expr)
+                parse_exprs.append(constant_expression)
 
-            field = ttypes.Field(parse_exprs=parse_exprs)
-            fields.append(field)
+            # field = ttypes.Field(parse_exprs=parse_exprs)
+            fields.append(parse_exprs)
 
         res = self._conn.insert(db_name=db_name, table_name=table_name, column_names=column_names,
                                 fields=fields)
@@ -283,23 +282,23 @@ class LocalTable(Table, ABC):
                 update_expr_array: list[ttypes.UpdateExpr] = []
                 for row in data:
                     for column_name, value in row.items():
-
+                        constant_expression = WrapConstantExpr()
                         if isinstance(value, str):
-                            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String,
-                                                                      str_value=value)
+                            constant_expression.literal_type = LiteralType.kString
+                            constant_expression.str_value = value
                         elif isinstance(value, int):
-                            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
-                                                                      i64_value=value)
+                            constant_expression.literal_type = LiteralType.kInteger
+                            constant_expression.i64_value = value
                         elif isinstance(value, float) or isinstance(value, np.float32):
-                            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
-                                                                      f64_value=value)
+                            constant_expression.literal_type = LiteralType.kDouble
+                            constant_expression.f64_value = value
                         elif isinstance(value, list):
                             if isinstance(value[0], int):
-                                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
-                                                                          i64_array_value=value)
+                                constant_expression.literal_type = LiteralType.kIntegerArray
+                                constant_expression.i64_array_value = value
                             elif isinstance(value[0], float):
-                                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
-                                                                          f64_array_value=value)
+                                constant_expression.literal_type = LiteralType.kDoubleArray
+                                constant_expression.f64_array_value = value
                         else:
                             raise Exception("Invalid constant expression")
 

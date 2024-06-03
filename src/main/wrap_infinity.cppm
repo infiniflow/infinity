@@ -29,6 +29,10 @@ import constant_expr;
 import knn_expr;
 import embedding_info;
 import statement_common;
+import search_options;
+import match_expr;
+import fusion_expr;
+import match_tensor_expr;
 
 // wrap Infinity function for nanobind infinity
 namespace infinity {
@@ -65,6 +69,8 @@ export struct WrapConstantExpr {
     String str_value;
     Vector<i64> i64_array_value;
     Vector<f64> f64_array_value;
+
+    ParsedExpr* GetParsedExpr();
 };
 
 export struct WrapColumnDef {
@@ -81,6 +87,66 @@ export struct WrapIndexInfo {
     IndexType index_type;
     String column_name;
     Vector<InitParameter> index_param_list;
+};
+
+export struct WrapColumnExpr {
+    Vector<String> names{};
+    bool star{false};
+    bool generated{false};
+};
+
+export struct WrapFunctionExpr {
+    String func_name{};
+    Vector<ParsedExpr *> *arguments{nullptr};
+    bool distinct{false};
+};
+
+export struct WrapBetweenExpr {
+    ParsedExpr *value{nullptr};
+    ParsedExpr *upper_bound{nullptr};
+    ParsedExpr *lower_bound{nullptr};
+};
+
+export struct WrapKnnExpr {
+    const bool own_memory;
+
+    ParsedExpr *column_expr{};
+    void *embedding_data_ptr{}; // Pointer to the embedding data ,the data type include float, int ,char ...., so we use void* here
+    i64 dimension{};
+    EmbeddingDataType embedding_data_type{EmbeddingDataType::kElemInvalid};
+    KnnDistanceType distance_type{KnnDistanceType::kInvalid};
+    i64 topn{};
+    Vector<InitParameter *> *opt_params{};
+};
+
+export struct WrapMatchExpr {
+    String fields_;
+    String matching_text_;
+    String options_text_;
+};
+
+export struct WrapFusionExpr {
+    String method_{};
+    SharedPtr<SearchOptions> options_{};
+};
+
+export struct WrapSearchExpr {
+    Vector<MatchExpr *> match_exprs_{};
+    Vector<KnnExpr *> knn_exprs_{};
+    Vector<MatchTensorExpr *> match_tensor_exprs_{};
+    FusionExpr *fusion_expr_{};
+};
+
+export struct WrapParsedExpr {
+    ParsedExprType type;
+    WrapConstantExpr constant_expr;
+    WrapColumnExpr column_expr;
+    WrapFunctionExpr function_expr;
+    WrapBetweenExpr between_expr;
+    WrapKnnExpr knn_expr;
+    WrapMatchExpr match_expr;
+    WrapFusionExpr fusion_expr;
+    WrapSearchExpr search_expr;
 };
 
 
@@ -170,7 +236,7 @@ export WrapQueryResult WrapShowBlockColumn(Infinity &instance,
                                            const SizeT &column_id);
 
 export WrapQueryResult
-WrapInsert(Infinity& instance, const String& db_name, const String& table_name, Vector<String> columns, Vector<Vector<ParsedExpr*>> values);
+WrapInsert(Infinity& instance, const String& db_name, const String& table_name, Vector<String>& columns, Vector<Vector<WrapConstantExpr>>& values);
 
 export WrapQueryResult
 WrapImport(Infinity &instance, const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
