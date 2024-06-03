@@ -50,9 +50,6 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
 
 private:
-    
-
-private:
     u64 table_index_ = 0;
     SharedPtr<MatchSparseExpression> match_sparse_expr_;
 

@@ -668,23 +668,15 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSpar
         LOG_ERROR(error_info);
         RecoverableError(Status::SyntaxError(error_info));
     }
-    // TODO: check query sparse here
-    auto *sparse_info = static_cast<SparseInfo *>(type_info);
 
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.emplace_back(expr_ptr);
 
-    if (expr.max_indice_ + 1 > static_cast<int64_t>(sparse_info->Dimension())) {
-        const auto error_info =
-            fmt::format("The query sparse indice is out of range, max indice: {}, dimension: {}", expr.max_indice_, sparse_info->Dimension());
-        LOG_ERROR(error_info);
-        RecoverableError(Status::SyntaxError(error_info));
-    }
-    auto sparse_info2 = SparseInfo::Make(expr.embedding_data_type_, expr.embedding_indice_type_, sparse_info->Dimension());
-    auto sparse_ref = SparseRefT{expr.query_sparse_indice_ptr_.get(), expr.query_sparse_data_ptr_.get(), expr.nnz_};
-
-    auto bound_match_sparse_expr =
-        MakeShared<MatchSparseExpression>(std::move(arguments), sparse_ref, sparse_info2, expr.metric_type_, expr.topn_, std::move(expr.opt_params_));
+    auto bound_match_sparse_expr = MakeShared<MatchSparseExpression>(std::move(arguments),
+                                                                     expr.query_sparse_expr_.get(),
+                                                                     expr.metric_type_,
+                                                                     expr.topn_,
+                                                                     std::move(expr.opt_params_));
     return bound_match_sparse_expr;
 }
 
@@ -771,7 +763,8 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         switch (special_function_ptr->special_type()) {
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {
-                    Status status = Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2");
+                    Status status =
+                        Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2");
                     LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
@@ -779,7 +772,8 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
             }
             case SpecialType::kSimilarity: {
                 if (!bind_context_ptr->allow_similarity) {
-                    Status status = Status::SyntaxError("SIMILARITY() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product");
+                    Status status = Status::SyntaxError(
+                        "SIMILARITY() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product");
                     LOG_ERROR(status.message());
                     RecoverableError(status);
                 }

@@ -2068,9 +2068,9 @@ Return:
     ;
 }
 
-//                 MATCH SPARSE (column_name, query_sparse,      data_type   metric_type,   topn)         extra options
-//                   1      2         4             6                8           10            12             14
-match_sparse_expr: MATCH SPARSE '(' expr ',' sparse_array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' with_index_param_list {
+//                 MATCH SPARSE (column_name, query_sparse,      metric_type,   topn)         extra options
+//                   1      2         4             6                8           10              12
+match_sparse_expr: MATCH SPARSE '(' expr ',' sparse_array_expr ',' STRING ',' LONG_VALUE ')' with_index_param_list {
     auto match_sparse_expr = new infinity::MatchSparseExpr();
     $$ = match_sparse_expr;
 
@@ -2078,15 +2078,14 @@ match_sparse_expr: MATCH SPARSE '(' expr ',' sparse_array_expr ',' STRING ',' ST
     match_sparse_expr->SetSearchColumn($4);
 
     // search sparse and data type
-    ParserHelper::ToUpper($8);
-    match_sparse_expr->SetQuerySparse($8, $6);
+    match_sparse_expr->SetQuerySparse($6);
 
     // metric type
-    ParserHelper::ToLower($10);
-    match_sparse_expr->SetMetricType($10);
+    ParserHelper::ToLower($8);
+    match_sparse_expr->SetMetricType($8);
 
     // topn and options
-    match_sparse_expr->SetOptParams($12, $14);
+    match_sparse_expr->SetOptParams($10, $12);
 }
 
 match_text_expr : MATCH TEXT '(' STRING ',' STRING ')' {

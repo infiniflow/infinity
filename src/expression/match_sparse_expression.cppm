@@ -25,30 +25,29 @@ import statement_common;
 import match_sparse_expr;
 import sparse_info;
 import column_expression;
+import constant_expr;
+import base_expression;
 
 namespace infinity {
 
 export class MatchSparseExpression final : public BaseExpression {
 public:
     MatchSparseExpression(Vector<SharedPtr<BaseExpression>> search_column,
-                          SparseRefT query_sparse,
-                          SharedPtr<SparseInfo> sparse_info,
+                          const ConstantExpr *query_sparse_expr,
                           SparseMetricType metric_type,
                           SizeT topn,
-                          const Vector<UniquePtr<InitParameter>> &opt_params)
-        : BaseExpression(ExpressionType::kMatchSparse, std::move(search_column)), query_sparse_(query_sparse), sparse_info_(sparse_info),
-          metric_type_(metric_type), topn_(topn), opt_params_(opt_params) {
-        column_expr_ = static_cast<const ColumnExpression *>(arguments_[0].get());
-    }
+                          const Vector<UniquePtr<InitParameter>> &opt_params);
 
     DataType Type() const override;
 
     String ToString() const override;
 
+private:
+    void MakeQuery(const ConstantExpr *query_sparse_expr);
+
 public:
     const ColumnExpression *column_expr_;
-    SparseRefT query_sparse_;
-    SharedPtr<SparseInfo> sparse_info_;
+    SharedPtr<BaseExpression> query_sparse_expr_;
 
     SparseMetricType metric_type_;
     SizeT topn_;

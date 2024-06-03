@@ -31,7 +31,7 @@ public:
 
     void SetSearchColumn(ParsedExpr *&column_expr);
 
-    void SetQuerySparse(char *&raw_data_type, ConstantExpr *raw_sparse_expr);
+    void SetQuerySparse(ConstantExpr *raw_sparse_expr);
 
     void SetMetricType(char *&raw_metric_type);
 
@@ -44,13 +44,9 @@ public:
 public:
     const bool own_memory_;
     std::unique_ptr<ParsedExpr> column_expr_;
-    
-    EmbeddingDataType embedding_data_type_ = EmbeddingDataType::kElemInvalid;
-    EmbeddingDataType embedding_indice_type_ = EmbeddingDataType::kElemInt64; // indice type is always int64
-    std::unique_ptr<char[]> query_sparse_indice_ptr_;
-    std::unique_ptr<char[]> query_sparse_data_ptr_;
+
+    std::unique_ptr<ConstantExpr> query_sparse_expr_{};
     uint32_t nnz_ = 0;
-    int64_t max_indice_ = 0;
 
     SparseMetricType metric_type_;
     size_t topn_;

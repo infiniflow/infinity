@@ -17,27 +17,30 @@ module;
 export module match_sparse_scan_function_data;
 
 import stl;
-// import function_data;
 import table_function;
 import global_block_id;
 import block_index;
-// import internal_types;
-// import knn_result_handler;
-// import infinity_exception;
-// import logger;
+import merge_knn;
+import data_block;
 
 namespace infinity {
 
 export class MatchSparseScanFunctionData : public TableFunctionData {
 public:
+    MatchSparseScanFunctionData() = default;
+
     MatchSparseScanFunctionData(const BlockIndex *block_index, const SharedPtr<Vector<GlobalBlockID>> &global_block_ids)
-        : block_index_(block_index), global_block_ids_(global_block_ids) {}
+        : block_index_(block_index), global_block_ids_(global_block_ids), query_data_(DataBlock::Make()) {}
 
 public:
-    const BlockIndex *block_index_;
-    const SharedPtr<Vector<GlobalBlockID>> &global_block_ids_;
+    const BlockIndex *block_index_{};
+    SharedPtr<Vector<GlobalBlockID>> global_block_ids_;
+
+    bool evaluated_ = false;
+    SharedPtr<DataBlock> query_data_{};
 
     u32 current_block_ids_idx_ = 0;
+    UniquePtr<MergeKnnBase> merge_knn_base_{};
 };
 
 } // namespace infinity

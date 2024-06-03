@@ -131,7 +131,7 @@ UniquePtr<OperatorState> MakeMatchSparseScanState(const PhysicalMatchSparseScan 
     auto operator_state = MakeUnique<MatchSparseScanOperatorState>();
     auto *match_sparse_scan_source_state = static_cast<MatchSparseScanSourceState *>(source_state);
     operator_state->match_sparse_scan_function_data_ =
-        MakeUnique<MatchSparseScanFunctionData>(physical_match_sparse_scan->GetBlockIndex(), match_sparse_scan_source_state->global_ids_);
+        MatchSparseScanFunctionData(physical_match_sparse_scan->GetBlockIndex(), match_sparse_scan_source_state->global_ids_);
     return operator_state;
 }
 

@@ -126,7 +126,7 @@ export struct MergeMatchTensorOperatorState : public OperatorState {
 export struct MatchSparseScanOperatorState : public OperatorState {
     inline explicit MatchSparseScanOperatorState() : OperatorState(PhysicalOperatorType::kMatchSparseScan) {}
 
-    UniquePtr<MatchSparseScanFunctionData> match_sparse_scan_function_data_{};
+    MatchSparseScanFunctionData match_sparse_scan_function_data_{};
 };
 
 // MergeMatchSparse
