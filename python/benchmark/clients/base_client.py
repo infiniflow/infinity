@@ -141,11 +141,11 @@ class BaseClient:
                 query_batch = 10
                 with self.mt_lock:
                     # how many queries a single worker can do in 10ms
-                    query_batch = self.mt_done_queries / (
-                        num_workers * report_qps_sec * 100
+                    query_batch = int(
+                        self.mt_done_queries / (num_workers * report_qps_sec * 100)
                     )
                     query_batch = min(100, query_batch)
-                    query_batch = max(query_batch, 1)
+                    query_batch = max(query_batch, 10)
                     self.mt_query_batch = query_batch
                     self.mt_done_queries = 0
                 start = now
@@ -273,11 +273,12 @@ class BaseClient:
                 query_batch = 10
                 with self.mp_lock:
                     # how many queries a single worker can do in 10ms
-                    query_batch = self.mp_done_queries.value / (
-                        num_workers * report_qps_sec * 100
+                    query_batch = int(
+                        self.mp_done_queries.value
+                        / (num_workers * report_qps_sec * 100)
                     )
                     query_batch = min(100, query_batch)
-                    query_batch = max(query_batch, 1)
+                    query_batch = max(query_batch, 10)
                     self.mp_query_batch.value = query_batch
                     self.mp_done_queries.value = 0
                 start = now
