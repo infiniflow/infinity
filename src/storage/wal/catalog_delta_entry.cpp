@@ -308,7 +308,8 @@ AddSegmentEntryOp::AddSegmentEntryOp(SegmentEntry *segment_entry, TxnTimeStamp c
       column_count_(segment_entry->column_count()), row_count_(segment_entry->row_count()), // FIXME: use append_state
       actual_row_count_(segment_entry->actual_row_count()),                                 // FIXME: use append_state
       row_capacity_(segment_entry->row_capacity()), min_row_ts_(segment_entry->min_row_ts()), max_row_ts_(segment_entry->max_row_ts()),
-      deprecate_ts_(segment_entry->deprecate_ts()), segment_filter_binary_data_(std::move(segment_filter_binary_data)) {}
+      first_delete_ts_(segment_entry->first_delete_ts()), deprecate_ts_(segment_entry->deprecate_ts()),
+      segment_filter_binary_data_(std::move(segment_filter_binary_data)) {}
 
 AddBlockEntryOp::AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts, String block_filter_binary_data)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, block_entry, commit_ts), block_entry_(block_entry),
@@ -389,6 +390,7 @@ UniquePtr<AddSegmentEntryOp> AddSegmentEntryOp::ReadAdv(char *&ptr) {
     add_segment_op->row_capacity_ = ReadBufAdv<SizeT>(ptr);
     add_segment_op->min_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     add_segment_op->max_row_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    add_segment_op->first_delete_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     add_segment_op->deprecate_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     add_segment_op->segment_filter_binary_data_ = ReadBufAdv<String>(ptr);
     return add_segment_op;
@@ -488,7 +490,7 @@ SizeT AddSegmentEntryOp::GetSizeInBytes() const {
     total_size += sizeof(SizeT);
     total_size += sizeof(actual_row_count_);
     total_size += sizeof(SizeT);
-    total_size += sizeof(TxnTimeStamp) * 3;
+    total_size += sizeof(TxnTimeStamp) * 4;
     total_size += sizeof(i32) + segment_filter_binary_data_.size();
     return total_size;
 }
@@ -571,6 +573,7 @@ void AddSegmentEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->row_capacity_);
     WriteBufAdv(buf, this->min_row_ts_);
     WriteBufAdv(buf, this->max_row_ts_);
+    WriteBufAdv(buf, this->first_delete_ts_);
     WriteBufAdv(buf, this->deprecate_ts_);
     WriteBufAdv(buf, this->segment_filter_binary_data_);
 }
@@ -647,9 +650,10 @@ const String AddSegmentEntryOp::ToString() const {
     std::stringstream sstream;
     sstream << fmt::format("AddSegmentEntryOp {}", CatalogDeltaOperation::ToString());
 
-    sstream << fmt::format(" min_row_ts: {} max_row_ts: {} row_capacity: {} row_count: {} actual_row_count: {} column_count: {}",
+    sstream << fmt::format(" min_row_ts: {} max_row_ts: {} first_delete_ts: {} row_capacity: {} row_count: {} actual_row_count: {} column_count: {}",
                            min_row_ts_,
                            max_row_ts_,
+                           first_delete_ts_,
                            row_capacity_,
                            row_count_,
                            actual_row_count_,
@@ -736,7 +740,8 @@ bool AddSegmentEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddSegmentEntryOp *>(&rhs);
     return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && status_ == rhs_op->status_ && column_count_ == rhs_op->column_count_ &&
            row_count_ == rhs_op->row_count_ && actual_row_count_ == rhs_op->actual_row_count_ && row_capacity_ == rhs_op->row_capacity_ &&
-           min_row_ts_ == rhs_op->min_row_ts_ && max_row_ts_ == rhs_op->max_row_ts_ && deprecate_ts_ == rhs_op->deprecate_ts_;
+           min_row_ts_ == rhs_op->min_row_ts_ && max_row_ts_ == rhs_op->max_row_ts_ && first_delete_ts_ == rhs_op->first_delete_ts_ &&
+           deprecate_ts_ == rhs_op->deprecate_ts_;
 }
 
 bool AddBlockEntryOp::operator==(const CatalogDeltaOperation &rhs) const {

@@ -1,0 +1,33 @@
+
+statement ok
+DROP TABLE IF EXISTS ft_delete;
+
+statement ok
+CREATE TABLE ft_delete(num int, doc varchar);
+
+# copy data from csv file
+statement ok
+COPY ft_delete FROM '/var/infinity/test_data/fulltext_delete.csv' WITH ( DELIMITER '\t' );
+
+statement ok
+CREATE INDEX ft_index ON ft_delete(doc) USING FULLTEXT;
+
+query I
+SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text');
+----
+1 first text 0 0.167868
+2 second text multiple 1 0.133531
+3 third text many words 2 0.110856
+
+statement ok
+DELETE FROM ft_delete WHERE 1 = num;
+
+query I
+SELECT num, doc, ROW_ID(), SCORE() FROM ft_delete SEARCH MATCH TEXT ('doc', 'text');
+----
+2 second text multiple 1 0.133531
+3 third text many words 2 0.110856
+
+# Clean up
+statement ok
+DROP TABLE ft_delete;

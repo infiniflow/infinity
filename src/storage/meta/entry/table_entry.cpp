@@ -1044,7 +1044,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
-        if (segment_entry->commit_ts_ > max_commit_ts) {
+        if (segment_entry->commit_ts_ > max_commit_ts or segment_entry->deprecate_ts() <= max_commit_ts) {
             continue;
         }
         json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
