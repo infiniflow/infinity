@@ -117,7 +117,6 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     SharedPtr<PlanFragment> plan_fragment{};
     UniquePtr<Notifier> notifier{};
 
-    this->BeginTxn();
 //    ProfilerStart("Query");
 //    BaseProfiler profiler;
 //    profiler.Begin();
