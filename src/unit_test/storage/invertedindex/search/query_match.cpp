@@ -38,6 +38,7 @@ import phrase_doc_iterator;
 import global_resource_usage;
 import term_doc_iterator;
 import logger;
+import column_index_reader;
 
 using namespace infinity;
 
@@ -294,7 +295,9 @@ void QueryMatchTest::QueryMatch(const String& db_name,
 
     auto fake_table_ref = BaseTableRef::FakeTableRef(table_entry, txn);
 
-    QueryBuilder query_builder(txn, fake_table_ref);
+    QueryBuilder query_builder(fake_table_ref.get());
+    IndexReader index_reader = fake_table_ref->table_entry_ptr_->GetFullTextIndexReader(txn);
+    query_builder.Init(index_reader);
     const Map<String, String> &column2analyzer = query_builder.GetColumn2Analyzer();
 
     auto match_expr = MakeShared<MatchExpr>();

@@ -39,7 +39,8 @@ enum class EarlyTermAlg;
 
 export class QueryBuilder {
 public:
-    explicit QueryBuilder(BaseTableRef* base_table_ref) : base_table_ref_(base_table_ref) {};
+    explicit QueryBuilder(BaseTableRef* base_table_ref)
+    : base_table_ref_(base_table_ref), table_entry_(base_table_ref->table_entry_ptr_) {};
 
     void Init(IndexReader index_reader);
 
@@ -55,6 +56,7 @@ public:
 
 private:
     BaseTableRef* base_table_ref_{nullptr};
+    TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
     Scorer scorer_;
 };
