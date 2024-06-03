@@ -212,8 +212,29 @@ class RemoteTable(Table, ABC):
                                 constant_expression = ttypes.ConstantExpr(
                                     literal_type=ttypes.LiteralType.DoubleTensorArray,
                                     f64_tensor_array_value=value)
+                elif isinstance(value, np.ndarray):
+                    float_list = value.tolist()
+                    if isinstance(float_list[0], int):
+                        constant_expression = ttypes.ConstantExpr(
+                            literal_type=ttypes.LiteralType.IntegerArray,
+                            i64_array_value=float_list)
+                    elif isinstance(float_list[0], float):
+                        constant_expression = ttypes.ConstantExpr(
+                            literal_type=ttypes.LiteralType.DoubleArray,
+                            f64_array_value=float_list)
+                    elif isinstance(float_list[0], list):
+                        if isinstance(float_list[0][0], int):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.IntegerTensorArray,
+                                i64_tensor_array_value=float_list)
+                        elif isinstance(float_list[0][0], float):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.DoubleTensorArray,
+                                f64_tensor_array_value=float_list)
+                    else:
+                        raise InfinityException(3069, f"Invalid list type: {type(value)}")
                 else:
-                    raise InfinityException(3069, f"Invalid constant expression: {type(value)}")
+                    raise InfinityException(3069, f"Invalid constant type: {type(value)}")
 
                 expr_type = ttypes.ParsedExprType(
                     constant_expr=constant_expression)

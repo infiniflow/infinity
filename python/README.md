@@ -39,22 +39,10 @@ from infinity.common import ConflictType
 infinity_obj = infinity.connect(REMOTE_HOST)
 db = infinity_obj.get_database("default_db")
 db.drop_table("my_table", ConflictType.Ignore)
-table = db_obj.create_table("my_table", {
-            "c1": {
-                "type": "int",
-                "constraints"(optional): ["primary key", ...],
-                "default"(optional): 1/"asdf"/[1,2]/...
-            },
-            "c2": {
-                "type":"vector,1024,float32",
-            }
-        }, None)
-table.insert(
-    [{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
-table.insert(
-    [{"num": 2, "body": "publisher=US National Office for Harmful Algal Blooms", "vec": [4.0] * 5}])
-table.insert(
-    [{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
+table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector,5,float"}}, ConflictType.Error)
+table.insert([{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec": [1.0] * 5}])
+table.insert([{"num": 2, "body": "publisher=US National Office for Harmful Algal Blooms", "vec": [4.0] * 5}])
+table.insert([{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
 
 res = table.output(["*"]).knn("vec", [3.0] * 5, "float", "ip", 2).to_pl()
 print(res)
