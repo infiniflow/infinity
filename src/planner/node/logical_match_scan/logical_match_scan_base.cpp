@@ -16,7 +16,7 @@ module;
 
 #include <sstream>
 
-module logical_match_tensor_scan;
+module logical_match_scan_base;
 
 import stl;
 import base_table_ref;
@@ -35,13 +35,17 @@ import logger;
 
 namespace infinity {
 
-LogicalMatchTensorScan::LogicalMatchTensorScan(const u64 node_id,
-                                               SharedPtr<BaseTableRef> base_table_ref,
-                                               SharedPtr<MatchTensorExpression> match_tensor_expr)
-    : LogicalNode(node_id, LogicalNodeType::kMatchTensorScan), base_table_ref_(std::move(base_table_ref)),
-      match_tensor_expr_(std::move(match_tensor_expr)) {}
+LogicalMatchScanBase::LogicalMatchScanBase(u64 node_id,
+                                           LogicalNodeType node_type,
+                                           SharedPtr<BaseTableRef> base_table_ref,
+                                           SharedPtr<BaseExpression> query_expression)
+    : LogicalNode(node_id, node_type), base_table_ref_(base_table_ref), query_expression_(query_expression)
 
-Vector<ColumnBinding> LogicalMatchTensorScan::GetColumnBindings() const {
+{
+    //
+}
+
+Vector<ColumnBinding> LogicalMatchScanBase::GetColumnBindings() const {
     Vector<ColumnBinding> result;
     auto &column_ids = base_table_ref_->column_ids_;
     result.reserve(column_ids.size());
@@ -51,7 +55,7 @@ Vector<ColumnBinding> LogicalMatchTensorScan::GetColumnBindings() const {
     return result;
 }
 
-SharedPtr<Vector<String>> LogicalMatchTensorScan::GetOutputNames() const {
+SharedPtr<Vector<String>> LogicalMatchScanBase::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
     const SizeT column_count = base_table_ref_->column_names_->size();
     result_names->reserve(column_count + 2);
@@ -63,58 +67,32 @@ SharedPtr<Vector<String>> LogicalMatchTensorScan::GetOutputNames() const {
     return result_names;
 }
 
-SharedPtr<Vector<SharedPtr<DataType>>> LogicalMatchTensorScan::GetOutputTypes() const {
+SharedPtr<Vector<SharedPtr<DataType>>> LogicalMatchScanBase::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
     const SizeT column_count = base_table_ref_->column_names_->size();
     result_types->reserve(column_count + 2);
     for (auto &type : *base_table_ref_->column_types_) {
         result_types->emplace_back(type);
     }
-    result_types->emplace_back(MakeShared<DataType>(match_tensor_expr_->Type()));
+    result_types->emplace_back(MakeShared<DataType>(query_expression_->Type()));
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return result_types;
 }
 
-TableEntry *LogicalMatchTensorScan::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
+TableEntry *LogicalMatchScanBase::table_collection_ptr() const { return base_table_ref_->table_entry_ptr_; }
 
-String LogicalMatchTensorScan::TableAlias() const { return base_table_ref_->alias_; }
+String LogicalMatchScanBase::TableAlias() const { return base_table_ref_->alias_; }
 
-u64 LogicalMatchTensorScan::TableIndex() const { return base_table_ref_->table_index_; }
+u64 LogicalMatchScanBase::TableIndex() const { return base_table_ref_->table_index_; }
 
-void LogicalMatchTensorScan::InitExtraOptions() {
-    SearchOptions options(match_tensor_expr_->options_text_);
-    // topn option
-    auto top_n_it = options.options_.find("topn");
-    if (top_n_it == options.options_.end()) {
-        top_n_it = options.options_.find("top_n");
-        if (top_n_it == options.options_.end()) {
-            top_n_it = options.options_.find("topk");
-            if (top_n_it == options.options_.end()) {
-                top_n_it = options.options_.find("top_k");
-            }
-        }
-    }
-    if (top_n_it != options.options_.end()) {
-        const int top_n_option = std::stoi(top_n_it->second);
-        if (top_n_option <= 0) {
-            Status status = Status::SyntaxError("topn must be a positive integer");
-            LOG_ERROR(status.message());
-            RecoverableError(status);
-        }
-        topn_ = top_n_option;
-    } else {
-        topn_ = DEFAULT_MATCH_TENSOR_OPTION_TOP_N;
-    }
-}
-
-String LogicalMatchTensorScan::ToString(i64 &space) const {
+String LogicalMatchScanBase::ToString(i64 &space) const {
     std::stringstream ss;
     String arrow_str;
     if (space != 0) {
         arrow_str = String(space - 2, ' ');
         arrow_str += "-> ";
     }
-    arrow_str += "LogicalMatchTensorScan";
+    arrow_str += const_cast<LogicalMatchScanBase *>(this)->name();
     arrow_str += fmt::format(" ({})", this->node_id());
     ss << arrow_str << std::endl;
 
@@ -136,7 +114,7 @@ String LogicalMatchTensorScan::ToString(i64 &space) const {
     ss << table_index << std::endl;
 
     String match_info = String(space, ' ');
-    match_info += " - match tensor expression: " + match_tensor_expr_->ToString();
+    match_info += " - match tensor expression: " + query_expression_->ToString();
     ss << match_info << std::endl;
 
     // filter expression

@@ -53,6 +53,8 @@ public:
 
     SegmentOffset GetSegmentOffset(SegmentID segment_id) const;
 
+    BlockOffset GetBlockOffset(SegmentID segment_id, BlockID block_id) const;
+
     bool IsEmpty() const { return segment_block_index_.empty(); }
 
 public:

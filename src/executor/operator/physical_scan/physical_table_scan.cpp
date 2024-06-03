@@ -83,10 +83,6 @@ TableEntry *PhysicalTableScan::TableEntry() const { return base_table_ref_->tabl
 
 SizeT PhysicalTableScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
-SizeT PhysicalTableScan::TaskletCount() { return base_table_ref_->block_index_->BlockCount(); }
-
-BlockIndex *PhysicalTableScan::GetBlockIndex() const { return base_table_ref_->block_index_.get(); }
-
 Vector<SizeT> &PhysicalTableScan::ColumnIDs() const {
     if (!add_row_id_)
         return base_table_ref_->column_ids_;
@@ -95,33 +91,6 @@ Vector<SizeT> &PhysicalTableScan::ColumnIDs() const {
     column_ids_ = base_table_ref_->column_ids_;
     column_ids_.push_back(COLUMN_IDENTIFIER_ROW_ID);
     return column_ids_;
-}
-
-Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalTableScan::PlanBlockEntries(i64 parallel_count) const {
-    BlockIndex *block_index = base_table_ref_->block_index_.get();
-
-    u64 all_block_count = block_index->BlockCount();
-    u64 block_per_task = all_block_count / parallel_count;
-    u64 residual = all_block_count % parallel_count;
-
-    Vector<GlobalBlockID> global_blocks;
-    for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
-        for (const auto *block_entry : segment_info.block_map_) {
-            global_blocks.emplace_back(GlobalBlockID{segment_id, block_entry->block_id()});
-        }
-    }
-    Vector<SharedPtr<Vector<GlobalBlockID>>> result(parallel_count, nullptr);
-    for (SizeT task_id = 0, global_block_id = 0, residual_idx = 0; (i64)task_id < parallel_count; ++task_id) {
-        result[task_id] = MakeShared<Vector<GlobalBlockID>>();
-        for (u64 block_id_in_task = 0; block_id_in_task < block_per_task; ++block_id_in_task) {
-            result[task_id]->emplace_back(global_blocks[global_block_id++]);
-        }
-        if (residual_idx < residual) {
-            result[task_id]->emplace_back(global_blocks[global_block_id++]);
-            ++residual_idx;
-        }
-    }
-    return result;
 }
 
 void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOperatorState *table_scan_operator_state) {

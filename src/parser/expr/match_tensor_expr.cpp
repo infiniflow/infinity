@@ -91,7 +91,7 @@ void MatchTensorExpr::SetQueryTensor(char *&raw_embedding_data_type, ConstantExp
 
 void MatchTensorExpr::SetQueryTensorStr(std::string embedding_data_type, const ConstantExpr *tensor_expr) {
     std::transform(embedding_data_type.begin(), embedding_data_type.end(), embedding_data_type.begin(), [](unsigned char c) {
-        return std::tolower(c);
+        return std::toupper(c);
     });
     uint32_t fake_assume_tensor_column_basic_embedding_dim = 0;
     switch (tensor_expr->literal_type_) {
@@ -125,29 +125,39 @@ void MatchTensorExpr::SetQueryTensorStr(std::string embedding_data_type, const C
             break;
         }
     }
-    if (embedding_data_type == "bit") {
-        embedding_data_type_ = EmbeddingDataType::kElemBit;
-        query_tensor_data_ptr_ = GetConcatenatedTensorData<bool>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
-    } else if (embedding_data_type == "int8") {
-        embedding_data_type_ = EmbeddingDataType::kElemInt8;
-        query_tensor_data_ptr_ = GetConcatenatedTensorData<int8_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
-    } else if (embedding_data_type == "int16") {
-        embedding_data_type_ = EmbeddingDataType::kElemInt16;
-        query_tensor_data_ptr_ = GetConcatenatedTensorData<int16_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
-    } else if (embedding_data_type == "int32" or embedding_data_type == "int") {
-        embedding_data_type_ = EmbeddingDataType::kElemInt32;
-        query_tensor_data_ptr_ = GetConcatenatedTensorData<int32_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
-    } else if (embedding_data_type == "int64") {
-        embedding_data_type_ = EmbeddingDataType::kElemInt64;
-        query_tensor_data_ptr_ = GetConcatenatedTensorData<int64_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
-    } else if (embedding_data_type == "float" or embedding_data_type == "float32" or embedding_data_type == "f32") {
-        embedding_data_type_ = EmbeddingDataType::kElemFloat;
-        query_tensor_data_ptr_ = GetConcatenatedTensorData<float>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
-    } else if (embedding_data_type == "double" or embedding_data_type == "float64" or embedding_data_type == "f64") {
-        embedding_data_type_ = EmbeddingDataType::kElemDouble;
-        query_tensor_data_ptr_ = GetConcatenatedTensorData<double>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
-    } else {
-        ParserError(fmt::format("Invalid embedding data type: {}", embedding_data_type));
+    embedding_data_type_ = EmbeddingT::String2EmbeddingDataType(embedding_data_type);
+    switch (embedding_data_type_) {
+        case kElemBit: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<bool>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case kElemInt8: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<int8_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case kElemInt16: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<int16_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case kElemInt32: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<int32_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case kElemInt64: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<int64_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case kElemFloat: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<float>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case kElemDouble: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<double>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        default: {
+            ParserError(fmt::format("Invalid embedding data type: {}", embedding_data_type));
+        }
     }
 }
 

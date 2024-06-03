@@ -41,6 +41,7 @@ import fusion_expression;
 import search_expression;
 import match_expression;
 import match_tensor_expression;
+import match_sparse_expression;
 import function;
 import aggregate_function;
 import aggregate_function_set;
@@ -59,6 +60,7 @@ import status;
 import query_context;
 import logger;
 import embedding_info;
+import sparse_info;
 import parsed_expr;
 import function_expr;
 import constant_expr;
@@ -72,6 +74,7 @@ import between_expr;
 import subquery_expr;
 import match_expr;
 import match_tensor_expr;
+import match_sparse_expr;
 import fusion_expr;
 import data_type;
 
@@ -653,10 +656,36 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
     return bound_match_tensor_expr;
 }
 
+SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSparseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
+    if (expr.column_expr_->type_ != ParsedExprType::kColumn) {
+        UnrecoverableError("MatchSparse expression expect a column expression");
+    }
+    auto expr_ptr = BuildColExpr(static_cast<ColumnExpr &>(*expr.column_expr_), bind_context_ptr, depth, false);
+    auto column_data_type = expr_ptr->Type();
+    TypeInfo *type_info = column_data_type.type_info().get();
+    if (column_data_type.type() != LogicalType::kSparse or type_info == nullptr or type_info->type() != TypeInfoType::kSparse) {
+        const auto error_info = fmt::format("Expect the column search is a sparse column, but got: {}", column_data_type.ToString());
+        LOG_ERROR(error_info);
+        RecoverableError(Status::SyntaxError(error_info));
+    }
+
+    Vector<SharedPtr<BaseExpression>> arguments;
+    arguments.emplace_back(expr_ptr);
+
+    auto bound_match_sparse_expr = MakeShared<MatchSparseExpression>(std::move(arguments),
+                                                                     expr.query_sparse_expr_.get(),
+                                                                     expr.metric_type_,
+                                                                     expr.query_n_,
+                                                                     expr.topn_,
+                                                                     std::move(expr.opt_params_));
+    return bound_match_sparse_expr;
+}
+
 SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     Vector<SharedPtr<MatchExpression>> match_exprs;
     Vector<SharedPtr<KnnExpression>> knn_exprs;
     Vector<SharedPtr<MatchTensorExpression>> match_tensor_exprs;
+    Vector<SharedPtr<MatchSparseExpression>> match_sparse_exprs;
     Vector<SharedPtr<FusionExpression>> fusion_exprs;
     for (MatchExpr *match_expr : expr.match_exprs_) {
         match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
@@ -668,6 +697,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
         match_tensor_exprs.push_back(
             static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*match_tensor_expr, bind_context_ptr, depth, false)));
     }
+    for (MatchSparseExpr *match_sparse_expr : expr.match_sparse_exprs_) {
+        match_sparse_exprs.push_back(
+            static_pointer_cast<MatchSparseExpression>(BuildMatchSparseExpr(std::move(*match_sparse_expr), bind_context_ptr, depth, false)));
+    }
     for (FusionExpr *fusion_expr : expr.fusion_exprs_) {
         auto output_expr = MakeShared<FusionExpression>(fusion_expr->method_, fusion_expr->options_);
         if (fusion_expr->match_tensor_expr_) {
@@ -676,7 +709,8 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
         }
         fusion_exprs.push_back(std::move(output_expr));
     }
-    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, knn_exprs, match_tensor_exprs, fusion_exprs);
+    SharedPtr<SearchExpression> bound_search_expr =
+        MakeShared<SearchExpression>(match_exprs, knn_exprs, match_tensor_exprs, match_sparse_exprs, fusion_exprs);
     return bound_search_expr;
 }
 
@@ -730,7 +764,8 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         switch (special_function_ptr->special_type()) {
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {
-                    Status status = Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2");
+                    Status status =
+                        Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2");
                     LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
@@ -738,7 +773,8 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
             }
             case SpecialType::kSimilarity: {
                 if (!bind_context_ptr->allow_similarity) {
-                    Status status = Status::SyntaxError("SIMILARITY() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product");
+                    Status status = Status::SyntaxError(
+                        "SIMILARITY() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product");
                     LOG_ERROR(status.message());
                     RecoverableError(status);
                 }

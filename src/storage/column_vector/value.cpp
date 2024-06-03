@@ -260,6 +260,27 @@ Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
     return value;
 }
 
+Value Value::MakeSparse(const char *raw_ptr, SizeT nnz, const SharedPtr<TypeInfo> type_info) {
+    const auto *sparse_info = static_cast<const SparseInfo *>(type_info.get());
+
+    const char *raw_indice_ptr = raw_ptr;
+    SizeT raw_indice_len = sparse_info->IndiceSize(nnz);
+    const char *raw_data_ptr = raw_ptr + raw_indice_len;
+    SizeT raw_data_len = sparse_info->DataSize(nnz);
+    Value value(LogicalType::kSparse, type_info);
+    value.value_info_ = MakeShared<SparseValueInfo>(nnz, raw_indice_ptr, raw_indice_len, raw_data_ptr, raw_data_len);
+    return value;
+}
+
+Value Value::MakeSparse(SizeT nnz, UniquePtr<char[]> indice_ptr, UniquePtr<char[]> data_ptr, const SharedPtr<TypeInfo> type_info) {
+    Value value(LogicalType::kSparse, type_info);
+    const auto *sparse_info = static_cast<const SparseInfo *>(type_info.get());
+    SizeT indice_len = sparse_info->IndiceSize(nnz);
+    SizeT data_len = sparse_info->DataSize(nnz);
+    value.value_info_ = MakeShared<SparseValueInfo>(nnz, std::move(indice_ptr), indice_len, std::move(data_ptr), data_len);
+    return value;
+}
+
 void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
     if (type_.type() != LogicalType::kTensorArray) {
         String error_message = fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString());

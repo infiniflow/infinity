@@ -68,9 +68,9 @@ public:
     SourcePosition source_position_{};
     String alias_{};
 
-protected:
     [[nodiscard]] virtual String ToString() const = 0;
 
+protected:
     ExpressionType type_{};
     Vector<SharedPtr<BaseExpression>> arguments_{};
 };

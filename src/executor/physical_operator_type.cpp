@@ -139,6 +139,10 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
             return "MatchTensorScan";
         case PhysicalOperatorType::kMergeMatchTensor:
             return "MergeMatchTensor";
+        case PhysicalOperatorType::kMatchSparseScan:
+            return "MatchSparseScan";
+        case PhysicalOperatorType::kMergeMatchSparse:
+            return "MergeMatchSparse";
         case PhysicalOperatorType::kFusion:
             return "Fusion";
         case PhysicalOperatorType::kMergeAggregate:

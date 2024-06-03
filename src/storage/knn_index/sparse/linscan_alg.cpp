@@ -35,6 +35,9 @@ void LinScan::Insert(const SparseVecRef &vec, u32 doc_id) {
 
 Pair<Vector<u32>, Vector<f32>> LinScan::Query(const SparseVecRef &query, u32 top_k) const {
     auto scores = MakeUnique<f32[]>(row_num_);
+    for (u32 i = 0; i < row_num_; ++i) {
+        scores[i] = 0.0;
+    }
     for (i32 i = 0; i < query.nnz_; ++i) {
         u32 indice = query.indices_[i];
         f32 val = query.data_[i];

@@ -31,17 +31,18 @@ import load_meta;
 import internal_types;
 import data_type;
 import fast_rough_filter;
+import physical_scan_base;
 
 namespace infinity {
 
-export class PhysicalTableScan : public PhysicalOperator {
+export class PhysicalTableScan : public PhysicalScanBase {
 public:
     explicit PhysicalTableScan(u64 id,
                                SharedPtr<BaseTableRef> base_table_ref,
                                UniquePtr<FastRoughFilterEvaluator> &&fast_rough_filter_evaluator,
                                SharedPtr<Vector<LoadMeta>> load_metas,
                                bool add_row_id = false)
-        : PhysicalOperator(PhysicalOperatorType::kTableScan, nullptr, nullptr, id, load_metas), base_table_ref_(std::move(base_table_ref)),
+        : PhysicalScanBase(id, PhysicalOperatorType::kTableScan, nullptr, nullptr, base_table_ref, load_metas),
           fast_rough_filter_evaluator_(std::move(fast_rough_filter_evaluator)), add_row_id_(add_row_id) {}
 
     ~PhysicalTableScan() override = default;
@@ -50,13 +51,9 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) final;
 
-    SizeT TaskletCount() override;
-
     SharedPtr<Vector<String>> GetOutputNames() const final;
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
-
-    Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const;
 
     String table_alias() const;
 
@@ -65,8 +62,6 @@ public:
     TableEntry *TableEntry() const;
 
     SizeT BlockEntryCount() const;
-
-    BlockIndex *GetBlockIndex() const;
 
     Vector<SizeT> &ColumnIDs() const;
 
@@ -82,8 +77,6 @@ private:
     void ExecuteInternal(QueryContext *query_context, TableScanOperatorState *table_scan_operator_state);
 
 private:
-    SharedPtr<BaseTableRef> base_table_ref_{};
-
     UniquePtr<FastRoughFilterEvaluator> fast_rough_filter_evaluator_{};
 
     bool add_row_id_;

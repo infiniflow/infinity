@@ -14,14 +14,13 @@
 
 module;
 
-export module logical_match_tensor_scan;
+export module logical_match_scan_base;
 
 import stl;
 import logical_node_type;
 import column_binding;
 import logical_node;
 import base_expression;
-import match_tensor_expression;
 import base_table_ref;
 import table_entry;
 import internal_types;
@@ -31,9 +30,9 @@ import common_query_filter;
 
 namespace infinity {
 
-export class LogicalMatchTensorScan final : public LogicalNode {
+export class LogicalMatchScanBase : public LogicalNode {
 public:
-    explicit LogicalMatchTensorScan(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<MatchTensorExpression> match_tensor_expr);
+    LogicalMatchScanBase(u64 node_id, LogicalNodeType node_type, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<BaseExpression> query_expression);
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const override;
 
@@ -49,17 +48,10 @@ public:
 
     String ToString(i64 &space) const override;
 
-    String name() override { return "LogicalMatchTensorScan"; }
-
-    void InitExtraOptions();
-
+public:
     SharedPtr<BaseTableRef> base_table_ref_{};
 
-    SharedPtr<MatchTensorExpression> match_tensor_expr_{};
-
-    // extra options
-    // will be parsed in InitExtraOptions()
-    u32 topn_ = 0;
+    SharedPtr<BaseExpression> query_expression_{};
 
     SharedPtr<BaseExpression> filter_expression_{};
 

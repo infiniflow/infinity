@@ -25,13 +25,14 @@ import match_tensor_expression;
 import base_table_ref;
 import data_type;
 import common_query_filter;
+import physical_scan_base;
 
 namespace infinity {
 struct LoadMeta;
 struct GlobalBlockID;
 struct BlockIndex;
 
-export class PhysicalMatchTensorScan final : public PhysicalOperator {
+export class PhysicalMatchTensorScan final : public PhysicalScanBase {
 public:
     explicit PhysicalMatchTensorScan(u64 id,
                                      u64 table_index,
@@ -49,10 +50,6 @@ public:
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
 
-    SizeT TaskletCount() override;
-
-    BlockIndex *GetBlockIndex() const;
-
     ColumnID SearchColumnID() const;
 
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
@@ -69,13 +66,10 @@ public:
 
     [[nodiscard]] inline const CommonQueryFilter *common_query_filter() const { return common_query_filter_.get(); }
 
-    [[nodiscard]] Vector<SharedPtr<Vector<GlobalBlockID>>> PlanBlockEntries(i64 parallel_count) const;
-
     [[nodiscard]] inline u32 GetTopN() const { return topn_; }
 
 private:
     u64 table_index_ = 0;
-    SharedPtr<BaseTableRef> base_table_ref_;
     SharedPtr<MatchTensorExpression> match_tensor_expr_;
 
     // for filter

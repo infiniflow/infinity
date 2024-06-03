@@ -23,7 +23,16 @@
 
 namespace infinity {
 
-enum EmbeddingDataType : int8_t { kElemBit, kElemInt8, kElemInt16, kElemInt32, kElemInt64, kElemFloat, kElemDouble, kElemInvalid };
+enum EmbeddingDataType : int8_t {
+    kElemBit,
+    kElemInt8,
+    kElemInt16,
+    kElemInt32,
+    kElemInt64,
+    kElemFloat,
+    kElemDouble,
+    kElemInvalid,
+};
 
 template <typename T>
 inline EmbeddingDataType ToEmbeddingDataType() {
@@ -106,6 +115,27 @@ public:
             }
         }
         return std::string();
+    }
+
+    static EmbeddingDataType String2EmbeddingDataType(std::string_view sv) {
+        if (sv == "BIT") {
+            return kElemBit;
+        } else if (sv == "INT8") {
+            return kElemInt8;
+        } else if (sv == "INT16") {
+            return kElemInt16;
+        } else if (sv == "INT32" || sv == "INT") {
+            return kElemInt32;
+        } else if (sv == "INT64") {
+            return kElemInt64;
+        } else if (sv == "FLOAT32" || sv == "FLOAT" || sv == "F32") {
+            return kElemFloat;
+        } else if (sv == "FLOAT64" || sv == "DOUBLE" || sv == "F64") {
+            return kElemDouble;
+        } else {
+            ParserError("Unexpected embedding type");
+        }
+        return kElemInvalid;
     }
 
     [[nodiscard]] static inline std::string Embedding2String(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension) {

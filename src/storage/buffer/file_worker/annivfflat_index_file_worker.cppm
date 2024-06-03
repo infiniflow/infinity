@@ -30,6 +30,7 @@ import create_index_info;
 import knn_expr;
 import column_def;
 import logger;
+import internal_types;
 
 namespace infinity {
 

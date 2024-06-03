@@ -39,7 +39,7 @@ import explain_statement;
 import create_index_info;
 import data_block;
 import table_def;
-
+import internal_types;
 import column_vector;
 import query_result;
 

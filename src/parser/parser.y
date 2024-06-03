@@ -430,7 +430,7 @@ struct SQL_LTYPE {
 %type <set_operator_t>          set_operator
 %type <explain_type_t>          explain_type
 
-%type <expr_t>                  expr expr_alias column_expr function_expr subquery_expr match_vector_expr match_tensor_expr
+%type <expr_t>                  expr expr_alias column_expr function_expr subquery_expr match_vector_expr match_tensor_expr match_sparse_expr sub_search
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
 %type <expr_t>                  conjunction_expr cast_expr case_expr
 %type <expr_t>                  match_text_expr query_expr fusion_expr search_clause
@@ -1994,6 +1994,7 @@ operand: '(' expr ')' {
 | match_vector_expr
 | match_text_expr
 | match_tensor_expr
+| match_sparse_expr
 | query_expr
 | fusion_expr
 
@@ -2067,6 +2068,26 @@ Return:
     ;
 }
 
+//                 MATCH SPARSE (column_name, query_sparse,      metric_type,   topn)         extra options
+//                   1      2         4             6                8           10              12
+match_sparse_expr: MATCH SPARSE '(' expr ',' sparse_array_expr ',' STRING ',' LONG_VALUE ')' with_index_param_list {
+    auto match_sparse_expr = new infinity::MatchSparseExpr();
+    $$ = match_sparse_expr;
+
+    // search column
+    match_sparse_expr->SetSearchColumn($4);
+
+    // search sparse and data type
+    match_sparse_expr->SetQuerySparse($6);
+
+    // metric type
+    ParserHelper::ToLower($8);
+    match_sparse_expr->SetMetricType($8);
+
+    // topn and options
+    match_sparse_expr->SetOptParams($10, $12);
+}
+
 match_text_expr : MATCH TEXT '(' STRING ',' STRING ')' {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->fields_ = std::string($4);
@@ -2119,44 +2140,30 @@ fusion_expr : FUSION '(' STRING ')' {
     $$ = fusion_expr.release();
 }
 
-
-sub_search_array : match_vector_expr {
-    $$ = new std::vector<infinity::ParsedExpr*>();
-    $$->emplace_back($1);
+sub_search : match_vector_expr {
+    $$ = $1;
 }
 | match_text_expr {
-    $$ = new std::vector<infinity::ParsedExpr*>();
-    $$->emplace_back($1);
+    $$ = $1;
 }
 | match_tensor_expr {
-    $$ = new std::vector<infinity::ParsedExpr*>();
-    $$->emplace_back($1);
+    $$ = $1;
+}
+| match_sparse_expr {
+    $$ = $1;
 }
 | query_expr {
-    $$ = new std::vector<infinity::ParsedExpr*>();
-    $$->emplace_back($1);
+    $$ = $1;
 }
 | fusion_expr {
+    $$ = $1;
+}
+
+sub_search_array : sub_search {
     $$ = new std::vector<infinity::ParsedExpr*>();
     $$->emplace_back($1);
 }
-| sub_search_array ',' match_vector_expr {
-    $1->emplace_back($3);
-    $$ = $1;
-}
-| sub_search_array ',' match_text_expr {
-    $1->emplace_back($3);
-    $$ = $1;
-}
-| sub_search_array ',' match_tensor_expr {
-    $1->emplace_back($3);
-    $$ = $1;
-}
-| sub_search_array ',' query_expr {
-    $1->emplace_back($3);
-    $$ = $1;
-}
-| sub_search_array ',' fusion_expr {
+| sub_search_array ',' sub_search {
     $1->emplace_back($3);
     $$ = $1;
 };

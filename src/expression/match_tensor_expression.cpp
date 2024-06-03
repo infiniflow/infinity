@@ -26,6 +26,7 @@ import embedding_info;
 import infinity_exception;
 import status;
 import logger;
+import logical_type;
 
 namespace infinity {
 
@@ -41,8 +42,6 @@ MatchTensorExpression::MatchTensorExpression(Vector<SharedPtr<BaseExpression>> s
       tensor_basic_embedding_dimension_(tensor_basic_embedding_dimension), options_text_(options_text) {
     column_expr_ = static_cast<ColumnExpression *>(arguments_[0].get());
 }
-
-LogicalType GetCommonLogicalType(const EmbeddingDataType query_data_type, const EmbeddingDataType column_type);
 
 DataType MatchTensorExpression::Type() const { return DataType(LogicalType::kFloat); }
 
