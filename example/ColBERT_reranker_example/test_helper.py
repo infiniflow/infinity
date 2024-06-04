@@ -20,10 +20,10 @@ document_passages = [
     "Born in Maida Vale, London, Turing was raised in southern England. He graduated from King's College, Cambridge, with a degree in mathematics.",
     "After the war, Turing worked at the National Physical Laboratory, where he designed the Automatic Computing Engine, one of the first designs for a stored-program computer.",
     "Turing has an extensive legacy with statues of him and many things named after him, including an annual award for computer science innovations.",
-    "This is an inrelevant sentence which will not help for the question which user may ask in the future.",
-    "This is another inrelevant sentence which will not help for the question about Turing which user may ask in the future.",
-    "This is another inrelevant sentence which will not help for the question about Alan Turing which user may ask in the future.",
-    "This is another inrelevant sentence which will not help for the question about the person Alan Turing which user may ask in the future.",
+    "This is an irrelevant sentence which will not help for the question which user may ask in the future.",
+    "This is another irrelevant sentence which will not help for the question about Turing which user may ask in the future.",
+    "This is another irrelevant sentence which will not help for the question about Alan Turing which user may ask in the future.",
+    "This is another irrelevant sentence which will not help for the question about the person Alan Turing which user may ask in the future.",
 ]
 
 
@@ -36,8 +36,8 @@ class TestHelper:
         time.sleep(3)
         self.h.show_data()
         self.h.query_bm25('Who was Alan Turing?', ['n'], 10)
-        self.h.query_float('Who was Alan Turing?', ['n'], 10, 10)
-        self.h.query_bit('Who was Alan Turing?', ['n'], 10, 10)
+        self.h.query_float('Who was Alan Turing?', ['n'], 10)
+        self.h.query_bit('Who was Alan Turing?', ['n'], 10)
         self.h.clear_test_env()
 
 
