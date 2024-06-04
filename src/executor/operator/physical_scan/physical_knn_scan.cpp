@@ -88,56 +88,56 @@ void ReadDataBlock(DataBlock *output,
     output->Finalize();
 }
 
-void MergeIntoBitmask(const VectorBuffer *input_bool_column_buffer,
-                      const SharedPtr<Bitmask> &input_null_mask,
-                      const SizeT count,
-                      Bitmask &bitmask,
-                      bool nullable,
-                      SizeT bitmask_offset = 0) {
-    if ((!nullable) || (input_null_mask->IsAllTrue())) {
-        for (SizeT idx = 0; idx < count; ++idx) {
-            if (!(input_bool_column_buffer->GetCompactBit(idx))) {
-                bitmask.SetFalse(idx + bitmask_offset);
-            }
-        }
-    } else {
-        const u64 *result_null_data = input_null_mask->GetData();
-        u64 *bitmask_data = bitmask.GetData();
-        SizeT unit_count = BitmaskBuffer::UnitCount(count);
-        bool bitmask_use_unit = (bitmask_offset % BitmaskBuffer::UNIT_BITS) == 0;
-        SizeT bitmask_unit_offset = bitmask_offset / BitmaskBuffer::UNIT_BITS;
-        for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count;
-             ++i, end_index = std::min(end_index + BitmaskBuffer::UNIT_BITS, count)) {
-            if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
-                // all data of 64 rows are not null
-                for (; start_index < end_index; ++start_index) {
-                    if (!(input_bool_column_buffer->GetCompactBit(start_index))) {
-                        bitmask.SetFalse(start_index + bitmask_offset);
-                    }
-                }
-            } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
-                // all data of 64 rows are null
-                if (bitmask_use_unit) {
-                    if (bitmask.GetData() == nullptr) {
-                        bitmask.SetFalse(start_index + bitmask_offset);
-                    }
-                    bitmask_data[i + bitmask_unit_offset] = BitmaskBuffer::UNIT_MIN;
-                    start_index = end_index;
-                } else {
-                    for (; start_index < end_index; ++start_index) {
-                        bitmask.SetFalse(start_index + bitmask_offset);
-                    }
-                }
-            } else {
-                for (; start_index < end_index; ++start_index) {
-                    if (!(input_null_mask->IsTrue(start_index)) || !(input_bool_column_buffer->GetCompactBit(start_index))) {
-                        bitmask.SetFalse(start_index + bitmask_offset);
-                    }
-                }
-            }
-        }
-    }
-}
+// void MergeIntoBitmask(const VectorBuffer *input_bool_column_buffer,
+//                       const SharedPtr<Bitmask> &input_null_mask,
+//                       const SizeT count,
+//                       Bitmask &bitmask,
+//                       bool nullable,
+//                       SizeT bitmask_offset = 0) {
+//     if ((!nullable) || (input_null_mask->IsAllTrue())) {
+//         for (SizeT idx = 0; idx < count; ++idx) {
+//             if (!(input_bool_column_buffer->GetCompactBit(idx))) {
+//                 bitmask.SetFalse(idx + bitmask_offset);
+//             }
+//         }
+//     } else {
+//         const u64 *result_null_data = input_null_mask->GetData();
+//         u64 *bitmask_data = bitmask.GetData();
+//         SizeT unit_count = BitmaskBuffer::UnitCount(count);
+//         bool bitmask_use_unit = (bitmask_offset % BitmaskBuffer::UNIT_BITS) == 0;
+//         SizeT bitmask_unit_offset = bitmask_offset / BitmaskBuffer::UNIT_BITS;
+//         for (SizeT i = 0, start_index = 0, end_index = BitmaskBuffer::UNIT_BITS; i < unit_count;
+//              ++i, end_index = std::min(end_index + BitmaskBuffer::UNIT_BITS, count)) {
+//             if (result_null_data[i] == BitmaskBuffer::UNIT_MAX) {
+//                 // all data of 64 rows are not null
+//                 for (; start_index < end_index; ++start_index) {
+//                     if (!(input_bool_column_buffer->GetCompactBit(start_index))) {
+//                         bitmask.SetFalse(start_index + bitmask_offset);
+//                     }
+//                 }
+//             } else if (result_null_data[i] == BitmaskBuffer::UNIT_MIN) {
+//                 // all data of 64 rows are null
+//                 if (bitmask_use_unit) {
+//                     if (bitmask.GetData() == nullptr) {
+//                         bitmask.SetFalse(start_index + bitmask_offset);
+//                     }
+//                     bitmask_data[i + bitmask_unit_offset] = BitmaskBuffer::UNIT_MIN;
+//                     start_index = end_index;
+//                 } else {
+//                     for (; start_index < end_index; ++start_index) {
+//                         bitmask.SetFalse(start_index + bitmask_offset);
+//                     }
+//                 }
+//             } else {
+//                 for (; start_index < end_index; ++start_index) {
+//                     if (!(input_null_mask->IsTrue(start_index)) || !(input_bool_column_buffer->GetCompactBit(start_index))) {
+//                         bitmask.SetFalse(start_index + bitmask_offset);
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
 
 void PhysicalKnnScan::Init() {}
 
@@ -270,41 +270,16 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         const BlockEntry *block_entry = block_column_entry->block_entry();
         const auto block_id = block_entry->block_id();
         const SegmentID segment_id = block_entry->GetSegmentEntry()->segment_id();
-        if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
+        const auto row_count = block_entry->row_count();
+
+        Bitmask bitmask;
+        if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
             LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} not skipped after common_query_filter",
                                   knn_scan_function_data->task_id_,
                                   block_column_idx + 1,
                                   brute_task_n));
-            const auto row_count = block_entry->row_count();
-            BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
-
-            // filter for segment
-            const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
-            Bitmask bitmask;
-            bitmask.Initialize(std::bit_ceil(row_count));
-            const u32 block_start_offset = block_id * DEFAULT_BLOCK_CAPACITY;
-            const u32 block_end_offset = block_start_offset + row_count;
-            if (std::holds_alternative<Vector<u32>>(filter_result)) {
-                const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-                const auto it1 = std::lower_bound(filter_result_vector.begin(), filter_result_vector.end(), block_start_offset);
-                const auto it2 = std::lower_bound(filter_result_vector.begin(), filter_result_vector.end(), block_end_offset);
-                bitmask.SetAllFalse();
-                for (auto it = it1; it < it2; ++it) {
-                    bitmask.SetTrue(*it - block_start_offset);
-                }
-            } else {
-                u32 u64_start_offset = block_start_offset / 64;
-                u32 u64_end_offset = (block_end_offset - 1) / 64;
-                if (const u64 *filter_data = std::get<Bitmask>(filter_result).GetData(); filter_data) {
-                    bitmask.SetAllFalse();
-                    u64 *data = bitmask.GetData();
-                    for (u32 i = u64_start_offset; i <= u64_end_offset; ++i) {
-                        data[i - u64_start_offset] = filter_data[i];
-                    }
-                }
-            }
             block_entry->SetDeleteBitmask(begin_ts, bitmask);
-
+            BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
             ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
 
             auto data = reinterpret_cast<const DataType *>(column_vector.data());
@@ -494,7 +469,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 BlockID block_id = l_ptr[i] / DEFAULT_BLOCK_CAPACITY;
                                 auto *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                                 if (block_entry == nullptr) {
-                                    String error_message = fmt::format("Cannot find segment id: {}, block id: {}, index chunk is {}", segment_id, block_id, chunk_id);
+                                    String error_message =
+                                        fmt::format("Cannot find segment id: {}, block id: {}, index chunk is {}", segment_id, block_id, chunk_id);
                                     LOG_CRITICAL(error_message);
                                     UnrecoverableError(error_message);
                                 } // this is for debug

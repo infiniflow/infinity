@@ -48,6 +48,8 @@ import merge_knn;
 import match_sparse_scan_function_data;
 import fix_heap;
 import global_block_id;
+import bitmask;
+import txn;
 
 namespace infinity {
 
@@ -57,8 +59,8 @@ PhysicalMatchSparseScan::PhysicalMatchSparseScan(u64 id,
                                                  SharedPtr<MatchSparseExpression> match_sparse_expression,
                                                  const SharedPtr<CommonQueryFilter> &common_query_filter,
                                                  SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalScanBase(id, PhysicalOperatorType::kMatchSparseScan, nullptr, nullptr, base_table_ref, load_metas), table_index_(table_index),
-      match_sparse_expr_(std::move(match_sparse_expression)), common_query_filter_(common_query_filter) {}
+    : PhysicalFilterScanBase(id, PhysicalOperatorType::kMatchSparseScan, nullptr, nullptr, base_table_ref, common_query_filter, load_metas),
+      table_index_(table_index), match_sparse_expr_(std::move(match_sparse_expression)) {}
 
 void PhysicalMatchSparseScan::Init() { search_column_id_ = match_sparse_expr_->column_expr_->binding().column_idx; }
 
@@ -222,7 +224,7 @@ void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSpa
     }
 }
 
-template <typename DataT, typename IdxType, typename ResultType,  template <typename, typename> typename C>
+template <typename DataT, typename IdxType, typename ResultType, template <typename, typename> typename C>
 void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state) {
     MatchSparseScanFunctionData &function_data = match_sparse_scan_state->match_sparse_scan_function_data_;
 
@@ -242,7 +244,17 @@ void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSpa
 }
 
 template <typename DistFunc, typename MergeHeap, typename ResultType>
-void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func, MergeHeap *merge_heap, QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state) {
+void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
+                                            MergeHeap *merge_heap,
+                                            QueryContext *query_context,
+                                            MatchSparseScanOperatorState *match_sparse_scan_state) {
+    Txn *txn = query_context->GetTxn();
+    const TxnTimeStamp begin_ts = txn->BeginTS();
+    if (!common_query_filter_->TryFinishBuild(txn)) {
+        // not ready, abort and wait for next time
+        return;
+    }
+
     SizeT query_n = match_sparse_expr_->query_n_;
     SizeT topn = match_sparse_expr_->topn_;
     MatchSparseScanFunctionData &function_data = match_sparse_scan_state->match_sparse_scan_function_data_;
@@ -253,7 +265,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func, MergeHeap *merg
         merge_knn_ptr->Begin();
         function_data.merge_knn_base_ = std::move(merge_knn_ptr);
 
-        auto dist_func_ptr =  MakeUnique<DistFunc>(match_sparse_expr_->metric_type_);
+        auto dist_func_ptr = MakeUnique<DistFunc>(match_sparse_expr_->metric_type_);
         dist_func = dist_func_ptr.get();
         function_data.sparse_distance_ = std::move(dist_func_ptr);
     }
@@ -263,13 +275,20 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func, MergeHeap *merg
     const BlockIndex *block_index = function_data.block_index_;
     auto &block_ids_idx = function_data.current_block_ids_idx_;
 
-    if (auto task_id = block_ids_idx; task_id < block_ids.size()) {
+    auto task_id = block_ids_idx;
+    while (task_id < block_ids.size()) {
         ++block_ids_idx;
         const auto [segment_id, block_id] = block_ids[task_id];
 
         BlockOffset row_cnt = block_index->GetBlockOffset(segment_id, block_id);
         const BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
         LOG_DEBUG(fmt::format("MatchSparseScan: segment_id: {}, block_id: {}", segment_id, block_id));
+
+        Bitmask bitmask;
+        if (!this->CalculateFilterBitmask(segment_id, block_id, row_cnt, bitmask)) {
+            break;
+        }
+        block_entry->SetDeleteBitmask(begin_ts, bitmask);
 
         auto *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id_);
         ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
@@ -287,6 +306,10 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func, MergeHeap *merg
             const auto *data_begin = reinterpret_cast<const SparseT *>(column_vector.data());
             FixHeapManager *heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
             for (BlockOffset i = 0; i < row_cnt; ++i) {
+                if (!bitmask.IsTrue(i)) {
+                    continue;
+                }
+
                 const auto *data = data_begin + i;
                 const auto &[nnz, chunk_id, chunk_offset] = *data;
 
@@ -303,6 +326,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func, MergeHeap *merg
                 merge_heap->Search(query_id, &d, &row_id, 1);
             }
         }
+        break;
     }
     if (block_ids_idx >= block_ids.size()) {
         LOG_DEBUG(fmt::format("MatchSparseScan: {} task finished", block_ids_idx));

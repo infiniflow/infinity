@@ -28,21 +28,21 @@ import common_query_filter;
 import physical_scan_base;
 import sparse_info;
 import match_sparse_expr;
-import match_sparse_scan_function_data;
+import physical_filter_scan_base;
 
 namespace infinity {
 struct LoadMeta;
 struct BlockIndex;
 class ColumnVector;
 
-export class PhysicalMatchSparseScan final : public PhysicalScanBase {
+export class PhysicalMatchSparseScan final : public PhysicalFilterScanBase {
 public:
-    explicit PhysicalMatchSparseScan(u64 id,
-                                     u64 table_index,
-                                     SharedPtr<BaseTableRef> base_table_ref,
-                                     SharedPtr<MatchSparseExpression> match_sparse_expression,
-                                     const SharedPtr<CommonQueryFilter> &common_query_filter,
-                                     SharedPtr<Vector<LoadMeta>> load_metas);
+    PhysicalMatchSparseScan(u64 id,
+                            u64 table_index,
+                            SharedPtr<BaseTableRef> base_table_ref,
+                            SharedPtr<MatchSparseExpression> match_sparse_expression,
+                            const SharedPtr<CommonQueryFilter> &common_query_filter,
+                            SharedPtr<Vector<LoadMeta>> load_metas);
 
     void Init() override;
 
@@ -75,9 +75,6 @@ private:
 private:
     u64 table_index_ = 0;
     SharedPtr<MatchSparseExpression> match_sparse_expr_;
-
-    // for filter
-    SharedPtr<CommonQueryFilter> common_query_filter_;
 
     // column to search
     ColumnID search_column_id_ = 0;
