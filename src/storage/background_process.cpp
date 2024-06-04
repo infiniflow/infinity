@@ -47,7 +47,10 @@ void BGTaskProcessor::Stop() {
     LOG_INFO("Background processor is stopped.");
 }
 
-void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
+void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) {
+    ++ task_count_;
+    task_queue_.Enqueue(std::move(bg_task));
+}
 
 void BGTaskProcessor::Process() {
     bool running{true};
@@ -55,6 +58,7 @@ void BGTaskProcessor::Process() {
     while (running) {
         task_queue_.DequeueBulk(tasks);
         for (const auto &bg_task : tasks) {
+            running_task_type_ = bg_task->type_;
             switch (bg_task->type_) {
                 case BGTaskType::kStopProcessor: {
                     LOG_INFO("Stop the background processor");
@@ -107,7 +111,9 @@ void BGTaskProcessor::Process() {
 
             bg_task->Complete();
         }
+        task_count_ -= tasks.size();
         tasks.clear();
+        running_task_type_ = BGTaskType::kInvalid;
     }
 }
 

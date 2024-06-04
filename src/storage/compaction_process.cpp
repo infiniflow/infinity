@@ -54,7 +54,10 @@ void CompactionProcessor::Stop() {
     LOG_INFO("Compaction processor is stopped.");
 }
 
-void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
+void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) {
+    task_queue_.Enqueue(std::move(bg_task));
+    ++ task_count_;
+}
 
 void CompactionProcessor::DoCompact() {
     Txn *scan_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanForCompact"));
@@ -177,6 +180,8 @@ void CompactionProcessor::Process() {
             }
             bg_task->Complete();
         }
+        task_count_ -= tasks.size();
+        tasks.clear();
     }
 }
 

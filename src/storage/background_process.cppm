@@ -33,6 +33,8 @@ public:
 
 public:
     void Submit(SharedPtr<BGTask> bg_task);
+    u64 RunningTaskCount() const { return task_count_; }
+    BGTaskType RunningTaskType() const { return running_task_type_; }
 
 private:
     void Process();
@@ -45,6 +47,9 @@ private:
 
     WalManager *wal_manager_{};
     Catalog *catalog_{};
+
+    Atomic<u64> task_count_{};
+    Atomic<BGTaskType> running_task_type_{BGTaskType::kInvalid};
 };
 
 } // namespace infinity
