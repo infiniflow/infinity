@@ -44,6 +44,7 @@ public:
 
     inline String name() final { return "LogicalFusion"; }
 
+    Vector<SharedPtr<LogicalNode>> other_children_{};
     SharedPtr<BaseTableRef> base_table_ref_{};
     SharedPtr<FusionExpression> fusion_expr_{};
 };

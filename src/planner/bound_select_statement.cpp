@@ -155,10 +155,6 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             String error_message = "SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR expression or MATCH SPARSE expression";
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
-        } else if (num_children >= 3) {
-            String error_message = "SEARCH shall have at max two MATCH TEXT or MATCH VECTOR expression";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
         }
         if (table_ref_ptr_->type() != TableRefType::kTable) {
             String error_message = "Not base table reference";
@@ -198,8 +194,14 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         if (!(search_expr_->fusion_exprs_.empty())) {
             auto firstfusionNode = MakeShared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), base_table_ref, search_expr_->fusion_exprs_[0]);
             firstfusionNode->set_left_node(match_knn_nodes[0]);
-            if (match_knn_nodes.size() > 1)
+            if (match_knn_nodes.size() > 1) {
                 firstfusionNode->set_right_node(match_knn_nodes[1]);
+                if (match_knn_nodes.size() > 2) {
+                    for (SizeT i = 2; i < match_knn_nodes.size(); i++) {
+                        firstfusionNode->other_children_.push_back(std::move(match_knn_nodes[i]));
+                    }
+                }
+            }
             root = std::move(firstfusionNode);
             // extra fusion nodes
             for (u32 i = 1; i < search_expr_->fusion_exprs_.size(); ++i) {

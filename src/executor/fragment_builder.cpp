@@ -26,6 +26,7 @@ import physical_sink;
 import physical_source;
 import physical_explain;
 import physical_knn_scan;
+import physical_fusion;
 import status;
 import infinity_exception;
 
@@ -243,6 +244,18 @@ void FragmentBuilder::BuildFragments(PhysicalOperator *phys_op, PlanFragment *cu
                                                 phys_op->right()->GetOutputTypes());
                 BuildFragments(phys_op->right(), next_plan_fragment.get());
                 current_fragment_ptr->AddChild(std::move(next_plan_fragment));
+            }
+            if (phys_op->operator_type() == PhysicalOperatorType::kFusion) {
+                PhysicalFusion *phys_fusion = static_cast<PhysicalFusion *>(phys_op);
+                for (auto &child_op : phys_fusion->other_children_) {
+                    auto next_plan_fragment = MakeUnique<PlanFragment>(GetFragmentId());
+                    next_plan_fragment->SetSinkNode(query_context_ptr_,
+                                                    SinkType::kLocalQueue,
+                                                    child_op->GetOutputNames(),
+                                                    child_op->GetOutputTypes());
+                    BuildFragments(child_op.get(), next_plan_fragment.get());
+                    current_fragment_ptr->AddChild(std::move(next_plan_fragment));
+                }
             }
             return;
         }
