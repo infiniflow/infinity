@@ -27,9 +27,32 @@ import internal_types;
 import logical_type;
 import third_party;
 import random;
+import global_resource_usage;
+import infinity_context;
 
 using namespace infinity;
 class ColumnIndexMergerTest : public BaseTest {
+public:
+    void SetUp() override {
+        BaseTest::SetUp();
+        BaseTest::RemoveDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        BaseTest::TearDown();
+    }
+
 public:
     ColumnIndexMergerTest() {}
 

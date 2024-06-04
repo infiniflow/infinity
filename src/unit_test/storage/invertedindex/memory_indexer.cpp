@@ -39,6 +39,8 @@ import inmem_posting_decoder;
 import inmem_position_list_decoder;
 import inmem_index_segment_reader;
 import segment_posting;
+import global_resource_usage;
+import infinity_context;
 
 using namespace infinity;
 
