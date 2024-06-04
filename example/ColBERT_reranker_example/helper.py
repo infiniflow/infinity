@@ -157,3 +157,11 @@ class InfinityHelperForColBERT:
             'match_tensor', f'topn={final_top_n}', match_tensor_expr=rerank_expr).to_pl()
         print(query_result)
         return query_result
+
+    def query_rerank_float(self, query_str: str, output_columns: list[str], final_top_n: int, first_stage_top_n: int):
+        target_col_name = self.inner_col_float
+        return self.query_fusion(query_str, output_columns, final_top_n, first_stage_top_n, target_col_name)
+
+    def query_rerank_bit(self, query_str: str, output_columns: list[str], final_top_n: int, first_stage_top_n: int):
+        target_col_name = self.inner_col_bit
+        return self.query_fusion(query_str, output_columns, final_top_n, first_stage_top_n, target_col_name)

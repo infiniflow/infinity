@@ -29,15 +29,32 @@ document_passages = [
 
 class TestHelper:
     def test(self):
+        # create a helper object
         self.h = helper.InfinityHelperForColBERT()
+        # create a test environment for ColBERT
         self.h.create_test_env({"n": {"type": "int"}})
+        # insert data
         for i, p in enumerate(document_passages):
             self.h.insert_data({'n': i}, p)
-        time.sleep(3)
+        # wait for fulltext index
+        time.sleep(2)
+        # show the whole table
         self.h.show_data()
+        # example: exhaustive search
+        print("example: exhaustive search")
+        print("example: exhaustive search with BM25")
         self.h.query_bm25('Who was Alan Turing?', ['n'], 10)
+        print("example: exhaustive search with ColBERT float target")
         self.h.query_float('Who was Alan Turing?', ['n'], 10)
+        print("example: exhaustive search with ColBERT bit target")
         self.h.query_bit('Who was Alan Turing?', ['n'], 10)
+        # example: rerank
+        print("example: rerank")
+        print("example: rerank with ColBERT float target")
+        self.h.query_rerank_float('Who was Alan Turing?', ['n'], 3, 10)
+        print("example: rerank with ColBERT bit target")
+        self.h.query_rerank_bit('Who was Alan Turing?', ['n'], 3, 10)
+        # drop the test db
         self.h.clear_test_env()
 
 
