@@ -155,29 +155,36 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
             # print(len(column_vector))
             # print(len(column_vector) // dimension)
             if column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt8:
-                all_list = list(struct.unpack(
-                    '<{}b'.format(len(column_vector)), column_vector))
+                all_list = list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt16:
-                all_list = list(struct.unpack('<{}h'.format(
-                    len(column_vector) // 2), column_vector))
+                all_list = list(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt32:
-                all_list = list(struct.unpack('<{}i'.format(
-                    len(column_vector) // 4), column_vector))
+                all_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+            elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt64:
+                all_list = list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat32:
-                all_list = list(struct.unpack('<{}f'.format(
-                    len(column_vector) // 4), column_vector))
+                all_list = list(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat64:
-                all_list = list(struct.unpack('<{}d'.format(
-                    len(column_vector) // 8), column_vector))
+                all_list = list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBit:
-                all_list = list(struct.unpack(
-                    '<{}?'.format(len(column_vector)), column_vector))
-                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+                all_list = list(struct.unpack('<{}B'.format(len(column_vector)), column_vector))
+                result = []
+                if dimension % 8 != 0:
+                    raise ValueError(f"Unsupported dimension {dimension}")
+                sub_dim: int = dimension // 8
+                for i in range(0, len(all_list), sub_dim):
+                    mid_res = all_list[i:i + sub_dim]
+                    mid_res_int: int = 0
+                    for j in reversed(mid_res):
+                        mid_res_int = mid_res_int * 256 + j
+                    result.append([f"\u007b0:0{dimension}b\u007d".format(mid_res_int)[::-1]])
+                return result
             else:
                 raise NotImplementedError(
                     f"Unsupported type {column_data_type.physical_type.embedding_type.element_type}")
@@ -232,29 +239,36 @@ def parse_tensorarray_bytes(column_data_type: ttypes.DataType, bytes_data):
 
 def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[Any]]:
     dimension = column_data_type.physical_type.embedding_type.dimension
-    if column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt8:
-        all_list = list(struct.unpack(
-            '<{}b'.format(len(binary_data)), binary_data))
+    if column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBit:
+        all_list = list(struct.unpack('<{}B'.format(len(binary_data)), binary_data))
+        result = []
+        if dimension % 8 != 0:
+            raise ValueError(f"Unsupported dimension {dimension}")
+        sub_dim: int = dimension // 8
+        for i in range(0, len(all_list), sub_dim):
+            mid_res = all_list[i:i + sub_dim]
+            mid_res_int: int = 0
+            for j in reversed(mid_res):
+                mid_res_int = mid_res_int * 256 + j
+            result.append([f"\u007b0:0{dimension}b\u007d".format(mid_res_int)[::-1]])
+        return result
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt8:
+        all_list = list(struct.unpack('<{}b'.format(len(binary_data)), binary_data))
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt16:
-        all_list = list(struct.unpack('<{}h'.format(
-            len(binary_data) // 2), binary_data))
+        all_list = list(struct.unpack('<{}h'.format(len(binary_data) // 2), binary_data))
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt32:
-        all_list = list(struct.unpack('<{}i'.format(
-            len(binary_data) // 4), binary_data))
+        all_list = list(struct.unpack('<{}i'.format(len(binary_data) // 4), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt64:
+        all_list = list(struct.unpack('<{}q'.format(len(binary_data) // 8), binary_data))
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat32:
-        all_list = list(struct.unpack('<{}f'.format(
-            len(binary_data) // 4), binary_data))
+        all_list = list(struct.unpack('<{}f'.format(len(binary_data) // 4), binary_data))
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat64:
-        all_list = list(struct.unpack('<{}d'.format(
-            len(binary_data) // 8), binary_data))
-        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
-    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBit:
-        all_list = list(struct.unpack(
-            '<{}?'.format(len(binary_data)), binary_data))
+        all_list = list(struct.unpack('<{}d'.format(len(binary_data) // 8), binary_data))
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     else:
         raise NotImplementedError(
