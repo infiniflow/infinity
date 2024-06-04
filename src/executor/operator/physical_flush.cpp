@@ -14,6 +14,8 @@
 
 module;
 
+module physical_flush;
+
 import stl;
 import txn;
 import query_context;
@@ -25,8 +27,7 @@ import operator_state;
 import logger;
 import bg_task;
 import third_party;
-
-module physical_flush;
+import status;
 
 namespace infinity {
 
@@ -65,10 +66,16 @@ void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operat
 
 void PhysicalFlush::FlushLog(QueryContext *query_context, OperatorState *operator_state) {
     // Generate the result
+    Status status = Status::NotSupport("Flush log");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 void PhysicalFlush::FlushBuffer(QueryContext *query_context, OperatorState *operator_state) {
     // Generate the result
+    Status status = Status::NotSupport("Flush buffer");
+    LOG_ERROR(status.message());
+    RecoverableError(status);
 }
 
 } // namespace infinity
