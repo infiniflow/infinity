@@ -34,6 +34,7 @@ import common_query_filter;
 import logger;
 import column_index_reader;
 import query_node;
+import early_terminate_iterator;
 
 namespace infinity {
 
@@ -45,6 +46,8 @@ public:
                            IndexReader index_reader,
                            UniquePtr<QueryNode>&& query_tree,
                            float begin_threshold,
+                           EarlyTermAlgo early_term_algo,
+                           u32 top_n,
                            const SharedPtr<CommonQueryFilter> &common_query_filter,
                            u64 match_table_index,
                            SharedPtr<Vector<LoadMeta>> load_metas);
@@ -89,6 +92,8 @@ private:
     IndexReader index_reader_;
     UniquePtr<QueryNode> query_tree_;
     float begin_threshold_;
+    EarlyTermAlgo early_term_algo_{EarlyTermAlgo::kBMW};
+    u32 top_n_{1};
 
     // for filter
     SharedPtr<CommonQueryFilter> common_query_filter_;

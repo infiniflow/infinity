@@ -928,6 +928,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
                                      logical_match->index_reader_,
                                      std::move(logical_match->query_tree_),
                                      logical_match->begin_threshold_,
+                                     logical_match->early_term_algo_,
+                                     logical_match->top_n_,
                                      logical_match->common_query_filter_,
                                      logical_match->TableIndex(),
                                      logical_operator->load_metas());

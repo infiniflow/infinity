@@ -35,7 +35,7 @@ export struct FullTextQueryContext {
 };
 
 class EarlyTerminateIterator;
-enum class EarlyTermAlg;
+enum class EarlyTermAlgo;
 
 export class QueryBuilder {
 public:
@@ -50,7 +50,7 @@ public:
 
     UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
-    UniquePtr<EarlyTerminateIterator> CreateEarlyTerminateSearch(FullTextQueryContext &context, EarlyTermAlg early_term_alg);
+    UniquePtr<EarlyTerminateIterator> CreateEarlyTerminateSearch(FullTextQueryContext &context, EarlyTermAlgo early_term_algo);
 
     inline float Score(RowID doc_id) { return scorer_.Score(doc_id); }
 

@@ -72,14 +72,14 @@ UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context)
     return result;
 }
 
-UniquePtr<EarlyTerminateIterator> QueryBuilder::CreateEarlyTerminateSearch(FullTextQueryContext &context, EarlyTermAlg early_term_alg) {
+UniquePtr<EarlyTerminateIterator> QueryBuilder::CreateEarlyTerminateSearch(FullTextQueryContext &context, EarlyTermAlgo early_term_algo) {
     // Optimize the query tree.
     if (!context.optimized_query_tree_) {
         context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
     }
     // Create the iterator from the query tree.
     UniquePtr<EarlyTerminateIterator> result =
-        context.optimized_query_tree_->CreateEarlyTerminateSearch(table_entry_, index_reader_, &scorer_, early_term_alg);
+        context.optimized_query_tree_->CreateEarlyTerminateSearch(table_entry_, index_reader_, &scorer_, early_term_algo);
 #ifdef INFINITY_DEBUG
     {
         OStringStream oss;
