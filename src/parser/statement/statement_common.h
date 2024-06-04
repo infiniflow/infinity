@@ -56,6 +56,14 @@ struct InitParameter {
     std::string param_value_{};
 
     std::string ToString() { return param_name_ + ": " + param_value_; }
+
+    static std::vector<std::unique_ptr<InitParameter>> MakeInitParameterList(std::vector<InitParameter *> *init_params) {
+        std::vector<std::unique_ptr<InitParameter>> results;
+        for (auto *init_param : *init_params) {
+            results.push_back(std::unique_ptr<InitParameter>(init_param));
+        }
+        return results;
+    }
 };
 
 struct IfExistsInfo {

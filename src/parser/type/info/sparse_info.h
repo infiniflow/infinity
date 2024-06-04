@@ -15,41 +15,32 @@
 #pragma once
 
 #include "embedding_info.h"
+#include "statement/statement_common.h"
 #include "type/complex/embedding_type.h"
 #include "type/complex/sparse_type.h"
 #include "type/type_info.h"
-#include <limits>
 
 namespace infinity {
 
+enum class SparseStoreType : int8_t {
+    kSort,
+    kNotSort,
+};
+
 class SparseInfo : public TypeInfo {
 public:
-    static std::shared_ptr<SparseInfo> Make(EmbeddingDataType data_type, size_t dimension) {
-        if (dimension == 0) {
-            return nullptr;
-        }
-        EmbeddingDataType index_type = EmbeddingDataType::kElemInvalid;
-        if (dimension <= std::numeric_limits<int8_t>::max() + 1) {
-            index_type = EmbeddingDataType::kElemInt8;
-        } else if (dimension <= std::numeric_limits<int16_t>::max() + 1) {
-            index_type = EmbeddingDataType::kElemInt16;
-        } else if (dimension <= std::numeric_limits<int32_t>::max() + 1ull) {
-            index_type = EmbeddingDataType::kElemInt32;
-        } else if (dimension <= std::numeric_limits<int64_t>::max() + 1ull) {
-            index_type = EmbeddingDataType::kElemInt64;
-        } else {
-            ParserAssert(false, "Sparse embedding dimension is too large");
-        }
-        return std::make_shared<SparseInfo>(data_type, index_type, dimension);
-    }
+    static SparseStoreType ParseStoreType(const std::vector<std::unique_ptr<InitParameter>> &options);
 
-    static std::shared_ptr<SparseInfo> Make(EmbeddingDataType data_type, EmbeddingDataType idx_type, size_t dimension) {
-        return std::make_shared<SparseInfo>(data_type, idx_type, dimension);
+    static std::shared_ptr<SparseInfo>
+    Make(EmbeddingDataType data_type, size_t dimension, SparseStoreType store_type);
+
+    static std::shared_ptr<SparseInfo> Make(EmbeddingDataType data_type, EmbeddingDataType idx_type, size_t dimension, SparseStoreType store_type) {
+        return std::make_shared<SparseInfo>(data_type, idx_type, dimension, store_type);
     }
 
 public:
-    explicit SparseInfo(EmbeddingDataType data_type, EmbeddingDataType index_type, size_t dim)
-        : TypeInfo(TypeInfoType::kSparse), data_type_(data_type), index_type_(index_type), dimension_(dim) {}
+    explicit SparseInfo(EmbeddingDataType data_type, EmbeddingDataType index_type, size_t dim, SparseStoreType store_type)
+        : TypeInfo(TypeInfoType::kSparse), data_type_(data_type), index_type_(index_type), dimension_(dim), store_type_(store_type) {}
 
     bool operator==(const TypeInfo &other) const override;
 
@@ -81,10 +72,13 @@ public:
 
     inline size_t Dimension() const noexcept { return dimension_; }
 
+    inline SparseStoreType StoreType() const noexcept { return store_type_; }
+
 private:
     EmbeddingDataType data_type_{EmbeddingDataType::kElemInvalid};
     EmbeddingDataType index_type_{EmbeddingDataType::kElemInvalid};
     size_t dimension_{};
+    SparseStoreType store_type_{SparseStoreType::kSort};
 };
 
 } // namespace infinity

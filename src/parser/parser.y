@@ -682,8 +682,10 @@ table_element : table_column {
 
 
 table_column :
-IDENTIFIER column_type default_expr {
+//   1          2              3                  4
+IDENTIFIER column_type with_index_param_list default_expr {
     std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
+    std::vector<std::unique_ptr<infinity::InitParameter>> index_param_list = infinity::InitParameter::MakeInitParameterList($3);
     switch($2.logical_type_) {
         case infinity::LogicalType::kDecimal: {
             type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
@@ -705,7 +707,8 @@ IDENTIFIER column_type default_expr {
             break;
         }
         case infinity::LogicalType::kSparse: {
-            type_info_ptr = infinity::SparseInfo::Make($2.embedding_type_, $2.width);
+            auto store_type = infinity::SparseInfo::ParseStoreType(index_param_list);
+            type_info_ptr = infinity::SparseInfo::Make($2.embedding_type_, $2.width, store_type);
             if (type_info_ptr == nullptr) {
                 yyerror(&yyloc, scanner, result, "Fail to create sparse info.");
                 free($1);
@@ -718,7 +721,7 @@ IDENTIFIER column_type default_expr {
         }
     }
 
-    std::shared_ptr<infinity::ParsedExpr> default_expr($3);
+    std::shared_ptr<infinity::ParsedExpr> default_expr($4);
     $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, std::move(default_expr));
 
     ParserHelper::ToLower($1);
@@ -2901,11 +2904,14 @@ index_param_list : index_param {
 };
 
 index_param : IDENTIFIER {
+    ParserHelper::ToLower($1);
     $$ = new infinity::InitParameter();
     $$->param_name_ = $1;
     free($1);
 }
 | IDENTIFIER '=' IDENTIFIER {
+    ParserHelper::ToLower($1);
+    ParserHelper::ToLower($3);
     $$ = new infinity::InitParameter();
     $$->param_name_ = $1;
     free($1);
