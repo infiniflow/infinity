@@ -21,13 +21,19 @@ import update_statement;
 import explain_statement;
 import command_statement;
 import infinity;
-import third_party;
+//import third_party;
 import data_block;
 import value;
 import data_type;
 import type_info;
 import logical_type;
 import constant_expr;
+import column_expr;
+import function_expr;
+import between_expr;
+import parsed_expr;
+import search_expr;
+import infinity_exception;
 
 namespace infinity {
 
@@ -72,7 +78,110 @@ ParsedExpr* WrapConstantExpr::GetParsedExpr() {
         }
     }
     return constant_expr;
+}
 
+ParsedExpr* WrapColumnExpr::GetParsedExpr() {
+    auto column_expr = new ColumnExpr();
+    column_expr->names_.reserve(names.size());
+    for (SizeT i = 0; i < names.size(); ++i) {
+        column_expr->names_.emplace_back(names[i]);
+    }
+    column_expr->star_ = star;
+    column_expr->generated_ = generated;
+    return column_expr;
+}
+
+ParsedExpr* WrapFunctionExpr::GetParsedExpr() {
+    auto function_expr = new FunctionExpr();
+    function_expr->func_name_ = func_name;
+    function_expr->distinct_ = distinct;
+//    function_expr->arguments_.reserve(arguments.size());
+//    for (SizeT i = 0; i < arguments.size(); ++i) {
+//        function_expr->arguments_->emplace_back(arguments[i].GetParsedExpr());
+//    }
+    return function_expr;
+}
+
+ParsedExpr* WrapBetweenExpr::GetParsedExpr() {
+    auto between_expr = new BetweenExpr();
+    between_expr->value_ = value->GetParsedExpr();
+    between_expr->lower_bound_ = lower_bound->GetParsedExpr();
+    between_expr->upper_bound_ = upper_bound->GetParsedExpr();
+    return between_expr;
+}
+
+ParsedExpr* WrapKnnExpr::GetParsedExpr() {
+    // todo
+    auto knn_expr = new KnnExpr(own_memory);
+    return knn_expr;
+}
+
+ParsedExpr* WrapMatchExpr::GetParsedExpr() {
+    auto match_expr = new MatchExpr();
+    match_expr->fields_ = fields;
+    match_expr->matching_text_ = matching_text;
+    match_expr->options_text_ = options_text;
+    return match_expr;
+}
+
+ParsedExpr* WrapFusionExpr::GetParsedExpr() {
+    auto fusion_expr = new FusionExpr();
+    fusion_expr->method_ = method;
+    fusion_expr->options_ = MakeShared<SearchOptions>(options_text);
+    return fusion_expr;
+}
+
+ParsedExpr* WrapMatchTensorExpr::GetParsedExpr() {
+    // todo
+    auto match_tensor_expr = new MatchTensorExpr(own_memory);
+    return match_tensor_expr;
+}
+
+ParsedExpr* WrapSearchExpr::GetParsedExpr() {
+    auto search_expr = new SearchExpr();
+    search_expr->match_exprs_.reserve(match_exprs.size());
+    for (SizeT i = 0; i < match_exprs.size(); ++i) {
+        search_expr->match_exprs_.emplace_back(dynamic_cast<MatchExpr*>(match_exprs[i]->GetParsedExpr()));
+    }
+    search_expr->knn_exprs_.reserve(knn_exprs.size());
+    for (SizeT i = 0; i < knn_exprs.size(); ++i) {
+        search_expr->knn_exprs_.emplace_back(dynamic_cast<KnnExpr*>(knn_exprs[i]->GetParsedExpr()));
+    }
+    search_expr->match_tensor_exprs_.reserve(match_tensor_exprs.size());
+    for (SizeT i = 0; i < match_tensor_exprs.size(); ++i) {
+        search_expr->match_tensor_exprs_.emplace_back(dynamic_cast<MatchTensorExpr*>(match_tensor_exprs[i]->GetParsedExpr()));
+    }
+    search_expr->fusion_expr_ = dynamic_cast<FusionExpr*>(fusion_expr->GetParsedExpr());
+    return search_expr;
+}
+
+ParsedExpr* WrapParsedExpr::GetParsedExpr() {
+    if (type == ParsedExprType::kConstant) {
+        return constant_expr.GetParsedExpr();
+    } else if (type == ParsedExprType::kColumn) {
+        return column_expr.GetParsedExpr();
+    } else if (type == ParsedExprType::kFunction) {
+        return function_expr.GetParsedExpr();
+    } else if (type == ParsedExprType::kBetween) {
+        return between_expr.GetParsedExpr();
+    } else if (type == ParsedExprType::kKnn) {
+        return knn_expr.GetParsedExpr();
+    } else if (type == ParsedExprType::kMatch) {
+        return match_expr.GetParsedExpr();
+    } else if (type == ParsedExprType::kFusion) {
+        return fusion_expr.GetParsedExpr();
+    } else if (type == ParsedExprType::kSearch) {
+        return search_expr.GetParsedExpr();
+    } else {
+        throw UnrecoverableException("Unsupported ParsedExprType");
+    }
+}
+
+UpdateExpr* WrapUpdateExpr::GetUpdateExpr() {
+    auto update_expr = new UpdateExpr();
+    update_expr->column_name = column_name;
+    update_expr->value = value.GetParsedExpr();
+    return update_expr;
 }
 
 WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options) {
@@ -320,13 +429,30 @@ WrapQueryResult WrapImport(Infinity &instance, const String &db_name, const Stri
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const String &table_name, ParsedExpr *filter) {
+WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const String &table_name, WrapParsedExpr* wrap_filter) {
+    ParsedExpr *filter = nullptr;
+    if (wrap_filter != nullptr) {
+        filter = wrap_filter->GetParsedExpr();
+    }
     auto query_result = instance.Delete(db_name, table_name, filter);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
 WrapQueryResult
-WrapUpdate(Infinity &instance, const String &db_name, const String &table_name, ParsedExpr *filter, Vector<UpdateExpr *> *update_list) {
+WrapUpdate(Infinity &instance, const String &db_name, const String &table_name, WrapParsedExpr *wrap_filter, Vector<WrapUpdateExpr> *wrap_update_list) {
+    ParsedExpr *filter = nullptr;
+    if (wrap_filter != nullptr) {
+        filter = wrap_filter->GetParsedExpr();
+    }
+    Vector<UpdateExpr* > *update_list = nullptr;
+    if (wrap_update_list != nullptr) {
+        update_list = new Vector<UpdateExpr *>(wrap_update_list->size());
+        for (SizeT i = 0; i < wrap_update_list->size(); ++i) {
+            auto &wrap_update_expr = (*wrap_update_list)[i];
+            UpdateExpr *update_expr = wrap_update_expr.GetUpdateExpr();
+            (*update_list)[i] = update_expr;
+        }
+    }
     auto query_result = instance.Update(db_name, table_name, filter, update_list);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
@@ -335,9 +461,23 @@ WrapQueryResult WrapExplain(Infinity &instance,
                             const String &db_name,
                             const String &table_name,
                             ExplainType explain_type,
-                            SearchExpr *search_expr,
-                            ParsedExpr *filter,
-                            Vector<ParsedExpr *> *output_columns) {
+                            Vector<WrapParsedExpr> wrap_output_columns,
+                            WrapSearchExpr* wrap_search_expr,
+                            WrapParsedExpr* wrap_filter) {
+    SearchExpr *search_expr = nullptr;
+    if (wrap_search_expr != nullptr) {
+        search_expr = dynamic_cast<SearchExpr*>(wrap_search_expr->GetParsedExpr());
+    }
+    ParsedExpr *filter = nullptr;
+    if (wrap_filter != nullptr) {
+        filter = wrap_filter->GetParsedExpr();
+    }
+    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+    output_columns->reserve(wrap_output_columns.size());
+    for (SizeT i = 0; i < wrap_output_columns.size(); ++i) {
+        output_columns->emplace_back(wrap_output_columns[i].GetParsedExpr());
+    }
+
     auto query_result = instance.Explain(db_name, table_name, explain_type, search_expr, filter, output_columns);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
@@ -345,11 +485,49 @@ WrapQueryResult WrapExplain(Infinity &instance,
 WrapQueryResult WrapSearch(Infinity &instance,
                            const String &db_name,
                            const String &table_name,
-                           SearchExpr *search_expr,
-                           ParsedExpr *filter,
-                           Vector<ParsedExpr *> *output_columns) {
+                           Vector<WrapParsedExpr> select_list,
+                           WrapSearchExpr* wrap_search_expr,
+                           WrapParsedExpr* where_expr,
+                           WrapParsedExpr* limit_expr,
+                           WrapParsedExpr* offset_expr) {
+    SearchExpr *search_expr = nullptr;
+    if (wrap_search_expr != nullptr) {
+        search_expr = dynamic_cast<SearchExpr*>(wrap_search_expr->GetParsedExpr());
+    }
+    ParsedExpr *filter = nullptr;
+    if (where_expr != nullptr) {
+        filter = where_expr->GetParsedExpr();
+    }
+    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+    output_columns->reserve(select_list.size());
+    for (SizeT i = 0; i < select_list.size(); ++i) {
+        output_columns->emplace_back(select_list[i].GetParsedExpr());
+    }
+
     auto query_result = instance.Search(db_name, table_name, search_expr, filter, output_columns);
-    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+    if (query_result.ErrorCode() != ErrorCode::kOk) {
+        return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+    }
+    auto wrap_query_result = WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+
+    SizeT block_rows = query_result.result_table_->DataBlockCount();
+    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+        DataBlock *data_block = query_result.result_table_->GetDataBlockById(block_id).get();
+        auto row_count = data_block->row_count();
+        auto column_cnt = query_result.result_table_->ColumnCount();
+
+        for (int row = 0; row < row_count; ++row) {
+            Vector<WrapColumnField> result_row(column_cnt);
+            for (SizeT col = 0; col < column_cnt; ++col) {
+                Value value = data_block->GetValue(col, row);
+                const String &column_name = query_result.result_table_->GetColumnNameById(col);
+                const String &column_value = value.ToString();
+                result_row[col] = WrapColumnField(column_name, column_value);
+            }
+            wrap_query_result.result_rows.emplace_back(result_row);
+        }
+    }
+    return wrap_query_result;
 }
 
 WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name) {

@@ -18,7 +18,7 @@ from infinity import URI
 
 # abstract class
 class InfinityConnection(ABC):
-    def __init__(self, uri: URI):
+    def __init__(self, uri):
         self.uri = uri
 
     @abstractmethod

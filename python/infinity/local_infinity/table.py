@@ -24,13 +24,17 @@ import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.common import INSERT_DATA, VEC
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
-from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
-from infinity.remote_thrift.types import build_result
-from infinity.remote_thrift.utils import traverse_conditions, name_validity_check, select_res_to_polars
+# from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
+# from infinity.remote_thrift.types import build_result
+# from infinity.remote_thrift.utils import traverse_conditions, name_validity_check, select_res_to_polars
+from infinity.remote_thrift.utils import name_validity_check
 from infinity.table import Table, ExplainType
 from infinity.common import ConflictType
+from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
+from infinity.local_infinity.types import build_result
+from infinity.local_infinity.utils import traverse_conditions
 from embedded_infinity import ConflictType as LocalConflictType
-from embedded_infinity import WrapIndexInfo, WrapConstantExpr, LiteralType
+from embedded_infinity import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType
 
 class LocalTable(Table, ABC):
 
@@ -38,7 +42,7 @@ class LocalTable(Table, ABC):
         self._conn = conn
         self._db_name = db_name
         self._table_name = table_name
-        self.query_builder = InfinityThriftQueryBuilder(table=self)
+        self.query_builder = InfinityLocalQueryBuilder(table=self)
 
     def params_type_check(func):
         @functools.wraps(func)
@@ -125,12 +129,12 @@ class LocalTable(Table, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def show_segments(self):
-        res = self._conn.show_segments(db_name=self._db_name, table_name=self._table_name)
-        if res.error_code == ErrorCode.OK:
-            return select_res_to_polars(res)
-        else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+    # def show_segments(self):
+    #     res = self._conn.show_segments(db_name=self._db_name, table_name=self._table_name)
+    #     if res.error_code == ErrorCode.OK:
+    #         return select_res_to_polars(res)
+    #     else:
+    #         raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def show_segment(self, segment_id: int):
         res = self._conn.show_segment(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
@@ -139,12 +143,12 @@ class LocalTable(Table, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    def show_blocks(self, segment_id: int):
-        res = self._conn.show_blocks(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
-        if res.error_code == ErrorCode.OK:
-            return select_res_to_polars(res)
-        else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+    # def show_blocks(self, segment_id: int):
+    #     res = self._conn.show_blocks(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
+    #     if res.error_code == ErrorCode.OK:
+    #         return select_res_to_polars(res)
+    #     else:
+    #         raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def show_block(self, segment_id: int, block_id: int):
         res = self._conn.show_block(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id,
@@ -213,23 +217,23 @@ class LocalTable(Table, ABC):
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def import_data(self, file_path: str, import_options: {} = None):
-        options = ttypes.ImportOption()
-        options.has_header = False
+        options = ImportOptions()
+        options.header = False
         options.delimiter = ','
-        options.copy_file_type = ttypes.CopyFileType.CSV
+        options.copy_file_type = CopyFileType.kCSV
         if import_options != None:
             for k, v in import_options.items():
                 key = k.lower()
                 if key == 'file_type':
                     file_type = v.lower()
                     if file_type == 'csv':
-                        options.copy_file_type = ttypes.CopyFileType.CSV
+                        options.copy_file_type = CopyFileType.kCSV
                     elif file_type == 'json':
-                        options.copy_file_type = ttypes.CopyFileType.JSON
+                        options.copy_file_type = CopyFileType.kJSON
                     elif file_type == 'jsonl':
-                        options.copy_file_type = ttypes.CopyFileType.JSONL
+                        options.copy_file_type = CopyFileType.kJSONL
                     elif file_type == 'fvecs':
-                        options.copy_file_type = ttypes.CopyFileType.FVECS
+                        options.copy_file_type = CopyFileType.kFVECS
                     else:
                         raise Exception("Unrecognized import file type")
                 elif key == 'delimiter':
@@ -239,7 +243,7 @@ class LocalTable(Table, ABC):
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
-                        options.has_header = v
+                        options.header = v
                     else:
                         raise Exception("Boolean value is expected in header field")
                 else:
@@ -337,35 +341,39 @@ class LocalTable(Table, ABC):
         self.query_builder.output(columns)
         return self
 
-    def filter(self, filter: Optional[str]):
-        self.query_builder.filter(filter)
-        return self
-
-    def limit(self, limit: Optional[int]):
-        self.query_builder.limit(limit)
-        return self
-
-    def offset(self, offset: Optional[int]):
-        self.query_builder.offset(offset)
-        return self
-
     def to_result(self):
         return self.query_builder.to_result()
 
-    def to_df(self):
-        return self.query_builder.to_df()
-
-    def to_pl(self):
-        return self.query_builder.to_pl()
-
-    def to_arrow(self):
-        return self.query_builder.to_arrow()
+    # def filter(self, filter: Optional[str]):
+    #     self.query_builder.filter(filter)
+    #     return self
+    #
+    # def limit(self, limit: Optional[int]):
+    #     self.query_builder.limit(limit)
+    #     return self
+    #
+    # def offset(self, offset: Optional[int]):
+    #     self.query_builder.offset(offset)
+    #     return self
+    #
+    # def to_result(self):
+    #     return self.query_builder.to_result()
+    #
+    # def to_df(self):
+    #     return self.query_builder.to_df()
+    #
+    # def to_pl(self):
+    #     return self.query_builder.to_pl()
+    #
+    # def to_arrow(self):
+    #     return self.query_builder.to_arrow()
 
     def explain(self, explain_type: ExplainType = ExplainType.Physical):
         return self.query_builder.explain(explain_type)
 
-    def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
+    def _execute_query(self, query: Query):
 
+        print("execute query: ", query.columns, query.search, query.filter, query.limit, query.offset)
         # execute the query
         res = self._conn.select(db_name=self._db_name,
                                 table_name=self._table_name,
@@ -378,7 +386,7 @@ class LocalTable(Table, ABC):
 
         # process the results
         if res.error_code == ErrorCode.OK:
-            return build_result(res)
+            return res
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 

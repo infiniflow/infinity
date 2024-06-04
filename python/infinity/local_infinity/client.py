@@ -17,11 +17,12 @@ from infinity.common import LOCAL_INFINITY_PATH
 from embedded_infinity import *
 
 class LocalQueryResult:
-    def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None):
+    def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, result_data=None):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_names = db_names
         self.table_names = table_names
+        self.result_data = result_data
 
 class LocalInfinityClient:
     def __init__(self, path: str = LOCAL_INFINITY_PATH):
@@ -34,11 +35,13 @@ class LocalInfinityClient:
         return LocalQueryResult(PyErrorCode.OK, "")
 
     # convert embedded_error code to python error code
-    def convert_res(self, res, has_db_name=False, has_table_name=False):
+    def convert_res(self, res, has_db_name=False, has_table_name=False, has_result_data=False):
         if has_db_name:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, db_names=res.names)
         if has_table_name:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, table_names=res.names)
+        if has_result_data:
+            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, result_data=res.result_rows)
         return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg)
 
     def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError):
@@ -118,10 +121,11 @@ class LocalInfinityClient:
     def import_data(self, db_name: str, table_name: str, file_name: str, import_options):
         return self.convert_res(self.client.Import(db_name, table_name, file_name, import_options))
 
-    def select(self, db_name: str, table_name: str, select_list, search_expr,
-               where_expr, group_by_list, limit_expr, offset_expr):
-        return self.convert_res(self.client.Select(db_name, table_name, select_list,
-                                search_expr, where_expr, group_by_list, limit_expr, offset_expr))
+    def select(self, db_name: str, table_name: str, select_list: list[WrapParsedExpr], search_expr: WrapSearchExpr,
+               where_expr: WrapParsedExpr, limit_expr: WrapParsedExpr, offset_expr: WrapParsedExpr, group_by_list=None):
+        return self.convert_res(self.client.Search(db_name, table_name, select_list,
+                               wrap_search_expr=search_expr, where_expr=where_expr,
+                               limit_expr=limit_expr, offset_expr=offset_expr), has_result_data=True)
 
     def explain(self, db_name: str, table_name: str, select_list, search_expr,
                 where_expr, group_by_list, limit_expr, offset_expr, explain_type):

@@ -25,13 +25,10 @@ from infinity.infinity import InfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 from infinity.local_infinity.infinity import LocalInfinityConnection
 
-def connect(
-        uri: URI = LOCAL_HOST,
-        path: str = LOCAL_INFINITY_PATH
-) -> InfinityConnection:
+def connect(uri) -> InfinityConnection:
     if isinstance(uri, NetworkAddress) and (uri.port == 9090 or uri.port == 23817 or uri.port == 9070):
         return RemoteThriftInfinityConnection(uri)
-    elif len(path) != 0 and os.path.exists(path) and os.path.isdir(path):
-        return LocalInfinityConnection(path=path)
+    elif isinstance(uri, str) and len(uri) != 0 and os.path.exists(uri) and os.path.isdir(uri):
+        return LocalInfinityConnection(uri)
     else:
         raise Exception(f"unknown uri: {uri}")

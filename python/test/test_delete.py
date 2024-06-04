@@ -31,6 +31,9 @@ class TestDelete(TestSdk):
         print(infinity.__version__)
 
     def test_delete(self):
+        self._test_delete(common_values.TEST_REMOTE_HOST)
+        # self._test_delete(common_values.TEST_LOCAL_PATH)
+    def _test_delete(self, uri):
         """
         target: test table delete apis
         method:
@@ -56,7 +59,7 @@ class TestDelete(TestSdk):
             - 'table_3'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
 
         # infinity

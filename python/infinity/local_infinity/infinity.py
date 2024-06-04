@@ -9,9 +9,9 @@ from infinity.local_infinity.db import LocalDatabase
 from infinity.remote_thrift.utils import name_validity_check
 
 class LocalInfinityConnection(InfinityConnection, ABC):
-    def __init__(self, path=LOCAL_INFINITY_PATH):
+    def __init__(self, uri=LOCAL_INFINITY_PATH):
         self.db_name = "default_db"
-        self._client = LocalInfinityClient(path)
+        self._client = LocalInfinityClient(uri)
         self._is_connected = True
 
     def __del__(self):

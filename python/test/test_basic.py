@@ -44,7 +44,7 @@ class TestCase(TestSdk):
             assert infinity_obj
             assert infinity_obj.disconnect()
 
-        local_infinity_obj = infinity.connect(uri=None, path=common_values.TEST_LOCAL_PATH)
+        local_infinity_obj = infinity.connect(common_values.TEST_LOCAL_PATH)
         assert local_infinity_obj
         assert local_infinity_obj.disconnect()
 
@@ -66,14 +66,14 @@ class TestCase(TestSdk):
         self.create_db_with_invalid_name(infinity_obj)
         assert infinity_obj.disconnect()
 
-        local_infinity_obj = infinity.connect(uri=None, path=common_values.TEST_LOCAL_PATH)
+        local_infinity_obj = infinity.connect(common_values.TEST_LOCAL_PATH)
         self.create_db_with_invalid_name(local_infinity_obj)
         assert local_infinity_obj.disconnect()
 
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_local_basic(self, check_data):
-        infinity_obj = infinity.connect(uri=None, path=common_values.TEST_LOCAL_PATH)
+        infinity_obj = infinity.connect(common_values.TEST_LOCAL_PATH)
         assert infinity_obj
 
         res = infinity_obj.list_databases()
@@ -145,7 +145,15 @@ class TestCase(TestSdk):
             [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
         assert res.error_code == ErrorCode.OK
         # search
-        res = table_obj.output(["c1 + 0.1"]).to_df()
+        res = table_obj.output(["c1"]).to_result()
+        print(res)
+        result_data = res.result_data
+        print(result_data)
+        for row in result_data:
+            for col in row:
+                print(str(col))
+                print(col.column_name, col.column_data)
+
         # pd.testing.assert_frame_equal(res,
         #                               pd.DataFrame({'(c1 + 0.100000)': (1.1, 2.1)}).astype(
         #                                   {'(c1 + 0.100000)': dtype('float64')}))
@@ -156,31 +164,33 @@ class TestCase(TestSdk):
         #                               pd.DataFrame({'c1': (2,), 'c2': (2.2,)}).astype(
         #                                   {'c1': dtype('int32'), 'c2': dtype('float32')}))
         #
-        # res = db_obj.drop_table("my_table3")
-        # assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("my_table3")
+        assert res.error_code == ErrorCode.OK
         #
         # # import
-        # db_obj.drop_table("my_table4", ConflictType.Ignore)
-        # table_obj = db_obj.create_table(
-        #     "my_table4", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
-        # assert table_obj is not None
-        # table_obj = db_obj.get_table("my_table4")
-        # assert table_obj
-        #
-        # if not check_data:
-        #     copy_data(test_csv_file)
-        #
-        # assert os.path.exists(common_values.TEST_TMP_DIR + test_csv_file)
-        #
-        # res = table_obj.import_data(common_values.TEST_TMP_DIR + test_csv_file)
-        # assert res.error_code == ErrorCode.OK
-        #
-        # # search
-        # res = table_obj.output(
-        #     ["c1"]).filter("c1 > 1").to_df()
-        # print(res)
-        # res = db_obj.drop_table("my_table4")
-        # assert res.error_code == ErrorCode.OK
+        db_obj.drop_table("my_table4", ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            "my_table4", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
+        assert table_obj is not None
+        table_obj = db_obj.get_table("my_table4")
+        assert table_obj
+
+        print("check_data:", check_data)
+        if not check_data:
+            print("test csv file: ", test_csv_file)
+            copy_data(test_csv_file)
+
+        assert os.path.exists(common_values.TEST_TMP_DIR + test_csv_file)
+
+        res = table_obj.import_data(common_values.TEST_TMP_DIR + test_csv_file)
+        assert res.error_code == ErrorCode.OK
+
+        # search
+        res = table_obj.output(
+            ["c1"]).to_result()
+        print(res)
+        res = db_obj.drop_table("my_table4")
+        assert res.error_code == ErrorCode.OK
 
         assert infinity_obj.disconnect()
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",

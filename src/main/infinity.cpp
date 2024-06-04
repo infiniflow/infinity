@@ -15,7 +15,6 @@
 module;
 
 #include <iostream>
-//#include <nanobind/nanobind.h>
 module infinity;
 
 import stl;
@@ -756,6 +755,26 @@ QueryResult Infinity::Explain(const String &db_name,
 
 QueryResult
 Infinity::Search(const String &db_name, const String &table_name, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns) {
+    std::cout << "begin run search " << db_name << " " << table_name << std::endl;
+    if (search_expr == nullptr) {
+        std::cout << "search_expr is null" << std::endl;
+    } else {
+        std::cout << "search_expr: " << search_expr->ToString() << std::endl;
+    }
+    if (filter == nullptr) {
+        std::cout << "filter is null" << std::endl;
+    } else {
+        std::cout << "filter: " << filter->ToString() << std::endl;
+    }
+
+    if (output_columns == nullptr) {
+        std::cout << "output_columns is null" << std::endl;
+    } else {
+        std::cout << "output_columns: " << std::endl;
+        for (SizeT i = 0; i < output_columns->size(); ++i) {
+            std::cout << (*output_columns)[i]->ToString() << std::endl;
+        }
+    }
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -773,6 +792,7 @@ Infinity::Search(const String &db_name, const String &table_name, SearchExpr *se
     select_statement->search_expr_ = search_expr;
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
+    std::cout << "run search success" << std::endl;
     return result;
 }
 

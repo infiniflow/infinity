@@ -16,7 +16,6 @@ import threading
 import infinity
 import pytest
 from common import common_values
-from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from test_sdkbase import TestSdk
@@ -28,6 +27,33 @@ class TestDatabase(TestSdk):
         print(infinity.__version__)
 
     def test_database(self):
+        # remote
+        self._test_database(common_values.TEST_REMOTE_HOST)
+        # local
+        self._test_database(common_values.TEST_LOCAL_PATH)
+
+    def test_create_database_invalid_name(self):
+        # remote
+        self._test_create_database_invalid_name(common_values.TEST_REMOTE_HOST)
+        # local
+        self._test_create_database_invalid_name(common_values.TEST_LOCAL_PATH)
+
+    def test_create_drop_show_1K_databases(self):
+        # remote
+        self._test_create_drop_show_1K_databases(common_values.TEST_REMOTE_HOST)
+        # local
+        self._test_create_drop_show_1K_databases(common_values.TEST_LOCAL_PATH)
+
+    @pytest.mark.slow
+    def test_create_drop_show_1M_databases(self):
+        self._test_create_drop_show_1M_databases(common_values.TEST_REMOTE_HOST)
+        # self._test_create_drop_show_1M_databases(common_values.TEST_LOCAL_PATH)
+
+    def test_repeatedly_create_drop_show_databases(self):
+        self._test_repeatedly_create_drop_show_databases(common_values.TEST_REMOTE_HOST)
+        self._test_repeatedly_create_drop_show_databases(common_values.TEST_LOCAL_PATH)
+
+    def _test_database(self, uri):
         """
         target: test table apis
         method:
@@ -46,7 +72,7 @@ class TestDatabase(TestSdk):
             - "default_db"
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(uri)
 
         infinity_obj.drop_database("my_database", ConflictType.Ignore)
 
@@ -91,7 +117,7 @@ class TestDatabase(TestSdk):
 
         assert res.error_code == ErrorCode.OK
 
-    def test_create_database_invalid_name(self):
+    def _test_create_database_invalid_name(self, uri):
         """
         create database with invalid name
 
@@ -103,7 +129,7 @@ class TestDatabase(TestSdk):
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(uri)
 
         # 2. create db with invalid name
         for db_name in common_values.invalid_name_array:
@@ -115,7 +141,7 @@ class TestDatabase(TestSdk):
 
         assert res.error_code == ErrorCode.OK
 
-    def test_create_drop_show_1K_databases(self):
+    def _test_create_drop_show_1K_databases(self, uri):
 
         """
         create 1K dbs, show these dbs, drop these dbs
@@ -134,7 +160,7 @@ class TestDatabase(TestSdk):
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(uri)
 
         db_count = 100
         for i in range(db_count):
@@ -160,8 +186,7 @@ class TestDatabase(TestSdk):
 
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.slow
-    def test_create_drop_show_1M_databases(self):
+    def _test_create_drop_show_1M_databases(self, uri):
 
         """
         create 1M dbs, show these dbs, drop these dbs
@@ -180,7 +205,7 @@ class TestDatabase(TestSdk):
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(uri)
 
         db_count = 1000000
         # db = infinity_obj.create_database('db_name')
@@ -208,7 +233,7 @@ class TestDatabase(TestSdk):
 
         assert res.error_code == ErrorCode.OK
 
-    def test_repeatedly_create_drop_show_databases(self):
+    def _test_repeatedly_create_drop_show_databases(self, uri):
 
         """
         create db, show db and drop db, repeat above ops 100 times
@@ -224,7 +249,7 @@ class TestDatabase(TestSdk):
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(uri)
 
         loop_count = 100
 

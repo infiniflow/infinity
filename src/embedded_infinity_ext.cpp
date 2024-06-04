@@ -27,7 +27,8 @@ import logical_type;
 import constant_expr;
 import embedding_info;
 import statement_common;
-
+import explain_statement;
+import search_options;
 
 class SayHello {
 public:
@@ -107,11 +108,22 @@ NB_MODULE(embedded_infinity_ext, m) {
     m.def("get_hello", &get_hello);
     m.def("test_shared", &test_shared_wrap);
 
+    nb::class_<WrapUpdateExpr>(m, "WrapUpdateExpr")
+        .def(nb::init<>())
+        .def_rw("column_name", &WrapUpdateExpr::column_name)
+        .def_rw("value", &WrapUpdateExpr::value);
+
     nb::class_<WrapQueryResult>(m, "WrapQueryResult")
         .def(nb::init<>())
         .def_rw("error_code", &WrapQueryResult::error_code)
         .def_rw("error_msg", &WrapQueryResult::error_msg)
-        .def_rw("names", &WrapQueryResult::names);
+        .def_rw("names", &WrapQueryResult::names)
+        .def_rw("result_rows", &WrapQueryResult::result_rows);
+
+    nb::class_<WrapColumnField>(m, "WrapColumnField")
+        .def(nb::init<>())
+        .def_rw("column_name", &WrapColumnField::column_name)
+        .def_rw("column_data", &WrapColumnField::column_data);
 
     nb::class_<WrapDataType>(m, "WrapDataType")
         .def(nb::init<>())
@@ -146,6 +158,82 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("index_type", &WrapIndexInfo::index_type)
         .def_rw("column_name", &WrapIndexInfo::column_name)
         .def_rw("index_param_list", &WrapIndexInfo::index_param_list);
+
+    // Bind WrapColumnExpr
+    nb::class_<WrapColumnExpr>(m, "WrapColumnExpr")
+        .def(nb::init<>())
+        .def_rw("names", &WrapColumnExpr::names)
+        .def_rw("star", &WrapColumnExpr::star)
+        .def_rw("generated", &WrapColumnExpr::generated);
+
+    // Bind WrapFunctionExpr
+    nb::class_<WrapFunctionExpr>(m, "WrapFunctionExpr")
+        .def(nb::init<>())
+        .def_rw("func_name", &WrapFunctionExpr::func_name)
+        .def_rw("arguments", &WrapFunctionExpr::arguments)
+        .def_rw("distinct", &WrapFunctionExpr::distinct);
+
+    // Bind WrapBetweenExpr
+    nb::class_<WrapBetweenExpr>(m, "WrapBetweenExpr")
+        .def(nb::init<>())
+        .def_rw("value", &WrapBetweenExpr::value)
+        .def_rw("upper_bound", &WrapBetweenExpr::upper_bound)
+        .def_rw("lower_bound", &WrapBetweenExpr::lower_bound);
+
+    // Bind WrapKnnExpr
+    nb::class_<WrapKnnExpr>(m, "WrapKnnExpr")
+        .def_rw("own_memory", &WrapKnnExpr::own_memory)
+        .def_rw("column_expr", &WrapKnnExpr::column_expr)
+        .def_rw("embedding_data_ptr", &WrapKnnExpr::embedding_data_ptr)
+        .def_rw("dimension", &WrapKnnExpr::dimension)
+        .def_rw("embedding_data_type", &WrapKnnExpr::embedding_data_type)
+        .def_rw("distance_type", &WrapKnnExpr::distance_type)
+        .def_rw("topn", &WrapKnnExpr::topn)
+        .def_rw("opt_params", &WrapKnnExpr::opt_params);
+
+    // Bind WrapMatchExpr
+    nb::class_<WrapMatchExpr>(m, "WrapMatchExpr")
+        .def(nb::init<>())
+        .def_rw("fields", &WrapMatchExpr::fields)
+        .def_rw("matching_text", &WrapMatchExpr::matching_text)
+        .def_rw("options_text", &WrapMatchExpr::options_text);
+
+    // Bind WrapFusionExpr
+    nb::class_<WrapFusionExpr>(m, "WrapFusionExpr")
+        .def(nb::init<>())
+        .def_rw("method", &WrapFusionExpr::method)
+        .def_rw("options_text", &WrapFusionExpr::options_text);
+
+    // Bind WrapMatchTensorExpr
+    nb::class_<WrapMatchTensorExpr>(m, "WrapMatchTensorExpr")
+        .def_rw("own_memory", &WrapMatchTensorExpr::own_memory)
+        .def_rw("search_method", &WrapMatchTensorExpr::search_method)
+        .def_rw("column_expr", &WrapMatchTensorExpr::column_expr)
+        .def_rw("tensor_expr", &WrapMatchTensorExpr::tensor_expr)
+        .def_rw("embedding_data_type", &WrapMatchTensorExpr::embedding_data_type)
+        .def_rw("options_text", &WrapMatchTensorExpr::options_text);
+
+    // Bind WrapSearchExpr
+    nb::class_<WrapSearchExpr>(m, "WrapSearchExpr")
+        .def(nb::init<>())
+        .def_rw("match_exprs", &WrapSearchExpr::match_exprs)
+        .def_rw("knn_exprs", &WrapSearchExpr::knn_exprs)
+        .def_rw("match_tensor_exprs", &WrapSearchExpr::match_tensor_exprs)
+        .def_rw("fusion_expr", &WrapSearchExpr::fusion_expr);
+
+    // Bind WrapParsedExpr
+    nb::class_<WrapParsedExpr>(m, "WrapParsedExpr")
+        .def(nb::init<>())
+        .def(nb::init<ParsedExprType>())
+        .def_rw("type", &WrapParsedExpr::type)
+        .def_rw("constant_expr", &WrapParsedExpr::constant_expr)
+        .def_rw("column_expr", &WrapParsedExpr::column_expr)
+        .def_rw("function_expr", &WrapParsedExpr::function_expr)
+        .def_rw("between_expr", &WrapParsedExpr::between_expr)
+        .def_rw("knn_expr", &WrapParsedExpr::knn_expr)
+        .def_rw("match_expr", &WrapParsedExpr::match_expr)
+        .def_rw("fusion_expr", &WrapParsedExpr::fusion_expr)
+        .def_rw("search_expr", &WrapParsedExpr::search_expr);
 
     // infinity
     nb::class_<Infinity>(m, "Infinity")
@@ -201,10 +289,30 @@ NB_MODULE(embedded_infinity_ext, m) {
 
         .def("Insert", &WrapInsert)
         .def("Import", &WrapImport)
-        .def("Delete", &WrapDelete)
-        .def("Update", &WrapUpdate)
-        .def("Explain", &WrapExplain)
-        .def("Search", &WrapSearch)
+        .def("Delete", &WrapDelete,
+             nb::arg("db_name"),
+             nb::arg("table_name"),
+             nb::arg("filter") = nullptr)
+        .def("Update", &WrapUpdate,
+             nb::arg("db_name"),
+             nb::arg("table_name"),
+             nb::arg("wrap_filter") = nullptr,
+             nb::arg("wrap_update_list") = nullptr)
+        .def("Explain", &WrapExplain,
+             nb::arg("db_name"),
+             nb::arg("table_name"),
+             nb::arg("explain_type"),
+             nb::arg("wrap_output_columns"),
+             nb::arg("wrap_search_expr") = nullptr,
+             nb::arg("wrap_filter") = nullptr)
+        .def("Search", &WrapSearch,
+             nb::arg("db_name"),
+             nb::arg("table_name"),
+             nb::arg("select_list"),
+             nb::arg("wrap_search_expr") = nullptr,
+             nb::arg("where_expr") = nullptr,
+             nb::arg("limit_expr") = nullptr,
+             nb::arg("offset_expr") = nullptr)
         .def("Optimize", &WrapOptimize);
 
     // extra_ddl_info
@@ -555,5 +663,17 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kElemFloat", EmbeddingDataType::kElemFloat)
         .value("kElemDouble", EmbeddingDataType::kElemDouble)
         .value("kElemInvalid", EmbeddingDataType::kElemInvalid)
+        .export_values();
+
+    // explain_statement
+    nb::enum_<ExplainType>(m, "ExplainType")
+        .value("kAnalyze", ExplainType::kAnalyze)
+        .value("kAst", ExplainType::kAst)
+        .value("kUnOpt", ExplainType::kUnOpt)
+        .value("kOpt", ExplainType::kOpt)
+        .value("kPhysical", ExplainType::kPhysical)
+        .value("kPipeline", ExplainType::kPipeline)
+        .value("kFragment", ExplainType::kFragment)
+        .value("kInvalid", ExplainType::kInvalid)
         .export_values();
 }
