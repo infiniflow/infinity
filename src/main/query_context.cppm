@@ -76,7 +76,7 @@ public:
 
     [[nodiscard]] inline u64 cpu_number_limit() const { return cpu_number_limit_; }
 
-    [[nodiscard]] inline bool is_enable_profiling() const { return session_ptr_->SessionVariables()->enable_profile_; }
+    [[nodiscard]] inline bool is_enable_profiling() const { return session_ptr_->GetProfile(); }
 
     [[nodiscard]] inline u64 memory_size_limit() const { return memory_size_limit_; }
 

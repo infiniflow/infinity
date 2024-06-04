@@ -40,6 +40,8 @@ public:
 
     void DoCompact();
 
+    u64 RunningTaskCount() const { return task_count_; }
+
     TxnTimeStamp ManualDoCompact(const String &schema_name,
                                  const String &table_name,
                                  bool rollback,
@@ -60,6 +62,8 @@ private:
     Catalog *catalog_{};
     TxnManager *txn_mgr_{};
     SessionManager *session_mgr_{};
+
+    Atomic<u64> task_count_{};
 };
 
 } // namespace infinity
