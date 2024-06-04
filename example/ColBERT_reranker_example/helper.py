@@ -23,7 +23,7 @@ class InfinityHelperForColBERT:
         from colbert.infra import ColBERTConfig
         self.ckpt = Checkpoint("colbert-ir/colbertv2.0", colbert_config=ColBERTConfig(root="experiments"))
         from langchain.text_splitter import RecursiveCharacterTextSplitter
-        self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=128, chunk_overlap=0, length_function=len,
+        self.text_splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=0, length_function=len,
                                                             is_separator_regex=False)
         self.test_db_name = None
         self.test_table_name = None
@@ -57,6 +57,7 @@ class InfinityHelperForColBERT:
         import infinity.index as index
         from infinity.common import ConflictType
         self.infinity_obj = infinity.connect(NetworkAddress("127.0.0.1", 23817))
+        self.infinity_obj.drop_database(self.test_db_name, ConflictType.Ignore)
         self.colbert_test_db = self.infinity_obj.create_database(self.test_db_name)
         self.colbert_test_table = self.colbert_test_db.create_table(self.test_table_name, schema, ConflictType.Error)
         self.colbert_test_table.create_index("test_ft_index",
@@ -81,6 +82,8 @@ class InfinityHelperForColBERT:
         list_bit_tensor_array = []
         chunks = self.text_splitter.create_documents([text_for_colbert])
         text_chunks = [chunk.page_content for chunk in chunks]
+        # output: split text_for_colbert into text_chunks
+        print(f'split input text into {len(text_chunks)} chunks')
         subtext_tensor = self.ckpt.docFromText(text_chunks)
         for tensor in subtext_tensor:
             list_float_tensor = []
@@ -88,8 +91,8 @@ class InfinityHelperForColBERT:
             for arr in tensor:
                 if arr.dim() != 1 or arr.size(0) != 128:
                     raise ValueError("Dimension error.")
-                if torch.count_nonzero(arr) == 0:
-                    continue
+                # if torch.count_nonzero(arr) == 0:
+                #     continue
                 list_v = arr.tolist()
                 list_float_tensor.append(list_v)
                 list_bit_tensor.append([1 if x > 0 else 0 for x in list_v])
@@ -104,21 +107,7 @@ class InfinityHelperForColBERT:
     def show_data(self):
         result = self.colbert_test_table.output(['*']).to_pl()
         print(result)
-
-    def query(self, query_str: str, output_columns: list[str], final_top_n: int, first_stage_top_n: int,
-              target_col_name: str):
-        if '_row_id' not in output_columns:
-            output_columns.append('_row_id')
-        if '_score' not in output_columns:
-            output_columns.append('_score')
-        query_tensor = self.ckpt.queryFromText([query_str])[0]
-        if query_tensor.dim() != 2 or query_tensor.size(1) != 128:
-            raise ValueError("Dimension error.")
-        query_result = self.colbert_test_table.output(output_columns).match(self.inner_col_txt, query_str,
-                                                                            f'topn={first_stage_top_n}').fusion(
-            'match_tensor', f'topn={final_top_n}',
-            make_match_tensor_expr(target_col_name, query_tensor.numpy(force=True), 'float', 'maxsim')).to_pl()
-        print(query_result)
+        return result
 
     def query_bm25(self, query_str: str, output_columns: list[str], top_n: int):
         if '_row_id' not in output_columns:
@@ -128,11 +117,51 @@ class InfinityHelperForColBERT:
         query_result = self.colbert_test_table.output(output_columns).match(self.inner_col_txt, query_str,
                                                                             f'topn={top_n}').to_pl()
         print(query_result)
+        return query_result
 
-    def query_float(self, query_str: str, output_columns: list[str], final_top_n: int, first_stage_top_n: int):
+    def query_match_tensor(self, query_str: str, output_columns: list[str], top_n: int, target_col_name: str):
+        if '_row_id' not in output_columns:
+            output_columns.append('_row_id')
+        if '_score' not in output_columns:
+            output_columns.append('_score')
+        query_tensor = self.ckpt.queryFromText([query_str])[0]
+        if query_tensor.dim() != 2 or query_tensor.size(1) != 128:
+            raise ValueError("Dimension error.")
+        query_result = self.colbert_test_table.output(output_columns).match_tensor(target_col_name,
+                                                                                   query_tensor.numpy(force=True),
+                                                                                   'float', 'maxsim',
+                                                                                   f'topn={top_n}').to_pl()
+        print(query_result)
+        return query_result
+
+    def query_float(self, query_str: str, output_columns: list[str], top_n: int):
         target_col_name = self.inner_col_float
-        return self.query(query_str, output_columns, final_top_n, first_stage_top_n, target_col_name)
+        return self.query_match_tensor(query_str, output_columns, top_n, target_col_name)
 
-    def query_bit(self, query_str: str, output_columns: list[str], final_top_n: int, first_stage_top_n: int):
+    def query_bit(self, query_str: str, output_columns: list[str], top_n: int):
         target_col_name = self.inner_col_bit
-        return self.query(query_str, output_columns, final_top_n, first_stage_top_n, target_col_name)
+        return self.query_match_tensor(query_str, output_columns, top_n, target_col_name)
+
+    def query_fusion(self, query_str: str, output_columns: list[str], final_top_n: int, first_stage_top_n: int,
+                     target_col_name: str):
+        if '_row_id' not in output_columns:
+            output_columns.append('_row_id')
+        if '_score' not in output_columns:
+            output_columns.append('_score')
+        query_tensor = self.ckpt.queryFromText([query_str])[0]
+        if query_tensor.dim() != 2 or query_tensor.size(1) != 128:
+            raise ValueError("Dimension error.")
+        rerank_expr = make_match_tensor_expr(target_col_name, query_tensor.numpy(force=True), 'float', 'maxsim')
+        query_result = self.colbert_test_table.output(output_columns).match(self.inner_col_txt, query_str,
+                                                                            f'topn={first_stage_top_n}').fusion(
+            'match_tensor', f'topn={final_top_n}', match_tensor_expr=rerank_expr).to_pl()
+        print(query_result)
+        return query_result
+
+    def query_rerank_float(self, query_str: str, output_columns: list[str], final_top_n: int, first_stage_top_n: int):
+        target_col_name = self.inner_col_float
+        return self.query_fusion(query_str, output_columns, final_top_n, first_stage_top_n, target_col_name)
+
+    def query_rerank_bit(self, query_str: str, output_columns: list[str], final_top_n: int, first_stage_top_n: int):
+        target_col_name = self.inner_col_bit
+        return self.query_fusion(query_str, output_columns, final_top_n, first_stage_top_n, target_col_name)

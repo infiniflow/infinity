@@ -64,10 +64,11 @@ PhysicalFusion::PhysicalFusion(const u64 id,
                                SharedPtr<BaseTableRef> base_table_ref,
                                UniquePtr<PhysicalOperator> left,
                                UniquePtr<PhysicalOperator> right,
+                               Vector<UniquePtr<PhysicalOperator>> other_children,
                                SharedPtr<FusionExpression> fusion_expr,
                                SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(PhysicalOperatorType::kFusion, std::move(left), std::move(right), id, load_metas), base_table_ref_(std::move(base_table_ref)),
-      fusion_expr_(std::move(fusion_expr)) {}
+    : PhysicalOperator(PhysicalOperatorType::kFusion, std::move(left), std::move(right), id, load_metas), other_children_(std::move(other_children)),
+      base_table_ref_(std::move(base_table_ref)), fusion_expr_(std::move(fusion_expr)) {}
 
 PhysicalFusion::~PhysicalFusion() {}
 
@@ -117,7 +118,7 @@ void PhysicalFusion::ExecuteRRF(const Map<u64, Vector<UniquePtr<DataBlock>>> &in
 
     Vector<RRFRankDoc> rrf_vec;
     Map<RowID, SizeT> rrf_map; // row_id to index of rrf_vec_
-    Vector<u64> fragment_ids;
+    Vector<u64> fragment_ids;  // index of children, 0 - left, 1 - right, 2.. - other_children
     SizeT fragment_idx = 0;
     // 1 calculate every doc's ranks
     for (const auto &[fragment_id, input_blocks] : input_data_blocks) {

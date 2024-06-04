@@ -20,24 +20,41 @@ document_passages = [
     "Born in Maida Vale, London, Turing was raised in southern England. He graduated from King's College, Cambridge, with a degree in mathematics.",
     "After the war, Turing worked at the National Physical Laboratory, where he designed the Automatic Computing Engine, one of the first designs for a stored-program computer.",
     "Turing has an extensive legacy with statues of him and many things named after him, including an annual award for computer science innovations.",
-    "This is an inrelevant sentence which will not help for the question which user may ask in the future.",
-    "This is another inrelevant sentence which will not help for the question about Turing which user may ask in the future.",
-    "This is another inrelevant sentence which will not help for the question about Alan Turing which user may ask in the future.",
-    "This is another inrelevant sentence which will not help for the question about the person Alan Turing which user may ask in the future.",
+    "This is an irrelevant sentence which will not help for the question which user may ask in the future.",
+    "This is another irrelevant sentence which will not help for the question about Turing which user may ask in the future.",
+    "This is another irrelevant sentence which will not help for the question about Alan Turing which user may ask in the future.",
+    "This is another irrelevant sentence which will not help for the question about the person Alan Turing which user may ask in the future.",
 ]
 
 
 class TestHelper:
     def test(self):
+        # create a helper object
         self.h = helper.InfinityHelperForColBERT()
+        # create a test environment for ColBERT
         self.h.create_test_env({"n": {"type": "int"}})
+        # insert data
         for i, p in enumerate(document_passages):
             self.h.insert_data({'n': i}, p)
-        time.sleep(3)
+        # wait for fulltext index
+        time.sleep(2)
+        # show the whole table
         self.h.show_data()
+        # example: exhaustive search
+        print("example: exhaustive search")
+        print("example: exhaustive search with BM25")
         self.h.query_bm25('Who was Alan Turing?', ['n'], 10)
-        self.h.query_float('Who was Alan Turing?', ['n'], 10, 10)
-        self.h.query_bit('Who was Alan Turing?', ['n'], 10, 10)
+        print("example: exhaustive search with ColBERT float target")
+        self.h.query_float('Who was Alan Turing?', ['n'], 10)
+        print("example: exhaustive search with ColBERT bit target")
+        self.h.query_bit('Who was Alan Turing?', ['n'], 10)
+        # example: rerank
+        print("example: rerank")
+        print("example: rerank with ColBERT float target")
+        self.h.query_rerank_float('Who was Alan Turing?', ['n'], 3, 10)
+        print("example: rerank with ColBERT bit target")
+        self.h.query_rerank_bit('Who was Alan Turing?', ['n'], 3, 10)
+        # drop the test db
         self.h.clear_test_env()
 
 
