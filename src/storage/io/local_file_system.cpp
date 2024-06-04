@@ -142,8 +142,10 @@ i64 LocalFileSystem::Read(FileHandler &file_handler, void *data, u64 nbytes) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
     u64 total_read_count = 0;
     do {
+        LOG_TRACE(fmt::format("Attempt to read {} bytes data", nbytes - total_read_count));
         i32 local_read_count = read(fd, data_ptr + total_read_count, nbytes - total_read_count);
         if(local_read_count > 0) {
+            LOG_TRACE(fmt::format("Read {} bytes data", total_read_count));
             total_read_count += local_read_count;
         } else if (local_read_count == 0) {
             LOG_WARN("Read zero bytes from file");
@@ -154,6 +156,8 @@ i64 LocalFileSystem::Read(FileHandler &file_handler, void *data, u64 nbytes) {
             UnrecoverableError(error_message);
         }
     } while(total_read_count < nbytes);
+
+    LOG_TRACE(fmt::format("Finish to read {} bytes data, attempt to read", nbytes, total_read_count));
     return total_read_count;
 }
 
