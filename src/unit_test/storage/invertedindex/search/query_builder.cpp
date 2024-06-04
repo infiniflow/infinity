@@ -79,7 +79,7 @@ struct MockQueryNode : public QueryNode {
         return MakeUnique<MockVectorDocIterator>(std::move(doc_ids_));
     }
     std::unique_ptr<EarlyTerminateIterator>
-    CreateEarlyTerminateSearch(const TableEntry *, IndexReader &, Scorer *, EarlyTermAlg early_term_alg) const final {
+    CreateEarlyTerminateSearch(const TableEntry *, IndexReader &, Scorer *, EarlyTermAlgo early_term_algo) const final {
         return nullptr;
     }
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final {
