@@ -23,9 +23,11 @@ import internal_types;
 
 namespace infinity {
 
-export enum class EarlyTermAlg : u8 {
-    kBMW = 0,
-    kBMM = 1,
+export enum class EarlyTermAlgo {
+    kBMW,
+    kBMM,
+    kNaive,
+    kCompare
 };
 
 // usage: get sequence of results by calling NextWithThreshold() or BlockNextWithThreshold()
