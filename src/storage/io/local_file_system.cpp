@@ -149,7 +149,7 @@ i64 LocalFileSystem::Read(FileHandler &file_handler, void *data, u64 nbytes) {
             total_read_count += local_read_count;
         } else if (local_read_count == 0) {
 //            LOG_WARN("Read zero bytes from file");
-            continue;
+            break;
         } else {
             String error_message = fmt::format("Can't read file: {}: {}", file_handler.path_.string(), strerror(errno));
             LOG_CRITICAL(error_message);
