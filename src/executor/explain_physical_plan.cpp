@@ -70,6 +70,8 @@ import physical_merge_match_tensor;
 import physical_match;
 import physical_match_tensor_scan;
 import physical_fusion;
+import physical_match_sparse_scan;
+import physical_merge_match_sparse;
 import physical_merge_aggregate;
 import status;
 import physical_operator_type;
@@ -284,6 +286,14 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kMatchTensorScan: {
             Explain((PhysicalMatchTensorScan *)op, result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kMatchSparseScan: {
+            Explain((PhysicalMatchSparseScan *)op, result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kMergeMatchSparse: {
+            Explain((PhysicalMergeMatchSparse *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kFusion: {

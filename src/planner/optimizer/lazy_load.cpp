@@ -28,6 +28,7 @@ import logical_index_scan;
 import logical_knn_scan;
 import logical_match;
 import logical_match_tensor_scan;
+import logical_match_scan_base;
 import base_table_ref;
 import load_meta;
 
@@ -45,20 +46,17 @@ Optional<BaseTableRef *> GetScanTableRef(LogicalNode &op) {
 
             return index_scan.base_table_ref_.get();
         }
+        case LogicalNodeType::kMatchTensorScan:
+        case LogicalNodeType::kMatchSparseScan:
         case LogicalNodeType::kKnnScan: {
-            auto &knn_scan = static_cast<LogicalKnnScan &>(op);
+            auto &match_base = static_cast<LogicalMatchScanBase &>(op);
 
-            return knn_scan.base_table_ref_.get();
+            return match_base.base_table_ref_.get();
         }
         case LogicalNodeType::kMatch: {
             auto &match = static_cast<LogicalMatch &>(op);
 
             return match.base_table_ref_.get();
-        }
-        case LogicalNodeType::kMatchTensorScan: {
-            auto &match_tensor = static_cast<LogicalMatchTensorScan &>(op);
-
-            return match_tensor.base_table_ref_.get();
         }
         default: {
             return None;
@@ -155,16 +153,14 @@ void CleanScan::VisitNode(LogicalNode &op) {
             index_scan.base_table_ref_->RetainColumnByIndices(project_idxs);
             break;
         }
-        case LogicalNodeType::kKnnScan: {
-            CleanScanVisitBaseTableRefNode<LogicalKnnScan>(op, last_op_load_metas_, scan_table_indexes_);
+        case LogicalNodeType::kKnnScan:
+        case LogicalNodeType::kMatchSparseScan:
+        case LogicalNodeType::kMatchTensorScan: {
+            CleanScanVisitBaseTableRefNode<LogicalMatchScanBase>(op, last_op_load_metas_, scan_table_indexes_);
             break;
         }
         case LogicalNodeType::kMatch: {
             CleanScanVisitBaseTableRefNode<LogicalMatch>(op, last_op_load_metas_, scan_table_indexes_);
-            break;
-        }
-        case LogicalNodeType::kMatchTensorScan: {
-            CleanScanVisitBaseTableRefNode<LogicalMatchTensorScan>(op, last_op_load_metas_, scan_table_indexes_);
             break;
         }
         case LogicalNodeType::kLimit:
