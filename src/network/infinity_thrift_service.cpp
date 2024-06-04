@@ -2063,7 +2063,10 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
                                                      SizeT row_count,
                                                      const SharedPtr<ColumnVector> &column_vector) {
     switch (column_vector->data_type()->type()) {
-        case LogicalType::kBoolean:
+        case LogicalType::kBoolean: {
+            HandleBoolType(output_column_field, row_count, column_vector);
+            break;
+        }
         case LogicalType::kTinyInt:
         case LogicalType::kSmallInt:
         case LogicalType::kInteger:
@@ -2099,6 +2102,18 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
         }
     }
     return Status::OK();
+}
+
+void InfinityThriftService::HandleBoolType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                           SizeT row_count,
+                                           const SharedPtr<ColumnVector> &column_vector) {
+    String dst;
+    dst.reserve(row_count);
+    for (SizeT index = 0; index < row_count; ++index) {
+        const char c = column_vector->buffer_->GetCompactBit(index) ? 1 : 0;
+        dst.push_back(c);
+    }
+    output_column_field.column_vectors.emplace_back(std::move(dst));
 }
 
 void InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field,

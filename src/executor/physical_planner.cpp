@@ -983,16 +983,23 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const SharedPt
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<LogicalNode> &logical_operator) const {
     const auto logical_fusion = static_pointer_cast<LogicalFusion>(logical_operator);
     UniquePtr<PhysicalOperator> left_phy = nullptr, right_phy = nullptr;
+    Vector<UniquePtr<PhysicalOperator>> other_children;
     if (const auto &left_logical_node = logical_operator->left_node(); left_logical_node.get() != nullptr) {
         left_phy = BuildPhysicalOperator(left_logical_node);
     }
     if (const auto right_logical_node = logical_operator->right_node(); right_logical_node.get() != nullptr) {
         right_phy = BuildPhysicalOperator(right_logical_node);
     }
+    SizeT num_other_children = logical_fusion->other_children_.size();
+    for (SizeT i = 0; i < num_other_children; i++) {
+        UniquePtr<PhysicalOperator> child_phy = BuildPhysicalOperator(logical_fusion->other_children_[i]);
+        other_children.push_back(std::move(child_phy));
+    }
     return MakeUnique<PhysicalFusion>(logical_fusion->node_id(),
                                       logical_fusion->base_table_ref_,
                                       std::move(left_phy),
                                       std::move(right_phy),
+                                      std::move(other_children),
                                       logical_fusion->fusion_expr_,
                                       logical_operator->load_metas());
 }

@@ -39,6 +39,7 @@ public:
                             SharedPtr<BaseTableRef> base_table_ref,
                             UniquePtr<PhysicalOperator> left,
                             UniquePtr<PhysicalOperator> right,
+                            Vector<UniquePtr<PhysicalOperator>> other_children,
                             SharedPtr<FusionExpression> fusion_expr,
                             SharedPtr<Vector<LoadMeta>> load_metas);
     ~PhysicalFusion() override;
@@ -64,6 +65,7 @@ public:
 
     String ToString(i64 &space) const;
 
+    Vector<UniquePtr<PhysicalOperator>> other_children_{};
     SharedPtr<BaseTableRef> base_table_ref_{};
     SharedPtr<FusionExpression> fusion_expr_;
 
