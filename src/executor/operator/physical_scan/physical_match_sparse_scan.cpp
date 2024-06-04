@@ -121,6 +121,22 @@ bool PhysicalMatchSparseScan::Execute(QueryContext *query_context, OperatorState
             ExecuteInner<double>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
             break;
         }
+        case EmbeddingDataType::kElemInt8: {
+            ExecuteInner<i8>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
+            break;
+        }
+        case EmbeddingDataType::kElemInt16: {
+            ExecuteInner<i16>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
+            break;
+        }
+        case EmbeddingDataType::kElemInt32: {
+            ExecuteInner<i32>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
+            break;
+        }
+        case EmbeddingDataType::kElemInt64: {
+            ExecuteInner<i64>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }

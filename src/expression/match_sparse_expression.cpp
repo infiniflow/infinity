@@ -78,6 +78,12 @@ DataType MatchSparseExpression::Type() const {
         case kElemDouble: {
             return DataType(LogicalType::kDouble);
         }
+        case kElemInt8:
+        case kElemInt16:
+        case kElemInt32:
+        case kElemInt64: {
+            return DataType(LogicalType::kFloat);
+        }
         default: {
             UnrecoverableError("Unimpelmented.");
         }
