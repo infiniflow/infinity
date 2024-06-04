@@ -111,12 +111,14 @@ export namespace std {
     using std::adopt_lock;
     using std::try_to_lock;
 
+    using std::accumulate;
     using std::binary_search;
+    using std::ceil;
+    using std::copy_n;
     using std::fabs;
     using std::fill_n;
     using std::find;
     using std::floor;
-    using std::ceil;
     using std::fmod;
     using std::forward_list;
     using std::isalnum;
@@ -125,21 +127,20 @@ export namespace std {
     using std::isnan;
     using std::log2;
     using std::make_heap;
+    using std::max_element;
+    using std::min_element;
     using std::nearbyint;
+    using std::partial_sort;
     using std::pop_heap;
     using std::pow;
+    using std::reduce;
     using std::remove_if;
     using std::reverse;
     using std::sort;
-    using std::max_element;
-    using std::min_element;
-    using std::unique;
-    using std::reduce;
-    using std::accumulate;
     using std::sqrt;
-    using std::transform;
-    using std::copy_n;
     using std::tie;
+    using std::transform;
+    using std::unique;
 
     namespace ranges {
 

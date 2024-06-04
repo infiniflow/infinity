@@ -95,14 +95,22 @@ void PhysicalFusion::Init() {
     }
 }
 
+// Refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/rrf.html
 void PhysicalFusion::ExecuteRRF(const Map<u64, Vector<UniquePtr<DataBlock>>> &input_data_blocks,
                                 Vector<UniquePtr<DataBlock>> &output_data_block_array) const {
     SizeT rank_constant = 60;
+    SizeT window_size = 100; // is equivalent to topn
     if (fusion_expr_->options_.get() != nullptr) {
         if (auto it = fusion_expr_->options_->options_.find("rank_constant"); it != fusion_expr_->options_->options_.end()) {
             long l = std::strtol(it->second.c_str(), NULL, 10);
-            if (l > 1) {
+            if (l >= 1) {
                 rank_constant = (SizeT)l;
+            }
+        }
+        if (auto it = fusion_expr_->options_->options_.find("window_size"); it != fusion_expr_->options_->options_.end()) {
+            long l = std::strtol(it->second.c_str(), NULL, 10);
+            if (l >= 1) {
+                window_size = (SizeT)l;
             }
         }
     }
@@ -153,7 +161,17 @@ void PhysicalFusion::ExecuteRRF(const Map<u64, Vector<UniquePtr<DataBlock>>> &in
         }
     }
     // 3 sort docs in reverse per their score
-    std::sort(std::begin(rrf_vec), std::end(rrf_vec), [](const RRFRankDoc &lhs, const RRFRankDoc &rhs) noexcept { return lhs.score > rhs.score; });
+    if (rrf_vec.size() <= window_size) {
+        std::sort(std::begin(rrf_vec), std::end(rrf_vec), [](const RRFRankDoc &lhs, const RRFRankDoc &rhs) noexcept {
+            return lhs.score > rhs.score;
+        });
+    } else {
+        std::partial_sort(std::begin(rrf_vec),
+                          std::begin(rrf_vec) + window_size,
+                          std::end(rrf_vec),
+                          [](const RRFRankDoc &lhs, const RRFRankDoc &rhs) noexcept { return lhs.score > rhs.score; });
+        rrf_vec.resize(window_size);
+    }
 
     // 4 generate output data blocks
     UniquePtr<DataBlock> output_data_block = DataBlock::MakeUniquePtr();
