@@ -61,7 +61,7 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 LOG_ERROR(status.message());
                                 RecoverableError(status);
                             }
-                            query_context->current_session()->SessionVariables()->enable_profile_ = set_command->value_bool();
+                            query_context->current_session()->SetProfile(set_command->value_bool());
                             return true;
                         }
                         case SessionVariable::kInvalid: {

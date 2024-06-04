@@ -37,7 +37,9 @@ export enum class GlobalVariable {
     kTotalRollbackCount,        // global
     kActiveWALFilename,         // global
     kProfileRecordCapacity,     // global
-
+    kBackgroundTaskCount,       // global
+    kRunningBGTask,             // global
+    kRunningCompactTask,        // global
     kInvalid,
 };
 
