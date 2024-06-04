@@ -35,6 +35,9 @@ void VarUtil::InitVariablesMap() {
     global_name_map_["total_rollback_count"] = GlobalVariable::kTotalRollbackCount;
     global_name_map_["active_wal_filename"] = GlobalVariable::kActiveWALFilename;
     global_name_map_["profile_record_capacity"] = GlobalVariable::kProfileRecordCapacity;
+    global_name_map_["bg_task_count"] = GlobalVariable::kBackgroundTaskCount;
+    global_name_map_["running_bg_task"] = GlobalVariable::kRunningBGTask;
+    global_name_map_["running_compact_task"] = GlobalVariable::kRunningCompactTask;
 
     session_name_map_["query_count"] = SessionVariable::kQueryCount;
     session_name_map_["total_commit_count"] = SessionVariable::kTotalCommitCount;

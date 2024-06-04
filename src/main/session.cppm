@@ -25,14 +25,6 @@ import catalog;
 
 namespace infinity {
 
-export class SessionVar {
-public:
-    i64 query_count_{};
-    i64 total_commit_count_{};
-    bool enable_profile_{false};
-    i64 connected_time_{};
-};
-
 export enum class SessionType {
     kLocal,
     kRemote,
@@ -47,7 +39,6 @@ public:
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
-    SessionVar *SessionVariables() { return &session_variables_; }
     [[nodiscard]] inline u64 session_id() const { return session_id_; }
 
     [[nodiscard]] inline Txn *GetTxn() const { return txn_; }
@@ -69,6 +60,10 @@ public:
 
     String ConnectedTimeToStr() const { return std::asctime(std::localtime(&connected_time_)); }
 
+    void SetProfile(bool flag) { enable_profile_ = flag; }
+
+    bool GetProfile() const { return enable_profile_; }
+
 protected:
     std::time_t connected_time_;
 
@@ -80,14 +75,14 @@ protected:
 
     SessionType session_type_{SessionType::kRemote};
 
-    SessionVar session_variables_;
-
     u64 session_id_{0};
 
     u64 query_count_{0};
 
     u64 committed_txn_count_{0};
     u64 rollbacked_txn_count_{0};
+
+    bool enable_profile_{false};
 };
 
 export class LocalSession : public BaseSession {
