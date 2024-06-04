@@ -80,6 +80,16 @@ SELECT num FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical'
 2123
 2
 
+query I
+SELECT num FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf');
+----
+0
+1
+2
+6989
+9893
+2123
+
 # Clean up
 statement ok
 DROP TABLE enwiki_embedding;
