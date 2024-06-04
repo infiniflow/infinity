@@ -64,8 +64,9 @@ void PhysicalMatchSparseScan::Init() { search_column_id_ = match_sparse_expr_->c
 
 SharedPtr<Vector<String>> PhysicalMatchSparseScan::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
-    result_names->reserve(base_table_ref_->column_names_->size() + 2);
-    for (auto &name : *base_table_ref_->column_names_) {
+    const Vector<String> &column_names = *base_table_ref_->column_names_;
+    result_names->reserve(column_names.size() + 2);
+    for (const auto &name : column_names) {
         result_names->emplace_back(name);
     }
     result_names->emplace_back(COLUMN_NAME_SCORE);
@@ -75,8 +76,9 @@ SharedPtr<Vector<String>> PhysicalMatchSparseScan::GetOutputNames() const {
 
 SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchSparseScan::GetOutputTypes() const {
     SharedPtr<Vector<SharedPtr<DataType>>> result_types = MakeShared<Vector<SharedPtr<DataType>>>();
-    result_types->reserve(base_table_ref_->column_types_->size() + 2);
-    for (auto &type : *base_table_ref_->column_types_) {
+    const Vector<SharedPtr<DataType>> &column_types = *base_table_ref_->column_types_;
+    result_types->reserve(column_types.size() + 2);
+    for (const auto &type : column_types) {
         result_types->emplace_back(type);
     }
     result_types->emplace_back(MakeShared<DataType>(match_sparse_expr_->Type()));
@@ -107,6 +109,10 @@ bool PhysicalMatchSparseScan::Execute(QueryContext *query_context, OperatorState
     const auto &column_type = match_sparse_expr_->column_expr_->Type();
     const auto *sparse_info = static_cast<const SparseInfo *>(column_type.type_info().get());
     switch (sparse_info->DataType()) {
+        case EmbeddingDataType::kElemBit: {
+            ExecuteInner<bool>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
+            break;
+        }
         case EmbeddingDataType::kElemFloat: {
             ExecuteInner<float>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
             break;
@@ -166,17 +172,74 @@ void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context,
     }
 }
 
-template <typename DataType, typename IdxType, template <typename, typename> typename C>
+template <typename DataT, typename IdxType, template <typename, typename> typename C>
 void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state) {
+    DataType result_type = match_sparse_expr_->Type();
+    switch (result_type.type()) {
+        case LogicalType::kTinyInt: {
+            ExecuteInner<DataT, IdxType, i8, C>(query_context, match_sparse_scan_state);
+            break;
+        }
+        case LogicalType::kSmallInt: {
+            ExecuteInner<DataT, IdxType, i16, C>(query_context, match_sparse_scan_state);
+            break;
+        }
+        case LogicalType::kInteger: {
+            ExecuteInner<DataT, IdxType, i32, C>(query_context, match_sparse_scan_state);
+            break;
+        }
+        case LogicalType::kBigInt: {
+            ExecuteInner<DataT, IdxType, i64, C>(query_context, match_sparse_scan_state);
+            break;
+        }
+        case LogicalType::kFloat: {
+            ExecuteInner<DataT, IdxType, float, C>(query_context, match_sparse_scan_state);
+            break;
+        }
+        case LogicalType::kDouble: {
+            ExecuteInner<DataT, IdxType, double, C>(query_context, match_sparse_scan_state);
+            break;
+        }
+        default: {
+            UnrecoverableError("Invalid result type.");
+        }
+    }
+}
+
+template <typename DataT, typename IdxType, typename ResultType,  template <typename, typename> typename C>
+void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state) {
+    MatchSparseScanFunctionData &function_data = match_sparse_scan_state->match_sparse_scan_function_data_;
+
+    using MergeHeap = MergeKnn<ResultType, C>;
+    auto *merge_heap = static_cast<MergeHeap *>(function_data.merge_knn_base_.get());
+    if constexpr (std::is_same_v<DataT, bool>) {
+        using DistFuncT = SparseBitDistance<IdxType, ResultType>;
+        auto *dist_func = static_cast<DistFuncT *>(function_data.sparse_distance_.get());
+
+        ExecuteInnerT<DistFuncT, MergeHeap, ResultType>(dist_func, merge_heap, query_context, match_sparse_scan_state);
+    } else {
+        using DistFuncT = SparseDistance<DataT, IdxType, ResultType>;
+        auto *dist_func = static_cast<DistFuncT *>(function_data.sparse_distance_.get());
+
+        ExecuteInnerT<DistFuncT, MergeHeap, ResultType>(dist_func, merge_heap, query_context, match_sparse_scan_state);
+    }
+}
+
+template <typename DistFunc, typename MergeHeap, typename ResultType>
+void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func, MergeHeap *merge_heap, QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state) {
     SizeT query_n = match_sparse_expr_->query_n_;
     SizeT topn = match_sparse_expr_->topn_;
-
     MatchSparseScanFunctionData &function_data = match_sparse_scan_state->match_sparse_scan_function_data_;
-    if (function_data.merge_knn_base_.get() == nullptr) {
-        auto merge_knn = MakeUnique<MergeKnn<DataType, C>>(query_n, topn);
-        merge_knn->Begin();
-        function_data.merge_knn_base_ = std::move(merge_knn);
-        function_data.sparse_distance_ = MakeUnique<SparseDistance<DataType, IdxType>>(match_sparse_expr_->metric_type_);
+
+    if (merge_heap == nullptr) {
+        auto merge_knn_ptr = MakeUnique<MergeHeap>(query_n, topn);
+        merge_heap = merge_knn_ptr.get();
+        merge_knn_ptr->Begin();
+        function_data.merge_knn_base_ = std::move(merge_knn_ptr);
+
+        auto dist_func_ptr =  MakeUnique<DistFunc>(match_sparse_expr_->metric_type_);
+        dist_func = dist_func_ptr.get();
+        function_data.sparse_distance_ = std::move(dist_func_ptr);
     }
 
     BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
@@ -193,14 +256,40 @@ void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSpa
         LOG_DEBUG(fmt::format("MatchSparseScan: segment_id: {}, block_id: {}", segment_id, block_id));
 
         auto *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id_);
-        auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+        ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+        const ColumnVector &query_vector = *function_data.query_data_->column_vectors[0];
 
-        CalculateOnColumnVector<DataType, IdxType, CompareMin>(column_vector, segment_id, block_id, row_cnt, function_data);
+        const auto *query_data_begin = reinterpret_cast<const SparseT *>(query_vector.data());
+        for (SizeT query_id = 0; query_id < query_n; ++query_id) {
+            const auto *query_data = query_data_begin + query_id;
+            const auto &[query_nnz, query_chunk_id, query_chunk_offset] = *query_data;
+            const char *query_sparse_ptr = nullptr;
+            if (query_nnz) {
+                query_sparse_ptr = query_vector.buffer_->fix_heap_mgr_->GetRawPtrFromChunk(query_chunk_id, query_chunk_offset);
+            }
+
+            const auto *data_begin = reinterpret_cast<const SparseT *>(column_vector.data());
+            FixHeapManager *heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
+            for (BlockOffset i = 0; i < row_cnt; ++i) {
+                const auto *data = data_begin + i;
+                const auto &[nnz, chunk_id, chunk_offset] = *data;
+
+                ResultType d = 0;
+                const char *sparse_ptr = nullptr;
+                if (nnz) {
+                    sparse_ptr = heap_mgr->GetRawPtrFromChunk(chunk_id, chunk_offset);
+                }
+                if (query_sparse_ptr != nullptr && sparse_ptr != nullptr) {
+                    d = dist_func->Calculate(query_sparse_ptr, query_nnz, sparse_ptr, nnz);
+                }
+                RowID row_id(segment_id, block_id * DEFAULT_BLOCK_CAPACITY + i);
+
+                merge_heap->Search(query_id, &d, &row_id, 1);
+            }
+        }
     }
     if (block_ids_idx >= block_ids.size()) {
         LOG_DEBUG(fmt::format("MatchSparseScan: {} task finished", block_ids_idx));
-
-        auto *merge_heap = static_cast<MergeKnn<DataType, C> *>(function_data.merge_knn_base_.get());
         merge_heap->End();
         i64 result_n = std::min(topn, (SizeT)merge_heap->total_count());
 
@@ -211,41 +300,9 @@ void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSpa
             row_ids_list.push_back(merge_heap->GetIDsByIdx(query_id));
         }
 
-        this->SetOutput(result_dists_list, row_ids_list, sizeof(DataType), result_n, query_context, match_sparse_scan_state);
+        this->SetOutput(result_dists_list, row_ids_list, sizeof(ResultType), result_n, query_context, match_sparse_scan_state);
 
         match_sparse_scan_state->SetComplete();
-    }
-}
-
-template <typename DataType, typename IdxType, template <typename, typename> typename C>
-void PhysicalMatchSparseScan::CalculateOnColumnVector(const ColumnVector &column_vector,
-                                                      SegmentID segment_id,
-                                                      BlockID block_id,
-                                                      BlockOffset row_cnt,
-                                                      MatchSparseScanFunctionData &function_data) {
-    auto *dist_func = static_cast<SparseDistance<DataType, IdxType> *>(function_data.sparse_distance_.get());
-    auto *merge_heap = static_cast<MergeKnn<DataType, C> *>(function_data.merge_knn_base_.get());
-
-    SharedPtr<ColumnVector> query_vec = function_data.query_data_->column_vectors[0];
-    const auto *query_data_begin = reinterpret_cast<const SparseT *>(query_vec->data());
-    SizeT query_n = match_sparse_expr_->query_n_;
-    for (SizeT query_id = 0; query_id < query_n; ++query_id) {
-        const auto *query_data = query_data_begin + query_id;
-        const auto &[query_nnz, query_chunk_id, query_chunk_offset] = *query_data;
-        const char *query_sparse_ptr = query_vec->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(query_chunk_id, query_chunk_offset);
-
-        const auto *data_begin = reinterpret_cast<const SparseT *>(column_vector.data());
-        FixHeapManager *heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
-        for (BlockOffset i = 0; i < row_cnt; ++i) {
-            const auto *data = data_begin + i;
-            const auto &[nnz, chunk_id, chunk_offset] = *data;
-            const char *sparse_ptr = heap_mgr->GetRawPtrFromChunk(chunk_id, chunk_offset);
-
-            DataType d = dist_func->Calculate(query_sparse_ptr, query_nnz, sparse_ptr, nnz);
-            RowID row_id(segment_id, block_id * DEFAULT_BLOCK_CAPACITY + i);
-
-            merge_heap->Search(query_id, &d, &row_id, 1);
-        }
     }
 }
 

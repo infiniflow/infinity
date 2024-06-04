@@ -54,7 +54,10 @@ public:
 
 private:
     template <typename DataType>
-    void ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *operator_state, const SparseInfo *sparse_info, const SparseMetricType &metric_type);
+    void ExecuteInner(QueryContext *query_context,
+                      MatchSparseScanOperatorState *operator_state,
+                      const SparseInfo *sparse_info,
+                      const SparseMetricType &metric_type);
 
     template <typename DataType, typename IdxType>
     void ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *operator_state, const SparseMetricType &metric_type);
@@ -62,8 +65,12 @@ private:
     template <typename DataType, typename IdxType, template <typename, typename> typename C>
     void ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *operator_state);
 
-    template <typename DataType, typename IdxType, template <typename, typename> typename C>
-    void CalculateOnColumnVector(const ColumnVector &column_vector, SegmentID segment_id, BlockID block_id, BlockOffset row_cnt, MatchSparseScanFunctionData &function_data);
+    template <typename DataT, typename IdxType, typename ResultType, template <typename, typename> typename C>
+    void ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state);
+
+    template <typename DistFunc, typename MergeHeap, typename DataType>
+    void
+    ExecuteInnerT(DistFunc *dist_func, MergeHeap *merge_heap, QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state);
 
 private:
     u64 table_index_ = 0;

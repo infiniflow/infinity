@@ -438,7 +438,7 @@ struct SQL_LTYPE {
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
 %type <const_expr_t>            common_array_expr subarray_array_expr unclosed_subarray_array_expr
 %type <const_expr_t>            sparse_array_expr long_sparse_array_expr unclosed_long_sparse_array_expr double_sparse_array_expr unclosed_double_sparse_array_expr
-%type <const_expr_t>            empty_array_expr
+%type <const_expr_t>            empty_array_expr common_sparse_array_expr
 %type <int_sparse_ele_t>        int_sparse_ele
 %type <float_sparse_ele_t>      float_sparse_ele
 %type <expr_array_t>            expr_array group_by_clause sub_search_array
@@ -2072,9 +2072,9 @@ Return:
     ;
 }
 
-//                 MATCH SPARSE (column_name, query_sparse,      metric_type,   topn)         extra options
-//                   1      2         4             6                8           10              12
-match_sparse_expr: MATCH SPARSE '(' expr ',' sparse_array_expr ',' STRING ',' LONG_VALUE ')' with_index_param_list {
+//                 MATCH SPARSE (column_name,       query_sparse,      metric_type,     topn)         extra options
+//                   1      2         4                  6                   8           10                12
+match_sparse_expr: MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ',' LONG_VALUE ')' with_index_param_list {
     auto match_sparse_expr = new infinity::MatchSparseExpr();
     $$ = match_sparse_expr;
 
@@ -2595,6 +2595,16 @@ common_array_expr: array_expr {
     $$ = $1;
 }
 | sparse_array_expr {
+    $$ = $1;
+}
+| empty_array_expr {
+    $$ = $1;
+}
+
+common_sparse_array_expr: sparse_array_expr {
+    $$ = $1;
+}
+| array_expr {
     $$ = $1;
 }
 | empty_array_expr {
