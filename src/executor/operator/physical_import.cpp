@@ -455,10 +455,10 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
             ++row_count;
 
             if (block_entry->GetAvailableCapacity() <= 0) {
-                LOG_DEBUG(fmt::format("Block {} saved", block_entry->block_id()));
+                LOG_DEBUG(fmt::format("Block {} saved, total rows: {}", block_entry->block_id(), row_count));
                 segment_entry->AppendBlockEntry(std::move(block_entry));
                 if (segment_entry->Room() <= 0) {
-                    LOG_DEBUG(fmt::format("Segment {} saved", segment_entry->segment_id()));
+                    LOG_DEBUG(fmt::format("Segment {} saved, total rows: {}", segment_entry->segment_id(), row_count));
                     SaveSegmentData(table_entry_, txn, segment_entry);
                     u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
                     segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
@@ -482,6 +482,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
                 std::move(*segment_entry).Cleanup();
             } else {
                 SaveSegmentData(table_entry_, txn, segment_entry);
+                LOG_DEBUG(fmt::format("Last segment {} saved, total rows: {}", segment_entry->segment_id(), row_count));
             }
             break;
         }
