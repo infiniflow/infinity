@@ -25,7 +25,7 @@ from infinity.utils import binary_exp_to_paser_exp
 from embedded_infinity import WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapSearchExpr, WrapConstantExpr, ParsedExprType, LiteralType
 
 
-def traverse_conditions(cons, fn=None) -> WrapParsedExpr:
+def traverse_conditions(cons, fn=None):
     if isinstance(cons, exp.Binary):
         parsed_expr = WrapParsedExpr()
         function_expr = WrapFunctionExpr()
@@ -37,14 +37,14 @@ def traverse_conditions(cons, fn=None) -> WrapParsedExpr:
             if fn:
                 expr = fn(value)
             else:
-                expr = traverse_conditions(value)
+                expr, _ = traverse_conditions(value)
             arguments.append(expr)
         function_expr.arguments = arguments
 
         parsed_expr.type = ParsedExprType.kFunction
         parsed_expr.function_expr = function_expr
 
-        return parsed_expr
+        return parsed_expr, arguments
 
     elif isinstance(cons, exp.Column):
         parsed_expr = WrapParsedExpr()
@@ -59,7 +59,7 @@ def traverse_conditions(cons, fn=None) -> WrapParsedExpr:
         parsed_expr.type = ParsedExprType.kColumn
         parsed_expr.column_expr = column_expr
 
-        return parsed_expr
+        return parsed_expr, None
 
     elif isinstance(cons, exp.Literal):
         parsed_expr = WrapParsedExpr()
@@ -79,7 +79,7 @@ def traverse_conditions(cons, fn=None) -> WrapParsedExpr:
 
         parsed_expr.type = ParsedExprType.kConstant
         parsed_expr.constant_expr = constant_expr
-        return parsed_expr
+        return parsed_expr, None
 
     elif isinstance(cons, exp.Paren):
         for value in cons.hashable_args:
@@ -101,12 +101,12 @@ def traverse_conditions(cons, fn=None) -> WrapParsedExpr:
             parsed_expr.type = ParsedExprType.kConstant
             parsed_expr.constant_expr = constant_expr
 
-            return parsed_expr
+            return parsed_expr, None
     else:
         raise Exception(f"unknown condition type: {cons}")
 
 
-def parse_expr(expr) -> WrapParsedExpr:
+def parse_expr(expr):
     try:
         return traverse_conditions(expr, parse_expr)
     except:

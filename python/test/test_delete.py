@@ -30,9 +30,37 @@ class TestDelete(TestSdk):
     def test_version(self):
         print(infinity.__version__)
 
+    def test_delete_local(self):
+        infinity_obj = infinity.connect(common_values.TEST_LOCAL_PATH)
+        db_obj = infinity_obj.get_database("default_db")
+
+        # infinity
+        db_obj.drop_table(table_name="test_delete", conflict_type=ConflictType.Ignore)
+        res = db_obj.create_table(
+            "test_delete",
+            {"c1": {"type": "int", "constraints": ["primary key", "not null"]},
+             "c2": {"type": "int"}, "c3": {"type": "int"}}, ConflictType.Error)
+
+        table_obj = db_obj.get_table("test_delete")
+
+        res = table_obj.insert(
+            [{"c1": 1, "c2": 10, "c3": 100}, {"c1": 2, "c2": 20, "c3": 200}, {"c1": 3, "c2": 30, "c3": 300},
+             {"c1": 4, "c2": 40, "c3": 400}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.delete("c1 = 1")
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_result()
+        print(res)
+        res = db_obj.drop_table("test_delete")
+        assert res.error_code == ErrorCode.OK
+
+        # disconnect
+        res = infinity_obj.disconnect()
+
+        assert res.error_code == ErrorCode.OK
     def test_delete(self):
         self._test_delete(common_values.TEST_REMOTE_HOST)
-        # self._test_delete(common_values.TEST_LOCAL_PATH)
     def _test_delete(self, uri):
         """
         target: test table delete apis

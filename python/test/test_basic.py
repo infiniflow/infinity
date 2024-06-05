@@ -24,11 +24,13 @@ from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from utils import copy_data
 from test_sdkbase import TestSdk
+from infinity.embed_infinity import add
 
 test_csv_file = "embedding_int_dim3.csv"
 
 class TestCase(TestSdk):
     def test_version(self):
+        print(add(1, 2))
         print(infinity.__version__)
 
     def test_connection(self):
@@ -147,26 +149,9 @@ class TestCase(TestSdk):
         # search
         res = table_obj.output(["c1"]).to_result()
         print(res)
-        result_data = res.result_data
-        print(result_data)
-        for row in result_data:
-            for col in row:
-                print(str(col))
-                print(col.column_name, col.column_data)
-
-        # pd.testing.assert_frame_equal(res,
-        #                               pd.DataFrame({'(c1 + 0.100000)': (1.1, 2.1)}).astype(
-        #                                   {'(c1 + 0.100000)': dtype('float64')}))
-        #
-        # res = table_obj.output(
-        #     ["*"]).filter("c1 > 1").to_df()
-        # pd.testing.assert_frame_equal(res,
-        #                               pd.DataFrame({'c1': (2,), 'c2': (2.2,)}).astype(
-        #                                   {'c1': dtype('int32'), 'c2': dtype('float32')}))
-        #
         res = db_obj.drop_table("my_table3")
         assert res.error_code == ErrorCode.OK
-        #
+
         # # import
         db_obj.drop_table("my_table4", ConflictType.Ignore)
         table_obj = db_obj.create_table(

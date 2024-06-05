@@ -21,7 +21,6 @@ import update_statement;
 import explain_statement;
 import command_statement;
 import infinity;
-//import third_party;
 import data_block;
 import value;
 import data_type;
@@ -95,10 +94,13 @@ ParsedExpr* WrapFunctionExpr::GetParsedExpr() {
     auto function_expr = new FunctionExpr();
     function_expr->func_name_ = func_name;
     function_expr->distinct_ = distinct;
-//    function_expr->arguments_.reserve(arguments.size());
-//    for (SizeT i = 0; i < arguments.size(); ++i) {
-//        function_expr->arguments_->emplace_back(arguments[i].GetParsedExpr());
-//    }
+    Vector<ParsedExpr *> *func_arguments = new Vector<ParsedExpr *>();
+    func_arguments->reserve(arguments.size());
+
+    for (SizeT i = 0; i < arguments.size(); ++i) {
+        func_arguments->emplace_back(arguments[i]->GetParsedExpr());
+    }
+    function_expr->arguments_ = func_arguments;
     return function_expr;
 }
 
@@ -111,7 +113,6 @@ ParsedExpr* WrapBetweenExpr::GetParsedExpr() {
 }
 
 ParsedExpr* WrapKnnExpr::GetParsedExpr() {
-    // todo
     auto knn_expr = new KnnExpr(own_memory);
     return knn_expr;
 }
@@ -132,7 +133,6 @@ ParsedExpr* WrapFusionExpr::GetParsedExpr() {
 }
 
 ParsedExpr* WrapMatchTensorExpr::GetParsedExpr() {
-    // todo
     auto match_tensor_expr = new MatchTensorExpr(own_memory);
     return match_tensor_expr;
 }
@@ -151,7 +151,10 @@ ParsedExpr* WrapSearchExpr::GetParsedExpr() {
     for (SizeT i = 0; i < match_tensor_exprs.size(); ++i) {
         search_expr->match_tensor_exprs_.emplace_back(dynamic_cast<MatchTensorExpr*>(match_tensor_exprs[i]->GetParsedExpr()));
     }
-    search_expr->fusion_expr_ = dynamic_cast<FusionExpr*>(fusion_expr->GetParsedExpr());
+    search_expr->fusion_exprs_.reserve(fusion_exprs.size());
+    for (SizeT i = 0; i < fusion_exprs.size(); ++i) {
+        search_expr->fusion_exprs_.emplace_back(dynamic_cast<FusionExpr*>(fusion_exprs[i]->GetParsedExpr()));
+    }
     return search_expr;
 }
 
@@ -276,10 +279,7 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
                                 const String &db_name,
                                 const String &table_name,
                                 Vector<WrapColumnDef> column_defs,
-                                // Vector<TableConstraint *> constraints,
                                 const CreateTableOptions &create_table_options) {
-    // std::cout << "receive CreateTable success, column size: " << column_defs.size() << std::endl;
-    // return WrapQueryResult{ErrorCode::kOk, ""};
     Vector<TableConstraint *> constraints;
     Vector<ColumnDef *> column_defs_ptr;
     for (SizeT i = 0; i < column_defs.size(); ++i) {
@@ -420,7 +420,6 @@ WrapInsert(Infinity& instance, const String& db_name, const String& table_name, 
     Vector<String> *insert_columns = new Vector<String>(columns);
 
     auto query_result = instance.Insert(db_name, table_name, insert_columns, value_ptr);
-    std::cout << "Wrap Insert success" << std::endl;
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 

@@ -20,21 +20,17 @@ from typing import Optional, Union, List, Any
 
 from sqlglot import condition
 
-import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.common import INSERT_DATA, VEC
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
-# from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
-# from infinity.remote_thrift.types import build_result
-# from infinity.remote_thrift.utils import traverse_conditions, name_validity_check, select_res_to_polars
+
 from infinity.remote_thrift.utils import name_validity_check
 from infinity.table import Table, ExplainType
 from infinity.common import ConflictType
 from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
-from infinity.local_infinity.types import build_result
 from infinity.local_infinity.utils import traverse_conditions
 from embedded_infinity import ConflictType as LocalConflictType
-from embedded_infinity import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType
+from embedded_infinity import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, WrapSearchExpr, ParsedExprType, WrapUpdateExpr
 
 class LocalTable(Table, ABC):
 
@@ -129,26 +125,12 @@ class LocalTable(Table, ABC):
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
-    # def show_segments(self):
-    #     res = self._conn.show_segments(db_name=self._db_name, table_name=self._table_name)
-    #     if res.error_code == ErrorCode.OK:
-    #         return select_res_to_polars(res)
-    #     else:
-    #         raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
-
     def show_segment(self, segment_id: int):
         res = self._conn.show_segment(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
         if res.error_code == ErrorCode.OK:
             return res
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
-
-    # def show_blocks(self, segment_id: int):
-    #     res = self._conn.show_blocks(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
-    #     if res.error_code == ErrorCode.OK:
-    #         return select_res_to_polars(res)
-    #     else:
-    #         raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 
     def show_block(self, segment_id: int, block_id: int):
         res = self._conn.show_block(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id,
@@ -199,14 +181,8 @@ class LocalTable(Table, ABC):
                         constant_expression.f64_array_value = value
                 else:
                     raise Exception("Invalid constant expression")
-
-                # expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
-                # paser_expr = ttypes.ParsedExpr(type=expr_type)
-                print("value = ", value, "type = ", constant_expression.literal_type)
-
                 parse_exprs.append(constant_expression)
 
-            # field = ttypes.Field(parse_exprs=parse_exprs)
             fields.append(parse_exprs)
 
         res = self._conn.insert(db_name=db_name, table_name=table_name, column_names=column_names,
@@ -263,7 +239,9 @@ class LocalTable(Table, ABC):
             case None:
                 where_expr = None
             case _:
-                where_expr = traverse_conditions(condition(cond))
+                print(cond, condition(cond))
+                where_expr, arguments = traverse_conditions(condition(cond))
+        print("where_expr = ", where_expr)
         res = self._conn.delete(
             db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
         if res.error_code == ErrorCode.OK:
@@ -278,12 +256,12 @@ class LocalTable(Table, ABC):
             case None:
                 where_expr = None
             case _:
-                where_expr = traverse_conditions(condition(cond))
+                where_expr, arguments = traverse_conditions(condition(cond))
         match data:
             case None:
                 update_expr_array = None
             case _:
-                update_expr_array: list[ttypes.UpdateExpr] = []
+                update_expr_array: list[WrapParsedExpr] = []
                 for row in data:
                     for column_name, value in row.items():
                         constant_expression = WrapConstantExpr()
@@ -306,11 +284,12 @@ class LocalTable(Table, ABC):
                         else:
                             raise Exception("Invalid constant expression")
 
-                        expr_type = ttypes.ParsedExprType(
-                            constant_expr=constant_expression)
-                        paser_expr = ttypes.ParsedExpr(type=expr_type)
-                        update_expr = ttypes.UpdateExpr(
-                            column_name=column_name, value=paser_expr)
+                        parsed_expr = WrapParsedExpr(ParsedExprType.kConstant)
+                        parsed_expr.constant_expr = constant_expression
+
+                        update_expr = WrapUpdateExpr()
+                        update_expr.column_name = column_name
+                        update_expr.value = parsed_expr
 
                         update_expr_array.append(update_expr)
 
@@ -344,6 +323,7 @@ class LocalTable(Table, ABC):
     def to_result(self):
         return self.query_builder.to_result()
 
+    # todo implement the following methods
     # def filter(self, filter: Optional[str]):
     #     self.query_builder.filter(filter)
     #     return self
@@ -355,9 +335,6 @@ class LocalTable(Table, ABC):
     # def offset(self, offset: Optional[int]):
     #     self.query_builder.offset(offset)
     #     return self
-    #
-    # def to_result(self):
-    #     return self.query_builder.to_result()
     #
     # def to_df(self):
     #     return self.query_builder.to_df()

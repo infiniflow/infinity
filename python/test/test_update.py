@@ -101,6 +101,36 @@ class TestUpdate(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    def test_local_update(self):
+        infinity_obj = infinity.connect(common_values.TEST_LOCAL_PATH)
+        db_obj = infinity_obj.get_database("default_db")
+
+        db_obj.drop_table(table_name="test_update", conflict_type=ConflictType.Ignore)
+
+        # infinity
+        table_obj = db_obj.create_table(
+            "test_update", {"c1": {"type": "int", "constraints": ["primary key", "not null"]},
+                            "c2": {"type": "int"}, "c3": {"type": "int"}}, ConflictType.Error)
+        assert table_obj is not None
+
+        res = table_obj.insert(
+            [{"c1": 1, "c2": 10, "c3": 100}, {"c1": 2, "c2": 20, "c3": 200}, {"c1": 3, "c2": 30, "c3": 300},
+             {"c1": 4, "c2": 40, "c3": 400}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_result()
+        print(res)
+
+        res = db_obj.drop_table("test_update", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     # update empty table
     @trace_expected_exceptions
     def test_update_empty_table(self):
@@ -121,9 +151,6 @@ class TestUpdate(TestSdk):
             tb_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
         except Exception as e:
             print(e)
-
-        # res = tb_obj.output["*"].to_df()
-        # print(res)
 
         res = db_obj.drop_table("test_update_empty_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK

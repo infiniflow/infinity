@@ -353,16 +353,6 @@ QueryResult Infinity::CreateTable(const String &db_name,
                                   Vector<ColumnDef *> column_defs,
                                   Vector<TableConstraint *> constraints,
                                   const CreateTableOptions &create_table_options) {
-    std::cout << "begin create table,  column size: " << column_defs.size() << std::endl;
-    for (SizeT i = 0; i < column_defs.size(); ++i) {
-        std::cout << "column name: " << column_defs[i]->name_ << std::endl;
-        std::cout << "column id: " << column_defs[i]->id_ << std::endl;
-        std::cout << "data type: " << column_defs[i]->column_type_.get() << std::endl;
-        std::cout << "data type logic type: " << int(column_defs[i]->column_type_->type()) << std::endl;
-        std::cout << "data type to str: " << column_defs[i]->column_type_->ToString() << std::endl;
-        std::cout << "column def to_str" << column_defs[i]->ToString() << std::endl;
-    }
-
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -379,7 +369,6 @@ QueryResult Infinity::CreateTable(const String &db_name,
     create_table_info->properties_ = create_table_options.properties_;
     create_statement->create_info_ = std::move(create_table_info);
     QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
-    std::cout << "create table success" << std::endl;
     return result;
 }
 
@@ -675,7 +664,6 @@ QueryResult Infinity::ShowBlockColumn(const String &db_name,
 }
 
 QueryResult Infinity::Insert(const String &db_name, const String &table_name, Vector<String> *columns, Vector<Vector<ParsedExpr *> *> *values) {
-    std::cout << "begin insert, db name = " << db_name << ", table_name = " << table_name << std::endl;
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -688,21 +676,7 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
     insert_statement->table_name_ = table_name;
     insert_statement->columns_ = columns;
     insert_statement->values_ = values;
-
-    for (SizeT i = 0; i < columns->size(); ++i) {
-        std::cout << (*columns)[i] << std::endl;
-    }
-
-    for (SizeT i = 0; i < values->size(); ++i) {
-        auto parse_list = (*values)[i];
-        for (SizeT j = 0; j < (*parse_list).size(); ++j) {
-            auto parse_expr = (*parse_list)[j];
-            std::cout << "parse expr: " << parse_expr->ToString() << std::endl;
-        }
-    }
-
     QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
-    std::cout << "finish insert, db name = " << db_name << ", table_name = " << table_name << std::endl;
     return result;
 }
 
@@ -794,26 +768,6 @@ QueryResult Infinity::Explain(const String &db_name,
 
 QueryResult
 Infinity::Search(const String &db_name, const String &table_name, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns) {
-    std::cout << "begin run search " << db_name << " " << table_name << std::endl;
-    if (search_expr == nullptr) {
-        std::cout << "search_expr is null" << std::endl;
-    } else {
-        std::cout << "search_expr: " << search_expr->ToString() << std::endl;
-    }
-    if (filter == nullptr) {
-        std::cout << "filter is null" << std::endl;
-    } else {
-        std::cout << "filter: " << filter->ToString() << std::endl;
-    }
-
-    if (output_columns == nullptr) {
-        std::cout << "output_columns is null" << std::endl;
-    } else {
-        std::cout << "output_columns: " << std::endl;
-        for (SizeT i = 0; i < output_columns->size(); ++i) {
-            std::cout << (*output_columns)[i]->ToString() << std::endl;
-        }
-    }
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -831,7 +785,6 @@ Infinity::Search(const String &db_name, const String &table_name, SearchExpr *se
     select_statement->search_expr_ = search_expr;
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
-    std::cout << "run search success" << std::endl;
     return result;
 }
 

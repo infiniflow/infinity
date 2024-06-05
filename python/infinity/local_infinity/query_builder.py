@@ -12,9 +12,6 @@ from sqlglot import condition, maybe_parse
 
 from infinity.common import VEC
 from embedded_infinity import *
-# from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
-# from infinity.remote_thrift.types import logic_type_to_dtype
-# from infinity.remote_thrift.utils import traverse_conditions, parse_expr
 from infinity.local_infinity.types import logic_type_to_dtype
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
 
@@ -152,11 +149,11 @@ class InfinityLocalQueryBuilder(ABC):
         fusion_expr = WrapFusionExpr()
         fusion_expr.method = method
         fusion_expr.options_text = options_text
-        self._search.fusion_expr = fusion_expr
+        self._search.fusion_exprs.append(fusion_expr)
         return self
 
     def filter(self, where: Optional[str]) -> InfinityLocalQueryBuilder:
-        where_expr = traverse_conditions(condition(where))
+        where_expr, _ = traverse_conditions(condition(where))
         self._filter = where_expr
         return self
 
@@ -177,6 +174,7 @@ class InfinityLocalQueryBuilder(ABC):
     def output(self, columns: Optional[list]) -> InfinityLocalQueryBuilder:
         self._columns = columns
         select_list: List[WrapParsedExpr] = []
+        unused = []
         for column in columns:
             if isinstance(column, str):
                 column = column.lower()
@@ -185,7 +183,6 @@ class InfinityLocalQueryBuilder(ABC):
                 case "*":
                     column_expr = WrapColumnExpr()
                     column_expr.star = True
-                    column_expr.column_name = []
 
                     parsed_expr = WrapParsedExpr(ParsedExprType.kColumn)
                     parsed_expr.column_expr = column_expr
@@ -212,9 +209,9 @@ class InfinityLocalQueryBuilder(ABC):
 
                     select_list.append(parsed_expr)
                 case _:
-                    # todo: modify
-                    select_list.append(parse_expr(maybe_parse(column)))
-                    # pass
+                    parsed_expr, _ = parse_expr(maybe_parse(column))
+                    unused.append(_)
+                    select_list.append(parsed_expr)
 
         self._columns = select_list
         return self

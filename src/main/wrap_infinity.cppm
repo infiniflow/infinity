@@ -1,6 +1,7 @@
 module;
 
 #include <cstring>
+#include "parser/type/complex/embedding_type.h"
 
 export module wrap_infinity;
 
@@ -116,8 +117,9 @@ export struct WrapColumnExpr {
 };
 
 export struct WrapFunctionExpr {
+    WrapFunctionExpr() = default;
     String func_name{};
-    Vector<WrapParsedExpr *> *arguments{nullptr};
+    Vector<WrapParsedExpr *> arguments{};
     bool distinct{false};
 
     ParsedExpr* GetParsedExpr();
@@ -172,7 +174,7 @@ export struct WrapSearchExpr {
     Vector<WrapMatchExpr *> match_exprs{};
     Vector<WrapKnnExpr *> knn_exprs{};
     Vector<WrapMatchTensorExpr *> match_tensor_exprs{};
-    WrapFusionExpr *fusion_expr{nullptr};
+    Vector<WrapFusionExpr *> fusion_exprs{};
 
     ParsedExpr* GetParsedExpr();
 };
@@ -235,7 +237,6 @@ export WrapQueryResult WrapCreateTable(Infinity &instance,
                                        const String &db_name,
                                        const String &table_name,
                                        Vector<WrapColumnDef> column_defs,
-//                                       Vector<TableConstraint *> constraints,
                                        const CreateTableOptions &create_table_options);
 
 export WrapQueryResult WrapDropTable(Infinity &instance, const String &db_name, const String &table_name, const DropTableOptions &drop_table_options);

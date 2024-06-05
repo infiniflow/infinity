@@ -322,6 +322,8 @@ target_link_libraries(embedded_infinity_ext PRIVATE
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 
+#nanobind_set_visibility(embedded_infinity_ext)
+
 install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity)
 
 ### unit test

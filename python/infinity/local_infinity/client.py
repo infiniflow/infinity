@@ -121,8 +121,9 @@ class LocalInfinityClient:
     def import_data(self, db_name: str, table_name: str, file_name: str, import_options):
         return self.convert_res(self.client.Import(db_name, table_name, file_name, import_options))
 
-    def select(self, db_name: str, table_name: str, select_list: list[WrapParsedExpr], search_expr: WrapSearchExpr,
-               where_expr: WrapParsedExpr, limit_expr: WrapParsedExpr, offset_expr: WrapParsedExpr, group_by_list=None):
+    def select(self, db_name: str, table_name: str, select_list: list[WrapParsedExpr], search_expr,
+               where_expr, limit_expr, offset_expr, group_by_list=None):
+
         return self.convert_res(self.client.Search(db_name, table_name, select_list,
                                wrap_search_expr=search_expr, where_expr=where_expr,
                                limit_expr=limit_expr, offset_expr=offset_expr), has_result_data=True)

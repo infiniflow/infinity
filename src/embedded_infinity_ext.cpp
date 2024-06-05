@@ -30,84 +30,10 @@ import statement_common;
 import explain_statement;
 import search_options;
 
-class SayHello {
-public:
-    void hello() {
-        std::cout << "say hello success" << std::endl;
-        infinity::Infinity::Hello();
-    }
-};
-
-int add(int a, int b) {
-    std::cout << "begin add" << std::endl;
-    infinity::UniquePtr<char[]> buf = infinity::MakeUnique<char[]>(10);
-    std::cout << "success make unique" << std::endl;
-    auto hello = SayHello();
-    hello.hello();
-
-    buf[0] = 'a';
-    return a + b;
-}
-
-int mul(int a, int b) { return a * b; }
-
-void print_str(infinity::String str) { std::cout << str << std::endl; }
-
-const char *get_hello() {
-    const static char hello[] = "hello";
-    std::cout << "get hello func: " << hello << std::endl;
-    return hello;
-}
-
-void test_shared(infinity::SharedPtr<infinity::String> ptr) { std::cout << ptr.get() << std::endl; }
-
-void test_shared_wrap(infinity::String str) {
-    auto str_ptr = infinity::MakeShared<infinity::String>(str);
-    test_shared(str_ptr);
-}
-
-// using infinity::Infinity;
 using namespace infinity;
 namespace nb = nanobind;
 
-namespace infinity {
-//
-// struct WrapQueryResult {
-//    ErrorCode error_code;
-//    String error_msg;
-//};
-//
-// WrapQueryResult WrapCreateDatabase(Infinity& instance,
-//                                   const String& db_name,
-//                                   const CreateDatabaseOptions& options) {
-//    WrapQueryResult result;
-//    auto query_result = instance.CreateDatabase(db_name, options);
-//    result.error_code = query_result.ErrorCode();
-//    result.error_msg = query_result.ErrorMsg();
-//    return result;
-//}
-
-// void WrapInsert(Infinity& instance,
-//                 const String& db_name,
-//                 const String& table_name,
-//                 Vector<String> columns,
-//                 Vector<Vector<ParsedExpr*>> values) {
-//     Vector<Vector<ParsedExpr*>*> value_ptr;
-//     for (auto& value : values) {
-//         value_ptr.push_back(&value);
-//     }
-//     instance.Insert(db_name, table_name, &columns, &value_ptr);
-// }
-} // namespace infinity
-
 NB_MODULE(embedded_infinity_ext, m) {
-    m.def("add", &add);
-    m.def("mul", &mul);
-    m.def("hello", &infinity::Infinity::Hello);
-    m.def("print_str", &print_str);
-    m.def("get_hello", &get_hello);
-    m.def("test_shared", &test_shared_wrap);
-
     nb::class_<WrapUpdateExpr>(m, "WrapUpdateExpr")
         .def(nb::init<>())
         .def_rw("column_name", &WrapUpdateExpr::column_name)
@@ -219,7 +145,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("match_exprs", &WrapSearchExpr::match_exprs)
         .def_rw("knn_exprs", &WrapSearchExpr::knn_exprs)
         .def_rw("match_tensor_exprs", &WrapSearchExpr::match_tensor_exprs)
-        .def_rw("fusion_expr", &WrapSearchExpr::fusion_expr);
+        .def_rw("fusion_exprs", &WrapSearchExpr::fusion_exprs);
 
     // Bind WrapParsedExpr
     nb::class_<WrapParsedExpr>(m, "WrapParsedExpr")
@@ -482,7 +408,7 @@ NB_MODULE(embedded_infinity_ext, m) {
 
         .value("kInvalidUsername", ErrorCode::kInvalidUsername)
         .value("kInvalidPasswd", ErrorCode::kInvalidPasswd)
-        .value("kInvalidDbName", ErrorCode::kInvalidDbName)
+        .value("kInvalidIdentifierName", ErrorCode::kInvalidIdentifierName)
         .value("kInvalidTableName", ErrorCode::kInvalidTableName)
         .value("kInvalidColumnName", ErrorCode::kInvalidColumnName)
         .value("kInvalidIndexName", ErrorCode::kInvalidIndexName)
@@ -577,7 +503,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kIOError", ErrorCode::kIOError)
         .value("kDuplicatedFile", ErrorCode::kDuplicatedFile)
         .value("kConfigFileError", ErrorCode::kConfigFileError)
-        .value("kLockFileExists", ErrorCode::kLockFileExists)
+        .value("kLockFileError", ErrorCode::kLockFileError)
         .value("kCatalogCorrupted", ErrorCode::kCatalogCorrupted)
         .value("kDataCorrupted", ErrorCode::kDataCorrupted)
         .value("kIndexCorrupted", ErrorCode::kIndexCorrupted)
