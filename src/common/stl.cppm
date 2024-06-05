@@ -18,6 +18,7 @@ module;
 #include <algorithm>
 #include <atomic>
 #include <bit>
+#include <bitset>
 #include <cassert>
 #include <charconv>
 #include <chrono>
@@ -112,6 +113,7 @@ export namespace std {
     using std::try_to_lock;
 
     using std::accumulate;
+    using std::bitset;
     using std::binary_search;
     using std::ceil;
     using std::copy_n;
