@@ -922,35 +922,71 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                 }
                 case kEmbedding: {
                     auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
-                    // SizeT dim = embedding_info->Dimension();
+                    SizeT dim = embedding_info->Dimension();
                     switch (embedding_info->Type()) {
                         case kElemInt8: {
                             Vector<i8> &&embedding = line_json[column_def->name_].get<Vector<i8>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }
                         case kElemInt16: {
                             Vector<i16> &&embedding = line_json[column_def->name_].get<Vector<i16>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }
                         case kElemInt32: {
                             Vector<i32> &&embedding = line_json[column_def->name_].get<Vector<i32>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }
                         case kElemInt64: {
                             Vector<i64> &&embedding = line_json[column_def->name_].get<Vector<i64>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }
                         case kElemFloat: {
                             Vector<float> &&embedding = line_json[column_def->name_].get<Vector<float>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }
                         case kElemDouble: {
                             Vector<double> &&embedding = line_json[column_def->name_].get<Vector<double>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }

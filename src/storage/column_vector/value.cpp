@@ -1071,7 +1071,7 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
                 UnrecoverableError(error_message);
             }
             const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
-            json[name] = EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
+            EmbeddingT::Embedding2Json(embedding, embedding_info->Type(), embedding_info->Dimension(), json[name]);
             return;
         }
         case LogicalType::kTensor: {
