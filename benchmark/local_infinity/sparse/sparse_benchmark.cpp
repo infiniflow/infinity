@@ -25,12 +25,13 @@ import third_party;
 import profiler;
 
 import linscan_alg;
-import sparse_iter;
+import sparse_util;
 
 using namespace infinity;
 
 // const f32 error_bound = 1e-6;
 const int log_interval = 10000;
+const int query_log_interval = 1000;
 
 SparseMatrix DecodeSparseDataset(const Path &data_path) {
     SparseMatrix ret;
@@ -40,7 +41,7 @@ SparseMatrix DecodeSparseDataset(const Path &data_path) {
         throw std::runtime_error(fmt::format("Data path: {} does not exist.", data_path.string()));
     }
     auto [file_handler, status] = fs.OpenFile(data_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         throw std::runtime_error(fmt::format("Can't open file: {}, reason: {}", data_path.string(), status.message()));
     }
     i64 nrow = 0;
@@ -77,7 +78,7 @@ Pair<UniquePtr<u32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path &groundtru
         throw std::runtime_error(fmt::format("Groundtruth path: {} does not exist.", groundtruth_path.string()));
     }
     auto [file_handler, status] = fs.OpenFile(groundtruth_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         throw std::runtime_error(fmt::format("Can't open file: {}, reason: {}", groundtruth_path.string(), status.message()));
     }
 
@@ -101,9 +102,9 @@ Pair<UniquePtr<u32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path &groundtru
     return {std::move(indices), std::move(scores)};
 }
 
-void ImportData(LinScan &index, const Path &data_path) {
-    SparseMatrix mat = DecodeSparseDataset(data_path);
-    for (SparseMatrixIter iter(mat); iter.HasNext(); iter.Next()) {
+LinScan ImportData(const SparseMatrix &data_mat) {
+    LinScan index;
+    for (SparseMatrixIter iter(data_mat); iter.HasNext(); iter.Next()) {
         SparseVecRef vec = iter.val();
         u32 doc_id = iter.row_id();
         index.Insert(vec, doc_id);
@@ -112,17 +113,18 @@ void ImportData(LinScan &index, const Path &data_path) {
             std::cout << fmt::format("Inserting doc {}\n", doc_id);
         }
     }
+    return index;
 }
 
-Vector<Pair<Vector<u32>, Vector<f32>>> QueryData(const LinScan &index, u32 top_k, const Path &query_path) {
+Vector<Pair<Vector<u32>, Vector<f32>>>
+Search(const SparseMatrix &query_mat, u32 top_k, std::function<Pair<Vector<u32>, Vector<f32>>(const SparseVecRef &, u32)> search_fn) {
     Vector<Pair<Vector<u32>, Vector<f32>>> res;
-    SparseMatrix mat = DecodeSparseDataset(query_path);
-    for (SparseMatrixIter iter(mat); iter.HasNext(); iter.Next()) {
+    for (SparseMatrixIter iter(query_mat); iter.HasNext(); iter.Next()) {
         SparseVecRef query = iter.val();
-        auto [indices, score] = index.Query(query, top_k);
-        res.emplace_back(std::move(indices), std::move(score));
+        auto [indices, scores] = search_fn(query, top_k);
+        res.emplace_back(std::move(indices), std::move(scores));
 
-        if (log_interval != 0 && iter.row_id() % log_interval == 0) {
+        if (query_log_interval != 0 && iter.row_id() % query_log_interval == 0) {
             std::cout << fmt::format("Querying doc {}\n", iter.row_id());
         }
     }
@@ -161,6 +163,11 @@ f32 CheckGroundtruth(const Path &groundtruth_path, const Vector<Pair<Vector<u32>
     f32 recall = static_cast<f32>(recall_n) / (query_n * top_k);
     return recall;
 }
+
+struct SearchKnnOption {
+    u32 candidate_n_;
+    i32 budget_;
+};
 
 int main(int argc, char *argv[]) {
     CLI::App app{"sparse_benchmark"};
@@ -221,30 +228,31 @@ int main(int argc, char *argv[]) {
     };
     u32 top_k = 10;
 
-    // switch (mode_type) {
-    //     case ModeType::kImport: {
-    //         ImportData(data_path);
-    //         break;
-    //     }
-    //     case ModeType::kQuery: {
-    //         throw std::runtime_error("Not implemented.");
-    //         return 1;
-    //     }
-    //     default: {
-    //         throw std::runtime_error(fmt::format("Unsupported mode type: {}.", static_cast<u8>(mode_type)));
-    //     }
-    // }
     BaseProfiler profiler;
 
-    LinScan index;
-
+    SparseMatrix data_mat = DecodeSparseDataset(data_path);
     profiler.Begin();
-    ImportData(index, data_path);
+    LinScan index = ImportData(data_mat);
     profiler.End();
     std::cout << fmt::format("Import data time: {}\n", profiler.ElapsedToString(1000));
 
+    Vector<Pair<Vector<u32>, Vector<f32>>> query_result;
+    bool bf = false;
+    SparseMatrix query_mat = DecodeSparseDataset(query_path);
     profiler.Begin();
-    auto query_result = QueryData(index, top_k, query_path);
+    if (bf) {
+        query_result = Search(query_mat, top_k, [&](const SparseVecRef &query, u32 top_k) { return index.SearchBF(query, top_k); });
+    } else {
+        u64 used_budget_all = 0;
+        i32 budget = static_cast<f32>(data_mat.nnz_) * data_mat.nnz_ / (data_mat.nrow_ * data_mat.ncol_);
+        SearchKnnOption option{.candidate_n_ = top_k * 2, .budget_ = budget};
+        query_result = Search(query_mat, top_k, [&](const SparseVecRef &query, u32 top_k) {
+            auto [candidate_indices, used_budget] = index.SearchKnn(query, option.candidate_n_, option.budget_);
+            used_budget_all += used_budget;
+            return SparseVecUtil::Rerank(data_mat, query, candidate_indices, top_k);
+        });
+        std::cout << fmt::format("avg budget: {}\n", (f32)used_budget_all / query_mat.nrow_);
+    }
     profiler.End();
     std::cout << fmt::format("Query data time: {}\n", profiler.ElapsedToString(1000));
 

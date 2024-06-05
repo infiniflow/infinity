@@ -17,7 +17,7 @@ module;
 export module linscan_alg;
 
 import stl;
-import sparse_iter;
+import sparse_util;
 
 namespace infinity {
 
@@ -30,7 +30,9 @@ export class LinScan {
 public:
     void Insert(const SparseVecRef &vec, u32 doc_id);
 
-    Pair<Vector<u32>, Vector<f32>> Query(const SparseVecRef &query, u32 top_k) const;
+    Pair<Vector<u32>, Vector<f32>> SearchBF(const SparseVecRef &query, u32 top_k) const;
+
+    Pair<Vector<u32>, i32> SearchKnn(const SparseVecRef &query, u32 top_k, i32 budget) const;
 
     u32 row_num() const { return row_num_; }
 
