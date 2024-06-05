@@ -19,7 +19,6 @@
 #include <charconv>
 #include <cstdint>
 #include <cstring>
-#include <json.hpp>
 #include <sstream>
 
 namespace infinity {
@@ -161,8 +160,6 @@ public:
         }
         return std::string();
     }
-
-    static void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, nlohmann::json& embedding_json);
 
 private:
     template <typename T>
