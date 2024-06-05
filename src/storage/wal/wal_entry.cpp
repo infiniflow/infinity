@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <fstream>
 #include <vector>
 
@@ -33,6 +34,7 @@ import internal_types;
 import logger;
 import block_entry;
 import segment_entry;
+import local_file_system;
 
 namespace infinity {
 
@@ -667,8 +669,8 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
         String error_message = "ptr goes out of range when reading WalEntry";
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
+        LOG_WARN(error_message);
+        return nullptr;
     }
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     auto *header = (WalEntryHeader *)ptr;
@@ -691,8 +693,8 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
         max_bytes = ptr_end - ptr;
         if (max_bytes <= 0) {
             String error_message = "ptr goes out of range when reading WalEntry";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
+            LOG_WARN(error_message);
+            return nullptr;
         }
         SharedPtr<WalCmd> cmd = WalCmd::ReadAdv(ptr, max_bytes);
         entry->cmds_.push_back(cmd);
@@ -701,10 +703,19 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
         String error_message = "ptr goes out of range when reading WalEntry";
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
+        LOG_WARN(error_message);
+        return nullptr;
     }
     return entry;
+}
+
+bool WalEntry::IsCheckPoint() const {
+    for (auto &cmd : cmds_) {
+        if (cmd->GetType() == WalCommandType::CHECKPOINT) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool WalEntry::IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const {
@@ -842,7 +853,7 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
     return command;
 }
 
-WalEntryIterator WalEntryIterator::Make(const String &wal_path) {
+UniquePtr<WalEntryIterator> WalEntryIterator::Make(const String &wal_path, bool is_backward) {
     std::ifstream ifs(wal_path.c_str(), std::ios::binary | std::ios::ate);
     if (!ifs.is_open()) {
         String error_message = "WAL open failed";
@@ -855,38 +866,123 @@ WalEntryIterator WalEntryIterator::Make(const String &wal_path) {
     ifs.read(buf.data(), wal_size);
     ifs.close();
 
-    return WalEntryIterator(std::move(buf), wal_size);
+    return MakeUnique<WalEntryIterator>(std::move(buf), wal_size, is_backward);
 }
 
 SharedPtr<WalEntry> WalEntryIterator::Next() {
-    if (end_ > buf_.data()) {
-        i32 entry_size;
-        std::memcpy(&entry_size, end_ - sizeof(i32), sizeof(entry_size));
-        end_ = end_ - entry_size;
-        auto entry = WalEntry::ReadAdv(end_, entry_size);
-        end_ = end_ - entry_size;
+    if (is_backward_) {
+        assert(off_ > 0);
+        i32 entry_size = *(i32 *)(buf_.data() + off_ - sizeof(i32));
+        if ((SizeT)entry_size > off_) {
+            return nullptr;
+        }
+        char *ptr = buf_.data() + off_ - (SizeT)entry_size;
+        auto entry = WalEntry::ReadAdv(ptr, entry_size);
+        if (entry.get() != nullptr) {
+            off_ -= entry_size;
+        }
         return entry;
     } else {
-        return nullptr;
+        assert(off_ < buf_.size());
+        i32 entry_size = *(i32 *)(buf_.data() + off_);
+        if (off_ + (SizeT)entry_size > buf_.size()) {
+            return nullptr;
+        }
+        char *ptr = buf_.data() + off_;
+        auto entry = WalEntry::ReadAdv(ptr, entry_size);
+        if (entry.get() != nullptr) {
+            off_ += (SizeT)entry_size;
+        }
+        return entry;
+    }
+}
+
+WalListIterator::WalListIterator(const Vector<String> &wal_list) {
+    assert(!wal_list.empty());
+    for (SizeT i = 0; i < wal_list.size(); ++i) {
+        wal_list_.push_back(wal_list[i]);
+    }
+    PurgeBadEntriesAfterLatestCheckpoint();
+    if (!wal_list_.empty())
+        iter_ = WalEntryIterator::Make(wal_list_.front(), true);
+}
+
+void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
+    bool found_checkpoint = false;
+    SizeT file_num = 0;
+    auto it = wal_list_.begin();
+    while (!found_checkpoint && it != wal_list_.end()) {
+        i64 bad_offset = i64(-1);
+        iter_ = WalEntryIterator::Make(*it, false);
+        while (iter_->HasNext()) {
+            auto entry = iter_->Next();
+            if (entry.get() != nullptr) {
+                if (entry->IsCheckPoint()) {
+                    found_checkpoint = true;
+                }
+            } else {
+                bad_offset = iter_->GetOffset();
+                break;
+            }
+        }
+        if (bad_offset != i64(-1)) {
+            String error_message = fmt::format("Found bad wal entry {}@{}", *it, bad_offset);
+            LOG_WARN(error_message);
+            LocalFileSystem fs;
+            if (bad_offset == 0) {
+                fs.DeleteFile(*it);
+                error_message = fmt::format("Removed wal log {}", *it);
+                LOG_WARN(error_message);
+                ++it;
+                for (SizeT i = 0; i <= file_num; ++i) {
+                    wal_list_.pop_front();
+                }
+                file_num = 0;
+            } else {
+                fs.Truncate(*it, bad_offset);
+                error_message = fmt::format("Truncated {}@{}", *it, bad_offset);
+                LOG_WARN(error_message);
+                ++it;
+                for (SizeT i = 0; i < file_num; ++i) {
+                    wal_list_.pop_front();
+                }
+                file_num = 1;
+            }
+        } else {
+            ++it;
+            ++file_num;
+        }
+    }
+    iter_.reset();
+}
+
+bool WalListIterator::HasNext() {
+    if (iter_.get() == nullptr) {
+        return false;
+    }
+    if (iter_->HasNext()) {
+        return true;
+    }
+    while (1) {
+        if (wal_list_.size() <= 1) {
+            return false;
+        }
+        wal_list_.pop_front();
+        iter_ = WalEntryIterator::Make(wal_list_.front(), true);
+        if (iter_->HasNext()) {
+            return true;
+        }
     }
 }
 
 SharedPtr<WalEntry> WalListIterator::Next() {
-    if (iter_.get() != nullptr) {
-        SharedPtr<WalEntry> entry = iter_->Next();
-
-        if (entry.get() != nullptr) {
-            return entry;
-        }
+    auto entry = iter_->Next();
+    if (entry.get() == nullptr) {
+        auto off = iter_->GetOffset();
+        String error_message = fmt::format("Found bad wal entry {}@{}", wal_list_.front(), off);
+        LOG_WARN(error_message);
     }
-    if (!wal_deque_.empty()) {
-        iter_ = MakeUnique<WalEntryIterator>(WalEntryIterator::Make(wal_deque_.front()));
-        wal_deque_.pop_front();
-
-        return Next();
-    } else {
-        return nullptr;
-    }
+    return entry;
 }
 
 } // namespace infinity
