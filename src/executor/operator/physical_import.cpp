@@ -461,6 +461,8 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
         column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
     }
+
+    SizeT row_count{0};
     while (true) {
         if (start_pos >= file_size) {
             if (block_entry->row_count() == 0) {
@@ -486,6 +488,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
 
         JSONLRowHandler(line_json, column_vectors);
         block_entry->IncreaseRowCount(1);
+        ++ row_count;
 
         if (block_entry->GetAvailableCapacity() <= 0) {
             LOG_DEBUG(fmt::format("Block {} saved", block_entry->block_id()));
@@ -506,7 +509,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         }
     }
 
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", table_entry_->row_count()));
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", row_count));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
@@ -555,6 +558,7 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
         return;
     }
 
+    SizeT row_count{0};
     for (const auto &json_entry : json_arr) {
         if (block_entry->GetAvailableCapacity() <= 0) {
             LOG_DEBUG(fmt::format("Block {} saved", block_entry->block_id()));
@@ -576,12 +580,13 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
 
         JSONLRowHandler(json_entry, column_vectors);
         block_entry->IncreaseRowCount(1);
+        ++ row_count;
     }
 
     segment_entry->AppendBlockEntry(std::move(block_entry));
     SaveSegmentData(table_entry_, txn, segment_entry);
 
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", table_entry_->row_count()));
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", row_count));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
