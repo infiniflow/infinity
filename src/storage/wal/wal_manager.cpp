@@ -454,12 +454,13 @@ i64 WalManager::ReplayWalFile() {
         WalListIterator iterator(wal_list);
         // phase 1: find the max commit ts and catalog path
         LOG_INFO("Replay phase 1: find the max commit ts and catalog path");
-        while (true) {
+        while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
-                break;
+                String error_message = "Found unexpected bad wal entry";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
-
             LOG_TRACE(wal_entry->ToString());
 
             WalCmdCheckpoint *checkpoint_cmd = nullptr;
@@ -475,12 +476,13 @@ i64 WalManager::ReplayWalFile() {
 
         // phase 2: by the max commit ts, find the entries to replay
         LOG_INFO("Replay phase 2: by the max commit ts, find the entries to replay");
-        while (true) {
+        bool found_bad_entry = false;
+        while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
+                found_bad_entry = true;
                 break;
             }
-
             LOG_TRACE(wal_entry->ToString());
 
             if (wal_entry->commit_ts_ > max_commit_ts) {
@@ -488,6 +490,9 @@ i64 WalManager::ReplayWalFile() {
             } else {
                 break;
             }
+        }
+        if (found_bad_entry) {
+            replay_entries.clear();
         }
     }
 

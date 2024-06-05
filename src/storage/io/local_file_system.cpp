@@ -270,6 +270,16 @@ void LocalFileSystem::AppendFile(const String &dst_path, const String &src_path)
     dstFile.close();
 }
 
+void LocalFileSystem::Truncate(const String &file_name, SizeT length) {
+    std::error_code error_code;
+    std::filesystem::resize_file(file_name, length, error_code);
+    if (error_code.value() != 0) {
+        String error_message = fmt::format("Failed to truncate {} to size {}", file_name, strerror(errno));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+}
+
 // Directory related methods
 bool LocalFileSystem::Exists(const String &path) {
     std::error_code error_code;
