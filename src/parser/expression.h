@@ -25,5 +25,6 @@
 #include "expr/knn_expr.h"
 #include "expr/match_expr.h"
 #include "expr/match_tensor_expr.h"
+#include "expr/match_sparse_expr.h"
 #include "expr/search_expr.h"
 #include "expr/subquery_expr.h"

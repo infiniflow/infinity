@@ -22,6 +22,7 @@ import fusion_expression;
 import match_expression;
 import knn_expression;
 import match_tensor_expression;
+import match_sparse_expression;
 import logical_type;
 import internal_types;
 import data_type;
@@ -33,7 +34,8 @@ public:
     SearchExpression(Vector<SharedPtr<MatchExpression>> &match_exprs,
                      Vector<SharedPtr<KnnExpression>> &knn_exprs,
                      Vector<SharedPtr<MatchTensorExpression>> &match_tensor_exprs,
-                     SharedPtr<FusionExpression> fusion_expr);
+                     Vector<SharedPtr<MatchSparseExpression>> match_sparse_exprs,
+                     Vector<SharedPtr<FusionExpression>> &fusion_exprs);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
@@ -43,7 +45,8 @@ public:
     Vector<SharedPtr<MatchExpression>> match_exprs_{};
     Vector<SharedPtr<KnnExpression>> knn_exprs_{};
     Vector<SharedPtr<MatchTensorExpression>> match_tensor_exprs_{};
-    SharedPtr<FusionExpression> fusion_expr_{};
+    Vector<SharedPtr<MatchSparseExpression>> match_sparse_exprs_{};
+    Vector<SharedPtr<FusionExpression>> fusion_exprs_{};
 };
 
 } // namespace infinity

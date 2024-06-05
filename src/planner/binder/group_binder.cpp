@@ -117,7 +117,9 @@ SharedPtr<BaseExpression> GroupBinder::BindColumnReference(const ColumnExpr &exp
 
 SharedPtr<BaseExpression> GroupBinder::BindConstantExpression(const ConstantExpr &expr, BindContext *bind_context_ptr) {
     if (expr.literal_type_ != LiteralType::kInteger) {
-        UnrecoverableError("Not an integer.");
+        String error_message = "Not an integer.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     i64 select_idx = expr.integer_value_;
 

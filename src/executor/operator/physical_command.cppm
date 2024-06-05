@@ -28,6 +28,7 @@ import infinity_exception;
 import table_entry;
 import command_statement;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -47,10 +48,7 @@ public:
 
     bool Execute(QueryContext *query_context, OperatorState *operator_state) override;
 
-    SizeT TaskletCount() override {
-        UnrecoverableError("Not implement: TaskletCount not Implement");
-        return 0;
-    }
+    SizeT TaskletCount() override;
 
     inline SharedPtr<Vector<String>> GetOutputNames() const override { return output_names_; }
 

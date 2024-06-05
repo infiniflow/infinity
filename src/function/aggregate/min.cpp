@@ -27,6 +27,7 @@ import third_party;
 import status;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -35,15 +36,35 @@ struct MinState {
 public:
     ValueType value_;
 
-    void Initialize() { UnrecoverableError("MinState::Initialize"); }
+    void Initialize() {
+        String error_message = "Not implement: MinState::Initialize";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 
-    void Update(const ValueType *__restrict, SizeT) { UnrecoverableError("Not implement: MinState::Update"); }
+    void Update(const ValueType *__restrict, SizeT) {
+        String error_message = "Not implement: MinState::Update";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 
-    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { UnrecoverableError("Not implement: MinState::ConstantUpdate"); }
+    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
+        String error_message = "Not implement: MinState::ConstantUpdate";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 
-    [[nodiscard]] ptr_t Finalize() const { UnrecoverableError("Not implement: MinState::Finalize"); }
+    [[nodiscard]] ptr_t Finalize() const {
+        String error_message = "Not implement: MinState::Finalize";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 
-    inline static SizeT Size(const DataType &) { UnrecoverableError("Not implement: MinState::Size"); }
+    inline static SizeT Size(const DataType &) {
+        String error_message = "Not implement: MinState::Size";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 };
 
 template <>

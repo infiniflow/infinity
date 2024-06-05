@@ -41,6 +41,7 @@ import data_type;
 import data_block;
 import segment_entry;
 import block_entry;
+import logger;
 
 using namespace infinity;
 
@@ -135,8 +136,11 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
                     case SegmentStatus::kSealed:
                         sealed_cnt++;
                         break;
-                    default:
-                        UnrecoverableError("Invalid segment status");
+                    default: {
+                        String error_message = "Invalid segment status";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
+                    }
                 }
             }
             EXPECT_EQ(unsealed_cnt, 1);

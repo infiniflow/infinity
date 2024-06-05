@@ -14,14 +14,12 @@
 
 module;
 
-import stl;
-
-import block_index;
-
-
-import infinity_exception;
-
 module binding;
+
+import stl;
+import block_index;
+import infinity_exception;
+import logger;
 
 namespace infinity {
 
@@ -37,7 +35,9 @@ SharedPtr<Binding> Binding::MakeBinding(BindingType binding_type,
 
     SizeT column_count = column_names->size();
     if (column_count != column_types->size()) {
-        UnrecoverableError("Make binding error: column size isn't valid.");
+        String error_message = "Make binding error: column size isn't valid.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     binding->column_types_ = std::move(column_types);
     binding->column_names_ = std::move(column_names);

@@ -27,6 +27,7 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -35,15 +36,35 @@ struct MaxState {
 public:
     ValueType value_;
 
-    void Initialize() { UnrecoverableError("Not implement: Max::Initialize"); }
+    void Initialize() {
+        String error_message = "Not implement: Max::Initialize";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 
-    void Update(const ValueType *__restrict, SizeT) { UnrecoverableError("Not implement: Max::Update"); }
+    void Update(const ValueType *__restrict, SizeT) {
+        String error_message = "Not implement: Max::Update";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 
-    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) { UnrecoverableError("Not implement: Max::ConstantUpdate"); }
+    inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
+        String error_message = "Not implement: Max::ConstantUpdate";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 
-    [[nodiscard]] ptr_t Finalize() const { UnrecoverableError("Not implement: Max::Finalize"); }
+    [[nodiscard]] ptr_t Finalize() const {
+        String error_message = "Not implement: Max::Finalize";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 
-    inline static SizeT Size(const DataType &) { UnrecoverableError("Not implement: Max::Size"); }
+    inline static SizeT Size(const DataType &) {
+        String error_message = "Not implement: Max::Size";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 };
 
 template <>

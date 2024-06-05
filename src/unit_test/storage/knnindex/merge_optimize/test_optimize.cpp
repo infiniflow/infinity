@@ -41,6 +41,7 @@ import bg_task;
 import txn_store;
 import wal_manager;
 import buffer_manager;
+import internal_types;
 
 using namespace infinity;
 
@@ -82,7 +83,9 @@ protected:
             }
             // wait for at most 10s
             if (end - start > 10) {
-                UnrecoverableError("WaitCleanup timeout");
+                String error_message = "WaitCleanup timeout";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             LOG_INFO(fmt::format("Before usleep. Wait cleanup for {} seconds", end - start));
             usleep(1000 * 1000);

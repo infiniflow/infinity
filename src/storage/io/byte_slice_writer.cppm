@@ -3,7 +3,7 @@ module;
 import stl;
 import byte_slice;
 import memory_chunk;
-import memory_pool;
+import default_values;
 import file_writer;
 import file_reader;
 
@@ -18,7 +18,7 @@ public:
     constexpr static u32 MIN_SLICE_SIZE = ByteSlice::GetHeadSize();
 
 public:
-    ByteSliceWriter(MemoryPool *pool = nullptr, u32 min_slice_size = MIN_SLICE_SIZE);
+    ByteSliceWriter(u32 min_slice_size = MIN_SLICE_SIZE);
 
     ~ByteSliceWriter();
 
@@ -80,7 +80,6 @@ private:
 
 private:
     ByteSliceList *slice_list_;
-    MemoryPool *pool_;
     u32 last_slice_size_;
     bool is_own_slice_list_;
     u32 allocated_size_;
@@ -147,7 +146,7 @@ inline void ByteSliceWriter::WriteUInt32(u32 value) {
 inline u32 ByteSliceWriter::GetIncrementedSliceSize(u32 last_slice_size) {
     u32 prev = last_slice_size + ByteSlice::GetHeadSize();
     u32 slice_size = prev + (prev >> 2) - ByteSlice::GetHeadSize();
-    u32 chunk_size = MemoryPool::DEFAULT_CHUNK_SIZE - ByteSlice::GetHeadSize() - sizeof(ChainedMemoryChunk);
+    u32 chunk_size = DEFAULT_CHUNK_SIZE - ByteSlice::GetHeadSize() - sizeof(ChainedMemoryChunk);
     return slice_size < chunk_size ? slice_size : chunk_size;
 }
 
@@ -163,22 +162,12 @@ inline ByteSlice *ByteSliceWriter::GetSliceForWrite() {
 }
 
 inline ByteSliceList *ByteSliceWriter::AllocateByteSliceList() {
-    if (pool_) {
-        void *buffer = pool_->Allocate(sizeof(ByteSliceList));
-        return new (buffer) ByteSliceList();
-    } else {
-        return new ByteSliceList();
-    }
+    return new ByteSliceList();
 }
 
 inline void ByteSliceWriter::DeAllocateByteSliceList(ByteSliceList *&byte_slice_list) {
-    if (pool_) {
-        byte_slice_list->~ByteSliceList();
-        byte_slice_list = nullptr;
-    } else {
-        delete byte_slice_list;
-        byte_slice_list = nullptr;
-    }
+    delete byte_slice_list;
+    byte_slice_list = nullptr;
 }
 
 } // namespace infinity

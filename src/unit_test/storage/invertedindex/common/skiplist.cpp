@@ -17,7 +17,7 @@
 
 import stl;
 import logger;
-import memory_pool;
+
 import skiplist;
 
 using namespace infinity;
@@ -27,17 +27,16 @@ class SkiplistTest : public BaseTest {};
 typedef u32 Key;
 typedef u32 Value;
 
-std::random_device rd;
-std::mt19937 gen(rd());
-std::uniform_int_distribution<int> dis(INT32_MAX / 2, INT32_MAX);
+static String available_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 static String RandStr() {
-    u32 len = dis(gen) % 100 + 50;
-    String str;
-    str.reserve(len);
-    for (u32 i = 0; i < len; ++i)
-        str.push_back('a' + dis(gen) % 26);
-    return str;
+    u32 len = random() % 100 + 50;
+    String ret(len, '\0');
+    for (SizeT i = 0; i < len; i++) {
+        SizeT rand_i = random() % available_chars.size();
+        ret[i] = available_chars[rand_i];
+    }
+    return ret;
 }
 
 class NumComparator {
@@ -55,7 +54,7 @@ public:
 TEST_F(SkiplistTest, test1) {
 
     NumComparator cmp;
-    SkipList<Key, Value, NumComparator> list(cmp, nullptr);
+    SkipList<Key, Value, NumComparator> list(cmp);
 
     constexpr int N = 50000;
     constexpr int R = 50000;
@@ -69,8 +68,8 @@ TEST_F(SkiplistTest, test1) {
     ASSERT_EQ(b, v);
 
     for (int i = 0; i < N; i++) {
-        Key key = dis(gen) % R;
-        Value value = dis(gen) % R;
+        Key key = random() % R;
+        Value value = random() % R;
         if (keys.emplace(key, value).second) {
             list.Insert(key, value);
 
@@ -97,7 +96,7 @@ TEST_F(SkiplistTest, test1) {
 
 TEST_F(SkiplistTest, test2) {
     KeyComparator cmp;
-    SkipList<String, String, KeyComparator> list(cmp, nullptr);
+    SkipList<String, String, KeyComparator> list(cmp);
     constexpr int N = 200;
     std::map<String, String> keys;
 
@@ -141,7 +140,7 @@ void InitRamdomList(int num_elements, int max_value) {
 constexpr int NUM_THREADS = 4;
 constexpr int NUM_OPERATIONS = 1000;
 KeyComparator cmp;
-SkipList<String, String, KeyComparator> s(cmp, nullptr);
+SkipList<String, String, KeyComparator> s(cmp);
 void PerformOperations(int thread_id) {
     for (int i = 0; i < NUM_OPERATIONS; ++i) {
         if (thread_id == 0) {

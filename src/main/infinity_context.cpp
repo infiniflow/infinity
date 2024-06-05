@@ -56,6 +56,8 @@ void InfinityContext::Init(const SharedPtr<String> &config_path) {
         storage_ = MakeUnique<Storage>(config_.get());
         storage_->Init();
 
+        inverting_thread_pool_.resize(config_->CPULimit());
+        commiting_thread_pool_.resize(config_->CPULimit());
         initialized_ = true;
     }
 }

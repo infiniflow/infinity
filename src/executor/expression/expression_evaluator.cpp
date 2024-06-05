@@ -60,7 +60,9 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
         case ExpressionType::kIn:
             return Execute(std::static_pointer_cast<InExpression>(expr), state, output_column);
         default: {
-            UnrecoverableError(fmt::format("Unknown expression type: {}", expr->Name()));
+            String error_message = fmt::format("Unknown expression type: {}", expr->Name());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -134,11 +136,15 @@ void ExpressionEvaluator::Execute(const SharedPtr<CastExpression> &expr,
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<CaseExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    UnrecoverableError("Case execution");
+    String error_message = "Case execution";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
-    UnrecoverableError("Column expression");
+    String error_message = "Column expression";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<FunctionExpression> &expr,
@@ -178,10 +184,14 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
     SizeT column_index = expr->column_index();
 
     if (input_data_block_ == nullptr) {
-        UnrecoverableError("Input data block is NULL");
+        String error_message = "Input data block is NULL";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (column_index >= input_data_block_->column_count()) {
-        UnrecoverableError("Invalid column index");
+        String error_message = "Invalid column index";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     output_column_vector = input_data_block_->column_vectors[column_index];

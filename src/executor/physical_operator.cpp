@@ -32,6 +32,8 @@ import block_column_entry;
 import logical_type;
 import internal_types;
 
+import logger;
+
 namespace infinity {
 
 String PhysicalOperator::GetName() const { return PhysicalOperatorToString(operator_type_); }
@@ -46,7 +48,9 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
     // FIXME: After columnar reading is supported, use a different table_ref for each LoadMetas
     auto table_ref = table_refs[load_metas[0].binding_.table_idx];
     if (table_ref.get() == nullptr) {
-        UnrecoverableError("TableRef not found!");
+        String error_message = "TableRef not found";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     for (SizeT i = 0; i < operator_state->prev_op_state_->data_block_array_.size(); ++i) {

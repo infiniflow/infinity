@@ -24,7 +24,7 @@ module blockmax_term_doc_iterator;
 import stl;
 import index_defines;
 import internal_types;
-import memory_pool;
+
 import segment_posting;
 import posting_iterator;
 import column_length_io;
@@ -46,14 +46,17 @@ BlockMaxTermDocIterator::~BlockMaxTermDocIterator() {
     LOG_TRACE(std::move(oss).str());
 }
 
-BlockMaxTermDocIterator::BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool) : iter_(flag, session_pool) {}
+BlockMaxTermDocIterator::BlockMaxTermDocIterator(optionflag_t flag) : iter_(flag) {}
 
 bool BlockMaxTermDocIterator::InitPostingIterator(SharedPtr<Vector<SegmentPosting>> seg_postings, const u32 state_pool_size) {
     if (iter_.Init(std::move(seg_postings), state_pool_size)) {
         doc_freq_ = iter_.GetDocFreq();
         return true;
     }
-    UnrecoverableError("Unexpected case: Init PostingIterator failed");
+
+    String error_message = "Unexpected case: Init PostingIterator failed";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 

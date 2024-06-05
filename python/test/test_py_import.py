@@ -19,7 +19,7 @@ from infinity import index
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
-from infinity.common import ConflictType
+from infinity.common import ConflictType, InfinityException
 from test_sdkbase import TestSdk
 
 from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
@@ -195,7 +195,7 @@ class TestImport(TestSdk):
         "int", "int8", "int16", "int32", "int64", "integer",
         "float", "float32", "double", "float64",
         "varchar",
-        ("bool", 7012)
+        ("bool", ErrorCode.PARSER_ERROR)
     ])
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_blankspace.csv",
                                              "data_dir": common_values.TEST_TMP_DIR},
@@ -224,11 +224,14 @@ class TestImport(TestSdk):
         else:
             table_obj = db_obj.create_table("test_csv_with_different_delimiter", {
                 "c1": {"type": types[0]}, "c2": {"type": types[0]}}, ConflictType.Error)
-            with pytest.raises(Exception, match=f"ERROR:{types[1]}*"):
+            with pytest.raises(InfinityException) as e:
                 table_obj.import_data(common_values.TEST_TMP_DIR + "/pysdk_test_" + delimiter[0] + ".csv",
                                       import_options={
                                           "delimiter": delimiter[1]
                                       })
+
+            assert e.type == InfinityException
+            assert e.value.args[0] == types[1]
             db_obj.drop_table("test_csv_with_different_delimiter", ConflictType.Error)
 
     # import csv with delimiter more than one character
@@ -277,10 +280,13 @@ class TestImport(TestSdk):
         db_obj.drop_table("test_import_fvecs_table_with_more_columns", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_import_fvecs_table_with_more_columns",
                                         {"c1": {"type": "int"}, "c2": {"type": "vector,128,float"}})
-        with pytest.raises(Exception, match="ERROR:3037*"):
+
+        with pytest.raises(InfinityException) as e:
             test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test.fvecs"
-            res = table_obj.import_data(test_csv_dir, import_options={"file_type": "fvecs"})
-            assert res.error_code == ErrorCode.OK
+            table_obj.import_data(test_csv_dir, import_options={"file_type": "fvecs"})
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.IMPORT_FILE_FORMAT_ERROR
 
         res = table_obj.output(["*"]).to_df()
         print(res)
@@ -324,9 +330,12 @@ class TestImport(TestSdk):
                                         {"c1": {"type": "int"}, "c2": {"type": types}})
 
         test_csv_dir = common_values.TEST_TMP_DIR + "embedding_int_dim3.csv"
-        with pytest.raises(Exception, match="ERROR:3037, Import file format error:*"):
-            res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
-            assert res.error_code == ErrorCode.OK
+
+        with pytest.raises(InfinityException) as e:
+            table_obj.import_data(test_csv_dir, import_options={"file_type": "csv"})
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.IMPORT_FILE_FORMAT_ERROR
 
         res = table_obj.output(["*"]).to_df()
         print(res)
@@ -406,9 +415,11 @@ class TestImport(TestSdk):
         table_obj = db_obj.create_table("test_table_with_not_matched_columns", columns)
 
         test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_commas.csv"
-        with pytest.raises(Exception, match="ERROR:3037*"):
-            res = table_obj.import_data(test_csv_dir)
-            assert res.error_code == ErrorCode.OK
+        with pytest.raises(InfinityException) as e:
+            table_obj.import_data(test_csv_dir)
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.COLUMN_COUNT_MISMATCH or e.value.args[0] == ErrorCode.IMPORT_FILE_FORMAT_ERROR
 
         res = table_obj.output(["*"]).to_df()
         print(res)

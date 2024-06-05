@@ -83,7 +83,9 @@ protected:
 public:
     static inline bool HaveLeftColumnAndRightValue(const SharedPtr<FunctionExpression> &expression, u32 sub_expr_depth, auto &is_valid_column) {
         if (expression->arguments().size() != 2) {
-            UnrecoverableError("HaveLeftColumnAndRightValue: argument size != 2");
+            String error_message = "HaveLeftColumnAndRightValue: argument size != 2";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return IsValidColumnExpression(expression->arguments()[0], sub_expr_depth + 1, is_valid_column) and
                IsValueResultExpression(expression->arguments()[1], sub_expr_depth + 1);
@@ -91,7 +93,9 @@ public:
 
     static inline bool HaveRightColumnAndLeftValue(const SharedPtr<FunctionExpression> &expression, u32 sub_expr_depth, auto &is_valid_column) {
         if (expression->arguments().size() != 2) {
-            UnrecoverableError("HaveRightColumnAndLeftValue: argument size != 2");
+            String error_message = "HaveRightColumnAndRightValue: argument size != 2";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return IsValidColumnExpression(expression->arguments()[1], sub_expr_depth + 1, is_valid_column) and
                IsValueResultExpression(expression->arguments()[0], sub_expr_depth + 1);
@@ -174,10 +178,12 @@ public:
             }
             case ExpressionType::kCast: {
                 if (expression->arguments().size() != 1) {
-                    UnrecoverableError(fmt::format("Expression depth: {}. Unsupported expression type: In IsValueResultExpression(), the cast "
-                                                   "expression {} has more than 1 argument.",
-                                                   sub_expr_depth,
-                                                   expression->Name()));
+                    String error_message = fmt::format("Expression depth: {}. Unsupported expression type: In IsValueResultExpression(), the cast "
+                                                       "expression {} has more than 1 argument.",
+                                                       sub_expr_depth,
+                                                       expression->Name());
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     return false;
                 }
                 return IsValueResultExpression(expression->arguments()[0], sub_expr_depth + 1);
@@ -347,10 +353,12 @@ private:
                     name_iter != IndexScanSupportedCompareFunctionNames.end()) {
                     // supported compare function
                     if (expression->arguments().size() != 2) {
-                        UnrecoverableError(fmt::format("Expression depth: {}. Unsupported expression type: In CheckExprIndexState(), the compare "
-                                                       "expression {} argument size != 2.",
-                                                       sub_expr_depth,
-                                                       expression->Name()));
+                        String error_message = fmt::format("Expression depth: {}. Unsupported expression type: In CheckExprIndexState(), the compare "
+                                                           "expression {} argument size != 2.",
+                                                           sub_expr_depth,
+                                                           expression->Name());
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                         return nullptr;
                     }
                     auto is_column_index = [&m = candidate_column_index_map_](const SharedPtr<BaseExpression> &expr, u32 depth) -> bool {
@@ -428,7 +436,9 @@ private:
         for (auto &expression : index_filter_candidates_) {
             if (!AddIndexForBooleanExpression(expression)) {
                 // cannot apply index scan
-                UnrecoverableError(fmt::format("Error when trying to apply index scan on expression {}.", expression->Name()));
+                String error_message = fmt::format("Error when trying to apply index scan on expression {}.", expression->Name());
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
         // 2. build index_filter_qualified_
@@ -473,7 +483,9 @@ private:
                 return AddIndexForBooleanExpression(expression->arguments()[0]) and AddIndexForBooleanExpression(expression->arguments()[1]);
             } else if (f_name == "NOT") {
                 // recursive check
-                UnrecoverableError("Error when trying to apply index scan on \"NOT\" expression: need to be excluded early.");
+                String error_message = "Error when trying to apply index scan on \"NOT\" expression: need to be excluded early.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 return false;
             } else {
                 // compare function "[cast] x compare value_expr"
@@ -649,7 +661,9 @@ public:
                             }
                             default: {
                                 // error
-                                UnrecoverableError("Wrong compare type!");
+                                String error_message = "Wrong compare type!";
+                                LOG_CRITICAL(error_message);
+                                UnrecoverableError(error_message);
                                 return ReturnAlwaysTrue();
                             }
                         }
@@ -726,7 +740,9 @@ public:
                             }
                             default: {
                                 // error
-                                UnrecoverableError("Wrong compare type!");
+                                String error_message = "Wrong compare type!";
+                                LOG_CRITICAL(error_message);
+                                UnrecoverableError(error_message);
                                 return ReturnAlwaysTrue();
                             }
                         }

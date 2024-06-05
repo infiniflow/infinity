@@ -67,8 +67,10 @@ Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, Trans
     : txn_store_(this, catalog), txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), txn_context_(begin_ts),
       wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
-UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id) {
-    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id, MAX_TIMESTAMP);
+UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id, begin_ts);
+    txn->txn_context_.commit_ts_ = begin_ts;
+    txn->txn_context_.state_ = TxnState::kCommitted;
     return txn;
 }
 
@@ -132,7 +134,9 @@ TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) { return txn_store
 void Txn::CheckTxnStatus() {
     TxnState txn_state = txn_context_.GetTxnState();
     if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction isn't started.");
+        String error_message = "Transaction isn't started.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -143,7 +147,7 @@ void Txn::CheckTxn(const String &db_name) {
     } else if (!IsEqual(db_name_, db_name)) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table from another database {}", db_name));
         LOG_ERROR(*err_msg);
-        RecoverableError(Status::InvalidDBName(db_name));
+        RecoverableError(Status::InvalidIdentifierName(db_name));
     }
 }
 
@@ -479,13 +483,6 @@ void Txn::CancelCommitBottom() {
     cond_var_.notify_one();
 }
 
-// Dangerous! only used during replaying wal.
-void Txn::FakeCommit(TxnTimeStamp commit_ts) {
-    txn_context_.begin_ts_ = commit_ts;
-    txn_context_.commit_ts_ = commit_ts;
-    txn_context_.state_ = TxnState::kCommitted;
-}
-
 void Txn::Rollback() {
     auto state = txn_context_.GetTxnState();
     TxnTimeStamp abort_ts = 0;
@@ -494,7 +491,9 @@ void Txn::Rollback() {
     } else if (state == TxnState::kCommitting) {
         abort_ts = txn_context_.GetCommitTS();
     } else {
-        UnrecoverableError(fmt::format("Transaction {} state is {}.", txn_id_, ToString(state)));
+        String error_message = fmt::format("Transaction {} state is {}.", txn_id_, ToString(state));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     txn_context_.SetTxnRollbacking(abort_ts);
 

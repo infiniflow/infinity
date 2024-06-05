@@ -14,11 +14,11 @@
 
 module;
 
-import stl;
-
-import infinity_exception;
-
 export module txn_state;
+
+import stl;
+import logger;
+import infinity_exception;
 
 namespace infinity {
 
@@ -56,7 +56,9 @@ export inline String ToString(TxnState txn_state) {
             break;
         }
     }
-    UnrecoverableError("Invalid transaction state.");
+    String error_message = "Invalid transaction state.";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return String();
 }
 

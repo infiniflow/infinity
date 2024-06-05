@@ -57,43 +57,44 @@ sed '1d' datasets/enwiki/enwiki-20120502-lines-1k.txt > datasets/enwiki/enwiki.c
 mkdir -p $HOME/elasticsearch
 docker run -d --name elasticsearch --network host -e "discovery.type=single-node" -e "ES_JAVA_OPTS=-Xms16384m -Xmx32000m" -e "xpack.security.enabled=false" -v $HOME/elasticsearch:/usr/share/elasticsearch elasticsearch:8.13.4
 
-mkdir -p $HOME/qdrant
-docker run -d --name qdrant --network host -v $HOME/qdrant:/qdrant qdrant/qdrant:v1.8.2
+mkdir -p $HOME/qdrant/storage
+docker run -d --name qdrant --network host -v $HOME/qdrant/storage:/qdrant/storage qdrant/qdrant:v1.9.2
 
-sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:0.1.0
+mkdir -p $HOME/infinity
+docker run -d --name infinity -v $HOME/infinity:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:0.1.0
 ```
 
 4. Run Benchmark:
 
-Drop file cache before benchmark query latency.
+Drop file cache before benchmark.
 
 ```bash
 echo 3 | sudo tee /proc/sys/vm/drop_caches
 ```
 
 Tasks of the Python script `run.py` include:
- - Delete the original data.
- - Re-insert the data.
- - Calculate the time to insert data and build index.
- - Calculate query latency.
- - Calculate QPS.
+ - Generate fulltext query set.
+ - Measure the time to import data and build index.
+ - Measure the query latency.
+ - Measure the QPS.
 
 ```bash
 $ python run.py -h
-usage: run.py [-h] [--generate] [--import] [--query] [--query-express QUERY_EXPRESS] [--engine ENGINE] [--dataset DATASET]
+usage: run.py [-h] [--generate] [--import] [--query QUERY] [--query-express QUERY_EXPRESS] [--concurrency CONCURRENCY] [--engine ENGINE] [--dataset DATASET]
 
 RAG Database Benchmark
 
 options:
-  -h, --help            show this help message and exit
-  --generate            Generate fulltext queries based on the dataset
-  --import              Import data set into database engine
-  --query               Run single client to benchmark query latency
-  --query-express QUERY_EXPRESS
-                        Run multiple clients in express mode to benchmark QPS
-  --engine ENGINE       database engine to benchmark, one of: all, infinity, qdrant, elasticsearch
-  --dataset DATASET     data set to benchmark, one of: all, gist, sift, geonames, enwiki
+-h, --help            show this help message and exit
+--generate            Generate fulltext query set based on the dataset (default: False)
+--import              Import dataset into database engine (default: False)
+--query QUERY         Run the query set only once using given number of clients with recording the result and latency. This is for result validation and latency analysis (default: 0)
+--query-express QUERY_EXPRESS
+Run the query set randomly using given number of clients without recording the result and latency. This is for QPS measurement. (default: 0)
+--concurrency CONCURRENCY
+Choose concurrency mechanism, one of: mp - multiprocessing(recommended), mt - multithreading. (default: mp)
+--engine ENGINE       Choose database engine to benchmark, one of: infinity, qdrant, elasticsearch (default: infinity)
+--dataset DATASET     Choose dataset to benchmark, one of: gist, sift, geonames, enwiki (default: enwiki)
 ```
 
 Following are commands for engine `infinity` and dataset `enwiki`:
@@ -101,7 +102,7 @@ Following are commands for engine `infinity` and dataset `enwiki`:
 ```bash
 python run.py --generate --engine infinity --dataset enwiki
 python run.py --import --engine infinity --dataset enwiki
-python run.py --query --engine infinity --dataset enwiki
+python run.py --query=16 --engine infinity --dataset enwiki
 python run.py --query-express=16 --engine infinity --dataset enwiki
 ```
 
@@ -148,7 +149,7 @@ psql -h 0.0.0.0 -p 5432 -c "SELECT doctitle, ROW_ID(), SCORE() FROM infinity_enw
 |                   | Time to insert & build index | Time to import & build index | P95 Latency(ms)| QPS (16 python clients) |  Memory | vCPU  |
 | ----------------- | ---------------------------- | ---------------------------- | ---------------| ------------------------| --------| ----- |
 | **Elasticsearch** | 2289 s                       | N/A                          | 14.75          | 1340                    | 21.0GB  | 10.6  |
-| **Infinity**      | 2321 s                       | 2890 s                       | 1.86           | 12328                   | 10.0GB  | 11.0  |
+| **Infinity**      | 1562 s                       | 2244 s                       | 1.86           | 12328                   | 10.0GB  | 11.0  |
 
 ---
 

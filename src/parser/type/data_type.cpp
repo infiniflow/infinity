@@ -18,6 +18,7 @@
 #include "spdlog/fmt/fmt.h"
 #include "type/info/decimal_info.h"
 #include "type/info/embedding_info.h"
+#include "type/info/sparse_info.h"
 #include "type/logical_type.h"
 #include "type/type_info.h"
 #include <charconv>
@@ -61,6 +62,7 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
         }
         case kMixed:
         case kVarchar:
+        case kSparse:
         case kTensor:
         case kTensorArray:
         case kArray:
@@ -72,6 +74,7 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
             break;
         }
         case kNull:
+        case kEmptyArray:
         case kMissing: {
             plain_type_ = true;
             break;
@@ -84,6 +87,9 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
 std::string DataType::ToString() const {
     if (type_ > kInvalid) {
         ParserError(fmt::format("Invalid logical data type {}.", int(type_)));
+    }
+    if (type_info_.get() != nullptr) {
+        return fmt::format("{}({})", LogicalType2Str(type_), type_info_->ToString());
     }
     return LogicalType2Str(type_);
 }
@@ -187,6 +193,11 @@ int32_t DataType::GetSizeInBytes() const {
                 size += sizeof(EmbeddingDataType);
                 size += sizeof(int32_t);
                 break;
+            case LogicalType::kSparse: {
+                size += sizeof(EmbeddingDataType) * 2;
+                size += sizeof(int64_t);
+                break;
+            }
             default:
                 ParserError(fmt::format("Unexpected type {} here.", int(this->type_)));
         }
@@ -233,6 +244,13 @@ void DataType::WriteAdv(char *&ptr) const {
             WriteBufAdv<int32_t>(ptr, int32_t(embedding_info->Dimension()));
             break;
         }
+        case LogicalType::kSparse: {
+            const auto *sparse_info = static_cast<SparseInfo *>(this->type_info().get());
+            WriteBufAdv<EmbeddingDataType>(ptr, sparse_info->DataType());
+            WriteBufAdv<EmbeddingDataType>(ptr, sparse_info->IndexType());
+            WriteBufAdv<int64_t>(ptr, sparse_info->Dimension());
+            break;
+        }
         default:
             // There's no type_info for other types
             break;
@@ -265,6 +283,17 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
             EmbeddingDataType embedding_type = ReadBufAdv<EmbeddingDataType>(ptr);
             int32_t dimension = ReadBufAdv<int32_t>(ptr);
             type_info = EmbeddingInfo::Make(EmbeddingDataType(embedding_type), dimension);
+            break;
+        }
+        case LogicalType::kSparse: {
+            EmbeddingDataType data_type = ReadBufAdv<EmbeddingDataType>(ptr);
+            EmbeddingDataType index_type = ReadBufAdv<EmbeddingDataType>(ptr);
+            int64_t dimension = ReadBufAdv<int64_t>(ptr);
+            auto sparse_info = SparseInfo::Make(data_type, dimension);
+            if (index_type != sparse_info->IndexType()) {
+                ParserError("Sparse index type is not consistent.");
+            }
+            type_info = sparse_info;
             break;
         }
         default:
@@ -312,6 +341,10 @@ std::shared_ptr<DataType> DataType::Deserialize(const nlohmann::json &data_type_
             case LogicalType::kTensorArray:
             case LogicalType::kEmbedding: {
                 type_info = EmbeddingInfo::Make(type_info_json["embedding_type"], type_info_json["dimension"]);
+                break;
+            }
+            case LogicalType::kSparse: {
+                type_info = SparseInfo::Deserialize(type_info_json);
                 break;
             }
             default:

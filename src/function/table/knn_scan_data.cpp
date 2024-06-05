@@ -85,7 +85,9 @@ template <typename DataType>
 void KnnScanFunctionData::Init() {
     switch (knn_scan_shared_data_->knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
-            UnrecoverableError("Invalid Knn distance type");
+            String error_message = "Invalid Knn distance type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {

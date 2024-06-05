@@ -48,6 +48,7 @@ BUFFER          { return BUFFER; }
 BY              { return BY; }
 CASE            { return CASE; }
 CAST            { return CAST; }
+CHUNK           { return CHUNK; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }
 COLUMN          { return COLUMN; }
@@ -159,6 +160,7 @@ SEGMENT         { return SEGMENT; }
 SEGMENTS         { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
+SPARSE          { return SPARSE; }
 TABLE           { return TABLE; }
 TABLES          { return TABLES; }
 TENSOR          { return TENSOR; }

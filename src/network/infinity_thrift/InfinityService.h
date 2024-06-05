@@ -22,7 +22,7 @@ namespace infinity_thrift_rpc {
 class InfinityServiceIf {
  public:
   virtual ~InfinityServiceIf() {}
-  virtual void Connect(CommonResponse& _return) = 0;
+  virtual void Connect(CommonResponse& _return, const ConnectRequest& request) = 0;
   virtual void Disconnect(CommonResponse& _return, const CommonRequest& request) = 0;
   virtual void CreateDatabase(CommonResponse& _return, const CreateDatabaseRequest& request) = 0;
   virtual void DropDatabase(CommonResponse& _return, const DropDatabaseRequest& request) = 0;
@@ -80,7 +80,7 @@ class InfinityServiceIfSingletonFactory : virtual public InfinityServiceIfFactor
 class InfinityServiceNull : virtual public InfinityServiceIf {
  public:
   virtual ~InfinityServiceNull() {}
-  void Connect(CommonResponse& /* _return */) override {
+  void Connect(CommonResponse& /* _return */, const ConnectRequest& /* request */) override {
     return;
   }
   void Disconnect(CommonResponse& /* _return */, const CommonRequest& /* request */) override {
@@ -169,6 +169,10 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
   }
 };
 
+typedef struct _InfinityService_Connect_args__isset {
+  _InfinityService_Connect_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_Connect_args__isset;
 
 class InfinityService_Connect_args {
  public:
@@ -179,9 +183,16 @@ class InfinityService_Connect_args {
   }
 
   virtual ~InfinityService_Connect_args() noexcept;
+  ConnectRequest request;
 
-  bool operator == (const InfinityService_Connect_args & /* rhs */) const
+  _InfinityService_Connect_args__isset __isset;
+
+  void __set_request(const ConnectRequest& val);
+
+  bool operator == (const InfinityService_Connect_args & rhs) const
   {
+    if (!(request == rhs.request))
+      return false;
     return true;
   }
   bool operator != (const InfinityService_Connect_args &rhs) const {
@@ -201,6 +212,7 @@ class InfinityService_Connect_pargs {
 
 
   virtual ~InfinityService_Connect_pargs() noexcept;
+  const ConnectRequest* request;
 
   uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
 
@@ -3198,8 +3210,8 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> getOutputProtocol() {
     return poprot_;
   }
-  void Connect(CommonResponse& _return) override;
-  void send_Connect();
+  void Connect(CommonResponse& _return, const ConnectRequest& request) override;
+  void send_Connect(const ConnectRequest& request);
   void recv_Connect(CommonResponse& _return);
   void Disconnect(CommonResponse& _return, const CommonRequest& request) override;
   void send_Disconnect(const CommonRequest& request);
@@ -3389,13 +3401,13 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
     ifaces_.push_back(iface);
   }
  public:
-  void Connect(CommonResponse& _return) override {
+  void Connect(CommonResponse& _return, const ConnectRequest& request) override {
     size_t sz = ifaces_.size();
     size_t i = 0;
     for (; i < (sz - 1); ++i) {
-      ifaces_[i]->Connect(_return);
+      ifaces_[i]->Connect(_return, request);
     }
-    ifaces_[i]->Connect(_return);
+    ifaces_[i]->Connect(_return, request);
     return;
   }
 
@@ -3711,8 +3723,8 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   std::shared_ptr< ::apache::thrift::protocol::TProtocol> getOutputProtocol() {
     return poprot_;
   }
-  void Connect(CommonResponse& _return) override;
-  int32_t send_Connect();
+  void Connect(CommonResponse& _return, const ConnectRequest& request) override;
+  int32_t send_Connect(const ConnectRequest& request);
   void recv_Connect(CommonResponse& _return, const int32_t seqid);
   void Disconnect(CommonResponse& _return, const CommonRequest& request) override;
   int32_t send_Disconnect(const CommonRequest& request);

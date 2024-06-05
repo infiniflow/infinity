@@ -18,6 +18,7 @@ import buffer_base;
 
 import infinity_exception;
 import stl;
+import logger;
 
 export module write_buffer;
 
@@ -78,7 +79,9 @@ public:
     }
 
     void WriteByte(u8 x) {
-        UnrecoverableError("Cannot write to finalized buffer");
+        String error_message = "Cannot write to finalized buffer";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         NextIfAtEnd();
         *pos_ = x;
         ++pos_;
@@ -168,7 +171,9 @@ private:
 
             if (0 == next_chunk_size) {
                 Set(Pos(), 0);
-                UnrecoverableError("current buffer exhaused");
+                String error_message = "Current buffer exhausted";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
 

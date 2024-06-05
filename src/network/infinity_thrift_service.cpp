@@ -44,6 +44,7 @@ import constant_expr;
 import column_expr;
 import function_expr;
 import knn_expr;
+import match_tensor_expr;
 import match_expr;
 import fusion_expr;
 import parsed_expr;
@@ -61,7 +62,48 @@ import query_result;
 
 namespace infinity {
 
-void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &response) {
+ClientVersions::ClientVersions() {
+    client_version_map_[1] = String("0.2.0.dev2");
+    client_version_map_[2] = String("0.2.0.dev3");
+    client_version_map_[3] = String("0.2.0.dev4");
+}
+
+Pair<const char*, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
+    auto iter = client_version_map_.find(version_index);
+    if(iter == client_version_map_.end()) {
+        return {nullptr, Status::UnsupportedVersionIndex(version_index)};
+    }
+    return {iter->second.c_str(), Status::OK()};
+}
+
+std::mutex InfinityThriftService::infinity_session_map_mutex_;
+HashMap<u64, SharedPtr<Infinity>> InfinityThriftService::infinity_session_map_;
+ClientVersions InfinityThriftService::client_version_;
+
+void InfinityThriftService::Connect(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ConnectRequest& request) {
+    i64 request_client_version = request.client_version;
+    if(request_client_version != current_version_index_) {
+        auto [request_version_ptr, status1] = client_version_.GetVersionByIndex(request_client_version);
+        if(!status1.ok()) {
+            response.__set_error_code((i64)(status1.code()));
+            response.__set_error_msg(status1.message());
+            LOG_ERROR(status1.message());
+            return ;
+        }
+
+        auto [expected_version_ptr, status2] = client_version_.GetVersionByIndex(current_version_index_);
+        if(!status2.ok()) {
+            LOG_CRITICAL(status2.message());
+            UnrecoverableError(status2.message());
+        }
+
+        Status status3 = Status::ClientVersionMismatch(expected_version_ptr, request_version_ptr);
+        response.__set_error_code((i64)(status3.code()));
+        response.__set_error_msg(status3.message());
+        LOG_ERROR(status3.message());
+        return ;
+    }
+
     auto infinity = Infinity::RemoteConnect();
     std::lock_guard<std::mutex> lock(infinity_session_map_mutex_);
     infinity_session_map_.emplace(infinity->GetSessionId(), infinity);
@@ -380,9 +422,10 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         search_expr = new SearchExpr();
         auto search_expr_list = new Vector<ParsedExpr *>();
         SizeT knn_expr_count = request.search_expr.knn_exprs.size();
+        SizeT match_tensor_expr_count = request.search_expr.match_tensor_exprs.size();
         SizeT match_expr_count = request.search_expr.match_exprs.size();
-        bool fusion_expr_exists = request.search_expr.__isset.fusion_expr;
-        SizeT total_expr_count = knn_expr_count + match_expr_count + fusion_expr_exists;
+        SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
+        SizeT total_expr_count = knn_expr_count + match_expr_count + match_tensor_expr_count + fusion_expr_count;
         search_expr_list->reserve(total_expr_count);
         for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
             auto [knn_expr, knn_expr_status] = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
@@ -420,13 +463,44 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
             search_expr_list->emplace_back(knn_expr);
         }
 
+        for (SizeT idx = 0; idx < match_tensor_expr_count; ++idx) {
+            auto [match_tensor_expr, match_tensor_status] = GetMatchTensorExprFromProto(request.search_expr.match_tensor_exprs[idx]);
+            if (!match_tensor_status.ok()) {
+                if (output_columns != nullptr) {
+                    for (auto &expr_ptr : *output_columns) {
+                        delete expr_ptr;
+                    }
+                    delete output_columns;
+                    output_columns = nullptr;
+                }
+                if (search_expr_list != nullptr) {
+                    for (auto &expr_ptr : *search_expr_list) {
+                        delete expr_ptr;
+                    }
+                    delete search_expr_list;
+                    search_expr_list = nullptr;
+                }
+                if (match_tensor_expr != nullptr) {
+                    delete match_tensor_expr;
+                    match_tensor_expr = nullptr;
+                }
+                if (search_expr != nullptr) {
+                    delete search_expr;
+                    search_expr = nullptr;
+                }
+                ProcessStatus(response, match_tensor_status);
+                return;
+            }
+            search_expr_list->emplace_back(match_tensor_expr);
+        }
+
         for (SizeT idx = 0; idx < match_expr_count; ++idx) {
             ParsedExpr *match_expr = GetMatchExprFromProto(request.search_expr.match_exprs[idx]);
             search_expr_list->emplace_back(match_expr);
         }
 
-        if (fusion_expr_exists) {
-            ParsedExpr *fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_expr);
+        for (SizeT idx = 0; idx < fusion_expr_count; ++idx) {
+            ParsedExpr *fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_exprs[idx]);
             search_expr_list->emplace_back(fusion_expr);
         }
 
@@ -563,8 +637,8 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
         auto search_expr_list = new Vector<ParsedExpr *>();
         SizeT knn_expr_count = request.search_expr.knn_exprs.size();
         SizeT match_expr_count = request.search_expr.match_exprs.size();
-        bool fusion_expr_exists = request.search_expr.__isset.fusion_expr;
-        SizeT total_expr_count = knn_expr_count + match_expr_count + fusion_expr_exists;
+        SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
+        SizeT total_expr_count = knn_expr_count + match_expr_count + fusion_expr_count;
         search_expr_list->reserve(total_expr_count);
         for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
             auto [knn_expr, knn_expr_status] = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
@@ -602,8 +676,8 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
             search_expr_list->emplace_back(match_expr);
         }
 
-        if (fusion_expr_exists) {
-            ParsedExpr *fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_expr);
+        for (SizeT idx = 0; idx < fusion_expr_count; ++idx) {
+            ParsedExpr *fusion_expr = GetFusionExprFromProto(request.search_expr.fusion_exprs[idx]);
             search_expr_list->emplace_back(fusion_expr);
         }
 
@@ -790,7 +864,9 @@ void InfinityThriftService::ShowDatabase(infinity_thrift_rpc::ShowDatabaseRespon
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 3) {
-            UnrecoverableError("ShowDatabase: query result is invalid.");
+            String error_message = "ShowDatabase: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -826,7 +902,9 @@ void InfinityThriftService::ShowTable(infinity_thrift_rpc::ShowTableResponse &re
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 6) {
-            UnrecoverableError("ShowTable: query result is invalid.");
+            String error_message = "ShowTable: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -1050,7 +1128,9 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 10) {
-            UnrecoverableError("ShowIndex: query result is invalid.");
+            String error_message = "ShowIndex: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -1138,7 +1218,9 @@ void InfinityThriftService::ShowSegment(infinity_thrift_rpc::ShowSegmentResponse
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 1) {
-            UnrecoverableError("ShowSegment: query result is invalid.");
+            String error_message = "ShowSegment: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -1221,7 +1303,9 @@ void InfinityThriftService::ShowBlock(infinity_thrift_rpc::ShowBlockResponse &re
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 1) {
-            UnrecoverableError("ShowSegment: query result is invalid.");
+            String error_message = "ShowBlock: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -1279,7 +1363,9 @@ void InfinityThriftService::ShowBlockColumn(infinity_thrift_rpc::ShowBlockColumn
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
         if (row_count != 6) {
-            UnrecoverableError("ShowIndex: query result is invalid.");
+            String error_message = "ShowBlockColumn: query result is invalid.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         {
@@ -1385,14 +1471,34 @@ SharedPtr<DataType> InfinityThriftService::GetColumnTypeFromProto(const infinity
             return MakeShared<infinity::DataType>(infinity::LogicalType::kFloat);
         case infinity_thrift_rpc::LogicType::Double:
             return MakeShared<infinity::DataType>(infinity::LogicalType::kDouble);
+        case infinity_thrift_rpc::LogicType::Tensor:
+        case infinity_thrift_rpc::LogicType::TensorArray:
         case infinity_thrift_rpc::LogicType::Embedding: {
             auto embedding_type = GetEmbeddingDataTypeFromProto(type.physical_type.embedding_type.element_type);
             if (embedding_type == EmbeddingDataType::kElemInvalid) {
                 return MakeShared<infinity::DataType>(infinity::LogicalType::kInvalid);
             }
             auto embedding_info = EmbeddingInfo::Make(embedding_type, type.physical_type.embedding_type.dimension);
-            return MakeShared<infinity::DataType>(infinity::LogicalType::kEmbedding, embedding_info);
-        };
+            infinity::LogicalType dt = infinity::LogicalType::kInvalid;
+            switch (type.logic_type) {
+                case infinity_thrift_rpc::LogicType::Tensor: {
+                    dt = infinity::LogicalType::kTensor;
+                    break;
+                }
+                case infinity_thrift_rpc::LogicType::TensorArray: {
+                    dt = infinity::LogicalType::kTensorArray;
+                    break;
+                }
+                case infinity_thrift_rpc::LogicType::Embedding: {
+                    dt = infinity::LogicalType::kEmbedding;
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Unreachable code!");
+                }
+            }
+            return MakeShared<infinity::DataType>(dt, embedding_info);
+        }
         case infinity_thrift_rpc::LogicType::Varchar:
             return MakeShared<infinity::DataType>(infinity::LogicalType::kVarchar);
         default:
@@ -1493,8 +1599,45 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
             }
             return parsed_expr;
         }
+        case infinity_thrift_rpc::LiteralType::IntegerTensorArray: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
+            parsed_expr->sub_array_array_.reserve(expr.i64_tensor_array_value.size());
+            for (auto &value_1 : expr.i64_tensor_array_value) {
+                auto parsed_expr_1 = new ConstantExpr(LiteralType::kSubArrayArray);
+                parsed_expr_1->sub_array_array_.reserve(value_1.size());
+                for (auto &value_2 : value_1) {
+                    auto parsed_expr_2 = new ConstantExpr(LiteralType::kIntegerArray);
+                    parsed_expr_2->long_array_.reserve(value_2.size());
+                    for (auto &value_3 : value_2) {
+                        parsed_expr_2->long_array_.emplace_back(value_3);
+                    }
+                    parsed_expr_1->sub_array_array_.emplace_back(parsed_expr_2);
+                }
+                parsed_expr->sub_array_array_.emplace_back(parsed_expr_1);
+            }
+            return parsed_expr;
+        }
+        case infinity_thrift_rpc::LiteralType::DoubleTensorArray: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
+            parsed_expr->sub_array_array_.reserve(expr.f64_tensor_array_value.size());
+            for (auto &value_1 : expr.f64_tensor_array_value) {
+                auto parsed_expr_1 = new ConstantExpr(LiteralType::kSubArrayArray);
+                parsed_expr_1->sub_array_array_.reserve(value_1.size());
+                for (auto &value_2 : value_1) {
+                    auto parsed_expr_2 = new ConstantExpr(LiteralType::kDoubleArray);
+                    parsed_expr_2->double_array_.reserve(value_2.size());
+                    for (auto &value_3 : value_2) {
+                        parsed_expr_2->double_array_.emplace_back(value_3);
+                    }
+                    parsed_expr_1->sub_array_array_.emplace_back(parsed_expr_2);
+                }
+                parsed_expr->sub_array_array_.emplace_back(parsed_expr_1);
+            }
+            return parsed_expr;
+        }
         default: {
             status = Status::InvalidConstantType();
+            return nullptr;
         }
     }
 }
@@ -1586,6 +1729,24 @@ Tuple<KnnExpr *, Status> InfinityThriftService::GetKnnExprFromProto(const infini
     return {knn_expr, status};
 }
 
+Pair<MatchTensorExpr *, Status> InfinityThriftService::GetMatchTensorExprFromProto(const infinity_thrift_rpc::MatchTensorExpr &expr) {
+    auto match_tensor_expr = MakeUnique<MatchTensorExpr>();
+    match_tensor_expr->SetSearchMethodStr(expr.search_method);
+    match_tensor_expr->column_expr_.reset(GetColumnExprFromProto(expr.column_expr));
+    match_tensor_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
+    auto [embedding_data_ptr, dimension, status] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+    if (!status.ok()) {
+        match_tensor_expr.reset();
+        return {nullptr, status};
+    }
+    match_tensor_expr->dimension_ = dimension;
+    const auto copy_bytes = EmbeddingT::EmbeddingSize(match_tensor_expr->embedding_data_type_, match_tensor_expr->dimension_);
+    match_tensor_expr->query_tensor_data_ptr_ = MakeUniqueForOverwrite<char[]>(copy_bytes);
+    std::memcpy(match_tensor_expr->query_tensor_data_ptr_.get(), embedding_data_ptr, copy_bytes);
+    match_tensor_expr->options_text_ = expr.extra_options;
+    return {match_tensor_expr.release(), status};
+}
+
 MatchExpr *InfinityThriftService::GetMatchExprFromProto(const infinity_thrift_rpc::MatchExpr &expr) {
     auto match_expr = new MatchExpr();
     match_expr->fields_ = expr.fields;
@@ -1595,10 +1756,17 @@ MatchExpr *InfinityThriftService::GetMatchExprFromProto(const infinity_thrift_rp
 }
 
 FusionExpr *InfinityThriftService::GetFusionExprFromProto(const infinity_thrift_rpc::FusionExpr &expr) {
-    auto fusion_expr = new FusionExpr();
+    auto fusion_expr = MakeUnique<FusionExpr>();
     fusion_expr->method_ = expr.method;
     fusion_expr->SetOptions(expr.options_text);
-    return fusion_expr;
+    if (expr.__isset.optional_match_tensor_expr) {
+        const auto [result_ptr, status] = GetMatchTensorExprFromProto(expr.optional_match_tensor_expr);
+        fusion_expr->match_tensor_expr_.reset(result_ptr);
+        if (!status.ok()) {
+            fusion_expr.reset();
+        }
+    }
+    return fusion_expr.release();
 }
 
 ParsedExpr *InfinityThriftService::GetParsedExprFromProto(Status &status, const infinity_thrift_rpc::ParsedExpr &expr) {
@@ -1714,10 +1882,17 @@ infinity_thrift_rpc::ColumnType::type InfinityThriftService::DataTypeToProtoColu
             return infinity_thrift_rpc::ColumnType::ColumnVarchar;
         case LogicalType::kEmbedding:
             return infinity_thrift_rpc::ColumnType::ColumnEmbedding;
+        case LogicalType::kTensor:
+            return infinity_thrift_rpc::ColumnType::ColumnTensor;
+        case LogicalType::kTensorArray:
+            return infinity_thrift_rpc::ColumnType::ColumnTensorArray;
         case LogicalType::kRowID:
             return infinity_thrift_rpc::ColumnType::ColumnRowID;
-        default:
-            UnrecoverableError("Invalid data type");
+        default: {
+            String error_message = fmt::format("Invalid logical data type: {}", data_type->ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
     }
     return infinity_thrift_rpc::ColumnType::ColumnInvalid;
 }
@@ -1768,21 +1943,40 @@ UniquePtr<infinity_thrift_rpc::DataType> InfinityThriftService::DataTypeToProtoD
             data_type_proto->__set_physical_type(physical_type);
             return data_type_proto;
         }
+        case LogicalType::kTensor:
+        case LogicalType::kTensorArray:
         case LogicalType::kEmbedding: {
             auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
             infinity_thrift_rpc::EmbeddingType embedding_type;
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
             embedding_type.__set_dimension(embedding_info->Dimension());
             embedding_type.__set_element_type(EmbeddingDataTypeToProtoElementType(*embedding_info));
-            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Embedding);
+            switch (data_type->type()) {
+                case LogicalType::kTensor: {
+                    data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Tensor);
+                    break;
+                }
+                case LogicalType::kTensorArray: {
+                    data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::TensorArray);
+                    break;
+                }
+                case LogicalType::kEmbedding: {
+                    data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Embedding);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid data type");
+                }
+            }
             infinity_thrift_rpc::PhysicalType physical_type;
             physical_type.__set_embedding_type(embedding_type);
             data_type_proto->__set_physical_type(physical_type);
             return data_type_proto;
         }
-        case LogicalType::kInvalid:
         default: {
-            UnrecoverableError("Invalid data type");
+            String error_message = fmt::format("Invalid logical data type: {}", data_type->ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return nullptr;
@@ -1805,7 +1999,9 @@ infinity_thrift_rpc::ElementType::type InfinityThriftService::EmbeddingDataTypeT
         case EmbeddingDataType::kElemDouble:
             return infinity_thrift_rpc::ElementType::ElementFloat64;
         case EmbeddingDataType::kElemInvalid: {
-            UnrecoverableError("Invalid embedding element data type");
+            String error_message = fmt::format("Invalid embedding element data type: {}", embedding_info.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return infinity_thrift_rpc::ElementType::ElementFloat32;
@@ -1867,7 +2063,10 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
                                                      SizeT row_count,
                                                      const SharedPtr<ColumnVector> &column_vector) {
     switch (column_vector->data_type()->type()) {
-        case LogicalType::kBoolean:
+        case LogicalType::kBoolean: {
+            HandleBoolType(output_column_field, row_count, column_vector);
+            break;
+        }
         case LogicalType::kTinyInt:
         case LogicalType::kSmallInt:
         case LogicalType::kInteger:
@@ -1886,6 +2085,14 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
             HandleEmbeddingType(output_column_field, row_count, column_vector);
             break;
         }
+        case LogicalType::kTensor: {
+            HandleTensorType(output_column_field, row_count, column_vector);
+            break;
+        }
+        case LogicalType::kTensorArray: {
+            HandleTensorArrayType(output_column_field, row_count, column_vector);
+            break;
+        }
         case LogicalType::kRowID: {
             HandleRowIDType(output_column_field, row_count, column_vector);
             break;
@@ -1895,6 +2102,18 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
         }
     }
     return Status::OK();
+}
+
+void InfinityThriftService::HandleBoolType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                           SizeT row_count,
+                                           const SharedPtr<ColumnVector> &column_vector) {
+    String dst;
+    dst.reserve(row_count);
+    for (SizeT index = 0; index < row_count; ++index) {
+        const char c = column_vector->buffer_->GetCompactBit(index) ? 1 : 0;
+        dst.push_back(c);
+    }
+    output_column_field.column_vectors.emplace_back(std::move(dst));
 }
 
 void InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &output_column_field,
@@ -1950,6 +2169,77 @@ void InfinityThriftService::HandleEmbeddingType(infinity_thrift_rpc::ColumnField
     String dst;
     dst.resize(size);
     std::memcpy(dst.data(), column_vector->data(), size);
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+}
+
+void InfinityThriftService::HandleTensorType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                             SizeT row_count,
+                                             const SharedPtr<ColumnVector> &column_vector) {
+    String dst;
+    SizeT total_tensor_embedding_num = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        TensorT &tensor = ((TensorT *)column_vector->data())[index];
+        total_tensor_embedding_num += tensor.embedding_num_;
+    }
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(column_vector->data_type()->type_info().get());
+    const auto unit_embedding_byte_size = embedding_info->Size();
+    dst.resize(total_tensor_embedding_num * unit_embedding_byte_size + row_count * sizeof(i32));
+
+    i32 current_offset = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        TensorT &tensor = ((TensorT *)column_vector->data())[index];
+        i32 length = tensor.embedding_num_ * unit_embedding_byte_size;
+        std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+        current_offset += sizeof(i32);
+        const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(tensor.chunk_id_, tensor.chunk_offset_);
+        std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
+        current_offset += length;
+    }
+
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
+}
+
+void InfinityThriftService::HandleTensorArrayType(infinity_thrift_rpc::ColumnField &output_column_field,
+                                                  SizeT row_count,
+                                                  const SharedPtr<ColumnVector> &column_vector) {
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(column_vector->data_type()->type_info().get());
+    const auto unit_embedding_byte_size = embedding_info->Size();
+    Vector<Vector<TensorT>> tensors_v(row_count);
+    SizeT expect_offset = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        const auto &tensorarray = ((const TensorArrayT *)column_vector->data())[index];
+        const i32 tensor_num = tensorarray.tensor_num_;
+        expect_offset += sizeof(i32);
+        Vector<TensorT> &tensors = tensors_v[index];
+        tensors.resize(tensor_num);
+        column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(reinterpret_cast<char *>(tensors.data()),
+                                                            tensorarray.chunk_id_,
+                                                            tensorarray.chunk_offset_,
+                                                            tensor_num * sizeof(TensorT));
+        for (const auto &tensor : tensors) {
+            expect_offset += sizeof(i32) + tensor.embedding_num_ * unit_embedding_byte_size;
+        }
+    }
+    String dst;
+    dst.resize(expect_offset);
+
+    i32 current_offset = 0;
+    for (Vector<TensorT> &tensors : tensors_v) {
+        const i32 tensor_num = tensors.size();
+        std::memcpy(dst.data() + current_offset, &tensor_num, sizeof(i32));
+        current_offset += sizeof(i32);
+        for (const auto &tensor : tensors) {
+            i32 length = tensor.embedding_num_ * unit_embedding_byte_size;
+            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+            current_offset += sizeof(i32);
+            const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_1_->GetRawPtrFromChunk(tensor.chunk_id_, tensor.chunk_offset_);
+            std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
+            current_offset += length;
+        }
+    }
+
     output_column_field.column_vectors.emplace_back(std::move(dst));
     output_column_field.__set_column_type(DataTypeToProtoColumnType(column_vector->data_type()));
 }

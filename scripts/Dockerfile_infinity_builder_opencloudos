@@ -55,7 +55,7 @@ RUN --mount=type=bind,source=cmake-3.29.0-linux-x86_64.tar.gz,target=/root/cmake
     && cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share \
     && rm -rf cmake-3.29.0-linux-x86_64
 
-# Install ninja-1.11.1
+# Install ninja-1.12.1
 RUN --mount=type=bind,source=ninja-linux.zip,target=/root/ninja-linux.zip \
     cd /root && unzip ninja-linux.zip \
     && cp ninja /usr/local/bin && rm ninja

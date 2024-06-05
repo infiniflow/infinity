@@ -10,7 +10,7 @@
     "query_link": "to_be_set",
     "mode": "fulltext",
     "topK": 10,
-    "use_import": true,
+    "use_import": false,
     "schema": {
         "doctitle": {"type": "varchar", "default":""},
         "docdate": {"type": "varchar", "default":""},

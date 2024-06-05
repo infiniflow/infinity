@@ -94,7 +94,9 @@ QueryResult QueryContext::Query(const String &query) {
     }
 
     if (parsed_result->statements_ptr_->size() != 1) {
-        UnrecoverableError("Only support single statement.");
+        String error_message = "Only support single statement.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     StopProfile(QueryPhase::kParser);
     for (BaseStatement *statement : *parsed_result->statements_ptr_) {
@@ -102,7 +104,9 @@ QueryResult QueryContext::Query(const String &query) {
         return query_result;
     }
 
-    UnrecoverableError("Not reachable");
+    String error_message = "Not reachable";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return QueryResult::UnusedResult();
 }
 
@@ -113,7 +117,6 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     SharedPtr<PlanFragment> plan_fragment{};
     UniquePtr<Notifier> notifier{};
 
-    this->BeginTxn();
 //    ProfilerStart("Query");
 //    BaseProfiler profiler;
 //    profiler.Begin();

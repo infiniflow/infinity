@@ -1,6 +1,6 @@
 ---
 sidebar_position: 3
-slug: /html_api_reference
+slug: /http_api_reference
 ---
 
 # HTTP API Reference
@@ -488,6 +488,76 @@ curl --request GET \
     "other_parameters": "metric = l2, centroids_count = 128",
     "segment_index_count": "0",
     "storage_directory": "/var/infinity/data/yjamyYqzzt_db_default/CxmfWOUCdN_table_test_index_tbl/inlt9JpOyy_index_idx1"
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 3018,
+    "error_message": "Index {index_name} doesn't exist in {table_name}."
+}
+```
+
+## Show index segment
+
+Show detailed information of a specified index segment.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code":0,
+    "chunk_count":"1",
+    "index_segment_size":"290.41MB",
+    "segment_id":"0",
+    "storage_path":"/var/infinity/data/XScyuGgMEf_db_default_db/X7Ilrg2jG1_table_sift_benchmark/gWao7rl6u4_index_hnsw_index"
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 3018,
+    "error_message": "Index {index_name} doesn't exist in {table_name}."
+}
+```
+
+## Show index chunk
+
+Show detailed information of a index chunk of specified index chunk.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code":0,
+    "deprecate_timestamp":"18446744073709551615",
+    "file_name":"",
+    "row_count":"1000000",
+    "start_row":"0"
 }
 ```
 

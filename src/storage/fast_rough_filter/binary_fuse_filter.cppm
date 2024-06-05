@@ -20,6 +20,7 @@ import default_values;
 import infinity_exception;
 import file_system;
 import third_party;
+import logger;
 
 namespace infinity {
 
@@ -53,25 +54,35 @@ public:
         {
             std::lock_guard<std::mutex> lock(mutex_check_task_start_);
             if (build_time_ != UNCOMMIT_TS) {
-                UnrecoverableError("Already have data, cannot allocate.");
+                String error_message = "Already have data, cannot allocate.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             build_time_ = begin_ts;
         }
         // check old data
         if (filter.Fingerprints) {
-            UnrecoverableError("Already have data, cannot allocate.");
+            String error_message = "Already have data, cannot allocate.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         bool alloc_ret = binary_fuse8_allocate(size, &filter);
         if (!alloc_ret) {
-            UnrecoverableError("Out of memory.");
+            String error_message = "Out of memory.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         // check data
         if (!filter.Fingerprints) {
-            UnrecoverableError("Need to allocate first.");
+            String error_message = "Need to allocate first.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         bool populate_ret = binary_fuse8_populate(data, size, &filter);
         if (!populate_ret) {
-            UnrecoverableError("Failed to populate data.");
+            String error_message = "Failed to populate data.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         // set finished_build_filter_ to true
         finished_build_filter_.test_and_set(std::memory_order_release);
@@ -129,7 +140,9 @@ public:
         is.read(reinterpret_cast<char *>(&filter.ArrayLength), sizeof(filter.ArrayLength));
         filter.Fingerprints = (uint8_t *)malloc(filter.ArrayLength * sizeof(uint8_t));
         if (!filter.Fingerprints) {
-            UnrecoverableError("Out of memory.");
+            String error_message = "Out of memory.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return false;
         }
         is.read(reinterpret_cast<char *>(filter.Fingerprints), filter.ArrayLength * sizeof(uint8_t));

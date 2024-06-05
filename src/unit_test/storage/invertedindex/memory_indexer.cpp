@@ -19,8 +19,7 @@
 import stl;
 import analyzer;
 import analyzer_pool;
-import memory_pool;
-import pool_allocator;
+
 import index_defines;
 import posting_list_format;
 import column_vector;
@@ -40,6 +39,8 @@ import inmem_posting_decoder;
 import inmem_position_list_decoder;
 import inmem_index_segment_reader;
 import segment_posting;
+import global_resource_usage;
+import infinity_context;
 
 using namespace infinity;
 
@@ -52,14 +53,12 @@ public:
     };
 
 protected:
-    MemoryPool byte_slice_pool_{};
-    RecyclePool buffer_pool_{};
     ThreadPool inverting_thread_pool_{4};
     ThreadPool commiting_thread_pool_{4};
     optionflag_t flag_{OPTION_FLAG_ALL};
     SharedPtr<ColumnVector> column_;
     Vector<ExpectedPosting> expected_postings_;
-    UniquePtr<MemoryPool> memory_pool_ = MakeUnique<MemoryPool>(1024);
+
 public:
     void SetUp() override {
         // https://en.wikipedia.org/wiki/Finite-state_transducer
@@ -88,7 +87,7 @@ public:
             const ExpectedPosting &expected = expected_postings_[i];
             const String &term = expected.term;
 
-            UniquePtr<PostingIterator> post_iter(reader.Lookup(term, &byte_slice_pool_));
+            UniquePtr<PostingIterator> post_iter(reader.Lookup(term));
             ASSERT_TRUE(post_iter != nullptr);
 
             RowID doc_id = INVALID_ROWID;
@@ -113,28 +112,12 @@ public:
 TEST_F(MemoryIndexerTest, Insert) {
     // prepare fake segment index entry
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
-    MemoryIndexer indexer1(GetTmpDir(),
-                           "chunk1",
-                           RowID(0U, 0U),
-                           flag_,
-                           "standard",
-                           byte_slice_pool_,
-                           buffer_pool_,
-                           inverting_thread_pool_,
-                           commiting_thread_pool_);
+    MemoryIndexer indexer1(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column_, 0, 1);
     indexer1.Insert(column_, 1, 3);
     indexer1.Dump();
 
-    auto indexer2 = MakeUnique<MemoryIndexer>(GetTmpDir(),
-                                              "chunk2",
-                                              RowID(0U, 4U),
-                                              flag_,
-                                              "standard",
-                                              byte_slice_pool_,
-                                              buffer_pool_,
-                                              inverting_thread_pool_,
-                                              commiting_thread_pool_);
+    auto indexer2 = MakeUnique<MemoryIndexer>(GetTmpDir(), "chunk2", RowID(0U, 4U), flag_, "standard");
     indexer2->Insert(column_, 4, 1);
     while (indexer2->GetInflightTasks() > 0) {
         sleep(1);
@@ -151,15 +134,7 @@ TEST_F(MemoryIndexerTest, Insert) {
 
 TEST_F(MemoryIndexerTest, test2) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
-    MemoryIndexer indexer1(GetTmpDir(),
-                           "chunk1",
-                           RowID(0U, 0U),
-                           flag_,
-                           "standard",
-                           byte_slice_pool_,
-                           buffer_pool_,
-                           inverting_thread_pool_,
-                           commiting_thread_pool_);
+    MemoryIndexer indexer1(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column_, 0, 2, true);
     indexer1.Insert(column_, 2, 2, true);
     indexer1.Insert(column_, 4, 1, true);
@@ -175,15 +150,7 @@ TEST_F(MemoryIndexerTest, test2) {
 
 TEST_F(MemoryIndexerTest, SpillLoadTest) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
-    auto indexer1 = MakeUnique<MemoryIndexer>(GetTmpDir(),
-                                              "chunk1",
-                                              RowID(0U, 0U),
-                                              flag_,
-                                              "standard",
-                                              byte_slice_pool_,
-                                              buffer_pool_,
-                                              inverting_thread_pool_,
-                                              commiting_thread_pool_);
+    auto indexer1 = MakeUnique<MemoryIndexer>(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     bool offline = false;
     bool spill = true;
     indexer1->Insert(column_, 0, 2, offline);
@@ -195,15 +162,7 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
     }
 
     indexer1->Dump(offline, spill);
-    UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetTmpDir(),
-                                                                        "chunk1",
-                                                                        RowID(0U, 0U),
-                                                                        flag_,
-                                                                        "standard",
-                                                                        byte_slice_pool_,
-                                                                        buffer_pool_,
-                                                                        inverting_thread_pool_,
-                                                                        commiting_thread_pool_);
+    UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
 
     loaded_indexer->Load();
     SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(loaded_indexer.get());
@@ -213,12 +172,12 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
         SegmentPosting seg_posting;
         SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
 
-        auto ret = segment_reader->GetSegmentPosting(term, seg_posting, &byte_slice_pool_);
+        auto ret = segment_reader->GetSegmentPosting(term, seg_posting);
         if (ret) {
             seg_postings->push_back(seg_posting);
         }
 
-        auto posting_iter = MakeUnique<PostingIterator>(flag_, &byte_slice_pool_);
+        auto posting_iter = MakeUnique<PostingIterator>(flag_);
         u32 state_pool_size = 0;
         posting_iter->Init(seg_postings, state_pool_size);
         RowID doc_id = INVALID_ROWID;

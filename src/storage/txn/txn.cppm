@@ -76,7 +76,7 @@ public:
     // For replay txn
     explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
+    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     // Txn steps:
     // 1. CreateTxn
@@ -195,9 +195,6 @@ public:
     void SetTxnWrite() { txn_context_.SetTxnType(TxnType::kWrite); }
 
     // WAL and replay OPS
-    // Dangerous! only used during replaying wal.
-    void FakeCommit(TxnTimeStamp commit_ts);
-
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
     bool Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);

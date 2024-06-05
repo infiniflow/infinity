@@ -24,6 +24,7 @@ import global_block_id;
 import txn;
 import table_index_entry;
 import segment_index_entry;
+import default_values;
 
 namespace infinity {
 
@@ -54,6 +55,14 @@ SegmentOffset BlockIndex::GetSegmentOffset(SegmentID segment_id) const {
         return blocks_info.segment_offset_;
     }
     return 0;
+}
+
+BlockOffset BlockIndex::GetBlockOffset(SegmentID segment_id, BlockID block_id) const {
+    SegmentOffset segment_offset = this->GetSegmentOffset(segment_id);
+    if ((SegmentOffset(block_id) + 1) * DEFAULT_BLOCK_CAPACITY < segment_offset) {
+        return DEFAULT_BLOCK_CAPACITY;
+    }
+    return segment_offset % DEFAULT_BLOCK_CAPACITY;
 }
 
 BlockEntry *BlockIndex::GetBlockEntry(u32 segment_id, u16 block_id) const {

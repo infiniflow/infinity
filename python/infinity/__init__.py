@@ -20,7 +20,7 @@ import os
 import pkg_resources
 __version__ = pkg_resources.get_distribution("infinity_sdk").version
 
-from infinity.common import URI, NetworkAddress, LOCAL_HOST, LOCAL_INFINITY_PATH
+from infinity.common import URI, NetworkAddress, LOCAL_HOST, LOCAL_INFINITY_PATH, InfinityException
 from infinity.infinity import InfinityConnection
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 from infinity.local_infinity.infinity import LocalInfinityConnection
@@ -31,4 +31,4 @@ def connect(uri) -> InfinityConnection:
     elif isinstance(uri, str) and len(uri) != 0 and os.path.exists(uri) and os.path.isdir(uri):
         return LocalInfinityConnection(uri)
     else:
-        raise Exception(f"unknown uri: {uri}")
+        raise InfinityException(7016, f"Unknown uri: {uri}")

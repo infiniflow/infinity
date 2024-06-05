@@ -20,7 +20,7 @@ export module knn_flat_ip;
 
 import stl;
 import knn_distance;
-
+import logger;
 import knn_result_handler;
 import infinity_exception;
 import default_values;
@@ -56,7 +56,9 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            UnrecoverableError("KnnFlatIP isn't begin");
+            String error_message = "KnnFlatIP isn't begin";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         this->total_base_count_ += base_count;
@@ -84,7 +86,9 @@ public:
             return;
         }
         if (!begin_) {
-            UnrecoverableError("KnnFlatIP isn't begin");
+            String error_message = "KnnFlatIP isn't begin";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         this->total_base_count_ += base_count;
@@ -124,14 +128,18 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            UnrecoverableError("Query index exceeds the limit");
+            String error_message = "Query index exceeds the limit";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            UnrecoverableError("Query index exceeds the limit");
+            String error_message = "Query index exceeds the limit";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return id_array_.get() + idx * this->top_k_;
     }

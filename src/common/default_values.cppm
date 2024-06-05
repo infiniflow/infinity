@@ -87,6 +87,9 @@ export {
     constexpr SizeT DEFAULT_BASE_FILE_SIZE = 8 * 1024;
     constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
+    constexpr SizeT DEFAULT_CHUNK_SIZE = 10 * 1024 * 1024;
+    constexpr SizeT DEFAULT_ALIGN_SIZE = sizeof(char *);
+
     constexpr SizeT MIN_CLEANUP_INTERVAL_SEC = 0; // 0 means disable the function
     constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
     constexpr std::string_view DEFAULT_CLEANUP_INTERVAL_SEC_STR = "10s"; // 10 seconds
@@ -212,6 +215,9 @@ export {
     constexpr std::string_view ACTIVE_WAL_FILENAME_VAR_NAME = "active_wal_filename";   // global
     constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "enable_profile";  // session
     constexpr std::string_view PROFILE_RECORD_CAPACITY_VAR_NAME = "profile_record_capacity";  // session
+    constexpr std::string_view BG_TASK_COUNT_VAR_NAME = "bg_task_count";  // global
+    constexpr std::string_view RUNNING_BG_TASK_VAR_NAME = "running_bg_task";  // global
+    constexpr std::string_view RUNNING_COMPACT_TASK_VAR_NAME = "running_compact_task";  // global
 
 }
 

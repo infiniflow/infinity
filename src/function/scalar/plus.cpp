@@ -14,6 +14,8 @@
 
 module;
 
+module plus;
+
 import stl;
 import catalog;
 import logical_type;
@@ -24,15 +26,16 @@ import scalar_function_set;
 import third_party;
 import internal_types;
 import data_type;
-
-module plus;
+import logger;
 
 namespace infinity {
 
 struct PlusFunction {
     template <typename TA, typename TB>
     static inline bool Run(TA, TB &) {
-        UnrecoverableError("Not implement: PlusFunction::Run");
+        String error_message = "Not implement: PlusFunction::Run";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };

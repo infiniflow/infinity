@@ -23,6 +23,7 @@ import task_scheduler;
 import storage;
 import singleton;
 import session_manager;
+import third_party;
 
 namespace infinity {
 
@@ -38,6 +39,9 @@ public:
 
     [[nodiscard]] inline SessionManager *session_manager() noexcept { return session_mgr_.get(); }
 
+    [[nodiscard]] inline ThreadPool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
+    [[nodiscard]] inline ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
+
     void Init(const SharedPtr<String> &config_path);
 
     void UnInit();
@@ -52,6 +56,9 @@ private:
     UniquePtr<TaskScheduler> task_scheduler_{};
     UniquePtr<Storage> storage_{};
     UniquePtr<SessionManager> session_mgr_{};
+    // For fulltext index
+    ThreadPool inverting_thread_pool_{4};
+    ThreadPool commiting_thread_pool_{2};
 
     bool initialized_{false};
 };

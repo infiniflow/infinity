@@ -139,6 +139,7 @@ public:
     bool single_row = false;
 
     bool allow_distance = false;
+    bool allow_similarity = false;
     bool allow_score = false;
 
 public:
@@ -166,15 +167,7 @@ public:
 
     void BoundTable(const String &table_name) { bound_table_set_.insert(table_name); }
 
-    void BoundSearch(ParsedExpr *expr) {
-        if (expr == nullptr) {
-            return;
-        }
-        auto search_expr = (SearchExpr *)expr;
-
-        allow_distance = !search_expr->knn_exprs_.empty() && search_expr->fusion_expr_ == nullptr;
-        allow_score = !search_expr->match_exprs_.empty() || !search_expr->match_tensor_exprs_.empty() || search_expr->fusion_expr_ != nullptr;
-    }
+    void BoundSearch(ParsedExpr *expr);
 
     void AddSubqueryBinding(const String &name,
                             u64 table_index,

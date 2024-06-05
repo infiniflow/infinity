@@ -39,6 +39,9 @@ enum class LiteralType : int32_t {
     kDoubleArray,
     kSubArrayArray,
     kInterval,
+    kLongSparseArray,
+    kDoubleSparseArray,
+    kEmptyArray,
 };
 
 class ConstantExpr : public ParsedExpr {
@@ -71,6 +74,8 @@ public:
     std::vector<int64_t> long_array_{};
     std::vector<double> double_array_{};
     std::vector<std::shared_ptr<ConstantExpr>> sub_array_array_{};
+    std::pair<std::vector<int64_t>, std::vector<int64_t>> long_sparse_array_{};
+    std::pair<std::vector<int64_t>, std::vector<double>> double_sparse_array_{};
 };
 
 } // namespace infinity

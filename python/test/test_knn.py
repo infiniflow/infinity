@@ -19,7 +19,8 @@ from common import common_values
 import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
-from infinity.common import ConflictType
+from infinity.common import ConflictType, InfinityException
+from infinity.remote_thrift.types import make_match_tensor_expr
 
 from utils import copy_data, generate_commas_enwiki
 from test_sdkbase import TestSdk
@@ -151,7 +152,7 @@ class TestKnn(TestSdk):
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
-        res = table_obj.output(["variant_id", "_row_id"]).knn(
+        res = table_obj.output(["variant_id", "_row_id", "_similarity"]).knn(
             column_name, [1.0] * 4, "float", "ip", 2).to_pl()
         print(res)
 
@@ -187,10 +188,11 @@ class TestKnn(TestSdk):
             copy_data("tmp_20240116.csv")
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
-        with pytest.raises(Exception, match="ERROR:3013, Expect the column search is an embedding column*"):
-            res = table_obj.output(["variant_id", "_row_id"]).knn(
-                column_name, [1.0] * 4, "float", "ip", 2).to_pl()
-            print(res)
+        with pytest.raises(InfinityException) as e:
+            table_obj.output(["variant_id", "_row_id"]).knn(column_name, [1.0] * 4, "float", "ip", 2).to_pl()
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
 
         res = db_obj.drop_table(
             "test_knn_on_non_vector_column", ConflictType.Error)
@@ -300,12 +302,12 @@ class TestKnn(TestSdk):
         test_csv_dir = "/var/infinity/test_data/tmp_20240116.csv"
         table_obj.import_data(test_csv_dir, None)
         if embedding_data_type[1]:
-            res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+            res = table_obj.output(["variant_id", "_distance"]).knn("gender_vector", embedding_data, embedding_data_type[0],
                                                        "l2",
                                                        2).to_pl()
             print(res)
         else:
-            res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+            res = table_obj.output(["variant_id", "_similarity"]).knn("gender_vector", embedding_data, embedding_data_type[0],
                                                        "ip",
                                                        2).to_pl()
 
@@ -402,10 +404,14 @@ class TestKnn(TestSdk):
                                                        2).to_pl()
             print(res)
         else:
-            with pytest.raises(Exception, match="ERROR:3032*"):
-                res = table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
-                                                           distance_type[0],
-                                                           2).to_pl()
+            with pytest.raises(InfinityException) as e:
+                table_obj.output(["variant_id"]).knn("gender_vector", embedding_data, embedding_data_type[0],
+                                                     distance_type[0],
+                                                     2).to_pl()
+
+            assert e.type == InfinityException
+            assert e.value.args[0] == ErrorCode.NOT_SUPPORTED
+
         res = db_obj.drop_table(
             "test_various_distance_type", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -415,13 +421,13 @@ class TestKnn(TestSdk):
     @pytest.mark.parametrize("topn", [
         (2, True),
         (10, True),
-        (0, False, "ERROR:3014*"),
-        (-1, False, "ERROR:3014*"),
-        (1.1, False, "Invalid topn"),
-        ("test", False, "Invalid topn"),
-        ({}, False, "Invalid topn"),
-        ((), False, "Invalid topn"),
-        ([1] * 4, False, "Invalid topn"),
+        (0, False, ErrorCode.INVALID_PARAMETER_VALUE),
+        (-1, False, ErrorCode.INVALID_PARAMETER_VALUE),
+        (1.1, False, ErrorCode.INVALID_TOPK_TYPE),
+        ("test", False, ErrorCode.INVALID_TOPK_TYPE),
+        ({}, False, ErrorCode.INVALID_TOPK_TYPE),
+        ((), False, ErrorCode.INVALID_TOPK_TYPE),
+        ([1] * 4, False, ErrorCode.INVALID_TOPK_TYPE),
     ])
     def test_various_topn(self, get_infinity_db, check_data, topn):
         db_obj = get_infinity_db
@@ -448,9 +454,13 @@ class TestKnn(TestSdk):
                 "gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
             print(res)
         else:
-            with pytest.raises(Exception, match=topn[2]):
-                res = table_obj.output(["variant_id"]).knn(
+            with pytest.raises(InfinityException) as e:
+                table_obj.output(["variant_id"]).knn(
                     "gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
+
+            assert e.type == InfinityException
+            assert e.value.args[0] == topn[2]
+
         res = db_obj.drop_table("test_various_topn", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -840,4 +850,55 @@ class TestKnn(TestSdk):
 
         res = db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_options", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_tensor_scan(self, get_infinity_db, check_data):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_tensor_scan", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_tensor_scan",
+                                        {"title": {"type": "varchar"},
+                                         "num": {"type": "int"},
+                                         "t": {"type": "tensor, 4, float"},
+                                         "body": {"type": "varchar"}})
+        if not check_data:
+            copy_data("tensor_maxsim.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj
+               .output(["*", "_row_id", "_score"])
+               .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', 'topn=2')
+               .to_pl())
+        print(res)
+
+        res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_multiple_fusion(self, get_infinity_db, check_data):
+        db_obj = get_infinity_db
+        db_obj.drop_table("test_with_multiple_fusion", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_multiple_fusion",
+                                        {"title": {"type": "varchar"},
+                                         "num": {"type": "int"},
+                                         "t": {"type": "tensor, 4, float"},
+                                         "body": {"type": "varchar"}})
+        if not check_data:
+            copy_data("tensor_maxsim.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj
+               .output(["*", "_row_id", "_score"])
+               .match('body', 'off', 'topn=4')
+               .match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim', 'topn=2')
+               .fusion('rrf')
+               .fusion('match_tensor', 'topn=2',
+                       make_match_tensor_expr('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float',
+                                              'maxsim'))
+               .to_pl())
+        print(res)
+
+        res = db_obj.drop_table("test_with_multiple_fusion", ConflictType.Error)
         assert res.error_code == ErrorCode.OK

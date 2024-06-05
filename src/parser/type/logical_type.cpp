@@ -16,6 +16,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include "complex/sparse_type.h"
  
 namespace infinity {
 
@@ -74,6 +75,11 @@ static const char *type2name[] = {
     "Tensor",
     "TensorArray",
 
+    // sparse
+    "Sparse",
+
+    "EmptyArray",
+
     "Invalid",
 };
 
@@ -131,6 +137,9 @@ std::unordered_map<std::string, LogicalType> name2type = {
     { "tensor" , LogicalType::kTensor },
     { "tensorarray" , LogicalType::kTensorArray },
 
+    // sparse
+    { "sparse" , LogicalType::kSparse},
+    { "emptyarray", LogicalType::kEmptyArray},
     { "invalid" , LogicalType::kInvalid },
 };
 
@@ -193,6 +202,10 @@ static int64_t type_size[] = {
     8, // Tensor
     8, // TensorArray
 
+    // sparse type
+    sizeof(SparseType),
+
+    0, // empty array
     0, // Invalid
 };
 
@@ -208,5 +221,80 @@ LogicalType Str2LogicalType(const std::string &str) {
 }
 
 int64_t LogicalTypeWidth(LogicalType logical_type) { return type_size[logical_type]; }
+
+template <typename T, typename U>
+LogicalType GetCommonLogicalType() {
+    using CommonType = std::common_type_t<T, U>;
+    if constexpr (std::is_same_v<CommonType, int8_t>) {
+        return LogicalType::kTinyInt;
+    } else if constexpr (std::is_same_v<CommonType, int16_t>) {
+        return LogicalType::kSmallInt;
+    } else if constexpr (std::is_same_v<CommonType, int32_t>) {
+        return LogicalType::kInteger;
+    } else if constexpr (std::is_same_v<CommonType, int64_t>) {
+        return LogicalType::kBigInt;
+    } else if constexpr (std::is_same_v<CommonType, float>) {
+        return LogicalType::kFloat;
+    } else if constexpr (std::is_same_v<CommonType, double>) {
+        return LogicalType::kDouble;
+    } else {
+        return LogicalType::kInvalid;
+    }
+}
+
+template <typename T>
+LogicalType GetCommonLogicalType(const EmbeddingDataType column_type) {
+    switch (column_type) {
+        case EmbeddingDataType::kElemInt8: {
+            return GetCommonLogicalType<T, int8_t>();
+        }
+        case EmbeddingDataType::kElemInt16: {
+            return GetCommonLogicalType<T, int16_t>();
+        }
+        case EmbeddingDataType::kElemInt32: {
+            return GetCommonLogicalType<T, int32_t>();
+        }
+        case EmbeddingDataType::kElemInt64: {
+            return GetCommonLogicalType<T, int64_t>();
+        }
+        case EmbeddingDataType::kElemFloat: {
+            return GetCommonLogicalType<T, float>();
+        }
+        case EmbeddingDataType::kElemDouble: {
+            return GetCommonLogicalType<T, double>();
+        }
+        case EmbeddingDataType::kElemBit:
+        case EmbeddingDataType::kElemInvalid: {
+            return LogicalType::kInvalid;
+        }
+    }
+}
+
+LogicalType GetCommonLogicalType(const EmbeddingDataType type1, const EmbeddingDataType type2) {
+    switch (type1) {
+        case EmbeddingDataType::kElemInt8: {
+            return GetCommonLogicalType<int8_t>(type2);
+        }
+        case EmbeddingDataType::kElemInt16: {
+            return GetCommonLogicalType<int16_t>(type2);
+        }
+        case EmbeddingDataType::kElemInt32: {
+            return GetCommonLogicalType<int32_t>(type2);
+        }
+        case EmbeddingDataType::kElemInt64: {
+            return GetCommonLogicalType<int64_t>(type2);
+        }
+        case EmbeddingDataType::kElemFloat: {
+            return GetCommonLogicalType<float>(type2);
+        }
+        case EmbeddingDataType::kElemDouble: {
+            return GetCommonLogicalType<double>(type2);
+        }
+        case EmbeddingDataType::kElemBit:
+        case EmbeddingDataType::kElemInvalid: {
+            return LogicalType::kInvalid;
+        }
+    }
+}
 
 } // namespace infinity

@@ -44,6 +44,7 @@ import logical_type;
 import expression_state;
 import infinity_exception;
 import third_party;
+import logger;
 
 namespace infinity {
 
@@ -180,10 +181,12 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
             bool_column->Reset();
         }
         if (segment_row_count_real < segment_row_count) {
-            UnrecoverableError(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
-                                           segment_id,
-                                           segment_row_count_real,
-                                           segment_row_count));
+            String error_message = fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
+                                               segment_id,
+                                               segment_row_count_real,
+                                               segment_row_count);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         // merge
         std::visit(Overload{[&bitmask](Vector<u32> &v) {

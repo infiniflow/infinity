@@ -3,7 +3,7 @@
 
 import stl;
 import posting_merger;
-import memory_pool;
+
 import memory_indexer;
 import segment_term_posting;
 import column_vector;
@@ -27,21 +27,36 @@ import internal_types;
 import logical_type;
 import third_party;
 import random;
+import global_resource_usage;
+import infinity_context;
 
 using namespace infinity;
 class ColumnIndexMergerTest : public BaseTest {
 public:
-    ColumnIndexMergerTest() {
-        memory_pool_ = new MemoryPool(BUFFER_SIZE_);
-        buffer_pool_ = new RecyclePool(BUFFER_SIZE_);
-        byte_slice_pool_ = new MemoryPool(BUFFER_SIZE_);
+    void SetUp() override {
+        BaseTest::SetUp();
+        BaseTest::RemoveDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
     }
 
-    ~ColumnIndexMergerTest() {
-        delete memory_pool_;
-        delete buffer_pool_;
-        delete byte_slice_pool_;
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        BaseTest::TearDown();
     }
+
+public:
+    ColumnIndexMergerTest() {}
+
+    ~ColumnIndexMergerTest() {}
 
 public:
     struct ExpectedPosting {
@@ -80,12 +95,6 @@ protected:
     String GetTerm(u32 n);
 
 protected:
-    MemoryPool *memory_pool_;
-    RecyclePool *buffer_pool_;
-
-    MemoryPool *byte_slice_pool_;
-    ThreadPool inverting_thread_pool_{4};
-    ThreadPool commiting_thread_pool_{2};
     optionflag_t flag_{OPTION_FLAG_ALL};
     static constexpr SizeT BUFFER_SIZE_ = 1024;
 };
@@ -109,15 +118,7 @@ void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(index_dir);
     for (SizeT i = 0; i < chunk_names.size(); ++i) {
-        MemoryIndexer indexer(index_dir,
-                              chunk_names[i],
-                              base_row_ids[i],
-                              flag_,
-                              "standard",
-                              *byte_slice_pool_,
-                              *buffer_pool_,
-                              inverting_thread_pool_,
-                              commiting_thread_pool_);
+        MemoryIndexer indexer(index_dir, chunk_names[i], base_row_ids[i], flag_, "standard");
         indexer.Insert(column, row_offsets[i], row_counts[i]);
         indexer.Dump();
     }
@@ -139,7 +140,7 @@ void ColumnIndexMergerTest::MergeAndCheckIndex(const String& index_dir,
                                                const Vector<RowID>& base_row_ids,
                                                const String &dst_base_name,
                                                const Vector<ExpectedPosting> &expected_postings) {
-    auto column_index_merger = MakeShared<ColumnIndexMerger>(index_dir, flag_, memory_pool_, buffer_pool_);
+    auto column_index_merger = MakeShared<ColumnIndexMerger>(index_dir, flag_);
     column_index_merger->Merge(base_names, base_row_ids, dst_base_name);
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(index_dir);
@@ -153,7 +154,7 @@ void ColumnIndexMergerTest::MergeAndCheckIndex(const String& index_dir,
         const ExpectedPosting &expected = expected_postings[i];
         const String &term = expected.term;
 
-        UniquePtr<PostingIterator> post_iter(reader.Lookup(term, byte_slice_pool_));
+        UniquePtr<PostingIterator> post_iter(reader.Lookup(term));
         ASSERT_TRUE(post_iter != nullptr);
 
         RowID doc_id = INVALID_ROWID;

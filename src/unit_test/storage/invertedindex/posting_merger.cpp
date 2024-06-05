@@ -2,7 +2,7 @@
 
 import posting_merger;
 import stl;
-import memory_pool;
+
 import segment_term_posting;
 import memory_indexer;
 import column_vector;
@@ -27,21 +27,14 @@ import internal_types;
 import logical_type;
 import infinity_exception;
 import vector_with_lock;
+import logger;
 
 using namespace infinity;
 
 class PostingMergerTest : public BaseTest {
 public:
-    PostingMergerTest() {
-        memory_pool_ = new MemoryPool(BUFFER_SIZE_);
-        buffer_pool_ = new RecyclePool(BUFFER_SIZE_);
-        byte_slice_pool_ = new MemoryPool(BUFFER_SIZE_);
-    }
-    ~PostingMergerTest() {
-        delete memory_pool_;
-        delete buffer_pool_;
-        delete byte_slice_pool_;
-    }
+    PostingMergerTest() {}
+    ~PostingMergerTest() {}
 
 public:
     struct ExpectedPosting {
@@ -54,12 +47,6 @@ protected:
     void CreateIndex();
 
 protected:
-    MemoryPool *memory_pool_;
-    RecyclePool *buffer_pool_;
-
-    MemoryPool *byte_slice_pool_;
-    ThreadPool inverting_thread_pool_{4};
-    ThreadPool commiting_thread_pool_{4};
     optionflag_t flag_{OPTION_FLAG_ALL};
     static constexpr SizeT BUFFER_SIZE_ = 1024;
 };
@@ -80,28 +67,12 @@ void PostingMergerTest::CreateIndex() {
     }
 
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
-    MemoryIndexer indexer1(GetTmpDir(),
-                           "chunk1",
-                           RowID(0U, 0U),
-                           flag_,
-                           "standard",
-                           *byte_slice_pool_,
-                           *buffer_pool_,
-                           inverting_thread_pool_,
-                           commiting_thread_pool_);
+    MemoryIndexer indexer1(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column, 0, 1);
     indexer1.Dump();
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
 
-    auto indexer2 = MakeUnique<MemoryIndexer>(GetTmpDir(),
-                                              "chunk2",
-                                              RowID(0U, 1U),
-                                              flag_,
-                                              "standard",
-                                              *byte_slice_pool_,
-                                              *buffer_pool_,
-                                              inverting_thread_pool_,
-                                              commiting_thread_pool_);
+    auto indexer2 = MakeUnique<MemoryIndexer>(GetTmpDir(), "chunk2", RowID(0U, 1U), flag_, "standard");
     indexer2->Insert(column, 1, 1);
     indexer2->Dump();
 }
@@ -171,19 +142,26 @@ TEST_F(PostingMergerTest, Basic) {
             String column_len_file = (Path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
             RowID base_row_id = row_ids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
-            UniquePtr<FileHandler> file_handler = fs.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            auto [file_handler, status] = fs.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            if(!status.ok()) {
+                String error_message = status.message();
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
             const u32 file_size = fs.GetFileSize(*file_handler);
             u32 file_read_array_len = file_size / sizeof(u32);
             unsafe_column_length_array.resize(id_offset + file_read_array_len);
             const i64 read_count = fs.Read(*file_handler, unsafe_column_length_array.data() + id_offset, file_size);
             file_handler->Close();
             if (read_count != file_size) {
-                UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
+                String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }
 
-    auto posting_merger = MakeShared<PostingMerger>(memory_pool_, buffer_pool_, flag_, column_length_array);
+    auto posting_merger = MakeShared<PostingMerger>(flag_, column_length_array);
 
     posting_merger->Merge(segment_term_postings, merge_base_rowid);
     EXPECT_EQ(posting_merger->GetDF(), static_cast<u32>(2));

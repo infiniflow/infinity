@@ -2,7 +2,7 @@
 #include <cassert>
 
 import stl;
-import memory_pool;
+
 import posting_byte_slice;
 import posting_byte_slice_reader;
 import doc_list_format_option;
@@ -12,20 +12,13 @@ using namespace infinity;
 
 class PostingByteSliceReaderTest : public BaseTest {
 public:
-    PostingByteSliceReaderTest() {
-        byte_slice_pool_ = new MemoryPool(1024);
-        buffer_pool_ = new RecyclePool(1024);
-    }
-    ~PostingByteSliceReaderTest() {
-        delete byte_slice_pool_;
-        delete buffer_pool_;
-    }
+    PostingByteSliceReaderTest() {}
+    ~PostingByteSliceReaderTest() {}
 
     void SetUp() override {
         DocListFormatOption option(NO_TERM_FREQUENCY);
-        doc_list_format_.reset(new DocListFormat());
-        doc_list_format_->Init(option);
-        posting_byte_slice_.reset(new PostingByteSlice(byte_slice_pool_, buffer_pool_));
+        doc_list_format_.reset(new DocListFormat(option));
+        posting_byte_slice_.reset(new PostingByteSlice());
         posting_byte_slice_->Init(doc_list_format_.get());
     }
     void TearDown() override {
@@ -71,7 +64,7 @@ protected:
     }
 
     SharedPtr<PostingByteSliceReader> CreateReader(u32 doc_id[], uint16_t doc_payload[], u32 doc_count, u32 flush_count) {
-        posting_byte_slice_.reset(new PostingByteSlice(byte_slice_pool_, buffer_pool_));
+        posting_byte_slice_.reset(new PostingByteSlice());
         posting_byte_slice_->Init(doc_list_format_.get());
 
         assert(posting_byte_slice_);
@@ -108,8 +101,6 @@ protected:
         return CreateReader(doc_id.data(), payload.data(), doc_count, flush_count);
     }
 
-    MemoryPool *byte_slice_pool_;
-    RecyclePool *buffer_pool_;
     SharedPtr<PostingByteSlice> posting_byte_slice_;
     SharedPtr<DocListFormat> doc_list_format_;
 };
@@ -117,11 +108,10 @@ protected:
 TEST_F(PostingByteSliceReaderTest, test1) {
     using namespace infinity;
     DocListFormatOption option(of_none);
-    DocListFormat doc_list_format;
-    doc_list_format.Init(option);
+    DocListFormat doc_list_format(option);
     {
         // empty posting buffer
-        PostingByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
+        PostingByteSlice posting_buffer;
         posting_buffer.Init(&doc_list_format);
 
         PostingByteSliceReader reader;
@@ -133,7 +123,7 @@ TEST_F(PostingByteSliceReaderTest, test1) {
     }
     {
         // only has short buffer
-        PostingByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
+        PostingByteSlice posting_buffer;
         posting_buffer.Init(&doc_list_format);
 
         posting_buffer.PushBack(0, (u32)1);
@@ -148,7 +138,7 @@ TEST_F(PostingByteSliceReaderTest, test1) {
     }
     {
         // only has flushed byte slice
-        PostingByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
+        PostingByteSlice posting_buffer;
         posting_buffer.Init(&doc_list_format);
 
         posting_buffer.PushBack(0, (u32)1);
@@ -165,7 +155,7 @@ TEST_F(PostingByteSliceReaderTest, test1) {
     }
     {
         // has short buffer and flushed byte slice
-        PostingByteSlice posting_buffer(byte_slice_pool_, buffer_pool_);
+        PostingByteSlice posting_buffer;
         posting_buffer.Init(&doc_list_format);
 
         posting_buffer.PushBack(0, (u32)1);

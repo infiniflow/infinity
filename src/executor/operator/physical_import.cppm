@@ -25,6 +25,7 @@ import physical_operator_type;
 import third_party;
 import txn;
 import txn_store;
+import constant_expr;
 import table_entry;
 import segment_entry;
 import block_entry;
@@ -35,6 +36,7 @@ import column_vector;
 import internal_types;
 import statement_common;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -84,11 +86,15 @@ public:
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
     SizeT TaskletCount() override {
-        UnrecoverableError("Not implement: TaskletCount not Implement");
+        String error_message = "Not implement: TaskletCount not Implement";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return 0;
     }
 
     void ImportFVECS(QueryContext *query_context, ImportOperatorState *import_op_state);
+
+    void ImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state);
 
     /// for push based execution
     void ImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state);
@@ -127,5 +133,7 @@ private:
     bool header_{false};
     char delimiter_{','};
 };
+
+export SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_object);
 
 } // namespace infinity

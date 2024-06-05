@@ -22,7 +22,7 @@ import logical_type;
 import infinity_exception;
 import scalar_function;
 import scalar_function_set;
-
+import logger;
 import third_party;
 import internal_types;
 import data_type;
@@ -32,7 +32,9 @@ namespace infinity {
 struct SubFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
-        UnrecoverableError("Not implement: SubFunction::Run");
+        String error_message = "Not implement: SubFunction::Run";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 };
 
@@ -71,7 +73,9 @@ inline bool SubFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 // HugeIntT - HugeIntT = HugeIntT, and check overflow
 template <>
 inline bool SubFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
-    UnrecoverableError("Not implement: SubFunction::Run");
+    String error_message = "Not implement: SubFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -98,7 +102,9 @@ inline bool SubFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal - Decimal = Decimal
 template <>
 inline bool SubFunction::Run(DecimalT, DecimalT, DecimalT &) {
-    UnrecoverableError("Not implement: SubFunction::Run");
+    String error_message = "Not implement: SubFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -129,35 +135,45 @@ inline bool SubFunction::Run(TimestampT left, IntervalT right, TimestampT &resul
 // Mixed Type - i64
 template <>
 inline bool SubFunction::Run(MixedT, BigIntT, MixedT &) {
-    UnrecoverableError("Not implement: SubFunction::Run");
+    String error_message = "Not implement: SubFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 // i64 - Mixed Type
 template <>
 inline bool SubFunction::Run(BigIntT, MixedT, MixedT &) {
-    UnrecoverableError("Not implement: SubFunction::Run");
+    String error_message = "Not implement: SubFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 // Mixed Type - f64
 template <>
 inline bool SubFunction::Run(MixedT, DoubleT, MixedT &) {
-    UnrecoverableError("Not implement: SubFunction::Run");
+    String error_message = "Not implement: SubFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 // f64 - Mixed Type
 template <>
 inline bool SubFunction::Run(DoubleT, MixedT, MixedT &) {
-    UnrecoverableError("Not implement: SubFunction::Run");
+    String error_message = "Not implement: SubFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 // Mixed Type - Mixed Type
 template <>
 inline bool SubFunction::Run(MixedT, MixedT, MixedT &) {
-    UnrecoverableError("Not implement: SubFunction::Run");
+    String error_message = "Not implement: SubFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 

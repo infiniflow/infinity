@@ -43,7 +43,9 @@ namespace infinity {
 Vector<std::string_view> BlockEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
-        UnrecoverableError(fmt::format("Invalid block entry encode: {}", encode));
+        String error_message = fmt::format("Invalid block entry encode: {}", encode);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto decodes = SegmentEntry::DecodeIndex(encode.substr(0, delimiter_i));
     decodes.push_back(encode.substr(delimiter_i + 1));
@@ -122,6 +124,8 @@ void BlockEntry::UpdateBlockReplay(SharedPtr<BlockEntry> block_entry, String blo
 
 SizeT BlockEntry::row_count(TxnTimeStamp check_ts) const {
     std::shared_lock lock(rw_locker_);
+    if (check_ts >= max_row_ts_)
+        return row_count_;
 
     auto block_version_handle = this->block_version_->Load();
     const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
@@ -206,11 +210,13 @@ u16 BlockEntry::AppendData(TransactionID txn_id,
                            BufferManager *buffer_mgr) {
     std::unique_lock<std::shared_mutex> lck(this->rw_locker_);
     if (this->using_txn_id_ != 0 && this->using_txn_id_ != txn_id) {
-        UnrecoverableError(fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}, using_txn_id_: {}, txn_id: {}",
-                                       this->segment_entry_->segment_id(),
-                                       this->block_id_,
-                                       this->using_txn_id_,
-                                       txn_id));
+        String error_message = fmt::format("Multiple transactions are changing data of Segment: {}, Block: {}, using_txn_id_: {}, txn_id: {}",
+                                           this->segment_entry_->segment_id(),
+                                           this->block_id_,
+                                           this->using_txn_id_,
+                                           txn_id);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     this->using_txn_id_ = txn_id;
@@ -257,12 +263,14 @@ SizeT BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const
     SizeT delete_row_n = 0;
     for (BlockOffset block_offset : rows) {
         if (block_version->deleted_[block_offset] != 0) {
-            UnrecoverableError(fmt::format("Segment {} Block {} Row {} is already deleted at {}, cur commit_ts: {}.",
-                                           segment_id,
-                                           block_id,
-                                           block_offset,
-                                           block_version->deleted_[block_offset],
-                                           commit_ts));
+            String error_message = fmt::format("Segment {} Block {} Row {} is already deleted at {}, cur commit_ts: {}.",
+                                               segment_id,
+                                               block_id,
+                                               block_offset,
+                                               block_version->deleted_[block_offset],
+                                               commit_ts);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         block_version->deleted_[block_offset] = commit_ts;
         delete_row_n++;
@@ -276,7 +284,9 @@ void BlockEntry::CommitFlushed(TxnTimeStamp commit_ts) {
     auto block_version_handle = block_version_->Load();
     auto *block_version = reinterpret_cast<BlockVersion *>(block_version_handle.GetDataMut());
     if (!block_version->created_.empty()) {
-        UnrecoverableError("BlockEntry::CommitFlushed: block_version->created_ is not empty");
+        String error_message = "BlockEntry::CommitFlushed: block_version->created_ is not empty";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     block_version->created_.emplace_back(commit_ts, this->row_count_);
 
@@ -294,7 +304,9 @@ void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
 
     min_row_ts_ = std::min(min_row_ts_, commit_ts);
     if (commit_ts < max_row_ts_) {
-        UnrecoverableError(fmt::format("BlockEntry commit_ts {} is less than max_row_ts_ {}", commit_ts, max_row_ts_));
+        String error_message = fmt::format("BlockEntry commit_ts {} is less than max_row_ts_ {}", commit_ts, max_row_ts_);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     max_row_ts_ = commit_ts;
     if (!this->Committed()) {
@@ -460,7 +472,9 @@ void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, Colum
 
 void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr) {
     if (read_size + row_count_ > row_capacity_) {
-        UnrecoverableError("BlockEntry::AppendBlock: read_size + row_count_ > row_capacity_");
+        String error_message = "BlockEntry::AppendBlock: read_size + row_count_ > row_capacity_";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (ColumnID column_id = 0; column_id < columns_.size(); ++column_id) {
         columns_[column_id]->Append(&column_vectors[column_id], row_begin, read_size, buffer_mgr);

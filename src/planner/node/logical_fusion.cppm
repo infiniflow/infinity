@@ -32,8 +32,7 @@ namespace infinity {
 
 export class LogicalFusion : public LogicalNode {
 public:
-    explicit LogicalFusion(u64 node_id,
-                           SharedPtr<FusionExpression> fusion_expr);
+    explicit LogicalFusion(u64 node_id, SharedPtr<BaseTableRef> base_table_ref, SharedPtr<FusionExpression> fusion_expr);
 
     Vector<ColumnBinding> GetColumnBindings() const final { return left_node_->GetColumnBindings(); };
 
@@ -45,6 +44,8 @@ public:
 
     inline String name() final { return "LogicalFusion"; }
 
+    Vector<SharedPtr<LogicalNode>> other_children_{};
+    SharedPtr<BaseTableRef> base_table_ref_{};
     SharedPtr<FusionExpression> fusion_expr_{};
 };
 

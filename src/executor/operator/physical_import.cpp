@@ -53,10 +53,11 @@ import status;
 import column_vector;
 import default_values;
 import embedding_info;
+import sparse_info;
 import column_def;
 import constant_expr;
 import wal_entry;
-
+import knn_expr;
 import value;
 import catalog;
 import catalog_delta_entry;
@@ -91,8 +92,14 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
             ImportFVECS(query_context, import_op_state);
             break;
         }
+        case CopyFileType::kCSR: {
+            ImportCSR(query_context, import_op_state);
+            break;
+        }
         case CopyFileType::kInvalid: {
-            UnrecoverableError("Invalid file type");
+            String error_message = "Invalid file type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     import_op_state->SetComplete();
@@ -122,7 +129,10 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
 
     LocalFileSystem fs;
 
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
     DeferFn defer_fn([&]() { fs.Close(*file_handler); });
 
     int dimension = 0;
@@ -148,14 +158,16 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     SizeT file_size = fs.GetFileSize(*file_handler);
     SizeT row_size = dimension * sizeof(FloatT) + sizeof(dimension);
     if (file_size % row_size != 0) {
-        UnrecoverableError("Weird file size.");
+        String error_message = "Weird file size.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     SizeT vector_n = file_size / row_size;
 
     Txn *txn = query_context->GetTxn();
 
     SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
-    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
     BufferHandle buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
     SizeT row_idx = 0;
@@ -194,6 +206,148 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         }
     }
     auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", vector_n));
+    import_op_state->result_msg_ = std::move(result_msg);
+}
+
+template <typename IdxT>
+UniquePtr<char[]> ConvertCSRIndice(const i32 *tmp_indice_ptr, SizeT nnz) {
+    auto res = MakeUnique<char []>(sizeof(IdxT) * nnz);
+    auto *ptr = reinterpret_cast<IdxT *>(res.get());
+    for (SizeT i = 0; i < nnz; ++i) {
+        if (tmp_indice_ptr[i] < 0 || tmp_indice_ptr[i] > std::numeric_limits<IdxT>::max()) {
+            String error_message = fmt::format("In compactible idx {} in csr file.", tmp_indice_ptr[i]);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+        ptr[i] = tmp_indice_ptr[i];
+    }
+    return res;
+}
+
+UniquePtr<char[]> ConvertCSRIndice(UniquePtr<char[]> tmp_indice_ptr, SparseInfo *sparse_info, SizeT nnz) {
+    switch (sparse_info->IndexType()) {
+        case EmbeddingDataType::kElemInt8: {
+            return ConvertCSRIndice<TinyIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
+        }
+        case EmbeddingDataType::kElemInt16: {
+            return ConvertCSRIndice<SmallIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
+        }
+        case EmbeddingDataType::kElemInt32: {
+            return tmp_indice_ptr;
+        }
+        case EmbeddingDataType::kElemInt64: {
+            return ConvertCSRIndice<BigIntT>(reinterpret_cast<i32 *>(tmp_indice_ptr.get()), nnz);
+        }
+        default: {
+            String error_message = fmt::format("Unsupported index type {}.", sparse_info->IndexType());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+    }
+    return {};
+}
+
+void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state) {
+    if (table_entry_->ColumnCount() != 1) {
+        Status status = Status::ImportFileFormatError("CSR file must have only one column.");
+        RecoverableError(status);
+    }
+    auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
+    if (column_type->type() != kSparse) {
+        Status status = Status::ImportFileFormatError("CSR file must have only one sparse column.");
+        RecoverableError(status);
+    }
+    auto sparse_info = std::static_pointer_cast<SparseInfo>(column_type->type_info());
+    if (sparse_info->DataType() != kElemFloat) {
+        Status status = Status::ImportFileFormatError("FVECS file must has only one sparse column with float element");
+        RecoverableError(status);
+    }
+
+    LocalFileSystem fs;
+    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if (!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+
+    i64 nrow = 0;
+    i64 ncol = 0;
+    i64 nnz = 0;
+    file_handler->Read(&nrow, sizeof(nrow));
+    file_handler->Read(&ncol, sizeof(ncol));
+    file_handler->Read(&nnz, sizeof(nnz));
+
+    SizeT file_size = fs.GetFileSize(*file_handler);
+    if (file_size != 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32) + nnz * sizeof(FloatT)) {
+        String error_message = "Invalid CSR file format.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    i64 prev_off = 0;
+    file_handler->Read(&prev_off, sizeof(i64));
+    if (prev_off != 0) {
+        String error_message = "Invalid CSR file format.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    auto [idx_reader, idx_status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if (!idx_status.ok()) {
+        LOG_CRITICAL(idx_status.message());
+        UnrecoverableError(idx_status.message());
+    }
+    fs.Seek(*idx_reader, 3 * sizeof(i64) + (nrow + 1) * sizeof(i64));
+    auto [data_reader, data_status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if (!data_status.ok()) {
+        LOG_CRITICAL(data_status.message());
+        UnrecoverableError(data_status.message());
+    }
+    fs.Seek(*data_reader, 3 * sizeof(i64) + (nrow + 1) * sizeof(i64) + nnz * sizeof(i32));
+
+    //------------------------------------------------------------------------------------------------------------------------
+
+    Txn *txn = query_context->GetTxn();
+    auto *buffer_mgr = txn->buffer_mgr();
+
+    SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+    auto column_vector = MakeShared<ColumnVector>(block_entry->GetColumnBlockEntry(0)->GetColumnVector(buffer_mgr));
+
+    i64 row_id = 0;
+    while (true) {
+        i64 off = 0;
+        file_handler->Read(&off, sizeof(i64));
+        i64 nnz = off - prev_off;
+        SizeT data_len = sparse_info->DataSize(nnz);
+        auto tmp_indice_ptr = MakeUnique<char[]>(sizeof(i32) * nnz);
+        auto data_ptr = MakeUnique<char[]>(data_len);
+        idx_reader->Read(tmp_indice_ptr.get(), sizeof(i32) * nnz);
+        data_reader->Read(data_ptr.get(), data_len);
+        auto indice_ptr = ConvertCSRIndice(std::move(tmp_indice_ptr), sparse_info.get(), nnz);
+
+        auto value = Value::MakeSparse(nnz, std::move(indice_ptr), std::move(data_ptr), sparse_info);
+        column_vector->AppendValue(value);
+
+        block_entry->IncreaseRowCount(1);
+        prev_off = off;
+        ++row_id;
+        if (row_id == nrow) {
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+            SaveSegmentData(table_entry_, txn, segment_entry);
+            break;
+        }
+        if (block_entry->GetAvailableCapacity() <= 0) {
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+            if (segment_entry->Room() <= 0) {
+                SaveSegmentData(table_entry_, txn, segment_entry);
+
+                segment_id = Catalog::GetNextSegmentID(table_entry_);
+                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+            }
+            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+            column_vector = MakeShared<ColumnVector>(block_entry->GetColumnBlockEntry(0)->GetColumnVector(buffer_mgr));
+        }
+    }
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", nrow));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
@@ -275,14 +429,19 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
 
 void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state) {
     LocalFileSystem fs;
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
     DeferFn file_defer([&]() { fs.Close(*file_handler); });
 
     SizeT file_size = fs.GetFileSize(*file_handler);
     String jsonl_str(file_size + 1, 0);
     SizeT read_n = file_handler->Read(jsonl_str.data(), file_size);
     if (read_n != file_size) {
-        UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+        String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     if (read_n == 0) {
@@ -355,14 +514,19 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
     nlohmann::json json_arr;
     {
         LocalFileSystem fs;
-        UniquePtr<FileHandler> file_handler = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+        auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+        if(!status.ok()) {
+            UnrecoverableError(status.message());
+        }
         DeferFn file_defer([&]() { fs.Close(*file_handler); });
 
         SizeT file_size = fs.GetFileSize(*file_handler);
         String json_str(file_size, 0);
         SizeT read_n = file_handler->Read(json_str.data(), file_size);
         if (read_n != file_size) {
-            UnrecoverableError(fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size));
+            String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         if (read_n == 0) {
@@ -465,11 +629,10 @@ void PhysicalImport::CSVRowHandler(void *context) {
     // if column count is larger than columns defined from schema, extra columns are abandoned
     if (column_count > table_entry->ColumnCount()) {
         UniquePtr<String> err_msg = MakeUnique<String>(
-            fmt::format("CSV file row count isn't match with table schema, row id: {}, column_count = {}, table_entry->ColumnCount = {}.",
+            fmt::format("CSV file column count isn't match with table schema, row id: {}, column_count = {}, table_entry->ColumnCount = {}.",
                         parser_context->row_count_,
                         column_count,
                         table_entry->ColumnCount()));
-        LOG_ERROR(*err_msg);
         for (SizeT i = 0; i < column_count; ++i) {
             ZsvCell cell = parser_context->parser_.GetCell(i);
             LOG_ERROR(fmt::format("Column {}: {}", i, std::string_view((char *)cell.str, cell.len)));
@@ -615,6 +778,102 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_obj
     }
 }
 
+SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &json_object, const SparseInfo *sparse_info) {
+    SharedPtr<ConstantExpr> res = nullptr;
+    switch (sparse_info->DataType()) {
+        case kElemBit:
+        case kElemInt8:
+        case kElemInt16:
+        case kElemInt32:
+        case kElemInt64: {
+            res = MakeShared<ConstantExpr>(LiteralType::kLongSparseArray);
+            break;
+        }
+        case kElemFloat:
+        case kElemDouble: {
+            res = MakeShared<ConstantExpr>(LiteralType::kDoubleSparseArray);
+            break;
+        }
+        default: {
+            const auto error_info = fmt::format("Unsupported sparse data type: {}", sparse_info->DataType());
+            RecoverableError(Status::ImportFileFormatError(error_info));
+            return nullptr;
+        }
+    }
+    if (json_object.size() == 0) {
+        return res;
+    }
+    switch (json_object.type()) {
+        case nlohmann::json::value_t::array: {
+            const u32 array_size = json_object.size();
+            switch (json_object[0].type()) {
+                case nlohmann::json::value_t::number_unsigned:
+                case nlohmann::json::value_t::number_integer: {
+                    res->long_sparse_array_.first.resize(array_size);
+                    for (u32 i = 0; i < array_size; ++i) {
+                        res->long_sparse_array_.first[i] = json_object[i].get<i64>();
+                    }
+                    return res;
+                }
+                default: {
+                    const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
+                    RecoverableError(Status::ImportFileFormatError(error_info));
+                    return nullptr;
+                }
+            }
+        }
+        case nlohmann::json::value_t::object: {
+            HashSet<i64> key_set;
+            for (auto iter = json_object.begin(); iter != json_object.end(); ++iter) {
+                i64 key = std::stoll(iter.key());
+                auto [_, insert_ok] = key_set.insert(key);
+                if (!insert_ok) {
+                    const auto error_info = fmt::format("Duplicate key {} in sparse array!", key);
+                    RecoverableError(Status::ImportFileFormatError(error_info));
+                    return nullptr;
+                }
+                if (res->literal_type_ == LiteralType::kLongSparseArray) {
+                    const auto &value_obj = iter.value();
+                    switch(value_obj.type()) {
+                        case nlohmann::json::value_t::number_unsigned:
+                        case nlohmann::json::value_t::number_integer: {
+                            res->long_sparse_array_.first.push_back(key);
+                            res->long_sparse_array_.second.push_back(value_obj.get<i64>());
+                            break;
+                        }
+                        default: {
+                            const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
+                            RecoverableError(Status::ImportFileFormatError(error_info));
+                            return nullptr;
+                        }
+                    }
+                } else {
+                    const auto &value_obj = iter.value();
+                    switch(value_obj.type()) {
+                        case nlohmann::json::value_t::number_float: {
+                            res->double_sparse_array_.first.push_back(key);
+                            res->double_sparse_array_.second.push_back(value_obj.get<double>());
+                            break;
+                        }
+                        default: {
+                            const auto error_info = fmt::format("Unrecognized json object type in array: {}", json_object.type_name());
+                            RecoverableError(Status::ImportFileFormatError(error_info));
+                            return nullptr;
+                        }
+                    }
+                }
+            }
+            return res;
+        }
+        default: {
+            const auto error_info = fmt::format("Unrecognized json object type: {}", json_object.type_name());
+            LOG_ERROR(error_info);
+            RecoverableError(Status::ImportFileFormatError(error_info));
+            return nullptr;
+        }
+    }
+}
+
 void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<ColumnVector> &column_vectors) {
     for (SizeT i = 0; auto &column_vector : column_vectors) {
         const ColumnDef *column_def = table_entry_->GetColumnDefByID(i++);
@@ -696,7 +955,10 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                             break;
                         }
                         default: {
-                            UnrecoverableError("Not implement: Embedding type.");
+                            String error_message = "Not implement: Embedding type.";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                            break;
                         }
                     }
                     break;
@@ -705,11 +967,25 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                 case kTensorArray: {
                     // build ConstantExpr
                     SharedPtr<ConstantExpr> const_expr = BuildConstantExprFromJson(line_json[column_def->name_]);
+                    if (const_expr.get() == nullptr) {
+                        RecoverableError(Status::ImportFileFormatError("Invalid json object."));
+                    }
+                    column_vector.AppendByConstantExpr(const_expr.get());
+                    break;
+                }
+                case kSparse: {
+                    const auto *sparse_info = static_cast<SparseInfo *>(column_vector.data_type()->type_info().get());
+                    SharedPtr<ConstantExpr> const_expr = BuildConstantSparseExprFromJson(line_json[column_def->name_], sparse_info);
+                    if (const_expr.get() == nullptr) {
+                        RecoverableError(Status::ImportFileFormatError("Invalid json object."));
+                    }
                     column_vector.AppendByConstantExpr(const_expr.get());
                     break;
                 }
                 default: {
-                    UnrecoverableError("Not implement: Invalid data type.");
+                    String error_message = "Not implement: Invalid data type.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
         } else if (column_def->has_default_value()) {

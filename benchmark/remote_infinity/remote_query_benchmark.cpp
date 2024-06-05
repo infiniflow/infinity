@@ -50,7 +50,9 @@ struct InfinityClient {
         client = std::make_unique<InfinityServiceClient>(protocol);
         transport->open();
         CommonResponse response;
-        client->Connect(response);
+        ConnectRequest request;
+        request.__set_client_version(1); // 0.2.0-dev2
+        client->Connect(response, request);
         session_id = response.session_id;
     }
     ~InfinityClient() {

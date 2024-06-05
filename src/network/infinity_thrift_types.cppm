@@ -21,6 +21,7 @@ export module infinity_thrift_types;
 namespace infinity_thrift_rpc {
 
 export using infinity_thrift_rpc::InfinityServiceIf;
+export using infinity_thrift_rpc::ConnectRequest;
 export using infinity_thrift_rpc::CommonResponse;
 export using infinity_thrift_rpc::CommonRequest;
 export using infinity_thrift_rpc::CreateDatabaseRequest;
@@ -70,6 +71,7 @@ export using infinity_thrift_rpc::ConstantExpr;
 export using infinity_thrift_rpc::ColumnExpr;
 export using infinity_thrift_rpc::FunctionExpr;
 export using infinity_thrift_rpc::KnnExpr;
+export using infinity_thrift_rpc::MatchTensorExpr;
 export using infinity_thrift_rpc::MatchExpr;
 export using infinity_thrift_rpc::FusionExpr;
 export using infinity_thrift_rpc::ParsedExpr;

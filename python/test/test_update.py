@@ -21,7 +21,7 @@ from numpy import dtype
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
-from infinity.common import ConflictType
+from infinity.common import ConflictType, InfinityException
 from utils import trace_expected_exceptions
 from test_sdkbase import TestSdk
 
@@ -412,10 +412,13 @@ class TestUpdate(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         # update
-        with pytest.raises(Exception, match="ERROR:3022*"):
+        with pytest.raises(InfinityException) as e:
             table_obj.update("c1 = 1", [{"c2": 21}])
             update_res = table_obj.output(["*"]).to_df()
             print(update_res)
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
         # disconnect
         res = infinity_obj.disconnect()
@@ -483,8 +486,12 @@ class TestUpdate(TestSdk):
                                         ConflictType.Error)
 
         # update
-        with pytest.raises(Exception, match="ERROR:3049, Not support to convert Embedding to*"):
+        with pytest.raises(InfinityException) as e:
             table_obj.update("c1 = 1", [{"c2": types_example}])
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.NOT_SUPPORTED_TYPE_CONVERSION
+
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 

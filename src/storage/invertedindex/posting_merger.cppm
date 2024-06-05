@@ -3,7 +3,7 @@ module;
 export module posting_merger;
 
 import stl;
-import memory_pool;
+
 import file_writer;
 import posting_decoder;
 import posting_list_format;
@@ -19,7 +19,7 @@ namespace infinity {
 class PostingDumper;
 export class PostingMerger {
 public:
-    PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, optionflag_t flag, VectorWithLock<u32> &column_length_array);
+    PostingMerger(optionflag_t flag, VectorWithLock<u32> &column_length_array);
 
     ~PostingMerger();
 
@@ -32,9 +32,7 @@ public:
     u32 GetTotalTF();
 
 private:
-    MemoryPool *memory_pool_{nullptr};
-    RecyclePool *buffer_pool_{nullptr};
-    PostingFormatOption format_option_;
+    PostingFormat posting_format_;
     SharedPtr<PostingDumper> posting_dumper_;
     df_t df_;
     ttf_t ttf_;

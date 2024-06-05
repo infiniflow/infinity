@@ -22,14 +22,16 @@ import internal_types;
 import third_party;
 import base_expression;
 import column_expression;
+import embedding_info;
 import infinity_exception;
 import status;
 import logger;
+import logical_type;
 
 namespace infinity {
 
 MatchTensorExpression::MatchTensorExpression(Vector<SharedPtr<BaseExpression>> search_column,
-                                             MatchTensorMethod search_method,
+                                             const MatchTensorSearchMethod search_method,
                                              const EmbeddingDataType embedding_data_type,
                                              const u32 dimension,
                                              EmbeddingT query_embedding,
@@ -41,20 +43,9 @@ MatchTensorExpression::MatchTensorExpression(Vector<SharedPtr<BaseExpression>> s
     column_expr_ = static_cast<ColumnExpression *>(arguments_[0].get());
 }
 
-DataType MatchTensorExpression::Type() const {
-    switch (embedding_data_type_) {
-        case EmbeddingDataType::kElemFloat: {
-            return DataType(LogicalType::kFloat);
-        }
-        default: {
-            Status status = Status::NotSupport(fmt::format("Unsupported query tensor data type: {}, now only support float input",
-                                                           EmbeddingT::EmbeddingDataType2String(embedding_data_type_)));
-            LOG_ERROR(status.message());
-            RecoverableError(status);
-            return DataType(LogicalType::kInvalid);
-        }
-    }
-}
+DataType MatchTensorExpression::Type() const { return DataType(LogicalType::kFloat); }
+
+String MatchTensorExpression::MethodToString(const MatchTensorSearchMethod method) { return MatchTensorExpr::SearchMethodToString(method); }
 
 String MatchTensorExpression::ToString() const {
     if (!alias_.empty()) {
@@ -67,15 +58,5 @@ String MatchTensorExpression::ToString() const {
     }
     return fmt::format("MATCH TENSOR ({}, [{}], {}, '{}')", column_expr_->Name(), tensor_str, MethodToString(search_method_), options_text_);
 }
-
-String MatchTensorExpression::MethodToString(MatchTensorMethod method) {
-    switch (method) {
-        case MatchTensorMethod::kInvalid:
-            return "INVALID";
-        case MatchTensorMethod::kMaxSim:
-            return "MAX_SIM";
-    }
-}
-
 
 } // namespace infinity

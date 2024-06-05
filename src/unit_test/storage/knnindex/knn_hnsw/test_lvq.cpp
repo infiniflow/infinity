@@ -23,6 +23,7 @@ import dist_func_l2;
 import data_store;
 import vec_store_type;
 import stl;
+import infinity_exception;
 
 using namespace infinity;
 
@@ -168,7 +169,10 @@ TEST_F(HnswLVQTest, test1) {
 
         {
             uint8_t file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-            std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+            auto [file_handler, status] = fs.OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+            if(!status.ok()) {
+                UnrecoverableError(status.message());
+            }
 
             auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
             auto [start_i, end_i] = lvq_store.OptAddVec(data.get(), vec_n_ / 2);
@@ -180,8 +184,10 @@ TEST_F(HnswLVQTest, test1) {
         }
         {
             uint8_t file_flags = FileFlags::READ_FLAG;
-            std::unique_ptr<FileHandler> file_handler = fs.OpenFile(file_path, file_flags, FileLockType::kReadLock);
-
+            auto [file_handler, status] = fs.OpenFile(file_path, file_flags, FileLockType::kReadLock);
+            if(!status.ok()) {
+                UnrecoverableError(status.message());
+            }
             auto lvq_store = DataStore::Load(*file_handler);
 
             CheckStore(lvq_store, data.get());

@@ -40,3 +40,9 @@ class ConflictType(object):
     Ignore = 0
     Error = 1
     Replace = 2
+
+
+class InfinityException(Exception):
+    def __init__(self, error_code=0, error_message=None):
+        self.error_code = error_code
+        self.error_message = error_message

@@ -45,7 +45,9 @@ public:
             auto &filter = static_cast<LogicalFilter &>(*op);
             auto &filter_expression = filter.expression();
             if (op->right_node().get() != nullptr) {
-                UnrecoverableError("BuildSecondaryIndexScan: Logical filter node shouldn't have right child.");
+                String error_message = "BuildSecondaryIndexScan: Logical filter node shouldn't have right child.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             } else if (op->left_node()->operator_type() == LogicalNodeType::kTableScan) {
                 auto &table_scan = static_cast<LogicalTableScan &>(*(op->left_node()));
                 table_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
@@ -71,7 +73,9 @@ public:
             auto &matchtensor = static_cast<LogicalMatchTensorScan &>(*op);
             matchtensor.common_query_filter_->TryApplyFastRoughFilterOptimizer();
         } else if (op->operator_type() == LogicalNodeType::kIndexScan) {
-            UnrecoverableError("ApplyFastRoughFilterMethod: IndexScan optimizer should not happen before ApplyFastRoughFilter optimizer.");
+            String error_message = "ApplyFastRoughFilterMethod: IndexScan optimizer should not happen before ApplyFastRoughFilter optimizer.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         // visit children after handling current node
         VisitNode(op->left_node());

@@ -39,11 +39,13 @@ export enum class ErrorCode : long {
     // 2. Auth error
     kWrongPasswd = 2001,
     kInsufficientPrivilege = 2002,
+    kUnsupportedVersionIndex = 2003,
+    kClientVersionMismatch = 2004,
 
     // 3. syntax error or access rule violation
     kInvalidUsername = 3001,
     kInvalidPasswd = 3002,
-    kInvalidDbName = 3003,
+    kInvalidIdentifierName = 3003,
     kInvalidTableName = 3004,
     kInvalidColumnName = 3005,
     kInvalidIndexName = 3006,
@@ -121,6 +123,8 @@ export enum class ErrorCode : long {
     kNotSupportedAnalyzer = 3078,
     kInvalidAnalyzerName = 3079,
     kInvalidAnalyzerFile = 3080,
+    kInvalidExplainType = 3081,
+    kChunkNotExist = 3082,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -142,7 +146,7 @@ export enum class ErrorCode : long {
     kIOError = 7001,
     kDuplicatedFile = 7002,
     kConfigFileError = 7003,
-    kLockFileExists = 7004,
+    kLockFileError = 7004,
     kCatalogCorrupted = 7005,
     kDataCorrupted = 7006,
     kIndexCorrupted = 7007,
@@ -153,6 +157,8 @@ export enum class ErrorCode : long {
     kParserError = 7012,
     kMmapFileError = 7013,
     kMunmapFileError = 7014,
+    kInvalidFileFlag = 7015,
+    kInvalidServerAddress = 7016,
 
     // 8. meta error
     kInvalidEntry = 8001,
@@ -170,10 +176,6 @@ public:
     // 1. Config error
     static Status InvalidTimeInfo(const String &time_info);
     static Status EmptyConfigParameter();
-
-    // 2. Auth error
-    static Status WrongPasswd(const String &user_name);
-    static Status InsufficientPrivilege(const String &user_name, const String &detailed_error);
     static Status MismatchVersion(const String &current_version, const String &expected_version);
     static Status InvalidTimezone(const String &timezone);
     static Status InvalidByteSize(const String &byte_size);
@@ -181,10 +183,16 @@ public:
     static Status InvalidLogLevel(const String &log_level);
     static Status InvalidConfig(const String &detailed_info);
 
+    // 2. Auth error
+    static Status WrongPasswd(const String &user_name);
+    static Status InsufficientPrivilege(const String &user_name, const String &detailed_error);
+    static Status UnsupportedVersionIndex(i64 given_index);
+    static Status ClientVersionMismatch(const char* expected_version, const char* given_version);
+
     // 3. Syntax error or access rule violation
     static Status InvalidUserName(const String &user_name);
     static Status InvalidPasswd();
-    static Status InvalidDBName(const String &db_name);
+    static Status InvalidIdentifierName(const String &db_name);
     static Status InvalidTableName(const String &table_name);
     static Status InvalidColumnName(const String &column_name);
     static Status InvalidIndexName(const String &index_name);
@@ -251,14 +259,15 @@ public:
     static Status InvalidJsonFormat(const String& invalid_json);
     static Status DuplicateColumnName(const String& column_name);
     static Status InvalidExpression(const String& expr_str);
-    static Status SegmentNotExist(const SegmentID &segment_id);
-    static Status BlockNotExist(const BlockID &block_id);
+    static Status SegmentNotExist(SegmentID segment_id);
+    static Status BlockNotExist(BlockID block_id);
     static Status AggregateFunctionWithEmptyArgs();
     static Status InvalidCommand(const String& detailed_error);
     static Status AnalyzerNotFound(const String& name);
     static Status NotSupportedAnalyzer(const String& name);
     static Status InvalidAnalyzerName(const String& name);
     static Status InvalidAnalyzerFile(const String& detailed_info);
+    static Status ChunkNotExist(ChunkID chunk_id);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
@@ -280,7 +289,7 @@ public:
     static Status IOError(const String &detailed_info);
     static Status DuplicatedFile(const String &filename);
     static Status ConfigFileError(const String &path, const String &detailed_info);
-    static Status LockFileExists(const String &path);
+    static Status LockFileError(const String &path, const String& error_msg);
     static Status CatalogCorrupted(const String &path);
     static Status DataCorrupted(const String &path);
     static Status IndexCorrupted(const String &path);
@@ -291,6 +300,7 @@ public:
     static Status ParserError(const String &detailed_info);
     static Status MmapFileError(const String &detailed_info);
     static Status MunmapFileError(const String &detailed_info);
+    static Status InvalidFileFlag(u8 flag);
 
     // meta
     static Status InvalidEntry();

@@ -1,20 +1,15 @@
 module;
 
-import memory_pool;
 import stl;
 
 module byte_slice;
 
 namespace infinity {
 
-ByteSlice *ByteSlice::CreateSlice(SizeT data_size, MemoryPool *pool) {
+ByteSlice *ByteSlice::CreateSlice(SizeT data_size) {
     u8 *mem;
     SizeT mem_size = data_size + GetHeadSize();
-    if (pool == nullptr) {
-        mem = new u8[mem_size];
-    } else {
-        mem = (u8 *)pool->Allocate(mem_size);
-    }
+    mem = new u8[mem_size];
     ByteSlice *slice = new (mem) ByteSlice;
     slice->data_ = mem + GetHeadSize();
     slice->size_ = data_size;
@@ -32,14 +27,10 @@ ByteSlice *ByteSlice::NewSlice(u8 *data, SizeT data_size) {
     return slice;
 }
 
-void ByteSlice::DestroySlice(ByteSlice *slice, MemoryPool *pool) {
+void ByteSlice::DestroySlice(ByteSlice *slice) {
     u8 *mem = (u8 *)slice;
     if (slice->owned_) {
-        if (pool == nullptr) {
-            delete[] mem;
-        } else {
-            pool->Deallocate(mem, slice->size_ + GetHeadSize());
-        }
+        delete[] mem;
     } else {
         delete slice;
     }
@@ -51,13 +42,13 @@ ByteSliceList::ByteSliceList() {
     total_size_ = 0;
 }
 
-ByteSliceList::ByteSliceList(ByteSlice *slice, MemoryPool *pool) : head_(nullptr), tail_(nullptr), total_size_(0), pool_(pool) {
+ByteSliceList::ByteSliceList(ByteSlice *slice) : head_(nullptr), tail_(nullptr), total_size_(0) {
     if (slice != nullptr) {
         Add(slice);
     }
 }
 
-ByteSliceList::~ByteSliceList() { Clear(pool_); }
+ByteSliceList::~ByteSliceList() { Clear(); }
 
 void ByteSliceList::Add(ByteSlice *slice) {
     if (tail_ == nullptr) {
@@ -69,13 +60,13 @@ void ByteSliceList::Add(ByteSlice *slice) {
     total_size_ = total_size_ + slice->size_;
 }
 
-void ByteSliceList::Clear(MemoryPool *pool) {
+void ByteSliceList::Clear() {
     ByteSlice *slice = head_;
     ByteSlice *next = nullptr;
 
     while (slice) {
         next = slice->next_;
-        ByteSlice::DestroySlice(slice, pool);
+        ByteSlice::DestroySlice(slice);
         slice = next;
     }
 

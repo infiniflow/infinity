@@ -31,6 +31,7 @@ import expression_type;
 
 import infinity_exception;
 import third_party;
+import logger;
 
 namespace infinity {
 
@@ -145,7 +146,9 @@ void VisitExpression(const SharedPtr<BaseExpression> &expression, const std::fun
         case ExpressionType::kValue:
             break;
         default: {
-            UnrecoverableError(fmt::format("Unsupported expression type: {}", expression->Name()));
+            String error_message = fmt::format("Unsupported expression type: {}", expression->Name());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }

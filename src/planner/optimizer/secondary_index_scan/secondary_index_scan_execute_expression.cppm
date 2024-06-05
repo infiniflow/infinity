@@ -26,6 +26,7 @@ import filter_expression_push_down_helper;
 import internal_types;
 import third_party;
 import filter_value_type_classification;
+import logger;
 
 namespace infinity {
 
@@ -97,7 +98,9 @@ private:
                 break;
             }
             default: {
-                UnrecoverableError("FilterExecuteSingleRangeT::AddFilter(): compare type error.");
+                String error_message = "FilterExecuteSingleRangeT::AddFilter(): compare type error.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }

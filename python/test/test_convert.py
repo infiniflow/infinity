@@ -4,7 +4,7 @@ from infinity.errors import ErrorCode
 from common import common_values
 import infinity
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
-from infinity.common import ConflictType
+from infinity.common import ConflictType, InfinityException
 from test_sdkbase import TestSdk
 
 
@@ -72,11 +72,15 @@ class TestConvert(TestSdk):
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
 
         table_obj.insert([{"c1": 1, "c2": 2.0}])
-        with pytest.raises(Exception, match="ERROR:3050*"):
+
+        with pytest.raises(InfinityException) as e:
             insert_res_df = table_obj.output([]).to_df()
             insert_res_arrow = table_obj.output([]).to_arrow()
             insert_res_pl = table_obj.output([]).to_pl()
             print(insert_res_df, insert_res_arrow, insert_res_pl)
+
+        assert e.type == infinity.common.InfinityException
+        assert e.value.args[0] == ErrorCode.EMPTY_SELECT_FIELDS
 
         db_obj.drop_table("test_without_output_select_list", ConflictType.Error)
         # disconnect
@@ -189,9 +193,11 @@ class TestConvert(TestSdk):
                           {"c1": 1000, "c2": 2.0},
                           {"c1": 10000, "c2": 2.0}])
         # TODO add more filter function
-        with pytest.raises(Exception):
+        with pytest.raises(Exception) as e:
             insert_res_df = InfinityThriftQueryBuilder(table_obj).output(["*"]).filter(filter_list).to_pl()
             print(str(insert_res_df))
+
+        print(e.type)
 
         db_obj.drop_table("test_output_with_invalid_filter_function", ConflictType.Error)
         # disconnect

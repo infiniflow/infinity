@@ -18,7 +18,7 @@ export module base_table;
 
 import stl;
 import table_entry_type;
-
+import logger;
 import infinity_exception;
 
 namespace infinity {
@@ -38,7 +38,9 @@ inline String ToString(BaseTableType type) {
             return "Collection";
         }
         default: {
-            UnrecoverableError("Invalid base table type");
+            String error_message = "Invalid base table type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 

@@ -166,7 +166,9 @@ bool FragmentTask::CompleteTask() {
     if (status_ == FragmentTaskStatus::kRunning) {
         status_ = FragmentTaskStatus::kFinished;
     } else {
-        UnrecoverableError("Status should be error");
+        String error_message = "Status should be an error status";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;
     LOG_TRACE(fmt::format("Task: {} of Fragment: {} is completed", task_id_, FragmentId()));

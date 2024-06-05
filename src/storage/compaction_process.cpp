@@ -54,7 +54,10 @@ void CompactionProcessor::Stop() {
     LOG_INFO("Compaction processor is stopped.");
 }
 
-void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) { task_queue_.Enqueue(std::move(bg_task)); }
+void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) {
+    task_queue_.Enqueue(std::move(bg_task));
+    ++ task_count_;
+}
 
 void CompactionProcessor::DoCompact() {
     Txn *scan_txn = txn_mgr_->BeginTxn(MakeUnique<String>("ScanForCompact"));
@@ -169,12 +172,16 @@ void CompactionProcessor::Process() {
                     break;
                 }
                 default: {
-                    UnrecoverableError(fmt::format("Invalid background task: {}", (u8)bg_task->type_));
+                    String error_message = fmt::format("Invalid background task: {}", (u8)bg_task->type_);
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     break;
                 }
             }
             bg_task->Complete();
         }
+        task_count_ -= tasks.size();
+        tasks.clear();
     }
 }
 

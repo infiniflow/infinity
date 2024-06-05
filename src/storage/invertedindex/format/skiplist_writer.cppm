@@ -5,14 +5,14 @@ import file_writer;
 import file_reader;
 import posting_byte_slice;
 import short_list_optimize_util;
-import memory_pool;
+
 export module skiplist_writer;
 
 namespace infinity {
 
 export class SkipListWriter : public PostingByteSlice {
 public:
-    SkipListWriter(MemoryPool *byte_slice_pool, MemoryPool *buffer_pool);
+    SkipListWriter();
     virtual ~SkipListWriter() = default;
 
     void AddItem(u32 delta_value1);

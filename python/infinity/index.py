@@ -15,6 +15,8 @@
 from enum import Enum
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
+from infinity.common import InfinityException
+
 from embedded_infinity import IndexType as LocalIndexType
 from embedded_infinity import InitParameter as LocalInitParameter
 from embedded_infinity import WrapIndexInfo as LocalIndexInfo
@@ -35,7 +37,7 @@ class IndexType(Enum):
         elif self == IndexType.FullText:
             return ttypes.IndexType.FullText
         else:
-            raise Exception("Unknown index type")
+            raise InfinityException(3060, "Unknown index type")
 
     def to_local_type(self):
         if self == IndexType.IVFFlat:

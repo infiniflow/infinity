@@ -50,6 +50,7 @@ import bg_task;
 import physical_import;
 import chunk_index_entry;
 import wal_manager;
+import internal_types;
 
 using namespace infinity;
 
@@ -102,7 +103,9 @@ public:
                 break;
             }
             if (end - start > 5) {
-                UnrecoverableError("WaitFlushDeltaOp timeout");
+                String error_message = "WaitFlushDeltaOp timeout";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             LOG_INFO(fmt::format("Before usleep. Wait flush delta op for {} seconds", end - start));
             usleep(1000 * 1000);

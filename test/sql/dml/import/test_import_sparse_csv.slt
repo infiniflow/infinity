@@ -1,0 +1,81 @@
+statement ok
+DROP TABLE IF EXISTS test_import_sparse;
+
+statement ok
+CREATE TABLE test_import_sparse (col1 INT, col2 SPARSE(DOUBLE, 30000));
+
+statement ok
+COPY test_import_sparse FROM '/var/infinity/test_data/sparse_float.csv' WITH (FORMAT CSV);
+
+statement error
+COPY test_import_sparse FROM '/var/infinity/test_data/invalid_sparse_float.csv' WITH (FORMAT CSV);
+
+statement error
+COPY test_import_sparse FROM '/var/infinity/test_data/invalid_sparse_float2.csv' WITH (FORMAT CSV);
+
+query I
+SELECT * FROM test_import_sparse;
+----
+1 10000: 1.000000, 20000: 2.000000
+3 3000: 3.000000
+0 (empty)
+
+#######################################
+
+statement ok
+DROP TABLE test_import_sparse;
+
+statement ok
+CREATE TABLE test_import_sparse (col1 INT, col2 SPARSE(FLOAT, 30000));
+
+statement ok
+COPY test_import_sparse FROM '/var/infinity/test_data/sparse_float.csv' WITH (FORMAT CSV);
+
+query I
+SELECT * FROM test_import_sparse;
+----
+1 10000: 1.000000, 20000: 2.000000
+3 3000: 3.000000
+0 (empty)
+
+#######################################
+
+statement ok
+DROP TABLE test_import_sparse;
+
+statement ok
+CREATE TABLE test_import_sparse (col1 INT, col2 SPARSE(INT, 30000));
+
+statement ok
+COPY test_import_sparse FROM '/var/infinity/test_data/sparse_integer.csv' WITH (FORMAT CSV);
+
+query I
+SELECT * FROM test_import_sparse;
+----
+1 10000: 1, 20000: 2
+3 3000: 3
+0 (empty)
+
+#######################################
+
+statement ok
+DROP TABLE test_import_sparse;
+
+statement ok
+CREATE TABLE test_import_sparse (col1 INT, col2 SPARSE(BIT, 30000));
+
+statement ok
+COPY test_import_sparse FROM '/var/infinity/test_data/sparse_bit.csv' WITH (FORMAT CSV);
+
+statement error
+COPY test_import_sparse FROM '/var/infinity/test_data/invalid_sparse_bit.csv' WITH (FORMAT CSV);
+
+statement error
+COPY test_import_sparse FROM '/var/infinity/test_data/invalid_sparse_bit2.csv' WITH (FORMAT CSV);
+
+query I
+SELECT * FROM test_import_sparse;
+----
+1 10000, 20000
+3 3000
+0 (empty)

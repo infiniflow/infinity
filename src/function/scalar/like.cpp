@@ -26,6 +26,7 @@ import scalar_function_set;
 import third_party;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -76,13 +77,17 @@ bool LikeOperator(const ptr_t left_ptr, SizeT left_len, const ptr_t right_ptr, S
 struct LikeFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA, TB, TC &) {
-        UnrecoverableError("Not implement: LikeFunction");
+        String error_message = "Not implement: LikeFunction";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 };
 
 template <>
 inline void LikeFunction::Run(VarcharT &, VarcharT &, bool &) {
-    UnrecoverableError("Not implement: varchar like varchar");
+    String error_message = "Not implement";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 
 //    ptr_t left_ptr = left.GetDataPtr();
 //    SizeT left_len = left.GetDataLen();
@@ -95,13 +100,19 @@ inline void LikeFunction::Run(VarcharT &, VarcharT &, bool &) {
 struct NotLikeFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA, TB, TC &) {
-        UnrecoverableError("Not implement: not like function");
+        String error_message = "Not implement";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+
     }
 };
 
 template <>
 inline void NotLikeFunction::Run(VarcharT &, VarcharT &, bool &) {
-    UnrecoverableError("Not implement: varchar not like varchar");
+    String error_message = "Not implement";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
+
 
 //    ptr_t left_ptr = left.GetDataPtr();
 //    SizeT left_len = left.GetDataLen();

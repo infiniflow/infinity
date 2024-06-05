@@ -33,6 +33,7 @@ import expression_state;
 import knn_expr;
 import statement_common;
 import base_table_ref;
+import internal_types;
 
 namespace infinity {
 

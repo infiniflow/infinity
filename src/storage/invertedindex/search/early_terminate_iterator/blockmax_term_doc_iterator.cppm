@@ -24,13 +24,12 @@ import term_doc_iterator;
 import early_terminate_iterator;
 
 namespace infinity {
-class MemoryPool;
 class SegmentPosting;
 class FullTextColumnLengthReader;
 
 export class BlockMaxTermDocIterator final : public EarlyTerminateIterator {
 public:
-    BlockMaxTermDocIterator(optionflag_t flag, MemoryPool *session_pool);
+    BlockMaxTermDocIterator(optionflag_t flag);
 
     ~BlockMaxTermDocIterator() override;
 

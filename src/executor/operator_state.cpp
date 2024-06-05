@@ -35,7 +35,9 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
             num_tasks_.erase(it);
         }
     } else {
-        UnrecoverableError("Get unexpected data from child fragment");
+        String error_message = "Get unexpected data from child fragment";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -45,7 +47,9 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
 bool QueueSourceState::GetData() {
     SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
     if (!source_queue_.TryDequeue(fragment_data_base)) {
-        UnrecoverableError("This task should not be scheduled if the source queue is empty");
+        String error_message = "This task should not be scheduled if the source queue is empty";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     switch (fragment_data_base->type_) {
@@ -74,7 +78,9 @@ bool QueueSourceState::GetData() {
             break;
         }
         default: {
-            UnrecoverableError("Not support fragment data type");
+            String error_message = "Not support fragment data type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
     }
@@ -87,6 +93,13 @@ bool QueueSourceState::GetData() {
             MergeKnnOperatorState *merge_knn_op_state = (MergeKnnOperatorState *)next_op_state;
             merge_knn_op_state->input_data_block_ = std::move(fragment_data->data_block_);
             merge_knn_op_state->input_complete_ = completed;
+            break;
+        }
+        case PhysicalOperatorType::kMergeMatchSparse: {
+            auto *fragment_data = static_cast<FragmentData *>(fragment_data_base.get());
+            auto *merge_match_sparse_op_state = static_cast<MergeMatchSparseOperatorState *>(next_op_state);
+            merge_match_sparse_op_state->input_data_block_ = std::move(fragment_data->data_block_);
+            merge_match_sparse_op_state->input_complete_ = completed;
             break;
         }
         case PhysicalOperatorType::kMergeMatchTensor: {
@@ -155,7 +168,9 @@ bool QueueSourceState::GetData() {
             break;
         }
         default: {
-            UnrecoverableError("Not support operator type");
+            String error_message = "Not support operator type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
     }

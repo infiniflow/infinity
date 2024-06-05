@@ -3,7 +3,7 @@ module;
 module posting_merger;
 
 import stl;
-import memory_pool;
+
 import file_writer;
 import doc_list_encoder;
 import inmem_posting_decoder;
@@ -115,12 +115,8 @@ bool DocMerger::HasNext() {
 
 class PostingDumper {
 public:
-    PostingDumper(MemoryPool *memory_pool,
-                  RecyclePool *buffer_pool,
-                  const PostingFormatOption &format_option,
-                  VectorWithLock<u32> &column_length_array)
-        : format_option_(format_option), column_lengths_(column_length_array) {
-        posting_writer_ = MakeShared<PostingWriter>(memory_pool, buffer_pool, format_option, column_lengths_);
+    PostingDumper(const PostingFormat &posting_format, VectorWithLock<u32> &column_length_array) : column_lengths_(column_length_array) {
+        posting_writer_ = MakeShared<PostingWriter>(posting_format, column_lengths_);
     }
 
     ~PostingDumper() {}
@@ -138,7 +134,6 @@ public:
     SharedPtr<PostingWriter> GetPostingWriter() { return posting_writer_; }
 
 private:
-    PostingFormatOption format_option_;
     SharedPtr<PostingWriter> posting_writer_;
     // for column length info
     VectorWithLock<u32> &column_lengths_;
@@ -174,9 +169,9 @@ private:
     DocMerger doc_merger_;
 };
 
-PostingMerger::PostingMerger(MemoryPool *memory_pool, RecyclePool *buffer_pool, optionflag_t flag, VectorWithLock<u32> &column_length_array)
-    : memory_pool_(memory_pool), buffer_pool_(buffer_pool), format_option_(flag), column_lengths_(column_length_array) {
-    posting_dumper_ = MakeShared<PostingDumper>(memory_pool, buffer_pool, format_option_, column_lengths_);
+PostingMerger::PostingMerger(optionflag_t flag, VectorWithLock<u32> &column_length_array)
+    : posting_format_(PostingFormatOption(flag)), column_lengths_(column_length_array) {
+    posting_dumper_ = MakeShared<PostingDumper>(posting_format_, column_lengths_);
 }
 
 PostingMerger::~PostingMerger() {}
@@ -188,7 +183,7 @@ void PostingMerger::Merge(const Vector<SegmentTermPosting *>& segment_term_posti
         RowID base_row_id = term_posting->GetBaseRowId();
         u32 base_doc_id = base_row_id - merge_base_rowid;
         PostingDecoder *decoder = term_posting->GetPostingDecoder();
-        SortedPosting sorted_posting(format_option_, base_doc_id, decoder);
+        SortedPosting sorted_posting(posting_format_.GetOption(), base_doc_id, decoder);
         while (sorted_posting.Next()) {
             sorted_posting.Merge(posting_dumper_);
         }

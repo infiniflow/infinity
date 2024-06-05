@@ -29,6 +29,7 @@ import internal_types;
 import data_type;
 import segment_entry;
 import buffer_handle;
+import logger;
 
 namespace infinity {
 class ChunkIndexEntry;
@@ -123,7 +124,9 @@ public:
 
     [[nodiscard]] inline auto SearchPGM(const void *val_ptr) const {
         if (!pgm_index_) {
-            UnrecoverableError("Not initialized yet.");
+            String error_message = "Not initialized yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return pgm_index_->SearchIndex(val_ptr);
     }

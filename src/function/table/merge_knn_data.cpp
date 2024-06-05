@@ -36,7 +36,9 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 query_count,
     : query_count_(query_count), topk_(topk), elem_type_(elem_type), table_ref_(table_ref) {
     switch (elem_type) {
         case kElemInvalid: {
-            UnrecoverableError("Invalid element type");
+            String error_message = "Invalid element type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case kElemFloat: {
             MergeKnnFunctionData::InitMergeKnn<f32>(knn_distance_type);
@@ -54,7 +56,9 @@ template <typename DataType>
 void MergeKnnFunctionData::InitMergeKnn(KnnDistanceType knn_distance_type) {
     switch (knn_distance_type) {
         case KnnDistanceType::kInvalid: {
-            UnrecoverableError("Invalid knn distance type");
+            String error_message = "Invalid knn distance type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {

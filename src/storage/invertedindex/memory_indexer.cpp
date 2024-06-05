@@ -31,7 +31,7 @@ module;
 module memory_indexer;
 
 import stl;
-import memory_pool;
+
 import index_defines;
 import posting_writer;
 import column_vector;
@@ -59,6 +59,7 @@ import mmap;
 import buf_writer;
 import profiler;
 import third_party;
+import infinity_context;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -69,20 +70,12 @@ bool MemoryIndexer::KeyComp::operator()(const String &lhs, const String &rhs) co
 
 MemoryIndexer::PostingTable::PostingTable() {}
 
-MemoryIndexer::MemoryIndexer(const String &index_dir,
-                             const String &base_name,
-                             RowID base_row_id,
-                             optionflag_t flag,
-                             const String &analyzer,
-                             MemoryPool &byte_slice_pool,
-                             RecyclePool &buffer_pool,
-                             ThreadPool &inverting_thread_pool,
-                             ThreadPool &commiting_thread_pool)
-    : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), analyzer_(analyzer), byte_slice_pool_(byte_slice_pool),
-      buffer_pool_(buffer_pool), inverting_thread_pool_(inverting_thread_pool), commiting_thread_pool_(commiting_thread_pool), ring_inverted_(15UL),
-      ring_sorted_(13UL) {
+MemoryIndexer::MemoryIndexer(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag, const String &analyzer)
+    : index_dir_(index_dir), base_name_(base_name), base_row_id_(base_row_id), flag_(flag), posting_format_(PostingFormatOption(flag_)),
+      analyzer_(analyzer), inverting_thread_pool_(infinity::InfinityContext::instance().GetFulltextInvertingThreadPool()),
+      commiting_thread_pool_(infinity::InfinityContext::instance().GetFulltextCommitingThreadPool()), ring_inverted_(15UL), ring_sorted_(13UL) {
     posting_table_ = MakeShared<PostingTable>();
-    prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
+    prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
     Path path = Path(index_dir) / (base_name + ".tmp.merge");
     spill_full_path_ = path.string();
 }
@@ -297,7 +290,12 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
 
     String column_length_file = index_prefix + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : "");
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    if(!status.ok()) {
+        LOG_CRITICAL(status.message());
+        UnrecoverableError(status.message());
+    }
+
     Vector<u32> &column_length_array = column_lengths_.UnsafeVec();
     fs.Write(*file_handler, &column_length_array[0], sizeof(column_length_array[0]) * column_length_array.size());
     fs.Close(*file_handler);
@@ -331,7 +329,12 @@ void MemoryIndexer::Load() {
     }
 
     String column_length_file = index_prefix + LENGTH_SUFFIX + SPILL_SUFFIX;
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(column_length_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+    auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+    if(!status.ok()) {
+        LOG_CRITICAL(status.message());
+        UnrecoverableError(status.message());
+    }
+
     Vector<u32> &column_lengths = column_lengths_.UnsafeVec();
     column_lengths.resize(doc_count_);
     fs.Read(*file_handler, &column_lengths[0], sizeof(column_lengths[0]) * column_lengths.size());
@@ -348,7 +351,7 @@ SharedPtr<PostingWriter> MemoryIndexer::GetOrAddPosting(const String &term) {
     PostingPtr posting;
     bool found = posting_store.GetOrAdd(term, posting, prepared_posting_);
     if (!found) {
-        prepared_posting_ = MakeShared<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
+        prepared_posting_ = MakeShared<PostingWriter>(posting_format_, column_lengths_);
     }
     return posting;
 }
@@ -435,7 +438,7 @@ void MemoryIndexer::OfflineDump() {
                 term_meta_dumpler.Dump(dict_file_writer, term_meta);
                 fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
             }
-            posting = MakeUnique<PostingWriter>(nullptr, nullptr, PostingFormatOption(flag_), column_lengths_);
+            posting = MakeUnique<PostingWriter>(posting_format_, column_lengths_);
             last_term_str = String(term);
             last_term = std::string_view(last_term_str);
             last_doc_id = INVALID_DOCID;
@@ -471,7 +474,12 @@ void MemoryIndexer::OfflineDump() {
     fs.DeleteFile(fst_file);
 
     String column_length_file = index_prefix + LENGTH_SUFFIX;
-    UniquePtr<FileHandler> file_handler = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+    if(!status.ok()) {
+        LOG_CRITICAL(status.message());
+        UnrecoverableError(status.message());
+    }
+
     Vector<u32> &unsafe_column_lengths = column_lengths_.UnsafeVec();
     fs.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
     fs.Close(*file_handler);

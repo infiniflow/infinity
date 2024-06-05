@@ -16,6 +16,7 @@ module;
 
 #include <bit>
 #include <vector>
+
 module secondary_index_in_mem;
 
 import stl;
@@ -32,6 +33,7 @@ import secondary_index_data;
 import chunk_index_entry;
 import segment_index_entry;
 import buffer_handle;
+import logger;
 
 namespace infinity {
 
@@ -107,7 +109,9 @@ private:
 
 SharedPtr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, RowID begin_row_id, u32 max_size) {
     if (!column_def->type()->CanBuildSecondaryIndex()) {
-        UnrecoverableError("Column type can't build secondary index");
+        String error_message = "Column type can't build secondary index";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     switch (column_def->type()->type()) {
         case LogicalType::kTinyInt: {

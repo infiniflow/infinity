@@ -26,6 +26,7 @@ import scalar_function_set;
 import third_party;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -45,7 +46,9 @@ struct ModuloFunction {
 
 template <>
 inline bool ModuloFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
-    UnrecoverableError("Not implement: MinusFunction::Run");
+    String error_message = "Not implement: MinusFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 

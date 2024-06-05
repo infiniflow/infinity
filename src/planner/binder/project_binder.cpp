@@ -28,6 +28,7 @@ import function_expr;
 import parsed_expr;
 import column_expr;
 import infinity_exception;
+import logger;
 
 namespace {
 
@@ -136,7 +137,9 @@ SharedPtr<BaseExpression> ProjectBinder::BuildFuncExpr(const FunctionExpr &expr,
     SharedPtr<FunctionSet> function_set_ptr = FunctionSet::GetFunctionSet(query_context_->storage()->catalog(), expr);
     if (function_set_ptr->type_ == FunctionType::kAggregate) {
         if (this->binding_agg_func_) {
-            UnrecoverableError(fmt::format("Aggregate function {} is called in another aggregate function.", function_set_ptr->name()));
+            String error_message = fmt::format("Aggregate function {} is called in another aggregate function.", function_set_ptr->name());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         } else {
             this->binding_agg_func_ = true;
         }

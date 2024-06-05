@@ -23,7 +23,7 @@ import byte_slice_reader;
 import index_defines;
 import internal_types;
 import file_reader;
-import memory_pool;
+
 import file_system;
 import third_party;
 
@@ -53,8 +53,7 @@ void SegmentPosting::Init(SharedPtr<ByteSliceList> doc_slice_list,
                           TermMeta &term_meta,
                           u64 pos_begin,
                           u64 pos_size,
-                          const SharedPtr<FileReader> &posting_reader,
-                          MemoryPool *session_pool) {
+                          const SharedPtr<FileReader> &posting_reader) {
     doc_slice_list_ = std::move(doc_slice_list);
     pos_slice_list_ = std::move(pos_slice_list);
     base_row_id_ = base_row_id;
@@ -65,17 +64,16 @@ void SegmentPosting::Init(SharedPtr<ByteSliceList> doc_slice_list,
     pos_begin_ = pos_begin;
     pos_size_ = pos_size;
     posting_reader_ = MakeShared<FileReader>(posting_reader->fs_, posting_reader->path_, 1024);
-    session_pool_ = session_pool;
 }
 
 const SharedPtr<ByteSliceList> &SegmentPosting::GetPosSliceListPtr() {
     if (pos_slice_list_.get() == nullptr) {
-        ByteSlice *pos_slice = ByteSlice::CreateSlice(pos_size_, session_pool_);
+        ByteSlice *pos_slice = ByteSlice::CreateSlice(pos_size_);
 
         posting_reader_->Seek(doc_start_ + pos_begin_);
         posting_reader_->Read((char *)pos_slice->data_, pos_size_);
 
-        pos_slice_list_ = MakeShared<ByteSliceList>(pos_slice, session_pool_);
+        pos_slice_list_ = MakeShared<ByteSliceList>(pos_slice);
     }
     return pos_slice_list_;
 }

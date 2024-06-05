@@ -22,7 +22,9 @@ import third_party;
 import parsed_expr;
 import knn_expr;
 import match_expr;
+import match_tensor_expr;
 import infinity;
+import internal_types;
 
 namespace infinity {
 
@@ -37,12 +39,13 @@ public:
 
     static ParsedExpr *ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static Vector<ParsedExpr *> *ParseOutput(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static Vector<ParsedExpr *> *ParseFusion(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-    static KnnExpr *ParseKnn(nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static bool ParseFusion(Vector<ParsedExpr *> &search_exprs, const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static KnnExpr *ParseKnn(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static MatchExpr *ParseMatch(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
+    static MatchTensorExpr *ParseMatchTensor(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
 
     static Tuple<i64, void *>
-    ParseVector(nlohmann::json &json_object, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response);
+    ParseVector(const nlohmann::json &json_object, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response);
 };
 
 } // namespace infinity

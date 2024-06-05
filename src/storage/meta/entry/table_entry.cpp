@@ -61,7 +61,9 @@ namespace infinity {
 Vector<std::string_view> TableEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
-        UnrecoverableError(fmt::format("Invalid table entry encode: {}", encode));
+        String error_message = fmt::format("Invalid table entry encode: {}", encode);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto decodes = DBEntry::DecodeIndex(encode.substr(0, delimiter_i));
     decodes.push_back(encode.substr(delimiter_i + 1));
@@ -160,7 +162,9 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
                                                          TxnManager *txn_mgr) {
     if (index_base->index_name_->empty()) {
         // Index name shouldn't be empty
-        UnrecoverableError("Attempt to create no name index.");
+        String error_message = "Attempt to create no name index.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
     auto init_index_meta = [&]() { return TableIndexMeta::NewTableIndexMeta(this, index_base->index_name_); };
@@ -200,6 +204,7 @@ Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const Str
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
@@ -228,6 +233,7 @@ TableIndexEntry *TableEntry::CreateIndexReplay(const SharedPtr<String> &index_na
 void TableEntry::UpdateIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     index_meta->UpdateEntryReplay(txn_id, begin_ts, commit_ts);
@@ -239,6 +245,7 @@ void TableEntry::DropIndexReplay(const String &index_name,
                                  TxnTimeStamp begin_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     index_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
@@ -247,6 +254,7 @@ void TableEntry::DropIndexReplay(const String &index_name,
 TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return index_meta->GetEntryReplay(txn_id, begin_ts);
@@ -273,7 +281,9 @@ void TableEntry::AddSegmentReplay(SharedPtr<SegmentEntry> new_segment) {
 
     auto [iter, insert_ok] = segment_map_.emplace(segment_id, new_segment);
     if (!insert_ok) {
-        UnrecoverableError(fmt::format("Segment {} already exists.", segment_id));
+        String error_message = fmt::format("Segment {} already exists.", segment_id);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (compaction_alg_.get() != nullptr) {
         compaction_alg_->AddSegment(new_segment.get());
@@ -288,7 +298,9 @@ void TableEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> new_segment, String
 
     auto iter = segment_map_.find(segment_id);
     if (iter == segment_map_.end()) {
-        UnrecoverableError(fmt::format("Segment {} not found.", segment_id));
+        String error_message = fmt::format("Segment {} not found.", segment_id);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     iter->second->UpdateSegmentReplay(new_segment, std::move(segment_filter_binary_data));
 }
@@ -316,7 +328,9 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         SegmentID segment_id = segment_entry->segment_id();
         auto [_, insert_ok] = this->segment_map_.emplace(segment_id, segment_entry);
         if (!insert_ok) {
-            UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
+            String error_message = fmt::format("Insert segment {} failed.", segment_id);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     // Populate index entirely for the segment
@@ -360,7 +374,9 @@ void TableEntry::AddCompactNew(SharedPtr<SegmentEntry> segment_entry) {
     SegmentID segment_id = segment_entry->segment_id();
     auto [_, insert_ok] = this->segment_map_.emplace(segment_id, std::move(segment_entry));
     if (!insert_ok) {
-        UnrecoverableError(fmt::format("Insert segment {} failed.", segment_id));
+        String error_message = fmt::format("Insert segment {} failed.", segment_id);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -369,7 +385,9 @@ void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp 
 
     // Read-only no lock needed.
     if (this->Deleted()) {
-        UnrecoverableError("table is deleted");
+        String error_message = "Table is deleted";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return;
     }
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
@@ -444,11 +462,15 @@ Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp co
 void TableEntry::RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, void *txn_store) {
     //    auto *txn_store_ptr = (TxnTableStore *)txn_store;
     //    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
-    UnrecoverableError("TableEntry::RollbackAppend");
+    String error_message = "TableEntry::RollbackAppend";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferManager *) {
-    UnrecoverableError("TableEntry::RollbackDelete");
+    String error_message = "TableEntry::RollbackDelete";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return Status::OK();
 }
 
@@ -517,7 +539,9 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
             break;
         }
         default: {
-            UnrecoverableError("Invalid compact task type");
+            String error_message = "Invalid compact task type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return Status::OK();
@@ -534,7 +558,9 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
             auto *segment_entry = segment_store.segment_entry_;
             segment_entry->RollbackBlocks(commit_ts, segment_store.block_entries_);
             if (segment_entry->Committed()) {
-                UnrecoverableError(fmt::format("RollbackCompact: segment {} is committed", segment_entry->segment_id()));
+                String error_message = fmt::format("RollbackCompact: segment {} is committed", segment_entry->segment_id());
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             {
                 std::unique_lock lock(this->rw_locker_);
@@ -542,7 +568,9 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
                     segment = std::move(iter->second);
                     segment_map_.erase(iter);
                 } else {
-                    UnrecoverableError(fmt::format("RollbackCompact: segment {} not found", segment_entry->segment_id()));
+                    String error_message = fmt::format("RollbackCompact: segment {} not found", segment_entry->segment_id());
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
 
                 for (auto *old_segment : old_segments) {
@@ -567,7 +595,9 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
                 break;
             }
             default: {
-                UnrecoverableError("Invalid compact task type");
+                String error_message = "Invalid compact task type";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }
@@ -599,7 +629,9 @@ Status TableEntry::RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegment
                     segment = std::move(iter->second);
                     segment_map_.erase(iter);
                 } else {
-                    UnrecoverableError(fmt::format("RollbackWrite: segment {} not found", segment_entry->segment_id()));
+                    String error_message = fmt::format("RollbackWrite: segment {} not found", segment_entry->segment_id());
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
             }
             segment->Cleanup();
@@ -666,12 +698,17 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
         if (block_entry->GetAvailableCapacity() <= 0)
             dump_idx = i;
     }
+
     for (SizeT i = 0; i < num_ranges; i++) {
         AppendRange &range = append_ranges[i];
         SharedPtr<BlockEntry> block_entry = block_entries[i];
         segment_index_entry->MemIndexInsert(block_entry, range.start_offset_, range.row_count_, txn->CommitTS(), txn->buffer_mgr());
-        if (i == dump_idx && segment_index_entry->MemIndexRowCount() >= infinity::InfinityContext::instance().config()->MemIndexCapacity()) {
+        if ((i == dump_idx && segment_index_entry->MemIndexRowCount() >= infinity::InfinityContext::instance().config()->MemIndexCapacity()) ||
+            (i == num_ranges - 1 && segment_entry->Room() <= 0)) {
             SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
+            String *index_name = index_base->index_name_.get();
+            String message = fmt::format("Table {}.{} index {} segment {} MemIndex dumped.", *GetDBName(), *table_name_, *index_name, seg_id);
+            LOG_INFO(message);
             if (chunk_index_entry.get() != nullptr) {
                 chunk_index_entry->Commit(txn->CommitTS());
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
@@ -713,7 +750,7 @@ void TableEntry::MemIndexCommit() {
 
 void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
-    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+    for (auto &[index_name, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
         if (!status.ok())
             continue;
@@ -757,20 +794,30 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
                 }
             }
 
-            // Insert block entries into MemIndexer
             SizeT num_ranges = append_ranges.size();
-            for (SizeT i = 0; i < num_ranges; i++) {
-                AppendRange &range = append_ranges[i];
-                segment_index_entry->MemIndexInsert(block_entries[range.block_id_],
-                                                    range.start_offset_,
-                                                    range.row_count_,
-                                                    segment_index_entry->max_ts(),
-                                                    buffer_manager);
+            if (num_ranges > 0) {
+                assert(segment_entry->Room() > 0);
+                // Insert block entries into MemIndexer
+                String message = fmt::format("Table {}.{} index {} segment {} MemIndex recovering from {} block entries.",
+                                             *GetDBName(),
+                                             *table_name_,
+                                             index_name,
+                                             segment_id,
+                                             num_ranges);
+                LOG_INFO(message);
+                for (SizeT i = 0; i < num_ranges; i++) {
+                    AppendRange &range = append_ranges[i];
+                    segment_index_entry->MemIndexInsert(block_entries[range.block_id_],
+                                                        range.start_offset_,
+                                                        range.row_count_,
+                                                        segment_index_entry->max_ts(),
+                                                        buffer_manager);
+                }
+                message = fmt::format("Table {}.{} index {} segment {} MemIndex recovered.", *GetDBName(), *table_name_, index_name, segment_id);
+                LOG_INFO(message);
             }
             if (segment_id == unsealed_id_) {
                 table_index_entry->last_segment_ = segment_index_entry;
-            } else {
-                segment_index_entry->MemIndexDump();
             }
         }
     }
@@ -812,10 +859,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
                     msg += " -> " + dst_base_name;
                     LOG_INFO(msg);
-                    ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_,
-                                                          index_fulltext->flag_,
-                                                          &table_index_entry->GetFulltextByteSlicePool(),
-                                                          &table_index_entry->GetFulltextBufferPool());
+                    ColumnIndexMerger column_index_merger(*table_index_entry->index_dir_, index_fulltext->flag_);
                     column_index_merger.Merge(base_names, base_rowids, dst_base_name);
 
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
@@ -1000,7 +1044,7 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
-        if (segment_entry->commit_ts_ > max_commit_ts) {
+        if (segment_entry->commit_ts_ > max_commit_ts or segment_entry->deprecate_ts() <= max_commit_ts) {
             continue;
         }
         json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
@@ -1080,7 +1124,9 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
 
     if (table_entry->deleted_) {
         if (!table_entry->segment_map_.empty()) {
-            UnrecoverableError("deleted table should have no segment");
+            String error_message = "deleted table should have no segment";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 

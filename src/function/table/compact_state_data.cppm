@@ -30,6 +30,7 @@ import segment_index_entry;
 import base_table_ref;
 import block_index;
 import txn;
+import logger;
 
 namespace infinity {
 
@@ -54,7 +55,9 @@ public:
                              [](BlockOffset block_offset, const Pair<BlockOffset, RowID> &pair) { return block_offset < pair.first; } // NOLINT
             );
         if (iter == block_vec.begin()) {
-            UnrecoverableError("RowID not found");
+            String error_message = "RowID not found";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         --iter;
         RowID rtn = iter->second;

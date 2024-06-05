@@ -25,10 +25,11 @@ enum class CopyFileType {
     kJSON,
     kJSONL,
     kFVECS,
+    kCSR,
     kInvalid,
 };
 
-inline std::shared_ptr<std::string> copy_file_to_str(CopyFileType copy_file_type) {
+inline std::shared_ptr<std::string> CopyFileTypeToStr(CopyFileType copy_file_type) {
     switch (copy_file_type) {
         case CopyFileType::kCSV:
             return std::make_shared<std::string>("CSV");
@@ -38,6 +39,8 @@ inline std::shared_ptr<std::string> copy_file_to_str(CopyFileType copy_file_type
             return std::make_shared<std::string>("FVECS");
         case CopyFileType::kJSONL:
             return std::make_shared<std::string>("JSONL");
+        case CopyFileType::kCSR:
+            return std::make_shared<std::string>("CSR");
         case CopyFileType::kInvalid:
             return std::make_shared<std::string>("Invalid");
     }
@@ -51,6 +54,8 @@ struct TableName {
 struct InitParameter {
     std::string param_name_{};
     std::string param_value_{};
+
+    std::string ToString() { return param_name_ + ": " + param_value_; }
 };
 
 struct IfExistsInfo {

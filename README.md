@@ -8,10 +8,10 @@
 </p>
 
 <h4 align="center">
-  <a href="https://github.com/infiniflow/infinity/issues/338">Roadmap 2024</a> |
+  <a href="https://infiniflow.org/docs/dev/category/get-started">Document</a> |
+  <a href="https://infiniflow.org/docs/dev/benchmark">Benchmark</a> |
   <a href="https://twitter.com/infiniflowai">Twitter</a> |
-  <a href="https://discord.gg/jEfRUwEYEV">Discord</a> |
-  <a href="https://www.youtube.com/@InfiniFlow-AI">YouTube</a> |
+  <a href="https://discord.gg/jEfRUwEYEV">Discord</a>
 </h4>
 
 
@@ -19,6 +19,7 @@ Infinity is a cutting-edge AI-native database that provides a wide range of sear
 
 - [Key Features](#-key-features)
 - [Get Started](#-get-started)
+- [Document](#-document)
 - [Roadmap](#-roadmap)
 - [Community](#-community)
 
@@ -29,10 +30,10 @@ Infinity comes with high performance, flexibility, ease-of-use, and many feature
 
 ### ⚡️ Incredibly fast
 
-- Achieves 0.1 milliseconds query latency on million-scale vector datasets.
-- Up to 15K QPS on million-scale vector datasets.
+- Achieves 0.1 milliseconds query latency and 15K+ QPS on million-scale vector datasets.
+- Achieves 1 millisecond latency and 12K+ QPS in full-text search on 33M documents.
 
-> See the [Benchmark report](./docs/references/benchmark.md) for more information.
+> See the [Benchmark report](https://infiniflow.org/docs/dev/benchmark) for more information.
 
 
 ### 🔮 Fused search
@@ -45,7 +46,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ### 🎁 Ease-of-use
 
-- Intuitive Python API. See the [Python API](docs/references/pysdk_api_reference.md)
+- Intuitive Python API. See the [Python API](https://infiniflow.org/docs/dev/python_api_reference)
 - A single-binary architecture with no dependencies, making deployment a breeze.
 
 ## 🎮 Get Started
@@ -77,14 +78,14 @@ sudo systemctl start infinity
 ```
 #### 🛠️ Build from Source
 
-See [Build from Source](docs/getstarted/build_from_source.md).
+See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
 
 ### Install Infinity's Python client
 
 `infinity-sdk` requires Python 3.10+.
 
 ```bash
-pip3 install infinity-sdk==0.2.0.dev1
+pip3 install infinity-sdk==0.2.0.dev4
 ```
 
 ### Import necessary modules
@@ -118,12 +119,7 @@ db = infinity_obj.get_database("default_db")
 # Drop my_table if it already exists
 db.drop_table("my_table", ConflictType.Ignore)
 # Create a table named "my_table"
-table = db.create_table(
-          "my_table", {
-            "num": {"type": "integer"}, 
-            "body": {"type": "varchar"},
-            "vec": {"type": "vector, 4, float"}
-          })
+table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
 ```
 
 
@@ -142,8 +138,15 @@ res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_
 print(res)
 ```
 
-> 💡 For more information about the Python API, see the [Python API Reference](docs/references/pysdk_api_reference.md).
+> 💡 For more information about the Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/python_api_reference).
 
+## Document
+
+- [Quickstart](https://infiniflow.org/docs/dev/)
+- [Python API](https://infiniflow.org/docs/dev/python_api_reference)
+- [HTTP API](https://infiniflow.org/docs/dev/http_api_reference)
+- [References](https://infiniflow.org/docs/dev/category/references)
+- [FAQ](https://infiniflow.org/docs/dev/FAQ)
 
 ## 📜 Roadmap
 
@@ -154,4 +157,4 @@ See the [Infinity Roadmap 2024](https://github.com/infiniflow/infinity/issues/33
 - [Discord](https://discord.gg/jEfRUwEYEV)
 - [Twitter](https://twitter.com/infiniflowai)
 - [GitHub Discussions](https://github.com/infiniflow/infinity/discussions)
-- [YouTube](https://www.youtube.com/@InfiniFlow-AI)
+

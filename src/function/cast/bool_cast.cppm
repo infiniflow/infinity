@@ -26,14 +26,16 @@ import column_vector;
 import logical_type;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
 export struct TryCastBoolean {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
-        UnrecoverableError(
-            fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>()));
+        String error_message = fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };
@@ -57,7 +59,9 @@ export struct TryCastBoolean {
 
 export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kBoolean) {
-        UnrecoverableError(fmt::format("Expect boolean type, but it is {}", source.ToString()));
+        String error_message = fmt::format("Expect boolean type, but it is {}", source.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     switch (target.type()) {
@@ -65,7 +69,9 @@ export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType 
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<BooleanT, VarcharT, TryCastBoolean>);
         }
         default: {
-            UnrecoverableError(fmt::format("Can't cast from Boolean to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast from Boolean to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return BoundCastFunc(nullptr);

@@ -172,6 +172,9 @@ struct SQL_LTYPE {
 
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
+
+    std::pair<int64_t, int64_t>*    int_sparse_ele_t;
+    std::pair<int64_t, double>*     float_sparse_ele_t;
 }
 
 %destructor {
@@ -358,6 +361,14 @@ struct SQL_LTYPE {
     }
 } <case_check_array_t>
 
+%destructor {
+    delete ($$);
+} <int_sparse_ele_t>
+
+%destructor {
+    delete ($$);
+} <float_sparse_ele_t>
+
 %token <str_value>              IDENTIFIER STRING
 %token <double_value>           DOUBLE_VALUE
 %token <long_value>             LONG_VALUE
@@ -366,11 +377,11 @@ struct SQL_LTYPE {
 
 %token CREATE SELECT INSERT DROP UPDATE DELETE COPY SET EXPLAIN SHOW ALTER EXECUTE PREPARE UNION ALL INTERSECT COMPACT
 %token EXCEPT FLUSH USE OPTIMIZE PROPERTIES
-%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES
+%token DATABASE TABLE COLLECTION TABLES INTO VALUES AST PIPELINE RAW LOGICAL PHYSICAL FRAGMENT VIEW INDEX ANALYZE VIEWS DATABASES SEGMENT SEGMENTS BLOCK BLOCKS COLUMN COLUMNS INDEXES CHUNK
 %token GROUP BY HAVING AS NATURAL JOIN LEFT RIGHT OUTER FULL ON INNER CROSS DISTINCT WHERE ORDER LIMIT OFFSET ASC DESC
 %token IF NOT EXISTS IN FROM TO WITH DELIMITER FORMAT HEADER CAST END CASE ELSE THEN WHEN
 %token BOOLEAN INTEGER INT TINYINT SMALLINT BIGINT HUGEINT VARCHAR FLOAT DOUBLE REAL DECIMAL DATE TIME DATETIME
-%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT TEXT TENSOR TENSORARRAY
+%token TIMESTAMP UUID POINT LINE LSEG BOX PATH POLYGON CIRCLE BLOB BITMAP EMBEDDING VECTOR BIT TEXT TENSOR SPARSE TENSORARRAY
 %token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
@@ -419,13 +430,17 @@ struct SQL_LTYPE {
 %type <set_operator_t>          set_operator
 %type <explain_type_t>          explain_type
 
-%type <expr_t>                  expr expr_alias column_expr function_expr subquery_expr match_vector_expr match_tensor_expr
+%type <expr_t>                  expr expr_alias column_expr function_expr subquery_expr match_vector_expr match_tensor_expr match_sparse_expr sub_search
 %type <expr_t>                  having_clause where_clause limit_expr offset_expr operand in_expr between_expr
 %type <expr_t>                  conjunction_expr cast_expr case_expr
 %type <expr_t>                  match_text_expr query_expr fusion_expr search_clause
 %type <const_expr_t>            constant_expr interval_expr default_expr
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
 %type <const_expr_t>            common_array_expr subarray_array_expr unclosed_subarray_array_expr
+%type <const_expr_t>            sparse_array_expr long_sparse_array_expr unclosed_long_sparse_array_expr double_sparse_array_expr unclosed_double_sparse_array_expr
+%type <const_expr_t>            empty_array_expr
+%type <int_sparse_ele_t>        int_sparse_ele
+%type <float_sparse_ele_t>      float_sparse_ele
 %type <expr_array_t>            expr_array group_by_clause sub_search_array
 %type <expr_array_list_t>       expr_array_list
 %type <update_expr_t>           update_expr;
@@ -674,7 +689,7 @@ IDENTIFIER column_type default_expr {
             type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
             if(type_info_ptr == nullptr) {
                 yyerror(&yyloc, scanner, result, "Fail to create decimal info.");
-                delete $1;
+                free($1);
                 YYERROR;
             }
             break;
@@ -687,6 +702,15 @@ IDENTIFIER column_type default_expr {
         case infinity::LogicalType::kTensorArray:
         case infinity::LogicalType::kEmbedding: {
             type_info_ptr = infinity::EmbeddingInfo::Make($2.embedding_type_, $2.width);
+            break;
+        }
+        case infinity::LogicalType::kSparse: {
+            type_info_ptr = infinity::SparseInfo::Make($2.embedding_type_, $2.width);
+            if (type_info_ptr == nullptr) {
+                yyerror(&yyloc, scanner, result, "Fail to create sparse info.");
+                free($1);
+                YYERROR;
+            }
             break;
         }
         default: {
@@ -803,6 +827,14 @@ BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, in
 | VECTOR '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt64}; }
 | VECTOR '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemFloat}; }
 | VECTOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemDouble}; }
+| SPARSE '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemBit}; }
+| SPARSE '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemInt8}; }
+| SPARSE '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemInt16}; }
+| SPARSE '(' INTEGER ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemInt32}; }
+| SPARSE '(' INT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemInt32}; }
+| SPARSE '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemInt64}; }
+| SPARSE '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemFloat}; }
+| SPARSE '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemDouble}; }
 /*
 | DECIMAL opt_decimal_specification {
   $$ = infinity::ColumnType{DataType::DECIMAL, 0, $2->first, $2->second};
@@ -1106,7 +1138,7 @@ drop_statement: DROP DATABASE if_exists IDENTIFIER {
 /*
  * COPY STATEMENT
  */
-// COPY database.table TO file_path WITH (FORMAT csv, DELIMITER ',', HEADER TRUE)
+// COPY database.table TO file_path WITH (FORMAT csv, DELIMITER ',', HEADER)
 copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     $$ = new infinity::CopyStatement();
 
@@ -1695,6 +1727,39 @@ show_statement: SHOW DATABASES {
     $$->index_name_ = $5;
     free($5);
 };
+| SHOW TABLE table_name INDEX IDENTIFIER SEGMENT LONG_VALUE {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kIndexSegment;
+    if($3->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $3->schema_name_ptr_;
+        free($3->schema_name_ptr_);
+    }
+    $$->table_name_ = $3->table_name_ptr_;
+    free($3->table_name_ptr_);
+    delete $3;
+
+    $$->index_name_ = $5;
+    free($5);
+
+    $$->segment_id_ = $7;
+};
+| SHOW TABLE table_name INDEX IDENTIFIER SEGMENT LONG_VALUE CHUNK LONG_VALUE {
+      $$ = new infinity::ShowStatement();
+      $$->show_type_ = infinity::ShowStmtType::kIndexChunk;
+      if($3->schema_name_ptr_ != nullptr) {
+          $$->schema_name_ = $3->schema_name_ptr_;
+          free($3->schema_name_ptr_);
+      }
+      $$->table_name_ = $3->table_name_ptr_;
+      free($3->table_name_ptr_);
+      delete $3;
+
+      $$->index_name_ = $5;
+      free($5);
+
+      $$->segment_id_ = $7;
+      $$->chunk_id_ = $9;
+  };
 
 /*
  * FLUSH STATEMENT
@@ -1929,6 +1994,7 @@ operand: '(' expr ')' {
 | match_vector_expr
 | match_text_expr
 | match_tensor_expr
+| match_sparse_expr
 | query_expr
 | fusion_expr
 
@@ -1942,27 +2008,24 @@ extra_match_tensor_option : ',' STRING {
 //                                       4                   6               8          10              11
 //                  MATCH TENSOR  (  column_name,     search_tensor, tensor_data_type, search_method, extra_match_tensor_option(including topn))
 match_tensor_expr : MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRING ',' STRING extra_match_tensor_option ')' {
-    infinity::MatchTensorExpr* match_tensor_expr = new infinity::MatchTensorExpr();
-    $$ = match_tensor_expr;
+    auto match_tensor_expr = std::make_unique<infinity::MatchTensorExpr>();
     // search column
-    match_tensor_expr->column_expr_.reset($4);
+    match_tensor_expr->SetSearchColumn($4);
     // search tensor
-    match_tensor_expr->tensor_expr_.reset($6);
-    // tensor data type
     ParserHelper::ToLower($8);
-    match_tensor_expr->embedding_data_type_ = $8;
-    free($8);
+    match_tensor_expr->SetQueryTensor($8, $6);
     // search method
     ParserHelper::ToLower($10);
-    match_tensor_expr->search_method_ = $10;
-    free($10);
+    match_tensor_expr->SetSearchMethod($10);
     // search options
     if ($11) {
-        match_tensor_expr->options_text_ = $11;
-        free($11);
+        match_tensor_expr->SetExtraOptions($11);
     }
+    $$ = match_tensor_expr.release();
 }
 
+//                  MATCH VECTOR (column_name, query_vec, data_type, metric_type, topn        )  extra options
+//                   1      2         4         6              8          10           12             14
 match_vector_expr : MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' with_index_param_list {
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     $$ = match_vector_expr;
@@ -1972,161 +2035,57 @@ match_vector_expr : MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING '
 
     // KNN distance type
     ParserHelper::ToLower($10);
-    if(strcmp($10, "l2") == 0) {
-        match_vector_expr->distance_type_ = infinity::KnnDistanceType::kL2;
-    } else if(strcmp($10, "ip") == 0) {
-        match_vector_expr->distance_type_ = infinity::KnnDistanceType::kInnerProduct;
-    } else if(strcmp($10, "cosine") == 0) {
-        match_vector_expr->distance_type_ = infinity::KnnDistanceType::kCosine;
-    } else if(strcmp($10, "hamming") == 0) {
-        match_vector_expr->distance_type_ = infinity::KnnDistanceType::kHamming;
-    } else {
-        for (auto* param_ptr: *$14) {
-            delete param_ptr;
-        }
-        delete $14;
-        free($8);
-        free($10);
-        delete $6;
-        delete $$;
-        yyerror(&yyloc, scanner, result, "Invalid knn distance type");
-        YYERROR;
+    bool check = match_vector_expr->InitDistanceType($10);
+    if (!check) {
+        goto Error;
     }
 
     // KNN data type
     ParserHelper::ToLower($8);
-    if(strcmp($8, "float") == 0 and match_vector_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
-        match_vector_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemFloat;
-        if(!($6->double_array_.empty())) {
-            match_vector_expr->dimension_ = $6->double_array_.size();
-            match_vector_expr->embedding_data_ptr_ = new float[match_vector_expr->dimension_];
-            for(long i = 0; i < match_vector_expr->dimension_; ++ i) {
-                ((float*)(match_vector_expr->embedding_data_ptr_))[i] = $6->double_array_[i];
-            }
-        }
-        if(!($6->long_array_.empty())) {
-            match_vector_expr->dimension_ = $6->long_array_.size();
-            match_vector_expr->embedding_data_ptr_ = new float[match_vector_expr->dimension_];
-            for(long i = 0; i < match_vector_expr->dimension_; ++ i) {
-                ((float*)(match_vector_expr->embedding_data_ptr_))[i] = $6->long_array_[i];
-            }
-        }
-        free($8);
-        free($10);
-        delete $6;
-    } else if(strcmp($8, "tinyint") == 0 and match_vector_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
-        match_vector_expr->dimension_ = $6->long_array_.size();
-        match_vector_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt8;
-        match_vector_expr->embedding_data_ptr_ = new char[match_vector_expr->dimension_];
-
-        for(long i = 0; i < match_vector_expr->dimension_; ++ i) {
-            ((char*)match_vector_expr->embedding_data_ptr_)[i] = $6->long_array_[i];
-        }
-        free($8);
-        free($10);
-        delete $6;
-    } else if(strcmp($8, "smallint") == 0 and match_vector_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
-        match_vector_expr->dimension_ = $6->long_array_.size();
-        match_vector_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt16;
-        match_vector_expr->embedding_data_ptr_ = new short int[match_vector_expr->dimension_];
-
-        for(long i = 0; i < match_vector_expr->dimension_; ++ i) {
-            ((short int*)match_vector_expr->embedding_data_ptr_)[i] = $6->long_array_[i];
-        }
-        free($8);
-        free($10);
-        delete $6;
-    } else if(strcmp($8, "integer") == 0 and match_vector_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
-        match_vector_expr->dimension_ = $6->long_array_.size();
-        match_vector_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt32;
-        match_vector_expr->embedding_data_ptr_ = new int[match_vector_expr->dimension_];
-
-        for(long i = 0; i < match_vector_expr->dimension_; ++ i) {
-            ((int*)match_vector_expr->embedding_data_ptr_)[i] = $6->long_array_[i];
-        }
-        free($8);
-        free($10);
-        delete $6;
-
-    } else if(strcmp($8, "bigint") == 0 and match_vector_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
-        match_vector_expr->dimension_ = $6->long_array_.size();
-        match_vector_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemInt64;
-        match_vector_expr->embedding_data_ptr_ = new long[match_vector_expr->dimension_];
-
-        memcpy(match_vector_expr->embedding_data_ptr_, (void*)$6->long_array_.data(), match_vector_expr->dimension_ * sizeof(long));
-        free($8);
-        free($10);
-        delete $6;
-
-    } else if(strcmp($8, "bit") == 0 and match_vector_expr->distance_type_ == infinity::KnnDistanceType::kHamming) {
-        match_vector_expr->dimension_ = $6->long_array_.size();
-        if(match_vector_expr->dimension_ % 8 == 0) {
-            match_vector_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemBit;
-            long embedding_size = match_vector_expr->dimension_ / 8;
-            char *char_ptr = new char[embedding_size];
-            uint8_t *data_ptr = reinterpret_cast<uint8_t *>(char_ptr);
-            match_vector_expr->embedding_data_ptr_ = char_ptr;
-            for(long i = 0; i < embedding_size; ++ i) {
-                uint8_t embedding_unit = 0;
-                for(long bit_idx = 0; bit_idx < 8; ++ bit_idx) {
-                    if($6->long_array_[i * 8 + bit_idx] == 1) {
-                        embedding_unit |= (uint8_t(1) << bit_idx);
-                    } else if($6->long_array_[i * 8 + bit_idx] == 0) {
-                        // no-op
-                    } else {
-                        for (auto* param_ptr: *$14) {
-                            delete param_ptr;
-                        }
-                        delete $14;
-                        free($8);
-                        free($10);
-                        delete $6;
-                        delete $$;
-                        yyerror(&yyloc, scanner, result, "Invalid bit embedding type data");
-                        YYERROR;
-                    }
-                }
-                data_ptr[i] = embedding_unit;
-            }
-            free($8);
-            free($10);
-            delete $6;
-        } else {
-            for (auto* param_ptr: *$14) {
-                delete param_ptr;
-            }
-            delete $14;
-            free($8);
-            free($10);
-            delete $6;
-            delete $$;
-            yyerror(&yyloc, scanner, result, "KNN data type is bit which length should be aligned with 8");
-            YYERROR;
-        }
-
-    } else if(strcmp($8, "double") == 0 and match_vector_expr->distance_type_ != infinity::KnnDistanceType::kHamming) {
-        match_vector_expr->dimension_ = $6->double_array_.size();
-        match_vector_expr->embedding_data_type_ = infinity::EmbeddingDataType::kElemDouble;
-        match_vector_expr->embedding_data_ptr_ = new double[match_vector_expr->dimension_];
-
-        memcpy(match_vector_expr->embedding_data_ptr_, (void*)$6->double_array_.data(), match_vector_expr->dimension_ * sizeof(double));
-        free($8);
-        free($10);
-        delete $6;
-    } else {
-        for (auto* param_ptr: *$14) {
-            delete param_ptr;
-        }
-        delete $14;
-        free($8);
-        free($10);
-        delete $6;
-        delete $$;
-        yyerror(&yyloc, scanner, result, "Invalid knn data type");
-        YYERROR;
+    check = match_vector_expr->InitEmbedding($8, $6);
+    if (!check) {
+        goto Error;
     }
+    free($8);
+    free($10);
+    delete $6;
+
     match_vector_expr->topn_ = $12;
     match_vector_expr->opt_params_ = $14;
+    goto Return;
+Error:
+    for (auto* param_ptr: *$14) {
+        delete param_ptr;
+    }
+    delete $14;
+    free($8);
+    free($10);
+    delete $6;
+    delete $$;
+    yyerror(&yyloc, scanner, result, "Invalid knn distance type");
+    YYERROR;
+Return:
+    ;
+}
+
+//                 MATCH SPARSE (column_name, query_sparse,      metric_type,   topn)         extra options
+//                   1      2         4             6                8           10              12
+match_sparse_expr: MATCH SPARSE '(' expr ',' sparse_array_expr ',' STRING ',' LONG_VALUE ')' with_index_param_list {
+    auto match_sparse_expr = new infinity::MatchSparseExpr();
+    $$ = match_sparse_expr;
+
+    // search column
+    match_sparse_expr->SetSearchColumn($4);
+
+    // search sparse and data type
+    match_sparse_expr->SetQuerySparse($6);
+
+    // metric type
+    ParserHelper::ToLower($8);
+    match_sparse_expr->SetMetricType($8);
+
+    // topn and options
+    match_sparse_expr->SetOptParams($10, $12);
 }
 
 match_text_expr : MATCH TEXT '(' STRING ',' STRING ')' {
@@ -2170,52 +2129,41 @@ fusion_expr : FUSION '(' STRING ')' {
     $$ = fusion_expr;
 }
 | FUSION '(' STRING ',' STRING ')' {
-    infinity::FusionExpr* fusion_expr = new infinity::FusionExpr();
+    auto fusion_expr = std::make_unique<infinity::FusionExpr>();
     fusion_expr->method_ = std::string($3);
     free($3);
+    $3 = nullptr;
     fusion_expr->SetOptions($5);
     free($5);
-    $$ = fusion_expr;
+    $5 = nullptr;
+    fusion_expr->JobAfterParser();
+    $$ = fusion_expr.release();
 }
 
-
-sub_search_array : match_vector_expr {
-    $$ = new std::vector<infinity::ParsedExpr*>();
-    $$->emplace_back($1);
+sub_search : match_vector_expr {
+    $$ = $1;
 }
 | match_text_expr {
-    $$ = new std::vector<infinity::ParsedExpr*>();
-    $$->emplace_back($1);
+    $$ = $1;
 }
 | match_tensor_expr {
-    $$ = new std::vector<infinity::ParsedExpr*>();
-    $$->emplace_back($1);
+    $$ = $1;
+}
+| match_sparse_expr {
+    $$ = $1;
 }
 | query_expr {
-    $$ = new std::vector<infinity::ParsedExpr*>();
-    $$->emplace_back($1);
+    $$ = $1;
 }
 | fusion_expr {
+    $$ = $1;
+}
+
+sub_search_array : sub_search {
     $$ = new std::vector<infinity::ParsedExpr*>();
     $$->emplace_back($1);
 }
-| sub_search_array ',' match_vector_expr {
-    $1->emplace_back($3);
-    $$ = $1;
-}
-| sub_search_array ',' match_text_expr {
-    $1->emplace_back($3);
-    $$ = $1;
-}
-| sub_search_array ',' match_tensor_expr {
-    $1->emplace_back($3);
-    $$ = $1;
-}
-| sub_search_array ',' query_expr {
-    $1->emplace_back($3);
-    $$ = $1;
-}
-| sub_search_array ',' fusion_expr {
+| sub_search_array ',' sub_search {
     $1->emplace_back($3);
     $$ = $1;
 };
@@ -2642,6 +2590,12 @@ common_array_expr: array_expr {
 | subarray_array_expr {
     $$ = $1;
 }
+| sparse_array_expr {
+    $$ = $1;
+}
+| empty_array_expr {
+    $$ = $1;
+}
 
 subarray_array_expr: unclosed_subarray_array_expr ']' {
     $$ = $1;
@@ -2655,6 +2609,61 @@ unclosed_subarray_array_expr: '[' common_array_expr {
 | unclosed_subarray_array_expr ',' common_array_expr {
     $1->sub_array_array_.emplace_back($3);
     $$ = $1;
+}
+
+sparse_array_expr: long_sparse_array_expr {
+    $$ = $1;
+}
+| double_sparse_array_expr {
+    $$ = $1;
+}
+
+long_sparse_array_expr: unclosed_long_sparse_array_expr ']' {
+    $$ = $1;
+}
+
+unclosed_long_sparse_array_expr: '[' int_sparse_ele {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kLongSparseArray);
+    const_expr->long_sparse_array_.first.emplace_back($2->first);
+    const_expr->long_sparse_array_.second.emplace_back($2->second);
+    delete $2;
+    $$ = const_expr;
+}
+| unclosed_long_sparse_array_expr ',' int_sparse_ele {
+    $1->long_sparse_array_.first.emplace_back($3->first);
+    $1->long_sparse_array_.second.emplace_back($3->second);
+    delete $3;
+    $$ = $1;
+}
+
+double_sparse_array_expr: unclosed_double_sparse_array_expr ']' {
+    $$ = $1;
+}
+
+unclosed_double_sparse_array_expr: '[' float_sparse_ele {
+    infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDoubleSparseArray);
+    const_expr->double_sparse_array_.first.emplace_back($2->first);
+    const_expr->double_sparse_array_.second.emplace_back($2->second);
+    delete $2;
+    $$ = const_expr;
+}
+| unclosed_double_sparse_array_expr ',' float_sparse_ele {
+    $1->double_sparse_array_.first.emplace_back($3->first);
+    $1->double_sparse_array_.second.emplace_back($3->second);
+    delete $3;
+    $$ = $1;
+}
+
+empty_array_expr: '[' ']' {
+    $$ = new infinity::ConstantExpr(infinity::LiteralType::kEmptyArray);
+}
+
+int_sparse_ele: LONG_VALUE ':' LONG_VALUE {
+    $$ = new std::pair<int64_t, int64_t>{$1, $3};
+}
+
+float_sparse_ele: LONG_VALUE ':' DOUBLE_VALUE {
+    $$ = new std::pair<int64_t, double>{$1, $3};
 }
 
 array_expr: long_array_expr {
@@ -2793,6 +2802,9 @@ copy_option : FORMAT IDENTIFIER {
     } else if (strcasecmp($2, "fvecs") == 0) {
         $$->file_type_ = infinity::CopyFileType::kFVECS;
         free($2);
+    } else if (strcasecmp($2, "csr") == 0) {
+        $$->file_type_ = infinity::CopyFileType::kCSR;
+        free($2);
     } else {
         free($2);
         delete $$;
@@ -2852,7 +2864,7 @@ if_not_exists_info : if_not_exists IDENTIFIER {
 }
 
 with_index_param_list : WITH '(' index_param_list ')' {
-    $$ = std::move($3);
+    $$ = $3;
 }
 | {
     $$ = new std::vector<infinity::InitParameter*>();

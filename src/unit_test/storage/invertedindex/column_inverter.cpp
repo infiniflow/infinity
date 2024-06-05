@@ -17,8 +17,6 @@
 import stl;
 import analyzer;
 import analyzer_pool;
-import memory_pool;
-import pool_allocator;
 import index_defines;
 import posting_writer;
 import posting_list_format;
@@ -38,9 +36,8 @@ using namespace infinity;
 
 class ColumnInverterTest : public BaseTest {
 protected:
-    MemoryPool byte_slice_pool_{};
-    RecyclePool buffer_pool_{};
     optionflag_t flag_{OPTION_FLAG_ALL};
+    PostingFormat posting_format_{PostingFormatOption(flag_)};
     Map<String, SharedPtr<PostingWriter>> postings_;
     VectorWithLock<u32> column_lengths_;
 
@@ -61,7 +58,7 @@ public:
         if (it != postings_.end()) {
             return it->second;
         }
-        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_lengths_);
+        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(posting_format_, column_lengths_);
         postings_[term] = posting;
         return posting;
     }
@@ -111,7 +108,7 @@ TEST_F(ColumnInverterTest, Invert) {
         SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>(1);
         seg_postings->at(0).Init(u64(0), posting);
 
-        PostingIterator post_iter(flag_, &byte_slice_pool_);
+        PostingIterator post_iter(flag_);
         post_iter.Init(seg_postings, 0);
 
         RowID doc_id = INVALID_ROWID;

@@ -79,7 +79,9 @@ public:
 
     inline void Update(const TinyIntT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
+            String error_message = fmt::format("Data count exceeds: {}", count_);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         this->count_++;
         value_ += input[idx];
@@ -112,7 +114,9 @@ public:
 
     inline void Update(const SmallIntT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
+            String error_message = fmt::format("Data count exceeds: {}", count_);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         this->count_++;
         value_ += input[idx];
@@ -146,7 +150,9 @@ public:
 
     inline void Update(const IntegerT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
+            String error_message = fmt::format("Data count exceeds: {}", count_);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         this->count_++;
         value_ += input[idx];
@@ -180,7 +186,9 @@ public:
 
     inline void Update(const BigIntT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
+            String error_message = fmt::format("Data count exceeds: {}", count_);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         this->count_++;
         value_ += input[idx];
@@ -214,7 +222,9 @@ public:
 
     inline void Update(const FloatT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
+            String error_message = fmt::format("Data count exceeds: {}", count_);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         this->count_++;
         value_ += input[idx];
@@ -248,7 +258,9 @@ public:
 
     inline void Update(const DoubleT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
-            UnrecoverableError(fmt::format("Data count exceeds: {}", count_));
+            String error_message = fmt::format("Data count exceeds: {}", count_);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         this->count_++;
         value_ += input[idx];

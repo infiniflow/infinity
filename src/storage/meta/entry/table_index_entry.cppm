@@ -32,7 +32,7 @@ import cleanup_scanner;
 import meta_entry_interface;
 import index_file_worker;
 import column_def;
-import memory_pool;
+
 import block_entry;
 
 namespace infinity {
@@ -125,10 +125,6 @@ public:
 
     Status CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn);
 
-    MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
-    RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }
-    ThreadPool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
-    ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
     TxnTimeStamp GetFulltexSegmentUpdateTs() {
         std::shared_lock lock(segment_update_ts_mutex_);
         return segment_update_ts_;
@@ -150,10 +146,6 @@ private:
 
 private:
     // For fulltext index
-    MemoryPool byte_slice_pool_{};
-    RecyclePool buffer_pool_{};
-    ThreadPool inverting_thread_pool_{};
-    ThreadPool commiting_thread_pool_{};
     std::shared_mutex segment_update_ts_mutex_{};
     TxnTimeStamp segment_update_ts_{0};
 

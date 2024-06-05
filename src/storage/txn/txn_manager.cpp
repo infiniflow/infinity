@@ -48,7 +48,9 @@ TxnManager::TxnManager(Catalog *catalog,
 Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        UnrecoverableError("TxnManager is not running, cannot create txn");
+        String error_message = "TxnManager is not running, cannot create txn";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     rw_locker_.lock();
@@ -162,10 +164,14 @@ bool TxnManager::CheckConflict(Txn *txn) {
 void TxnManager::SendToWAL(Txn *txn) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        UnrecoverableError("TxnManager is not running, cannot put wal entry");
+        String error_message = "TxnManager is not running, cannot put wal entry";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (wal_mgr_ == nullptr) {
-        UnrecoverableError("TxnManager is null");
+        String error_message = "TxnManager is null";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     TxnTimeStamp commit_ts = txn->CommitTS();
@@ -173,12 +179,16 @@ void TxnManager::SendToWAL(Txn *txn) {
 
     std::lock_guard guard(rw_locker_);
     if (wait_conflict_ck_.empty()) {
-        UnrecoverableError(fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS()));
+        String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     if (wait_conflict_ck_.begin()->first > commit_ts) {
-        UnrecoverableError(fmt::format("WalManager::PutEntry wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
-                                       wait_conflict_ck_.begin()->first,
-                                       txn->CommitTS()));
+        String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
+                                           wait_conflict_ck_.begin()->first,
+                                           txn->CommitTS());
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     if (wal_entry) {
         wait_conflict_ck_.at(commit_ts) = wal_entry;
@@ -198,7 +208,9 @@ void TxnManager::SendToWAL(Txn *txn) {
 void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
-        UnrecoverableError("TxnManager is not running, cannot add delta entry");
+        String error_message = "TxnManager is not running, cannot add delta entry";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     i64 wal_size = wal_mgr_->WalSize();
     bg_task_processor_->Submit(MakeShared<AddDeltaEntryTask>(std::move(delta_entry), wal_size));
@@ -273,7 +285,9 @@ void TxnManager::FinishTxn(Txn *txn) {
     std::lock_guard guard(rw_locker_);
 
     if (txn->GetTxnType() == TxnType::kInvalid) {
-        UnrecoverableError("Txn type is invalid");
+        String error_message = "Txn type is invalid";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     } else if (txn->GetTxnType() == TxnType::kRead) {
         txn_map_.erase(txn->TxnID());
         return;
@@ -318,7 +332,9 @@ void TxnManager::FinishTxn(Txn *txn) {
         // LOG_INFO(fmt::format("Txn: {} is erased", finished_txn_id));
         SizeT remove_n = txn_map_.erase(finished_txn_id);
         if (remove_n == 0) {
-            UnrecoverableError(fmt::format("Txn: {} not found in txn map", finished_txn_id));
+            String error_message = fmt::format("Txn: {} not found in txn map", finished_txn_id);
+            LOG_ERROR(error_message);
+            UnrecoverableError(error_message);
         }
         finished_txns_.pop_front();
     }
