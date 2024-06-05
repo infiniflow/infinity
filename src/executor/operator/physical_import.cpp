@@ -473,6 +473,7 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
             }
         } else {
             if (block_entry->row_count() == 0) {
+                column_vectors.clear();
                 std::move(*block_entry).Cleanup();
             } else {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
