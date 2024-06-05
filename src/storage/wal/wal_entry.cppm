@@ -357,8 +357,7 @@ export struct WalCmdCompact : public WalCmd {
 };
 
 export struct WalEntryHeader {
-    i32 size_{}; // size of payload, including the header, round to multi
-    // of 4. There's 4 bytes pad just after the payload storing
+    i32 size_{}; // size of header + payload + 4 bytes pad. There's 4 bytes pad just after the payload storing
     // the same value to assist backward iterating.
     u32 checksum_{}; // crc32 of the entry, including the header and the
     // payload. User shall populate it before writing to wal.
@@ -382,38 +381,53 @@ export struct WalEntry : WalEntryHeader {
 
     Vector<SharedPtr<WalCmd>> cmds_{};
 
+    // Return if the entry is a full checkpoint or delta checkpoint.
+    [[nodiscard]] bool IsCheckPoint() const;
+
     [[nodiscard]] bool IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const;
 
     [[nodiscard]] String ToString() const;
 
 };
 
+// Forward and backward iterator of WAL entries in a given WAL file
 export class WalEntryIterator {
 public:
-    static WalEntryIterator Make(const String &wal_path);
+    static UniquePtr<WalEntryIterator> Make(const String &wal_path, bool is_backward);
 
-    [[nodiscard]] SharedPtr<WalEntry> Next();
-
-private:
-    WalEntryIterator(Vector<char> &&buf, std::streamsize wal_size) : buf_(std::move(buf)), wal_size_(wal_size) { end_ = buf_.data() + wal_size_; }
-
-    Vector<char> buf_{};
-    std::streamsize wal_size_{};
-    char *end_{};
-};
-
-export class WalListIterator {
-public:
-    explicit WalListIterator(const Vector<String> &wal_list) {
-        for (SizeT i = 0; i < wal_list.size(); ++i) {
-            wal_deque_.push_back(wal_list[i]);
+    WalEntryIterator(Vector<char> &&buf, SizeT wal_size, bool is_backward)
+        : is_backward_(is_backward), off_(0), buf_(std::move(buf)), wal_size_(wal_size) {
+        if (is_backward_) {
+            off_ = buf_.size();
         }
     }
 
+    [[nodiscard]] bool HasNext() { return (is_backward_ && off_ > 0) || (!is_backward_ && off_ < buf_.size()); }
+
+    [[nodiscard]] SharedPtr<WalEntry> Next();
+
+    [[nodiscard]] i64 GetOffset() { return off_; };
+
+private:
+    bool is_backward_{};
+    SizeT off_{}; // offset of last returned entry if is_backward, otherwise offset of the entry needs to be returned
+    Vector<char> buf_{};
+    SizeT wal_size_{};
+};
+
+// Backward iterator of WAL entries in given WAL files
+export class WalListIterator {
+public:
+    explicit WalListIterator(const Vector<String> &wal_list);
+
+    [[nodiscard]] bool HasNext();
+
     [[nodiscard]] SharedPtr<WalEntry> Next();
 
 private:
-    Deque<String> wal_deque_{};
+    // Locate the latest full checkpoint entry, and purge bad entries after it.
+    void PurgeBadEntriesAfterLatestCheckpoint();
+    List<String> wal_list_{};
     UniquePtr<WalEntryIterator> iter_{};
 };
 

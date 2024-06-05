@@ -273,10 +273,10 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     String ckp_file_path = String(GetDataDir()) + "/catalog/META_123.full.json";
     MockWalFile(wal_file_path, ckp_file_path);
     {
-        auto iterator1 = WalEntryIterator::Make(wal_file_path);
+        auto iterator1 = WalEntryIterator::Make(wal_file_path, true);
 
-        while (true) {
-            auto wal_entry = iterator1.Next();
+        while (iterator1->HasNext()) {
+            auto wal_entry = iterator1->Next();
             if (wal_entry == nullptr) {
                 break;
             }
@@ -291,11 +291,11 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     TxnTimeStamp max_commit_ts = 0;
     String catalog_path;
     {
-        auto iterator = WalEntryIterator::Make(wal_file_path);
+        auto iterator = WalEntryIterator::Make(wal_file_path, true);
 
         // phase 1: find the max commit ts and catalog path
-        while (true) {
-            auto wal_entry = iterator.Next();
+        while (iterator->HasNext()) {
+            auto wal_entry = iterator->Next();
             if (wal_entry == nullptr) {
                 break;
             }
@@ -313,8 +313,8 @@ TEST_F(WalEntryTest, WalEntryIterator) {
         }
 
         // phase 2: by the max commit ts, find the entries to replay
-        while (true) {
-            auto wal_entry = iterator.Next();
+        while (iterator->HasNext()) {
+            auto wal_entry = iterator->Next();
             if (wal_entry == nullptr) {
                 break;
             }
@@ -349,7 +349,7 @@ TEST_F(WalEntryTest, WalListIterator) {
 
     WalListIterator iterator1({wal_file_path1, wal_file_path2});
 
-    while (true) {
+    while (iterator1.HasNext()) {
         auto wal_entry = iterator1.Next();
         if (wal_entry.get() == nullptr) {
             break;
@@ -367,7 +367,7 @@ TEST_F(WalEntryTest, WalListIterator) {
         WalListIterator iterator({wal_file_path1, wal_file_path2});
 
         // phase 1: find the max commit ts and catalog path
-        while (true) {
+        while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
                 break;
@@ -386,7 +386,7 @@ TEST_F(WalEntryTest, WalListIterator) {
         }
 
         // phase 2: by the max commit ts, find the entries to replay
-        while (true) {
+        while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
                 break;
