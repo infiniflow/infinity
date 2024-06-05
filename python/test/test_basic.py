@@ -24,13 +24,13 @@ from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from utils import copy_data
 from test_sdkbase import TestSdk
-from infinity.embed_infinity import add
+# from infinity.embed_infinity import add
 
 test_csv_file = "embedding_int_dim3.csv"
 
 class TestCase(TestSdk):
     def test_version(self):
-        print(add(1, 2))
+        # print(add(1, 2))
         print(infinity.__version__)
 
     def test_connection(self):

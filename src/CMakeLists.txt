@@ -298,7 +298,9 @@ target_sources(embedded_infinity_ext
 nanobind_compile_options(embedded_infinity_ext)
 nanobind_link_options(embedded_infinity_ext)
 set_target_properties(embedded_infinity_ext PROPERTIES LINKER_LANGUAGE CXX)
-set(libname "nanobind")
+set(ARG_NB_STATIC TRUE)
+set(ARG_STABLE_ABI FALSE)
+set(libname "nanobind-static")
 nanobind_build_library(${libname})
 nanobind_extension(embedded_infinity_ext)
 add_dependencies(embedded_infinity_ext oatpp)
@@ -321,6 +323,9 @@ target_link_libraries(embedded_infinity_ext PRIVATE
 
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
+nanobind_disable_stack_protector(embedded_infinity_ext)
+nanobind_opt_size(embedded_infinity_ext)
+nanobind_strip(embedded_infinity_ext)
 
 #nanobind_set_visibility(embedded_infinity_ext)
 
