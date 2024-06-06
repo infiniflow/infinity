@@ -16,8 +16,10 @@ from infinity.errors import ErrorCode as PyErrorCode
 from infinity.common import LOCAL_INFINITY_PATH
 from embedded_infinity import *
 
+
 class LocalQueryResult:
-    def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, column_defs=None, column_fields=None):
+    def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, column_defs=None,
+                 column_fields=None):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_names = db_names
@@ -25,6 +27,7 @@ class LocalQueryResult:
         # self.result_data = result_data
         self.column_defs = column_defs
         self.column_fields = column_fields
+
 
 class LocalInfinityClient:
     def __init__(self, path: str = LOCAL_INFINITY_PATH):
@@ -43,7 +46,8 @@ class LocalInfinityClient:
         if has_table_name:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, table_names=res.names)
         if has_result_data:
-            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, column_defs=res.column_defs, column_fields=res.column_fields)
+            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, column_defs=res.column_defs,
+                                    column_fields=res.column_fields)
         return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg)
 
     def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError):
@@ -89,10 +93,12 @@ class LocalInfinityClient:
     def show_table(self, db_name: str, table_name: str):
         return self.convert_res(self.client.ShowTable(db_name, table_name))
 
-    def create_index(self, db_name: str, table_name: str, index_name: str, index_info_list: list[WrapIndexInfo], conflict_type: ConflictType = ConflictType.kError):
+    def create_index(self, db_name: str, table_name: str, index_name: str, index_info_list: list[WrapIndexInfo],
+                     conflict_type: ConflictType = ConflictType.kError):
         create_index_options = CreateIndexOptions()
         create_index_options.conflict_type = conflict_type
-        return self.convert_res(self.client.CreateIndex(db_name, table_name, index_name, index_info_list, create_index_options))
+        return self.convert_res(
+            self.client.CreateIndex(db_name, table_name, index_name, index_info_list, create_index_options))
 
     def show_index(self, db_name: str, table_name: str, index_name: str):
         return self.convert_res(self.client.ShowIndex(db_name, table_name, index_name))
@@ -100,7 +106,8 @@ class LocalInfinityClient:
     def list_indexes(self, db_name: str, table_name: str):
         return self.convert_res(self.client.ListIndex(db_name, table_name))
 
-    def drop_index(self, db_name: str, table_name: str, index_name: str, conflict_type: ConflictType = ConflictType.kError):
+    def drop_index(self, db_name: str, table_name: str, index_name: str,
+                   conflict_type: ConflictType = ConflictType.kError):
         drop_index_options = DropIndexOptions()
         drop_index_options.conflict_type = conflict_type
         return self.convert_res(self.client.DropIndex(db_name, table_name, index_name, drop_index_options))
@@ -126,13 +133,15 @@ class LocalInfinityClient:
                where_expr, limit_expr, offset_expr, group_by_list=None):
 
         return self.convert_res(self.client.Search(db_name, table_name, select_list,
-                               wrap_search_expr=search_expr, where_expr=where_expr,
-                               limit_expr=limit_expr, offset_expr=offset_expr), has_result_data=True)
+                                                   wrap_search_expr=search_expr, where_expr=where_expr,
+                                                   limit_expr=limit_expr, offset_expr=offset_expr),
+                                has_result_data=True)
 
     def explain(self, db_name: str, table_name: str, select_list, search_expr,
                 where_expr, group_by_list, limit_expr, offset_expr, explain_type):
         return self.convert_res(self.client.Explain(db_name, table_name, select_list,
-                                   search_expr, where_expr, group_by_list, limit_expr, offset_expr, explain_type))
+                                                    search_expr, where_expr, group_by_list, limit_expr, offset_expr,
+                                                    explain_type))
 
     def delete(self, db_name: str, table_name: str, where_expr):
         return self.convert_res(self.client.Delete(db_name, table_name, where_expr))

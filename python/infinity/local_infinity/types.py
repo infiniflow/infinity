@@ -217,8 +217,10 @@ def build_result(res: WrapQueryResult) -> tuple[dict[str | Any, list[Any, Any]],
         column_type = column_field.column_type
         column_data_type = column_def.column_type
         # convert to [ bytes:8 ]
-        column_vectors = [bytes(s, 'latin1') for s in column_field.column_vectors]
-
+        # column_vectors = [bytes(s, 'latin1') for s in column_field.column_vectors]
+        # column_vectors = [bytes([ord(c) for c in s]) for s in column_field.column_vectors]
+        column_vectors = column_field.column_vectors
+        print(column_vectors)
         data_list = column_vector_to_list(column_type, column_data_type, column_vectors)
         print("data list = ", data_list)
         # data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))

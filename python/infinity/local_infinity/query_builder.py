@@ -15,9 +15,6 @@ from embedded_infinity import *
 from infinity.local_infinity.types import logic_type_to_dtype
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
 
-'''FIXME: How to disable validation of only the search field?'''
-
-
 class Query(ABC):
     def __init__(self, columns: Optional[List[WrapParsedExpr]], search: Optional[WrapSearchExpr], filter: Optional[WrapParsedExpr],
                  limit: Optional[WrapParsedExpr], offset: Optional[WrapParsedExpr]):
