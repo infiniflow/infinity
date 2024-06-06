@@ -23,6 +23,7 @@ export module buffer_manager;
 namespace infinity {
 
 class BufferObj;
+class BufferObjectInfo;
 
 export class BufferManager {
 public:
@@ -56,6 +57,8 @@ public:
     SizeT BufferedObjectCount();
 
     void RemoveClean();
+
+    Vector<BufferObjectInfo> GetBufferObjectsInfo();
 
 private:
     friend class BufferObj;

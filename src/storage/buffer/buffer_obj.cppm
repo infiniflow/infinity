@@ -17,6 +17,7 @@ module;
 import stl;
 import file_worker;
 import buffer_handle;
+import file_worker_type;
 
 export module buffer_obj;
 
@@ -38,6 +39,14 @@ export enum class BufferType {
     kTemp,
 };
 
+export struct BufferObjectInfo {
+    String object_path_{};
+    BufferStatus buffered_status_{BufferStatus::kNew};
+    BufferType buffered_type_{BufferType::kTemp};
+    FileWorkerType file_type_{FileWorkerType::kInvalid};
+    SizeT object_size_{};
+};
+
 export String BufferStatusToString(BufferStatus status) {
     switch (status) {
         case BufferStatus::kLoaded:
@@ -52,6 +61,17 @@ export String BufferStatusToString(BufferStatus status) {
             return "Clean";
         default:
             return "Invalid";
+    }
+}
+
+export String BufferTypeToString(BufferType buffer_type) {
+    switch (buffer_type) {
+        case BufferType::kPersistent:
+            return "Persistent";
+        case BufferType::kEphemeral:
+            return "Ephemeral";
+        case BufferType::kTemp:
+            return "Temporary";
     }
 }
 
