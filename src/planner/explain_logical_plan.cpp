@@ -1439,6 +1439,24 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case ShowType::kShowBuffer: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW BUFFER ";
+            } else {
+                show_str = "SHOW BUFFER ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [path, status, size, buffered_type, type]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowType::kShowProfiles: {
             String show_str;
             if (intent_size != 0) {

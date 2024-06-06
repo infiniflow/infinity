@@ -41,6 +41,7 @@ enum class ShowStmtType {
     kGlobalVariable,
     kGlobalVariables,
     kConfig,
+    kBuffer,
     kIndexSegment,
     kIndexChunk,
 };

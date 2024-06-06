@@ -377,6 +377,21 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowBuffer: {
+            output_names_->reserve(5);
+            output_types_->reserve(5);
+            output_names_->emplace_back("path");
+            output_names_->emplace_back("status");
+            output_names_->emplace_back("size");
+            output_names_->emplace_back("buffered_type");
+            output_names_->emplace_back("type");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             LOG_ERROR(status.message());
@@ -476,6 +491,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowConfig: {
             ExecuteShowConfig(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowBuffer: {
+            ExecuteShowBuffer(query_context, show_operator_state);
             break;
         }
         default: {
@@ -4078,6 +4097,10 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorState *operator_state) {
+    return ;
 }
 
 } // namespace infinity

@@ -24,6 +24,7 @@ import index_base;
 import knn_expr;
 import column_def;
 import internal_types;
+import file_worker_type;
 
 namespace infinity {
 
@@ -46,6 +47,8 @@ public:
     void AllocateInMemory() override;
 
     void FreeInMemory() override;
+
+    FileWorkerType Type() const override { return FileWorkerType::kHNSWIndexFile; }
 
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;

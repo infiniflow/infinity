@@ -178,7 +178,7 @@ add_library(infinity_core
         ${expression_cpp}
         ${executor_cpp}
         ${common_cpp}
-)
+        storage/buffer/file_worker/file_worker_type.cppm)
 
 target_sources(infinity_core
         PUBLIC
