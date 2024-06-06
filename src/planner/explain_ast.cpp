@@ -555,6 +555,10 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             Status::NotSupport("Show views");
             break;
         }
+        case ShowStmtType::kBuffer: {
+            result->emplace_back(MakeShared<String>("SHOW BUFFER"));
+            break;
+        }
         case ShowStmtType::kTables: {
             result->emplace_back(MakeShared<String>("SHOW TABLES: "));
             intent_size += 2;
@@ -563,7 +567,7 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             break;
         }
         case ShowStmtType::kDatabases: {
-            result->emplace_back(MakeShared<String>("SHOW DATABASES: "));
+            result->emplace_back(MakeShared<String>("SHOW DATABASES"));
             break;
         }
         case ShowStmtType::kSegments: {

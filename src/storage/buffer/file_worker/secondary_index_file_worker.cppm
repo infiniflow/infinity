@@ -24,6 +24,7 @@ import index_base;
 import infinity_exception;
 import default_values;
 import column_def;
+import file_worker_type;
 
 namespace infinity {
 
@@ -49,6 +50,8 @@ public:
 
     void FreeInMemory() override;
 
+    FileWorkerType Type() const override { return FileWorkerType::kSecondaryIndexFile; }
+
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
 
@@ -72,6 +75,8 @@ public:
     void AllocateInMemory() override;
 
     void FreeInMemory() override;
+
+    FileWorkerType Type() const override { return FileWorkerType::kSecondaryIndexPartFile; }
 
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;

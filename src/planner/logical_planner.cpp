@@ -1095,6 +1095,9 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kConfig: {
             return BuildShowConfig(statement, bind_context_ptr);
         }
+        case ShowStmtType::kBuffer: {
+            return BuildShowBuffer(statement, bind_context_ptr);
+        }
         default: {
             String error_message = "Unexpected show statement type.";
             LOG_CRITICAL(error_message);
@@ -1356,6 +1359,17 @@ Status LogicalPlanner::BuildShowGlobalVariables(const ShowStatement *statement, 
 Status LogicalPlanner::BuildShowConfig(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowConfig,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowBuffer(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowBuffer,
                                                                   query_context_ptr_->schema_name(),
                                                                   statement->var_name_,
                                                                   bind_context_ptr->GenerateTableIndex());

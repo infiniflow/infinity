@@ -20,6 +20,7 @@ import index_base;
 import file_worker;
 import stl;
 import column_def;
+import file_worker_type;
 
 namespace infinity {
 
@@ -45,6 +46,8 @@ public:
         : FileWorker(file_dir, file_name), column_def_(column_def), index_base_(index_base) {}
 
     SizeT GetMemoryCost() const override { return 0; }
+
+    FileWorkerType Type() const override { return FileWorkerType::kIndexFile; }
 
     ~IndexFileWorker() override = default;
 };

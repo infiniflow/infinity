@@ -68,6 +68,8 @@ import chunk_index_entry;
 import background_process;
 import compaction_process;
 import bg_task;
+import buffer_obj;
+import file_worker_type;
 
 namespace infinity {
 
@@ -377,6 +379,21 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowBuffer: {
+            output_names_->reserve(5);
+            output_types_->reserve(5);
+            output_names_->emplace_back("path");
+            output_names_->emplace_back("status");
+            output_names_->emplace_back("size");
+            output_names_->emplace_back("buffered_type");
+            output_names_->emplace_back("type");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             LOG_ERROR(status.message());
@@ -476,6 +493,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowConfig: {
             ExecuteShowConfig(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowBuffer: {
+            ExecuteShowBuffer(query_context, show_operator_state);
             break;
         }
         default: {
@@ -2789,7 +2810,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     {
         auto map_guard = table_entry->IndexMetaMap();
         for (const auto &[index_name, index_meta] : *map_guard) {
-            if (!output_block_ptr) {
+            if (output_block_ptr.get() == nullptr) {
                 output_block_ptr = DataBlock::MakeUniquePtr();
                 output_block_ptr->Init(column_types);
             }
@@ -4078,6 +4099,89 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
+}
+
+void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "path", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "status", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, bigint_type, "size", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "buffered_type", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "type", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_buffer"), column_defs);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+        bigint_type,
+        varchar_type,
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+    Vector<BufferObjectInfo> buffer_object_info_array = buffer_manager->GetBufferObjectsInfo();
+    for(const auto& buffer_object_info: buffer_object_info_array) {
+
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // path
+            Value value = Value::MakeVarchar(buffer_object_info.object_path_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // status
+            Value value = Value::MakeVarchar(BufferStatusToString(buffer_object_info.buffered_status_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // size
+            i64 buffer_object_size = static_cast<i64>(buffer_object_info.object_size_);
+            Value value = Value::MakeBigInt(buffer_object_size);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+        {
+            // buffered type
+            Value value = Value::MakeVarchar(BufferTypeToString(buffer_object_info.buffered_type_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+        {
+            // type
+            Value value = Value::MakeVarchar(FileWorkerType2Str(buffer_object_info.file_type_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        ++ row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return ;
 }
 
 } // namespace infinity
