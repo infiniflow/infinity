@@ -1,7 +1,9 @@
 module;
 
-#include <cstring>
+#include <nanobind/nanobind.h>
 #include "parser/type/complex/embedding_type.h"
+#include <cstring>
+#include <string>
 
 export module wrap_infinity;
 
@@ -40,18 +42,20 @@ import between_expr;
 import parsed_expr;
 import search_expr;
 
+namespace nb = nanobind;
+
 // wrap Infinity function for nanobind infinity
 namespace infinity {
 
 export struct ColumnField {
     LogicalType column_type;
-    Vector<String> column_vectors;
+    Vector<nb::bytes> column_vectors;
     String column_name;
 };
 
 export struct WrapColumnField {
     WrapColumnField() = default;
-    WrapColumnField(const String& column_name, const String& column_data) : column_name(column_name), column_data(column_data) {}
+    WrapColumnField(const String &column_name, const String &column_data) : column_name(column_name), column_data(column_data) {}
     String column_name;
     String column_data;
 };
@@ -75,7 +79,7 @@ export struct WrapConstantExpr {
     Vector<i64> i64_array_value;
     Vector<f64> f64_array_value;
 
-    ParsedExpr* GetParsedExpr();
+    ParsedExpr *GetParsedExpr();
 };
 
 export struct WrapColumnDef {
@@ -84,18 +88,16 @@ export struct WrapColumnDef {
     String column_name;
     Set<ConstraintType> constraints;
     WrapConstantExpr constant_expr;
-
-    // ParsedExpr* default_expr;
 };
 
 export struct WrapQueryResult {
     ErrorCode error_code;
     String error_msg;
     Vector<String> names;
-//    Vector<Vector<WrapColumnField>> result_rows;
+    //    Vector<Vector<WrapColumnField>> result_rows;
     Vector<WrapColumnDef> column_defs;
     Vector<ColumnField> column_fields;
-//    Vector<WrapColumnField> column_fields;
+    //    Vector<WrapColumnField> column_fields;
     WrapQueryResult() = default;
     WrapQueryResult(ErrorCode error_code, const char *error_msg) : error_code(error_code) {
         if (error_msg != nullptr) {
@@ -120,7 +122,7 @@ export struct WrapColumnExpr {
     Vector<String> names{};
     bool generated{false};
 
-    ParsedExpr* GetParsedExpr();
+    ParsedExpr *GetParsedExpr();
 };
 
 export struct WrapFunctionExpr {
@@ -129,14 +131,14 @@ export struct WrapFunctionExpr {
     Vector<SharedPtr<WrapParsedExpr>> arguments;
     bool distinct{false};
 
-    ParsedExpr* GetParsedExpr();
+    ParsedExpr *GetParsedExpr();
 };
 
 export struct WrapBetweenExpr {
     SharedPtr<WrapParsedExpr> value{nullptr};
     SharedPtr<WrapParsedExpr> upper_bound{nullptr};
     SharedPtr<WrapParsedExpr> lower_bound{nullptr};
-    ParsedExpr* GetParsedExpr();
+    ParsedExpr *GetParsedExpr();
 };
 
 export struct WrapKnnExpr {
@@ -147,9 +149,9 @@ export struct WrapKnnExpr {
     EmbeddingDataType embedding_data_type{EmbeddingDataType::kElemInvalid};
     KnnDistanceType distance_type{KnnDistanceType::kInvalid};
     i64 topn{};
-    Vector<InitParameter *> *opt_params{};
+    Vector<SharedPtr<InitParameter>> *opt_params{};
 
-    ParsedExpr* GetParsedExpr();
+    ParsedExpr *GetParsedExpr();
 };
 
 export struct WrapMatchExpr {
@@ -157,14 +159,14 @@ export struct WrapMatchExpr {
     String matching_text;
     String options_text;
 
-    ParsedExpr* GetParsedExpr();
+    ParsedExpr *GetParsedExpr();
 };
 
 export struct WrapFusionExpr {
     String method{};
     String options_text{};
 
-    ParsedExpr* GetParsedExpr();
+    ParsedExpr *GetParsedExpr();
 };
 
 export struct WrapMatchTensorExpr {
@@ -174,7 +176,7 @@ export struct WrapMatchTensorExpr {
     SharedPtr<WrapConstantExpr> tensor_expr;
     String embedding_data_type;
     String options_text;
-    ParsedExpr* GetParsedExpr();
+    ParsedExpr *GetParsedExpr();
 };
 
 export struct WrapSearchExpr {
@@ -183,12 +185,12 @@ export struct WrapSearchExpr {
     Vector<SharedPtr<WrapMatchTensorExpr>> match_tensor_exprs{};
     Vector<SharedPtr<WrapFusionExpr>> fusion_exprs{};
 
-    ParsedExpr* GetParsedExpr();
+    ParsedExpr *GetParsedExpr();
 };
 
 export struct WrapParsedExpr {
     WrapParsedExpr() = default;
-    WrapParsedExpr(ParsedExprType expr_type): type(expr_type) {};
+    WrapParsedExpr(ParsedExprType expr_type) : type(expr_type){};
     ParsedExprType type;
     WrapConstantExpr constant_expr;
     WrapColumnExpr column_expr;
@@ -199,13 +201,13 @@ export struct WrapParsedExpr {
     WrapFusionExpr fusion_expr;
     WrapSearchExpr search_expr;
 
-    ParsedExpr* GetParsedExpr();
+    ParsedExpr *GetParsedExpr();
 };
 
 export struct WrapUpdateExpr {
     String column_name;
     WrapParsedExpr value;
-    UpdateExpr* GetUpdateExpr();
+    UpdateExpr *GetUpdateExpr();
 };
 
 export WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options);
@@ -293,32 +295,35 @@ export WrapQueryResult WrapShowBlockColumn(Infinity &instance,
                                            const SizeT &column_id);
 
 export WrapQueryResult
-WrapInsert(Infinity& instance, const String& db_name, const String& table_name, Vector<String>& columns, Vector<Vector<WrapConstantExpr>>& values);
+WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<String> &columns, Vector<Vector<WrapConstantExpr>> &values);
 
 export WrapQueryResult
 WrapImport(Infinity &instance, const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
 
-export WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const String &table_name, WrapParsedExpr* filter);
+export WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const String &table_name, WrapParsedExpr *filter);
 
-export WrapQueryResult
-WrapUpdate(Infinity &instance, const String &db_name, const String &table_name, WrapParsedExpr *wrap_filter, Vector<WrapUpdateExpr> *wrap_update_list);
+export WrapQueryResult WrapUpdate(Infinity &instance,
+                                  const String &db_name,
+                                  const String &table_name,
+                                  WrapParsedExpr *wrap_filter,
+                                  Vector<WrapUpdateExpr> *wrap_update_list);
 
 export WrapQueryResult WrapExplain(Infinity &instance,
                                    const String &db_name,
                                    const String &table_name,
                                    ExplainType explain_type,
                                    Vector<WrapParsedExpr> wrap_output_columns,
-                                   WrapSearchExpr* wrap_search_expr,
-                                   WrapParsedExpr* wrap_filter);
+                                   WrapSearchExpr *wrap_search_expr,
+                                   WrapParsedExpr *wrap_filter);
 
 export WrapQueryResult WrapSearch(Infinity &instance,
                                   const String &db_name,
                                   const String &table_name,
                                   Vector<WrapParsedExpr> select_list,
-                                  WrapSearchExpr* wrap_search_expr = nullptr,
-                                  WrapParsedExpr* where_expr = nullptr,
-                                  WrapParsedExpr* limit_expr = nullptr,
-                                  WrapParsedExpr* offset_expr = nullptr);
+                                  WrapSearchExpr *wrap_search_expr = nullptr,
+                                  WrapParsedExpr *where_expr = nullptr,
+                                  WrapParsedExpr *limit_expr = nullptr,
+                                  WrapParsedExpr *offset_expr = nullptr);
 
 export WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name);
 

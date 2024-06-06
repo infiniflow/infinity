@@ -2,7 +2,6 @@
 #include <nanobind/stl/set.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/string.h>
-#include <nanobind/stl/unique_ptr.h>
 #include <nanobind/stl/vector.h>
 
 #include "parser/definition/column_def.h"
@@ -30,10 +29,12 @@ import statement_common;
 import explain_statement;
 import search_options;
 
-using namespace infinity;
 namespace nb = nanobind;
 
+using namespace infinity;
+
 NB_MODULE(embedded_infinity_ext, m) {
+    nb::bytes a;
     nb::class_<WrapUpdateExpr>(m, "WrapUpdateExpr")
         .def(nb::init<>())
         .def_rw("column_name", &WrapUpdateExpr::column_name)
@@ -46,7 +47,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("names", &WrapQueryResult::names)
         .def_rw("column_defs", &WrapQueryResult::column_defs)
         .def_rw("column_fields", &WrapQueryResult::column_fields);
-//        .def_rw("result_rows", &WrapQueryResult::result_rows);
+    //        .def_rw("result_rows", &WrapQueryResult::result_rows);
 
     nb::class_<WrapColumnField>(m, "WrapColumnField")
         .def(nb::init<>())
@@ -223,23 +224,23 @@ NB_MODULE(embedded_infinity_ext, m) {
 
         .def("Insert", &WrapInsert)
         .def("Import", &WrapImport)
-        .def("Delete", &WrapDelete,
-             nb::arg("db_name"),
-             nb::arg("table_name"),
-             nb::arg("filter") = nullptr)
-        .def("Update", &WrapUpdate,
+        .def("Delete", &WrapDelete, nb::arg("db_name"), nb::arg("table_name"), nb::arg("filter") = nullptr)
+        .def("Update",
+             &WrapUpdate,
              nb::arg("db_name"),
              nb::arg("table_name"),
              nb::arg("wrap_filter") = nullptr,
              nb::arg("wrap_update_list") = nullptr)
-        .def("Explain", &WrapExplain,
+        .def("Explain",
+             &WrapExplain,
              nb::arg("db_name"),
              nb::arg("table_name"),
              nb::arg("explain_type"),
              nb::arg("wrap_output_columns"),
              nb::arg("wrap_search_expr") = nullptr,
              nb::arg("wrap_filter") = nullptr)
-        .def("Search", &WrapSearch,
+        .def("Search",
+             &WrapSearch,
              nb::arg("db_name"),
              nb::arg("table_name"),
              nb::arg("select_list"),

@@ -24,13 +24,12 @@ from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from utils import copy_data
 from test_sdkbase import TestSdk
-# from infinity.embed_infinity import add
 
 test_csv_file = "embedding_int_dim3.csv"
 
+
 class TestCase(TestSdk):
     def test_version(self):
-        # print(add(1, 2))
         print(infinity.__version__)
 
     def test_connection(self):
@@ -99,14 +98,12 @@ class TestCase(TestSdk):
 
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("my_table1", ConflictType.Ignore)
-
         table_obj = db_obj.create_table(
             "my_table1", {"c1": {"type": "int", "constraints": ["primary key"]}}, ConflictType.Error)
         assert table_obj is not None
 
         res = db_obj.list_tables()
         assert res.error_code == ErrorCode.OK
-        print(res)
 
         res = db_obj.drop_table("my_table1")
         assert res.error_code == ErrorCode.OK
@@ -146,21 +143,28 @@ class TestCase(TestSdk):
         res = table_obj.insert(
             [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}])
         assert res.error_code == ErrorCode.OK
+
         # search
-        res = table_obj.output(["c1 + 1"]).to_result()
-        res = table_obj.output(["c1"]).to_df()
+        res = table_obj.output(["c1 - 2"]).to_df()
         print(res)
-        # res = table_obj.output(["*"]).filter("c1 > 1").to_result()
-        # print(res)
+        # pd.testing.assert_frame_equal(res,
+        #                             pd.DataFrame({'(c1 + 1)': (2, 3)}).astype(
+        #                                 {'(c1 + 1)': dtype('int64')}))
 
-
+        # res = table_obj.output(["c1 + 0.1"]).to_df()
+        # pd.testing.assert_frame_equal(res,
+        #                               pd.DataFrame({'(c1 + 0.100000)': (1.1, 2.1)}).astype(
+        #                                   {'(c1 + 0.100000)': dtype('float64')}))
+        #
         # res = table_obj.output(["*"]).filter("c1 > 1").to_df()
         # print(res)
         # pd.testing.assert_frame_equal(res,
         #                               pd.DataFrame({'c1': (2,), 'c2': (2.2,)}).astype(
         #                                   {'c1': dtype('int32'), 'c2': dtype('float32')}))
-        res = db_obj.drop_table("my_table3")
-        assert res.error_code == ErrorCode.OK
+        #
+        # res = db_obj.drop_table("my_table3")
+        # assert res.error_code == ErrorCode.OK
+
         # # import
         # db_obj.drop_table("my_table4", ConflictType.Ignore)
         # table_obj = db_obj.create_table(
@@ -169,9 +173,7 @@ class TestCase(TestSdk):
         # table_obj = db_obj.get_table("my_table4")
         # assert table_obj
         #
-        # print("check_data:", check_data)
         # if not check_data:
-        #     print("test csv file: ", test_csv_file)
         #     copy_data(test_csv_file)
         #
         # assert os.path.exists(common_values.TEST_TMP_DIR + test_csv_file)
@@ -181,12 +183,15 @@ class TestCase(TestSdk):
         #
         # # search
         # res = table_obj.output(
-        #     ["c1"]).to_result()
+        #     ["c1"]).filter("c1 > 1").to_df()
         # print(res)
         # res = db_obj.drop_table("my_table4")
         # assert res.error_code == ErrorCode.OK
 
-        assert infinity_obj.disconnect()
+        # disconnect
+        res = infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_basic(self, check_data):

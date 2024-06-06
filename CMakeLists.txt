@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.28.1)
 
 project(infinity VERSION 0.2.0)
 
-if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
+if (NOT CMAKE_GENERATOR STREQUAL "Ninja")
     message(FATAL_ERROR "This project requires the Ninja generator. Refers to https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html#generator-support")
-endif()
+endif ()
 
 # find_program(CCACHE_FOUND ccache)
 
@@ -35,9 +35,9 @@ message(STATUS "Build time = ${CURRENT_SYS_TIME}")
 
 # Get git information. WARNING: For functions which invoke execute_process, the variable populated by execute_process is visiable only inside the function!
 find_package(Git)
-if(NOT Git_FOUND)
+if (NOT Git_FOUND)
     message(FATAL_ERROR "Git not found.")
-endif()
+endif ()
 execute_process(
         COMMAND "${GIT_EXECUTABLE}" symbolic-ref --short HEAD
         OUTPUT_VARIABLE GIT_BRANCH_NAME
@@ -46,16 +46,16 @@ execute_process(
         COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
         OUTPUT_VARIABLE GIT_COMMIT_ID
         OUTPUT_STRIP_TRAILING_WHITESPACE)
-if("${GIT_BRANCH_NAME}" STREQUAL "")
+if ("${GIT_BRANCH_NAME}" STREQUAL "")
     message(WARNING "Branch name not found.")
-else()
+else ()
     message(STATUS "Branch name = ${GIT_BRANCH_NAME}")
-endif()
-if("${GIT_COMMIT_ID}" STREQUAL "")
+endif ()
+if ("${GIT_COMMIT_ID}" STREQUAL "")
     message(WARNING "Commit id not found.")
-else()
+else ()
     message(STATUS "Commit-id = ${GIT_COMMIT_ID}")
-endif()
+endif ()
 
 # attach additional cmake modules
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
@@ -80,19 +80,19 @@ message(STATUS "Build type = ${CMAKE_BUILD_TYPE}")
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
 
     set(CMAKE_CXX_FLAGS "-Ofast -DNDEBUG")
-    set(CMAKE_C_FLAGS  "-Ofast -DNDEBUG")
+    set(CMAKE_C_FLAGS "-Ofast -DNDEBUG")
 
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
 
     set(CMAKE_CXX_FLAGS "-O2 -g -DNDEBUG")
-    set(CMAKE_C_FLAGS  "-O2 -g -DNDEBUG")
+    set(CMAKE_C_FLAGS "-O2 -g -DNDEBUG")
 
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
     set(CMAKE_CXX_FLAGS "-O0 -g")
     set(CMAKE_C_FLAGS "-O0 -g")
 
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-stack-protector -fno-omit-frame-pointer -fno-var-tracking ")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-stack-protector -fno-omit-frame-pointer -fno-var-tracking ")
     #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=memory -fno-omit-frame-pointer")
     #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=thread -fno-omit-frame-pointer")
     #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=undefined -fno-omit-frame-pointer")
@@ -104,9 +104,9 @@ else ()
 endif ()
 
 if (CLANG_VERSION_STRING VERSION_EQUAL 17)
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-read-modules-implicitly -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wno-read-modules-implicitly -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
 else ()
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wno-asm-operand-widths -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wextra -Wno-unused-parameter -Wno-unused-private-field -pthread -fcolor-diagnostics")
 endif ()
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
@@ -123,10 +123,10 @@ execute_process(
         COMMAND bash -c "zgrep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /proc/config.gz 2>/dev/null; grep CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y /boot/config-$(uname -r) 2>/dev/null"
         OUTPUT_VARIABLE HAVE_EFFICIENT_UNALIGNED_ACCESS
         OUTPUT_STRIP_TRAILING_WHITESPACE)
-if("${HAVE_EFFICIENT_UNALIGNED_ACCESS}" STREQUAL "CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y")
+if ("${HAVE_EFFICIENT_UNALIGNED_ACCESS}" STREQUAL "CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y")
     message(STATUS "Found CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y")
     add_definitions(-DHAVE_EFFICIENT_UNALIGNED_ACCESS)
-endif()
+endif ()
 
 ADD_DEFINITIONS(-D INFINITY_DEBUG)
 
@@ -135,11 +135,11 @@ find_package(Lz4 REQUIRED)
 
 # You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
 option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
-if(ENABLE_JEMALLOC AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+if (ENABLE_JEMALLOC AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     find_package(jemalloc REQUIRED)
-    set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
-endif()
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
+endif ()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 
@@ -150,7 +150,7 @@ find_package(Python 3.8
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
-endif()
+endif ()
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/nanobind)
 

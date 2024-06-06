@@ -1,6 +1,8 @@
 module;
-#include <cstring>
 #include <cassert>
+#include <cstring>
+#include <string>
+#include <nanobind/nanobind.h>
 
 module wrap_infinity;
 
@@ -37,10 +39,11 @@ import infinity_exception;
 import column_vector;
 import internal_types;
 import table_def;
+import third_party;
 
 namespace infinity {
 
-ParsedExpr* WrapConstantExpr::GetParsedExpr() {
+ParsedExpr *WrapConstantExpr::GetParsedExpr() {
     auto constant_expr = new ConstantExpr(literal_type);
     switch (literal_type) {
         case LiteralType::kBoolean: {
@@ -83,7 +86,7 @@ ParsedExpr* WrapConstantExpr::GetParsedExpr() {
     return constant_expr;
 }
 
-ParsedExpr* WrapColumnExpr::GetParsedExpr() {
+ParsedExpr *WrapColumnExpr::GetParsedExpr() {
     auto column_expr = new ColumnExpr();
     column_expr->names_.reserve(names.size());
     for (SizeT i = 0; i < names.size(); ++i) {
@@ -94,7 +97,7 @@ ParsedExpr* WrapColumnExpr::GetParsedExpr() {
     return column_expr;
 }
 
-ParsedExpr* WrapFunctionExpr::GetParsedExpr() {
+ParsedExpr *WrapFunctionExpr::GetParsedExpr() {
     auto function_expr = new FunctionExpr();
     function_expr->func_name_ = func_name;
     function_expr->distinct_ = distinct;
@@ -108,7 +111,7 @@ ParsedExpr* WrapFunctionExpr::GetParsedExpr() {
     return function_expr;
 }
 
-ParsedExpr* WrapBetweenExpr::GetParsedExpr() {
+ParsedExpr *WrapBetweenExpr::GetParsedExpr() {
     auto between_expr = new BetweenExpr();
     between_expr->value_ = value->GetParsedExpr();
     between_expr->lower_bound_ = lower_bound->GetParsedExpr();
@@ -116,12 +119,12 @@ ParsedExpr* WrapBetweenExpr::GetParsedExpr() {
     return between_expr;
 }
 
-ParsedExpr* WrapKnnExpr::GetParsedExpr() {
+ParsedExpr *WrapKnnExpr::GetParsedExpr() {
     auto knn_expr = new KnnExpr(own_memory);
     return knn_expr;
 }
 
-ParsedExpr* WrapMatchExpr::GetParsedExpr() {
+ParsedExpr *WrapMatchExpr::GetParsedExpr() {
     auto match_expr = new MatchExpr();
     match_expr->fields_ = fields;
     match_expr->matching_text_ = matching_text;
@@ -129,40 +132,40 @@ ParsedExpr* WrapMatchExpr::GetParsedExpr() {
     return match_expr;
 }
 
-ParsedExpr* WrapFusionExpr::GetParsedExpr() {
+ParsedExpr *WrapFusionExpr::GetParsedExpr() {
     auto fusion_expr = new FusionExpr();
     fusion_expr->method_ = method;
     fusion_expr->options_ = MakeShared<SearchOptions>(options_text);
     return fusion_expr;
 }
 
-ParsedExpr* WrapMatchTensorExpr::GetParsedExpr() {
+ParsedExpr *WrapMatchTensorExpr::GetParsedExpr() {
     auto match_tensor_expr = new MatchTensorExpr(own_memory);
     return match_tensor_expr;
 }
 
-ParsedExpr* WrapSearchExpr::GetParsedExpr() {
+ParsedExpr *WrapSearchExpr::GetParsedExpr() {
     auto search_expr = new SearchExpr();
     search_expr->match_exprs_.reserve(match_exprs.size());
     for (SizeT i = 0; i < match_exprs.size(); ++i) {
-        search_expr->match_exprs_.emplace_back(dynamic_cast<MatchExpr*>(match_exprs[i]->GetParsedExpr()));
+        search_expr->match_exprs_.emplace_back(dynamic_cast<MatchExpr *>(match_exprs[i]->GetParsedExpr()));
     }
     search_expr->knn_exprs_.reserve(knn_exprs.size());
     for (SizeT i = 0; i < knn_exprs.size(); ++i) {
-        search_expr->knn_exprs_.emplace_back(dynamic_cast<KnnExpr*>(knn_exprs[i]->GetParsedExpr()));
+        search_expr->knn_exprs_.emplace_back(dynamic_cast<KnnExpr *>(knn_exprs[i]->GetParsedExpr()));
     }
     search_expr->match_tensor_exprs_.reserve(match_tensor_exprs.size());
     for (SizeT i = 0; i < match_tensor_exprs.size(); ++i) {
-        search_expr->match_tensor_exprs_.emplace_back(dynamic_cast<MatchTensorExpr*>(match_tensor_exprs[i]->GetParsedExpr()));
+        search_expr->match_tensor_exprs_.emplace_back(dynamic_cast<MatchTensorExpr *>(match_tensor_exprs[i]->GetParsedExpr()));
     }
     search_expr->fusion_exprs_.reserve(fusion_exprs.size());
     for (SizeT i = 0; i < fusion_exprs.size(); ++i) {
-        search_expr->fusion_exprs_.emplace_back(dynamic_cast<FusionExpr*>(fusion_exprs[i]->GetParsedExpr()));
+        search_expr->fusion_exprs_.emplace_back(dynamic_cast<FusionExpr *>(fusion_exprs[i]->GetParsedExpr()));
     }
     return search_expr;
 }
 
-ParsedExpr* WrapParsedExpr::GetParsedExpr() {
+ParsedExpr *WrapParsedExpr::GetParsedExpr() {
     if (type == ParsedExprType::kConstant) {
         return constant_expr.GetParsedExpr();
     } else if (type == ParsedExprType::kColumn) {
@@ -184,7 +187,7 @@ ParsedExpr* WrapParsedExpr::GetParsedExpr() {
     }
 }
 
-UpdateExpr* WrapUpdateExpr::GetUpdateExpr() {
+UpdateExpr *WrapUpdateExpr::GetUpdateExpr() {
     auto update_expr = new UpdateExpr();
     update_expr->column_name = column_name;
     update_expr->value = value.GetParsedExpr();
@@ -208,7 +211,7 @@ WrapQueryResult WrapListDatabases(Infinity &instance) {
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
 
     SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
-    auto& names = result.names;
+    auto &names = result.names;
     names.resize(data_block->row_count());
     for (SizeT i = 0; i < names.size(); ++i) {
         Value value = data_block->GetValue(0, i);
@@ -287,7 +290,7 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
     Vector<TableConstraint *> constraints;
     Vector<ColumnDef *> column_defs_ptr;
     for (SizeT i = 0; i < column_defs.size(); ++i) {
-        auto& wrap_column_def = column_defs[i];
+        auto &wrap_column_def = column_defs[i];
         SharedPtr<TypeInfo> type_info_ptr = nullptr;
         if (wrap_column_def.column_type.logical_type == LogicalType::kEmbedding) {
             auto &embedding_type = wrap_column_def.column_type.embedding_type;
@@ -353,8 +356,8 @@ WrapQueryResult WrapCreateIndex(Infinity &instance,
         index_info->column_name_ = wrap_index_info.column_name;
         {
             auto index_param_list = new Vector<InitParameter *>();
-            for(SizeT j = 0; j < wrap_index_info.index_param_list.size(); ++j) {
-                auto& wrap_init_param = wrap_index_info.index_param_list[j];
+            for (SizeT j = 0; j < wrap_index_info.index_param_list.size(); ++j) {
+                auto &wrap_init_param = wrap_index_info.index_param_list[j];
                 index_param_list->emplace_back(new InitParameter(wrap_init_param.param_name_, wrap_init_param.param_value_));
             }
             index_info->index_param_list_ = index_param_list;
@@ -411,12 +414,12 @@ WrapQueryResult WrapShowBlockColumn(Infinity &instance,
 }
 
 WrapQueryResult
-WrapInsert(Infinity& instance, const String& db_name, const String& table_name, Vector<String>& columns, Vector<Vector<WrapConstantExpr>>& values) {
+WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<String> &columns, Vector<Vector<WrapConstantExpr>> &values) {
     Vector<Vector<ParsedExpr *> *> *value_ptr = new Vector<Vector<ParsedExpr *> *>(values.size());
     for (SizeT i = 0; i < values.size(); ++i) {
         auto value_list = new Vector<ParsedExpr *>(values[i].size());
         for (SizeT j = 0; j < values[i].size(); ++j) {
-            auto& wrap_constant_expr = values[i][j];
+            auto &wrap_constant_expr = values[i][j];
             (*value_list)[j] = wrap_constant_expr.GetParsedExpr();
         }
         (*value_ptr)[i] = value_list;
@@ -432,7 +435,7 @@ WrapQueryResult WrapImport(Infinity &instance, const String &db_name, const Stri
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const String &table_name, WrapParsedExpr* wrap_filter) {
+WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const String &table_name, WrapParsedExpr *wrap_filter) {
     ParsedExpr *filter = nullptr;
     if (wrap_filter != nullptr) {
         filter = wrap_filter->GetParsedExpr();
@@ -441,13 +444,16 @@ WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const Stri
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult
-WrapUpdate(Infinity &instance, const String &db_name, const String &table_name, WrapParsedExpr *wrap_filter, Vector<WrapUpdateExpr> *wrap_update_list) {
+WrapQueryResult WrapUpdate(Infinity &instance,
+                           const String &db_name,
+                           const String &table_name,
+                           WrapParsedExpr *wrap_filter,
+                           Vector<WrapUpdateExpr> *wrap_update_list) {
     ParsedExpr *filter = nullptr;
     if (wrap_filter != nullptr) {
         filter = wrap_filter->GetParsedExpr();
     }
-    Vector<UpdateExpr* > *update_list = nullptr;
+    Vector<UpdateExpr *> *update_list = nullptr;
     if (wrap_update_list != nullptr) {
         update_list = new Vector<UpdateExpr *>(wrap_update_list->size());
         for (SizeT i = 0; i < wrap_update_list->size(); ++i) {
@@ -465,11 +471,11 @@ WrapQueryResult WrapExplain(Infinity &instance,
                             const String &table_name,
                             ExplainType explain_type,
                             Vector<WrapParsedExpr> wrap_output_columns,
-                            WrapSearchExpr* wrap_search_expr,
-                            WrapParsedExpr* wrap_filter) {
+                            WrapSearchExpr *wrap_search_expr,
+                            WrapParsedExpr *wrap_filter) {
     SearchExpr *search_expr = nullptr;
     if (wrap_search_expr != nullptr) {
-        search_expr = dynamic_cast<SearchExpr*>(wrap_search_expr->GetParsedExpr());
+        search_expr = dynamic_cast<SearchExpr *>(wrap_search_expr->GetParsedExpr());
     }
     ParsedExpr *filter = nullptr;
     if (wrap_filter != nullptr) {
@@ -486,31 +492,34 @@ WrapQueryResult WrapExplain(Infinity &instance,
 }
 
 // WrapSearch related function
-void HandleBoolType(ColumnField &output_column_field,
-                    SizeT row_count,
-                    const SharedPtr<ColumnVector> &column_vector) {
+void HandleBoolType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     String dst;
     dst.reserve(row_count);
     for (SizeT index = 0; index < row_count; ++index) {
         const char c = column_vector->buffer_->GetCompactBit(index) ? 1 : 0;
         dst.push_back(c);
     }
-    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.column_vectors.emplace_back(dst.c_str());
 }
 
-void HandlePodType(ColumnField &output_column_field,
-                   SizeT row_count,
-                   const SharedPtr<ColumnVector> &column_vector) {
+void HandlePodType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
     String dst;
     dst.resize(size);
     std::memcpy(dst.data(), column_vector->data(), size);
-    output_column_field.column_vectors.emplace_back(std::move(dst));
+    fmt::print("HandlePodType func, dst size = {}\n", dst.size());
+    for (SizeT i = 0; i < dst.size(); ++i) {
+        fmt::print("{:02x} ", unsigned(dst[i]));
+    }
+    fmt::print("\n");
+    fmt::print("column vector:\n {}\n", column_vector->ToString());
+//    fmt::print("HandlePodType, dst = {}\n", dst.c_str());
+//    std::cout << "HandlePodType, dst = " << std::endl;
+//    std::cout << "size = " << size << " dst = " << dst.c_str() << std::endl;
+    output_column_field.column_vectors.emplace_back(dst.c_str());
 }
 
-void HandleVarcharType(ColumnField &output_column_field,
-                       SizeT row_count,
-                       const SharedPtr<ColumnVector> &column_vector) {
+void HandleVarcharType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     String dst;
     SizeT total_varchar_data_size = 0;
     for (SizeT index = 0; index < row_count; ++index) {
@@ -540,24 +549,20 @@ void HandleVarcharType(ColumnField &output_column_field,
         current_offset += sizeof(i32) + varchar.length_;
     }
 
-    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.column_vectors.emplace_back(dst.c_str());
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleEmbeddingType(ColumnField &output_column_field,
-                                                SizeT row_count,
-                                                const SharedPtr<ColumnVector> &column_vector) {
+void HandleEmbeddingType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
     String dst;
     dst.resize(size);
     std::memcpy(dst.data(), column_vector->data(), size);
-    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.column_vectors.emplace_back(dst.c_str());
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleTensorType(ColumnField &output_column_field,
-                                             SizeT row_count,
-                                             const SharedPtr<ColumnVector> &column_vector) {
+void HandleTensorType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     String dst;
     SizeT total_tensor_embedding_num = 0;
     for (SizeT index = 0; index < row_count; ++index) {
@@ -579,13 +584,11 @@ void HandleTensorType(ColumnField &output_column_field,
         current_offset += length;
     }
 
-    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.column_vectors.emplace_back(dst.c_str());
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleTensorArrayType(ColumnField &output_column_field,
-                                                  SizeT row_count,
-                                                  const SharedPtr<ColumnVector> &column_vector) {
+void HandleTensorArrayType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     const auto embedding_info = static_cast<const EmbeddingInfo *>(column_vector->data_type()->type_info().get());
     const auto unit_embedding_byte_size = embedding_info->Size();
     Vector<Vector<TensorT>> tensors_v(row_count);
@@ -625,25 +628,20 @@ void HandleTensorArrayType(ColumnField &output_column_field,
         }
     }
 
-    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.column_vectors.emplace_back(dst.c_str());
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-void HandleRowIDType(ColumnField &output_column_field,
-                                            SizeT row_count,
-                                            const SharedPtr<ColumnVector> &column_vector) {
+void HandleRowIDType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
     String dst;
     dst.resize(size);
     std::memcpy(dst.data(), column_vector->data(), size);
-    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.column_vectors.emplace_back(dst.c_str());
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
-
-void ProcessColumnFieldType(ColumnField &output_column_field,
-                            SizeT row_count,
-                            const SharedPtr<ColumnVector> &column_vector) {
+void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     switch (column_vector->data_type()->type()) {
         case LogicalType::kBoolean: {
             HandleBoolType(output_column_field, row_count, column_vector);
@@ -695,10 +693,7 @@ void ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, 
     }
 }
 
-void HandleColumnDef(WrapQueryResult &wrap_query_result,
-                     SizeT column_count,
-                     SharedPtr<TableDef> table_def,
-                     Vector<ColumnField> &all_column_vectors) {
+void HandleColumnDef(WrapQueryResult &wrap_query_result, SizeT column_count, SharedPtr<TableDef> table_def, Vector<ColumnField> &all_column_vectors) {
     assert(column_count == all_column_vectors.size());
 
     for (SizeT col_index = 0; col_index < column_count; ++col_index) {
@@ -707,7 +702,7 @@ void HandleColumnDef(WrapQueryResult &wrap_query_result,
         proto_column_def.id = column_def->id();
         proto_column_def.column_name = column_def->name();
 
-        WrapDataType& proto_data_type = proto_column_def.column_type;
+        WrapDataType &proto_data_type = proto_column_def.column_type;
         proto_data_type.logical_type = column_def->type()->type();
         wrap_query_result.column_defs.emplace_back(proto_column_def);
     }
@@ -726,13 +721,13 @@ WrapQueryResult WrapSearch(Infinity &instance,
                            const String &db_name,
                            const String &table_name,
                            Vector<WrapParsedExpr> select_list,
-                           WrapSearchExpr* wrap_search_expr,
-                           WrapParsedExpr* where_expr,
-                           WrapParsedExpr* limit_expr,
-                           WrapParsedExpr* offset_expr) {
+                           WrapSearchExpr *wrap_search_expr,
+                           WrapParsedExpr *where_expr,
+                           WrapParsedExpr *limit_expr,
+                           WrapParsedExpr *offset_expr) {
     SearchExpr *search_expr = nullptr;
     if (wrap_search_expr != nullptr) {
-        search_expr = dynamic_cast<SearchExpr*>(wrap_search_expr->GetParsedExpr());
+        search_expr = dynamic_cast<SearchExpr *>(wrap_search_expr->GetParsedExpr());
     }
     ParsedExpr *filter = nullptr;
     if (where_expr != nullptr) {
@@ -752,23 +747,6 @@ WrapQueryResult WrapSearch(Infinity &instance,
     auto &columns = wrap_query_result.column_fields;
     columns.resize(query_result.result_table_->ColumnCount());
     ProcessDataBlocks(query_result, wrap_query_result, columns);
-//    SizeT block_rows = query_result.result_table_->DataBlockCount();
-//    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-//        DataBlock *data_block = query_result.result_table_->GetDataBlockById(block_id).get();
-//        auto row_count = data_block->row_count();
-//        auto column_cnt = query_result.result_table_->ColumnCount();
-//
-//        for (int row = 0; row < row_count; ++row) {
-//            Vector<WrapColumnField> result_row(column_cnt);
-//            for (SizeT col = 0; col < column_cnt; ++col) {
-//                Value value = data_block->GetValue(col, row);
-//                const String &column_name = query_result.result_table_->GetColumnNameById(col);
-//                const String &column_value = value.ToString();
-//                result_row[col] = WrapColumnField(column_name, column_value);
-//            }
-//            wrap_query_result.result_rows.emplace_back(result_row);
-//        }
-//    }
     return wrap_query_result;
 }
 
