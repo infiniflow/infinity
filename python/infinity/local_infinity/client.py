@@ -17,12 +17,14 @@ from infinity.common import LOCAL_INFINITY_PATH
 from embedded_infinity import *
 
 class LocalQueryResult:
-    def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, result_data=None):
+    def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, column_defs=None, column_fields=None):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_names = db_names
         self.table_names = table_names
-        self.result_data = result_data
+        # self.result_data = result_data
+        self.column_defs = column_defs
+        self.column_fields = column_fields
 
 class LocalInfinityClient:
     def __init__(self, path: str = LOCAL_INFINITY_PATH):
@@ -41,7 +43,7 @@ class LocalInfinityClient:
         if has_table_name:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, table_names=res.names)
         if has_result_data:
-            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, result_data=res.result_rows)
+            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, column_defs=res.column_defs, column_fields=res.column_fields)
         return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg)
 
     def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError):

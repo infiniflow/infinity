@@ -44,12 +44,20 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("error_code", &WrapQueryResult::error_code)
         .def_rw("error_msg", &WrapQueryResult::error_msg)
         .def_rw("names", &WrapQueryResult::names)
-        .def_rw("result_rows", &WrapQueryResult::result_rows);
+        .def_rw("column_defs", &WrapQueryResult::column_defs)
+        .def_rw("column_fields", &WrapQueryResult::column_fields);
+//        .def_rw("result_rows", &WrapQueryResult::result_rows);
 
     nb::class_<WrapColumnField>(m, "WrapColumnField")
         .def(nb::init<>())
         .def_rw("column_name", &WrapColumnField::column_name)
         .def_rw("column_data", &WrapColumnField::column_data);
+
+    nb::class_<ColumnField>(m, "ColumnField")
+        .def(nb::init<>())
+        .def_rw("column_type", &ColumnField::column_type)
+        .def_rw("column_vectors", &ColumnField::column_vectors)
+        .def_rw("column_name", &ColumnField::column_name);
 
     nb::class_<WrapDataType>(m, "WrapDataType")
         .def(nb::init<>())

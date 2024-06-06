@@ -43,6 +43,12 @@ import search_expr;
 // wrap Infinity function for nanobind infinity
 namespace infinity {
 
+export struct ColumnField {
+    LogicalType column_type;
+    Vector<String> column_vectors;
+    String column_name;
+};
+
 export struct WrapColumnField {
     WrapColumnField() = default;
     WrapColumnField(const String& column_name, const String& column_data) : column_name(column_name), column_data(column_data) {}
@@ -86,8 +92,9 @@ export struct WrapQueryResult {
     ErrorCode error_code;
     String error_msg;
     Vector<String> names;
-    Vector<Vector<WrapColumnField>> result_rows;
-//    Vector<WrapColumnDef> column_defs;
+//    Vector<Vector<WrapColumnField>> result_rows;
+    Vector<WrapColumnDef> column_defs;
+    Vector<ColumnField> column_fields;
 //    Vector<WrapColumnField> column_fields;
     WrapQueryResult() = default;
     WrapQueryResult(ErrorCode error_code, const char *error_msg) : error_code(error_code) {

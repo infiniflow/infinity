@@ -148,12 +148,19 @@ class TestCase(TestSdk):
         assert res.error_code == ErrorCode.OK
         # search
         res = table_obj.output(["c1"]).to_result()
+        res = table_obj.output(["c1"]).to_df()
         print(res)
         # res = table_obj.output(["*"]).filter("c1 > 1").to_result()
         # print(res)
+
+
+        # res = table_obj.output(["*"]).filter("c1 > 1").to_df()
+        # print(res)
+        # pd.testing.assert_frame_equal(res,
+        #                               pd.DataFrame({'c1': (2,), 'c2': (2.2,)}).astype(
+        #                                   {'c1': dtype('int32'), 'c2': dtype('float32')}))
         res = db_obj.drop_table("my_table3")
         assert res.error_code == ErrorCode.OK
-
         # # import
         # db_obj.drop_table("my_table4", ConflictType.Ignore)
         # table_obj = db_obj.create_table(

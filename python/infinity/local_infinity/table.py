@@ -28,6 +28,7 @@ from infinity.remote_thrift.utils import name_validity_check
 from infinity.table import Table, ExplainType
 from infinity.common import ConflictType
 from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
+from infinity.local_infinity.types import build_result
 from infinity.local_infinity.utils import traverse_conditions
 from embedded_infinity import ConflictType as LocalConflictType
 from embedded_infinity import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, WrapSearchExpr, ParsedExprType, WrapUpdateExpr
@@ -363,7 +364,7 @@ class LocalTable(Table, ABC):
 
         # process the results
         if res.error_code == ErrorCode.OK:
-            return res
+            return build_result(res)
         else:
             raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
 

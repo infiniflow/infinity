@@ -1,5 +1,6 @@
 module;
 #include <cstring>
+#include <cassert>
 
 module wrap_infinity;
 
@@ -33,6 +34,9 @@ import between_expr;
 import parsed_expr;
 import search_expr;
 import infinity_exception;
+import column_vector;
+import internal_types;
+import table_def;
 
 namespace infinity {
 
@@ -481,6 +485,242 @@ WrapQueryResult WrapExplain(Infinity &instance,
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
+void HandleBoolType(ColumnField &output_column_field,
+                    SizeT row_count,
+                    const SharedPtr<ColumnVector> &column_vector) {
+    String dst;
+    dst.reserve(row_count);
+    for (SizeT index = 0; index < row_count; ++index) {
+        const char c = column_vector->buffer_->GetCompactBit(index) ? 1 : 0;
+        dst.push_back(c);
+    }
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+}
+
+void HandlePodType(ColumnField &output_column_field,
+                   SizeT row_count,
+                   const SharedPtr<ColumnVector> &column_vector) {
+    auto size = column_vector->data_type()->Size() * row_count;
+    String dst;
+    dst.resize(size);
+    std::memcpy(dst.data(), column_vector->data(), size);
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+}
+
+void HandleVarcharType(ColumnField &output_column_field,
+                       SizeT row_count,
+                       const SharedPtr<ColumnVector> &column_vector) {
+    String dst;
+    SizeT total_varchar_data_size = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
+        total_varchar_data_size += varchar.length_;
+    }
+
+    auto all_size = total_varchar_data_size + row_count * sizeof(i32);
+    dst.resize(all_size);
+
+    i32 current_offset = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
+        i32 length = varchar.length_;
+        if (varchar.IsInlined()) {
+            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+            std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
+        } else {
+            auto varchar_ptr = MakeUnique<char[]>(varchar.length_ + 1);
+            column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(),
+                                                                varchar.vector_.chunk_id_,
+                                                                varchar.vector_.chunk_offset_,
+                                                                varchar.length_);
+            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+            std::memcpy(dst.data() + current_offset + sizeof(i32), varchar_ptr.get(), varchar.length_);
+        }
+        current_offset += sizeof(i32) + varchar.length_;
+    }
+
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.column_type = column_vector->data_type()->type();
+}
+
+void HandleEmbeddingType(ColumnField &output_column_field,
+                                                SizeT row_count,
+                                                const SharedPtr<ColumnVector> &column_vector) {
+    auto size = column_vector->data_type()->Size() * row_count;
+    String dst;
+    dst.resize(size);
+    std::memcpy(dst.data(), column_vector->data(), size);
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.column_type = column_vector->data_type()->type();
+}
+
+void HandleTensorType(ColumnField &output_column_field,
+                                             SizeT row_count,
+                                             const SharedPtr<ColumnVector> &column_vector) {
+    String dst;
+    SizeT total_tensor_embedding_num = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        TensorT &tensor = ((TensorT *)column_vector->data())[index];
+        total_tensor_embedding_num += tensor.embedding_num_;
+    }
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(column_vector->data_type()->type_info().get());
+    const auto unit_embedding_byte_size = embedding_info->Size();
+    dst.resize(total_tensor_embedding_num * unit_embedding_byte_size + row_count * sizeof(i32));
+
+    i32 current_offset = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        TensorT &tensor = ((TensorT *)column_vector->data())[index];
+        i32 length = tensor.embedding_num_ * unit_embedding_byte_size;
+        std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+        current_offset += sizeof(i32);
+        const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(tensor.chunk_id_, tensor.chunk_offset_);
+        std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
+        current_offset += length;
+    }
+
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.column_type = column_vector->data_type()->type();
+}
+
+void HandleTensorArrayType(ColumnField &output_column_field,
+                                                  SizeT row_count,
+                                                  const SharedPtr<ColumnVector> &column_vector) {
+    const auto embedding_info = static_cast<const EmbeddingInfo *>(column_vector->data_type()->type_info().get());
+    const auto unit_embedding_byte_size = embedding_info->Size();
+    Vector<Vector<TensorT>> tensors_v(row_count);
+    SizeT expect_offset = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        const auto &tensorarray = ((const TensorArrayT *)column_vector->data())[index];
+        const i32 tensor_num = tensorarray.tensor_num_;
+        expect_offset += sizeof(i32);
+        Vector<TensorT> &tensors = tensors_v[index];
+        tensors.resize(tensor_num);
+        column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(reinterpret_cast<char *>(tensors.data()),
+                                                            tensorarray.chunk_id_,
+                                                            tensorarray.chunk_offset_,
+                                                            tensor_num * sizeof(TensorT));
+        for (SizeT i = 0; i < tensors.size(); ++i) {
+            const auto &tensor = tensors[i];
+            expect_offset += sizeof(i32) + tensor.embedding_num_ * unit_embedding_byte_size;
+        }
+    }
+    String dst;
+    dst.resize(expect_offset);
+
+    i32 current_offset = 0;
+    for (SizeT i = 0; i < tensors_v.size(); ++i) {
+        auto &tensors = tensors_v[i];
+        const i32 tensor_num = tensors.size();
+        std::memcpy(dst.data() + current_offset, &tensor_num, sizeof(i32));
+        current_offset += sizeof(i32);
+        for (SizeT j = 0; j < tensors.size(); ++j) {
+            auto tensor = tensors[j];
+            i32 length = tensor.embedding_num_ * unit_embedding_byte_size;
+            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+            current_offset += sizeof(i32);
+            const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_1_->GetRawPtrFromChunk(tensor.chunk_id_, tensor.chunk_offset_);
+            std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
+            current_offset += length;
+        }
+    }
+
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.column_type = column_vector->data_type()->type();
+}
+
+void HandleRowIDType(ColumnField &output_column_field,
+                                            SizeT row_count,
+                                            const SharedPtr<ColumnVector> &column_vector) {
+    auto size = column_vector->data_type()->Size() * row_count;
+    String dst;
+    dst.resize(size);
+    std::memcpy(dst.data(), column_vector->data(), size);
+    output_column_field.column_vectors.emplace_back(std::move(dst));
+    output_column_field.column_type = column_vector->data_type()->type();
+}
+
+
+void ProcessColumnFieldType(ColumnField &output_column_field,
+                            SizeT row_count,
+                            const SharedPtr<ColumnVector> &column_vector) {
+    switch (column_vector->data_type()->type()) {
+        case LogicalType::kBoolean: {
+            HandleBoolType(output_column_field, row_count, column_vector);
+            break;
+        }
+        case LogicalType::kTinyInt:
+        case LogicalType::kSmallInt:
+        case LogicalType::kInteger:
+        case LogicalType::kBigInt:
+        case LogicalType::kHugeInt:
+        case LogicalType::kFloat:
+        case LogicalType::kDouble: {
+            HandlePodType(output_column_field, row_count, column_vector);
+            break;
+        }
+        case LogicalType::kVarchar: {
+            HandleVarcharType(output_column_field, row_count, column_vector);
+            break;
+        }
+        case LogicalType::kEmbedding: {
+            HandleEmbeddingType(output_column_field, row_count, column_vector);
+            break;
+        }
+        case LogicalType::kTensor: {
+            HandleTensorType(output_column_field, row_count, column_vector);
+            break;
+        }
+        case LogicalType::kTensorArray: {
+            HandleTensorArrayType(output_column_field, row_count, column_vector);
+            break;
+        }
+        case LogicalType::kRowID: {
+            HandleRowIDType(output_column_field, row_count, column_vector);
+            break;
+        }
+        default: {
+            throw UnrecoverableException("Unsupported column type");
+        }
+    }
+}
+
+void ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, Vector<ColumnField> &columns) {
+    auto row_count = data_block->row_count();
+    for (SizeT col_index = 0; col_index < column_count; ++col_index) {
+        auto &result_column_vector = data_block->column_vectors[col_index];
+        ColumnField &output_column_field = columns[col_index];
+        output_column_field.column_type = result_column_vector->data_type()->type();
+        ProcessColumnFieldType(output_column_field, row_count, result_column_vector);
+    }
+}
+
+void HandleColumnDef(WrapQueryResult &wrap_query_result,
+                     SizeT column_count,
+                     SharedPtr<TableDef> table_def,
+                     Vector<ColumnField> &all_column_vectors) {
+    assert(column_count == all_column_vectors.size());
+
+    for (SizeT col_index = 0; col_index < column_count; ++col_index) {
+        auto column_def = table_def->columns()[col_index];
+        WrapColumnDef proto_column_def;
+        proto_column_def.id = column_def->id();
+        proto_column_def.column_name = column_def->name();
+
+        WrapDataType& proto_data_type = proto_column_def.column_type;
+        proto_data_type.logical_type = column_def->type()->type();
+        wrap_query_result.column_defs.emplace_back(proto_column_def);
+    }
+}
+
+void ProcessDataBlocks(QueryResult &query_result, WrapQueryResult &wrap_query_result, Vector<ColumnField> &columns) {
+    SizeT blocks_count = query_result.result_table_->DataBlockCount();
+    for (SizeT block_idx = 0; block_idx < blocks_count; ++block_idx) {
+        auto data_block = query_result.result_table_->GetDataBlockById(block_idx);
+        ProcessColumns(data_block, query_result.result_table_->ColumnCount(), columns);
+    }
+    HandleColumnDef(wrap_query_result, query_result.result_table_->ColumnCount(), query_result.result_table_->definition_ptr_, columns);
+}
+
 WrapQueryResult WrapSearch(Infinity &instance,
                            const String &db_name,
                            const String &table_name,
@@ -508,24 +748,26 @@ WrapQueryResult WrapSearch(Infinity &instance,
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }
     auto wrap_query_result = WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
-
-    SizeT block_rows = query_result.result_table_->DataBlockCount();
-    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
-        DataBlock *data_block = query_result.result_table_->GetDataBlockById(block_id).get();
-        auto row_count = data_block->row_count();
-        auto column_cnt = query_result.result_table_->ColumnCount();
-
-        for (int row = 0; row < row_count; ++row) {
-            Vector<WrapColumnField> result_row(column_cnt);
-            for (SizeT col = 0; col < column_cnt; ++col) {
-                Value value = data_block->GetValue(col, row);
-                const String &column_name = query_result.result_table_->GetColumnNameById(col);
-                const String &column_value = value.ToString();
-                result_row[col] = WrapColumnField(column_name, column_value);
-            }
-            wrap_query_result.result_rows.emplace_back(result_row);
-        }
-    }
+    auto &columns = wrap_query_result.column_fields;
+    columns.resize(query_result.result_table_->ColumnCount());
+    ProcessDataBlocks(query_result, wrap_query_result, columns);
+//    SizeT block_rows = query_result.result_table_->DataBlockCount();
+//    for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+//        DataBlock *data_block = query_result.result_table_->GetDataBlockById(block_id).get();
+//        auto row_count = data_block->row_count();
+//        auto column_cnt = query_result.result_table_->ColumnCount();
+//
+//        for (int row = 0; row < row_count; ++row) {
+//            Vector<WrapColumnField> result_row(column_cnt);
+//            for (SizeT col = 0; col < column_cnt; ++col) {
+//                Value value = data_block->GetValue(col, row);
+//                const String &column_name = query_result.result_table_->GetColumnNameById(col);
+//                const String &column_value = value.ToString();
+//                result_row[col] = WrapColumnField(column_name, column_value);
+//            }
+//            wrap_query_result.result_rows.emplace_back(result_row);
+//        }
+//    }
     return wrap_query_result;
 }
 
