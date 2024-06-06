@@ -241,7 +241,7 @@ class LocalTable(Table, ABC):
                 where_expr = None
             case _:
                 print(cond, condition(cond))
-                where_expr, arguments = traverse_conditions(condition(cond))
+                where_expr = traverse_conditions(condition(cond))
         print("where_expr = ", where_expr)
         res = self._conn.delete(
             db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
@@ -257,7 +257,7 @@ class LocalTable(Table, ABC):
             case None:
                 where_expr = None
             case _:
-                where_expr, arguments = traverse_conditions(condition(cond))
+                where_expr = traverse_conditions(condition(cond))
         match data:
             case None:
                 update_expr_array = None
@@ -335,7 +335,6 @@ class LocalTable(Table, ABC):
     def offset(self, offset: Optional[int]):
         self.query_builder.offset(offset)
         return self
-    # todo implement the following methods
 
     def to_df(self):
         return self.query_builder.to_df()

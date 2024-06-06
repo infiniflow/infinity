@@ -35,16 +35,16 @@ def traverse_conditions(cons, fn=None):
         arguments = []
         for value in cons.hashable_args:
             if fn:
-                expr, _ = fn(value)
+                expr = fn(value)
             else:
-                expr, _ = traverse_conditions(value)
+                expr = traverse_conditions(value)
             arguments.append(expr)
         function_expr.arguments = arguments
 
         parsed_expr.type = ParsedExprType.kFunction
         parsed_expr.function_expr = function_expr
 
-        return parsed_expr, arguments
+        return parsed_expr
 
     elif isinstance(cons, exp.Column):
         parsed_expr = WrapParsedExpr()
@@ -59,7 +59,7 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.type = ParsedExprType.kColumn
         parsed_expr.column_expr = column_expr
 
-        return parsed_expr, None
+        return parsed_expr
 
     elif isinstance(cons, exp.Literal):
         parsed_expr = WrapParsedExpr()
@@ -79,7 +79,7 @@ def traverse_conditions(cons, fn=None):
 
         parsed_expr.type = ParsedExprType.kConstant
         parsed_expr.constant_expr = constant_expr
-        return parsed_expr, None
+        return parsed_expr
 
     elif isinstance(cons, exp.Paren):
         for value in cons.hashable_args:
@@ -101,7 +101,7 @@ def traverse_conditions(cons, fn=None):
             parsed_expr.type = ParsedExprType.kConstant
             parsed_expr.constant_expr = constant_expr
 
-            return parsed_expr, None
+            return parsed_expr
     else:
         raise Exception(f"unknown condition type: {cons}")
 
@@ -114,7 +114,7 @@ def parse_expr(expr):
             arguments = []
             for arg in expr.args.values():
                 if arg:
-                    parsed_expr, _ = parse_expr(arg)
+                    parsed_expr = parse_expr(arg)
                     arguments.append(parsed_expr)
             func_expr = WrapFunctionExpr()
             func_expr.func_name = expr.key
@@ -123,13 +123,13 @@ def parse_expr(expr):
             parsed_expr = WrapParsedExpr()
             parsed_expr.type = ParsedExprType.kFunction
             parsed_expr.function_expr = func_expr
-            return parsed_expr, None
+            return parsed_expr
         elif isinstance(expr, exp.Star):
             column_expr = WrapColumnExpr()
             column_expr.star = True
             parsed_expr = WrapParsedExpr(ParsedExprType.kColumn)
             parsed_expr.column_expr = column_expr
-            return parsed_expr, None
+            return parsed_expr
         else:
             raise Exception(f"unknown expression type: {expr}")
 

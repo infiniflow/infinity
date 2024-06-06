@@ -153,7 +153,7 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def filter(self, where: Optional[str]) -> InfinityLocalQueryBuilder:
-        where_expr, _ = traverse_conditions(condition(where))
+        where_expr = traverse_conditions(condition(where))
         self._filter = where_expr
         return self
 
@@ -174,7 +174,6 @@ class InfinityLocalQueryBuilder(ABC):
     def output(self, columns: Optional[list]) -> InfinityLocalQueryBuilder:
         self._columns = columns
         select_list: List[WrapParsedExpr] = []
-        unused = []
         for column in columns:
             if isinstance(column, str):
                 column = column.lower()
@@ -209,8 +208,7 @@ class InfinityLocalQueryBuilder(ABC):
 
                     select_list.append(parsed_expr)
                 case _:
-                    parsed_expr, _ = parse_expr(maybe_parse(column))
-                    unused.append(_)
+                    parsed_expr = parse_expr(maybe_parse(column))
                     select_list.append(parsed_expr)
 
         self._columns = select_list

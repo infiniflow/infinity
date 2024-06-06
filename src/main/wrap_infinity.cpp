@@ -485,6 +485,7 @@ WrapQueryResult WrapExplain(Infinity &instance,
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
+// WrapSearch related function
 void HandleBoolType(ColumnField &output_column_field,
                     SizeT row_count,
                     const SharedPtr<ColumnVector> &column_vector) {

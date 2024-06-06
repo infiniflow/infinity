@@ -126,22 +126,22 @@ export struct WrapColumnExpr {
 export struct WrapFunctionExpr {
     WrapFunctionExpr() = default;
     String func_name{};
-    Vector<WrapParsedExpr *> arguments{};
+    Vector<SharedPtr<WrapParsedExpr>> arguments;
     bool distinct{false};
 
     ParsedExpr* GetParsedExpr();
 };
 
 export struct WrapBetweenExpr {
-    WrapParsedExpr *value{nullptr};
-    WrapParsedExpr *upper_bound{nullptr};
-    WrapParsedExpr *lower_bound{nullptr};
+    SharedPtr<WrapParsedExpr> value{nullptr};
+    SharedPtr<WrapParsedExpr> upper_bound{nullptr};
+    SharedPtr<WrapParsedExpr> lower_bound{nullptr};
     ParsedExpr* GetParsedExpr();
 };
 
 export struct WrapKnnExpr {
     bool own_memory;
-    WrapParsedExpr *column_expr{};
+    SharedPtr<WrapParsedExpr> column_expr{};
     void *embedding_data_ptr{}; // Pointer to the embedding data ,the data type include float, int ,char ...., so we use void* here
     i64 dimension{};
     EmbeddingDataType embedding_data_type{EmbeddingDataType::kElemInvalid};
@@ -170,18 +170,18 @@ export struct WrapFusionExpr {
 export struct WrapMatchTensorExpr {
     bool own_memory;
     String search_method{};
-    WrapParsedExpr* column_expr;
-    WrapConstantExpr* tensor_expr;
+    SharedPtr<WrapParsedExpr> column_expr;
+    SharedPtr<WrapConstantExpr> tensor_expr;
     String embedding_data_type;
     String options_text;
     ParsedExpr* GetParsedExpr();
 };
 
 export struct WrapSearchExpr {
-    Vector<WrapMatchExpr *> match_exprs{};
-    Vector<WrapKnnExpr *> knn_exprs{};
-    Vector<WrapMatchTensorExpr *> match_tensor_exprs{};
-    Vector<WrapFusionExpr *> fusion_exprs{};
+    Vector<SharedPtr<WrapMatchExpr>> match_exprs{};
+    Vector<SharedPtr<WrapKnnExpr>> knn_exprs{};
+    Vector<SharedPtr<WrapMatchTensorExpr>> match_tensor_exprs{};
+    Vector<SharedPtr<WrapFusionExpr>> fusion_exprs{};
 
     ParsedExpr* GetParsedExpr();
 };
