@@ -79,6 +79,8 @@ public:
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
     }
 
+    inline bool IsKnnMinHeap() const { return knn_expression_->IsKnnMinHeap(); }
+
 public:
     SharedPtr<KnnExpression> knn_expression_{};
 

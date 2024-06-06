@@ -17,6 +17,7 @@ COPY enwiki_embedding FROM '/var/infinity/test_data/enwiki_embedding_9999.csv' W
 statement ok
 CREATE INDEX ft_index ON enwiki_embedding(body) USING FULLTEXT;
 
+
 query TTT
 SELECT doctitle, docdate, body, num, vec FROM enwiki_embedding SEARCH MATCH TEXT ('doctitle^2,body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf');
 ----
@@ -79,6 +80,29 @@ SELECT num FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical'
 1
 2123
 2
+
+
+query II
+SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum');
+----
+6989 1.000000
+0 1.000000
+1 0.750000
+9893 0.432297
+2123 0.000000
+2 0.000000
+
+
+query II
+SELECT num, SCORE() FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('weighted_sum', 'weights=0.8,0.2');
+----
+6989 0.800000
+9893 0.345838
+0 0.200000
+1 0.150000
+2123 0.000000
+2 0.000000
+
 
 query I
 SELECT num FROM enwiki_embedding SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3'), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), MATCH VECTOR (vec, [0.0, 0.0, 0.0, 0.0], 'float', 'l2', 3), FUSION('rrf');
