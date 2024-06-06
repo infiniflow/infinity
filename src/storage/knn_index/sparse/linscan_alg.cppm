@@ -18,12 +18,19 @@ export module linscan_alg;
 
 import stl;
 import sparse_util;
+import file_system;
 
 namespace infinity {
 
 struct Posting {
     u32 doc_id_;
     f32 val_;
+
+    void WriteAdv(char *&p) const;
+
+    static Posting ReadAdv(char *&p);
+
+    static SizeT GetSizeInBytes();
 };
 
 export class LinScan {
@@ -32,9 +39,20 @@ public:
 
     Pair<Vector<u32>, Vector<f32>> SearchBF(const SparseVecRef &query, u32 top_k) const;
 
-    Pair<Vector<u32>, i32> SearchKnn(const SparseVecRef &query, u32 top_k, i32 budget) const;
+    Tuple<Vector<u32>, Vector<f32>, i32> SearchKnn(const SparseVecRef &query, u32 top_k, i32 budget) const;
 
     u32 row_num() const { return row_num_; }
+
+    void Save(FileHandler &file_handler) const;
+
+    static LinScan Load(FileHandler &file_handler);
+
+private:
+    void WriteAdv(char *&p) const;
+
+    static LinScan ReadAdv(char *&p);
+
+    SizeT GetSizeInBytes() const;
 
 private:
     HashMap<u32, Vector<Posting>> inverted_idx_;

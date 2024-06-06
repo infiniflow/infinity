@@ -14,13 +14,12 @@
 
 module;
 
-#include <vector>
-
 export module sparse_util;
 
 import stl;
 import sparse_vector_distance;
 import knn_result_handler;
+import file_system;
 
 namespace infinity {
 
@@ -39,6 +38,10 @@ public:
         i32 nnz = indptr_[row_id + 1] - offset;
         return SparseVecRef{data, indices, nnz};
     }
+
+    static SparseMatrix Load(FileHandler &file_handler);
+
+    void Save(FileHandler &file_handler) const;
 
 public:
     UniquePtr<f32[]> data_{};
@@ -80,19 +83,7 @@ export struct SparseVecUtil {
         return SparseIPDistance(vec1.data_, vec1.indices_, vec1.nnz_, vec2.data_, vec2.indices_, vec2.nnz_);
     }
 
-    static Pair<Vector<u32>, Vector<f32>> Rerank(const SparseMatrix &mat, const SparseVecRef &query, Vector<u32> candidates, u32 topk) {
-        Vector<u32> result(topk);
-        Vector<f32> result_score(topk);
-
-        HeapResultHandler<CompareMin<f32, u32>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
-        for (u32 row_id : candidates) {
-            SparseVecRef vec = mat.at(row_id);
-            f32 score = SparseVecUtil::DistanceIP(query, vec);
-            result_handler.AddResult(0 /*query_id*/, score, row_id);
-        }
-        result_handler.End(0 /*query_id*/);
-        return {std::move(result), std::move(result_score)};
-    }
+    static Pair<Vector<u32>, Vector<f32>> Rerank(const SparseMatrix &mat, const SparseVecRef &query, Vector<u32> candidates, u32 topk);
 };
 
 } // namespace infinity

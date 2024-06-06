@@ -268,7 +268,7 @@ TEST_F(LinScanAlgTest, approximate_scan) {
     for (auto iter = SparseMatrixIter(query); iter.HasNext(); iter.Next()) {
         SparseVecRef query = iter.val();
 
-        auto [candidate_indices, used_budget] = index.SearchKnn(query, candidate_n, budget);
+        auto [candidate_indices, candidate_scores, used_budget] = index.SearchKnn(query, candidate_n, budget);
         used_budget_all += used_budget;
 
         // std::cout << fmt::format("budget: {}, used: {}\n", budget, used_budget);

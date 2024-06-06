@@ -21,13 +21,33 @@ module linscan_alg;
 
 import stl;
 import knn_result_handler;
+import serialize;
+import infinity_exception;
+import third_party;
 
 namespace infinity {
+
+void Posting::WriteAdv(char *&p) const {
+    WriteBufAdv<u32>(p, doc_id_);
+    WriteBufAdv<f32>(p, val_);
+}
+
+Posting Posting::ReadAdv(char *&p) {
+    Posting res;
+    res.doc_id_ = ReadBufAdv<u32>(p);
+    res.val_ = ReadBufAdv<f32>(p);
+    return res;
+}
+
+SizeT Posting::GetSizeInBytes() { return sizeof(doc_id_) + sizeof(val_); }
 
 void LinScan::Insert(const SparseVecRef &vec, u32 doc_id) {
     for (i32 i = 0; i < vec.nnz_; ++i) {
         u32 indice = vec.indices_[i];
         f32 val = vec.data_[i];
+        if (val == 0.0) {
+            continue;
+        }
         Posting posting{doc_id, val};
         inverted_idx_[indice].push_back(posting);
     }
@@ -62,10 +82,10 @@ Pair<Vector<u32>, Vector<f32>> LinScan::SearchBF(const SparseVecRef &query, u32 
         result_handler.AddResult(0 /*query_id*/, score, row_id);
     }
     result_handler.End(0 /*query_id*/);
-    return {std::move(res), std::move(res_score)};
+    return {res, res_score};
 }
 
-Pair<Vector<u32>, i32> LinScan::SearchKnn(const SparseVecRef &query, u32 top_k, i32 budget) const {
+Tuple<Vector<u32>, Vector<f32>, i32> LinScan::SearchKnn(const SparseVecRef &query, u32 top_k, i32 budget) const {
     if (budget <= 0) {
         return {};
     }
@@ -102,7 +122,74 @@ Pair<Vector<u32>, i32> LinScan::SearchKnn(const SparseVecRef &query, u32 top_k, 
         result_handler.AddResult(0 /*query_id*/, score, row_id);
     }
     result_handler.EndWithoutSort(0 /*query_id*/);
-    return {result, cur_budget};
+    return {result, result_score, cur_budget};
+}
+
+void LinScan::Save(FileHandler &file_handler) const {
+    SizeT bytes = GetSizeInBytes();
+    auto buffer = MakeUnique<char[]>(sizeof(bytes) + bytes);
+    char *p = buffer.get();
+    WriteBufAdv<SizeT>(p, bytes);
+    WriteAdv(p);
+    file_handler.Write(buffer.get(), sizeof(bytes) + bytes);
+}
+
+LinScan LinScan::Load(FileHandler &file_handler) {
+    LinScan linscan;
+    SizeT bytes;
+    file_handler.Read(&bytes, sizeof(bytes));
+    auto buffer = MakeUnique<char[]>(bytes);
+    file_handler.Read(buffer.get(), bytes);
+    char *buffer_ptr = buffer.get();
+    return ReadAdv(buffer_ptr);
+}
+
+void LinScan::WriteAdv(char *&p) const {
+    WriteBufAdv<u32>(p, row_num_);
+    SizeT inverted_idx_size = inverted_idx_.size();
+    WriteBufAdv<SizeT>(p, inverted_idx_size);
+    for (const auto &[indice, posting_list] : inverted_idx_) {
+        WriteBufAdv<u32>(p, indice);
+        SizeT posting_size = posting_list.size();
+        WriteBufAdv<SizeT>(p, posting_size);
+        for (const auto &posting : posting_list) {
+            posting.WriteAdv(p);
+        }
+    }
+}
+
+LinScan LinScan::ReadAdv(char *&p) {
+    LinScan res;
+    res.row_num_ = ReadBufAdv<u32>(p);
+    SizeT inverted_idx_size = ReadBufAdv<SizeT>(p);
+    for (SizeT i = 0; i < inverted_idx_size; ++i) {
+        u32 indice = ReadBufAdv<u32>(p);
+        SizeT posting_size = ReadBufAdv<SizeT>(p);
+        Vector<Posting> posting_list(posting_size);
+        for (SizeT j = 0; j < posting_size; ++j) {
+            posting_list[j] = Posting::ReadAdv(p);
+            if (j > 0 && posting_list[j].doc_id_ <= posting_list[j - 1].doc_id_) {
+                UnrecoverableError("Duplicate doc_id in posting list");
+            }
+        }
+        auto [iter, insert_ok] = res.inverted_idx_.emplace(indice, std::move(posting_list));
+        if (!insert_ok) {
+            UnrecoverableError("Duplicate indice in inverted index");
+        }
+    }
+    return res;
+}
+
+SizeT LinScan::GetSizeInBytes() const {
+    SizeT bytes = 0;
+    bytes += sizeof(row_num_);
+    bytes += sizeof(SizeT);
+    for (const auto &[indice, posting_list] : inverted_idx_) {
+        bytes += sizeof(u32);
+        bytes += sizeof(SizeT);
+        bytes += posting_list.size() * Posting::GetSizeInBytes();
+    }
+    return bytes;
 }
 
 } // namespace infinity
