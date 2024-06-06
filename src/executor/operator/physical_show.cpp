@@ -2810,7 +2810,7 @@ void PhysicalShow::ExecuteShowIndexes(QueryContext *query_context, ShowOperatorS
     {
         auto map_guard = table_entry->IndexMetaMap();
         for (const auto &[index_name, index_meta] : *map_guard) {
-            if (!output_block_ptr) {
+            if (output_block_ptr.get() == nullptr) {
                 output_block_ptr = DataBlock::MakeUniquePtr();
                 output_block_ptr->Init(column_types);
             }
@@ -4116,7 +4116,6 @@ void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorSt
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_buffer"), column_defs);
 
     // create data block for output state
-    UniquePtr<DataBlock> output_block_ptr = nullptr;
     Vector<SharedPtr<DataType>> column_types{
         varchar_type,
         varchar_type,
@@ -4125,22 +4124,19 @@ void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorSt
         varchar_type,
     };
 
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
     Vector<BufferObjectInfo> buffer_object_info_array = buffer_manager->GetBufferObjectsInfo();
-    SizeT row_count = buffer_object_info_array.size();
-    for(SizeT row_idx = 0; row_idx < row_count; ++ row_idx) {
+    for(const auto& buffer_object_info: buffer_object_info_array) {
 
-        if(row_idx % DEFAULT_BLOCK_CAPACITY == 0) {
-            if(row_idx != 0) {
-                output_block_ptr->Finalize();
-                operator_state->output_.emplace_back(std::move(output_block_ptr));
-            }
-
+        if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
         }
 
-        const auto& buffer_object_info = buffer_object_info_array[row_idx];
         {
             // path
             Value value = Value::MakeVarchar(buffer_object_info.object_path_);
@@ -4172,11 +4168,15 @@ void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorSt
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
-    }
 
-    if(output_block_ptr.get() == nullptr) {
-        output_block_ptr = DataBlock::MakeUniquePtr();
-        output_block_ptr->Init(column_types);
+        ++ row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+
     }
 
     output_block_ptr->Finalize();
