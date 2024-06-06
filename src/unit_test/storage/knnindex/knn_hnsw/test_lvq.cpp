@@ -24,17 +24,35 @@ import data_store;
 import vec_store_type;
 import stl;
 import infinity_exception;
+import global_resource_usage;
+import infinity_context;
 
 using namespace infinity;
 
 class HnswLVQTest : public BaseTest {
 public:
+public:
     void SetUp() override {
+        RemoveDbDirs();
         system(("rm -rf " + file_dir_).c_str());
         system(("mkdir -p " + file_dir_).c_str());
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
     }
 
-    void TearDown() override { system(("rm -rf " + file_dir_).c_str()); }
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        BaseTest::TearDown();
+        system(("rm -rf " + file_dir_).c_str());
+    }
 
 public:
     using LabelT = int;
