@@ -103,7 +103,6 @@ class LocalInfinityClient:
         drop_index_options.conflict_type = conflict_type
         return self.convert_res(self.client.DropIndex(db_name, table_name, index_name, drop_index_options))
 
-    # todo fields : list[ParsedExpr], ParsedExpr is abstract class, all sub class need to bind
     def insert(self, db_name: str, table_name: str, column_names: list[str], fields):
         retry = 0
         inner_ex = None

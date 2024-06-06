@@ -77,9 +77,9 @@ class InfinityLocalQueryBuilder(ABC):
             raise Exception(f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}")
 
         if (embedding_data_type == 'tinyint' or
-                embedding_data_type == 'smallint' or
-                embedding_data_type == 'int' or
-                embedding_data_type == 'bigint'):
+            embedding_data_type == 'smallint' or
+            embedding_data_type == 'int' or
+            embedding_data_type == 'bigint'):
             embedding_data = [int(x) for x in embedding_data]
 
         data = EmbeddingData()
@@ -216,7 +216,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._columns = select_list
         return self
 
-    def to_result(self) -> tuple[dict[str, list[Any]], dict[str, Any]]:
+    def to_result(self):
         query = Query(
             columns=self._columns,
             search=self._search,

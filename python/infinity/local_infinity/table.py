@@ -323,27 +323,27 @@ class LocalTable(Table, ABC):
     def to_result(self):
         return self.query_builder.to_result()
 
+    def filter(self, filter: Optional[str]):
+        self.query_builder.filter(filter)
+        return self
+
+    def limit(self, limit: Optional[int]):
+        self.query_builder.limit(limit)
+        return self
+
+    def offset(self, offset: Optional[int]):
+        self.query_builder.offset(offset)
+        return self
     # todo implement the following methods
-    # def filter(self, filter: Optional[str]):
-    #     self.query_builder.filter(filter)
-    #     return self
-    #
-    # def limit(self, limit: Optional[int]):
-    #     self.query_builder.limit(limit)
-    #     return self
-    #
-    # def offset(self, offset: Optional[int]):
-    #     self.query_builder.offset(offset)
-    #     return self
-    #
-    # def to_df(self):
-    #     return self.query_builder.to_df()
-    #
-    # def to_pl(self):
-    #     return self.query_builder.to_pl()
-    #
-    # def to_arrow(self):
-    #     return self.query_builder.to_arrow()
+
+    def to_df(self):
+        return self.query_builder.to_df()
+
+    def to_pl(self):
+        return self.query_builder.to_pl()
+
+    def to_arrow(self):
+        return self.query_builder.to_arrow()
 
     def explain(self, explain_type: ExplainType = ExplainType.Physical):
         return self.query_builder.explain(explain_type)

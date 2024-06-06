@@ -35,7 +35,7 @@ def traverse_conditions(cons, fn=None):
         arguments = []
         for value in cons.hashable_args:
             if fn:
-                expr = fn(value)
+                expr, _ = fn(value)
             else:
                 expr, _ = traverse_conditions(value)
             arguments.append(expr)
@@ -114,21 +114,22 @@ def parse_expr(expr):
             arguments = []
             for arg in expr.args.values():
                 if arg:
-                    arguments.append(parse_expr(arg))
+                    parsed_expr, _ = parse_expr(arg)
+                    arguments.append(parsed_expr)
             func_expr = WrapFunctionExpr()
             func_expr.func_name = expr.key
-            func_expr.arguments=arguments
+            func_expr.arguments = arguments
 
             parsed_expr = WrapParsedExpr()
             parsed_expr.type = ParsedExprType.kFunction
             parsed_expr.function_expr = func_expr
-            return parsed_expr
+            return parsed_expr, None
         elif isinstance(expr, exp.Star):
             column_expr = WrapColumnExpr()
             column_expr.star = True
             parsed_expr = WrapParsedExpr(ParsedExprType.kColumn)
             parsed_expr.column_expr = column_expr
-            return parsed_expr
+            return parsed_expr, None
         else:
             raise Exception(f"unknown expression type: {expr}")
 
