@@ -221,6 +221,7 @@ def test_chinese():
             "2018年世界羽毛球锦标赛在哪个城市举办？",
             "hi\-tech",
             '"hi-tech"',
+            "graphics card",
             '"graphics card"',
             '"DS-K3AJ303/Dm140"',
             "Bloom filter",
