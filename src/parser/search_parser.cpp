@@ -42,7 +42,7 @@
 
 
 // Unqualified %code blocks.
-#line 32 "search_parser.y"
+#line 42 "search_parser.y"
 
     #include "search_driver.h"
     #include "search_scanner.h"
@@ -152,7 +152,7 @@
 #define YYERROR         goto yyerrorlab
 #define YYRECOVERING()  (!!yyerrstatus_)
 
-#line 9 "search_parser.y"
+#line 10 "search_parser.y"
 namespace infinity {
 #line 158 "search_parser.cpp"
 
@@ -189,12 +189,12 @@ namespace infinity {
   {
     switch (this->kind ())
     {
-      case symbol_kind::S_CARAT: // CARAT
-        value.copy< float > (YY_MOVE (that.value));
+      case symbol_kind::S_STRING: // STRING
+        value.copy< InfString > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::S_STRING: // STRING
-        value.copy< std::string > (YY_MOVE (that.value));
+      case symbol_kind::S_CARAT: // CARAT
+        value.copy< float > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::S_topLevelQuery: // topLevelQuery
@@ -237,12 +237,12 @@ namespace infinity {
     super_type::move (s);
     switch (this->kind ())
     {
-      case symbol_kind::S_CARAT: // CARAT
-        value.move< float > (YY_MOVE (s.value));
+      case symbol_kind::S_STRING: // STRING
+        value.move< InfString > (YY_MOVE (s.value));
         break;
 
-      case symbol_kind::S_STRING: // STRING
-        value.move< std::string > (YY_MOVE (s.value));
+      case symbol_kind::S_CARAT: // CARAT
+        value.move< float > (YY_MOVE (s.value));
         break;
 
       case symbol_kind::S_topLevelQuery: // topLevelQuery
@@ -355,12 +355,12 @@ namespace infinity {
   {
     switch (that.kind ())
     {
-      case symbol_kind::S_CARAT: // CARAT
-        value.YY_MOVE_OR_COPY< float > (YY_MOVE (that.value));
+      case symbol_kind::S_STRING: // STRING
+        value.YY_MOVE_OR_COPY< InfString > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::S_STRING: // STRING
-        value.YY_MOVE_OR_COPY< std::string > (YY_MOVE (that.value));
+      case symbol_kind::S_CARAT: // CARAT
+        value.YY_MOVE_OR_COPY< float > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::S_topLevelQuery: // topLevelQuery
@@ -387,12 +387,12 @@ namespace infinity {
   {
     switch (that.kind ())
     {
-      case symbol_kind::S_CARAT: // CARAT
-        value.move< float > (YY_MOVE (that.value));
+      case symbol_kind::S_STRING: // STRING
+        value.move< InfString > (YY_MOVE (that.value));
         break;
 
-      case symbol_kind::S_STRING: // STRING
-        value.move< std::string > (YY_MOVE (that.value));
+      case symbol_kind::S_CARAT: // CARAT
+        value.move< float > (YY_MOVE (that.value));
         break;
 
       case symbol_kind::S_topLevelQuery: // topLevelQuery
@@ -419,12 +419,12 @@ namespace infinity {
     state = that.state;
     switch (that.kind ())
     {
-      case symbol_kind::S_CARAT: // CARAT
-        value.copy< float > (that.value);
+      case symbol_kind::S_STRING: // STRING
+        value.copy< InfString > (that.value);
         break;
 
-      case symbol_kind::S_STRING: // STRING
-        value.copy< std::string > (that.value);
+      case symbol_kind::S_CARAT: // CARAT
+        value.copy< float > (that.value);
         break;
 
       case symbol_kind::S_topLevelQuery: // topLevelQuery
@@ -450,12 +450,12 @@ namespace infinity {
     state = that.state;
     switch (that.kind ())
     {
-      case symbol_kind::S_CARAT: // CARAT
-        value.move< float > (that.value);
+      case symbol_kind::S_STRING: // STRING
+        value.move< InfString > (that.value);
         break;
 
-      case symbol_kind::S_STRING: // STRING
-        value.move< std::string > (that.value);
+      case symbol_kind::S_CARAT: // CARAT
+        value.move< float > (that.value);
         break;
 
       case symbol_kind::S_topLevelQuery: // topLevelQuery
@@ -725,12 +725,12 @@ namespace infinity {
          when using variants.  */
       switch (yyr1_[yyn])
     {
-      case symbol_kind::S_CARAT: // CARAT
-        yylhs.value.emplace< float > ();
+      case symbol_kind::S_STRING: // STRING
+        yylhs.value.emplace< InfString > ();
         break;
 
-      case symbol_kind::S_STRING: // STRING
-        yylhs.value.emplace< std::string > ();
+      case symbol_kind::S_CARAT: // CARAT
+        yylhs.value.emplace< float > ();
         break;
 
       case symbol_kind::S_topLevelQuery: // topLevelQuery
@@ -763,7 +763,7 @@ namespace infinity {
           switch (yyn)
             {
   case 2: // topLevelQuery: query "end of file"
-#line 74 "search_parser.y"
+#line 84 "search_parser.y"
             {
     parse_result = std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ());
 }
@@ -771,13 +771,13 @@ namespace infinity {
     break;
 
   case 3: // query: clause
-#line 79 "search_parser.y"
+#line 89 "search_parser.y"
          { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()); }
 #line 777 "search_parser.cpp"
     break;
 
   case 4: // query: query clause
-#line 80 "search_parser.y"
+#line 90 "search_parser.y"
                {
     auto query = std::make_unique<OrQueryNode>();
     query->Add(std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ()));
@@ -788,7 +788,7 @@ namespace infinity {
     break;
 
   case 5: // query: query OR clause
-#line 86 "search_parser.y"
+#line 96 "search_parser.y"
                   {
     auto query = std::make_unique<OrQueryNode>();
     query->Add(std::move(yystack_[2].value.as < std::unique_ptr<QueryNode> > ()));
@@ -799,13 +799,13 @@ namespace infinity {
     break;
 
   case 6: // clause: term
-#line 94 "search_parser.y"
+#line 104 "search_parser.y"
        { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()); }
 #line 805 "search_parser.cpp"
     break;
 
   case 7: // clause: clause AND term
-#line 95 "search_parser.y"
+#line 105 "search_parser.y"
                   {
     auto query = std::make_unique<AndQueryNode>();
     query->Add(std::move(yystack_[2].value.as < std::unique_ptr<QueryNode> > ()));
@@ -816,13 +816,13 @@ namespace infinity {
     break;
 
   case 8: // term: basic_filter_boost
-#line 103 "search_parser.y"
+#line 113 "search_parser.y"
                      { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()); }
 #line 822 "search_parser.cpp"
     break;
 
   case 9: // term: NOT term
-#line 104 "search_parser.y"
+#line 114 "search_parser.y"
            {
     auto query = std::make_unique<NotQueryNode>();
     query->Add(std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ()));
@@ -832,13 +832,13 @@ namespace infinity {
     break;
 
   case 10: // term: LPAREN query RPAREN
-#line 109 "search_parser.y"
+#line 119 "search_parser.y"
                       { yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ()); }
 #line 838 "search_parser.cpp"
     break;
 
   case 11: // term: LPAREN query RPAREN CARAT
-#line 110 "search_parser.y"
+#line 120 "search_parser.y"
                             {
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[2].value.as < std::unique_ptr<QueryNode> > ());
     yylhs.value.as < std::unique_ptr<QueryNode> > ()->MultiplyWeight(yystack_[0].value.as < float > ());
@@ -847,7 +847,7 @@ namespace infinity {
     break;
 
   case 12: // basic_filter_boost: basic_filter
-#line 116 "search_parser.y"
+#line 126 "search_parser.y"
                {
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[0].value.as < std::unique_ptr<QueryNode> > ());
 }
@@ -855,7 +855,7 @@ namespace infinity {
     break;
 
   case 13: // basic_filter_boost: basic_filter CARAT
-#line 119 "search_parser.y"
+#line 129 "search_parser.y"
                      {
     yylhs.value.as < std::unique_ptr<QueryNode> > () = std::move(yystack_[1].value.as < std::unique_ptr<QueryNode> > ());
     yylhs.value.as < std::unique_ptr<QueryNode> > ()->MultiplyWeight(yystack_[0].value.as < float > ());
@@ -864,28 +864,31 @@ namespace infinity {
     break;
 
   case 14: // basic_filter: STRING
-#line 125 "search_parser.y"
+#line 135 "search_parser.y"
          {
     const std::string &field = default_field;
     if(field.empty()){
         error(yystack_[0].location, "default_field is empty");
         YYERROR;
     }
-    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, std::move(yystack_[0].value.as < std::string > ()));
+    std::string text = SearchDriver::Unescape(yystack_[0].value.as < InfString > ().text_);
+    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(field, std::move(text), yystack_[0].value.as < InfString > ().from_quoted_);
 }
-#line 877 "search_parser.cpp"
+#line 878 "search_parser.cpp"
     break;
 
   case 15: // basic_filter: STRING OP_COLON STRING
-#line 133 "search_parser.y"
+#line 144 "search_parser.y"
                          {
-    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(yystack_[2].value.as < std::string > (), std::move(yystack_[0].value.as < std::string > ()));
+    std::string field = SearchDriver::Unescape(yystack_[2].value.as < InfString > ().text_);
+    std::string text = SearchDriver::Unescape(yystack_[0].value.as < InfString > ().text_);
+    yylhs.value.as < std::unique_ptr<QueryNode> > () = driver.AnalyzeAndBuildQueryNode(std::move(field), std::move(text), yystack_[0].value.as < InfString > ().from_quoted_);
 }
-#line 885 "search_parser.cpp"
+#line 888 "search_parser.cpp"
     break;
 
 
-#line 889 "search_parser.cpp"
+#line 892 "search_parser.cpp"
 
             default:
               break;
@@ -1326,8 +1329,8 @@ namespace infinity {
   const unsigned char
   SearchParser::yyrline_[] =
   {
-       0,    74,    74,    79,    80,    86,    94,    95,   103,   104,
-     109,   110,   116,   119,   125,   133
+       0,    84,    84,    89,    90,    96,   104,   105,   113,   114,
+     119,   120,   126,   129,   135,   144
   };
 
   void
@@ -1363,11 +1366,11 @@ namespace infinity {
     return static_cast<symbol_kind_type> (t);
   }
 
-#line 9 "search_parser.y"
+#line 10 "search_parser.y"
 } // infinity
-#line 1369 "search_parser.cpp"
+#line 1372 "search_parser.cpp"
 
-#line 137 "search_parser.y"
+#line 150 "search_parser.y"
 
 
 namespace infinity{

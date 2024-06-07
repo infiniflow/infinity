@@ -53,7 +53,7 @@
 #  endif
 # endif
 
-#line 9 "search_parser.y"
+#line 10 "search_parser.y"
 namespace infinity {
 #line 59 "location.hh"
 
@@ -299,7 +299,7 @@ namespace infinity {
     return ostr;
   }
 
-#line 9 "search_parser.y"
+#line 10 "search_parser.y"
 } // infinity
 #line 305 "location.hh"
 

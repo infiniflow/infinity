@@ -112,10 +112,22 @@ name:star OR name:duna
 _exists_:"author" AND page_count:yyy AND (name:star OR name:duna)
 _exists_:"author" AND page_count:zzz^1.3 AND (name:star^0.1 OR name:duna^1.2)^1.2
 
-#test
+#query
 (dune^1.2 AND NOT name:god^2 AND NOT kddd:ss^4 OR ee:ff^1.2)^1.3
 (dune^1.2 AND NOT (name:god^2 || kddd:ss^4) OR ee:ff^1.2)^1.3
 (dune^1.2 AND (NOT name:god^2 || NOT kddd:ss^4) AND ee:ff^1.2)^1.3
+
+#escape reserved characters per https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
+first\ name:Alice
+book\*:quick
+DS\-K3AJ303/Dm140
+DS\-K3AJ303\/Dm140
+\(DS\-K3AJ303\/Dm140\)
+
+#quote
+"first name":Alice
+"book*":quick
+"DS-K3AJ303/Dm140"
     )##";
 
     Map<String, String> column2analyzer;
@@ -166,10 +178,15 @@ name:星空 OR name:邓肯
 _exists_:"author" AND page_count:yyy AND (name:星空 OR name:邓肯)
 _exists_:"author" AND page_count:zzz^1.3 AND (name:星空^0.1 OR name:邓肯^1.2)^1.2
 
-#test
+#query
 (邓肯^1.2 AND NOT name:上帝^2 AND NOT kddd:ss^4 OR ee:ff^1.2)^1.3
 (邓肯^1.2 AND NOT (name:上帝^2 || kddd:ss^4) OR ee:ff^1.2)^1.3
 (邓肯^1.2 AND (NOT name:上帝^2 || NOT kddd:ss^4) AND ee:ff^1.2)^1.3
+
+#quote
+吉祥物“羽宝”头部
+nanjing吉祥物"羽宝"头部head "DS-K3AJ303/Dm140"
+吉祥物nanjing"DS-K3AJ303/Dm140"头部
     )##";
 
     Map<String, String> column2analyzer;

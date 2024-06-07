@@ -42,6 +42,9 @@ UANY    {ASC}|{U2}{U}|{U3}{U}{U}|{U4}{U}{U}{U}
 UANYN   {ASCN}|{U2}{U}|{U3}{U}{U}|{U4}{U}{U}{U}
 UONLY   {U2}{U}|{U3}{U}{U}|{U4}{U}{U}{U}
 
+ESCAPABLE [\x20+\-=&|!(){}\[\]^"~*?:\\/]
+ESCAPED    \\{ESCAPABLE}
+
 %x SINGLE_QUOTED_STRING
 %x DOUBLE_QUOTED_STRING
 
@@ -76,18 +79,18 @@ NOT |
 
 -?[0-9]+("."[0-9]*)? |
 -?"."[0-9]+ |
-([a-zA-Z0-9_]|{UONLY})+        { yylval->build<std::string>(yytext); return token::STRING; }  // https://stackoverflow.com/questions/9611682/flexlexer-support-for-unicode
+([a-zA-Z0-9_]|{UONLY}|{ESCAPED})+        { yylval->build<InfString>(InfString(yytext, false)); return token::STRING; }  // https://stackoverflow.com/questions/9611682/flexlexer-support-for-unicode
 
 \'                            { BEGIN SINGLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
 <SINGLE_QUOTED_STRING>\'\'    { string_buffer << '\''; }
 <SINGLE_QUOTED_STRING>[^']*   { string_buffer << yytext; }
-<SINGLE_QUOTED_STRING>\'      { BEGIN INITIAL; yylval->build<std::string>(string_buffer.str()); return token::STRING; }
+<SINGLE_QUOTED_STRING>\'      { BEGIN INITIAL; yylval->build<InfString>(InfString(string_buffer.str(), true)); return token::STRING; }
 <SINGLE_QUOTED_STRING><<EOF>> { std::cerr << "[Lucene-Lexer-Error] Unterminated string" << std::endl; return 0; }
 
 \"                            { BEGIN DOUBLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
 <DOUBLE_QUOTED_STRING>\"\"    { string_buffer << '\"'; }
 <DOUBLE_QUOTED_STRING>[^"]*   { string_buffer << yytext; }
-<DOUBLE_QUOTED_STRING>\"      { BEGIN INITIAL; yylval->build<std::string>(string_buffer.str()); return token::STRING; }
+<DOUBLE_QUOTED_STRING>\"      { BEGIN INITIAL; yylval->build<InfString>(InfString(string_buffer.str(), true)); return token::STRING; }
 <DOUBLE_QUOTED_STRING><<EOF>> { std::cerr << "[Lucene-Lexer-Error] Unterminated string" << std::endl; return 0; }
 
 %%
