@@ -49,6 +49,6 @@ private:
     String dict_path_;
     bool own_jieba_{};
     Vector<cppjieba::Word> cut_words_;
-    FlatHashSet<String> *stopwords_{nullptr};
+    SharedPtr<FlatHashSet<String>> stopwords_{};
 };
 } // namespace infinity

@@ -55,8 +55,6 @@ ChineseAnalyzer::ChineseAnalyzer(const ChineseAnalyzer &other) {
 ChineseAnalyzer::~ChineseAnalyzer() {
     if (own_jieba_ && jieba_) {
         delete jieba_;
-        if (stopwords_)
-            delete stopwords_;
     }
 }
 
@@ -102,7 +100,7 @@ Status ChineseAnalyzer::Load() {
 void ChineseAnalyzer::LoadStopwordsDict(const String &stopwords_path) {
     std::ifstream ifs(stopwords_path);
     String line;
-    stopwords_ = new FlatHashSet<String>;
+    stopwords_ = MakeShared<FlatHashSet<String>>();
     while (getline(ifs, line)) {
         stopwords_->insert(line);
     }
