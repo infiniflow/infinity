@@ -157,6 +157,9 @@ class LocalInfinityClient:
     def show_tables(self, db_name: str):
         return self.convert_res(self.client.ShowTables(db_name))
 
+    def show_columns(self, db_name: str, table_name: str):
+        return self.convert_res(self.client.ShowColumns(db_name, table_name), has_result_data=True)
+
     def show_segments(self, db_name: str, table_name: str):
         return self.convert_res(self.client.ShowSegments(db_name, table_name))
 

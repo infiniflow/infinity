@@ -36,9 +36,10 @@ def disconnect_infinity():
 
 
 @pytest.fixture(scope="function")
-def get_infinity_db():
+def get_infinity_db(request):
+    uri = request.param if hasattr(request, 'param') else common_values.TEST_REMOTE_HOST
     # connect
-    infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    infinity_obj = infinity.connect(uri)
 
     yield infinity_obj.get_database("default_db")
 

@@ -182,18 +182,18 @@ def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
 
-#
-# def parse_bytes(bytes_data):
-#     results = []
-#     offset = 0
-#     while offset < len(bytes_data):
-#         length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
-#         offset += 4
-#         string_data = bytes_data[offset:offset + length].decode('utf-8')
-#         results.append(string_data)
-#         offset += length
-#     return results
-#
+
+def parse_bytes(bytes_data):
+    results = []
+    offset = 0
+    while offset < len(bytes_data):
+        length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+        offset += 4
+        string_data = bytes_data[offset:offset + length].decode('utf-8')
+        results.append(string_data)
+        offset += length
+    return results
+
 #
 # def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> ttypes.DataType:
 #     for column_def in column_defs:

@@ -342,11 +342,6 @@ WrapQueryResult WrapShowTable(Infinity &instance, const String &db_name, const S
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult WrapShowColumns(Infinity &instance, const String &db_name, const String &table_name) {
-    auto query_result = instance.ShowColumns(db_name, table_name);
-    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
-}
-
 WrapQueryResult WrapListTableIndexes(Infinity &instance, const String &db_name, const String &table_name) {
     auto query_result = instance.ListTableIndexes(db_name, table_name);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
@@ -768,6 +763,18 @@ WrapQueryResult WrapSearch(Infinity &instance,
     fmt::print("before search, select list size = {}\n", select_list.size());
     auto query_result = instance.Search(db_name, table_name, search_expr, filter, output_columns);
     fmt::print("after search\n");
+    if (query_result.ErrorCode() != ErrorCode::kOk) {
+        return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+    }
+    auto wrap_query_result = WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+    auto &columns = wrap_query_result.column_fields;
+    columns.resize(query_result.result_table_->ColumnCount());
+    ProcessDataBlocks(query_result, wrap_query_result, columns);
+    return wrap_query_result;
+}
+
+WrapQueryResult WrapShowColumns(Infinity &instance, const String &db_name, const String &table_name) {
+    auto query_result = instance.ShowColumns(db_name, table_name);
     if (query_result.ErrorCode() != ErrorCode::kOk) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }

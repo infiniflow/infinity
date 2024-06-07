@@ -69,14 +69,12 @@ class TestLocalInfinity():
         test_database_obj = TestDatabase(common_values.TEST_LOCAL_PATH)
         test_database_obj._test_create_drop_show_1M_databases()
 
-    # todo modify get_infinity_db in conftext.py
-    @pytest.mark.skip()
     @pytest.mark.parametrize("table_name", ["test_show_table"])
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
     def test_database_test_show_valid_table(self, get_infinity_db, table_name):
         test_database_obj = TestDatabase(common_values.TEST_LOCAL_PATH)
         test_database_obj._test_show_valid_table(get_infinity_db, table_name)
 
-    @pytest.mark.skip()
     @pytest.mark.parametrize("table_name", [pytest.param("Invalid name"),
                                             pytest.param(1),
                                             pytest.param(1.1),
@@ -85,23 +83,24 @@ class TestLocalInfinity():
                                             pytest.param(()),
                                             pytest.param({}),
                                             ])
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
     def test_database_test_show_invalid_table(self, get_infinity_db, table_name):
         test_database_obj = TestDatabase(common_values.TEST_LOCAL_PATH)
         test_database_obj._test_show_invalid_table(get_infinity_db, table_name)
 
-    @pytest.mark.skip()
     @pytest.mark.parametrize("table_name", [pytest.param("not_exist_name")])
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
     def test_database_test_show_not_exist_table(self, get_infinity_db, table_name):
         test_database_obj = TestDatabase(common_values.TEST_LOCAL_PATH)
         test_database_obj._test_show_not_exist_table(get_infinity_db, table_name)
 
-    @pytest.mark.skip()
     @pytest.mark.parametrize("column_name", ["test_show_table_columns"])
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
     def test_database_test_show_table_columns_with_valid_name(self, get_infinity_db, column_name):
         test_database_obj = TestDatabase(common_values.TEST_LOCAL_PATH)
         test_database_obj._test_show_table_columns_with_valid_name(get_infinity_db, column_name)
 
-    @pytest.mark.skip()
+    # @pytest.mark.skip()
     @pytest.mark.parametrize("column_name", [pytest.param("Invalid name"),
                                              pytest.param("not_exist_name"),
                                              pytest.param(1),
@@ -111,6 +110,7 @@ class TestLocalInfinity():
                                              pytest.param(()),
                                              pytest.param({}),
                                              ])
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
     def test_database_test_show_table_columns_with_invalid_name(self, get_infinity_db, column_name):
         test_database_obj = TestDatabase(common_values.TEST_LOCAL_PATH)
         test_database_obj._test_show_table_columns_with_invalid_name(get_infinity_db, column_name)

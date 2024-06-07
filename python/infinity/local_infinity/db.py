@@ -5,8 +5,9 @@ import numpy as np
 from infinity.db import Database
 from infinity.errors import ErrorCode
 from infinity.local_infinity.table import LocalTable
-from infinity.remote_thrift.utils import check_valid_name, name_validity_check, select_res_to_polars
-from infinity.common import ConflictType
+from infinity.remote_thrift.utils import check_valid_name, name_validity_check
+from infinity.common import ConflictType, InfinityException
+from infinity.local_infinity.utils import select_res_to_polars
 from embedded_infinity import ConflictType as LocalConflictType
 from embedded_infinity import WrapColumnDef, WrapDataType, LogicalType, ConstraintType, LiteralType, WrapConstantExpr, \
     EmbeddingDataType, WrapEmbeddingType, WrapIndexInfo
@@ -42,7 +43,7 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
     elif datatype == "bool":
         proto_column_type.logical_type = LogicalType.kBoolean
     else:
-        raise Exception(f"unknown datatype: {datatype}")
+        raise InfinityException(3051, f"Unknown datatype: {datatype}")
 
     # process constraints
     proto_column_def.column_type = proto_column_type
@@ -58,7 +59,7 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
             elif constraint == "unique":
                 proto_column_def.constraints.add(ConstraintType.kUnique)
             else:
-                raise Exception(f"unknown constraint: {constraint}")
+                raise InfinityException(3055, f"Unknown constraint: {constraint}")
 
     # process constant expression
     default = None
@@ -90,7 +91,7 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                 constant_expression.literal_type = LiteralType.kDoubleArray,
                 constant_expression.f64_array_value = default
         else:
-            raise Exception("Invalid constant expression")
+            raise InfinityException(3069, "Invalid constant expression")
         proto_column_def.constant_expr = constant_expression
     column_defs.append(proto_column_def)
 
@@ -122,7 +123,7 @@ def get_embedding_info(column_info, column_defs, column_name, index):
     elif element_type == "int64":
         embedding_type.element_type = EmbeddingDataType.kElemInt64
     else:
-        raise Exception(f"unknown element type: {element_type}")
+        raise InfinityException(3057, f"Unknown element type: {element_type}")
     embedding_type.dimension = int(length)
     assert isinstance(embedding_type, WrapEmbeddingType)
     assert embedding_type.element_type is not None
@@ -162,7 +163,7 @@ def get_embedding_info(column_info, column_defs, column_name, index):
                 constant_expression.literal_type = LiteralType.kDoubleArray,
                 constant_expression.f64_array_value = default
         else:
-            raise Exception("Invalid constant expression")
+            raise InfinityException(3069, "Invalid constant expression")
         proto_column_def.constant_expr = constant_expression
 
     column_defs.append(proto_column_def)
@@ -207,7 +208,7 @@ class LocalDatabase(Database, ABC):
         elif conflict_type == ConflictType.Replace:
             create_table_conflict = LocalConflictType.kReplace
         else:
-            raise Exception(f"ERROR:3066, Invalid conflict type")
+            raise InfinityException(3066, f"Invalid conflict type")
         print(column_defs)
         print(type(column_defs))
         res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
@@ -217,7 +218,7 @@ class LocalDatabase(Database, ABC):
         if res.error_code == ErrorCode.OK:
             return LocalTable(self._conn, self._db_name, table_name)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("table_name", "Table")
     def drop_table(self, table_name, conflict_type: ConflictType = ConflictType.Error):
@@ -227,19 +228,19 @@ class LocalDatabase(Database, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_table_conflict = LocalConflictType.kIgnore
         else:
-            raise Exception(f"ERROR:3066, Invalid conflict type")
+            raise InfinityException(3066, "nvalid conflict type")
         res = self._conn.drop_table(db_name=self._db_name, table_name=table_name, conflict_type=drop_table_conflict)
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def list_tables(self):
         res = self._conn.list_tables(self._db_name)
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("table_name", "Table")
     def show_table(self, table_name):
@@ -247,7 +248,7 @@ class LocalDatabase(Database, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("table_name", "Table")
     def show_columns(self, table_name):
@@ -255,7 +256,7 @@ class LocalDatabase(Database, ABC):
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("table_name", "Table")
     def get_table(self, table_name):
@@ -263,11 +264,11 @@ class LocalDatabase(Database, ABC):
         if res.error_code == ErrorCode.OK:
             return LocalTable(self._conn, self._db_name, table_name)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_tables(self):
         res = self._conn.show_tables(self._db_name)
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
