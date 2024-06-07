@@ -25,7 +25,7 @@ SparseStoreType SparseInfo::ParseStoreType(const std::vector<std::unique_ptr<Ini
         } else if (option->param_name_ == "notsort") {
             store_type = SparseStoreType::kNotSort;
         } else {
-            ParserAssert(false, "Unknown option for sparse embedding: " + option->param_name_);
+            store_type = SparseStoreType::kInvalid;
         }
     }
 
@@ -33,7 +33,7 @@ SparseStoreType SparseInfo::ParseStoreType(const std::vector<std::unique_ptr<Ini
 }
 
 std::shared_ptr<SparseInfo> SparseInfo::Make(EmbeddingDataType data_type, size_t dimension, SparseStoreType store_type) {
-    if (dimension == 0) {
+    if (dimension == 0 || store_type == SparseStoreType::kInvalid) {
         return nullptr;
     }
     EmbeddingDataType index_type = EmbeddingDataType::kElemInvalid;
