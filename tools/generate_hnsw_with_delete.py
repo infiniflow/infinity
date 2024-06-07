@@ -133,10 +133,10 @@ def generate(generate_if_exists: bool, copy: bool):
             slt_file.write("----\n")
             if v_x in delete_x_1:
                 slt_file.write(
-                    "{}\n".format(to_result_embedding(delete_nearest_1[v_x]))
+                    "[{}]\n".format(to_result_embedding(delete_nearest_1[v_x]))
                 )
             else:
-                slt_file.write("{}\n".format(to_result_embedding(v_x)))
+                slt_file.write("[{}]\n".format(to_result_embedding(v_x)))
             slt_file.write("\n")
 
         slt_file.write("statement ok\n")
@@ -154,10 +154,10 @@ def generate(generate_if_exists: bool, copy: bool):
             slt_file.write("----\n")
             if v_x in delete_x_all:
                 slt_file.write(
-                    "{}\n".format(to_result_embedding(delete_nearest_all[v_x]))
+                    "[{}]\n".format(to_result_embedding(delete_nearest_all[v_x]))
                 )
             else:
-                slt_file.write("{}\n".format(to_result_embedding(v_x)))
+                slt_file.write("[{}]\n".format(to_result_embedding(v_x)))
             slt_file.write("\n")
 
         slt_file.write("statement ok\n")

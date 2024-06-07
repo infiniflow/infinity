@@ -11,20 +11,20 @@ COPY test_jsonl FROM '/var/infinity/test_data/test_jsonl.jsonl' WITH (FORMAT JSO
 query III
 SELECT * FROM test_jsonl;
 ----
-John 30 1,2,3,4,5
-Peter 45 1,2,3,4,5
-Amy 25 1,2,3,4,5
-Hannah 28 1,2,3,4,5
-Michael 32 1,2,3,4,5
-Sandy 23 1,2,3,4,5
-Betty 20 1,2,3,4,5
-Richard 38 1,2,3,4,5
-Susan 27 1,2,3,4,5
-Vicky 22 1,2,3,4,5
-Ben 33 1,2,3,4,5
-William 28 1,2,3,4,5
-Chuck 29 1,2,3,4,5
-Viola 35 1,2,3,4,5
+John 30 [1,2,3,4,5]
+Peter 45 [1,2,3,4,5]
+Amy 25 [1,2,3,4,5]
+Hannah 28 [1,2,3,4,5]
+Michael 32 [1,2,3,4,5]
+Sandy 23 [1,2,3,4,5]
+Betty 20 [1,2,3,4,5]
+Richard 38 [1,2,3,4,5]
+Susan 27 [1,2,3,4,5]
+Vicky 22 [1,2,3,4,5]
+Ben 33 [1,2,3,4,5]
+William 28 [1,2,3,4,5]
+Chuck 29 [1,2,3,4,5]
+Viola 35 [1,2,3,4,5]
 
 query III
 SELECT count(*) FROM test_jsonl;

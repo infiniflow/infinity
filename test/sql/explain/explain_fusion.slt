@@ -31,7 +31,7 @@ PROJECT (5)
          - element type: FLOAT32
          - dimension: 4
          - distance type: L2
-         - query embedding: 0,-10,0,0.7
+         - query embedding: [0,-10,0,0.7]
        - filter: 10 > CAST(num (#1) AS BigInt)
        - output columns: [title, num, __score, __rowid]
 

@@ -201,7 +201,6 @@ private:
             const uint8_t byte = array[i];
             for (size_t j = 0; j < 8; ++j) {
                 str.push_back((byte & (1 << j)) ? '1' : '0');
-                str.push_back(',');
             }
         }
         str.push_back(']');
