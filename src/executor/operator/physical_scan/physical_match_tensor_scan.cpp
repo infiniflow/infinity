@@ -64,15 +64,15 @@ import filter_value_type_classification;
 
 namespace infinity {
 
-PhysicalMatchTensorScan::PhysicalMatchTensorScan(const u64 id,
-                                                 const u64 table_index,
+PhysicalMatchTensorScan::PhysicalMatchTensorScan(u64 id,
+                                                 u64 table_index,
                                                  SharedPtr<BaseTableRef> base_table_ref,
-                                                 SharedPtr<MatchTensorExpression> match_tensor_expr,
+                                                 SharedPtr<MatchTensorExpression> match_tensor_expression,
                                                  const SharedPtr<CommonQueryFilter> &common_query_filter,
-                                                 const u32 topn,
+                                                 u32 topn,
                                                  SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalScanBase(id, PhysicalOperatorType::kMatchTensorScan, nullptr, nullptr, base_table_ref, load_metas), table_index_(table_index),
-      match_tensor_expr_(std::move(match_tensor_expr)), common_query_filter_(common_query_filter), topn_(topn) {
+    : PhysicalFilterScanBase(id, PhysicalOperatorType::kMatchTensorScan, nullptr, nullptr, base_table_ref, common_query_filter, load_metas),
+      table_index_(table_index), match_tensor_expr_(std::move(match_tensor_expression)), topn_(topn) {
     search_column_id_ = std::numeric_limits<ColumnID>::max();
 }
 
@@ -172,34 +172,10 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         ++block_ids_idx;
         const auto [segment_id, block_id] = block_ids[task_id];
         const BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-        if (auto it_filter = common_query_filter_->filter_result_.find(segment_id); it_filter != common_query_filter_->filter_result_.end()) {
-            // not skipped after common_query_filter
-            const u32 row_count = block_entry->row_count();
-            // filter for segment
-            const std::variant<Vector<u32>, Bitmask> &filter_result = it_filter->second;
-            Bitmask bitmask;
-            bitmask.Initialize(std::bit_ceil(row_count));
-            const u32 block_start_offset = block_id * DEFAULT_BLOCK_CAPACITY;
-            const u32 block_end_offset = block_start_offset + row_count;
-            if (std::holds_alternative<Vector<u32>>(filter_result)) {
-                const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-                const auto it1 = std::lower_bound(filter_result_vector.begin(), filter_result_vector.end(), block_start_offset);
-                const auto it2 = std::lower_bound(filter_result_vector.begin(), filter_result_vector.end(), block_end_offset);
-                bitmask.SetAllFalse();
-                for (auto it = it1; it < it2; ++it) {
-                    bitmask.SetTrue(*it - block_start_offset);
-                }
-            } else {
-                u32 u64_start_offset = block_start_offset / 64;
-                u32 u64_end_offset = (block_end_offset - 1) / 64;
-                if (const u64 *filter_data = std::get<Bitmask>(filter_result).GetData(); filter_data) {
-                    bitmask.SetAllFalse();
-                    u64 *data = bitmask.GetData();
-                    for (u32 i = u64_start_offset; i <= u64_end_offset; ++i) {
-                        data[i - u64_start_offset] = filter_data[i];
-                    }
-                }
-            }
+
+        BlockOffset row_count = block_index->GetBlockOffset(segment_id, block_id);
+        Bitmask bitmask;
+        if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
             block_entry->SetDeleteBitmask(begin_ts, bitmask);
             auto *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id);
             auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);

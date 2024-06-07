@@ -20,4 +20,6 @@ export module sparse_info;
 
 namespace infinity {
 export using infinity::SparseInfo;
+
+export using infinity::SparseStoreType;
 }

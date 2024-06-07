@@ -283,7 +283,7 @@ public:
             }
             sparse_dim = *std::max_element(indice_vec.begin(), indice_vec.end()) + 1;
         }
-        auto sparse_info_ptr = SparseInfo::Make(ToEmbeddingDataType<T>(), ToEmbeddingDataType<Idx>(), sparse_dim);
+        auto sparse_info_ptr = SparseInfo::Make(ToEmbeddingDataType<T>(), ToEmbeddingDataType<Idx>(), sparse_dim, SparseStoreType::kNotSort);
         Value value(LogicalType::kSparse, sparse_info_ptr);
         value.value_info_ = MakeShared<SparseValueInfo>(indice_vec, data_vec);
 

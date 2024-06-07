@@ -33,7 +33,7 @@ namespace infinity {
 export class MatchSparseExpression final : public BaseExpression {
 public:
     MatchSparseExpression(Vector<SharedPtr<BaseExpression>> search_column,
-                          const ConstantExpr *query_sparse_expr,
+                          SharedPtr<BaseExpression> query_sparse_expr,
                           SparseMetricType metric_type,
                           SizeT query_n,
                           SizeT topn,
@@ -44,7 +44,7 @@ public:
     String ToString() const override;
 
 private:
-    void MakeQuery(const ConstantExpr *query_sparse_expr);
+    void MakeQuery(SharedPtr<BaseExpression> query_sparse_expr);
 
 public:
     const ColumnExpression *column_expr_;

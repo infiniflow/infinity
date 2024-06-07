@@ -258,6 +258,7 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
         Status status = Status::ImportFileFormatError("CSR file must have only one sparse column.");
         RecoverableError(status);
     }
+    // nocheck sort or not sort
     auto sparse_info = std::static_pointer_cast<SparseInfo>(column_type->type_info());
     if (sparse_info->DataType() != kElemFloat) {
         Status status = Status::ImportFileFormatError("FVECS file must has only one sparse column with float element");

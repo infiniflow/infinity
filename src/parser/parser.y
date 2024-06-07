@@ -438,7 +438,7 @@ struct SQL_LTYPE {
 %type <const_expr_t>            array_expr long_array_expr unclosed_long_array_expr double_array_expr unclosed_double_array_expr
 %type <const_expr_t>            common_array_expr subarray_array_expr unclosed_subarray_array_expr
 %type <const_expr_t>            sparse_array_expr long_sparse_array_expr unclosed_long_sparse_array_expr double_sparse_array_expr unclosed_double_sparse_array_expr
-%type <const_expr_t>            empty_array_expr
+%type <const_expr_t>            empty_array_expr common_sparse_array_expr
 %type <int_sparse_ele_t>        int_sparse_ele
 %type <float_sparse_ele_t>      float_sparse_ele
 %type <expr_array_t>            expr_array group_by_clause sub_search_array
@@ -682,8 +682,10 @@ table_element : table_column {
 
 
 table_column :
-IDENTIFIER column_type default_expr {
+//   1          2              3                  4
+IDENTIFIER column_type with_index_param_list default_expr {
     std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
+    std::vector<std::unique_ptr<infinity::InitParameter>> index_param_list = infinity::InitParameter::MakeInitParameterList($3);
     switch($2.logical_type_) {
         case infinity::LogicalType::kDecimal: {
             type_info_ptr = infinity::DecimalInfo::Make($2.precision, $2.scale);
@@ -705,7 +707,8 @@ IDENTIFIER column_type default_expr {
             break;
         }
         case infinity::LogicalType::kSparse: {
-            type_info_ptr = infinity::SparseInfo::Make($2.embedding_type_, $2.width);
+            auto store_type = infinity::SparseInfo::ParseStoreType(index_param_list);
+            type_info_ptr = infinity::SparseInfo::Make($2.embedding_type_, $2.width, store_type);
             if (type_info_ptr == nullptr) {
                 yyerror(&yyloc, scanner, result, "Fail to create sparse info.");
                 free($1);
@@ -718,7 +721,7 @@ IDENTIFIER column_type default_expr {
         }
     }
 
-    std::shared_ptr<infinity::ParsedExpr> default_expr($3);
+    std::shared_ptr<infinity::ParsedExpr> default_expr($4);
     $$ = new infinity::ColumnDef($2.logical_type_, type_info_ptr, std::move(default_expr));
 
     ParserHelper::ToLower($1);
@@ -2072,9 +2075,9 @@ Return:
     ;
 }
 
-//                 MATCH SPARSE (column_name, query_sparse,      metric_type,   topn)         extra options
-//                   1      2         4             6                8           10              12
-match_sparse_expr: MATCH SPARSE '(' expr ',' sparse_array_expr ',' STRING ',' LONG_VALUE ')' with_index_param_list {
+//                 MATCH SPARSE (column_name,       query_sparse,      metric_type,     topn)         extra options
+//                   1      2         4                  6                   8           10                12
+match_sparse_expr: MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ',' LONG_VALUE ')' with_index_param_list {
     auto match_sparse_expr = new infinity::MatchSparseExpr();
     $$ = match_sparse_expr;
 
@@ -2601,6 +2604,16 @@ common_array_expr: array_expr {
     $$ = $1;
 }
 
+common_sparse_array_expr: sparse_array_expr {
+    $$ = $1;
+}
+| array_expr {
+    $$ = $1;
+}
+| empty_array_expr {
+    $$ = $1;
+}
+
 subarray_array_expr: unclosed_subarray_array_expr ']' {
     $$ = $1;
 };
@@ -2891,11 +2904,14 @@ index_param_list : index_param {
 };
 
 index_param : IDENTIFIER {
+    ParserHelper::ToLower($1);
     $$ = new infinity::InitParameter();
     $$->param_name_ = $1;
     free($1);
 }
 | IDENTIFIER '=' IDENTIFIER {
+    ParserHelper::ToLower($1);
+    ParserHelper::ToLower($3);
     $$ = new infinity::InitParameter();
     $$->param_name_ = $1;
     free($1);
