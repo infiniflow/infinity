@@ -62,6 +62,7 @@ struct InitParameter {
         for (auto *init_param : *init_params) {
             results.push_back(std::unique_ptr<InitParameter>(init_param));
         }
+        delete init_params;
         return results;
     }
 };
