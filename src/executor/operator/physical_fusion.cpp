@@ -14,6 +14,7 @@
 
 module;
 #include <cassert>
+#include <cmath>
 #include <cstdlib>
 #include <string>
 
@@ -253,36 +254,16 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                 }
             }
         }
-        Vector<float> min_scores(num_children, std::numeric_limits<float>::max());
-        Vector<float> max_scores(num_children, std::numeric_limits<float>::min());
-        Vector<float> gap_scores(num_children, 0.0F);
-        for (auto &doc : rescore_vec) {
-            for (SizeT i = 0; i < num_children; ++i) {
-                if (!doc.mask_[i])
-                    continue;
-                if (doc.child_scores_[i] < min_scores[i])
-                    min_scores[i] = doc.child_scores_[i];
-                if (doc.child_scores_[i] > max_scores[i])
-                    max_scores[i] = doc.child_scores_[i];
-            }
-        }
-        for (SizeT i = 0; i < num_children; ++i) {
-            gap_scores[i] = max_scores[i] - min_scores[i];
-        }
         for (auto &doc : rescore_vec) {
             doc.fusion_score_ = 0.0F;
             for (SizeT i = 0; i < num_children; ++i) {
                 if (!doc.mask_[i])
                     continue;
-                if (gap_scores[i] <= 1e-6) {
-                    doc.fusion_score_ += weights[i];
-                    continue;
-                }
-                if (min_heaps[i]) {
-                    doc.fusion_score_ += weights[i] * (doc.child_scores_[i] - min_scores[i]) / gap_scores[i];
-                } else {
-                    doc.fusion_score_ += weights[i] * (max_scores[i] - doc.child_scores_[i]) / gap_scores[i];
-                }
+                // Normalize the child score in R to [0, 1]
+                double normalized_score = std::atan(doc.child_scores_[i]) / M_PI + 0.5;
+                if (!min_heaps[i])
+                    normalized_score = 1.0 - normalized_score;
+                doc.fusion_score_ += weights[i] * normalized_score;
             }
         }
     }
