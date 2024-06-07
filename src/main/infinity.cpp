@@ -701,6 +701,28 @@ QueryResult Infinity::Import(const String &db_name, const String &table_name, co
     return result;
 }
 
+QueryResult Infinity::Export(const String &db_name, const String &table_name, const String &path, ExportOptions export_options) {
+    UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
+    query_context_ptr->Init(InfinityContext::instance().config(),
+                            InfinityContext::instance().task_scheduler(),
+                            InfinityContext::instance().storage(),
+                            InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().session_manager());
+    UniquePtr<CopyStatement> export_statement = MakeUnique<CopyStatement>();
+
+    export_statement->copy_from_ = false;
+    export_statement->file_path_ = path;
+    export_statement->schema_name_ = db_name;
+    export_statement->table_name_ = table_name;
+
+    export_statement->header_ = export_options.header_;
+    export_statement->copy_file_type_ = export_options.copy_file_type_;
+    export_statement->delimiter_ = export_options.delimiter_;
+
+    QueryResult result = query_context_ptr->QueryStatement(export_statement.get());
+    return result;
+}
+
 QueryResult Infinity::Delete(const String &db_name, const String &table_name, ParsedExpr *filter) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),

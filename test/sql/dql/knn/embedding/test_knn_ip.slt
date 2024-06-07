@@ -24,9 +24,9 @@ SELECT c1 FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float
 query I
 SELECT c2 FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);
 ----
-0.4,0.3,0.2,0.1
-0.3,0.2,0.1,0.4
-0.2,0.1,0.3,0.4
+[0.4,0.3,0.2,0.1]
+[0.3,0.2,0.1,0.4]
+[0.2,0.1,0.3,0.4]
 
 query II
 SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_ip SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'ip', 3);

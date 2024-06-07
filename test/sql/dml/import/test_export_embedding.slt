@@ -13,8 +13,8 @@ INSERT INTO test_export_jsonl VALUES(4, '4433253', [1.9, 2.0, 3.045, 4.5]);
 query III
 SELECT * FROM test_export_jsonl;
 ----
-3 4433252 1.1,2.03,3.04,4
-4 4433253 1.9,2,3.045,4.5
+3 4433252 [1.1,2.03,3.04,4]
+4 4433253 [1.9,2,3.045,4.5]
 
 query I
 COPY test_export_jsonl TO '/var/infinity/test_data/test_export_jsonl.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
@@ -27,10 +27,10 @@ COPY test_export_jsonl FROM '/var/infinity/test_data/test_export_jsonl.jsonl' WI
 query III
 SELECT * FROM test_export_jsonl;
 ----
-3 4433252 1.1,2.03,3.04,4
-4 4433253 1.9,2,3.045,4.5
-3 4433252 1.1,2.03,3.04,4
-4 4433253 1.9,2,3.045,4.5
+3 4433252 [1.1,2.03,3.04,4]
+4 4433253 [1.9,2,3.045,4.5]
+3 4433252 [1.1,2.03,3.04,4]
+4 4433253 [1.9,2,3.045,4.5]
 
 query III
 SELECT count(*) FROM test_export_jsonl;

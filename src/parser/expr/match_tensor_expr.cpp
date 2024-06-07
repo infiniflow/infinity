@@ -40,9 +40,9 @@ std::string MatchTensorExpr::ToString() const {
     const auto data_type_str = EmbeddingT::EmbeddingDataType2String(embedding_data_type_);
     const auto method_str = SearchMethodToString(search_method_enum_);
     if (options_text_.empty()) {
-        return fmt::format("MATCH TENSOR ({}, [{}], {}, {})", column_expr_->ToString(), query_str, data_type_str, method_str);
+        return fmt::format("MATCH TENSOR ({}, {}, {}, {})", column_expr_->ToString(), query_str, data_type_str, method_str);
     }
-    return fmt::format("MATCH TENSOR ({}, [{}], {}, {}, EXTRA OPTION : '{}')",
+    return fmt::format("MATCH TENSOR ({}, {}, {}, {}, EXTRA OPTION : '{}')",
                        column_expr_->ToString(),
                        query_str,
                        data_type_str,
