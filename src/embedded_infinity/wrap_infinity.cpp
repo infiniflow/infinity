@@ -733,13 +733,21 @@ WrapQueryResult WrapSearch(Infinity &instance,
     if (where_expr != nullptr) {
         filter = where_expr->GetParsedExpr();
     }
-    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
-    output_columns->reserve(select_list.size());
-    for (SizeT i = 0; i < select_list.size(); ++i) {
-        output_columns->emplace_back(select_list[i].GetParsedExpr());
+    Vector<ParsedExpr *> *output_columns = nullptr;
+
+    if (select_list.empty()) {
+        return WrapQueryResult(ErrorCode::kEmptySelectFields, "[error] Select fields are empty");
+    } else {
+        output_columns = new Vector<ParsedExpr *>();
+        output_columns->reserve(select_list.size());
+        for (SizeT i = 0; i < select_list.size(); ++i) {
+            output_columns->emplace_back(select_list[i].GetParsedExpr());
+        }
     }
 
+    fmt::print("before search, select list size = {}\n", select_list.size());
     auto query_result = instance.Search(db_name, table_name, search_expr, filter, output_columns);
+    fmt::print("after search\n");
     if (query_result.ErrorCode() != ErrorCode::kOk) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }

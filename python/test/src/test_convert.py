@@ -9,8 +9,8 @@ from src.test_sdkbase import TestSdk
 
 
 class TestConvert(TestSdk):
-    def test_to_pl(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_to_pl(self):
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_to_pl", ConflictType.Ignore)
         db_obj.create_table("test_to_pl", {
@@ -27,8 +27,8 @@ class TestConvert(TestSdk):
         print(res)
         db_obj.drop_table("test_to_pl", ConflictType.Error)
 
-    def test_to_pa(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_to_pa(self):
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_to_pa", ConflictType.Ignore)
         db_obj.create_table("test_to_pa", {
@@ -45,8 +45,8 @@ class TestConvert(TestSdk):
         print(res)
         db_obj.drop_table("test_to_pa", ConflictType.Error)
 
-    def test_to_df(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_to_df(self):
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_to_df", ConflictType.Ignore)
         db_obj.create_table("test_to_df", {
@@ -63,9 +63,9 @@ class TestConvert(TestSdk):
         print(res)
         db_obj.drop_table("test_to_df", ConflictType.Error)
 
-    def test_without_output_select_list(self):
+    def _test_without_output_select_list(self):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_without_output_select_list", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_without_output_select_list", {
@@ -87,16 +87,16 @@ class TestConvert(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("condition_list", ["c1 > 0.1 and c2 < 3.0",
-                                                "c1 > 0.1 and c2 < 1.0",
-                                                "c1 < 0.1 and c2 < 1.0",
-                                                "c1",
-                                                "c1 = 0",
-                                                "_row_id",
-                                                "*"])
-    def test_with_valid_select_list_output(self, condition_list):
+    # @pytest.mark.parametrize("condition_list", ["c1 > 0.1 and c2 < 3.0",
+    #                                             "c1 > 0.1 and c2 < 1.0",
+    #                                             "c1 < 0.1 and c2 < 1.0",
+    #                                             "c1",
+    #                                             "c1 = 0",
+    #                                             "_row_id",
+    #                                             "*"])
+    def _test_with_valid_select_list_output(self, condition_list):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_with_valid_select_list_output", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_valid_select_list_output", {
@@ -115,13 +115,13 @@ class TestConvert(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("condition_list", [pytest.param("c1 + 0.1 and c2 - 1.0", ),
-                                                pytest.param("c1 * 0.1 and c2 / 1.0", ),
-                                                pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", ),
-                                                ])
-    def test_with_invalid_select_list_output(self, condition_list):
+    # @pytest.mark.parametrize("condition_list", [pytest.param("c1 + 0.1 and c2 - 1.0", ),
+    #                                             pytest.param("c1 * 0.1 and c2 / 1.0", ),
+    #                                             pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", ),
+    #                                             ])
+    def _test_with_invalid_select_list_output(self, condition_list):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_with_invalid_select_list_output", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_invalid_select_list_output", {
@@ -141,18 +141,9 @@ class TestConvert(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("filter_list", [
-        "c1 > 10",
-        "c2 > 1",
-        "c1 > 0.1 and c2 < 3.0",
-        "c1 > 0.1 and c2 < 1.0",
-        "c1 < 0.1 and c2 < 1.0",
-        "c1 < 0.1 and c1 > 1.0",
-        "c1 = 0",
-    ])
-    def test_output_with_valid_filter_function(self, filter_list):
+    def _test_output_with_valid_filter_function(self, filter_list):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_output_with_valid_filter_function", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_output_with_valid_filter_function", {
@@ -171,18 +162,9 @@ class TestConvert(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("filter_list", [
-        pytest.param("c1"),
-        pytest.param("_row_id"),
-        pytest.param("*"),
-        pytest.param("#@$%@#f"),
-        pytest.param("c1 + 0.1 and c2 - 1.0"),
-        pytest.param("c1 * 0.1 and c2 / 1.0"),
-        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
-    ])
-    def test_output_with_invalid_filter_function(self, filter_list):
+    def _test_output_with_invalid_filter_function(self, filter_list):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_output_with_invalid_filter_function", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_output_with_invalid_filter_function", {

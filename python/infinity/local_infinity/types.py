@@ -139,10 +139,9 @@ def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
             return list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
         case LogicalType.kSmallInt:
             return list(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector))
-        # case LogicalType.ColumnRowID:
-        #     all_list = list(struct.unpack('<{}i'.format(
-        #         len(column_vector) // 4), column_vector))
-        #     return [all_list[i:i + 2] for i in range(0, len(all_list), 2)]
+        case LogicalType.kRowID:
+            all_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
+            return [all_list[i:i + 2] for i in range(0, len(all_list), 2)]
         case LogicalType.kEmbedding:
             dimension = column_data_type.embedding_type.dimension
             # print(dimension)
@@ -216,14 +215,9 @@ def build_result(res: WrapQueryResult) -> tuple[dict[str | Any, list[Any, Any]],
 
         column_type = column_field.column_type
         column_data_type = column_def.column_type
-        # convert to [ bytes:8 ]
-        # column_vectors = [bytes(s, 'latin1') for s in column_field.column_vectors]
-        # column_vectors = [bytes([ord(c) for c in s]) for s in column_field.column_vectors]
         column_vectors = column_field.column_vectors
-        print(column_vectors)
         data_list = column_vector_to_list(column_type, column_data_type, column_vectors)
-        print("data list = ", data_list)
-        # data_series = pd.Series(data_list, dtype=logic_type_to_dtype(column_data_type))
+
         data_dict[column_name] = data_list
         data_type_dict[column_name] = column_data_type
 

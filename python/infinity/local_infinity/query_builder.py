@@ -186,7 +186,7 @@ class InfinityLocalQueryBuilder(ABC):
                     select_list.append(parsed_expr)
                 case "_row_id":
                     func_expr = WrapFunctionExpr()
-                    func_expr.function_name = "row_id"
+                    func_expr.func_name = "row_id"
                     func_expr.arguments = []
 
                     expr_type = ParsedExprType(ParsedExprType.kFunction)
@@ -196,7 +196,7 @@ class InfinityLocalQueryBuilder(ABC):
                     select_list.append(parsed_expr)
                 case "_score":
                     func_expr = WrapFunctionExpr()
-                    func_expr.function_name = "score"
+                    func_expr.func_name = "score"
                     func_expr.arguments = []
 
                     expr_type = ParsedExprType(ParsedExprType.kFunction)
