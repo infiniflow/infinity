@@ -49,6 +49,7 @@ export enum class ShowType {
     kShowGlobalVariable,
     kShowGlobalVariables,
     kShowConfig,
+    kShowBuffer,
 };
 
 export String ToString(ShowType type);

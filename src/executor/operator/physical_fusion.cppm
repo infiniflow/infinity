@@ -33,6 +33,8 @@ import logger;
 namespace infinity {
 struct DataBlock;
 
+export enum class FusionMethod { kRRF, kWeightedSum, kMatchTensor };
+
 export class PhysicalFusion final : public PhysicalOperator {
 public:
     explicit PhysicalFusion(u64 id,
@@ -72,14 +74,15 @@ public:
 private:
     bool ExecuteFirstOp(QueryContext *query_context, FusionOperatorState *fusion_operator_state) const;
     bool ExecuteNotFirstOp(QueryContext *query_context, OperatorState *operator_state) const;
-    // RRF has multiple input source, must be first op
-    void ExecuteRRF(const Map<u64, Vector<UniquePtr<DataBlock>>> &input_data_blocks, Vector<UniquePtr<DataBlock>> &output_data_block_array) const;
-    // MatchTensor may have multiple or single input source, can be first or not first op
+    // RRF and WeightedSum have multiple input sources, must be first fusion op
+    void ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBlock>>> &input_data_blocks,
+                            Vector<UniquePtr<DataBlock>> &output_data_block_array) const;
+    // MatchTensor may have multiple or single input source, can be first or not first fusion op
     void ExecuteMatchTensor(QueryContext *query_context,
                             const Map<u64, Vector<UniquePtr<DataBlock>>> &input_data_blocks,
                             Vector<UniquePtr<DataBlock>> &output_data_block_array) const;
 
-    String to_lower_method_;
+    FusionMethod fusion_method_;
     SharedPtr<Vector<String>> output_names_;
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_;
 };

@@ -68,6 +68,8 @@ public:
 
     inline u64 knn_table_index() const { return knn_table_index_; }
 
+    inline bool IsKnnMinHeap() const { return knn_expression_->IsKnnMinHeap(); }
+
 private:
     template <typename T, template <typename, typename> typename C>
     void ExecuteInner(QueryContext *query_context, MergeKnnOperatorState *operator_state);

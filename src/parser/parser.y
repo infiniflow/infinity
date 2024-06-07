@@ -1592,6 +1592,10 @@ show_statement: SHOW DATABASES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kProfiles;
 }
+| SHOW BUFFER {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kBuffer;
+}
 | SHOW SESSION VARIABLES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kSessionVariables;

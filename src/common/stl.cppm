@@ -138,6 +138,7 @@ export namespace std {
     using std::reverse;
     using std::sort;
     using std::sqrt;
+    using std::stable_sort;
     using std::tie;
     using std::transform;
     using std::unique;
