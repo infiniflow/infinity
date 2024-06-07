@@ -251,9 +251,14 @@ struct ColumnField {
 
 struct ImportOption {
 1:  string delimiter,
-2:  bool copy_from,
-3:  bool has_header,
-4:  CopyFileType copy_file_type,
+2:  bool has_header,
+3:  CopyFileType copy_file_type,
+}
+
+struct ExportOption {
+1:  string delimiter,
+2:  bool has_header,
+3:  CopyFileType copy_file_type,
 }
 
 struct ConnectRequest {
@@ -441,9 +446,16 @@ struct ImportRequest{
 1:  string db_name,
 2:  string table_name,
 3:  string file_name,
-4:  binary file_content,
-5:  ImportOption import_option,
-6:  i64 session_id,
+4:  ImportOption import_option,
+5:  i64 session_id,
+}
+
+struct ExportRequest{
+1:  string db_name,
+2:  string table_name,
+3:  string file_name,
+4:  ExportOption export_option,
+5:  i64 session_id,
 }
 
 enum ExplainType {
@@ -603,6 +615,7 @@ CommonResponse CreateTable(1:CreateTableRequest request),
 CommonResponse DropTable(1:DropTableRequest request),
 CommonResponse Insert(1:InsertRequest request),
 CommonResponse Import(1:ImportRequest request),
+CommonResponse Export(1:ExportRequest request),
 SelectResponse Select(1:SelectRequest request),
 SelectResponse Explain(1:ExplainRequest request),
 CommonResponse Delete(1:DeleteRequest request),

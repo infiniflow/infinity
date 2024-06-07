@@ -66,6 +66,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[1] = String("0.2.0.dev2");
     client_version_map_[2] = String("0.2.0.dev3");
     client_version_map_[3] = String("0.2.0.dev4");
+    client_version_map_[4] = String("0.2.0.dev5");
 }
 
 Pair<const char*, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -364,6 +365,30 @@ void InfinityThriftService::Import(infinity_thrift_rpc::CommonResponse &response
     import_options.delimiter_ = delimiter_string[0];
 
     const QueryResult result = infinity->Import(request.db_name, request.table_name, request.file_name.c_str(), import_options);
+    ProcessQueryResult(response, result);
+}
+
+void InfinityThriftService::Export(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ExportRequest &request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    auto [copy_file_type, status] = GetCopyFileType(request.export_option.copy_file_type);
+    if (!status.ok()) {
+        ProcessStatus(response, status);
+    }
+
+    ExportOptions export_options;
+    export_options.copy_file_type_ = copy_file_type;
+    auto &delimiter_string = request.export_option.delimiter;
+    if (export_options.copy_file_type_ == CopyFileType::kCSV && delimiter_string.size() != 1) {
+        ProcessStatus(response, Status::SyntaxError("CSV file delimiter isn't a char."));
+    }
+    export_options.delimiter_ = delimiter_string[0];
+
+    const QueryResult result = infinity->Export(request.db_name, request.table_name, request.file_name.c_str(), export_options);
     ProcessQueryResult(response, result);
 }
 
