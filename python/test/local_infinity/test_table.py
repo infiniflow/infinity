@@ -102,10 +102,11 @@ class TestLocalInfinity():
         test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
         test_table_obj._test_create_same_name_table()
 
-    # todo fix
-    # def test_table_drop_same_name_table(self):
-    #     test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
-    #     test_table_obj._test_drop_same_name_table()
+    # todo fix: why return TABLE_NOT_EXIST error
+    @pytest.mark.skip()
+    def test_table_drop_same_name_table(self):
+        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj._test_drop_same_name_table()
 
     def test_table_same_column_name(self):
         test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
