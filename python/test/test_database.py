@@ -18,7 +18,7 @@ import pytest
 from common import common_values
 from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
-from test_sdkbase import TestSdk
+from src.test_sdkbase import TestSdk
 
 
 class TestDatabase(TestSdk):

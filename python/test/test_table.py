@@ -20,8 +20,8 @@ from common import common_values
 from infinity.common import ConflictType, InfinityException
 import infinity
 from infinity.errors import ErrorCode
-from utils import trace_expected_exceptions
-from test_sdkbase import TestSdk
+from src.utils import trace_expected_exceptions
+from src.test_sdkbase import TestSdk
 
 
 class TestTable(TestSdk):

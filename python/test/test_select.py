@@ -21,8 +21,8 @@ import infinity
 from numpy import dtype
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
-from utils import copy_data
-from test_sdkbase import TestSdk
+from src.utils import copy_data
+from src.test_sdkbase import TestSdk
 
 
 class TestSelect(TestSdk):

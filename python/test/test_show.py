@@ -17,7 +17,7 @@ from common import common_values
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 import infinity
-from test_sdkbase import TestSdk
+from src.test_sdkbase import TestSdk
 
 
 class TestDescribe(TestSdk):

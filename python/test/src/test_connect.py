@@ -17,19 +17,19 @@ from common import common_values
 import infinity
 from infinity.common import NetworkAddress
 
-from test_sdkbase import TestSdk
+from src.test_sdkbase import TestSdk
 class TestConnection(TestSdk):
-    def test_connect_and_disconnect_ok(self):
+    def _test_connect_and_disconnect_ok(self):
         """
         target: test connect and server ok
         method: connect server
         expected: ok
         """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         assert infinity_obj
         assert infinity_obj.disconnect()
 
-    def test_connect_invalid_address(self):
+    def _test_connect_invalid_address(self):
         """
         target: test connect invalid address, wrong address, invalid port, wrong port
         method: connect server with (invalid/wrong address and invalid/wrong port)
@@ -76,17 +76,17 @@ class TestConnection(TestSdk):
         except Exception as e:
             print(e)
 
-    def test_repeat_connect(self):
+    def _test_repeat_connect(self):
         """
         target: disconnect the infinity which is already disconnected.
         method: connect server -> connect server
         expected: success
         """
-        infinity_instance = infinity.connect(common_values.TEST_REMOTE_HOST)
-        infinity_instance = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_instance = infinity.connect(self.uri)
+        infinity_instance = infinity.connect(self.uri)
 
     @pytest.mark.slow
-    def test_multiple_connect(self):
+    def _test_multiple_connect(self):
         """
         target: disconnect the infinity which is already disconnected.
         method: multiple connection to server
@@ -95,18 +95,18 @@ class TestConnection(TestSdk):
         connection_limit = 128
         infinity_instances = []
         for i in range(0, connection_limit):
-            infinity_instances.append(infinity.connect(common_values.TEST_REMOTE_HOST))
+            infinity_instances.append(infinity.connect(self.uri))
 
         for i in range(0, connection_limit):
             infinity_instances[i].disconnect()
 
-    def test_repeat_disconnect(self):
+    def _test_repeat_disconnect(self):
         """
         target: disconnect the infinity which is already disconnected.
         method: connect server -> disconnect server -> disconnect server
         expected: failed
         """
-        infinity_instance = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_instance = infinity.connect(self.uri)
         infinity_instance.disconnect()
 
         try:

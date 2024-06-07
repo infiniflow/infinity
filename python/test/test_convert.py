@@ -5,7 +5,7 @@ from common import common_values
 import infinity
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.common import ConflictType, InfinityException
-from test_sdkbase import TestSdk
+from src.test_sdkbase import TestSdk
 
 
 class TestConvert(TestSdk):

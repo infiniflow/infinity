@@ -18,10 +18,10 @@ import infinity.index as index
 import pandas
 import pytest
 from common import common_values
-from utils import copy_data
+from src.utils import copy_data
 from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
-from test_sdkbase import TestSdk
+from src.test_sdkbase import TestSdk
 
 TEST_DATA_DIR = "/test/data/"
 

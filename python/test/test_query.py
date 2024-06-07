@@ -21,7 +21,7 @@ from infinity.remote_thrift.db import RemoteDatabase
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.table import RemoteTable
 from infinity.common import ConflictType
-from test_sdkbase import TestSdk
+from src.test_sdkbase import TestSdk
 
 
 class TestQuery(TestSdk):

@@ -21,8 +21,8 @@ from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
-from utils import trace_expected_exceptions
-from test_sdkbase import TestSdk
+from src.utils import trace_expected_exceptions
+from src.test_sdkbase import TestSdk
 
 
 class TestDelete(TestSdk):

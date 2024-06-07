@@ -20,9 +20,9 @@ from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
-from test_sdkbase import TestSdk
+from src.test_sdkbase import TestSdk
 
-from utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
+from src.utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
     generate_commas_enwiki
 
 

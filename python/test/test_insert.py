@@ -24,8 +24,8 @@ import infinity
 import infinity.index as index
 from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
-from utils import start_infinity_service_in_subporcess
-from test_sdkbase import TestSdk
+from src.utils import start_infinity_service_in_subporcess
+from src.test_sdkbase import TestSdk
 
 
 class TestInsert(TestSdk):

@@ -20,7 +20,7 @@ from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
 
 from common import common_values
-from test_sdkbase import TestSdk
+from src.test_sdkbase import TestSdk
 
 class TestInfinity(TestSdk):
 

@@ -22,8 +22,8 @@ from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
 from infinity.remote_thrift.types import make_match_tensor_expr
 
-from utils import copy_data, generate_commas_enwiki
-from test_sdkbase import TestSdk
+from src.utils import copy_data, generate_commas_enwiki
+from src.test_sdkbase import TestSdk
 
 
 class TestKnn(TestSdk):
