@@ -17,45 +17,12 @@
 #include <cstdlib>
 #include <immintrin.h>
 #include <random>
-
-import infinity_exception;
+#include <vector>
 
 import stl;
+import emvb_simd_funcs;
+
 using namespace infinity;
-
-// https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
-inline float hsum_ps_sse3(__m128 &v) {
-    __m128 shuf = _mm_movehdup_ps(v); // broadcast elements 3,1 to 2,0
-    __m128 sums = _mm_add_ps(v, shuf);
-    shuf = _mm_movehl_ps(shuf, sums); // high half -> low half
-    sums = _mm_add_ss(sums, shuf);
-    return _mm_cvtss_f32(sums);
-}
-
-// https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
-inline float hsum256_ps_avx(__m256 &v) {
-    __m128 vlow = _mm256_castps256_ps128(v);
-    __m128 vhigh = _mm256_extractf128_ps(v, 1); // high 128
-    vlow = _mm_add_ps(vlow, vhigh);             // add the low 128
-    return hsum_ps_sse3(vlow);                  // and inline the sse3 version, which is optimal for AVX
-    // (no wasted instructions, and all of them are the 4B minimum)
-}
-
-// https://stackoverflow.com/questions/36932240/avx2-what-is-the-most-efficient-way-to-pack-left-based-on-a-mask/36951611#36951611
-// Uses 64bit pdep / pext to save a step in unpacking.
-__m256i compress256i(__m256i src, unsigned int mask /* from movmskps */) {
-    uint64_t expanded_mask = _pdep_u64(mask, 0x0101010101010101); // unpack each bit to a byte
-    expanded_mask *= 0xFF;                                        // mask |= mask<<1 | mask<<2 | ... | mask<<7;
-    // ABC... -> AAAAAAAABBBBBBBBCCCCCCCC...: replicate each bit to fill its byte
-
-    const uint64_t identity_indices = 0x0706050403020100; // the identity shuffle for vpermps, packed to one index per byte
-    uint64_t wanted_indices = _pext_u64(identity_indices, expanded_mask);
-
-    __m128i bytevec = _mm_cvtsi64_si128(wanted_indices);
-    __m256i shufmask = _mm256_cvtepu8_epi32(bytevec);
-
-    return _mm256_permutevar8x32_epi32(src, shufmask);
-}
 
 class SIMDTest : public BaseTest {};
 
