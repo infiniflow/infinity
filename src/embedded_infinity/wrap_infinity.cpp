@@ -229,6 +229,26 @@ WrapQueryResult WrapGetDatabase(Infinity &instance, const String &db_name) {
 WrapQueryResult WrapShowDatabase(Infinity &instance, const String &db_name) {
     auto query_result = instance.ShowDatabase(db_name);
     WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
+    if (query_result.IsOk()) {
+        SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+        auto row_count = data_block->row_count();
+        if (row_count != 3) {
+            String error_message = "ShowDatabase: query result is invalid.";
+            UnrecoverableError(error_message);
+        }
+        {
+            Value value = data_block->GetValue(1, 0);
+            result.database_name = value.GetVarchar();
+        }
+        {
+            Value value = data_block->GetValue(1, 1);
+            result.store_dir = value.GetVarchar();
+        }
+        {
+            Value value = data_block->GetValue(1, 2);
+            result.table_count = value.value_.big_int;
+        }
+    }
     return result;
 }
 

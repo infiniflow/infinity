@@ -19,7 +19,7 @@ from embedded_infinity import *
 
 class LocalQueryResult:
     def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, column_defs=None,
-                 column_fields=None):
+                 column_fields=None, database_name=None, store_dir=None, table_count=None):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_names = db_names
@@ -27,7 +27,9 @@ class LocalQueryResult:
         # self.result_data = result_data
         self.column_defs = column_defs
         self.column_fields = column_fields
-
+        self.database_name = database_name
+        self.store_dir = store_dir
+        self.table_count = table_count
 
 class LocalInfinityClient:
     def __init__(self, path: str = LOCAL_INFINITY_PATH):
@@ -40,14 +42,17 @@ class LocalInfinityClient:
         return LocalQueryResult(PyErrorCode.OK, "")
 
     # convert embedded_error code to python error code
-    def convert_res(self, res, has_db_name=False, has_table_name=False, has_result_data=False):
-        if has_db_name:
+    def convert_res(self, res, has_db_names=False, has_table_names=False, has_result_data=False, has_db_name=False):
+        if has_db_names:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, db_names=res.names)
-        if has_table_name:
+        if has_table_names:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, table_names=res.names)
         if has_result_data:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, column_defs=res.column_defs,
                                     column_fields=res.column_fields)
+        if has_db_name:
+            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, database_name=res.database_name,
+                                    store_dir=res.store_dir, table_count=res.table_count)
         return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg)
 
     def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError):
@@ -61,10 +66,10 @@ class LocalInfinityClient:
         return self.convert_res(self.client.DropDatabase(db_name, drop_database_options))
 
     def list_databases(self):
-        return self.convert_res(self.client.ListDatabases(), has_db_name=True)
+        return self.convert_res(self.client.ListDatabases(), has_db_names=True)
 
     def show_database(self, db_name: str):
-        return self.convert_res(self.client.ShowDatabase(db_name))
+        return self.convert_res(self.client.ShowDatabase(db_name), has_db_name=True)
 
     def get_database(self, db_name: str):
         return self.convert_res(self.client.GetDatabase(db_name))
@@ -88,7 +93,7 @@ class LocalInfinityClient:
         return self.convert_res(self.client.GetTable(db_name, table_name))
 
     def list_tables(self, db_name: str):
-        return self.convert_res(self.client.ListTables(db_name), has_table_name=True)
+        return self.convert_res(self.client.ListTables(db_name), has_table_names=True)
 
     def show_table(self, db_name: str, table_name: str):
         return self.convert_res(self.client.ShowTable(db_name, table_name))

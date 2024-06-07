@@ -20,40 +20,12 @@ from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
 from src.test_sdkbase import TestSdk
 
-
 class TestDatabase(TestSdk):
 
-    def test_version(self):
+    def _test_version(self):
         print(infinity.__version__)
 
-    def test_database(self):
-        # remote
-        self._test_database(common_values.TEST_REMOTE_HOST)
-        # local
-        self._test_database(common_values.TEST_LOCAL_PATH)
-
-    def test_create_database_invalid_name(self):
-        # remote
-        self._test_create_database_invalid_name(common_values.TEST_REMOTE_HOST)
-        # local
-        self._test_create_database_invalid_name(common_values.TEST_LOCAL_PATH)
-
-    def test_create_drop_show_1K_databases(self):
-        # remote
-        self._test_create_drop_show_1K_databases(common_values.TEST_REMOTE_HOST)
-        # local
-        self._test_create_drop_show_1K_databases(common_values.TEST_LOCAL_PATH)
-
-    @pytest.mark.slow
-    def test_create_drop_show_1M_databases(self):
-        self._test_create_drop_show_1M_databases(common_values.TEST_REMOTE_HOST)
-        # self._test_create_drop_show_1M_databases(common_values.TEST_LOCAL_PATH)
-
-    def test_repeatedly_create_drop_show_databases(self):
-        self._test_repeatedly_create_drop_show_databases(common_values.TEST_REMOTE_HOST)
-        self._test_repeatedly_create_drop_show_databases(common_values.TEST_LOCAL_PATH)
-
-    def _test_database(self, uri):
+    def _test_database(self):
         """
         target: test table apis
         method:
@@ -72,7 +44,7 @@ class TestDatabase(TestSdk):
             - "default_db"
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(uri)
+        infinity_obj = infinity.connect(self.uri)
 
         infinity_obj.drop_database("my_database", ConflictType.Ignore)
 
@@ -129,7 +101,7 @@ class TestDatabase(TestSdk):
 
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_database_invalid_name(self, uri):
+    def _test_create_database_invalid_name(self):
         """
         create database with invalid name
 
@@ -141,7 +113,7 @@ class TestDatabase(TestSdk):
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(uri)
+        infinity_obj = infinity.connect(self.uri)
 
         # 2. create db with invalid name
         for db_name in common_values.invalid_name_array:
@@ -156,7 +128,7 @@ class TestDatabase(TestSdk):
 
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_drop_show_1K_databases(self, uri):
+    def _test_create_drop_show_1K_databases(self):
 
         """
         create 1K dbs, show these dbs, drop these dbs
@@ -175,7 +147,7 @@ class TestDatabase(TestSdk):
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(uri)
+        infinity_obj = infinity.connect(self.uri)
 
         db_count = 100
         for i in range(db_count):
@@ -201,7 +173,8 @@ class TestDatabase(TestSdk):
 
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_drop_show_1M_databases(self, uri):
+    @pytest.mark.slow
+    def _test_create_drop_show_1M_databases(self):
 
         """
         create 1M dbs, show these dbs, drop these dbs
@@ -220,7 +193,7 @@ class TestDatabase(TestSdk):
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(uri)
+        infinity_obj = infinity.connect(self.uri)
 
         db_count = 1000000
         # db = infinity_obj.create_database('db_name')
@@ -248,7 +221,7 @@ class TestDatabase(TestSdk):
 
         assert res.error_code == ErrorCode.OK
 
-    def _test_repeatedly_create_drop_show_databases(self, uri):
+    def _test_repeatedly_create_drop_show_databases(self):
 
         """
         create db, show db and drop db, repeat above ops 100 times
@@ -264,7 +237,7 @@ class TestDatabase(TestSdk):
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(uri)
+        infinity_obj = infinity.connect(self.uri)
 
         loop_count = 100
 
@@ -288,7 +261,7 @@ class TestDatabase(TestSdk):
 
         assert res.error_code == ErrorCode.OK
 
-    def test_drop_database_with_invalid_name(self):
+    def _test_drop_database_with_invalid_name(self):
         """
         drop database with invalid name
 
@@ -300,7 +273,7 @@ class TestDatabase(TestSdk):
         """
 
         # 1. connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
 
         # 2. drop db with invalid name
         for db_name in common_values.invalid_name_array:
@@ -314,7 +287,7 @@ class TestDatabase(TestSdk):
 
         assert res.error_code == ErrorCode.OK
 
-    def test_get_db(self):
+    def _test_get_db(self):
         """
         target: get db
         method:
@@ -324,7 +297,7 @@ class TestDatabase(TestSdk):
         4. show invalid name db
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
 
 
         # option: if not exists
@@ -362,7 +335,7 @@ class TestDatabase(TestSdk):
 
         assert res.error_code == ErrorCode.OK
 
-    def test_db_ops_after_disconnection(self):
+    def _test_db_ops_after_disconnection(self):
         """
         target: show db
         method:
@@ -376,7 +349,7 @@ class TestDatabase(TestSdk):
         """
 
         # 1. connect and disconnect db
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         res = infinity_obj.disconnect()
 
         # 2. create db
@@ -418,9 +391,9 @@ class TestDatabase(TestSdk):
     # TODO drop non-existent db with ignore if non-existent option repeatedly
 
     # drop non-existent db
-    def test_drop_non_existent_db(self):
+    def _test_drop_non_existent_db(self):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
 
         for db_name in common_values.invalid_name_array:
             with pytest.raises(InfinityException) as e:
@@ -433,16 +406,16 @@ class TestDatabase(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # one thread get db, another thread drop this db
-    def test_get_drop_db_with_two_threads(self):
+    def _test_get_drop_db_with_two_threads(self):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         infinity_obj.drop_database("test_get_drop_db_with_two_thread", ConflictType.Ignore)
         infinity_obj.create_database("test_get_drop_db_with_two_thread")
 
         thread1 = threading.Thread(target=infinity_obj.drop_database("test_get_drop_db_with_two_thread"), args=(1,))
 
         with pytest.raises(InfinityException) as e:
-        # with pytest.raises(Exception, match="ERROR:3021, Not existed entry*"):
+            # with pytest.raises(Exception, match="ERROR:3021, Not existed entry*"):
             thread2 = threading.Thread(target=infinity_obj.get_database("test_get_drop_db_with_two_thread"), args=(2,))
 
             thread1.start()
@@ -474,9 +447,9 @@ class TestDatabase(TestSdk):
 
     # create same db in different thread to test conflict and show dbs
     # @trace_expected_exceptions
-    def test_create_same_db_in_different_threads(self):
+    def _test_create_same_db_in_different_threads(self):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
 
         with pytest.raises(InfinityException) as e:
             thread1 = threading.Thread(target=infinity_obj.create_database("test_create_same_db_in_different_threads"),
@@ -499,9 +472,9 @@ class TestDatabase(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_show_database(self):
+    def _test_show_database(self):
         # create db
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         infinity_obj.drop_database("test_show_database", ConflictType.Ignore)
         infinity_obj.create_database("test_show_database", ConflictType.Error)
 
@@ -520,9 +493,9 @@ class TestDatabase(TestSdk):
                                                1,
                                                2,
                                                ])
-    def test_create_with_valid_option(self, conflict_type):
+    def _test_create_with_valid_option(self, conflict_type):
         # create db
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         infinity_obj.drop_database("test_create_option", ConflictType.Ignore)
         infinity_obj.create_database("test_create_option", conflict_type)
 
@@ -541,8 +514,8 @@ class TestDatabase(TestSdk):
                                                pytest.param({}),
                                                pytest.param(()),
                                                ])
-    def test_create_with_invalid_option(self, conflict_type):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_create_with_invalid_option(self, conflict_type):
+        infinity_obj = infinity.connect(self.uri)
         infinity_obj.drop_database("test_create_option", ConflictType.Ignore)
 
         with pytest.raises(InfinityException) as e:
@@ -563,10 +536,10 @@ class TestDatabase(TestSdk):
         0,
         1,
     ])
-    def test_drop_option_with_valid_option(self, conflict_type):
+    def _test_drop_option_with_valid_option(self, conflict_type):
         # create db
 
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         infinity_obj.drop_database("test_drop_option", ConflictType.Ignore)
         infinity_obj.create_database("test_drop_option")
         infinity_obj.drop_database("test_drop_option", conflict_type)
@@ -585,10 +558,10 @@ class TestDatabase(TestSdk):
         pytest.param({}),
         pytest.param(()),
     ])
-    def test_drop_option(self, conflict_type):
+    def _test_drop_option(self, conflict_type):
         # create db
 
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         infinity_obj.drop_database("test_drop_option", ConflictType.Ignore)
         infinity_obj.create_database("test_drop_option")
         with pytest.raises(InfinityException) as e:
@@ -603,7 +576,7 @@ class TestDatabase(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("table_name", ["test_show_table"])
-    def test_show_valid_table(self, get_infinity_db, table_name):
+    def _test_show_valid_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
         db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
@@ -621,7 +594,7 @@ class TestDatabase(TestSdk):
                                             pytest.param(()),
                                             pytest.param({}),
                                             ])
-    def test_show_invalid_table(self, get_infinity_db, table_name):
+    def _test_show_invalid_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
         db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
@@ -639,7 +612,7 @@ class TestDatabase(TestSdk):
         db_obj.drop_table("test_show_table", ConflictType.Error)
 
     @pytest.mark.parametrize("table_name", [pytest.param("not_exist_name")])
-    def test_show_not_exist_table(self, get_infinity_db, table_name):
+    def _test_show_not_exist_table(self, get_infinity_db, table_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
         db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
@@ -654,7 +627,7 @@ class TestDatabase(TestSdk):
         db_obj.drop_table("test_show_table", ConflictType.Error)
 
     @pytest.mark.parametrize("column_name", ["test_show_table_columns"])
-    def test_show_table_columns_with_valid_name(self, get_infinity_db, column_name):
+    def _test_show_table_columns_with_valid_name(self, get_infinity_db, column_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
 
@@ -674,7 +647,7 @@ class TestDatabase(TestSdk):
                                              pytest.param(()),
                                              pytest.param({}),
                                              ])
-    def test_show_table_columns_with_invalid_name(self, get_infinity_db, column_name):
+    def _test_show_table_columns_with_invalid_name(self, get_infinity_db, column_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
 

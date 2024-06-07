@@ -41,6 +41,7 @@ import function_expr;
 import between_expr;
 import parsed_expr;
 import search_expr;
+import internal_types;
 
 namespace nb = nanobind;
 
@@ -94,10 +95,13 @@ export struct WrapQueryResult {
     ErrorCode error_code;
     String error_msg;
     Vector<String> names;
-    //    Vector<Vector<WrapColumnField>> result_rows;
     Vector<WrapColumnDef> column_defs;
     Vector<ColumnField> column_fields;
-    //    Vector<WrapColumnField> column_fields;
+    // show database
+    String database_name;
+    String store_dir;
+    BigIntT table_count;
+
     WrapQueryResult() = default;
     WrapQueryResult(ErrorCode error_code, const char *error_msg) : error_code(error_code) {
         if (error_msg != nullptr) {
