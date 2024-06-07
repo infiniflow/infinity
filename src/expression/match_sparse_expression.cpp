@@ -38,7 +38,7 @@ import value_expression;
 namespace infinity {
 
 MatchSparseExpression::MatchSparseExpression(Vector<SharedPtr<BaseExpression>> search_column,
-                                             const ConstantExpr *query_sparse_expr,
+                                             SharedPtr<BaseExpression> query_sparse_expr,
                                              SparseMetricType metric_type,
                                              SizeT query_n,
                                              SizeT topn,
@@ -49,33 +49,52 @@ MatchSparseExpression::MatchSparseExpression(Vector<SharedPtr<BaseExpression>> s
     this->MakeQuery(query_sparse_expr);
 }
 
-DataType MatchSparseExpression::Type() const { return DataType(LogicalType::kFloat); }
-
-void MatchSparseExpression::MakeQuery(const ConstantExpr *query_sparse_expr) {
-    SharedPtr<ValueExpression> value_expr = nullptr;
-    {
-        Value query_sparse(DataType{LogicalType::kInvalid});
-        switch (query_sparse_expr->literal_type_) {
-            case LiteralType::kLongSparseArray: {
-                query_sparse = Value::MakeSparse(query_sparse_expr->long_sparse_array_);
-                break;
-            }
-            case LiteralType::kDoubleSparseArray: {
-                query_sparse = Value::MakeSparse(query_sparse_expr->double_sparse_array_);
-                break;
-            }
-            default: {
-                Status status = Status::NotSupport(fmt::format("Unsupported query sparse data type: {}", query_sparse_expr->ToString()));
-                LOG_ERROR(status.message());
-                RecoverableError(std::move(status));
+DataType MatchSparseExpression::Type() const {
+    const DataType &column_type = column_expr_->Type();
+    const auto *sparse_info = static_cast<const SparseInfo *>(column_type.type_info().get());
+    switch (sparse_info->DataType()) {
+        case kElemBit: {
+            switch (sparse_info->IndexType()) {
+                case kElemInt8: {
+                    return DataType(LogicalType::kTinyInt);
+                }
+                case kElemInt16: {
+                    return DataType(LogicalType::kSmallInt);
+                }
+                case kElemInt32: {
+                    return DataType(LogicalType::kInteger);
+                }
+                case kElemInt64: {
+                    return DataType(LogicalType::kBigInt);
+                }
+                default: {
+                    UnrecoverableError("Invalid index type.");
+                }
             }
         }
-        value_expr = MakeShared<ValueExpression>(std::move(query_sparse));
+        case kElemFloat: {
+            return DataType(LogicalType::kFloat);
+        }
+        case kElemDouble: {
+            return DataType(LogicalType::kDouble);
+        }
+        case kElemInt8:
+        case kElemInt16:
+        case kElemInt32:
+        case kElemInt64: {
+            return DataType(LogicalType::kFloat);
+        }
+        default: {
+            UnrecoverableError("Unimpelmented.");
+        }
     }
+    return DataType(LogicalType::kInvalid);
+}
 
+void MatchSparseExpression::MakeQuery(SharedPtr<BaseExpression> query_sparse_expr) {
     const auto &column_type = column_expr_->Type();
-    BoundCastFunc cast = CastFunction::GetBoundFunc(value_expr->GetValue().type(), column_type);
-    query_sparse_expr_ = MakeShared<CastExpression>(cast, value_expr, column_type);
+    BoundCastFunc cast = CastFunction::GetBoundFunc(query_sparse_expr->Type(), column_type);
+    query_sparse_expr_ = MakeShared<CastExpression>(cast, query_sparse_expr, column_type);
 }
 
 String MatchSparseExpression::ToString() const {

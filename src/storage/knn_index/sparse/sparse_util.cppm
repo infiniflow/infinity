@@ -14,25 +14,42 @@
 
 module;
 
-export module sparse_iter;
+export module sparse_util;
 
 import stl;
+import sparse_vector_distance;
+import knn_result_handler;
+import file_system;
 
 namespace infinity {
 
+export struct SparseVecRef {
+    const f32 *data_;
+    const u32 *indices_;
+    i32 nnz_;
+};
+
 export struct SparseMatrix {
+public:
+    SparseVecRef at(i64 row_id) const {
+        i64 offset = indptr_[row_id];
+        const float *data = data_.get() + offset;
+        const auto *indices = reinterpret_cast<const u32 *>(indices_.get() + offset);
+        i32 nnz = indptr_[row_id + 1] - offset;
+        return SparseVecRef{data, indices, nnz};
+    }
+
+    static SparseMatrix Load(FileHandler &file_handler);
+
+    void Save(FileHandler &file_handler) const;
+
+public:
     UniquePtr<f32[]> data_{};
     UniquePtr<i32[]> indices_{};
     UniquePtr<i64[]> indptr_{}; // row i's data and indice is stored in data_[indptr_[i]:indptr_[i+1]], indices_[indptr_[i]:indptr_[i+1]]
     i64 nrow_{};
     i64 ncol_{};
     i64 nnz_{};
-};
-
-export struct SparseVecRef {
-    const f32 *data_;
-    const u32 *indices_;
-    i32 nnz_;
 };
 
 export class SparseMatrixIter {
@@ -59,6 +76,14 @@ private:
     const SparseMatrix &mat_;
     i64 row_i_{};
     i64 offset_{};
+};
+
+export struct SparseVecUtil {
+    static f32 DistanceIP(const SparseVecRef &vec1, const SparseVecRef &vec2) {
+        return SparseIPDistance(vec1.data_, vec1.indices_, vec1.nnz_, vec2.data_, vec2.indices_, vec2.nnz_);
+    }
+
+    static Pair<Vector<u32>, Vector<f32>> Rerank(const SparseMatrix &mat, const SparseVecRef &query, Vector<u32> candidates, u32 topk);
 };
 
 } // namespace infinity

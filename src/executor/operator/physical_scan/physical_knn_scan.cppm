@@ -35,11 +35,11 @@ import infinity_exception;
 import internal_types;
 import data_type;
 import common_query_filter;
-import physical_scan_base;
+import physical_filter_scan_base;
 
 namespace infinity {
 
-export class PhysicalKnnScan final : public PhysicalScanBase {
+export class PhysicalKnnScan final : public PhysicalFilterScanBase {
 public:
     explicit PhysicalKnnScan(u64 id,
                              SharedPtr<BaseTableRef> base_table_ref,
@@ -49,9 +49,9 @@ public:
                              SharedPtr<Vector<SharedPtr<DataType>>> output_types,
                              u64 knn_table_index,
                              SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalScanBase(id, PhysicalOperatorType::kKnnScan, nullptr, nullptr, base_table_ref, load_metas),
-          knn_expression_(std::move(knn_expression)), common_query_filter_(common_query_filter), output_names_(std::move(output_names)),
-          output_types_(std::move(output_types)), knn_table_index_(knn_table_index) {}
+        : PhysicalFilterScanBase(id, PhysicalOperatorType::kKnnScan, nullptr, nullptr, base_table_ref, common_query_filter, load_metas),
+          knn_expression_(std::move(knn_expression)), output_names_(std::move(output_names)), output_types_(std::move(output_types)),
+          knn_table_index_(knn_table_index) {}
 
     ~PhysicalKnnScan() override = default;
 
@@ -83,8 +83,6 @@ public:
 
 public:
     SharedPtr<KnnExpression> knn_expression_{};
-
-    SharedPtr<CommonQueryFilter> common_query_filter_;
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

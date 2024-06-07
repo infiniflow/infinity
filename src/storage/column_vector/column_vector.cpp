@@ -134,7 +134,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
             nulls_ptr_ = Bitmask::Make(8);
         } else {
             buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_types);
-            nulls_ptr_ = Bitmask::Make(capacity_);
+            nulls_ptr_ = Bitmask::Make(std::bit_ceil(capacity_));
         }
         data_ptr_ = buffer_->GetDataMut();
     } else {
@@ -168,7 +168,7 @@ void ColumnVector::Initialize(BufferManager *buffer_mgr,
         nulls_ptr_ = Bitmask::Make(8);
     } else {
         buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_types);
-        nulls_ptr_ = Bitmask::Make(capacity_); // TODO: version file is not managed by buffer_manager now.
+        nulls_ptr_ = Bitmask::Make(capacity_);
     }
     data_ptr_ = buffer_->GetDataMut();
     tail_index_ = current_row_count;

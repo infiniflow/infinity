@@ -17,4 +17,5 @@ def generate_sparse_data(row_n: int, max_dim: int, sparsity: float):
         start, end = indptr[row_id], indptr[row_id + 1]
         for i, r in zip(range(start, end), random.sample(range(max_dim), end - start)):
             indices[i] = r
+        indices[start:end] = np.sort(indices[start:end])
     return indptr, indices, data
