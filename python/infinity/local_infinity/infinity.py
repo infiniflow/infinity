@@ -17,8 +17,12 @@ class LocalInfinityConnection(InfinityConnection, ABC):
         if self._is_connected is True:
             self.disconnect()
 
+    def check_connect(self):
+        if (self._is_connected is False):
+            raise Exception("Local infinity is not connected")
     @name_validity_check("db_name", "DB")
     def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.Error):
+        self.check_connect()
         create_database_conflict: LocalConflictType
         if conflict_type == ConflictType.Error:
             create_database_conflict = LocalConflictType.kError
@@ -36,6 +40,7 @@ class LocalInfinityConnection(InfinityConnection, ABC):
             raise InfinityException(res.error_code, res.error_msg)
 
     def list_databases(self):
+        self.check_connect()
         res = self._client.list_databases()
         if res.error_code == ErrorCode.OK:
             return res
@@ -44,6 +49,7 @@ class LocalInfinityConnection(InfinityConnection, ABC):
 
     @name_validity_check("db_name", "DB")
     def show_database(self, db_name):
+        self.check_connect()
         res = self._client.show_database(db_name)
         if res.error_code == ErrorCode.OK:
             return res
@@ -52,6 +58,7 @@ class LocalInfinityConnection(InfinityConnection, ABC):
 
     @name_validity_check("db_name", "DB")
     def drop_database(self, db_name, conflict_type: ConflictType = ConflictType.Error):
+        self.check_connect()
         drop_database_conflict: LocalConflictType
         if conflict_type == ConflictType.Error:
             drop_database_conflict = LocalConflictType.kError
@@ -66,15 +73,14 @@ class LocalInfinityConnection(InfinityConnection, ABC):
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
-
     @name_validity_check("db_name", "DB")
     def get_database(self, db_name):
+        self.check_connect()
         res = self._client.get_database(db_name)
         if res.error_code == ErrorCode.OK:
             return LocalDatabase(self._client, db_name)
         else:
             raise InfinityException(res.error_code, res.error_msg)
-
 
     def disconnect(self):
         res = self._client.disconnect()
