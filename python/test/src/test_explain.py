@@ -24,7 +24,7 @@ from src.test_sdkbase import TestSdk
 
 class TestExplain(TestSdk):
 
-    def test_explain_default(self):
+    def _test_explain_default(self):
         """
             # Analyze = 1
             # Ast = 2
@@ -34,7 +34,7 @@ class TestExplain(TestSdk):
             # Pipeline = 6
             # Fragment = 7
         """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_explain_default", ConflictType.Ignore)
         table = db_obj.create_table("test_explain_default", {

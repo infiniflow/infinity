@@ -28,13 +28,13 @@ from src.test_sdkbase import TestSdk
 
 class TestKnn(TestSdk):
 
-    def test_version(self):
+    def _test_version(self):
         print(infinity.__version__)
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_knn(self, check_data):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_knn(self, check_data):
+        infinity_obj = infinity.connect(self.uri)
         # assert infinity_obj
         #
         # infinity
@@ -90,8 +90,8 @@ class TestKnn(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_insert_multi_column(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_insert_multi_column(self):
+        infinity_obj = infinity.connect(self.uri)
 
         with pytest.raises(Exception, match=r".*value count mismatch*"):
             db_obj = infinity_obj.get_database("default_db")
@@ -132,7 +132,7 @@ class TestKnn(TestSdk):
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("column_name", ["gender_vector",
                                              "color_vector"])
-    def test_knn_on_vector_column(self, get_infinity_db, check_data, column_name):
+    def _test_knn_on_vector_column(self, get_infinity_db, check_data, column_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_knn_on_vector_column",
                           conflict_type=ConflictType.Ignore)
@@ -168,7 +168,7 @@ class TestKnn(TestSdk):
                                              # pytest.param(2.2, marks=pytest.mark.xfail),
                                              # pytest.param("!@#/\#$ ## #$%  @#$^", marks=pytest.mark.xfail),
                                              ])
-    def test_knn_on_non_vector_column(self, get_infinity_db, check_data, column_name):
+    def _test_knn_on_non_vector_column(self, get_infinity_db, check_data, column_name):
         db_obj = get_infinity_db
         db_obj.drop_table("test_knn_on_non_vector_column",
                           conflict_type=ConflictType.Ignore)
@@ -204,7 +204,7 @@ class TestKnn(TestSdk):
         [1] * 4,
         (1, 2, 3, 4),
     ])
-    def test_valid_embedding_data(self, get_infinity_db, check_data, embedding_data):
+    def _test_valid_embedding_data(self, get_infinity_db, check_data, embedding_data):
         db_obj = get_infinity_db
         db_obj.drop_table("test_valid_embedding_data",
                           conflict_type=ConflictType.Ignore)
@@ -243,7 +243,7 @@ class TestKnn(TestSdk):
         pytest.param((1, 2, 3)),
         pytest.param({"c": "12"}),
     ])
-    def test_invalid_embedding_data(self, get_infinity_db, check_data, embedding_data):
+    def _test_invalid_embedding_data(self, get_infinity_db, check_data, embedding_data):
         db_obj = get_infinity_db
         db_obj.drop_table("test_invalid_embedding_data",
                           conflict_type=ConflictType.Ignore)
@@ -281,7 +281,7 @@ class TestKnn(TestSdk):
     @pytest.mark.parametrize("embedding_data_type", [
         ("float", True),
     ])
-    def test_valid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
+    def _test_valid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
         db_obj = get_infinity_db
         db_obj.drop_table("test_valid_embedding_data_type",
                           conflict_type=ConflictType.Ignore)
@@ -327,7 +327,7 @@ class TestKnn(TestSdk):
         pytest.param(2.2),
         pytest.param("#@!$!@"),
     ])
-    def test_invalid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
+    def _test_invalid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
         db_obj = get_infinity_db
         db_obj.drop_table("test_invalid_embedding_data_type",
                           conflict_type=ConflictType.Ignore)
@@ -377,7 +377,7 @@ class TestKnn(TestSdk):
         ("ip", True),
         ("hamming", False),
     ])
-    def test_various_distance_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type,
+    def _test_various_distance_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type,
                                    distance_type):
         db_obj = get_infinity_db
         db_obj.drop_table("test_various_distance_type",
@@ -429,7 +429,7 @@ class TestKnn(TestSdk):
         ((), False, ErrorCode.INVALID_TOPK_TYPE),
         ([1] * 4, False, ErrorCode.INVALID_TOPK_TYPE),
     ])
-    def test_various_topn(self, get_infinity_db, check_data, topn):
+    def _test_various_topn(self, get_infinity_db, check_data, topn):
         db_obj = get_infinity_db
         db_obj.drop_table("test_various_topn",
                           conflict_type=ConflictType.Ignore)
@@ -478,7 +478,7 @@ class TestKnn(TestSdk):
                                                  "other_vector"])
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
-    def test_with_index_before(self, get_infinity_db, check_data, index_column_name, knn_column_name,
+    def _test_with_index_before(self, get_infinity_db, check_data, index_column_name, knn_column_name,
                                index_distance_type, knn_distance_type):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_index", ConflictType.Ignore)
@@ -538,7 +538,7 @@ class TestKnn(TestSdk):
                                                  "other_vector"])
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
-    def test_with_index_after(self, get_infinity_db, check_data,
+    def _test_with_index_after(self, get_infinity_db, check_data,
                               index_column_name, knn_column_name,
                               index_distance_type, knn_distance_type):
         db_obj = get_infinity_db
@@ -587,7 +587,7 @@ class TestKnn(TestSdk):
     @pytest.mark.parametrize("match_param_1", ["doctitle,num,body^5"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_with_fulltext_match_with_valid_columns(self, get_infinity_db, check_data, match_param_1):
+    def _test_with_fulltext_match_with_valid_columns(self, get_infinity_db, check_data, match_param_1):
         db_obj = get_infinity_db
         db_obj.drop_table(
             "test_with_fulltext_match_with_valid_columns", ConflictType.Ignore)
@@ -633,7 +633,7 @@ class TestKnn(TestSdk):
                                                pytest.param("invalid column name")])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_with_fulltext_match_with_invalid_columns(self, get_infinity_db, check_data, match_param_1):
+    def _test_with_fulltext_match_with_invalid_columns(self, get_infinity_db, check_data, match_param_1):
         db_obj = get_infinity_db
         db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_columns", ConflictType.Ignore)
@@ -676,7 +676,7 @@ class TestKnn(TestSdk):
                                                "body=Greek"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_with_fulltext_match_with_valid_words(self, get_infinity_db, check_data, match_param_2):
+    def _test_with_fulltext_match_with_valid_words(self, get_infinity_db, check_data, match_param_2):
         db_obj = get_infinity_db
         db_obj.drop_table(
             "test_with_fulltext_match_with_valid_words", ConflictType.Ignore)
@@ -722,7 +722,7 @@ class TestKnn(TestSdk):
                                                pytest.param("@#$!#@$SDasdf3!@#$")])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_with_fulltext_match_with_invalid_words(self, get_infinity_db, check_data, match_param_2):
+    def _test_with_fulltext_match_with_invalid_words(self, get_infinity_db, check_data, match_param_2):
         db_obj = get_infinity_db
         db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_words", ConflictType.Ignore)
@@ -767,7 +767,7 @@ class TestKnn(TestSdk):
                                                "1"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_with_fulltext_match_with_options(self, get_infinity_db, check_data, match_param_3):
+    def _test_with_fulltext_match_with_options(self, get_infinity_db, check_data, match_param_3):
         db_obj = get_infinity_db
         db_obj.drop_table(
             "test_with_fulltext_match_with_options", ConflictType.Ignore)
@@ -812,7 +812,7 @@ class TestKnn(TestSdk):
                                                pytest.param(()), ])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_with_fulltext_match_with_invalid_options(self, get_infinity_db, check_data, match_param_3):
+    def _test_with_fulltext_match_with_invalid_options(self, get_infinity_db, check_data, match_param_3):
         db_obj = get_infinity_db
         db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_options", ConflictType.Ignore)
@@ -854,7 +854,7 @@ class TestKnn(TestSdk):
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_tensor_scan(self, get_infinity_db, check_data):
+    def _test_tensor_scan(self, get_infinity_db, check_data):
         db_obj = get_infinity_db
         db_obj.drop_table("test_tensor_scan", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_tensor_scan",
@@ -877,7 +877,7 @@ class TestKnn(TestSdk):
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_with_multiple_fusion(self, get_infinity_db, check_data):
+    def _test_with_multiple_fusion(self, get_infinity_db, check_data):
         db_obj = get_infinity_db
         db_obj.drop_table("test_with_multiple_fusion", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_multiple_fusion",
