@@ -549,19 +549,15 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body)["data"];
+            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
             ExportOptions export_options;
 
             String file_type_str = http_body_json["file_type"];
             ToLower(file_type_str);
             if (file_type_str == "csv") {
                 export_options.copy_file_type_ = CopyFileType::kCSV;
-            } else if (file_type_str == "json") {
-                export_options.copy_file_type_ = CopyFileType::kJSON;
             } else if (file_type_str == "jsonl") {
                 export_options.copy_file_type_ = CopyFileType::kJSONL;
-            } else if (file_type_str == "fvecs") {
-                export_options.copy_file_type_ = CopyFileType::kFVECS;
             } else {
                 json_response["error_code"] = ErrorCode::kNotSupported;
                 json_response["error_message"] = fmt::format("Not supported file type {}", file_type_str);
@@ -658,7 +654,7 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body)["data"];
+            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
             ImportOptions import_options;
 
             String file_type_str = http_body_json["file_type"];
