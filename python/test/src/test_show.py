@@ -22,8 +22,8 @@ from src.test_sdkbase import TestSdk
 
 class TestDescribe(TestSdk):
 
-    def test_show_table(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_show_table(self):
+        infinity_obj = infinity.connect(self.uri)
 
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
@@ -42,8 +42,8 @@ class TestDescribe(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_show_columns(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_show_columns(self):
+        infinity_obj = infinity.connect(self.uri)
 
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_columns", ConflictType.Ignore)
@@ -64,8 +64,8 @@ class TestDescribe(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_show_big_databases(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_show_big_databases(self):
+        infinity_obj = infinity.connect(self.uri)
 
         for i in range(8193):
             infinity_obj.drop_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
