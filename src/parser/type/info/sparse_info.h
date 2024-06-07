@@ -25,6 +25,7 @@ namespace infinity {
 enum class SparseStoreType : int8_t {
     kSort,
     kNotSort,
+    kInvalid,
 };
 
 class SparseInfo : public TypeInfo {
