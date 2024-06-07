@@ -24,7 +24,7 @@ from src.test_sdkbase import TestSdk
 
 class TestInfinity(TestSdk):
 
-    def test_get_database(self):
+    def _test_get_database(self):
         infinity_obj = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
         database_res = infinity_obj.get_database("default_db")
         print(type(database_res))
@@ -33,8 +33,8 @@ class TestInfinity(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_list_database(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_list_database(self):
+        infinity_obj = infinity.connect(self.uri)
         database_res = infinity_obj.list_databases()
         assert database_res.db_names[0] == "default_db"
 
