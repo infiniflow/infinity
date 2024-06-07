@@ -276,7 +276,7 @@ class HttpTest:
     def import_data(self, db_name, table_name, data={}, expect={}):
         url = f"databases/{db_name}/tables/{table_name}"
         h = self.set_up_header(['accept', "content-type"])
-        d = self.set_up_data([], {"data": data})
+        d = self.set_up_data([], data)
         r = self.request(url, "put", h, d)
         self.tear_down(r, expect)
         return
