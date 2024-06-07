@@ -43,6 +43,20 @@ public:
 
     String ToString() const override;
 
+    bool IsKnnMinHeap() const {
+        switch (distance_type_) {
+            case KnnDistanceType::kL2:
+            case KnnDistanceType::kHamming: {
+                return false;
+            }
+            case KnnDistanceType::kCosine:
+            case KnnDistanceType::kInnerProduct:
+            default: {
+                return true;
+            }
+        }
+    }
+
 public:
     const i64 dimension_{0};
     const EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
