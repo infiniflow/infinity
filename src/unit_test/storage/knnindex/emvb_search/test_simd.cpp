@@ -131,3 +131,28 @@ TEST_F(SIMDTest, testleftpack) {
         EXPECT_EQ(misaligned_addr[expect_out_id++], i);
     }
 }
+
+TEST_F(SIMDTest, testleftpackf) {
+    auto ptr = std::aligned_alloc(32, 1024 * sizeof(f32));
+    EXPECT_NE(ptr, nullptr);
+    std::unique_ptr<f32[], decltype([](f32 *p) { std::free(p); })> test_input(static_cast<f32 *>(ptr));
+    Vector<u32> ids(1000);
+    std::iota(ids.begin(), ids.end(), 0);
+    Vector<u32> expect_out_ids;
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<f32> dis(0.0f, 2.0f);
+    for (u32 i = 0; i < 1000; ++i) {
+        const f32 value = dis(gen);
+        test_input[i] = value;
+        if (value > 1.0f) {
+            expect_out_ids.push_back(i);
+        }
+    }
+    auto out_ptr = std::make_unique_for_overwrite<u32[]>(1008);
+    auto out_ptr_end = filter_scores_output_ids(out_ptr.get(), 1.0f, test_input.get(), 1000);
+    EXPECT_EQ(out_ptr_end, out_ptr.get() + expect_out_ids.size());
+    for (u32 i = 0; i < expect_out_ids.size(); ++i) {
+        EXPECT_EQ(out_ptr[i], expect_out_ids[i]);
+    }
+}
