@@ -50,10 +50,14 @@ ChineseAnalyzer::ChineseAnalyzer(const String &path) : dict_path_(path) {}
 ChineseAnalyzer::ChineseAnalyzer(const ChineseAnalyzer &other) {
     own_jieba_ = false;
     jieba_ = other.jieba_;
+    stopwords_ = other.stopwords_;
 }
 ChineseAnalyzer::~ChineseAnalyzer() {
-    if (own_jieba_ && jieba_)
+    if (own_jieba_ && jieba_) {
         delete jieba_;
+        if (stopwords_)
+            delete stopwords_;
+    }
 }
 
 Status ChineseAnalyzer::Load() {
@@ -98,8 +102,9 @@ Status ChineseAnalyzer::Load() {
 void ChineseAnalyzer::LoadStopwordsDict(const String &stopwords_path) {
     std::ifstream ifs(stopwords_path);
     String line;
+    stopwords_ = new FlatHashSet<String>;
     while (getline(ifs, line)) {
-        stopwords_.insert(line);
+        stopwords_->insert(line);
     }
 }
 

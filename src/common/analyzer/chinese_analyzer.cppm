@@ -42,13 +42,13 @@ protected:
 
 private:
     void LoadStopwordsDict(const String &stopwords_path);
-    bool Accept_token(const String &term) { return !stopwords_.contains(term); }
+    bool Accept_token(const String &term) { return !stopwords_->contains(term); }
 
 private:
     cppjieba::Jieba *jieba_{nullptr};
     String dict_path_;
     bool own_jieba_{};
     Vector<cppjieba::Word> cut_words_;
-    FlatHashSet<String> stopwords_;
+    FlatHashSet<String> *stopwords_{nullptr};
 };
 } // namespace infinity
