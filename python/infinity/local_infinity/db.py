@@ -106,7 +106,14 @@ def get_embedding_info(column_info, column_defs, column_name, index):
     proto_column_def.id = index
     proto_column_def.column_name = column_name
     column_type = WrapDataType()
-    column_type.logical_type = LogicalType.kEmbedding
+
+    if column_big_info[0] == "vector":
+        column_type.logical_type = LogicalType.kEmbedding
+    elif column_big_info[0] == "tensor":
+        column_type.logical_type = LogicalType.kTensor
+    elif column_big_info[0] == "tensorarray":
+        column_type.logical_type = LogicalType.kTensorArray
+
     embedding_type = WrapEmbeddingType()
     if element_type == "bit":
         embedding_type.element_type = EmbeddingDataType.kElemBit
@@ -195,7 +202,7 @@ class LocalDatabase(Database, ABC):
         for index, (column_name, column_info) in enumerate(columns_definition.items()):
             check_valid_name(column_name, "Column")
             column_big_info = [item.strip() for item in column_info["type"].split(",")]
-            if column_big_info[0] == "vector":
+            if column_big_info[0] == "vector" or column_big_info[0] == "tensor" or column_big_info[0] == "tensorarray":
                 get_embedding_info(column_info, column_defs, column_name, index)
             else:  # numeric or varchar
                 get_ordinary_info(column_info, column_defs, column_name, index)

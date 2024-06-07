@@ -155,7 +155,7 @@ class LocalInfinityClient:
         return self.convert_res(self.client.Update(db_name, table_name, where_expr, update_expr_array))
 
     def show_tables(self, db_name: str):
-        return self.convert_res(self.client.ShowTables(db_name))
+        return self.convert_res(self.client.ShowTables(db_name), has_result_data=True)
 
     def show_columns(self, db_name: str, table_name: str):
         return self.convert_res(self.client.ShowColumns(db_name, table_name), has_result_data=True)
