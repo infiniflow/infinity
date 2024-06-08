@@ -114,7 +114,7 @@ class TestRemoteInfinity():
     def test_various_distance_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type,
                                    distance_type):
         test_infinity_obj = TestKnn(common_values.TEST_REMOTE_HOST)
-        test_infinity_obj._test_various_topn(get_infinity_db, check_data, embedding_data, embedding_data_type,
+        test_infinity_obj._test_various_distance_type(get_infinity_db, check_data, embedding_data, embedding_data_type,
                                              distance_type)
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
@@ -149,11 +149,12 @@ class TestRemoteInfinity():
                                                  "other_vector"])
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_REMOTE_HOST], indirect=True)
     def test_with_index_before(self, get_infinity_db, check_data, index_column_name, knn_column_name,
                                index_distance_type, knn_distance_type):
         test_infinity_obj = TestKnn(common_values.TEST_REMOTE_HOST)
-        test_infinity_obj._test_various_topn(get_infinity_db, check_data, index_column_name, knn_column_name,
-                                             index_distance_type, knn_distance_type)
+        test_infinity_obj._test_with_index_before(get_infinity_db, check_data, index_column_name, knn_column_name,
+                                                  index_distance_type, knn_distance_type)
 
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -169,16 +170,18 @@ class TestRemoteInfinity():
                                                  "other_vector"])
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_REMOTE_HOST], indirect=True)
     def test_with_index_after(self, get_infinity_db, check_data,
                               index_column_name, knn_column_name,
                               index_distance_type, knn_distance_type):
         test_infinity_obj = TestKnn(common_values.TEST_REMOTE_HOST)
-        test_infinity_obj._test_various_topn(get_infinity_db, check_data, index_column_name, knn_column_name,
-                                            index_distance_type, knn_distance_type)
+        test_infinity_obj._test_with_index_after(get_infinity_db, check_data, index_column_name, knn_column_name,
+                                                index_distance_type, knn_distance_type)
 
     @pytest.mark.parametrize("match_param_1", ["doctitle,num,body^5"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                          "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_REMOTE_HOST], indirect=True)
     def test_with_fulltext_match_with_valid_columns(self, get_infinity_db, check_data, match_param_1):
         test_infinity_obj = TestKnn(common_values.TEST_REMOTE_HOST)
         test_infinity_obj._test_with_fulltext_match_with_valid_columns(get_infinity_db, check_data, match_param_1)
@@ -190,6 +193,7 @@ class TestRemoteInfinity():
                                                pytest.param("invalid column name")])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_REMOTE_HOST], indirect=True)
     def test_with_fulltext_match_with_invalid_columns(self, get_infinity_db, check_data, match_param_1):
         test_infinity_obj = TestKnn(common_values.TEST_REMOTE_HOST)
         test_infinity_obj._test_with_fulltext_match_with_invalid_columns(get_infinity_db, check_data, match_param_1)
@@ -197,6 +201,7 @@ class TestRemoteInfinity():
                                                "body=Greek"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_REMOTE_HOST], indirect=True)
     def test_with_fulltext_match_with_valid_words(self, get_infinity_db, check_data, match_param_2):
         test_infinity_obj = TestKnn(common_values.TEST_REMOTE_HOST)
         test_infinity_obj._test_with_fulltext_match_with_valid_words(get_infinity_db, check_data, match_param_2)
@@ -208,6 +213,7 @@ class TestRemoteInfinity():
                                                pytest.param("@#$!#@$SDasdf3!@#$")])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_REMOTE_HOST], indirect=True)
     def test_with_fulltext_match_with_invalid_words(self, get_infinity_db, check_data, match_param_2):
         test_infinity_obj = TestKnn(common_values.TEST_REMOTE_HOST)
         test_infinity_obj._test_with_fulltext_match_with_invalid_words(get_infinity_db, check_data, match_param_2)
@@ -216,6 +222,7 @@ class TestRemoteInfinity():
                                                "1"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_REMOTE_HOST], indirect=True)
     def test_with_fulltext_match_with_options(self, get_infinity_db, check_data, match_param_3):
         test_infinity_obj = TestKnn(common_values.TEST_REMOTE_HOST)
         test_infinity_obj._test_with_fulltext_match_with_options(get_infinity_db, check_data, match_param_3)
@@ -226,16 +233,19 @@ class TestRemoteInfinity():
                                                pytest.param(()), ])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_REMOTE_HOST], indirect=True)
     def test_with_fulltext_match_with_invalid_options(self, get_infinity_db, check_data, match_param_3):
         test_infinity_obj = TestKnn(common_values.TEST_REMOTE_HOST)
         test_infinity_obj._test_with_fulltext_match_with_invalid_options(get_infinity_db, check_data, match_param_3)
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_REMOTE_HOST], indirect=True)
     def test_tensor_scan(self, get_infinity_db, check_data):
         test_infinity_obj = TestKnn(common_values.TEST_REMOTE_HOST)
         test_infinity_obj._test_tensor_scan(get_infinity_db, check_data)
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_REMOTE_HOST], indirect=True)
     def test_with_multiple_fusion(self, get_infinity_db, check_data):
         test_infinity_obj = TestKnn(common_values.TEST_REMOTE_HOST)
         test_infinity_obj._test_with_multiple_fusion(get_infinity_db, check_data)

@@ -25,7 +25,7 @@ from src.test_sdkbase import TestSdk
 
 
 class TestQuery(TestSdk):
-    def test_query(self):
+    def _test_query(self):
         conn = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
         db = RemoteDatabase(conn, "default_db")
         db.drop_table("my_table", conflict_type=ConflictType.Ignore)
@@ -71,9 +71,9 @@ class TestQuery(TestSdk):
         res = conn.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_query_builder(self):
+    def _test_query_builder(self):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_query_builder",
                           conflict_type=ConflictType.Ignore)

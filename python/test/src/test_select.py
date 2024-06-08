@@ -27,10 +27,10 @@ from src.test_sdkbase import TestSdk
 
 class TestSelect(TestSdk):
 
-    def test_version(self):
+    def _test_version(self):
         print(infinity.__version__)
 
-    def test_select(self):
+    def _test_select(self):
         """
         target: test table select apis
         method:
@@ -81,7 +81,7 @@ class TestSelect(TestSdk):
             - 'test_select'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
 
         # infinity
@@ -160,7 +160,7 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_select_aggregate(self):
+    def _test_select_aggregate(self):
         """
         target: test table select apis
         methods:
@@ -196,7 +196,7 @@ class TestSelect(TestSdk):
             - select avg(c2) from test_select_aggregate
                 - 2.387692308
         """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
 
         # infinity
@@ -239,7 +239,7 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_select_varchar(self):
+    def _test_select_varchar(self):
         """
         target: test table select apis
         method:
@@ -288,7 +288,7 @@ class TestSelect(TestSdk):
         expect: all operations successfully
 
         """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_varchar", ConflictType.Ignore)
         db_obj.create_table("test_select_varchar",
@@ -324,8 +324,8 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_select_big(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_select_big(self):
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_select_big", ConflictType.Ignore)
         db_obj.create_table("test_select_big", {
@@ -345,9 +345,9 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_select_embedding_int32(self, check_data):
+    # @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+    #                                          "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def _test_select_embedding_int32(self, check_data):
         """
         TestSelect.test_select_embedding()
         This method tests the functionality of selecting embeddings from a table in the database.
@@ -363,7 +363,7 @@ class TestSelect(TestSdk):
         test_obj.test_select_embedding()
 
         """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
 
         db_obj.drop_table("test_select_embedding", ConflictType.Ignore)
@@ -399,9 +399,9 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_float_dim4.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_select_embedding_float(self, check_data):
+    # @pytest.mark.parametrize("check_data", [{"file_name": "embedding_float_dim4.csv",
+    #                                          "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def _test_select_embedding_float(self, check_data):
         """
         Method: test_select_embedding_float
         This method performs a series of tests on the `test_select_embedding_float` table in the Infinity database.
@@ -416,7 +416,7 @@ class TestSelect(TestSdk):
         test_select_embedding_float()
 
         """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
 
         db_obj.drop_table("test_select_embedding_float", ConflictType.Ignore)
@@ -459,9 +459,9 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_select_big_embedding(self, check_data):
+    # @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+    #                                          "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def _test_select_big_embedding(self, check_data):
         """
         Method: test_select_big_embedding
 
@@ -479,7 +479,7 @@ class TestSelect(TestSdk):
         Example Usage:
         test_select_big_embedding()
         """
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
 
         db_obj.drop_table("test_select_big_embedding", ConflictType.Ignore)
@@ -507,8 +507,8 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_select_same_output(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_select_same_output(self):
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_same_output", ConflictType.Ignore)
         db_obj.create_table("test_select_same_output", {
@@ -531,8 +531,8 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_empty_table(self):
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+    def _test_empty_table(self):
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_empty_table", ConflictType.Ignore)
         db_obj.create_table("test_empty_table", {
@@ -557,18 +557,18 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("filter_list", [
-        "c1 > 10",
-        "c2 > 1",
-        "c1 > 0.1 and c2 < 3.0",
-        "c1 > 0.1 and c2 < 1.0",
-        "c1 < 0.1 and c2 < 1.0",
-        "c1 < 0.1 and c1 > 1.0",
-        "c1 = 0",
-    ])
-    def test_valid_filter_expression(self, filter_list):
+    # @pytest.mark.parametrize("filter_list", [
+    #     "c1 > 10",
+    #     "c2 > 1",
+    #     "c1 > 0.1 and c2 < 3.0",
+    #     "c1 > 0.1 and c2 < 1.0",
+    #     "c1 < 0.1 and c2 < 1.0",
+    #     "c1 < 0.1 and c1 > 1.0",
+    #     "c1 = 0",
+    # ])
+    def _test_valid_filter_expression(self, filter_list):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_valid_filter_expression", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_valid_filter_expression", {
@@ -590,18 +590,18 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("filter_list", [
-        pytest.param("c1"),
-        pytest.param("_row_id"),
-        pytest.param("*"),
-        pytest.param("#@$%@#f"),
-        pytest.param("c1 + 0.1 and c2 - 1.0"),
-        pytest.param("c1 * 0.1 and c2 / 1.0"),
-        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
-    ])
-    def test_invalid_filter_expression(self, filter_list):
+    # @pytest.mark.parametrize("filter_list", [
+    #     pytest.param("c1"),
+    #     pytest.param("_row_id"),
+    #     pytest.param("*"),
+    #     pytest.param("#@$%@#f"),
+    #     pytest.param("c1 + 0.1 and c2 - 1.0"),
+    #     pytest.param("c1 * 0.1 and c2 / 1.0"),
+    #     pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
+    # ])
+    def _test_invalid_filter_expression(self, filter_list):
         # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
+        infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
         db_obj.drop_table("test_invalid_filter_expression",
                           ConflictType.Ignore)
