@@ -63,18 +63,18 @@ def logic_type_to_dtype(ttype: WrapDataType):
             return dtype('str')
         case LogicalType.kEmbedding:
             if ttype.embedding_type is not None:
-                match ttype.EmbeddingDataType.element_type:
-                    case EmbeddingDataType.kElementInt8:
+                match ttype.embedding_type.element_type:
+                    case EmbeddingDataType.kElemInt8:
                         return object
-                    case EmbeddingDataType.kElementInt16:
+                    case EmbeddingDataType.kElemInt16:
                         return object
-                    case EmbeddingDataType.kElementInt32:
+                    case EmbeddingDataType.kElemInt32:
                         return object
-                    case EmbeddingDataType.kElementFloat32:
+                    case EmbeddingDataType.kElemFloat:
                         return object
-                    case EmbeddingDataType.kElementFloat64:
+                    case EmbeddingDataType.kElemDouble:
                         return object
-                    case EmbeddingDataType.kElementBit:
+                    case EmbeddingDataType.kElemBit:
                         return object
                     case _:
                         raise NotImplementedError(f"Unsupported type {ttype}")
@@ -103,17 +103,17 @@ def logic_type_to_dtype(ttype: WrapDataType):
 #         case LogicalType.kEmbedding:
 #             if ttype.physical_type.embedding_type is not None:
 #                 match ttype.physical_type.embedding_type.element_type:
-#                     case EmbeddingDataType.kElementInt8:
+#                     case EmbeddingDataType.kElemInt8:
 #                         return pl.List
-#                     case EmbeddingDataType.kElementInt16:
+#                     case EmbeddingDataType.kElemInt16:
 #                         return pl.List
-#                     case EmbeddingDataType.kElementInt32:
+#                     case EmbeddingDataType.kElemInt32:
 #                         return pl.List
-#                     case EmbeddingDataType.kElementFloat32:
+#                     case EmbeddingDataType.kElemFloat:
 #                         return pl.List
-#                     case EmbeddingDataType.kElementFloat64:
+#                     case EmbeddingDataType.kElemDouble:
 #                         return pl.List
-#                     case EmbeddingDataType.kElementBit:
+#                     case EmbeddingDataType.kElemBit:
 #                         return pl.List
 #                     case _:
 #                         raise NotImplementedError(f"Unsupported type {ttype}")
@@ -148,22 +148,22 @@ def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
             # print(len(column_vector))
             # print(len(column_vector) // dimension)
             element_type = column_data_type.embedding_type.element_type
-            if element_type == EmbeddingDataType.kElementInt8:
+            if element_type == EmbeddingDataType.kElemInt8:
                 all_list = list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
-            elif element_type == EmbeddingDataType.kElementInt16:
+            elif element_type == EmbeddingDataType.kElemInt16:
                 all_list = list(struct.unpack('<{}h'.format(len(column_vector) // 2), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
-            elif element_type == EmbeddingDataType.kElementInt32:
+            elif element_type == EmbeddingDataType.kElemInt32:
                 all_list = list(struct.unpack('<{}i'.format(len(column_vector) // 4), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
-            elif element_type == EmbeddingDataType.kElementFloat32:
+            elif element_type == EmbeddingDataType.kElemFloat:
                 all_list = list(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
-            elif element_type == EmbeddingDataType.kElementFloat64:
+            elif element_type == EmbeddingDataType.kElemDouble:
                 all_list = list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
-            elif element_type == EmbeddingDataType.kElementBit:
+            elif element_type == EmbeddingDataType.kElemBit:
                 all_list = list(struct.unpack('<{}B'.format(len(column_vector)), column_vector))
                 result = []
                 if dimension % 8 != 0:

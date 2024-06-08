@@ -8,7 +8,6 @@ class TestRemoteInfinity():
         test_infinity_obj = TestInsert(common_values.TEST_REMOTE_HOST)
         test_infinity_obj._test_version()
         test_infinity_obj._test_insert_basic()
-        test_infinity_obj._test_insert_basic()
         test_infinity_obj._test_insert_varchar()
         test_infinity_obj._test_insert_big_varchar()
         test_infinity_obj._test_insert_embedding()

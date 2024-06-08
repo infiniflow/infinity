@@ -40,6 +40,7 @@ import column_vector;
 import internal_types;
 import table_def;
 import third_party;
+import logger;
 
 namespace infinity {
 
@@ -121,6 +122,7 @@ ParsedExpr *WrapBetweenExpr::GetParsedExpr() {
 
 ParsedExpr *WrapKnnExpr::GetParsedExpr() {
     auto knn_expr = new KnnExpr(own_memory);
+    fmt::print("use unimpl knn expr!");
     return knn_expr;
 }
 
@@ -707,6 +709,42 @@ void ProcessColumns(const SharedPtr<DataBlock> &data_block, SizeT column_count, 
     }
 }
 
+void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataType> &data_type) {
+    switch (data_type->type()) {
+        case LogicalType::kBoolean:
+        case LogicalType::kTinyInt:
+        case LogicalType::kSmallInt:
+        case LogicalType::kInteger:
+        case LogicalType::kBigInt:
+        case LogicalType::kFloat:
+        case LogicalType::kDouble: {
+            proto_data_type.logical_type = data_type->type();
+            break;
+        }
+        case LogicalType::kVarchar: {
+            // need physical type?
+            proto_data_type.logical_type = data_type->type();
+            break;
+        }
+        case LogicalType::kTensor:
+        case LogicalType::kTensorArray:
+        case LogicalType::kEmbedding: {
+            proto_data_type.logical_type = data_type->type();
+            WrapEmbeddingType& embedding_type = proto_data_type.embedding_type;
+
+            auto embedding_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
+            embedding_type.dimension = embedding_info->Dimension();
+            embedding_type.element_type = embedding_info->Type();
+            break;
+        }
+        default: {
+            String error_message = fmt::format("Invalid logical data type: {}", data_type->ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+    }
+}
+
 void HandleColumnDef(WrapQueryResult &wrap_query_result, SizeT column_count, SharedPtr<TableDef> table_def, Vector<ColumnField> &all_column_vectors) {
     assert(column_count == all_column_vectors.size());
 
@@ -717,7 +755,9 @@ void HandleColumnDef(WrapQueryResult &wrap_query_result, SizeT column_count, Sha
         proto_column_def.column_name = column_def->name();
 
         WrapDataType &proto_data_type = proto_column_def.column_type;
-        proto_data_type.logical_type = column_def->type()->type();
+        DataTypeToWrapDataType(proto_data_type, column_def->type());
+        // proto_data_type.logical_type = column_def->type()->type();
+
         wrap_query_result.column_defs.emplace_back(proto_column_def);
     }
 }
