@@ -160,6 +160,8 @@ if __name__ == "__main__":
     generate16(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
 
+    if os.path.exists("/var/infinity/test_data/test_export_jsonl.jsonl"):
+        os.remove("/var/infinity/test_data/test_export_jsonl.jsonl")
     print("Start copying data...")
     if args.just_copy_all_data is True:
         copy_all(args.data, args.copy)

@@ -32,6 +32,10 @@ std::string ShowStatement::ToString() const {
             ss << "Show index, database: " << schema_name_;
             break;
         }
+        case ShowStmtType::kBuffer: {
+            ss << "Show buffer";
+            break;
+        }
         case ShowStmtType::kIndexSegment: {
             ss << "Show index segment, database: " << schema_name_ << ", table_name: " << table_name_;
             break;

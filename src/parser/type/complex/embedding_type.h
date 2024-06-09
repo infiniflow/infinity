@@ -165,16 +165,18 @@ private:
     template <typename T>
     static inline std::string Embedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
         std::stringstream ss;
+        ss << "[";
         for (size_t i = 0; i < dimension - 1; ++i) {
             ss << ((T *)(embedding.ptr))[i] << ',';
         }
-        ss << ((T *)(embedding.ptr))[dimension - 1];
+        ss << ((T *)(embedding.ptr))[dimension - 1] << "]";
         return ss.str();
     }
 
     template <>
     inline std::string Embedding2StringInternal<float>(const EmbeddingType &embedding, size_t dimension) {
         std::stringstream ss;
+        ss << "[";
         for (size_t i = 0; i < dimension - 1; ++i) {
             char buffer[20];
             auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[i], std::chars_format::general, 6);
@@ -184,6 +186,7 @@ private:
         char buffer[20];
         auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[dimension - 1], std::chars_format::general, 6);
         ss.write((const char *)buffer, ptr - buffer);
+        ss << "]";
         return ss.str();
     }
 
@@ -191,7 +194,8 @@ private:
         // TODO:  This is for bitmap, and high-performance implementation is needed here.
         ParserAssert(dimension % 8 == 0, "Binary embedding dimension should be the times of 8.");
         std::string str;
-        str.reserve(dimension);
+        str.reserve(2 * dimension + 2);
+        str.push_back('[');
         auto *array = reinterpret_cast<const uint8_t *>(embedding.ptr);
         for (size_t i = 0; i < dimension / 8; ++i) {
             const uint8_t byte = array[i];
@@ -199,6 +203,7 @@ private:
                 str.push_back((byte & (1 << j)) ? '1' : '0');
             }
         }
+        str.push_back(']');
         return str;
     }
 

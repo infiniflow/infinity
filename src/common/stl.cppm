@@ -18,6 +18,7 @@ module;
 #include <algorithm>
 #include <atomic>
 #include <bit>
+#include <bitset>
 #include <cassert>
 #include <charconv>
 #include <chrono>
@@ -112,6 +113,7 @@ export namespace std {
     using std::try_to_lock;
 
     using std::accumulate;
+    using std::bitset;
     using std::binary_search;
     using std::ceil;
     using std::copy_n;
@@ -138,6 +140,7 @@ export namespace std {
     using std::reverse;
     using std::sort;
     using std::sqrt;
+    using std::stable_sort;
     using std::tie;
     using std::transform;
     using std::unique;

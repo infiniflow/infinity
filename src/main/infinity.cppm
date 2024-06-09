@@ -139,6 +139,8 @@ public:
 
     QueryResult Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
 
+    QueryResult Export(const String &db_name, const String &table_name, const String &path, ExportOptions export_options);
+
     QueryResult Delete(const String &db_name, const String &table_name, ParsedExpr *filter);
 
     QueryResult Update(const String &db_name, const String &table_name, ParsedExpr *filter, Vector<UpdateExpr *> *update_list);

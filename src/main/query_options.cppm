@@ -58,4 +58,11 @@ public:
     CopyFileType copy_file_type_{CopyFileType::kCSV};
 };
 
+export class ExportOptions {
+public:
+    char delimiter_{','};
+    bool header_{false};
+    CopyFileType copy_file_type_{CopyFileType::kCSV};
+};
+
 } // namespace infinity

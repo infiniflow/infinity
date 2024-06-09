@@ -25,14 +25,14 @@ import match_tensor_expression;
 import base_table_ref;
 import data_type;
 import common_query_filter;
-import physical_scan_base;
+import physical_filter_scan_base;
 
 namespace infinity {
 struct LoadMeta;
 struct GlobalBlockID;
 struct BlockIndex;
 
-export class PhysicalMatchTensorScan final : public PhysicalScanBase {
+export class PhysicalMatchTensorScan final : public PhysicalFilterScanBase {
 public:
     explicit PhysicalMatchTensorScan(u64 id,
                                      u64 table_index,
@@ -71,9 +71,6 @@ public:
 private:
     u64 table_index_ = 0;
     SharedPtr<MatchTensorExpression> match_tensor_expr_;
-
-    // for filter
-    SharedPtr<CommonQueryFilter> common_query_filter_;
 
     // extra options from match_tensor_expr_
     u32 topn_ = 0;

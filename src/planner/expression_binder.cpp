@@ -656,7 +656,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
     return bound_match_tensor_expr;
 }
 
-SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSparseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
+SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSparseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     if (expr.column_expr_->type_ != ParsedExprType::kColumn) {
         UnrecoverableError("MatchSparse expression expect a column expression");
     }
@@ -672,8 +672,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSpar
     Vector<SharedPtr<BaseExpression>> arguments;
     arguments.emplace_back(expr_ptr);
 
+    SharedPtr<BaseExpression> query_expr = BuildExpression(*expr.query_sparse_expr_, bind_context_ptr, depth, root);
+
     auto bound_match_sparse_expr = MakeShared<MatchSparseExpression>(std::move(arguments),
-                                                                     expr.query_sparse_expr_.get(),
+                                                                     query_expr,
                                                                      expr.metric_type_,
                                                                      expr.query_n_,
                                                                      expr.topn_,

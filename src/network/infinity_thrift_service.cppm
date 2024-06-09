@@ -56,7 +56,7 @@ struct ClientVersions {
 export class InfinityThriftService final : public infinity_thrift_rpc::InfinityServiceIf {
 private:
     static constexpr std::string_view ErrorMsgHeader = "[THRIFT ERROR]";
-    static constexpr i64 current_version_index_{3}; // 0.2.0.dev4
+    static constexpr i64 current_version_index_{4}; // 0.2.0.dev5
 
     static std::mutex infinity_session_map_mutex_;
     static HashMap<u64, SharedPtr<Infinity>> infinity_session_map_;
@@ -83,6 +83,8 @@ public:
     Tuple<CopyFileType, Status> GetCopyFileType(infinity_thrift_rpc::CopyFileType::type copy_file_type);
 
     void Import(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ImportRequest &request) final;
+
+    void Export(infinity_thrift_rpc::CommonResponse &response, const infinity_thrift_rpc::ExportRequest &request) final;
 
     void Select(infinity_thrift_rpc::SelectResponse &response, const infinity_thrift_rpc::SelectRequest &request) final;
 

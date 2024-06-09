@@ -62,6 +62,7 @@ jobs:
         run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-debug/src/test_main > unittest_debug.log 2>&1"
 
       - name: Collect infinity unit test debug output
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat unittest_debug.log 2>/dev/null || true
 
       - name: Install pysdk
@@ -159,6 +160,7 @@ jobs:
         run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
       
       - name: Collect infinity unit test release output
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat unittest_release.log 2>/dev/null || true
 
       - name: Install pysdk

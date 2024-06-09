@@ -26,6 +26,8 @@ from utils import copy_data
 from test_sdkbase import TestSdk
 
 test_csv_file = "embedding_int_dim3.csv"
+test_export_csv_file = "export_embedding_int_dim3.csv"
+test_export_jsonl_file = "export_embedding_int_dim3.jsonl"
 
 
 class TestCase(TestSdk):
@@ -181,6 +183,40 @@ class TestCase(TestSdk):
 
             res = table_obj.import_data(common_values.TEST_TMP_DIR + test_csv_file)
             assert res.error_code == ErrorCode.OK
+
+            # export
+            if os.path.exists(common_values.TEST_TMP_DIR + test_export_csv_file):
+                os.remove(common_values.TEST_TMP_DIR + test_export_csv_file)
+            res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_csv_file)
+            assert res.error_code == ErrorCode.OK
+
+            if os.path.exists(common_values.TEST_TMP_DIR + test_export_jsonl_file):
+                os.remove(common_values.TEST_TMP_DIR + test_export_jsonl_file)
+            res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_jsonl_file)
+            assert res.error_code == ErrorCode.OK
+
+            db_obj.drop_table("my_table_export", ConflictType.Ignore)
+            export_table_obj = db_obj.create_table("my_table_export", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
+            assert export_table_obj is not None
+
+            res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_csv_file)
+            assert res.error_code == ErrorCode.OK
+            res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
+            print(res)
+
+            res = db_obj.drop_table("my_table_export")
+            assert res.error_code == ErrorCode.OK
+            export_table_obj = db_obj.create_table("my_table_export", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
+            assert export_table_obj is not None
+            res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_jsonl_file)
+            assert res.error_code == ErrorCode.OK
+            res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
+            print(res)
+            res = db_obj.drop_table("my_table_export")
+            assert res.error_code == ErrorCode.OK
+
+            os.remove(common_values.TEST_TMP_DIR + test_export_csv_file)
+            os.remove(common_values.TEST_TMP_DIR + test_export_jsonl_file)
 
             # search
             res = table_obj.output(

@@ -28,21 +28,21 @@ import common_query_filter;
 import physical_scan_base;
 import sparse_info;
 import match_sparse_expr;
-import match_sparse_scan_function_data;
+import physical_filter_scan_base;
 
 namespace infinity {
 struct LoadMeta;
 struct BlockIndex;
 class ColumnVector;
 
-export class PhysicalMatchSparseScan final : public PhysicalScanBase {
+export class PhysicalMatchSparseScan final : public PhysicalFilterScanBase {
 public:
-    explicit PhysicalMatchSparseScan(u64 id,
-                                     u64 table_index,
-                                     SharedPtr<BaseTableRef> base_table_ref,
-                                     SharedPtr<MatchSparseExpression> match_sparse_expression,
-                                     const SharedPtr<CommonQueryFilter> &common_query_filter,
-                                     SharedPtr<Vector<LoadMeta>> load_metas);
+    PhysicalMatchSparseScan(u64 id,
+                            u64 table_index,
+                            SharedPtr<BaseTableRef> base_table_ref,
+                            SharedPtr<MatchSparseExpression> match_sparse_expression,
+                            const SharedPtr<CommonQueryFilter> &common_query_filter,
+                            SharedPtr<Vector<LoadMeta>> load_metas);
 
     void Init() override;
 
@@ -54,7 +54,10 @@ public:
 
 private:
     template <typename DataType>
-    void ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *operator_state, const SparseInfo *sparse_info, const SparseMetricType &metric_type);
+    void ExecuteInner(QueryContext *query_context,
+                      MatchSparseScanOperatorState *operator_state,
+                      const SparseInfo *sparse_info,
+                      const SparseMetricType &metric_type);
 
     template <typename DataType, typename IdxType>
     void ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *operator_state, const SparseMetricType &metric_type);
@@ -62,15 +65,16 @@ private:
     template <typename DataType, typename IdxType, template <typename, typename> typename C>
     void ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *operator_state);
 
-    template <typename DataType, typename IdxType, template <typename, typename> typename C>
-    void CalculateOnColumnVector(const ColumnVector &column_vector, SegmentID segment_id, BlockID block_id, BlockOffset row_cnt, MatchSparseScanFunctionData &function_data);
+    template <typename DataT, typename IdxType, typename ResultType, template <typename, typename> typename C>
+    void ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state);
+
+    template <typename DistFunc, typename MergeHeap, typename DataType>
+    void
+    ExecuteInnerT(DistFunc *dist_func, MergeHeap *merge_heap, QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state);
 
 private:
     u64 table_index_ = 0;
     SharedPtr<MatchSparseExpression> match_sparse_expr_;
-
-    // for filter
-    SharedPtr<CommonQueryFilter> common_query_filter_;
 
     // column to search
     ColumnID search_column_id_ = 0;

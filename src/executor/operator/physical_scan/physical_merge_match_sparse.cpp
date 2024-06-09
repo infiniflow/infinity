@@ -66,16 +66,10 @@ bool PhysicalMergeMatchSparse::Execute(QueryContext *query_context, OperatorStat
         merge_match_sparse_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
         merge_match_sparse_state->data_block_array_[0]->Init(*GetOutputTypes());
     }
-    const auto &column_type = match_sparse_expr_->column_expr_->Type();
-    const auto *sparse_info = static_cast<const SparseInfo *>(column_type.type_info().get());
 
-    switch (sparse_info->DataType()) {
-        case EmbeddingDataType::kElemFloat: {
-            ExecuteInner<float>(query_context, merge_match_sparse_state, match_sparse_expr_->metric_type_);
-            break;
-        }
-        case EmbeddingDataType::kElemDouble: {
-            ExecuteInner<double>(query_context, merge_match_sparse_state, match_sparse_expr_->metric_type_);
+    switch (match_sparse_expr_->metric_type_) {
+        case SparseMetricType::kInnerProduct: {
+            ExecuteInner<CompareMin>(query_context, merge_match_sparse_state);
             break;
         }
         default: {
@@ -86,23 +80,53 @@ bool PhysicalMergeMatchSparse::Execute(QueryContext *query_context, OperatorStat
     return true;
 }
 
-template <typename DataType>
-void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context,
-                                            MergeMatchSparseOperatorState *operator_state,
-                                            const SparseMetricType &metric_type) {
-    switch (metric_type) {
-        case SparseMetricType::kInnerProduct: {
-            ExecuteInner<DataType, CompareMin>(query_context, operator_state);
+template <template <typename, typename> typename C>
+void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state) {
+    DataType result_type = match_sparse_expr_->Type();
+    switch (result_type.type()) {
+        case kTinyInt: {
+            ExecuteInner<i8, C>(query_context, operator_state);
+            break;
+        }
+        case kSmallInt: {
+            ExecuteInner<i16, C>(query_context, operator_state);
+            break;
+        }
+        case kInteger: {
+            ExecuteInner<i32, C>(query_context, operator_state);
+            break;
+        }
+        case kBigInt: {
+            ExecuteInner<i64, C>(query_context, operator_state);
+            break;
+        }
+        case kFloat: {
+            ExecuteInner<float, C>(query_context, operator_state);
+            break;
+        }
+        case kDouble: {
+            ExecuteInner<double, C>(query_context, operator_state);
             break;
         }
         default: {
-            UnrecoverableError("Not implemented yet");
+            UnrecoverableError("Invalid result type.");
         }
     }
 }
 
-template <typename DataType, template <typename, typename> typename C>
+template <typename ResultType, template <typename, typename> typename C>
 void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state) {
+    SizeT query_n = match_sparse_expr_->query_n_;
+    SizeT topn = match_sparse_expr_->topn_;
+    MergeSparseFunctionData &match_sparse_data = operator_state->merge_sparse_function_data_;
+
+    using MergeHeap = MergeKnn<ResultType, C>;
+    if (match_sparse_data.merge_knn_base_.get() == nullptr) {
+        auto merge_knn = MakeUnique<MergeHeap>(query_n, topn);
+        merge_knn->Begin();
+        match_sparse_data.merge_knn_base_ = std::move(merge_knn);
+    }
+
     auto &input_data = *operator_state->input_data_block_;
     if (!input_data.Finalized()) {
         UnrecoverableError("Input data block is not finalized");
@@ -111,23 +135,12 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
     if (column_n < 0) {
         UnrecoverableError(fmt::format("Invalid column count, {}", column_n));
     }
-
+    auto *merge_knn = static_cast<MergeHeap *>(match_sparse_data.merge_knn_base_.get());
     auto &dist_column = *input_data.column_vectors[column_n];
     auto &row_id_column = *input_data.column_vectors[column_n + 1];
-    auto dists = reinterpret_cast<DataType *>(dist_column.data());
+    auto dists = reinterpret_cast<ResultType *>(dist_column.data());
     auto row_ids = reinterpret_cast<RowID *>(row_id_column.data());
     SizeT row_n = input_data.row_count();
-
-    SizeT query_n = match_sparse_expr_->query_n_;
-    SizeT topn = match_sparse_expr_->topn_;
-    MergeSparseFunctionData &match_sparse_data = operator_state->merge_sparse_function_data_;
-    if (match_sparse_data.merge_knn_base_.get() == nullptr) {
-        auto merge_knn = MakeUnique<MergeKnn<DataType, C>>(query_n, topn);
-        merge_knn->Begin();
-        match_sparse_data.merge_knn_base_ = std::move(merge_knn);
-    }
-
-    auto *merge_knn = static_cast<MergeKnn<DataType, C> *>(match_sparse_data.merge_knn_base_.get());
     merge_knn->Search(dists, row_ids, row_n);
 
     if (operator_state->input_complete_) {
@@ -140,7 +153,7 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
             result_dists_list.emplace_back(reinterpret_cast<char *>(merge_knn->GetDistancesByIdx(query_id)));
             row_ids_list.emplace_back(merge_knn->GetIDsByIdx(query_id));
         }
-        this->SetOutput(result_dists_list, row_ids_list, sizeof(DataType), result_n, query_context, operator_state);
+        this->SetOutput(result_dists_list, row_ids_list, sizeof(ResultType), result_n, query_context, operator_state);
         operator_state->SetComplete();
     }
 }

@@ -245,6 +245,8 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         }
         for (auto &match_sparse_expr : search_expr_->match_sparse_exprs_) {
             auto match_sparse_node = MakeShared<LogicalMatchSparseScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_sparse_expr);
+            match_sparse_node->filter_expression_ = filter_expr;
+            match_sparse_node->common_query_filter_ = common_query_filter;
             match_knn_nodes.push_back(std::move(match_sparse_node));
         }
         bind_context->GenerateTableIndex();
@@ -309,10 +311,8 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
             auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
 
             // Change function table to knn table scan function
-            SharedPtr<LogicalKnnScan> knn_scan_node = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(), base_table_ref);
-
-            knn_scan_node->knn_expression_ = knn_expr;
-            knn_scan_node->knn_table_index_ = bind_context->knn_table_index_;
+            SharedPtr<LogicalKnnScan> knn_scan_node =
+                MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, knn_expr, bind_context->knn_table_index_);
             return knn_scan_node;
         }
         case TableRefType::kSubquery: {

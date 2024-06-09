@@ -85,7 +85,7 @@ See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
 `infinity-sdk` requires Python 3.10+.
 
 ```bash
-pip3 install infinity-sdk==0.2.0.dev4
+pip3 install infinity-sdk==0.2.0.dev5
 ```
 
 ### Import necessary modules

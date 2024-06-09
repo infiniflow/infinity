@@ -50,6 +50,7 @@ import logical_flush;
 import logical_optimize;
 import logical_match;
 import logical_match_tensor_scan;
+import logical_match_sparse_scan;
 import logical_fusion;
 import base_expression;
 
@@ -199,6 +200,10 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
         }
         case LogicalNodeType::kKnnScan: {
             Explain((LogicalKnnScan *)statement, result, intent_size);
+            break;
+        }
+        case LogicalNodeType::kMatchSparseScan: {
+            Explain((LogicalMatchSparseScan *)statement, result, intent_size);
             break;
         }
         case LogicalNodeType::kMatch: {
@@ -885,8 +890,7 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
     table_index += std::to_string(knn_scan_node->TableIndex());
     result->emplace_back(MakeShared<String>(table_index));
 
-    const auto &knn_expression = knn_scan_node->knn_expression_;
-    KnnExpression *knn_expr_raw = static_cast<KnnExpression *>(knn_expression.get());
+    KnnExpression *knn_expr_raw = knn_scan_node->knn_expression().get();
     // Embedding info
     String embedding_info = String(intent_size, ' ');
     embedding_info += " - embedding info: ";
@@ -1436,6 +1440,24 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
 
             String output_columns_str = String(intent_size, ' ');
             output_columns_str += " - output columns: [config_name, value, description]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowBuffer: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW BUFFER ";
+            } else {
+                show_str = "SHOW BUFFER ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [path, status, size, buffered_type, type]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }

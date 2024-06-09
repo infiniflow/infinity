@@ -38,14 +38,6 @@ import query_context;
 
 namespace infinity {
 
-PhysicalScanBase::PhysicalScanBase(u64 id,
-                                   PhysicalOperatorType type,
-                                   UniquePtr<PhysicalOperator> left,
-                                   UniquePtr<PhysicalOperator> right,
-                                   SharedPtr<BaseTableRef> base_table_ref,
-                                   SharedPtr<Vector<LoadMeta>> load_metas)
-    : PhysicalOperator(type, std::move(left), std::move(right), id, load_metas), base_table_ref_(base_table_ref) {}
-
 Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 parallel_count) const {
     BlockIndex *block_index = base_table_ref_->block_index_.get();
 

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "CLI11.hpp"
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
@@ -19,91 +20,67 @@
 import stl;
 import file_system;
 import local_file_system;
+import infinity_exception;
 import file_system_type;
 import compilation_config;
 import third_party;
 import profiler;
-
 import linscan_alg;
-import sparse_iter;
+import sparse_util;
 
 using namespace infinity;
 
 // const f32 error_bound = 1e-6;
 const int log_interval = 10000;
+const int query_log_interval = 100;
 
 SparseMatrix DecodeSparseDataset(const Path &data_path) {
-    SparseMatrix ret;
-
     LocalFileSystem fs;
-    if (!fs.Exists(data_path)) {
-        throw std::runtime_error(fmt::format("Data path: {} does not exist.", data_path.string()));
-    }
     auto [file_handler, status] = fs.OpenFile(data_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
-    if(!status.ok()) {
-        throw std::runtime_error(fmt::format("Can't open file: {}, reason: {}", data_path.string(), status.message()));
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", data_path.string(), status.message()));
     }
-    i64 nrow = 0;
-    i64 ncol = 0;
-    i64 nnz = 0;
-    file_handler->Read(&nrow, sizeof(nrow));
-    file_handler->Read(&ncol, sizeof(ncol));
-    file_handler->Read(&nnz, sizeof(nnz));
-
-    auto indptr = MakeUnique<i64[]>(nrow + 1);
-    file_handler->Read(indptr.get(), sizeof(i64) * (nrow + 1));
-    if (indptr[nrow] != nnz) {
-        throw std::runtime_error("Invalid indptr.");
-    }
-
-    auto indices = MakeUnique<i32[]>(nnz);
-    file_handler->Read(indices.get(), sizeof(i32) * nnz);
-    // assert all element in indices >= 0 and < ncol
-    {
-        bool check = std::all_of(indices.get(), indices.get() + nnz, [ncol](i32 ele) { return ele >= 0 && ele < ncol; });
-        if (!check) {
-            throw std::runtime_error("Invalid indices.");
-        }
-    }
-
-    auto data = MakeUnique<f32[]>(nnz);
-    file_handler->Read(data.get(), sizeof(f32) * nnz);
-    return {std::move(data), std::move(indices), std::move(indptr), nrow, ncol, nnz};
+    return SparseMatrix::Load(*file_handler);
 }
 
-Pair<UniquePtr<u32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path &groundtruth_path, u32 top_k, u32 query_n) {
+void SaveSparseMatrix(const SparseMatrix &mat, const Path &data_path) {
     LocalFileSystem fs;
-    if (!fs.Exists(groundtruth_path)) {
-        throw std::runtime_error(fmt::format("Groundtruth path: {} does not exist.", groundtruth_path.string()));
+    auto [file_handler, status] = fs.OpenFile(data_path.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", data_path.string(), status.message()));
     }
+    mat.Save(*file_handler);
+}
+
+Tuple<u32, u32, UniquePtr<u32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path &groundtruth_path, bool meta) {
+    LocalFileSystem fs;
     auto [file_handler, status] = fs.OpenFile(groundtruth_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
-    if(!status.ok()) {
-        throw std::runtime_error(fmt::format("Can't open file: {}, reason: {}", groundtruth_path.string(), status.message()));
+    if (!status.ok()) {
+        UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", groundtruth_path.string(), status.message()));
     }
 
+    u32 top_k = 0;
+    u32 query_n = 0;
+    file_handler->Read(&query_n, sizeof(query_n));
+    file_handler->Read(&top_k, sizeof(top_k));
     SizeT file_size = fs.GetFileSize(*file_handler);
     if (file_size != sizeof(u32) * 2 + (sizeof(u32) + sizeof(float)) * (query_n * top_k)) {
-        throw std::runtime_error("Invalid groundtruth file format");
+        UnrecoverableError("Invalid groundtruth file format");
     }
-    {
-        u32 ans_n = 0;
-        file_handler->Read(&ans_n, sizeof(ans_n));
-        u32 top_k1 = 0;
-        file_handler->Read(&top_k1, sizeof(top_k1));
-        if (ans_n != query_n || top_k1 != top_k) {
-            throw std::runtime_error("Invalid groundtruth file format");
-        }
+    if (meta) {
+        return {top_k, query_n, nullptr, nullptr};
     }
+
     auto indices = MakeUnique<u32[]>(query_n * top_k);
     file_handler->Read(indices.get(), sizeof(u32) * query_n * top_k);
     auto scores = MakeUnique<f32[]>(query_n * top_k);
     file_handler->Read(scores.get(), sizeof(f32) * query_n * top_k);
-    return {std::move(indices), std::move(scores)};
+    return {top_k, query_n, std::move(indices), std::move(scores)};
 }
 
-void ImportData(LinScan &index, const Path &data_path) {
-    SparseMatrix mat = DecodeSparseDataset(data_path);
-    for (SparseMatrixIter iter(mat); iter.HasNext(); iter.Next()) {
+LinScan ImportData(const SparseMatrix &data_mat) {
+    LinScan index;
+    for (SparseMatrixIter iter(data_mat); iter.HasNext(); iter.Next()) {
         SparseVecRef vec = iter.val();
         u32 doc_id = iter.row_id();
         index.Insert(vec, doc_id);
@@ -112,44 +89,63 @@ void ImportData(LinScan &index, const Path &data_path) {
             std::cout << fmt::format("Inserting doc {}\n", doc_id);
         }
     }
+    return index;
 }
 
-Vector<Pair<Vector<u32>, Vector<f32>>> QueryData(const LinScan &index, u32 top_k, const Path &query_path) {
-    Vector<Pair<Vector<u32>, Vector<f32>>> res;
-    SparseMatrix mat = DecodeSparseDataset(query_path);
-    for (SparseMatrixIter iter(mat); iter.HasNext(); iter.Next()) {
-        SparseVecRef query = iter.val();
-        auto [indices, score] = index.Query(query, top_k);
-        res.emplace_back(std::move(indices), std::move(score));
+Vector<Pair<Vector<u32>, Vector<f32>>> Search(i32 thread_n,
+                                              const SparseMatrix &query_mat,
+                                              u32 top_k,
+                                              i64 query_n,
+                                              std::function<Pair<Vector<u32>, Vector<f32>>(const SparseVecRef &, u32)> search_fn) {
+    Vector<Pair<Vector<u32>, Vector<f32>>> res(query_n);
+    Atomic<i64> query_idx = 0;
+    Vector<Thread> threads;
+    for (i32 thread_id = 0; thread_id < thread_n; ++thread_id) {
+        threads.emplace_back([&]() {
+            while (true) {
+                i64 query_i = query_idx.fetch_add(1);
+                if (query_i >= query_n) {
+                    break;
+                }
+                SparseVecRef query = query_mat.at(query_i);
+                auto [indices, scores] = search_fn(query, top_k);
+                res[query_i] = {std::move(indices), std::move(scores)};
 
-        if (log_interval != 0 && iter.row_id() % log_interval == 0) {
-            std::cout << fmt::format("Querying doc {}\n", iter.row_id());
-        }
+                if (query_log_interval != 0 && query_i % query_log_interval == 0) {
+                    std::cout << fmt::format("Querying doc {}\n", query_i);
+                }
+            }
+        });
+    };
+    for (auto &thread : threads) {
+        thread.join();
     }
     return res;
 }
 
 void PrintQuery(u32 query_id, const u32 *gt_indices, const f32 *gt_scores, u32 gt_size, const Vector<u32> &indices, const Vector<f32> &scores) {
     std::cout << fmt::format("Query {}\n", query_id);
+    std::cout << "Result:\n";
     for (u32 i = 0; i < gt_size; ++i) {
         std::cout << fmt::format("{} {}, ", indices[i], scores[i]);
     }
     std::cout << "\n";
+    std::cout << "Groundtruth:\n";
     for (u32 i = 0; i < gt_size; ++i) {
         std::cout << fmt::format("{} {}, ", gt_indices[i], gt_scores[i]);
     }
     std::cout << "\n";
 }
 
-f32 CheckGroundtruth(const Path &groundtruth_path, const Vector<Pair<Vector<u32>, Vector<f32>>> &results, u32 top_k) {
+f32 CheckGroundtruth(u32 *gt_indices_list, f32 *gt_score_list, const Vector<Pair<Vector<u32>, Vector<f32>>> &results, u32 top_k) {
     u32 query_n = results.size();
-    auto [gt_indices_list, gt_score_list] = DecodeGroundtruth(groundtruth_path, top_k, query_n);
+
     SizeT recall_n = 0;
     for (u32 i = 0; i < results.size(); ++i) {
         const auto &[indices, scores] = results[i];
-        const u32 *gt_indices = gt_indices_list.get() + i * top_k;
+        const u32 *gt_indices = gt_indices_list + i * top_k;
 
-        // const f32 *gt_score = gt_score_list.get() + i * top_k;
+        // const f32 *gt_score = gt_score_list + i * top_k;
         // PrintQuery(i, gt_indices, gt_score, top_k, indices, scores);
         HashSet<u32> indices_set(indices.begin(), indices.end());
         for (u32 j = 0; j < top_k; ++j) {
@@ -162,19 +158,24 @@ f32 CheckGroundtruth(const Path &groundtruth_path, const Vector<Pair<Vector<u32>
     return recall;
 }
 
+struct SearchKnnOption {
+    u32 candidate_n_;
+    i32 budget_;
+};
+
 int main(int argc, char *argv[]) {
     CLI::App app{"sparse_benchmark"};
 
-    // enum class ModeType : i8 {
-    //     kImport,
-    //     kQuery,
-    // };
-    // Map<String, ModeType> mode_type_map = {
-    //     {"import", ModeType::kImport},
-    //     {"query", ModeType::kQuery},
-    // };
-    // ModeType mode_type = ModeType::kImport;
-    // app.add_option("--mode", mode_type, "Mode type")->required()->transform(CLI::CheckedTransformer(mode_type_map, CLI::ignore_case));
+    enum class ModeType : i8 {
+        kImport,
+        kQuery,
+    };
+    Map<String, ModeType> mode_type_map = {
+        {"import", ModeType::kImport},
+        {"query", ModeType::kQuery},
+    };
+    ModeType mode_type = ModeType::kImport;
+    app.add_option("--mode", mode_type, "Mode type")->required()->transform(CLI::CheckedTransformer(mode_type_map, CLI::ignore_case));
 
     enum class DataSetType : u8 {
         kSmall,
@@ -189,6 +190,21 @@ int main(int argc, char *argv[]) {
     DataSetType dataset_type = DataSetType::kSmall;
     app.add_option("--dataset", dataset_type, "Dataset type")->required()->transform(CLI::CheckedTransformer(dataset_type_map, CLI::ignore_case));
 
+    i64 query_n = 0;
+    app.add_option("--query_n", query_n, "Test query number")->required(false)->transform(CLI::TypeValidator<i64>());
+
+    bool bf = false;
+    app.add_option("--bf", bf, "Use brute force search")->required(false)->transform(CLI::TypeValidator<bool>());
+
+    i32 thread_n = 1;
+    app.add_option("--thread_n", thread_n, "Thread number")->required(false)->transform(CLI::Range(1, 1024));
+
+    f32 candidate_ratio = 1.5;
+    app.add_option("--candidate_ratio", candidate_ratio, "Candidate ratio")->required(false)->transform(CLI::Range(1.0, 100.0));
+
+    f32 budget_radio = 0.75;
+    app.add_option("--budget_ratio", budget_radio, "Budget radio")->required(false)->transform(CLI::Range(0.0, 100.0));
+
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError &e) {
@@ -199,56 +215,110 @@ int main(int argc, char *argv[]) {
     Path query_path = dataset_dir / "queries.dev.csr";
     Path data_path = dataset_dir;
     Path groundtruth_path = dataset_dir;
+    Path index_save_path = tmp_data_path();
     switch (dataset_type) {
         case DataSetType::kSmall: {
             data_path /= "base_small.csr";
             groundtruth_path /= "base_small.dev.gt";
+            index_save_path /= "small_linscan.bin";
             break;
         }
         case DataSetType::k1M: {
             data_path /= "base_1M.csr";
             groundtruth_path /= "base_1M.dev.gt";
+            index_save_path /= "1M_linscan.bin";
             break;
         }
         case DataSetType::kFull: {
             data_path /= "base_full.csr";
             groundtruth_path /= "base_full.dev.gt";
+            index_save_path /= "full_linscan.bin";
             break;
         }
         default: {
-            throw std::runtime_error(fmt::format("Unsupported dataset type: {}.", static_cast<u8>(dataset_type)));
+            UnrecoverableError(fmt::format("Unsupported dataset type: {}.", static_cast<u8>(dataset_type)));
         }
     };
-    u32 top_k = 10;
 
-    // switch (mode_type) {
-    //     case ModeType::kImport: {
-    //         ImportData(data_path);
-    //         break;
-    //     }
-    //     case ModeType::kQuery: {
-    //         throw std::runtime_error("Not implemented.");
-    //         return 1;
-    //     }
-    //     default: {
-    //         throw std::runtime_error(fmt::format("Unsupported mode type: {}.", static_cast<u8>(mode_type)));
-    //     }
-    // }
     BaseProfiler profiler;
 
-    LinScan index;
+    LocalFileSystem fs;
+    switch (mode_type) {
+        case ModeType::kImport: {
+            LinScan index;
 
-    profiler.Begin();
-    ImportData(index, data_path);
-    profiler.End();
-    std::cout << fmt::format("Import data time: {}\n", profiler.ElapsedToString(1000));
+            {
+                SparseMatrix data_mat = DecodeSparseDataset(data_path);
+                profiler.Begin();
+                index = ImportData(data_mat);
+                profiler.End();
+            }
+            std::cout << fmt::format("Import data time: {}\n", profiler.ElapsedToString(1000));
 
-    profiler.Begin();
-    auto query_result = QueryData(index, top_k, query_path);
-    profiler.End();
-    std::cout << fmt::format("Query data time: {}\n", profiler.ElapsedToString(1000));
+            auto [file_handler, status] =
+                fs.OpenFile(index_save_path.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+            if (!status.ok()) {
+                UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", index_save_path.string(), status.message()));
+            }
+            index.Save(*file_handler);
+            break;
+        }
+        case ModeType::kQuery: {
+            Vector<Pair<Vector<u32>, Vector<f32>>> query_result;
 
-    f32 recall = CheckGroundtruth(groundtruth_path, query_result, top_k);
-    std::cout << fmt::format("Recall: {}\n", recall);
+            auto [top_k, all_query_n, _1, _2] = DecodeGroundtruth(groundtruth_path, true);
+            {
+                auto [file_handler, status] = fs.OpenFile(index_save_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+                if (!status.ok()) {
+                    UnrecoverableError(fmt::format("Can't open file: {}, reason: {}", index_save_path.string(), status.message()));
+                }
+                LinScan index = LinScan::Load(*file_handler);
+
+                SparseMatrix query_mat = DecodeSparseDataset(query_path);
+                if (all_query_n != query_mat.nrow_) {
+                    UnrecoverableError(fmt::format("Query number mismatch: {} vs {}", query_n, query_mat.nrow_));
+                }
+                if (query_n > all_query_n) {
+                    UnrecoverableError(fmt::format("Query number: {} is larger than all query number: {}", query_n, all_query_n));
+                }
+                if (query_n == 0) {
+                    query_n = all_query_n;
+                }
+
+                if (bf) {
+                    profiler.Begin();
+                    query_result = Search(thread_n, query_mat, top_k, query_n, [&](const SparseVecRef &query, u32 top_k) {
+                        return index.SearchBF(query, top_k);
+                    });
+                    profiler.End();
+                } else {
+                    SparseMatrix data_mat = DecodeSparseDataset(data_path);
+
+                    u64 used_budget_all = 0;
+                    i32 budget = static_cast<f32>(data_mat.nnz_) * data_mat.nnz_ / (data_mat.nrow_ * data_mat.ncol_) * budget_radio;
+                    u32 candidate_n = top_k * candidate_ratio;
+                    SearchKnnOption option{.candidate_n_ = candidate_n, .budget_ = budget};
+
+                    profiler.Begin();
+                    query_result = Search(thread_n, query_mat, top_k, query_n, [&](const SparseVecRef &query, u32 top_k) {
+                        auto [candidate_indices, candidate_scores, used_budget] = index.SearchKnn(query, option.candidate_n_, option.budget_);
+                        used_budget_all += used_budget;
+                        return SparseVecUtil::Rerank(data_mat, query, candidate_indices, top_k);
+                    });
+                    profiler.End();
+                    std::cout << fmt::format("avg budget: {}\n", (f32)used_budget_all / query_mat.nrow_);
+                }
+            }
+            std::cout << fmt::format("Query data time: {}\n", profiler.ElapsedToString(1000));
+
+            {
+                auto [_1, _2, gt_indices_list, gt_score_list] = DecodeGroundtruth(groundtruth_path, false);
+                f32 recall = CheckGroundtruth(gt_indices_list.get(), gt_score_list.get(), query_result, top_k);
+                std::cout << fmt::format("Recall: {}\n", recall);
+            }
+            break;
+        }
+    }
+
     return 0;
 }

@@ -102,13 +102,11 @@ def generate_test_embedding(
             col_n = random.randint(dim // 2, dim)
             embedding = [random.randint(low, high) for _ in range(col_n)]
             csv_file.write(
-                str(integer) + ',"[' + ",".join([str(x)
-                                                 for x in embedding]) + ']"\n'
+                str(integer) + ',"[' + ",".join([str(x) for x in embedding]) + ']"\n'
             )
             embedding.extend([0] * (dim - col_n))
             slt_file.write(
-                str(integer) + " " + ",".join([str(x)
-                                               for x in embedding]) + "\n"
+                str(integer) + " [" + ",".join([str(x) for x in embedding]) + "]\n"
             )
         slt_file.write("\n")
 

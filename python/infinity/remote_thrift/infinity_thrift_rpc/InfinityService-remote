@@ -32,6 +32,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  CommonResponse DropTable(DropTableRequest request)')
     print('  CommonResponse Insert(InsertRequest request)')
     print('  CommonResponse Import(ImportRequest request)')
+    print('  CommonResponse Export(ExportRequest request)')
     print('  SelectResponse Select(SelectRequest request)')
     print('  SelectResponse Explain(ExplainRequest request)')
     print('  CommonResponse Delete(DeleteRequest request)')
@@ -179,6 +180,12 @@ elif cmd == 'Import':
         print('Import requires 1 args')
         sys.exit(1)
     pp.pprint(client.Import(eval(args[0]),))
+
+elif cmd == 'Export':
+    if len(args) != 1:
+        print('Export requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.Export(eval(args[0]),))
 
 elif cmd == 'Select':
     if len(args) != 1:

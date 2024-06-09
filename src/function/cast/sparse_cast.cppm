@@ -59,6 +59,21 @@ struct SparseTryCastToSparse {
     }
 };
 
+template <typename SourceValueType, typename SourceIndiceType>
+void SortSourceSparse(char *source_ptr, SizeT source_nnz) {
+    auto *source_indice_ptr = reinterpret_cast<SourceIndiceType *>(source_ptr);
+    auto *source_data_ptr = reinterpret_cast<SourceValueType *>(source_ptr + source_nnz * sizeof(SourceIndiceType));
+    Vector<Pair<SourceIndiceType, SourceValueType>> indice_value_pairs;
+    for (SizeT i = 0; i < source_nnz; ++i) {
+        indice_value_pairs.emplace_back(source_indice_ptr[i], source_data_ptr[i]);
+    }
+    std::sort(indice_value_pairs.begin(), indice_value_pairs.end());
+    for (SizeT i = 0; i < source_nnz; ++i) {
+        source_indice_ptr[i] = indice_value_pairs[i].first;
+        source_data_ptr[i] = indice_value_pairs[i].second;
+    }
+}
+
 template <typename TargetValueType, typename TargetIndiceType, typename SourceValueType, typename SourceIndiceType>
 void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
                                    const SparseT &source,
@@ -73,7 +88,12 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
         target.chunk_offset_ = 0;
         return;
     }
-    const_ptr_t source_ptr = source_fix_heap_mgr->GetRawPtrFromChunk(source_chunk_id, source_chunk_offset);
+    const char *source_ptr = source_fix_heap_mgr->GetRawPtrFromChunk(source_chunk_id, source_chunk_offset);
+    if (target_info->StoreType() == SparseStoreType::kSort && source_info->StoreType() != SparseStoreType::kSort) {
+        auto *source_ptr_mut = const_cast<char *>(source_ptr);
+        SortSourceSparse<SourceValueType, SourceIndiceType>(source_ptr_mut, source_nnz);
+    }
+
     SizeT sparse_bytes = source_info->SparseSize(source_nnz);
     if constexpr (std::is_same_v<TargetValueType, SourceValueType>) {
         if constexpr (std::is_same_v<TargetIndiceType, SourceIndiceType>) {

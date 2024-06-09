@@ -267,6 +267,8 @@ class ColumnField;
 
 class ImportOption;
 
+class ExportOption;
+
 class ConnectRequest;
 
 class CommonRequest;
@@ -320,6 +322,8 @@ class DropTableRequest;
 class InsertRequest;
 
 class ImportRequest;
+
+class ExportRequest;
 
 class ExplainRequest;
 
@@ -1910,9 +1914,8 @@ void swap(ColumnField &a, ColumnField &b);
 std::ostream& operator<<(std::ostream& out, const ColumnField& obj);
 
 typedef struct _ImportOption__isset {
-  _ImportOption__isset() : delimiter(false), copy_from(false), has_header(false), copy_file_type(false) {}
+  _ImportOption__isset() : delimiter(false), has_header(false), copy_file_type(false) {}
   bool delimiter :1;
-  bool copy_from :1;
   bool has_header :1;
   bool copy_file_type :1;
 } _ImportOption__isset;
@@ -1924,14 +1927,12 @@ class ImportOption : public virtual ::apache::thrift::TBase {
   ImportOption& operator=(const ImportOption&);
   ImportOption() noexcept
                : delimiter(),
-                 copy_from(0),
                  has_header(0),
                  copy_file_type(static_cast<CopyFileType::type>(0)) {
   }
 
   virtual ~ImportOption() noexcept;
   std::string delimiter;
-  bool copy_from;
   bool has_header;
   /**
    * 
@@ -1943,8 +1944,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 
   void __set_delimiter(const std::string& val);
 
-  void __set_copy_from(const bool val);
-
   void __set_has_header(const bool val);
 
   void __set_copy_file_type(const CopyFileType::type val);
@@ -1952,8 +1951,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
   bool operator == (const ImportOption & rhs) const
   {
     if (!(delimiter == rhs.delimiter))
-      return false;
-    if (!(copy_from == rhs.copy_from))
       return false;
     if (!(has_header == rhs.has_header))
       return false;
@@ -1976,6 +1973,67 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 void swap(ImportOption &a, ImportOption &b);
 
 std::ostream& operator<<(std::ostream& out, const ImportOption& obj);
+
+typedef struct _ExportOption__isset {
+  _ExportOption__isset() : delimiter(false), has_header(false), copy_file_type(false) {}
+  bool delimiter :1;
+  bool has_header :1;
+  bool copy_file_type :1;
+} _ExportOption__isset;
+
+class ExportOption : public virtual ::apache::thrift::TBase {
+ public:
+
+  ExportOption(const ExportOption&);
+  ExportOption& operator=(const ExportOption&);
+  ExportOption() noexcept
+               : delimiter(),
+                 has_header(0),
+                 copy_file_type(static_cast<CopyFileType::type>(0)) {
+  }
+
+  virtual ~ExportOption() noexcept;
+  std::string delimiter;
+  bool has_header;
+  /**
+   * 
+   * @see CopyFileType
+   */
+  CopyFileType::type copy_file_type;
+
+  _ExportOption__isset __isset;
+
+  void __set_delimiter(const std::string& val);
+
+  void __set_has_header(const bool val);
+
+  void __set_copy_file_type(const CopyFileType::type val);
+
+  bool operator == (const ExportOption & rhs) const
+  {
+    if (!(delimiter == rhs.delimiter))
+      return false;
+    if (!(has_header == rhs.has_header))
+      return false;
+    if (!(copy_file_type == rhs.copy_file_type))
+      return false;
+    return true;
+  }
+  bool operator != (const ExportOption &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ExportOption & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ExportOption &a, ExportOption &b);
+
+std::ostream& operator<<(std::ostream& out, const ExportOption& obj);
 
 typedef struct _ConnectRequest__isset {
   _ConnectRequest__isset() : client_version(false) {}
@@ -3584,11 +3642,10 @@ void swap(InsertRequest &a, InsertRequest &b);
 std::ostream& operator<<(std::ostream& out, const InsertRequest& obj);
 
 typedef struct _ImportRequest__isset {
-  _ImportRequest__isset() : db_name(false), table_name(false), file_name(false), file_content(false), import_option(false), session_id(false) {}
+  _ImportRequest__isset() : db_name(false), table_name(false), file_name(false), import_option(false), session_id(false) {}
   bool db_name :1;
   bool table_name :1;
   bool file_name :1;
-  bool file_content :1;
   bool import_option :1;
   bool session_id :1;
 } _ImportRequest__isset;
@@ -3602,7 +3659,6 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
                 : db_name(),
                   table_name(),
                   file_name(),
-                  file_content(),
                   session_id(0) {
   }
 
@@ -3610,7 +3666,6 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
   std::string db_name;
   std::string table_name;
   std::string file_name;
-  std::string file_content;
   ImportOption import_option;
   int64_t session_id;
 
@@ -3621,8 +3676,6 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
   void __set_table_name(const std::string& val);
 
   void __set_file_name(const std::string& val);
-
-  void __set_file_content(const std::string& val);
 
   void __set_import_option(const ImportOption& val);
 
@@ -3635,8 +3688,6 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
     if (!(table_name == rhs.table_name))
       return false;
     if (!(file_name == rhs.file_name))
-      return false;
-    if (!(file_content == rhs.file_content))
       return false;
     if (!(import_option == rhs.import_option))
       return false;
@@ -3659,6 +3710,76 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
 void swap(ImportRequest &a, ImportRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const ImportRequest& obj);
+
+typedef struct _ExportRequest__isset {
+  _ExportRequest__isset() : db_name(false), table_name(false), file_name(false), export_option(false), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool file_name :1;
+  bool export_option :1;
+  bool session_id :1;
+} _ExportRequest__isset;
+
+class ExportRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ExportRequest(const ExportRequest&);
+  ExportRequest& operator=(const ExportRequest&);
+  ExportRequest() noexcept
+                : db_name(),
+                  table_name(),
+                  file_name(),
+                  session_id(0) {
+  }
+
+  virtual ~ExportRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  std::string file_name;
+  ExportOption export_option;
+  int64_t session_id;
+
+  _ExportRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_file_name(const std::string& val);
+
+  void __set_export_option(const ExportOption& val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const ExportRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(file_name == rhs.file_name))
+      return false;
+    if (!(export_option == rhs.export_option))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const ExportRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ExportRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ExportRequest &a, ExportRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ExportRequest& obj);
 
 typedef struct _ExplainRequest__isset {
   _ExplainRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), explain_type(false) {}

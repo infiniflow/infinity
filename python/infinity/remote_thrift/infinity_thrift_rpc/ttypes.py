@@ -2672,16 +2672,14 @@ class ImportOption(object):
     """
     Attributes:
      - delimiter
-     - copy_from
      - has_header
      - copy_file_type
 
     """
 
 
-    def __init__(self, delimiter=None, copy_from=None, has_header=None, copy_file_type=None,):
+    def __init__(self, delimiter=None, has_header=None, copy_file_type=None,):
         self.delimiter = delimiter
-        self.copy_from = copy_from
         self.has_header = has_header
         self.copy_file_type = copy_file_type
 
@@ -2701,15 +2699,10 @@ class ImportOption(object):
                     iprot.skip(ftype)
             elif fid == 2:
                 if ftype == TType.BOOL:
-                    self.copy_from = iprot.readBool()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 3:
-                if ftype == TType.BOOL:
                     self.has_header = iprot.readBool()
                 else:
                     iprot.skip(ftype)
-            elif fid == 4:
+            elif fid == 3:
                 if ftype == TType.I32:
                     self.copy_file_type = iprot.readI32()
                 else:
@@ -2728,16 +2721,91 @@ class ImportOption(object):
             oprot.writeFieldBegin('delimiter', TType.STRING, 1)
             oprot.writeString(self.delimiter.encode('utf-8') if sys.version_info[0] == 2 else self.delimiter)
             oprot.writeFieldEnd()
-        if self.copy_from is not None:
-            oprot.writeFieldBegin('copy_from', TType.BOOL, 2)
-            oprot.writeBool(self.copy_from)
-            oprot.writeFieldEnd()
         if self.has_header is not None:
-            oprot.writeFieldBegin('has_header', TType.BOOL, 3)
+            oprot.writeFieldBegin('has_header', TType.BOOL, 2)
             oprot.writeBool(self.has_header)
             oprot.writeFieldEnd()
         if self.copy_file_type is not None:
-            oprot.writeFieldBegin('copy_file_type', TType.I32, 4)
+            oprot.writeFieldBegin('copy_file_type', TType.I32, 3)
+            oprot.writeI32(self.copy_file_type)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ExportOption(object):
+    """
+    Attributes:
+     - delimiter
+     - has_header
+     - copy_file_type
+
+    """
+
+
+    def __init__(self, delimiter=None, has_header=None, copy_file_type=None,):
+        self.delimiter = delimiter
+        self.has_header = has_header
+        self.copy_file_type = copy_file_type
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.delimiter = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.BOOL:
+                    self.has_header = iprot.readBool()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.I32:
+                    self.copy_file_type = iprot.readI32()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ExportOption')
+        if self.delimiter is not None:
+            oprot.writeFieldBegin('delimiter', TType.STRING, 1)
+            oprot.writeString(self.delimiter.encode('utf-8') if sys.version_info[0] == 2 else self.delimiter)
+            oprot.writeFieldEnd()
+        if self.has_header is not None:
+            oprot.writeFieldBegin('has_header', TType.BOOL, 2)
+            oprot.writeBool(self.has_header)
+            oprot.writeFieldEnd()
+        if self.copy_file_type is not None:
+            oprot.writeFieldBegin('copy_file_type', TType.I32, 3)
             oprot.writeI32(self.copy_file_type)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -5122,18 +5190,16 @@ class ImportRequest(object):
      - db_name
      - table_name
      - file_name
-     - file_content
      - import_option
      - session_id
 
     """
 
 
-    def __init__(self, db_name=None, table_name=None, file_name=None, file_content=None, import_option=None, session_id=None,):
+    def __init__(self, db_name=None, table_name=None, file_name=None, import_option=None, session_id=None,):
         self.db_name = db_name
         self.table_name = table_name
         self.file_name = file_name
-        self.file_content = file_content
         self.import_option = import_option
         self.session_id = session_id
 
@@ -5162,17 +5228,12 @@ class ImportRequest(object):
                 else:
                     iprot.skip(ftype)
             elif fid == 4:
-                if ftype == TType.STRING:
-                    self.file_content = iprot.readBinary()
-                else:
-                    iprot.skip(ftype)
-            elif fid == 5:
                 if ftype == TType.STRUCT:
                     self.import_option = ImportOption()
                     self.import_option.read(iprot)
                 else:
                     iprot.skip(ftype)
-            elif fid == 6:
+            elif fid == 5:
                 if ftype == TType.I64:
                     self.session_id = iprot.readI64()
                 else:
@@ -5199,16 +5260,114 @@ class ImportRequest(object):
             oprot.writeFieldBegin('file_name', TType.STRING, 3)
             oprot.writeString(self.file_name.encode('utf-8') if sys.version_info[0] == 2 else self.file_name)
             oprot.writeFieldEnd()
-        if self.file_content is not None:
-            oprot.writeFieldBegin('file_content', TType.STRING, 4)
-            oprot.writeBinary(self.file_content)
-            oprot.writeFieldEnd()
         if self.import_option is not None:
-            oprot.writeFieldBegin('import_option', TType.STRUCT, 5)
+            oprot.writeFieldBegin('import_option', TType.STRUCT, 4)
             self.import_option.write(oprot)
             oprot.writeFieldEnd()
         if self.session_id is not None:
-            oprot.writeFieldBegin('session_id', TType.I64, 6)
+            oprot.writeFieldBegin('session_id', TType.I64, 5)
+            oprot.writeI64(self.session_id)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class ExportRequest(object):
+    """
+    Attributes:
+     - db_name
+     - table_name
+     - file_name
+     - export_option
+     - session_id
+
+    """
+
+
+    def __init__(self, db_name=None, table_name=None, file_name=None, export_option=None, session_id=None,):
+        self.db_name = db_name
+        self.table_name = table_name
+        self.file_name = file_name
+        self.export_option = export_option
+        self.session_id = session_id
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRING:
+                    self.db_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 2:
+                if ftype == TType.STRING:
+                    self.table_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 3:
+                if ftype == TType.STRING:
+                    self.file_name = iprot.readString().decode('utf-8', errors='replace') if sys.version_info[0] == 2 else iprot.readString()
+                else:
+                    iprot.skip(ftype)
+            elif fid == 4:
+                if ftype == TType.STRUCT:
+                    self.export_option = ExportOption()
+                    self.export_option.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            elif fid == 5:
+                if ftype == TType.I64:
+                    self.session_id = iprot.readI64()
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('ExportRequest')
+        if self.db_name is not None:
+            oprot.writeFieldBegin('db_name', TType.STRING, 1)
+            oprot.writeString(self.db_name.encode('utf-8') if sys.version_info[0] == 2 else self.db_name)
+            oprot.writeFieldEnd()
+        if self.table_name is not None:
+            oprot.writeFieldBegin('table_name', TType.STRING, 2)
+            oprot.writeString(self.table_name.encode('utf-8') if sys.version_info[0] == 2 else self.table_name)
+            oprot.writeFieldEnd()
+        if self.file_name is not None:
+            oprot.writeFieldBegin('file_name', TType.STRING, 3)
+            oprot.writeString(self.file_name.encode('utf-8') if sys.version_info[0] == 2 else self.file_name)
+            oprot.writeFieldEnd()
+        if self.export_option is not None:
+            oprot.writeFieldBegin('export_option', TType.STRUCT, 4)
+            self.export_option.write(oprot)
+            oprot.writeFieldEnd()
+        if self.session_id is not None:
+            oprot.writeFieldBegin('session_id', TType.I64, 5)
             oprot.writeI64(self.session_id)
             oprot.writeFieldEnd()
         oprot.writeFieldStop()
@@ -7266,9 +7425,15 @@ all_structs.append(ImportOption)
 ImportOption.thrift_spec = (
     None,  # 0
     (1, TType.STRING, 'delimiter', 'UTF8', None, ),  # 1
-    (2, TType.BOOL, 'copy_from', None, None, ),  # 2
-    (3, TType.BOOL, 'has_header', None, None, ),  # 3
-    (4, TType.I32, 'copy_file_type', None, None, ),  # 4
+    (2, TType.BOOL, 'has_header', None, None, ),  # 2
+    (3, TType.I32, 'copy_file_type', None, None, ),  # 3
+)
+all_structs.append(ExportOption)
+ExportOption.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'delimiter', 'UTF8', None, ),  # 1
+    (2, TType.BOOL, 'has_header', None, None, ),  # 2
+    (3, TType.I32, 'copy_file_type', None, None, ),  # 3
 )
 all_structs.append(ConnectRequest)
 ConnectRequest.thrift_spec = (
@@ -7487,9 +7652,17 @@ ImportRequest.thrift_spec = (
     (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
     (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
     (3, TType.STRING, 'file_name', 'UTF8', None, ),  # 3
-    (4, TType.STRING, 'file_content', 'BINARY', None, ),  # 4
-    (5, TType.STRUCT, 'import_option', [ImportOption, None], None, ),  # 5
-    (6, TType.I64, 'session_id', None, None, ),  # 6
+    (4, TType.STRUCT, 'import_option', [ImportOption, None], None, ),  # 4
+    (5, TType.I64, 'session_id', None, None, ),  # 5
+)
+all_structs.append(ExportRequest)
+ExportRequest.thrift_spec = (
+    None,  # 0
+    (1, TType.STRING, 'db_name', 'UTF8', None, ),  # 1
+    (2, TType.STRING, 'table_name', 'UTF8', None, ),  # 2
+    (3, TType.STRING, 'file_name', 'UTF8', None, ),  # 3
+    (4, TType.STRUCT, 'export_option', [ExportOption, None], None, ),  # 4
+    (5, TType.I64, 'session_id', None, None, ),  # 5
 )
 all_structs.append(ExplainRequest)
 ExplainRequest.thrift_spec = (

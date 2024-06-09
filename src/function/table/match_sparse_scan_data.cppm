@@ -33,13 +33,13 @@ namespace infinity {
 
 export class SparseDistanceBase {};
 
-export template <typename DataType, typename IndexType>
+export template <typename DataType, typename IndexType, typename ResultType = DataType>
 class SparseDistance : public SparseDistanceBase {
 public:
     SparseDistance(SparseMetricType metric_type) {
         switch (metric_type) {
             case SparseMetricType::kInnerProduct: {
-                dist_func_ = SparseIPDistance<DataType, IndexType>;
+                dist_func_ = SparseIPDistance<DataType, IndexType, ResultType>;
                 break;
             }
             default: {
@@ -48,7 +48,10 @@ public:
         }
     }
 
-    DataType Calculate(const char *raw1, SizeT nnz1, const char *raw2, SizeT nnz2) {
+    ResultType Calculate(const char *raw1, SizeT nnz1, const char *raw2, SizeT nnz2) {
+        if (raw1 == nullptr || raw2 == nullptr) {
+            return 0;
+        }
         const IndexType *index1 = reinterpret_cast<const IndexType *>(raw1);
         const DataType *data1 = reinterpret_cast<const DataType *>(raw1 + nnz1 * sizeof(IndexType));
         const IndexType *index2 = reinterpret_cast<const IndexType *>(raw2);
@@ -56,13 +59,45 @@ public:
         return Calculate(data1, index1, nnz1, data2, index2, nnz2);
     }
 
-    DataType Calculate(const DataType *data, const IndexType *index, SizeT nnz, const DataType *data2, const IndexType *index2, SizeT nnz2) {
+    ResultType Calculate(const DataType *data, const IndexType *index, SizeT nnz, const DataType *data2, const IndexType *index2, SizeT nnz2) {
         return dist_func_(data, index, nnz, data2, index2, nnz2);
     }
 
 public:
     using DistFunc =
-        DataType (*)(const DataType *data, const IndexType *index, SizeT nnz, const DataType *data2, const IndexType *index2, SizeT nnz2);
+        ResultType (*)(const DataType *data, const IndexType *index, SizeT nnz, const DataType *data2, const IndexType *index2, SizeT nnz2);
+
+    DistFunc dist_func_{};
+};
+
+export template <typename IndexType, typename ResultType = IndexType>
+class SparseBitDistance : public SparseDistanceBase {
+public:
+    SparseBitDistance(SparseMetricType metric_type) {
+        switch (metric_type) {
+            case SparseMetricType::kInnerProduct: {
+                dist_func_ = SparseBitIPDistance<IndexType, ResultType>;
+                break;
+            }
+            default: {
+                UnrecoverableError(fmt::format("SparseMetricType: {} is not supported.", (i8)metric_type));
+            }
+        }
+    }
+
+    ResultType Calculate(const char *raw1, SizeT nnz1, const char *raw2, SizeT nnz2) {
+        if (raw1 == nullptr || raw2 == nullptr) {
+            return 0;
+        }
+        const IndexType *index1 = reinterpret_cast<const IndexType *>(raw1);
+        const IndexType *index2 = reinterpret_cast<const IndexType *>(raw2);
+        return Calculate(index1, nnz1, index2, nnz2);
+    }
+
+    ResultType Calculate(const IndexType *index1, SizeT nnz1, const IndexType *index2, SizeT nnz2) { return dist_func_(index1, nnz1, index2, nnz2); }
+
+public:
+    using DistFunc = ResultType (*)(const IndexType *raw1, SizeT nnz1, const IndexType *raw2, SizeT nnz2);
 
     DistFunc dist_func_{};
 };

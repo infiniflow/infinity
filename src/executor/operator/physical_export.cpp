@@ -32,6 +32,7 @@ import file_system;
 import file_system_type;
 import defer_op;
 import stl;
+import logical_type;
 
 namespace infinity {
 
@@ -114,7 +115,15 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 String line;
                 for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
                     Value v = column_vectors[column_idx].GetValue(row_idx);
-                    line += v.ToString();
+                    switch(v.type().type()) {
+                        case LogicalType::kEmbedding: {
+                            line += fmt::format("\"{}\"", v.ToString());
+                            break;
+                        }
+                        default: {
+                            line += v.ToString();
+                        }
+                    }
                     if(column_idx == column_count - 1) {
                         line += "\n";
                     } else {
