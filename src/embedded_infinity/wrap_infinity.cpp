@@ -431,6 +431,10 @@ WrapQueryResult WrapShowBlockColumn(Infinity &instance,
 
 WrapQueryResult
 WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<String> &columns, Vector<Vector<WrapConstantExpr>> &values) {
+    fmt::print("begin warp insert\n");
+    if (values.empty()) {
+        return WrapQueryResult(ErrorCode::kInsertWithoutValues, "insert values is empty");
+    }
     Vector<Vector<ParsedExpr *> *> *value_ptr = new Vector<Vector<ParsedExpr *> *>(values.size());
     for (SizeT i = 0; i < values.size(); ++i) {
         auto value_list = new Vector<ParsedExpr *>(values[i].size());
@@ -441,8 +445,9 @@ WrapInsert(Infinity &instance, const String &db_name, const String &table_name, 
         (*value_ptr)[i] = value_list;
     }
     Vector<String> *insert_columns = new Vector<String>(columns);
-
+    fmt::print("begin insert\n");
     auto query_result = instance.Insert(db_name, table_name, insert_columns, value_ptr);
+    fmt::print("insert success\n");
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 

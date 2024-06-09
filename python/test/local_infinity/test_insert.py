@@ -19,11 +19,11 @@ class TestLocalInfinity():
         test_infinity_obj._test_insert_table_with_10000_columns()
         test_infinity_obj._test_read_after_shutdown()
         test_infinity_obj._test_batch_insert()
+        test_infinity_obj._test_insert_zero_column()
 
-        # not passed
+        # todo support tensor
         # test_infinity_obj._test_insert_tensor()
         # test_infinity_obj._test_insert_tensor_array()
-        # test_infinity_obj._test_insert_zero_column()
 
 
     @pytest.mark.parametrize("types", ["vector,65535,int", "vector,65535,float"])
