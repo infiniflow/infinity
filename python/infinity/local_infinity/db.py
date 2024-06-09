@@ -85,10 +85,10 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
 
         elif isinstance(default, list):
             if isinstance(default[0], int):
-                constant_expression.literal_type = LiteralType.kIntegerArray,
+                constant_expression.literal_type = LiteralType.kIntegerArray
                 constant_expression.i64_array_value = default
             elif isinstance(default[0], float):
-                constant_expression.literal_type = LiteralType.kDoubleArray,
+                constant_expression.literal_type = LiteralType.kDoubleArray
                 constant_expression.f64_array_value = default
         else:
             raise InfinityException(3069, "Invalid constant expression")
@@ -164,10 +164,10 @@ def get_embedding_info(column_info, column_defs, column_name, index):
 
         elif isinstance(default, list):
             if isinstance(default[0], int):
-                constant_expression.literal_type = LiteralType.kIntegerArray,
+                constant_expression.literal_type = LiteralType.kIntegerArray
                 constant_expression.i64_array_value = default
             elif isinstance(default[0], float):
-                constant_expression.literal_type = LiteralType.kDoubleArray,
+                constant_expression.literal_type = LiteralType.kDoubleArray
                 constant_expression.f64_array_value = default
         else:
             raise InfinityException(3069, "Invalid constant expression")
@@ -237,7 +237,7 @@ class LocalDatabase(Database, ABC):
         else:
             raise InfinityException(3066, "nvalid conflict type")
         res = self._conn.drop_table(db_name=self._db_name, table_name=table_name, conflict_type=drop_table_conflict)
-        if res.error_code == ErrorCode.OK:
+        if res.error_code == ErrorCode.OK or res.error_code == ErrorCode.TABLE_NOT_EXIST:
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)

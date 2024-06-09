@@ -382,7 +382,7 @@ class TestInsert(TestSdk):
         # connect
         infinity_obj = infinity.connect(self.uri)
         db_obj = infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_data_not_aligned_with_table_definition")
+        db_obj.drop_table("test_insert_data_not_aligned_with_table_definition", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_data_not_aligned_with_table_definition",
                                         {"c1": {"type": "int"}, "c2": {"type": types}}, ConflictType.Error)
 
