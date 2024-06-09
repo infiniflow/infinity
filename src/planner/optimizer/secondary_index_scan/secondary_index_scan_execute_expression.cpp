@@ -82,6 +82,16 @@ private:
                 result.SetIntervalRange<TimestampT>(value, compare_type);
                 break;
             }
+            case LogicalType::kVarchar: {
+                if (compare_type == FilterCompareType::kEqual) {
+                    result.SetIntervalRange<VarcharT>(value, compare_type);
+                } else {
+                    String error_message = "SaveToResult(): VarcharT only support kEqual compare type.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                }
+                break;
+            }
             default: {
                 String error_message = fmt::format("SaveToResult(): type error: {}.", value.type().ToString());
                 LOG_CRITICAL(error_message);

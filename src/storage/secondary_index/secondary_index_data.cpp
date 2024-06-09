@@ -246,6 +246,9 @@ SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, 
         case LogicalType::kTimestamp: {
             return new SecondaryIndexDataT<TimestampT>(chunk_row_count, allocate);
         }
+        case LogicalType::kVarchar: {
+            return new SecondaryIndexDataT<VarcharT>(chunk_row_count, allocate);
+        }
         default: {
             String error_message = fmt::format("Need to add secondary index support for data type: {}", data_type->ToString());
             LOG_CRITICAL(error_message);
@@ -292,6 +295,9 @@ u32 GetSecondaryIndexDataPairSize(const SharedPtr<DataType> &data_type) {
         }
         case LogicalType::kTimestamp: {
             return SecondaryIndexDataT<TimestampT>::PairSize;
+        }
+        case LogicalType::kVarchar: {
+            return SecondaryIndexDataT<VarcharT>::PairSize;
         }
         default: {
             String error_message = fmt::format("Need to add secondary index support for data type: {}", data_type->ToString());

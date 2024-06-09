@@ -94,6 +94,7 @@ public:
             case kTime:
             case kDateTime:  // need to be converted to int64 and keep order
             case kTimestamp: // need to be converted to int64 and keep order
+            case kVarchar:  // need to be converted to int64 by hash
             {
                 return true;
             }
