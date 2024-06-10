@@ -168,8 +168,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             UnrecoverableError(status.message());
         }
 
-        // Log To Stdout
+        // Record running query
         bool record_running_query = false;
+        record_running_query_ = record_running_query;
         UniquePtr<BooleanOption> record_running_query_option = MakeUnique<BooleanOption>(RECORD_RUNNING_QUERY_OPTION_NAME, record_running_query);
         status = global_options_.AddOption(std::move(record_running_query_option));
         if(!status.ok()) {
@@ -523,7 +524,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                             } else {
                                 return Status::InvalidConfig("'record_running_query' field isn't boolean.");
                             }
-
+                            record_running_query_ = record_running_query;
                             UniquePtr<BooleanOption> record_running_query_option = MakeUnique<BooleanOption>(RECORD_RUNNING_QUERY_OPTION_NAME, record_running_query);
                             Status status = global_options_.AddOption(std::move(record_running_query_option));
                             if(!status.ok()) {
@@ -570,6 +571,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 if(global_options_.GetOptionByIndex(GlobalOptionIndex::kRecordRunningQuery) == nullptr) {
                     // Record running query
                     bool record_running_query = false;
+                    record_running_query_ = record_running_query;
                     UniquePtr<BooleanOption> record_running_query_option = MakeUnique<BooleanOption>(RECORD_RUNNING_QUERY_OPTION_NAME, record_running_query);
                     Status status = global_options_.AddOption(std::move(record_running_query_option));
                     if(!status.ok()) {
@@ -1554,8 +1556,7 @@ i64 Config::CPULimit() {
 }
 
 bool Config::RecordRunningQuery() {
-    std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetBoolValue(GlobalOptionIndex::kRecordRunningQuery);
+    return record_running_query_;
 }
 
 void Config::SetRecordRunningQuery(bool flag) {
@@ -1568,6 +1569,7 @@ void Config::SetRecordRunningQuery(bool flag) {
     }
     BooleanOption *record_running_query_option = static_cast<BooleanOption *>(base_option);
     record_running_query_option->value_ = flag;
+    record_running_query_ = flag;
 }
 
 // Network
