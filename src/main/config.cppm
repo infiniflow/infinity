@@ -41,6 +41,8 @@ public:
 
     void SetCPULimit(i64 new_cpu_limit);
     i64 CPULimit();
+    bool RecordRunningQuery();
+    void SetRecordRunningQuery(bool flag);
 
     // Network
     String ServerAddress();

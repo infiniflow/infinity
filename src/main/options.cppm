@@ -141,7 +141,8 @@ export enum class GlobalOptionIndex {
     kDeltaCheckpointThreshold = 26,
     kFlushMethodAtCommit = 27,
     kResourcePath = 28,
-    kInvalid = 29
+    kRecordRunningQuery = 29,
+    kInvalid = 30
 };
 
 export struct GlobalOptions {

@@ -2252,6 +2252,28 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
     }
 
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(RECORD_RUNNING_QUERY_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = global_config->RecordRunningQuery() ? Value::MakeVarchar("True") : Value::MakeVarchar("False");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("To record running query");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
     {
         {
             // option name

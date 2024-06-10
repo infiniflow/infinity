@@ -148,6 +148,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             RecoverableError(status);
                             break;
                         }
+                        case GlobalOptionIndex::kRecordRunningQuery: {
+                            config->SetRecordRunningQuery(set_command->value_bool());
+                            break;
+                        }
                         case GlobalOptionIndex::kInvalid: {
                             Status status = Status::InvalidCommand(fmt::format("Unknown config: {}", set_command->var_name()));
                             LOG_ERROR(status.message());
