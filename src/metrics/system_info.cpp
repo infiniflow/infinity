@@ -15,6 +15,9 @@
 module;
 
 #include <cstdio>
+#include <dirent.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 module system_info;
 
@@ -60,11 +63,57 @@ i64 SystemInfo::MemoryUsage() {
 }
 
 f64 SystemInfo::CPUUsage() {
+
+
+//    unsigned long totalcputime1, totalcputime2;
+//    unsigned long procputime1, procputime2;
+//
+//    totalcputime1 = get_cpu_total_occupy();
+//    procputime1 = get_cpu_proc_occupy(pid);
+//
+//    // FIXME: the 200ms is a magic number, works well
+//    usleep(200000); // sleep 200ms to fetch two time point cpu usage snapshots sample for later calculation
+//
+//    totalcputime2 = get_cpu_total_occupy();
+//    procputime2 = get_cpu_proc_occupy(pid);
+//
+//    float pcpu = 0.0;
+//    if (0 != totalcputime2 - totalcputime1)
+//        pcpu = (procputime2 - procputime1) / float(totalcputime2 - totalcputime1); // float number
+//
+//    int cpu_num = get_nprocs();
+//    pcpu *= cpu_num; // should multiply cpu num in multiple cpu machine
+//
+//    return pcpu;
+
     return 0;
 }
 
-i64 SystemInfo::OpenFDCount() {
-    return 0;
+i64 SystemInfo::OpenFileCount() {
+    String dir_path;
+    int count = 0;
+    DIR *dir;
+    struct dirent *entry;
+
+    pid_t current_pid = getpid();
+    dir_path = fmt::format("/proc/{}/fd", current_pid);
+    dir = opendir(dir_path.c_str());
+    if (dir == NULL) {
+        Status status = Status::FailToGetSysInfo(fmt::format("Can't open dir: {}", dir_path));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        LOG_DEBUG(fmt::format("PID: {}, {}", current_pid, entry->d_name));
+        if (entry->d_name[0] == '.') {
+            continue;
+        }
+        count++;
+    }
+
+    closedir(dir);
+    return count;
 }
 
 }
