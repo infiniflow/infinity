@@ -17,33 +17,34 @@ module;
 module variables;
 
 import stl;
+import default_values;
 
 namespace infinity {
 
 void VarUtil::InitVariablesMap() {
-    global_name_map_["query_count"] = GlobalVariable::kQueryCount;
-    global_name_map_["session_count"] = GlobalVariable::kSessionCount;
-    global_name_map_["buffer_usage"] = GlobalVariable::kBufferPoolUsage;
-    global_name_map_["schedule_policy"] = GlobalVariable::kSchedulePolicy;
-    global_name_map_["delta_log_count"] = GlobalVariable::kDeltaLogCount;
-    global_name_map_["next_transaction_id"] = GlobalVariable::kNextTxnID;
-    global_name_map_["buffer_object_count"] = GlobalVariable::kBufferedObjectCount;
-    global_name_map_["unused_buffer_object"] = GlobalVariable::kUnusedBufferObjectCount;
-    global_name_map_["active_txn_count"] = GlobalVariable::kActiveTxnCount;
-    global_name_map_["current_timestamp"] = GlobalVariable::kCurrentTs;
-    global_name_map_["total_commit_count"] = GlobalVariable::kTotalCommitCount;
-    global_name_map_["total_rollback_count"] = GlobalVariable::kTotalRollbackCount;
-    global_name_map_["active_wal_filename"] = GlobalVariable::kActiveWALFilename;
-    global_name_map_["profile_record_capacity"] = GlobalVariable::kProfileRecordCapacity;
-    global_name_map_["bg_task_count"] = GlobalVariable::kBackgroundTaskCount;
-    global_name_map_["running_bg_task"] = GlobalVariable::kRunningBGTask;
-    global_name_map_["running_compact_task"] = GlobalVariable::kRunningCompactTask;
-    global_name_map_["system_memory_usage"] = GlobalVariable::kSystemMemoryUsage;
+    global_name_map_[QUERY_COUNT_VAR_NAME.data()] = GlobalVariable::kQueryCount;
+    global_name_map_[SESSION_COUNT_VAR_NAME.data()] = GlobalVariable::kSessionCount;
+    global_name_map_[BUFFER_USAGE_VAR_NAME.data()] = GlobalVariable::kBufferPoolUsage;
+    global_name_map_[SCHEDULE_POLICY_VAR_NAME.data()] = GlobalVariable::kSchedulePolicy;
+    global_name_map_[DELTA_LOG_COUNT_VAR_NAME.data()] = GlobalVariable::kDeltaLogCount;
+    global_name_map_[NEXT_TXN_ID_VAR_NAME.data()] = GlobalVariable::kNextTxnID;
+    global_name_map_[BUFFER_OBJECT_COUNT_VAR_NAME.data()] = GlobalVariable::kBufferedObjectCount;
+    global_name_map_[UNUSED_BUFFER_OBJECT_COUNT_VAR_NAME.data()] = GlobalVariable::kUnusedBufferObjectCount;
+    global_name_map_[ACTIVE_TXN_COUNT_VAR_NAME.data()] = GlobalVariable::kActiveTxnCount;
+    global_name_map_[CURRENT_TS_VAR_NAME.data()] = GlobalVariable::kCurrentTs;
+    global_name_map_[TOTAL_COMMIT_COUNT_VAR_NAME.data()] = GlobalVariable::kTotalCommitCount;
+    global_name_map_[TOTAL_ROLLBACK_COUNT_VAR_NAME.data()] = GlobalVariable::kTotalRollbackCount;
+    global_name_map_[ACTIVE_WAL_FILENAME_VAR_NAME.data()] = GlobalVariable::kActiveWALFilename;
+    global_name_map_[PROFILE_RECORD_CAPACITY_VAR_NAME.data()] = GlobalVariable::kProfileRecordCapacity;
+    global_name_map_[BG_TASK_COUNT_VAR_NAME.data()] = GlobalVariable::kBackgroundTaskCount;
+    global_name_map_[RUNNING_BG_TASK_VAR_NAME.data()] = GlobalVariable::kRunningBGTask;
+    global_name_map_[RUNNING_COMPACT_TASK_VAR_NAME.data()] = GlobalVariable::kRunningCompactTask;
+    global_name_map_[SYSTEM_MEMORY_USAGE_VAR_NAME.data()] = GlobalVariable::kSystemMemoryUsage;
 
-    session_name_map_["query_count"] = SessionVariable::kQueryCount;
-    session_name_map_["total_commit_count"] = SessionVariable::kTotalCommitCount;
-    session_name_map_["total_rollback_count"] = SessionVariable::kTotalRollbackCount;
-    session_name_map_["connected_timestamp"] = SessionVariable::kConnectedTime;
+    session_name_map_[QUERY_COUNT_VAR_NAME.data()] = SessionVariable::kQueryCount;
+    session_name_map_[TOTAL_COMMIT_COUNT_VAR_NAME.data()] = SessionVariable::kTotalCommitCount;
+    session_name_map_[TOTAL_ROLLBACK_COUNT_VAR_NAME.data()] = SessionVariable::kTotalRollbackCount;
+    session_name_map_[CONNECTED_TS_VAR_NAME.data()] = SessionVariable::kConnectedTime;
     session_name_map_["enable_profile"] = SessionVariable::kEnableProfile;
 }
 
