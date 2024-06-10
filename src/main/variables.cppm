@@ -40,6 +40,7 @@ export enum class GlobalVariable {
     kBackgroundTaskCount,       // global
     kRunningBGTask,             // global
     kRunningCompactTask,        // global
+    kSystemMemoryUsage,         // global
     kInvalid,
 };
 

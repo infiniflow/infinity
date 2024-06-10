@@ -253,6 +253,7 @@ export namespace std {
 
     using std::stof;
     using std::stod;
+    using std::strtoull;
 
     using std::construct_at;
 
@@ -261,6 +262,9 @@ export namespace std {
     using std::all_of;
     using std::any_of;
     using std::none_of;
+
+    using std::strncmp;
+    using std::memset;
 } // namespace std
 
 namespace infinity {

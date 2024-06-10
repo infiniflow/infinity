@@ -38,6 +38,7 @@ void VarUtil::InitVariablesMap() {
     global_name_map_["bg_task_count"] = GlobalVariable::kBackgroundTaskCount;
     global_name_map_["running_bg_task"] = GlobalVariable::kRunningBGTask;
     global_name_map_["running_compact_task"] = GlobalVariable::kRunningCompactTask;
+    global_name_map_["system_memory_usage"] = GlobalVariable::kSystemMemoryUsage;
 
     session_name_map_["query_count"] = SessionVariable::kQueryCount;
     session_name_map_["total_commit_count"] = SessionVariable::kTotalCommitCount;
