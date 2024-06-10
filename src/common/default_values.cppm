@@ -221,6 +221,7 @@ export {
     constexpr std::string_view RUNNING_COMPACT_TASK_VAR_NAME = "running_compact_task";  // global
     constexpr std::string_view SYSTEM_MEMORY_USAGE_VAR_NAME = "system_memory_usage";  // global
     constexpr std::string_view OPEN_FILE_COUNT_VAR_NAME = "open_file_count";  // global
+    constexpr std::string_view CPU_USAGE_VAR_NAME = "cpu_usage";  // global
 
 }
 

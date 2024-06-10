@@ -31,6 +31,82 @@ import default_values;
 
 namespace infinity {
 
+namespace {
+
+
+u64 cpu_total_cost() {
+    // different mode cpu cost
+    u64 user_time;
+    u64 nice_time;
+    u64 system_time;
+    u64 idle_time;
+
+    FILE *fd;
+    char buffer[1024] = {0};
+
+    fd = fopen("/proc/stat", "r");
+    if (nullptr == fd) {
+        return 0;
+    }
+
+    fgets(buffer, sizeof(buffer), fd);
+    char name[64] = {0};
+    sscanf(buffer, "%s %ld %ld %ld %ld", name, &user_time, &nice_time, &system_time, &idle_time);
+    fclose(fd);
+
+    return (user_time + nice_time + system_time + idle_time);
+}
+
+
+const char* get_items(const char* buffer, u32 item) {
+    // read from buffer by offset
+    const char *p = buffer;
+
+    i64 len = std::strlen(buffer);
+    i64 count = 0;
+
+    for (int i = 0; i < len; i++) {
+        if (' ' == *p) {
+            count++;
+            if (count == item - 1) {
+                p++;
+                break;
+            }
+        }
+        ++p;
+    }
+
+    return p;
+}
+
+u64 cpu_cost_of_process(pid_t pid) {
+    // get specific pid cpu use time
+    u32 tmp_pid;
+    u64 utime;  // user time
+    u64 stime;  // kernel time
+    u64 cutime; // all user time
+    u64 cstime; // all dead time
+
+    FILE *fd;
+    char line_buff[1024] = {0};
+    String file_name = fmt::format("/proc/{}/stat", pid);
+
+    fd = std::fopen(file_name.c_str(), "r");
+    if (nullptr == fd)
+        return 0;
+
+    fgets(line_buff, sizeof(line_buff), fd);
+
+    sscanf(line_buff, "%u", &tmp_pid);
+    const char *q = get_items(line_buff, 14);
+    sscanf(q, "%ld %ld %ld %ld", &utime, &stime, &cutime, &cstime);
+    fclose(fd);
+
+    return (utime + stime + cutime + cstime);
+}
+
+}
+
 i64 SystemInfo::MemoryUsage() {
     i64 vm_rss_in_kb = 0;
     try {
@@ -62,31 +138,27 @@ i64 SystemInfo::MemoryUsage() {
     return vm_rss_in_kb * KB;
 }
 
+
 f64 SystemInfo::CPUUsage() {
 
+    pid_t current_pid = getpid();
+    u64 total_cpu_cost1 = cpu_total_cost();
+    u64 cpu_cost_of_process1 = cpu_cost_of_process(current_pid);
 
-//    unsigned long totalcputime1, totalcputime2;
-//    unsigned long procputime1, procputime2;
-//
-//    totalcputime1 = get_cpu_total_occupy();
-//    procputime1 = get_cpu_proc_occupy(pid);
-//
-//    // FIXME: the 200ms is a magic number, works well
-//    usleep(200000); // sleep 200ms to fetch two time point cpu usage snapshots sample for later calculation
-//
-//    totalcputime2 = get_cpu_total_occupy();
-//    procputime2 = get_cpu_proc_occupy(pid);
-//
-//    float pcpu = 0.0;
-//    if (0 != totalcputime2 - totalcputime1)
-//        pcpu = (procputime2 - procputime1) / float(totalcputime2 - totalcputime1); // float number
-//
-//    int cpu_num = get_nprocs();
-//    pcpu *= cpu_num; // should multiply cpu num in multiple cpu machine
-//
-//    return pcpu;
+    usleep(200000); // sleep 200ms to fetch two time point cpu snapshots
 
-    return 0;
+    u64 total_cpu_cost2 = cpu_total_cost();
+    u64 cpu_cost_of_process2 = cpu_cost_of_process(current_pid);
+
+    f64 cpu_usage = 0.0;
+    if (total_cpu_cost2 - total_cpu_cost1 != 0) {
+        cpu_usage = (cpu_cost_of_process2 - cpu_cost_of_process1) / f64(total_cpu_cost2 - total_cpu_cost1);
+    }
+
+    i32 cpu_count = std::thread::hardware_concurrency();
+    cpu_usage *= cpu_count; // should multiply cpu num in multiple cpu machine
+
+    return cpu_usage;
 }
 
 i64 SystemInfo::OpenFileCount() {

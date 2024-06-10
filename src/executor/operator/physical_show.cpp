@@ -3213,6 +3213,7 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
 void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOperatorState *operator_state) {
     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     SharedPtr<DataType> integer_type = MakeShared<DataType>(LogicalType::kBigInt);
+    SharedPtr<DataType> double_type = MakeShared<DataType>(LogicalType::kDouble);
     SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
@@ -3595,6 +3596,26 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             i64 open_file_count = SystemInfo::OpenFileCount();
             Value value = Value::MakeBigInt(open_file_count);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case GlobalVariable::kCPUUsage: {
+            Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            };
+
+            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
+            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                double_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+
+            f64 cpu_usage = SystemInfo::CPUUsage();
+            Value value = Value::MakeDouble(cpu_usage * 100);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -4046,6 +4067,28 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                     // option value
                     i64 open_file_count = SystemInfo::OpenFileCount();
                     Value value = Value::MakeVarchar(std::to_string(open_file_count));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("File description opened count by Infinity.");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
+            case GlobalVariable::kCPUUsage: {
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+                    // option value
+                    f64 cpu_usage = SystemInfo::CPUUsage();
+                    Value value = Value::MakeVarchar(fmt::format("{:.{}f}", cpu_usage * 100, 2));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                 }
