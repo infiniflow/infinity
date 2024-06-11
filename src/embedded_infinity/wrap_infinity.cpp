@@ -1,8 +1,8 @@
 module;
 #include <cassert>
 #include <cstring>
-#include <string>
 #include <nanobind/nanobind.h>
+#include <string>
 
 module wrap_infinity;
 
@@ -150,7 +150,7 @@ ParsedExpr *WrapBetweenExpr::GetParsedExpr(Status &status) {
     return between_expr;
 }
 
-Tuple<void *, i64> GetEmbeddingDataTypeDataPtrFromProto(const EmbeddingData &embedding_data, Status& status) {
+Tuple<void *, i64> GetEmbeddingDataTypeDataPtrFromProto(const EmbeddingData &embedding_data, Status &status) {
     status.code_ = ErrorCode::kOk;
     if (embedding_data.i8_array_value.size() != 0) {
         return {(void *)embedding_data.i8_array_value.data(), embedding_data.i8_array_value.size()};
@@ -447,13 +447,12 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
                                 const String &table_name,
                                 Vector<WrapColumnDef> column_defs,
                                 const CreateTableOptions &create_table_options) {
-    fmt::print("begin wrap create table\n");
     Vector<TableConstraint *> constraints;
     Vector<ColumnDef *> column_defs_ptr;
     for (SizeT i = 0; i < column_defs.size(); ++i) {
         auto &wrap_column_def = column_defs[i];
         SharedPtr<TypeInfo> type_info_ptr = nullptr;
-        auto& logical_type = wrap_column_def.column_type.logical_type;
+        auto &logical_type = wrap_column_def.column_type.logical_type;
         if (logical_type == LogicalType::kEmbedding || logical_type == LogicalType::kTensor || logical_type == LogicalType::kTensorArray) {
             auto &embedding_type = wrap_column_def.column_type.embedding_type;
             type_info_ptr = MakeShared<EmbeddingInfo>(embedding_type.element_type, embedding_type.dimension);
@@ -473,9 +472,7 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
         auto column_def = new ColumnDef(wrap_column_def.id, column_type, wrap_column_def.column_name, wrap_column_def.constraints, default_expr);
         column_defs_ptr.push_back(column_def);
     }
-    fmt::print("begin create table\n");
     auto query_result = instance.CreateTable(db_name, table_name, std::move(column_defs_ptr), constraints, create_table_options);
-    fmt::print("create table success\n");
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
@@ -577,7 +574,6 @@ WrapQueryResult WrapShowBlockColumn(Infinity &instance,
 
 WrapQueryResult
 WrapInsert(Infinity &instance, const String &db_name, const String &table_name, Vector<String> &columns, Vector<Vector<WrapConstantExpr>> &values) {
-    fmt::print("begin warp insert\n");
     if (values.empty()) {
         return WrapQueryResult(ErrorCode::kInsertWithoutValues, "insert values is empty");
     }
@@ -604,9 +600,7 @@ WrapInsert(Infinity &instance, const String &db_name, const String &table_name, 
         (*value_ptr)[i] = value_list;
     }
     Vector<String> *insert_columns = new Vector<String>(columns);
-    fmt::print("begin insert\n");
     auto query_result = instance.Insert(db_name, table_name, insert_columns, value_ptr);
-    fmt::print("insert success\n");
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
@@ -764,15 +758,6 @@ void HandlePodType(ColumnField &output_column_field, SizeT row_count, const Shar
     String dst;
     dst.resize(size);
     std::memcpy(dst.data(), column_vector->data(), size);
-    fmt::print("HandlePodType func, dst size = {}\n", dst.size());
-    for (SizeT i = 0; i < dst.size(); ++i) {
-        fmt::print("{:02x} ", unsigned(dst[i]));
-    }
-    fmt::print("\n");
-    fmt::print("column vector:\n {}\n", column_vector->ToString());
-//    fmt::print("HandlePodType, dst = {}\n", dst.c_str());
-//    std::cout << "HandlePodType, dst = " << std::endl;
-//    std::cout << "size = " << size << " dst = " << dst.c_str() << std::endl;
     output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
 }
 
@@ -963,7 +948,6 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
             break;
         }
         case LogicalType::kVarchar: {
-            // need physical type?
             proto_data_type.logical_type = data_type->type();
             break;
         }
@@ -971,7 +955,7 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
         case LogicalType::kTensorArray:
         case LogicalType::kEmbedding: {
             proto_data_type.logical_type = data_type->type();
-            WrapEmbeddingType& embedding_type = proto_data_type.embedding_type;
+            WrapEmbeddingType &embedding_type = proto_data_type.embedding_type;
 
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
             embedding_type.dimension = embedding_info->Dimension();
@@ -997,7 +981,6 @@ void HandleColumnDef(WrapQueryResult &wrap_query_result, SizeT column_count, Sha
 
         WrapDataType &proto_data_type = proto_column_def.column_type;
         DataTypeToWrapDataType(proto_data_type, column_def->type());
-        // proto_data_type.logical_type = column_def->type()->type();
 
         wrap_query_result.column_defs.emplace_back(proto_column_def);
     }
@@ -1090,9 +1073,7 @@ WrapQueryResult WrapSearch(Infinity &instance,
         }
     }
 
-    fmt::print("before search, select list size = {}\n", select_list.size());
     auto query_result = instance.Search(db_name, table_name, search_expr, filter, output_columns);
-    fmt::print("after search\n");
     if (!query_result.IsOk()) {
         return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
     }

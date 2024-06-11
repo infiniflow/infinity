@@ -261,7 +261,6 @@ class TestDelete(TestSdk):
         db_obj.drop_table("test_delete_insert_data", ConflictType.Error)
 
     # delete inserted long before and select to check
-    # @pytest.mark.slow
     def _test_delete_inserted_long_before_data(self, get_infinity_db):
         # connect
         db_obj = get_infinity_db
@@ -299,18 +298,6 @@ class TestDelete(TestSdk):
 
 
     # various expression will be given in where clause, and check result correctness
-    # @trace_expected_exceptions
-    # @pytest.mark.parametrize('column_types', ["int", "int8", "int16", "int32", "int64", "integer",
-    #                                           "float", "float32", "double", "float64",
-    #                                           "varchar",
-    #                                           "bool",
-    #                                           "vector, 3, float"])
-    # @pytest.mark.parametrize('column_types_example', [1, 127, 32767, 2147483647, pow(2, 63) - 1, 10,
-    #                                                   float(1.1), np.float32(1 / 3), np.double(1 / 3),
-    #                                                   np.float64(1 / 3),
-    #                                                   "^789$ test insert varchar",
-    #                                                   True,
-    #                                                   np.array([1.1, 2.2, 3.3]), [1, 2, 3]])
     def _test_various_expression_in_where_clause(self, get_infinity_db, column_types, column_types_example):
         # connect
         db_obj = get_infinity_db
@@ -376,15 +363,6 @@ class TestDelete(TestSdk):
         print(delete_res)
         db_obj.drop_table("test_delete_one_segment_without_expression", ConflictType.Error)
 
-    # @pytest.mark.parametrize("filter_list", [
-    #     "c1 > 10",
-    #     "c2 > 1",
-    #     "c1 > 0.1 and c2 < 3.0",
-    #     "c1 > 0.1 and c2 < 1.0",
-    #     "c1 < 0.1 and c2 < 1.0",
-    #     "c1 < 0.1 and c1 > 1.0",
-    #     "c1 = 0",
-    # ])
     def _test_filter_with_valid_expression(self, get_infinity_db, filter_list):
         # connect
         db_obj = get_infinity_db
@@ -405,15 +383,6 @@ class TestDelete(TestSdk):
         print(delete_res)
         db_obj.drop_table("test_filter_expression", ConflictType.Error)
 
-    # @pytest.mark.parametrize("filter_list", [
-    #     pytest.param("c1"),
-    #     pytest.param("_row_id"),
-    #     pytest.param("*"),
-    #     pytest.param("#@$%@#f"),
-    #     pytest.param("c1 + 0.1 and c2 - 1.0"),
-    #     pytest.param("c1 * 0.1 and c2 / 1.0"),
-    #     pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
-    # ])
     def _test_filter_with_invalid_expression(self, get_infinity_db, filter_list):
         # connect
         db_obj = get_infinity_db

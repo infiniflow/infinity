@@ -345,8 +345,6 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
-    #                                          "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_select_embedding_int32(self, check_data):
         """
         TestSelect.test_select_embedding()
@@ -399,8 +397,6 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.parametrize("check_data", [{"file_name": "embedding_float_dim4.csv",
-    #                                          "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_select_embedding_float(self, check_data):
         """
         Method: test_select_embedding_float
@@ -459,8 +455,6 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
-    #                                          "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_select_big_embedding(self, check_data):
         """
         Method: test_select_big_embedding
@@ -557,15 +551,6 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.parametrize("filter_list", [
-    #     "c1 > 10",
-    #     "c2 > 1",
-    #     "c1 > 0.1 and c2 < 3.0",
-    #     "c1 > 0.1 and c2 < 1.0",
-    #     "c1 < 0.1 and c2 < 1.0",
-    #     "c1 < 0.1 and c1 > 1.0",
-    #     "c1 = 0",
-    # ])
     def _test_valid_filter_expression(self, filter_list):
         # connect
         infinity_obj = infinity.connect(self.uri)
@@ -590,15 +575,6 @@ class TestSelect(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.parametrize("filter_list", [
-    #     pytest.param("c1"),
-    #     pytest.param("_row_id"),
-    #     pytest.param("*"),
-    #     pytest.param("#@$%@#f"),
-    #     pytest.param("c1 + 0.1 and c2 - 1.0"),
-    #     pytest.param("c1 * 0.1 and c2 / 1.0"),
-    #     pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
-    # ])
     def _test_invalid_filter_expression(self, filter_list):
         # connect
         infinity_obj = infinity.connect(self.uri)

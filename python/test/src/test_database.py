@@ -446,7 +446,6 @@ class TestDatabase(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # create same db in different thread to test conflict and show dbs
-    # @trace_expected_exceptions
     def _test_create_same_db_in_different_threads(self):
         # connect
         infinity_obj = infinity.connect(self.uri)

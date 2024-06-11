@@ -58,8 +58,6 @@ class TestCase(TestSdk):
             db = infinity_obj.create_database("")
         assert infinity_obj.disconnect()
 
-    # @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
-    #                                          "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_basic(self, check_data):
         """
         target: test basic operation

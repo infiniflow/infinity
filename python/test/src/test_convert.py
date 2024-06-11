@@ -87,13 +87,6 @@ class TestConvert(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.parametrize("condition_list", ["c1 > 0.1 and c2 < 3.0",
-    #                                             "c1 > 0.1 and c2 < 1.0",
-    #                                             "c1 < 0.1 and c2 < 1.0",
-    #                                             "c1",
-    #                                             "c1 = 0",
-    #                                             "_row_id",
-    #                                             "*"])
     def _test_with_valid_select_list_output(self, condition_list):
         # connect
         infinity_obj = infinity.connect(self.uri)
@@ -115,10 +108,6 @@ class TestConvert(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.parametrize("condition_list", [pytest.param("c1 + 0.1 and c2 - 1.0", ),
-    #                                             pytest.param("c1 * 0.1 and c2 / 1.0", ),
-    #                                             pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", ),
-    #                                             ])
     def _test_with_invalid_select_list_output(self, condition_list):
         # connect
         infinity_obj = infinity.connect(self.uri)

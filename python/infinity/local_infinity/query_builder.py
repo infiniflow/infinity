@@ -48,7 +48,6 @@ class InfinityLocalQueryBuilder(ABC):
         self._limit = None
         self._offset = None
 
-    # todo modify
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
             topn: int, knn_params: {} = None) -> InfinityLocalQueryBuilder:
         if self._search is None:

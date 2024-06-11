@@ -141,7 +141,6 @@ class TestLocalInfinity():
         test_infinity_obj = TestIndex(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_create_index_import_data(get_infinity_db, index_type, file_format)
 
-    # @pytest.mark.skip
     @pytest.mark.parametrize("file_format", ["csv"])
     @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
     def test_insert_data_fulltext_index_search(self, get_infinity_db, file_format):

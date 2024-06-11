@@ -100,7 +100,6 @@ class TestLocalInfinity():
         test_database_obj = TestDatabase(common_values.TEST_LOCAL_PATH)
         test_database_obj._test_show_table_columns_with_valid_name(get_infinity_db, column_name)
 
-    # @pytest.mark.skip()
     @pytest.mark.parametrize("column_name", [pytest.param("Invalid name"),
                                              pytest.param("not_exist_name"),
                                              pytest.param(1),

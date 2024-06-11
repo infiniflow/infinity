@@ -11,6 +11,7 @@ class TestLocalInfinity():
     def test_version(self):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_version()
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_knn(self, check_data):
@@ -20,6 +21,7 @@ class TestLocalInfinity():
     def test_insert_multi_column(self):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_insert_multi_column()
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("column_name", ["gender_vector",
@@ -28,6 +30,7 @@ class TestLocalInfinity():
     def test_knn_on_vector_column(self, get_infinity_db, check_data, column_name):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_knn_on_vector_column(get_infinity_db, check_data, column_name)
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("column_name", [pytest.param("variant_id"),
@@ -40,16 +43,18 @@ class TestLocalInfinity():
     def test_knn_on_non_vector_column(self, get_infinity_db, check_data, column_name):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_knn_on_non_vector_column(get_infinity_db, check_data, column_name)
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
         [1] * 4,
         (1, 2, 3, 4),
-        ])
+    ])
     @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
     def test_valid_embedding_data(self, get_infinity_db, check_data, embedding_data):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_valid_embedding_data(get_infinity_db, check_data, embedding_data)
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
@@ -65,25 +70,28 @@ class TestLocalInfinity():
     def test_invalid_embedding_data(self, get_infinity_db, check_data, embedding_data):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_invalid_embedding_data(get_infinity_db, check_data, embedding_data)
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
         [1] * 4,
         [1.0] * 4,
-        ])
+    ])
     @pytest.mark.parametrize("embedding_data_type", [
         ("float", True),
     ])
     @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
     def test_valid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
-        test_infinity_obj._test_valid_embedding_data_type(get_infinity_db, check_data, embedding_data, embedding_data_type)
+        test_infinity_obj._test_valid_embedding_data_type(get_infinity_db, check_data, embedding_data,
+                                                          embedding_data_type)
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
         [1] * 4,
         [1.0] * 4,
-        ])
+    ])
     @pytest.mark.parametrize("embedding_data_type", [
         ("int", False),
         pytest.param(1),
@@ -93,13 +101,15 @@ class TestLocalInfinity():
     @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
     def test_invalid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
-        test_infinity_obj._test_invalid_embedding_data_type(get_infinity_db, check_data, embedding_data, embedding_data_type)
+        test_infinity_obj._test_invalid_embedding_data_type(get_infinity_db, check_data, embedding_data,
+                                                            embedding_data_type)
+
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
         [1] * 4,
         [1.0] * 4,
-        ])
+    ])
     @pytest.mark.parametrize("embedding_data_type", [
         # ("int", False),
         ("float", True),
@@ -115,7 +125,7 @@ class TestLocalInfinity():
                                    distance_type):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_various_distance_type(get_infinity_db, check_data, embedding_data, embedding_data_type,
-                                             distance_type)
+                                                      distance_type)
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -176,15 +186,16 @@ class TestLocalInfinity():
                               index_distance_type, knn_distance_type):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_with_index_after(get_infinity_db, check_data, index_column_name, knn_column_name,
-                                                index_distance_type, knn_distance_type)
+                                                 index_distance_type, knn_distance_type)
 
     @pytest.mark.parametrize("match_param_1", ["doctitle,num,body^5"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
-                                         "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
     def test_with_fulltext_match_with_valid_columns(self, get_infinity_db, check_data, match_param_1):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_with_fulltext_match_with_valid_columns(get_infinity_db, check_data, match_param_1)
+
     @pytest.mark.parametrize("match_param_1", [pytest.param(1),
                                                pytest.param(1.1),
                                                pytest.param([]),
@@ -197,6 +208,7 @@ class TestLocalInfinity():
     def test_with_fulltext_match_with_invalid_columns(self, get_infinity_db, check_data, match_param_1):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_with_fulltext_match_with_invalid_columns(get_infinity_db, check_data, match_param_1)
+
     @pytest.mark.parametrize("match_param_2", ["a word a segment",
                                                "body=Greek"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
@@ -205,6 +217,7 @@ class TestLocalInfinity():
     def test_with_fulltext_match_with_valid_words(self, get_infinity_db, check_data, match_param_2):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_with_fulltext_match_with_valid_words(get_infinity_db, check_data, match_param_2)
+
     @pytest.mark.parametrize("match_param_2", [pytest.param(1),
                                                pytest.param(1.1),
                                                pytest.param([]),
@@ -217,6 +230,7 @@ class TestLocalInfinity():
     def test_with_fulltext_match_with_invalid_words(self, get_infinity_db, check_data, match_param_2):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_with_fulltext_match_with_invalid_words(get_infinity_db, check_data, match_param_2)
+
     @pytest.mark.parametrize("match_param_3", [pytest.param("@#$!#@$SDa^sdf3!@#$"),
                                                "topn=1",
                                                "1"])
@@ -226,6 +240,7 @@ class TestLocalInfinity():
     def test_with_fulltext_match_with_options(self, get_infinity_db, check_data, match_param_3):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_with_fulltext_match_with_options(get_infinity_db, check_data, match_param_3)
+
     @pytest.mark.parametrize("match_param_3", [pytest.param(1),
                                                pytest.param(1.1),
                                                pytest.param([]),

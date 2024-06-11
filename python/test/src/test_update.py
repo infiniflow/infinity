@@ -102,7 +102,6 @@ class TestUpdate(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # update empty table
-    # @trace_expected_exceptions
     def _test_update_empty_table(self):
 
         # connect
@@ -163,7 +162,6 @@ class TestUpdate(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # update table, no row is met the condition
-    # @trace_expected_exceptions
     def _test_update_no_row_is_met_the_condition(self):
 
         # connect
@@ -207,7 +205,6 @@ class TestUpdate(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # update table, all rows are met the condition
-    # @trace_expected_exceptions
     def _test_update_all_row_is_met_the_condition(self):
 
         # connect
@@ -369,8 +366,6 @@ class TestUpdate(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # update inserted long before and select to check
-    # @pytest.mark.slow
-    # @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Taking too much time.")
     def _test_update_inserted_long_before(self):
         # connect
         infinity_obj = infinity.connect(self.uri)
@@ -425,8 +420,6 @@ class TestUpdate(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # update new value is invalid
-    # @pytest.mark.parametrize("types", ["varchar"])
-    # @pytest.mark.parametrize("types_example", [[1, 2, 3]])
     def _test_update_invalid_value(self, types, types_example):
         # connect
         infinity_obj = infinity.connect(self.uri)
@@ -447,12 +440,6 @@ class TestUpdate(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # update new value type is not match with table
-    # @pytest.mark.parametrize("types", ["int", "float"])
-    # @pytest.mark.parametrize("types_example", [
-    #     1,
-    #     1.333,
-    #     "1",
-    # ])
     def _test_update_new_value(self, types, types_example):
         # connect
         infinity_obj = infinity.connect(self.uri)
@@ -473,10 +460,6 @@ class TestUpdate(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.parametrize("types", ["int", "float"])
-    # @pytest.mark.parametrize("types_example", [
-    #     pytest.param([1, 2, 3])
-    # ])
     def _test_update_invalid_value(self, types, types_example):
         # connect
         infinity_obj = infinity.connect(self.uri)
@@ -502,16 +485,6 @@ class TestUpdate(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.parametrize("filter_list", [
-    #     "c1 > 10",
-    #     "c2 > 1",
-    #     "c1 > 0.1 and c2 < 3.0",
-    #     "c1 > 0.1 and c2 < 1.0",
-    #     "c1 < 0.1 and c2 < 1.0",
-    #     "c1 < 0.1 and c1 > 1.0",
-    #     "c1 = 0",
-    # ])
-    # @pytest.mark.parametrize("types_example", [1, 1.333])
     def _test_valid_filter_expression(self, get_infinity_db, filter_list, types_example):
         # connect
         db_obj = get_infinity_db
@@ -534,16 +507,6 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_filter_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    # @pytest.mark.parametrize("filter_list", [
-    #     pytest.param("c1"),
-    #     pytest.param("_row_id"),
-    #     pytest.param("*"),
-    #     pytest.param("#@$%@#f"),
-    #     pytest.param("c1 + 0.1 and c2 - 1.0"),
-    #     pytest.param("c1 * 0.1 and c2 / 1.0"),
-    #     pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
-    # ])
-    # @pytest.mark.parametrize("types_example", [1, 1.333])
     def _test_invalid_filter_expression(self, get_infinity_db, filter_list, types_example):
         # connect
         db_obj = get_infinity_db
