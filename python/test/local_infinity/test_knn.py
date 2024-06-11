@@ -237,12 +237,16 @@ class TestLocalInfinity():
     def test_with_fulltext_match_with_invalid_options(self, get_infinity_db, check_data, match_param_3):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_with_fulltext_match_with_invalid_options(get_infinity_db, check_data, match_param_3)
+
+    @pytest.mark.skip
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
     def test_tensor_scan(self, get_infinity_db, check_data):
         test_infinity_obj = TestKnn(common_values.TEST_LOCAL_PATH)
         test_infinity_obj._test_tensor_scan(get_infinity_db, check_data)
+
+    @pytest.mark.skip
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)

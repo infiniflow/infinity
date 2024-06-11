@@ -10,7 +10,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC
+from infinity.common import VEC, InfinityException
 from embedded_infinity import *
 from infinity.local_infinity.types import logic_type_to_dtype
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
@@ -61,7 +61,7 @@ class InfinityLocalQueryBuilder(ABC):
         column_expr.star = False
 
         if not isinstance(topn, int):
-            raise Exception(f"Invalid topn, type should be embedded, but get {type(topn)}")
+            raise InfinityException(3073, f"Invalid topn, type should be embedded, but get {type(topn)}")
 
         # type casting
         if isinstance(embedding_data, list):
@@ -71,7 +71,7 @@ class InfinityLocalQueryBuilder(ABC):
         elif isinstance(embedding_data, np.ndarray):
             embedding_data = embedding_data.tolist()
         else:
-            raise Exception(f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}")
+            raise InfinityException(3051, f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}")
 
         if (embedding_data_type == 'tinyint' or
                 embedding_data_type == 'smallint' or
@@ -103,7 +103,7 @@ class InfinityLocalQueryBuilder(ABC):
             elem_type = EmbeddingDataType.kElemDouble
             data.f64_array_value = embedding_data
         else:
-            raise Exception(f"Invalid embedding {embedding_data[0]} type")
+            raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
 
         dist_type = KnnDistanceType.kInvalid
         if distance_type == 'l2':
@@ -115,7 +115,7 @@ class InfinityLocalQueryBuilder(ABC):
         elif distance_type == 'hamming':
             dist_type = KnnDistanceType.kHamming
         else:
-            raise Exception(f"Invalid distance type {distance_type}")
+            raise InfinityException(3056, f"Invalid distance type {distance_type}")
 
         knn_opt_params = []
         if knn_params != None:
@@ -130,7 +130,7 @@ class InfinityLocalQueryBuilder(ABC):
         knn_expr.topn = topn
         knn_expr.opt_params = knn_opt_params
 
-        # now work
+        # not work
         # self._search.knn_exprs.append(knn_expr)
 
         knn_exprs = [knn_expr]

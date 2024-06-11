@@ -80,7 +80,7 @@ export struct WrapConstantExpr {
     Vector<i64> i64_array_value;
     Vector<f64> f64_array_value;
 
-    ParsedExpr *GetParsedExpr();
+    ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct WrapColumnDef {
@@ -126,7 +126,7 @@ export struct WrapColumnExpr {
     Vector<String> names{};
     bool generated{false};
 
-    ParsedExpr *GetParsedExpr();
+    ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct WrapFunctionExpr {
@@ -135,14 +135,14 @@ export struct WrapFunctionExpr {
     Vector<SharedPtr<WrapParsedExpr>> arguments;
     bool distinct{false};
 
-    ParsedExpr *GetParsedExpr();
+    ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct WrapBetweenExpr {
     SharedPtr<WrapParsedExpr> value{nullptr};
     SharedPtr<WrapParsedExpr> upper_bound{nullptr};
     SharedPtr<WrapParsedExpr> lower_bound{nullptr};
-    ParsedExpr *GetParsedExpr();
+    ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct EmbeddingData {
@@ -163,7 +163,7 @@ export struct WrapKnnExpr {
     i64 topn{};
     Vector<SharedPtr<InitParameter>> opt_params{};
 
-    ParsedExpr *GetParsedExpr();
+    ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct WrapMatchExpr {
@@ -171,14 +171,14 @@ export struct WrapMatchExpr {
     String matching_text;
     String options_text;
 
-    ParsedExpr *GetParsedExpr();
+    ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct WrapFusionExpr {
     String method{};
     String options_text{};
 
-    ParsedExpr *GetParsedExpr();
+    ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct WrapMatchTensorExpr {
@@ -188,7 +188,7 @@ export struct WrapMatchTensorExpr {
     SharedPtr<WrapConstantExpr> tensor_expr;
     String embedding_data_type;
     String options_text;
-    ParsedExpr *GetParsedExpr();
+    ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct WrapSearchExpr {
@@ -197,7 +197,7 @@ export struct WrapSearchExpr {
     Vector<SharedPtr<WrapMatchTensorExpr>> match_tensor_exprs{};
     Vector<SharedPtr<WrapFusionExpr>> fusion_exprs{};
 
-    ParsedExpr *GetParsedExpr();
+    ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct WrapParsedExpr {
@@ -213,13 +213,13 @@ export struct WrapParsedExpr {
     WrapFusionExpr fusion_expr;
     WrapSearchExpr search_expr;
 
-    ParsedExpr *GetParsedExpr();
+    ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct WrapUpdateExpr {
     String column_name;
     WrapParsedExpr value;
-    UpdateExpr *GetUpdateExpr();
+    UpdateExpr *GetUpdateExpr(Status &status);
 };
 
 export WrapQueryResult WrapCreateDatabase(Infinity &instance, const String &db_name, const CreateDatabaseOptions &options);
