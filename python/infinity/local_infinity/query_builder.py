@@ -224,6 +224,28 @@ class InfinityLocalQueryBuilder(ABC):
                     parsed_expr.function_expr = func_expr
 
                     select_list.append(parsed_expr)
+
+                case "_similarity":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "similarity"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    select_list.append(parsed_expr)
+                case "_distance":
+                    func_expr = WrapFunctionExpr()
+                    func_expr.func_name = "distance"
+                    func_expr.arguments = []
+
+                    expr_type = ParsedExprType(ParsedExprType.kFunction)
+                    parsed_expr = WrapParsedExpr(expr_type)
+                    parsed_expr.function_expr = func_expr
+
+                    select_list.append(parsed_expr)
+
                 case _:
                     parsed_expr = parse_expr(maybe_parse(column))
                     select_list.append(parsed_expr)
