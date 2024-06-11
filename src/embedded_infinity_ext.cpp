@@ -226,6 +226,7 @@ NB_MODULE(embedded_infinity_ext, m) {
 
         .def("Insert", &WrapInsert)
         .def("Import", &WrapImport)
+        .def("Export", &WrapExport)
         .def("Delete", &WrapDelete, nb::arg("db_name"), nb::arg("table_name"), nb::arg("filter") = nullptr)
         .def("Update",
              &WrapUpdate,
@@ -300,6 +301,12 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("delimiter", &ImportOptions::delimiter_)
         .def_rw("header", &ImportOptions::header_)
         .def_rw("copy_file_type", &ImportOptions::copy_file_type_);
+
+    nb::class_<ExportOptions>(m, "ExportOptions")
+        .def(nb::init<>())
+        .def_rw("delimiter", &ExportOptions::delimiter_)
+        .def_rw("header", &ExportOptions::header_)
+        .def_rw("copy_file_type", &ExportOptions::copy_file_type_);
 
     // parsed_expr
     nb::enum_<ParsedExprType>(m, "ParsedExprType")

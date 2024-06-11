@@ -25,7 +25,8 @@ from src.utils import copy_data
 from src.test_sdkbase import TestSdk
 
 test_csv_file = "embedding_int_dim3.csv"
-
+test_export_csv_file = "export_embedding_int_dim3.csv"
+test_export_jsonl_file = "export_embedding_int_dim3.jsonl"
 
 class TestCase(TestSdk):
     def _test_version(self):
@@ -42,8 +43,12 @@ class TestCase(TestSdk):
         assert infinity_obj
         assert infinity_obj.disconnect()
 
-
     def _test_create_db_with_invalid_name(self):
+        """
+        target: test db name limitation
+        method: create db with empty name
+        expect: create db fail with error message
+        """
         infinity_obj = infinity.connect(self.uri)
         assert infinity_obj
 
@@ -53,9 +58,9 @@ class TestCase(TestSdk):
             db = infinity_obj.create_database("")
         assert infinity_obj.disconnect()
 
-
-    def _test_basic(self, check_data=[{"file_name": "embedding_int_dim3.csv",
-                                       "data_dir": common_values.TEST_TMP_DIR}]):
+    # @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+    #                                          "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def _test_basic(self, check_data):
         """
         target: test basic operation
         method:
@@ -173,9 +178,44 @@ class TestCase(TestSdk):
         res = table_obj.import_data(common_values.TEST_TMP_DIR + test_csv_file)
         assert res.error_code == ErrorCode.OK
 
+        # export
+        if os.path.exists(common_values.TEST_TMP_DIR + test_export_csv_file):
+            os.remove(common_values.TEST_TMP_DIR + test_export_csv_file)
+        res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_csv_file)
+        assert res.error_code == ErrorCode.OK
+
+        if os.path.exists(common_values.TEST_TMP_DIR + test_export_jsonl_file):
+            os.remove(common_values.TEST_TMP_DIR + test_export_jsonl_file)
+        res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_jsonl_file)
+        assert res.error_code == ErrorCode.OK
+
+        db_obj.drop_table("my_table_export", ConflictType.Ignore)
+        export_table_obj = db_obj.create_table("my_table_export", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
+        assert export_table_obj is not None
+
+        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_csv_file)
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
+        print(res)
+
+        res = db_obj.drop_table("my_table_export")
+        assert res.error_code == ErrorCode.OK
+        export_table_obj = db_obj.create_table("my_table_export", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
+        assert export_table_obj is not None
+        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_jsonl_file)
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
+        print(res)
+        res = db_obj.drop_table("my_table_export")
+        assert res.error_code == ErrorCode.OK
+
+        os.remove(common_values.TEST_TMP_DIR + test_export_csv_file)
+        os.remove(common_values.TEST_TMP_DIR + test_export_jsonl_file)
+
         # search
         res = table_obj.output(
             ["c1"]).filter("c1 > 1").to_df()
+        print(res)
         res = db_obj.drop_table("my_table4")
         assert res.error_code == ErrorCode.OK
 

@@ -131,6 +131,9 @@ class LocalInfinityClient:
     def import_data(self, db_name: str, table_name: str, file_name: str, import_options):
         return self.convert_res(self.client.Import(db_name, table_name, file_name, import_options))
 
+    def export_data(self, db_name: str, table_name: str, file_name: str, export_options):
+        return self.convert_res(self.client.Export(db_name, table_name, file_name, export_options))
+
     def select(self, db_name: str, table_name: str, select_list: list[WrapParsedExpr], search_expr,
                where_expr, limit_expr, offset_expr, group_by_list=None):
 

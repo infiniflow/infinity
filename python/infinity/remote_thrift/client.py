@@ -45,7 +45,8 @@ class ThriftInfinityClient:
         # version: 0.2.0.dev3, client_version: 2
         # version: 0.2.0.dev4, client_version: 3
         # version: 0.2.0.dev5, client_version: 4
-        res = self.client.Connect(ConnectRequest(client_version=3))
+        # version: 0.2.0.dev6, client_version: 5
+        res = self.client.Connect(ConnectRequest(client_version=4))
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
@@ -168,6 +169,13 @@ class ThriftInfinityClient:
                                                 table_name=table_name,
                                                 file_name=file_name,
                                                 import_option=import_options))
+
+    def export_data(self, db_name: str, table_name: str, file_name: str, export_options):
+        return self.client.Export(ExportRequest(session_id=self.session_id,
+                                                db_name=db_name,
+                                                table_name=table_name,
+                                                file_name=file_name,
+                                                export_option=export_options))
 
     def select(self, db_name: str, table_name: str, select_list, search_expr,
                where_expr, group_by_list, limit_expr, offset_expr):

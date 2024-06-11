@@ -147,6 +147,8 @@ public:
 
     Status BuildShowConfigs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowBuffer(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     Status BuildShowProfiles(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowSessionVariable(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

@@ -211,11 +211,11 @@ class LocalTable(Table, ABC):
                     elif file_type == 'fvecs':
                         options.copy_file_type = CopyFileType.kFVECS
                     else:
-                        raise InfinityException(3037, "Unrecognized import file type")
+                        raise InfinityException(3037, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
-                        raise InfinityException(3037, "Unrecognized import file delimiter")
+                        raise InfinityException(3037, f"Unrecognized export file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
@@ -223,12 +223,50 @@ class LocalTable(Table, ABC):
                     else:
                         raise InfinityException(3037, "Boolean value is expected in header field")
                 else:
-                    raise InfinityException(3037, "Unknown import parameter")
+                    raise InfinityException(3037, f"Unknown export parameter: {k}")
 
         res = self._conn.import_data(db_name=self._db_name,
                                      table_name=self._table_name,
                                      file_name=file_path,
                                      import_options=options)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
+
+    def export_data(self, file_path: str, export_options: {} = None):
+        options = ExportOption()
+        options.has_header = False
+        options.delimiter = ','
+        options.copy_file_type = CopyFileType.kCSV
+        if export_options != None:
+            for k, v in export_options.items():
+                key = k.lower()
+                if key == 'file_type':
+                    file_type = v.lower()
+                    if file_type == 'csv':
+                        options.copy_file_type = CopyFileType.kCSV
+                    elif file_type == 'jsonl':
+                        options.copy_file_type = CopyFileType.kJSONL
+                    else:
+                        raise InfinityException(3037, f"Unrecognized export file type: {file_type}")
+                elif key == 'delimiter':
+                    delimiter = v.lower()
+                    if len(delimiter) != 1:
+                        raise InfinityException(3037, f"Unrecognized export file delimiter: {delimiter}")
+                    options.delimiter = delimiter[0]
+                elif key == 'header':
+                    if isinstance(v, bool):
+                        options.has_header = v
+                    else:
+                        raise InfinityException(3037, "Boolean value is expected in header field")
+                else:
+                    raise InfinityException(3037, f"Unknown export parameter: {k}")
+
+        res = self._conn.export_data(db_name=self._db_name,
+                                     table_name=self._table_name,
+                                     file_name=file_path,
+                                     export_options=options)
         if res.error_code == ErrorCode.OK:
             return res
         else:

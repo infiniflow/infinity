@@ -30,6 +30,7 @@ class InfinityServiceIf {
   virtual void DropTable(CommonResponse& _return, const DropTableRequest& request) = 0;
   virtual void Insert(CommonResponse& _return, const InsertRequest& request) = 0;
   virtual void Import(CommonResponse& _return, const ImportRequest& request) = 0;
+  virtual void Export(CommonResponse& _return, const ExportRequest& request) = 0;
   virtual void Select(SelectResponse& _return, const SelectRequest& request) = 0;
   virtual void Explain(SelectResponse& _return, const ExplainRequest& request) = 0;
   virtual void Delete(CommonResponse& _return, const DeleteRequest& request) = 0;
@@ -102,6 +103,9 @@ class InfinityServiceNull : virtual public InfinityServiceIf {
     return;
   }
   void Import(CommonResponse& /* _return */, const ImportRequest& /* request */) override {
+    return;
+  }
+  void Export(CommonResponse& /* _return */, const ExportRequest& /* request */) override {
     return;
   }
   void Select(SelectResponse& /* _return */, const SelectRequest& /* request */) override {
@@ -996,6 +1000,110 @@ class InfinityService_Import_presult {
   CommonResponse* success;
 
   _InfinityService_Import_presult__isset __isset;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+
+};
+
+typedef struct _InfinityService_Export_args__isset {
+  _InfinityService_Export_args__isset() : request(false) {}
+  bool request :1;
+} _InfinityService_Export_args__isset;
+
+class InfinityService_Export_args {
+ public:
+
+  InfinityService_Export_args(const InfinityService_Export_args&);
+  InfinityService_Export_args& operator=(const InfinityService_Export_args&);
+  InfinityService_Export_args() noexcept {
+  }
+
+  virtual ~InfinityService_Export_args() noexcept;
+  ExportRequest request;
+
+  _InfinityService_Export_args__isset __isset;
+
+  void __set_request(const ExportRequest& val);
+
+  bool operator == (const InfinityService_Export_args & rhs) const
+  {
+    if (!(request == rhs.request))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Export_args &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Export_args & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+
+class InfinityService_Export_pargs {
+ public:
+
+
+  virtual ~InfinityService_Export_pargs() noexcept;
+  const ExportRequest* request;
+
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Export_result__isset {
+  _InfinityService_Export_result__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Export_result__isset;
+
+class InfinityService_Export_result {
+ public:
+
+  InfinityService_Export_result(const InfinityService_Export_result&);
+  InfinityService_Export_result& operator=(const InfinityService_Export_result&);
+  InfinityService_Export_result() noexcept {
+  }
+
+  virtual ~InfinityService_Export_result() noexcept;
+  CommonResponse success;
+
+  _InfinityService_Export_result__isset __isset;
+
+  void __set_success(const CommonResponse& val);
+
+  bool operator == (const InfinityService_Export_result & rhs) const
+  {
+    if (!(success == rhs.success))
+      return false;
+    return true;
+  }
+  bool operator != (const InfinityService_Export_result &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const InfinityService_Export_result & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const;
+
+};
+
+typedef struct _InfinityService_Export_presult__isset {
+  _InfinityService_Export_presult__isset() : success(false) {}
+  bool success :1;
+} _InfinityService_Export_presult__isset;
+
+class InfinityService_Export_presult {
+ public:
+
+
+  virtual ~InfinityService_Export_presult() noexcept;
+  CommonResponse* success;
+
+  _InfinityService_Export_presult__isset __isset;
 
   uint32_t read(::apache::thrift::protocol::TProtocol* iprot);
 
@@ -3234,6 +3342,9 @@ class InfinityServiceClient : virtual public InfinityServiceIf {
   void Import(CommonResponse& _return, const ImportRequest& request) override;
   void send_Import(const ImportRequest& request);
   void recv_Import(CommonResponse& _return);
+  void Export(CommonResponse& _return, const ExportRequest& request) override;
+  void send_Export(const ExportRequest& request);
+  void recv_Export(CommonResponse& _return);
   void Select(SelectResponse& _return, const SelectRequest& request) override;
   void send_Select(const SelectRequest& request);
   void recv_Select(SelectResponse& _return);
@@ -3320,6 +3431,7 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
   void process_DropTable(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Insert(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Import(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
+  void process_Export(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Select(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Explain(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
   void process_Delete(int32_t seqid, ::apache::thrift::protocol::TProtocol* iprot, ::apache::thrift::protocol::TProtocol* oprot, void* callContext);
@@ -3352,6 +3464,7 @@ class InfinityServiceProcessor : public ::apache::thrift::TDispatchProcessor {
     processMap_["DropTable"] = &InfinityServiceProcessor::process_DropTable;
     processMap_["Insert"] = &InfinityServiceProcessor::process_Insert;
     processMap_["Import"] = &InfinityServiceProcessor::process_Import;
+    processMap_["Export"] = &InfinityServiceProcessor::process_Export;
     processMap_["Select"] = &InfinityServiceProcessor::process_Select;
     processMap_["Explain"] = &InfinityServiceProcessor::process_Explain;
     processMap_["Delete"] = &InfinityServiceProcessor::process_Delete;
@@ -3478,6 +3591,16 @@ class InfinityServiceMultiface : virtual public InfinityServiceIf {
       ifaces_[i]->Import(_return, request);
     }
     ifaces_[i]->Import(_return, request);
+    return;
+  }
+
+  void Export(CommonResponse& _return, const ExportRequest& request) override {
+    size_t sz = ifaces_.size();
+    size_t i = 0;
+    for (; i < (sz - 1); ++i) {
+      ifaces_[i]->Export(_return, request);
+    }
+    ifaces_[i]->Export(_return, request);
     return;
   }
 
@@ -3747,6 +3870,9 @@ class InfinityServiceConcurrentClient : virtual public InfinityServiceIf {
   void Import(CommonResponse& _return, const ImportRequest& request) override;
   int32_t send_Import(const ImportRequest& request);
   void recv_Import(CommonResponse& _return, const int32_t seqid);
+  void Export(CommonResponse& _return, const ExportRequest& request) override;
+  int32_t send_Export(const ExportRequest& request);
+  void recv_Export(CommonResponse& _return, const int32_t seqid);
   void Select(SelectResponse& _return, const SelectRequest& request) override;
   int32_t send_Select(const SelectRequest& request);
   void recv_Select(SelectResponse& _return, const int32_t seqid);

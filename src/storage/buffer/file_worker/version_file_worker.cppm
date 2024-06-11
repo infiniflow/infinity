@@ -18,6 +18,7 @@ export module version_file_worker;
 
 import stl;
 import file_worker;
+import file_worker_type;
 
 namespace infinity {
 
@@ -35,6 +36,8 @@ public:
     SizeT GetMemoryCost() const override;
 
     void SetCheckpointTS(TxnTimeStamp ts) { checkpoint_ts_ = ts; }
+
+    FileWorkerType Type() const override { return FileWorkerType::kVersionDataFile; }
 
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;

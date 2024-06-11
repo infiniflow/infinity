@@ -50,10 +50,10 @@ public:
     SizeT TaskletCount() override;
 
 private:
-    template <typename DataType>
-    void ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state, const SparseMetricType &metric_type);
+    template <template <typename, typename> typename C>
+    void ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state);
 
-    template <typename DataType, template <typename, typename> typename C>
+    template <typename ResultType, template <typename, typename> typename C>
     void ExecuteInner(QueryContext *query_context, MergeMatchSparseOperatorState *operator_state);
 
 private:

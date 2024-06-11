@@ -62,6 +62,7 @@ import value;
 import catalog;
 import catalog_delta_entry;
 import build_fast_rough_filter_task;
+import stream_io;
 
 namespace infinity {
 
@@ -257,6 +258,7 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
         Status status = Status::ImportFileFormatError("CSR file must have only one sparse column.");
         RecoverableError(status);
     }
+    // nocheck sort or not sort
     auto sparse_info = std::static_pointer_cast<SparseInfo>(column_type->type_info());
     if (sparse_info->DataType() != kElemFloat) {
         Status status = Status::ImportFileFormatError("FVECS file must has only one sparse column with float element");
@@ -428,42 +430,51 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
 }
 
 void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state) {
-    LocalFileSystem fs;
-    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
-    if(!status.ok()) {
-        UnrecoverableError(status.message());
-    }
-    DeferFn file_defer([&]() { fs.Close(*file_handler); });
-
-    SizeT file_size = fs.GetFileSize(*file_handler);
-    String jsonl_str(file_size + 1, 0);
-    SizeT read_n = file_handler->Read(jsonl_str.data(), file_size);
-    if (read_n != file_size) {
-        String error_message = fmt::format("Read file size {} doesn't match with file size {}.", read_n, file_size);
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
-    }
-
-    if (read_n == 0) {
-        auto result_msg = MakeUnique<String>(fmt::format("Empty JSONL file, IMPORT 0 Rows"));
-        import_op_state->result_msg_ = std::move(result_msg);
-        return;
-    }
+    StreamIO stream_io;
+    stream_io.Init(file_path_, FileFlags::READ_FLAG);
+    DeferFn file_defer([&]() { stream_io.Close(); });
 
     Txn *txn = query_context->GetTxn();
     u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
 
-    SizeT start_pos = 0;
     Vector<ColumnVector> column_vectors;
     for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
         auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
         column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
     }
+
+    SizeT row_count{0};
     while (true) {
-        if (start_pos >= file_size) {
+        String json_str;
+        if (stream_io.ReadLine(json_str)) {
+            nlohmann::json line_json = nlohmann::json::parse(json_str);
+
+            JSONLRowHandler(line_json, column_vectors);
+            block_entry->IncreaseRowCount(1);
+            ++row_count;
+
+            if (block_entry->GetAvailableCapacity() <= 0) {
+                LOG_DEBUG(fmt::format("Block {} saved, total rows: {}", block_entry->block_id(), row_count));
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+                if (segment_entry->Room() <= 0) {
+                    LOG_DEBUG(fmt::format("Segment {} saved, total rows: {}", segment_entry->segment_id(), row_count));
+                    SaveSegmentData(table_entry_, txn, segment_entry);
+                    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+                }
+
+                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+                column_vectors.clear();
+                for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+                    auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
+                    column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+                }
+            }
+        } else {
             if (block_entry->row_count() == 0) {
+                column_vectors.clear();
                 std::move(*block_entry).Cleanup();
             } else {
                 segment_entry->AppendBlockEntry(std::move(block_entry));
@@ -472,41 +483,13 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
                 std::move(*segment_entry).Cleanup();
             } else {
                 SaveSegmentData(table_entry_, txn, segment_entry);
+                LOG_DEBUG(fmt::format("Last segment {} saved, total rows: {}", segment_entry->segment_id(), row_count));
             }
             break;
         }
-        SizeT end_pos = jsonl_str.find('\n', start_pos);
-        if (end_pos == String::npos) {
-            end_pos = file_size;
-        }
-        std::string_view json_sv(jsonl_str.data() + start_pos, end_pos - start_pos);
-        start_pos = end_pos + 1;
-
-        nlohmann::json line_json = nlohmann::json::parse(json_sv);
-
-        JSONLRowHandler(line_json, column_vectors);
-        block_entry->IncreaseRowCount(1);
-
-        if (block_entry->GetAvailableCapacity() <= 0) {
-            LOG_DEBUG(fmt::format("Block {} saved", block_entry->block_id()));
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            if (segment_entry->Room() <= 0) {
-                LOG_DEBUG(fmt::format("Segment {} saved", segment_entry->segment_id()));
-                SaveSegmentData(table_entry_, txn, segment_entry);
-                u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
-                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
-            }
-
-            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
-            column_vectors.clear();
-            for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
-                auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
-                column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
-            }
-        }
     }
 
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", table_entry_->row_count()));
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", row_count));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
@@ -555,6 +538,7 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
         return;
     }
 
+    SizeT row_count{0};
     for (const auto &json_entry : json_arr) {
         if (block_entry->GetAvailableCapacity() <= 0) {
             LOG_DEBUG(fmt::format("Block {} saved", block_entry->block_id()));
@@ -576,12 +560,13 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
 
         JSONLRowHandler(json_entry, column_vectors);
         block_entry->IncreaseRowCount(1);
+        ++ row_count;
     }
 
     segment_entry->AppendBlockEntry(std::move(block_entry));
     SaveSegmentData(table_entry_, txn, segment_entry);
 
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", table_entry_->row_count()));
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", row_count));
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
@@ -922,35 +907,71 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                 }
                 case kEmbedding: {
                     auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
-                    // SizeT dim = embedding_info->Dimension();
+                    SizeT dim = embedding_info->Dimension();
                     switch (embedding_info->Type()) {
                         case kElemInt8: {
                             Vector<i8> &&embedding = line_json[column_def->name_].get<Vector<i8>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }
                         case kElemInt16: {
                             Vector<i16> &&embedding = line_json[column_def->name_].get<Vector<i16>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }
                         case kElemInt32: {
                             Vector<i32> &&embedding = line_json[column_def->name_].get<Vector<i32>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }
                         case kElemInt64: {
                             Vector<i64> &&embedding = line_json[column_def->name_].get<Vector<i64>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }
                         case kElemFloat: {
                             Vector<float> &&embedding = line_json[column_def->name_].get<Vector<float>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }
                         case kElemDouble: {
                             Vector<double> &&embedding = line_json[column_def->name_].get<Vector<double>>();
+                            SizeT embedding_dim = embedding.size();
+                            if(embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
                             break;
                         }

@@ -108,6 +108,8 @@ public:
         return std::make_pair(v_ptr, block_offset_ + cur_++);
     }
 
+    SharedPtr<ColumnVector> column_vector() const { return column_vector_; }
+
 private:
     SegmentOffset block_offset_;
     SharedPtr<ColumnVector> column_vector_;

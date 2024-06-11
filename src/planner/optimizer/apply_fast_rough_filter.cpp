@@ -32,6 +32,7 @@ import logger;
 import third_party;
 import filter_expression_push_down;
 import fast_rough_filter;
+import logical_match_scan_base;
 
 namespace infinity {
 
@@ -41,41 +42,50 @@ public:
         if (!op) {
             return;
         }
-        if (op->operator_type() == LogicalNodeType::kFilter) {
-            auto &filter = static_cast<LogicalFilter &>(*op);
-            auto &filter_expression = filter.expression();
-            if (op->right_node().get() != nullptr) {
-                String error_message = "BuildSecondaryIndexScan: Logical filter node shouldn't have right child.";
+        switch (op->operator_type()) {
+            case LogicalNodeType::kFilter: {
+                auto &filter = static_cast<LogicalFilter &>(*op);
+                auto &filter_expression = filter.expression();
+                if (op->right_node().get() != nullptr) {
+                    String error_message = "BuildSecondaryIndexScan: Logical filter node shouldn't have right child.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                } else if (op->left_node()->operator_type() == LogicalNodeType::kTableScan) {
+                    auto &table_scan = static_cast<LogicalTableScan &>(*(op->left_node()));
+                    table_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
+                } else if (op->left_node()->operator_type() == LogicalNodeType::kIndexScan) {
+                    // warn
+                    LOG_WARN("ApplyFastRoughFilterMethod: IndexScan exist after Filter. A part of filter condition has been removed.");
+                    // still build from remaining filter condition
+                    auto &index_scan = static_cast<LogicalIndexScan &>(*(op->left_node()));
+                    index_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
+                } else {
+                    LOG_WARN("ApplyFastRoughFilterMethod: Filter node should be followed by TableScan or IndexScan.");
+                }
+                break;
+            }
+            case LogicalNodeType::kMatch: {
+                // also need to apply filter
+                auto &match = static_cast<LogicalMatch &>(*op);
+                match.common_query_filter_->TryApplyFastRoughFilterOptimizer();
+                break;
+            }
+            case LogicalNodeType::kKnnScan:
+            case LogicalNodeType::kMatchTensorScan:
+            case LogicalNodeType::kMatchSparseScan: {
+                auto &match = static_cast<LogicalMatchScanBase &>(*op);
+                match.common_query_filter_->TryApplyFastRoughFilterOptimizer();
+                break;
+            }
+            case LogicalNodeType::kIndexScan: {
+                String error_message = "ApplyFastRoughFilterMethod: IndexScan optimizer should not happen before ApplyFastRoughFilter optimizer.";
                 LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
-            } else if (op->left_node()->operator_type() == LogicalNodeType::kTableScan) {
-                auto &table_scan = static_cast<LogicalTableScan &>(*(op->left_node()));
-                table_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
-            } else if (op->left_node()->operator_type() == LogicalNodeType::kIndexScan) {
-                // warn
-                LOG_WARN("ApplyFastRoughFilterMethod: IndexScan exist after Filter. A part of filter condition has been removed.");
-                // still build from remaining filter condition
-                auto &index_scan = static_cast<LogicalIndexScan &>(*(op->left_node()));
-                index_scan.fast_rough_filter_evaluator_ = FilterExpressionPushDown::PushDownToFastRoughFilter(filter_expression);
-            } else {
-                LOG_WARN("ApplyFastRoughFilterMethod: Filter node should be followed by TableScan or IndexScan.");
+                break;
             }
-        } else if (op->operator_type() == LogicalNodeType::kKnnScan) {
-            // also need to apply filter
-            auto &knn_scan = static_cast<LogicalKnnScan &>(*op);
-            knn_scan.common_query_filter_->TryApplyFastRoughFilterOptimizer();
-        } else if (op->operator_type() == LogicalNodeType::kMatch) {
-            // also need to apply filter
-            auto &match = static_cast<LogicalMatch &>(*op);
-            match.common_query_filter_->TryApplyFastRoughFilterOptimizer();
-        } else if (op->operator_type() == LogicalNodeType::kMatchTensorScan) {
-            // also need to apply filter
-            auto &matchtensor = static_cast<LogicalMatchTensorScan &>(*op);
-            matchtensor.common_query_filter_->TryApplyFastRoughFilterOptimizer();
-        } else if (op->operator_type() == LogicalNodeType::kIndexScan) {
-            String error_message = "ApplyFastRoughFilterMethod: IndexScan optimizer should not happen before ApplyFastRoughFilter optimizer.";
-            LOG_CRITICAL(error_message);
-            UnrecoverableError(error_message);
+            default: {
+                break;
+            }
         }
         // visit children after handling current node
         VisitNode(op->left_node());

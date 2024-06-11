@@ -12,19 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "unit_test/base_test.h"
+module;
+
+#include <fstream>
+
+export module stream_io;
 
 import stl;
+import status;
 
-class SparseCastTest : public BaseTest {
-protected:
-    void SetUp() override {
-        //
-    }
+namespace infinity {
 
-    void TearDown() override {
-        //
-    }
+export class StreamIO {
+
+public:
+    StreamIO() = default;
+    ~StreamIO();
+
+    void Init(const String& file_name, u8 flags);
+    bool ReadLine(String& line);
+    void Close();
+
+private:
+    std::fstream file_;
+    bool reader_{false};
+    bool writer_{false};
 };
 
-TEST_F(SparseCastTest, test1) {}
+} // namespace infinity

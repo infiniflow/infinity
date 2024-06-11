@@ -1009,7 +1009,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
     //    logical_knn_scan->
     UniquePtr<PhysicalKnnScan> knn_scan_op = MakeUnique<PhysicalKnnScan>(logical_knn_scan->node_id(),
                                                                          logical_knn_scan->base_table_ref_,
-                                                                         logical_knn_scan->knn_expression_,
+                                                                         logical_knn_scan->knn_expression(),
                                                                          logical_knn_scan->common_query_filter_,
                                                                          logical_knn_scan->GetOutputNames(),
                                                                          logical_knn_scan->GetOutputTypes(),
@@ -1025,7 +1025,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNod
                                             std::move(knn_scan_op),
                                             logical_knn_scan->GetOutputNames(),
                                             logical_knn_scan->GetOutputTypes(),
-                                            logical_knn_scan->knn_expression_,
+                                            logical_knn_scan->knn_expression(),
                                             logical_knn_scan->knn_table_index_,
                                             MakeShared<Vector<LoadMeta>>());
     }

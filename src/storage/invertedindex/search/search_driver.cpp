@@ -133,7 +133,7 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
     return result;
 }
 
-std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text) const {
+std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text, bool from_quoted) const {
     if (text.empty()) {
         Status status = Status::SyntaxError("Empty query text");
         LOG_ERROR(status.message());
@@ -201,7 +201,7 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         result->column_ = field;
         return result;
     } else {
-        if (analyzer_name == AnalyzerPool::STANDARD) {
+        if (from_quoted) {
             auto result = std::make_unique<PhraseQueryNode>();
             for (auto term : terms) {
                 result->AddTerm(term.Text());
@@ -219,6 +219,50 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
             return result;
         }
     }
+}
+
+// Unescape reserved characters per https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
+// Shall keep sync with ESCAPEABLE in search_lexer.l
+// [\x20+\-=&|!(){}\[\]^"~*?:\\/]
+std::string SearchDriver::Unescape(const std::string &text) {
+    std::string result;
+    result.reserve(text.size());
+    for (size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == '\\' && i + 1 < text.size()) {
+            switch (text[i + 1]) {
+                case ' ':
+                case '+':
+                case '-':
+                case '=':
+                case '&':
+                case '|':
+                case '!':
+                case '(':
+                case ')':
+                case '{':
+                case '}':
+                case '[':
+                case ']':
+                case '^':
+                case '"':
+                case '~':
+                case '*':
+                case '?':
+                case ':':
+                case '\\':
+                case '/':
+                    result.push_back(text[i + 1]);
+                    ++i;
+                    break;
+                default:
+                    result.push_back(text[i]);
+                    break;
+            }
+        } else {
+            result.push_back(text[i]);
+        }
+    }
+    return result;
 }
 
 } // namespace infinity

@@ -69,6 +69,8 @@ public:
 
     void AppendFile(const String &dst_path, const String &src_path) final;
 
+    void Truncate(const String &file_name, SizeT length);
+
     // Directory related methods
     bool Exists(const String &path) final; // if file or directory exists
 

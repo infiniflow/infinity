@@ -223,4 +223,23 @@ bool BufferManager::RemoveFromGCQueueInner(BufferObj *buffer_obj) {
     return false;
 }
 
+Vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
+    Vector<BufferObjectInfo> result;
+    {
+        std::unique_lock lock(w_locker_);
+        result.reserve(buffer_map_.size());
+        for(const auto& buffer_pair: buffer_map_) {
+            BufferObjectInfo buffer_object_info;
+            buffer_object_info.object_path_ = buffer_pair.first;
+            BufferObj* buffer_object_ptr = buffer_pair.second.get();
+            buffer_object_info.buffered_status_ = buffer_object_ptr->status();
+            buffer_object_info.buffered_type_ = buffer_object_ptr->type();
+            buffer_object_info.file_type_ = buffer_object_ptr->file_worker()->Type();
+            buffer_object_info.object_size_ = buffer_object_ptr->GetBufferSize();
+            result.emplace_back(buffer_object_info);
+        }
+    }
+    return result;
+}
+
 } // namespace infinity

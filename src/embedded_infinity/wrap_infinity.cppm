@@ -304,6 +304,9 @@ WrapInsert(Infinity &instance, const String &db_name, const String &table_name, 
 export WrapQueryResult
 WrapImport(Infinity &instance, const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
 
+export WrapQueryResult
+WrapExport(Infinity &instance, const String &db_name, const String &table_name, const String &path, ExportOptions export_options);
+
 export WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const String &table_name, WrapParsedExpr *filter);
 
 export WrapQueryResult WrapUpdate(Infinity &instance,

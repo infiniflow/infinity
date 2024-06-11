@@ -19,6 +19,7 @@ export module file_worker;
 import stl;
 import file_system;
 import third_party;
+import file_worker_type;
 
 namespace infinity {
 
@@ -42,6 +43,8 @@ public:
     virtual void FreeInMemory() = 0;
 
     virtual SizeT GetMemoryCost() const = 0;
+
+    virtual FileWorkerType Type() const = 0;
 
     void *GetData() { return data_; }
 

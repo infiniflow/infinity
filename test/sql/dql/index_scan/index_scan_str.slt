@@ -1,0 +1,56 @@
+statement ok
+DROP TABLE IF EXISTS str_index_scan_insert;
+
+statement ok
+CREATE TABLE str_index_scan_insert (i INTEGER, d1 DATE, d2 DATE, name VARCHAR);
+
+statement ok
+INSERT INTO str_index_scan_insert VALUES
+ (2222, DATE '2022-1-31', DATE '2023-1-31', 'hello infinity'),
+ (1, DATE '1970-1-1', DATE '2970-1-1', 'hello 2024'),
+ (11, DATE '1870-11-1', DATE '2570-1-1', 'hello 2570'),
+ (111, DATE '6570-11-1', DATE '5570-6-21', 'hello infinity');
+
+query I
+SELECT * FROM str_index_scan_insert WHERE name = 'hello infinity';
+----
+2222 2022-01-31 2023-01-31 hello infinity
+111 6570-11-01 5570-06-21 hello infinity
+
+query II
+EXPLAIN SELECT * FROM str_index_scan_insert WHERE name = 'hello infinity';
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [i (#1), d1 (#2), d2 (#3), name (#0)]
+-> FILTER (3)
+   - filter: name (#0) = hello infinity
+   - output columns: [name, __rowid]
+   -> TABLE SCAN (2)
+   - table name: str_index_scan_insert(default_db.str_index_scan_insert)
+   - table index: #1
+   - output_columns: [name, __rowid]
+
+statement ok
+CREATE INDEX str_index_scan_insert_name ON str_index_scan_insert(name);
+
+query III
+SELECT * FROM str_index_scan_insert WHERE name = 'hello infinity';
+----
+2222 2022-01-31 2023-01-31 hello infinity
+111 6570-11-01 5570-06-21 hello infinity
+
+query IV
+EXPLAIN SELECT * FROM str_index_scan_insert WHERE name = 'hello infinity';
+----
+PROJECT (4)
+ - table index: #4
+ - expressions: [i (#0), d1 (#1), d2 (#2), name (#3)]
+-> INDEX SCAN (6)
+   - table name: str_index_scan_insert(default_db.str_index_scan_insert)
+   - table index: #1
+   - filter: name (#1.3) = hello infinity
+   - output_columns: [__rowid]
+
+statement ok
+DROP TABLE str_index_scan_insert;

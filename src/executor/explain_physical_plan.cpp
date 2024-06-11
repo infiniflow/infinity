@@ -70,6 +70,8 @@ import physical_merge_match_tensor;
 import physical_match;
 import physical_match_tensor_scan;
 import physical_fusion;
+import physical_match_sparse_scan;
+import physical_merge_match_sparse;
 import physical_merge_aggregate;
 import status;
 import physical_operator_type;
@@ -284,6 +286,14 @@ void ExplainPhysicalPlan::Explain(const PhysicalOperator *op, SharedPtr<Vector<S
         }
         case PhysicalOperatorType::kMatchTensorScan: {
             Explain((PhysicalMatchTensorScan *)op, result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kMatchSparseScan: {
+            Explain((PhysicalMatchSparseScan *)op, result, intent_size);
+            break;
+        }
+        case PhysicalOperatorType::kMergeMatchSparse: {
+            Explain((PhysicalMergeMatchSparse *)op, result, intent_size);
             break;
         }
         case PhysicalOperatorType::kFusion: {
@@ -1239,6 +1249,20 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
 
             String output_columns_str =
                 String(intent_size, ' ') + " - output columns: [schema, table, type, column_count, row_count, block_count, block_size]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowBuffer: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ') + "-> SHOW BUFFER ";
+            } else {
+                show_str = "SHOW BUFFER ";
+            }
+            show_str += "(" + std::to_string(show_node->node_id()) + ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ') + " - output columns: [path, status, size, buffered_type, type]";
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }

@@ -132,33 +132,22 @@ void LocalFileSystem::Rename(const String &old_path, const String &new_path) {
 }
 
 i64 LocalFileSystem::Read(FileHandler &file_handler, void *data, u64 nbytes) {
-    if(nbytes == 0) {
-//        LOG_WARN("Attempt to read zero bytes from file");
-        return 0;
-    }
-
-    char* data_ptr = (char*)data;
-
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
-    u64 total_read_count = 0;
-    do {
-//        LOG_TRACE(fmt::format("Attempt to read {} bytes data", nbytes - total_read_count));
-        i32 local_read_count = read(fd, data_ptr + total_read_count, nbytes - total_read_count);
-        if(local_read_count > 0) {
-//            LOG_TRACE(fmt::format("Read {} bytes data", total_read_count));
-            total_read_count += local_read_count;
-        } else if (local_read_count == 0) {
-//            LOG_WARN("Read zero bytes from file");
+    i64 readen = 0;
+    while (readen < (i64)nbytes) {
+        SizeT a = nbytes - readen;
+        i64 read_count = read(fd, (char *)data + readen, a);
+        if (read_count == 0) {
             break;
-        } else {
+        }
+        if (read_count == -1) {
             String error_message = fmt::format("Can't read file: {}: {}", file_handler.path_.string(), strerror(errno));
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
-    } while(total_read_count < nbytes);
-
-//    LOG_TRACE(fmt::format("Finish to read {} bytes data, attempt to read", nbytes, total_read_count));
-    return total_read_count;
+        readen += read_count;
+    }
+    return readen;
 }
 
 i64 LocalFileSystem::Write(FileHandler &file_handler, const void *data, u64 nbytes) {
@@ -178,13 +167,20 @@ i64 LocalFileSystem::Write(FileHandler &file_handler, const void *data, u64 nbyt
 
 i64 LocalFileSystem::ReadAt(FileHandler &file_handler, i64 file_offset, void *data, u64 nbytes) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
-    i64 read_count = pread(fd, data, nbytes, file_offset);
-    if (read_count == -1) {
-        String error_message = fmt::format("Can't read file: {}: {}", file_handler.path_.string(), strerror(errno));
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
+    i64 readen = 0;
+    while (readen < (i64)nbytes) {
+        i64 read_count = pread(fd, (char *)data + readen, nbytes - readen, file_offset + readen);
+        if (read_count == 0) {
+            break;
+        }
+        if (read_count == -1) {
+            String error_message = fmt::format("Can't read file: {}: {}", file_handler.path_.string(), strerror(errno));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+        readen += read_count;
     }
-    return read_count;
+    return readen;
 }
 
 i64 LocalFileSystem::WriteAt(FileHandler &file_handler, i64 file_offset, const void *data, u64 nbytes) {
@@ -268,6 +264,16 @@ void LocalFileSystem::AppendFile(const String &dst_path, const String &src_path)
     dstFile.write(buffer, srcFile.gcount());
     srcFile.close();
     dstFile.close();
+}
+
+void LocalFileSystem::Truncate(const String &file_name, SizeT length) {
+    std::error_code error_code;
+    std::filesystem::resize_file(file_name, length, error_code);
+    if (error_code.value() != 0) {
+        String error_message = fmt::format("Failed to truncate {} to size {}", file_name, strerror(errno));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
 }
 
 // Directory related methods

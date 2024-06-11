@@ -456,6 +456,11 @@ WrapQueryResult WrapImport(Infinity &instance, const String &db_name, const Stri
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
+WrapQueryResult WrapExport(Infinity &instance, const String &db_name, const String &table_name, const String &path, ExportOptions export_options) {
+    auto query_result = instance.Export(db_name, table_name, path, export_options);
+    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+}
+
 WrapQueryResult WrapDelete(Infinity &instance, const String &db_name, const String &table_name, WrapParsedExpr *wrap_filter) {
     ParsedExpr *filter = nullptr;
     if (wrap_filter != nullptr) {

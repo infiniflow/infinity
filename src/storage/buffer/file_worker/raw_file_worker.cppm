@@ -18,6 +18,7 @@ export module raw_file_worker;
 
 import stl;
 import file_worker;
+import file_worker_type;
 
 namespace infinity {
 
@@ -37,6 +38,8 @@ public:
     void FreeInMemory() override;
 
     SizeT GetMemoryCost() const override { return buffer_size_; }
+
+    FileWorkerType Type() const override { return FileWorkerType::kRawFile; }
 
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;

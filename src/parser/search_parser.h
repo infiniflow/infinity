@@ -45,7 +45,7 @@
 #ifndef YY_YY_SEARCH_PARSER_H_INCLUDED
 # define YY_YY_SEARCH_PARSER_H_INCLUDED
 // "%code requires" blocks.
-#line 17 "search_parser.y"
+#line 18 "search_parser.y"
 
     // unique_ptr<QueryNode> requires sizeof(QueryNode)
     #ifndef QUERY_NODE_H
@@ -55,9 +55,18 @@
     namespace infinity {
         class SearchDriver;
         class SearchScanner;
+
+        class InfString {
+        public:
+            // Bison requires default constructor for inplace new
+            InfString() = default;
+            InfString(const std::string &text, bool from_quoted) : text_{text}, from_quoted_{from_quoted} {}
+            std::string text_{};
+            bool from_quoted_{};
+        };
     }
 
-#line 61 "search_parser.h"
+#line 70 "search_parser.h"
 
 # include <cassert>
 # include <cstdlib> // std::abort
@@ -196,9 +205,9 @@
 # define YYDEBUG 1
 #endif
 
-#line 9 "search_parser.y"
+#line 10 "search_parser.y"
 namespace infinity {
-#line 202 "search_parser.h"
+#line 211 "search_parser.h"
 
 
 
@@ -417,11 +426,11 @@ namespace infinity {
     /// An auxiliary type to compute the largest semantic type.
     union union_type
     {
-      // CARAT
-      char dummy1[sizeof (float)];
-
       // STRING
-      char dummy2[sizeof (std::string)];
+      char dummy1[sizeof (InfString)];
+
+      // CARAT
+      char dummy2[sizeof (float)];
 
       // topLevelQuery
       // query
@@ -562,12 +571,12 @@ namespace infinity {
       {
         switch (this->kind ())
     {
-      case symbol_kind::S_CARAT: // CARAT
-        value.move< float > (std::move (that.value));
+      case symbol_kind::S_STRING: // STRING
+        value.move< InfString > (std::move (that.value));
         break;
 
-      case symbol_kind::S_STRING: // STRING
-        value.move< std::string > (std::move (that.value));
+      case symbol_kind::S_CARAT: // CARAT
+        value.move< float > (std::move (that.value));
         break;
 
       case symbol_kind::S_topLevelQuery: // topLevelQuery
@@ -603,13 +612,13 @@ namespace infinity {
 #endif
 
 #if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, float&& v, location_type&& l)
+      basic_symbol (typename Base::kind_type t, InfString&& v, location_type&& l)
         : Base (t)
         , value (std::move (v))
         , location (std::move (l))
       {}
 #else
-      basic_symbol (typename Base::kind_type t, const float& v, const location_type& l)
+      basic_symbol (typename Base::kind_type t, const InfString& v, const location_type& l)
         : Base (t)
         , value (v)
         , location (l)
@@ -617,13 +626,13 @@ namespace infinity {
 #endif
 
 #if 201103L <= YY_CPLUSPLUS
-      basic_symbol (typename Base::kind_type t, std::string&& v, location_type&& l)
+      basic_symbol (typename Base::kind_type t, float&& v, location_type&& l)
         : Base (t)
         , value (std::move (v))
         , location (std::move (l))
       {}
 #else
-      basic_symbol (typename Base::kind_type t, const std::string& v, const location_type& l)
+      basic_symbol (typename Base::kind_type t, const float& v, const location_type& l)
         : Base (t)
         , value (v)
         , location (l)
@@ -668,12 +677,12 @@ namespace infinity {
         // Value type destructor.
 switch (yykind)
     {
-      case symbol_kind::S_CARAT: // CARAT
-        value.template destroy< float > ();
+      case symbol_kind::S_STRING: // STRING
+        value.template destroy< InfString > ();
         break;
 
-      case symbol_kind::S_STRING: // STRING
-        value.template destroy< std::string > ();
+      case symbol_kind::S_CARAT: // CARAT
+        value.template destroy< float > ();
         break;
 
       case symbol_kind::S_topLevelQuery: // topLevelQuery
@@ -787,6 +796,18 @@ switch (yykind)
 #endif
       }
 #if 201103L <= YY_CPLUSPLUS
+      symbol_type (int tok, InfString v, location_type l)
+        : super_type (token_kind_type (tok), std::move (v), std::move (l))
+#else
+      symbol_type (int tok, const InfString& v, const location_type& l)
+        : super_type (token_kind_type (tok), v, l)
+#endif
+      {
+#if !defined _MSC_VER || defined __clang__
+        YY_ASSERT (tok == token::STRING);
+#endif
+      }
+#if 201103L <= YY_CPLUSPLUS
       symbol_type (int tok, float v, location_type l)
         : super_type (token_kind_type (tok), std::move (v), std::move (l))
 #else
@@ -796,18 +817,6 @@ switch (yykind)
       {
 #if !defined _MSC_VER || defined __clang__
         YY_ASSERT (tok == token::CARAT);
-#endif
-      }
-#if 201103L <= YY_CPLUSPLUS
-      symbol_type (int tok, std::string v, location_type l)
-        : super_type (token_kind_type (tok), std::move (v), std::move (l))
-#else
-      symbol_type (int tok, const std::string& v, const location_type& l)
-        : super_type (token_kind_type (tok), v, l)
-#endif
-      {
-#if !defined _MSC_VER || defined __clang__
-        YY_ASSERT (tok == token::STRING);
 #endif
       }
     };
@@ -1011,14 +1020,14 @@ switch (yykind)
 #if 201103L <= YY_CPLUSPLUS
       static
       symbol_type
-      make_STRING (std::string v, location_type l)
+      make_STRING (InfString v, location_type l)
       {
         return symbol_type (token::STRING, std::move (v), std::move (l));
       }
 #else
       static
       symbol_type
-      make_STRING (const std::string& v, const location_type& l)
+      make_STRING (const InfString& v, const location_type& l)
       {
         return symbol_type (token::STRING, v, l);
       }
@@ -1368,9 +1377,9 @@ switch (yykind)
   };
 
 
-#line 9 "search_parser.y"
+#line 10 "search_parser.y"
 } // infinity
-#line 1374 "search_parser.h"
+#line 1383 "search_parser.h"
 
 
 

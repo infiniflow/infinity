@@ -644,6 +644,45 @@ curl --request PUT \
 }
 ```
 
+## Export data
+
+Export data into a specified table.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/table/{table_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' \
+{
+    "file_path":"/var/infinity/filename.csv",
+    "file_type":"csv",
+    "header":false,
+    "delimiter":","
+} '
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code": 0
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 7002,
+    "error_message": "File already existed: /var/infinity/filename.csv"
+}
+```
+
 ## Insert data
 
 Insert data into a specified table.

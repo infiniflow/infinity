@@ -32,6 +32,7 @@ import file_system;
 import file_system_type;
 import defer_op;
 import stl;
+import logical_type;
 
 namespace infinity {
 
@@ -114,7 +115,15 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 String line;
                 for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
                     Value v = column_vectors[column_idx].GetValue(row_idx);
-                    line += v.ToString();
+                    switch(v.type().type()) {
+                        case LogicalType::kEmbedding: {
+                            line += fmt::format("\"{}\"", v.ToString());
+                            break;
+                        }
+                        default: {
+                            line += v.ToString();
+                        }
+                    }
                     if(column_idx == column_count - 1) {
                         line += "\n";
                     } else {
@@ -144,9 +153,11 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
 
     SizeT row_count{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
+
+    LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
     for(auto& [segment_id, segment_snapshot]: segment_block_index_ref) {
-        LOG_DEBUG(fmt::format("Export segment_id: {}", segment_id));
         SizeT block_count = segment_snapshot.block_map_.size();
+        LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
         for(SizeT block_idx = 0; block_idx < block_count; ++ block_idx) {
             LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
             BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];

@@ -68,6 +68,10 @@ class Table(ABC):
         pass
 
     @abstractmethod
+    def export_data(self, file_path: str, options=None):
+        pass
+
+    @abstractmethod
     def delete(self, cond: Optional[str] = None):
         pass
 
