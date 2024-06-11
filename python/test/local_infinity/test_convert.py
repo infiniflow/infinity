@@ -31,7 +31,7 @@ class TestLocalInfinity():
         test_convert_obj = TestConvert(common_values.TEST_LOCAL_PATH)
         test_convert_obj._test_with_invalid_select_list_output(condition_list)
 
-    # skipped tests using InfinityThriftQueryBuilder which is incompatible with local infinity todo modify
+    # skipped tests using InfinityThriftQueryBuilder which is incompatible with local infinity
     @pytest.mark.skip()
     @pytest.mark.parametrize("filter_list", [
         "c1 > 10",
