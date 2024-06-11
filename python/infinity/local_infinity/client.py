@@ -136,7 +136,8 @@ class LocalInfinityClient:
 
     def select(self, db_name: str, table_name: str, select_list: list[WrapParsedExpr], search_expr,
                where_expr, limit_expr, offset_expr, group_by_list=None):
-
+        print("search expr: ", search_expr)
+        print("select_list: ", select_list)
         return self.convert_res(self.client.Search(db_name, table_name, select_list,
                                                    wrap_search_expr=search_expr, where_expr=where_expr,
                                                    limit_expr=limit_expr, offset_expr=offset_expr),

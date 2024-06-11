@@ -28,6 +28,7 @@ import embedding_info;
 import statement_common;
 import explain_statement;
 import search_options;
+import knn_expr;
 
 namespace nb = nanobind;
 
@@ -119,14 +120,23 @@ NB_MODULE(embedded_infinity_ext, m) {
 
     // Bind WrapKnnExpr
     nb::class_<WrapKnnExpr>(m, "WrapKnnExpr")
-        .def_rw("own_memory", &WrapKnnExpr::own_memory)
+        .def(nb::init<>())
         .def_rw("column_expr", &WrapKnnExpr::column_expr)
-        .def_rw("embedding_data_ptr", &WrapKnnExpr::embedding_data_ptr)
-        .def_rw("dimension", &WrapKnnExpr::dimension)
+        .def_rw("embedding_data", &WrapKnnExpr::embedding_data)
         .def_rw("embedding_data_type", &WrapKnnExpr::embedding_data_type)
         .def_rw("distance_type", &WrapKnnExpr::distance_type)
         .def_rw("topn", &WrapKnnExpr::topn)
         .def_rw("opt_params", &WrapKnnExpr::opt_params);
+
+    nb::class_<EmbeddingData>(m, "EmbeddingData")
+        .def(nb::init<>())
+        .def_rw("bool_array_value", &EmbeddingData::bool_array_value)
+        .def_rw("i8_array_value", &EmbeddingData::i8_array_value)
+        .def_rw("i16_array_value", &EmbeddingData::i16_array_value)
+        .def_rw("i32_array_value", &EmbeddingData::i32_array_value)
+        .def_rw("i64_array_value", &EmbeddingData::i64_array_value)
+        .def_rw("f32_array_value", &EmbeddingData::f32_array_value)
+        .def_rw("f64_array_value", &EmbeddingData::f64_array_value);
 
     // Bind WrapMatchExpr
     nb::class_<WrapMatchExpr>(m, "WrapMatchExpr")
@@ -143,6 +153,7 @@ NB_MODULE(embedded_infinity_ext, m) {
 
     // Bind WrapMatchTensorExpr
     nb::class_<WrapMatchTensorExpr>(m, "WrapMatchTensorExpr")
+        .def(nb::init<>())
         .def_rw("own_memory", &WrapMatchTensorExpr::own_memory)
         .def_rw("search_method", &WrapMatchTensorExpr::search_method)
         .def_rw("column_expr", &WrapMatchTensorExpr::column_expr)
@@ -279,6 +290,14 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kGlobal", SetScope::kGlobal)
         .value("kConfig", SetScope::kConfig)
         .value("kInvalid", SetScope::kInvalid);
+
+    // knn_expr
+    nb::enum_<KnnDistanceType>(m, "KnnDistanceType")
+        .value("kInvalid", KnnDistanceType::kInvalid)
+        .value("kL2", KnnDistanceType::kL2)
+        .value("kCosine", KnnDistanceType::kCosine)
+        .value("kInnerProduct", KnnDistanceType::kInnerProduct)
+        .value("kHamming", KnnDistanceType::kHamming);
 
     // query_options
     nb::class_<CreateDatabaseOptions>(m, "CreateDatabaseOptions").def(nb::init<>()).def_rw("conflict_type", &CreateDatabaseOptions::conflict_type_);

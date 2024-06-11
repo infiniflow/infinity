@@ -73,8 +73,7 @@ class TestKnn(TestSdk):
         # print(res)
 
         # true
-        res = table_obj.output(["variant_id", "_row_id"]).knn(
-            "gender_vector", [1.0] * 4, "float", "ip", 10).to_pl()
+        res = table_obj.output(["variant_id", "_row_id"]).knn("gender_vector", [1.0] * 4, "float", "ip", 10).to_pl()
         print(res)
 
         # FIXME

@@ -120,9 +120,69 @@ ParsedExpr *WrapBetweenExpr::GetParsedExpr() {
     return between_expr;
 }
 
+Tuple<void *, i64> GetEmbeddingDataTypeDataPtrFromProto(const EmbeddingData &embedding_data) {
+    if (embedding_data.i8_array_value.size() != 0) {
+        return {(void *)embedding_data.i8_array_value.data(), embedding_data.i8_array_value.size()};
+    } else if (embedding_data.i16_array_value.size() != 0) {
+        return {(void *)embedding_data.i16_array_value.data(), embedding_data.i16_array_value.size()};
+    } else if (embedding_data.i32_array_value.size() != 0) {
+        return {(void *)embedding_data.i32_array_value.data(), embedding_data.i32_array_value.size()};
+    } else if (embedding_data.i64_array_value.size() != 0) {
+        return {(void *)embedding_data.i64_array_value.data(), embedding_data.i64_array_value.size()};
+    } else if (embedding_data.f32_array_value.size() != 0) {
+        auto ptr_double = (double *)(embedding_data.f32_array_value.data());
+        auto ptr_float = (float *)(embedding_data.f32_array_value.data());
+        for (size_t i = 0; i < embedding_data.f32_array_value.size(); ++i) {
+            ptr_float[i] = float(ptr_double[i]);
+        }
+        return {(void *)embedding_data.f32_array_value.data(), embedding_data.f32_array_value.size()};
+    } else if (embedding_data.f64_array_value.size() != 0) {
+        return {(void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size()};
+    } else {
+        return {nullptr, 0};
+    }
+}
+
 ParsedExpr *WrapKnnExpr::GetParsedExpr() {
-    auto knn_expr = new KnnExpr(own_memory);
-    fmt::print("use unimpl knn expr!");
+    auto knn_expr = new KnnExpr(false);
+    knn_expr->column_expr_ = column_expr->GetParsedExpr();
+    knn_expr->distance_type_ = distance_type;
+    if (knn_expr->distance_type_ == KnnDistanceType::kInvalid) {
+        delete knn_expr;
+        knn_expr = nullptr;
+        return nullptr;
+    }
+    knn_expr->embedding_data_type_ = embedding_data_type;
+    if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemInvalid) {
+        delete knn_expr;
+        knn_expr = nullptr;
+        return nullptr;
+    }
+
+    auto [embedding_data_ptr, dimension] = GetEmbeddingDataTypeDataPtrFromProto(embedding_data);
+    if (embedding_data_ptr == nullptr) {
+        delete knn_expr;
+        knn_expr = nullptr;
+        return nullptr;
+    }
+    knn_expr->embedding_data_ptr_ = embedding_data_ptr;
+    knn_expr->dimension_ = dimension;
+
+    knn_expr->topn_ = topn;
+    if (knn_expr->topn_ <= 0) {
+        delete knn_expr;
+        knn_expr = nullptr;
+        return nullptr;
+    }
+
+    knn_expr->opt_params_ = new Vector<InitParameter *>();
+    for (auto &param : opt_params) {
+        auto init_parameter = new InitParameter();
+        init_parameter->param_name_ = param->param_name_;
+        init_parameter->param_value_ = param->param_value_;
+        knn_expr->opt_params_->emplace_back(init_parameter);
+    }
+
     return knn_expr;
 }
 
@@ -148,6 +208,8 @@ ParsedExpr *WrapMatchTensorExpr::GetParsedExpr() {
 
 ParsedExpr *WrapSearchExpr::GetParsedExpr() {
     auto search_expr = new SearchExpr();
+    fmt::print("search expr: match_exprs size = {}, knn_exprs size = {}, match_tensor_exprs size = {}, fusion_exprs size = {}\n",
+               match_exprs.size(), knn_exprs.size(), match_tensor_exprs.size(), fusion_exprs.size());
     search_expr->match_exprs_.reserve(match_exprs.size());
     for (SizeT i = 0; i < match_exprs.size(); ++i) {
         search_expr->match_exprs_.emplace_back(dynamic_cast<MatchExpr *>(match_exprs[i]->GetParsedExpr()));

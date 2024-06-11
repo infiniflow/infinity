@@ -53,11 +53,11 @@ class InfinityLocalQueryBuilder(ABC):
             topn: int, knn_params: {} = None) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
-        if self._search.knn_exprs is None:
-            self._search.knn_exprs = list()
+        if self._search.knn_exprs is None or len(self._search.knn_exprs) == 0:
+            self._search.knn_exprs = []
 
         column_expr = WrapColumnExpr()
-        column_expr.column_name = [vector_column_name]
+        column_expr.names = [vector_column_name]
         column_expr.star = False
 
         if not isinstance(topn, int):
@@ -74,46 +74,46 @@ class InfinityLocalQueryBuilder(ABC):
             raise Exception(f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}")
 
         if (embedding_data_type == 'tinyint' or
-            embedding_data_type == 'smallint' or
-            embedding_data_type == 'int' or
-            embedding_data_type == 'bigint'):
+                embedding_data_type == 'smallint' or
+                embedding_data_type == 'int' or
+                embedding_data_type == 'bigint'):
             embedding_data = [int(x) for x in embedding_data]
 
         data = EmbeddingData()
-        elem_type = ElementType.ElementFloat32
+        elem_type = EmbeddingDataType.kElemFloat
         if embedding_data_type == 'bit':
-            elem_type = ElementType.ElementBit
+            elem_type = EmbeddingDataType.kElemBit
             raise Exception(f"Invalid embedding {embedding_data[0]} type")
         elif embedding_data_type == 'tinyint':
-            elem_type = ElementType.ElementInt8
+            elem_type = EmbeddingDataType.kElemInt8
             data.i8_array_value = embedding_data
         elif embedding_data_type == 'smallint':
-            elem_type = ElementType.ElementInt16
+            elem_type = EmbeddingDataType.kElemInt16
             data.i16_array_value = embedding_data
         elif embedding_data_type == 'int':
-            elem_type = ElementType.ElementInt32
+            elem_type = EmbeddingDataType.kElemInt32
             data.i32_array_value = embedding_data
         elif embedding_data_type == 'bigint':
-            elem_type = ElementType.ElementInt64
+            elem_type = EmbeddingDataType.kElemInt64
             data.i64_array_value = embedding_data
         elif embedding_data_type == 'float':
-            elem_type = ElementType.ElementFloat32
+            elem_type = EmbeddingDataType.kElemFloat
             data.f32_array_value = embedding_data
         elif embedding_data_type == 'double':
-            elem_type = ElementType.ElementFloat64
+            elem_type = EmbeddingDataType.kElemDouble
             data.f64_array_value = embedding_data
         else:
             raise Exception(f"Invalid embedding {embedding_data[0]} type")
 
-        dist_type = KnnDistanceType.L2
+        dist_type = KnnDistanceType.kInvalid
         if distance_type == 'l2':
-            dist_type = KnnDistanceType.L2
+            dist_type = KnnDistanceType.kL2
         elif distance_type == 'cosine':
-            dist_type = KnnDistanceType.Cosine
+            dist_type = KnnDistanceType.kCosine
         elif distance_type == 'ip':
-            dist_type = KnnDistanceType.InnerProduct
+            dist_type = KnnDistanceType.kInnerProduct
         elif distance_type == 'hamming':
-            dist_type = KnnDistanceType.Hamming
+            dist_type = KnnDistanceType.kHamming
         else:
             raise Exception(f"Invalid distance type {distance_type}")
 
@@ -122,9 +122,22 @@ class InfinityLocalQueryBuilder(ABC):
             for k, v in knn_params.items():
                 knn_opt_params.append(InitParameter(k, v))
 
-        knn_expr = KnnExpr(column_expr=column_expr, embedding_data=data, embedding_data_type=elem_type,
-                           distance_type=dist_type, topn=topn, opt_params=knn_opt_params)
-        self._search.knn_exprs.append(knn_expr)
+        knn_expr = WrapKnnExpr()
+        knn_expr.column_expr = column_expr
+        knn_expr.embedding_data = data
+        knn_expr.embedding_data_type = elem_type
+        knn_expr.distance_type = dist_type
+        knn_expr.topn = topn
+        knn_expr.opt_params = knn_opt_params
+
+        # now work
+        # self._search.knn_exprs.append(knn_expr)
+
+        knn_exprs = [knn_expr]
+        self._search.knn_exprs = self._search.knn_exprs + knn_exprs
+
+        assert(len(self._search.knn_exprs) > 0)
+        print("knn exprs: ", self._search.knn_exprs)
         return self
 
     def match(self, fields: str, matching_text: str, options_text: str = '') -> InfinityLocalQueryBuilder:
@@ -136,7 +149,12 @@ class InfinityLocalQueryBuilder(ABC):
         match_expr.fields = fields
         match_expr.matching_text = matching_text
         match_expr.options_text = options_text
-        self._search.match_exprs.append(match_expr)
+
+        match_exprs = [match_expr]
+        self._search.match_exprs = self._search.match_exprs + match_exprs
+        assert(len(self._search.match_exprs) > 0)
+
+        # self._search.match_exprs.append(match_expr)
         return self
 
     def fusion(self, method: str, options_text: str = '') -> InfinityLocalQueryBuilder:
@@ -145,7 +163,10 @@ class InfinityLocalQueryBuilder(ABC):
         fusion_expr = WrapFusionExpr()
         fusion_expr.method = method
         fusion_expr.options_text = options_text
-        self._search.fusion_exprs.append(fusion_expr)
+        # self._search.fusion_exprs.append(fusion_expr)
+        fusion_exprs = [fusion_expr]
+        self._search.fusion_exprs = self._search.fusion_exprs + fusion_exprs
+        assert(len(self._search.fusion_exprs) > 0)
         return self
 
     def filter(self, where: Optional[str]) -> InfinityLocalQueryBuilder:

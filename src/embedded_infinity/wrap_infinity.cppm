@@ -145,15 +145,23 @@ export struct WrapBetweenExpr {
     ParsedExpr *GetParsedExpr();
 };
 
+export struct EmbeddingData {
+    Vector<bool>  bool_array_value;
+    Vector<String>  i8_array_value;
+    Vector<int16_t>  i16_array_value;
+    Vector<int32_t>  i32_array_value;
+    Vector<int64_t>  i64_array_value;
+    Vector<double>  f32_array_value;
+    Vector<double>  f64_array_value;
+};
+
 export struct WrapKnnExpr {
-    bool own_memory;
-    SharedPtr<WrapParsedExpr> column_expr{};
-    void *embedding_data_ptr{}; // Pointer to the embedding data ,the data type include float, int ,char ...., so we use void* here
-    i64 dimension{};
+    SharedPtr<WrapColumnExpr> column_expr{};
+    EmbeddingData embedding_data;
     EmbeddingDataType embedding_data_type{EmbeddingDataType::kElemInvalid};
     KnnDistanceType distance_type{KnnDistanceType::kInvalid};
     i64 topn{};
-    Vector<SharedPtr<InitParameter>> *opt_params{};
+    Vector<SharedPtr<InitParameter>> opt_params{};
 
     ParsedExpr *GetParsedExpr();
 };
@@ -176,7 +184,7 @@ export struct WrapFusionExpr {
 export struct WrapMatchTensorExpr {
     bool own_memory;
     String search_method{};
-    SharedPtr<WrapParsedExpr> column_expr;
+    SharedPtr<WrapColumnExpr> column_expr;
     SharedPtr<WrapConstantExpr> tensor_expr;
     String embedding_data_type;
     String options_text;
