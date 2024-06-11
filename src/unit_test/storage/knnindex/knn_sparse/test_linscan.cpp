@@ -99,7 +99,7 @@ TEST_F(LinScanAlgTest, accurate_scan) {
     const SparseMatrix query_set = SparseTestUtil::GenerateDataset(query_n, ncol, sparsity);
     const auto [gt_indices_list, gt_scores_list] = SparseTestUtil::GenerateGroundtruth(dataset, query_set, topk, false);
 
-    LinScan index;
+    LinScan<f32, i32> index;
     for (auto iter = SparseMatrixIter(dataset); iter.HasNext(); iter.Next()) {
         SparseVecRef vec = iter.val();
         u32 row_id = iter.row_id();
@@ -141,7 +141,7 @@ TEST_F(LinScanAlgTest, approximate_scan) {
     const SparseMatrix query = SparseTestUtil::GenerateDataset(query_n, ncol, sparsity);
     const auto [gt_indices_list, gt_scores_list] = SparseTestUtil::GenerateGroundtruth(dataset, query, topk, false);
 
-    LinScan index;
+    LinScan<f32, i32> index;
     for (auto iter = SparseMatrixIter(dataset); iter.HasNext(); iter.Next()) {
         SparseVecRef vec = iter.val();
         u32 row_id = iter.row_id();

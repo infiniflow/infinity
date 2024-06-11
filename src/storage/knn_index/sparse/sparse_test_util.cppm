@@ -29,7 +29,7 @@ import infinity_exception;
 namespace infinity {
 
 export struct SparseTestUtil {
-    static SparseMatrix GenerateDataset(u32 nrow, u32 ncol, f32 sparsity = 0.01, f32 data_min = -10.0, f32 data_max = 10.0) {
+    static SparseMatrix<f32, i32> GenerateDataset(u32 nrow, u32 ncol, f32 sparsity = 0.01, f32 data_min = -10.0, f32 data_max = 10.0) {
         std::mt19937 rng{std::random_device{}()};
 
         if (sparsity < 0.0 || sparsity > 1.0) {
@@ -91,24 +91,24 @@ export struct SparseTestUtil {
                 start = end;
             }
         }
-        return SparseMatrix{std::move(data), std::move(indices), std::move(indptr), nrow, ncol, nnz};
+        return SparseMatrix<f32, i32>{std::move(data), std::move(indices), std::move(indptr), nrow, ncol, nnz};
     }
 
     static Pair<UniquePtr<i32[]>, UniquePtr<f32[]>>
-    GenerateGroundtruth(const SparseMatrix &mat, const SparseMatrix &query, u32 topk, bool use_linscan = true) {
+    GenerateGroundtruth(const SparseMatrix<f32, i32> &mat, const SparseMatrix<f32, i32> &query, u32 topk, bool use_linscan = true) {
         if (mat.ncol_ != query.ncol_) {
             UnrecoverableError("Inconsistent dimension.");
         }
         auto gt_indices = MakeUnique<i32[]>(query.nrow_ * topk);
         auto gt_scores = MakeUnique<f32[]>(query.nrow_ * topk);
         if (use_linscan) {
-            LinScan index;
-            for (auto iter = SparseMatrixIter(mat); iter.HasNext(); iter.Next()) {
+            LinScan<f32, i32> index;
+            for (auto iter = SparseMatrixIter<f32, i32>(mat); iter.HasNext(); iter.Next()) {
                 SparseVecRef vec = iter.val();
                 u32 row_id = iter.row_id();
                 index.Insert(vec, row_id);
             }
-            for (auto iter = SparseMatrixIter(query); iter.HasNext(); iter.Next()) {
+            for (auto iter = SparseMatrixIter<f32, i32>(query); iter.HasNext(); iter.Next()) {
                 SparseVecRef query = iter.val();
                 auto [indices, scores] = index.SearchBF(query, topk);
                 u32 query_id = iter.row_id();
@@ -116,7 +116,7 @@ export struct SparseTestUtil {
                 Copy(scores.begin(), scores.end(), gt_scores.get() + query_id * topk);
             }
         } else { // brute force, only used in linscan test
-            for (auto iter = SparseMatrixIter(query); iter.HasNext(); iter.Next()) {
+            for (auto iter = SparseMatrixIter<f32, i32>(query); iter.HasNext(); iter.Next()) {
                 SparseVecRef query = iter.val();
                 auto [indices, scores] = SparseTestUtil::BruteForceKnn(mat, query, topk);
                 u32 query_id = iter.row_id();
@@ -128,9 +128,9 @@ export struct SparseTestUtil {
     }
 
 private:
-    static Pair<Vector<u32>, Vector<f32>> BruteForceKnn(const SparseMatrix &mat, const SparseVecRef<f32, i32> &query, u32 topk) {
+    static Pair<Vector<u32>, Vector<f32>> BruteForceKnn(const SparseMatrix<f32, i32> &mat, const SparseVecRef<f32, i32> &query, u32 topk) {
         Vector<f32> scores(mat.nrow_, 0.0);
-        for (auto iter = SparseMatrixIter(mat); iter.HasNext(); iter.Next()) {
+        for (auto iter = SparseMatrixIter<f32, i32>(mat); iter.HasNext(); iter.Next()) {
             SparseVecRef vec = iter.val();
             u32 row_id = iter.row_id();
             f32 score = SparseVecUtil::DistanceIP(query, vec);
