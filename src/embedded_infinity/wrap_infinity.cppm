@@ -156,12 +156,12 @@ export struct EmbeddingData {
 };
 
 export struct WrapKnnExpr {
-    SharedPtr<WrapColumnExpr> column_expr{};
+    WrapColumnExpr column_expr;
     EmbeddingData embedding_data;
     EmbeddingDataType embedding_data_type{EmbeddingDataType::kElemInvalid};
     KnnDistanceType distance_type{KnnDistanceType::kInvalid};
     i64 topn{};
-    Vector<SharedPtr<InitParameter>> opt_params{};
+    Vector<InitParameter> opt_params{};
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -184,18 +184,18 @@ export struct WrapFusionExpr {
 export struct WrapMatchTensorExpr {
     bool own_memory;
     String search_method{};
-    SharedPtr<WrapColumnExpr> column_expr;
-    SharedPtr<WrapConstantExpr> tensor_expr;
+    WrapColumnExpr column_expr;
+    WrapConstantExpr tensor_expr;
     String embedding_data_type;
     String options_text;
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
 export struct WrapSearchExpr {
-    Vector<SharedPtr<WrapMatchExpr>> match_exprs{};
-    Vector<SharedPtr<WrapKnnExpr>> knn_exprs{};
-    Vector<SharedPtr<WrapMatchTensorExpr>> match_tensor_exprs{};
-    Vector<SharedPtr<WrapFusionExpr>> fusion_exprs{};
+    Vector<WrapMatchExpr> match_exprs{};
+    Vector<WrapKnnExpr> knn_exprs{};
+    Vector<WrapMatchTensorExpr> match_tensor_exprs{};
+    Vector<WrapFusionExpr> fusion_exprs{};
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
