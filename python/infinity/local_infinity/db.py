@@ -216,8 +216,6 @@ class LocalDatabase(Database, ABC):
             create_table_conflict = LocalConflictType.kReplace
         else:
             raise InfinityException(3066, f"Invalid conflict type")
-        print(column_defs)
-        print(type(column_defs))
         res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                       column_defs=column_defs,
                                       conflict_type=create_table_conflict)

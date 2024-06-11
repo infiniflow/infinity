@@ -26,7 +26,7 @@ from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
 from infinity.local_infinity.types import build_result
-from infinity.local_infinity.utils import traverse_conditions
+from infinity.local_infinity.utils import traverse_conditions, select_res_to_polars
 from infinity.remote_thrift.utils import name_validity_check
 from infinity.table import Table, ExplainType
 from sqlglot import condition
@@ -239,9 +239,7 @@ class LocalTable(Table, ABC):
             case None:
                 where_expr = None
             case _:
-                print(cond, condition(cond))
                 where_expr = traverse_conditions(condition(cond))
-        print("where_expr = ", where_expr)
         res = self._conn.delete(
             db_name=self._db_name, table_name=self._table_name, where_expr=where_expr)
         if res.error_code == ErrorCode.OK:
@@ -348,8 +346,6 @@ class LocalTable(Table, ABC):
         return self.query_builder.explain(explain_type)
 
     def _execute_query(self, query: Query):
-
-        print("execute query: ", query.columns, query.search, query.filter, query.limit, query.offset)
         # execute the query
         res = self._conn.select(db_name=self._db_name,
                                 table_name=self._table_name,

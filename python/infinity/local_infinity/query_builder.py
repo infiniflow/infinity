@@ -124,7 +124,6 @@ class InfinityLocalQueryBuilder(ABC):
 
         knn_expr = KnnExpr(column_expr=column_expr, embedding_data=data, embedding_data_type=elem_type,
                            distance_type=dist_type, topn=topn, opt_params=knn_opt_params)
-        # print(knn_expr)
         self._search.knn_exprs.append(knn_expr)
         return self
 
@@ -133,7 +132,7 @@ class InfinityLocalQueryBuilder(ABC):
             self._search = WrapSearchExpr()
         if self._search.match_exprs is None:
             self._search.match_exprs = list()
-        match_expr = MatchExpr()
+        match_expr = WrapMatchExpr()
         match_expr.fields = fields
         match_expr.matching_text = matching_text
         match_expr.options_text = options_text

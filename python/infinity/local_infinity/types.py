@@ -144,9 +144,6 @@ def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
             return [all_list[i:i + 2] for i in range(0, len(all_list), 2)]
         case LogicalType.kEmbedding:
             dimension = column_data_type.embedding_type.dimension
-            # print(dimension)
-            # print(len(column_vector))
-            # print(len(column_vector) // dimension)
             element_type = column_data_type.embedding_type.element_type
             if element_type == EmbeddingDataType.kElemInt8:
                 all_list = list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))

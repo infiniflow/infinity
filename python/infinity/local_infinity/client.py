@@ -78,7 +78,6 @@ class LocalInfinityClient:
                      conflict_type: ConflictType = ConflictType.kError, properties: list = None):
         create_table_options = CreateTableOptions()
         create_table_options.conflict_type = conflict_type
-        print("py client create_table column_defs: ", column_defs)
         return self.convert_res(self.client.CreateTable(db_name,
                                                         table_name,
                                                         column_defs,
@@ -109,7 +108,7 @@ class LocalInfinityClient:
         return self.convert_res(self.client.ShowIndex(db_name, table_name, index_name))
 
     def list_indexes(self, db_name: str, table_name: str):
-        return self.convert_res(self.client.ListIndex(db_name, table_name))
+        return self.convert_res(self.client.ListTableIndexes(db_name, table_name))
 
     def drop_index(self, db_name: str, table_name: str, index_name: str,
                    conflict_type: ConflictType = ConflictType.kError):
@@ -122,8 +121,6 @@ class LocalInfinityClient:
         inner_ex = None
         while retry <= 2:
             try:
-                print("type(fields): ", type(fields))
-                print("fields: ", fields)
                 res = self.client.Insert(db_name, table_name, column_names, fields)
                 return self.convert_res(res)
             except Exception as ex:
