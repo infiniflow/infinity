@@ -22,6 +22,12 @@ import term;
 import tokenizer;
 
 namespace infinity {
+
+export enum class CutGrain {
+    kCoarse,
+    kFine,
+};
+
 export class Analyzer {
 public:
     Analyzer() = default;

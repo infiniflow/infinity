@@ -35,6 +35,8 @@ public:
 
     Status Load();
 
+    void SetCutGrain(CutGrain cut_grain) { cut_grain_ = cut_grain; }
+
 protected:
     void Parse(const String &input) override;
 
@@ -59,5 +61,6 @@ private:
     i32 cursor_{};
     i32 cut_size_{};
     SharedPtr<FlatHashSet<String>> stopwords_{};
+    CutGrain cut_grain_{CutGrain::kCoarse};
 };
 } // namespace infinity

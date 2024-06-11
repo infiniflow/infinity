@@ -14,6 +14,10 @@
 
 module;
 
+#include <cstring>
+
+module analyzer_pool;
+
 import stl;
 import third_party;
 import config;
@@ -23,8 +27,6 @@ import chinese_analyzer;
 import japanese_analyzer;
 import standard_analyzer;
 import ngram_analyzer;
-
-module analyzer_pool;
 
 namespace infinity {
 
@@ -39,6 +41,7 @@ constexpr u64 Str2Int(const char *str, u64 last_value = basis) {
 Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_view &name) {
     switch (Str2Int(name.data())) {
         case Str2Int(CHINESE.data()): {
+            // chinese-{coarse|fine}
             Analyzer *prototype = cache_[CHINESE].get();
             if (prototype == nullptr) {
                 String path;
@@ -57,7 +60,17 @@ Tuple<UniquePtr<Analyzer>, Status> AnalyzerPool::GetAnalyzer(const std::string_v
                 prototype = analyzer.get();
                 cache_[CHINESE] = std::move(analyzer);
             }
-            return {MakeUnique<ChineseAnalyzer>(*reinterpret_cast<ChineseAnalyzer *>(prototype)), Status::OK()};
+            CutGrain cut_grain = CutGrain::kCoarse;
+            const char *str = name.data();
+            while (*str != '\0' && *str != '-') {
+                str++;
+            }
+            if (strcmp(str, "-fine") == 0) {
+                cut_grain = CutGrain::kFine;
+            }
+            UniquePtr<ChineseAnalyzer> analyzer = MakeUnique<ChineseAnalyzer>(*reinterpret_cast<ChineseAnalyzer *>(prototype));
+            analyzer->SetCutGrain(cut_grain);
+            return {std::move(analyzer), Status::OK()};
         }
         case Str2Int(JAPANESE.data()): {
             Analyzer *prototype = cache_[JAPANESE].get();
