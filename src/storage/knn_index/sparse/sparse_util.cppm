@@ -14,6 +14,8 @@
 
 module;
 
+#include <cassert>
+
 export module sparse_util;
 
 import stl;
@@ -23,20 +25,26 @@ import file_system;
 
 namespace infinity {
 
-export struct SparseVecRef {
-    const f32 *data_;
-    const u32 *indices_;
+export template <typename DataT, typename IdxT>
+struct SparseVecRef {
+    using DataType = DataT;
+    using IdxType = IdxT;
+
+    SparseVecRef(i32 nnz, const IdxT *indices, const DataT *data) : nnz_(nnz), indices_(indices), data_(data) {}
+
     i32 nnz_;
+    const IdxType *indices_;
+    const DataType *data_;
 };
 
 export struct SparseMatrix {
 public:
-    SparseVecRef at(i64 row_id) const {
+    SparseVecRef<f32, i32> at(i64 row_id) const {
         i64 offset = indptr_[row_id];
-        const float *data = data_.get() + offset;
-        const auto *indices = reinterpret_cast<const u32 *>(indices_.get() + offset);
         i32 nnz = indptr_[row_id + 1] - offset;
-        return SparseVecRef{data, indices, nnz};
+        const auto *indices = reinterpret_cast<const i32 *>(indices_.get() + offset);
+        const float *data = data_.get() + offset;
+        return SparseVecRef<f32, i32>(nnz, indices, data);
     }
 
     static SparseMatrix Load(FileHandler &file_handler);
@@ -63,11 +71,11 @@ public:
         offset_ = mat_.indptr_[row_i_];
     }
 
-    SparseVecRef val() const {
-        const float *data = mat_.data_.get() + offset_;
-        const auto *indices = reinterpret_cast<const u32 *>(mat_.indices_.get() + offset_);
+    SparseVecRef<f32, i32> val() const {
         i32 nnz = mat_.indptr_[row_i_ + 1] - offset_;
-        return SparseVecRef{data, indices, nnz};
+        const auto *indices = reinterpret_cast<const i32 *>(mat_.indices_.get() + offset_);
+        const float *data = mat_.data_.get() + offset_;
+        return SparseVecRef<f32, i32>(nnz, indices, data);
     }
 
     i64 row_id() const { return row_i_; }
@@ -79,11 +87,11 @@ private:
 };
 
 export struct SparseVecUtil {
-    static f32 DistanceIP(const SparseVecRef &vec1, const SparseVecRef &vec2) {
+    static f32 DistanceIP(const SparseVecRef<f32, i32> &vec1, const SparseVecRef<f32, i32> &vec2) {
         return SparseIPDistance(vec1.data_, vec1.indices_, vec1.nnz_, vec2.data_, vec2.indices_, vec2.nnz_);
     }
 
-    static Pair<Vector<u32>, Vector<f32>> Rerank(const SparseMatrix &mat, const SparseVecRef &query, Vector<u32> candidates, u32 topk);
+    static Pair<Vector<i32>, Vector<f32>> Rerank(const SparseMatrix &mat, const SparseVecRef<f32, i32> &query, Vector<i32> candidates, u32 topk);
 };
 
 } // namespace infinity

@@ -41,7 +41,7 @@ Posting Posting::ReadAdv(char *&p) {
 
 SizeT Posting::GetSizeInBytes() { return sizeof(doc_id_) + sizeof(val_); }
 
-void LinScan::Insert(const SparseVecRef &vec, u32 doc_id) {
+void LinScan::Insert(const SparseVecRef<f32, i32> &vec, u32 doc_id) {
     for (i32 i = 0; i < vec.nnz_; ++i) {
         u32 indice = vec.indices_[i];
         f32 val = vec.data_[i];
@@ -54,7 +54,7 @@ void LinScan::Insert(const SparseVecRef &vec, u32 doc_id) {
     ++row_num_;
 }
 
-Pair<Vector<u32>, Vector<f32>> LinScan::SearchBF(const SparseVecRef &query, u32 top_k) const {
+Pair<Vector<i32>, Vector<f32>> LinScan::SearchBF(const SparseVecRef<f32, i32> &query, u32 top_k) const {
     u32 result_n = std::min(top_k, row_num_);
 
     HashMap<u32, f32> scores;
@@ -72,9 +72,9 @@ Pair<Vector<u32>, Vector<f32>> LinScan::SearchBF(const SparseVecRef &query, u32 
         }
     }
 
-    Vector<u32> res(result_n);
+    Vector<i32> res(result_n);
     Vector<f32> res_score(result_n);
-    HeapResultHandler<CompareMin<f32, u32>> result_handler(1 /*query_n*/, result_n, res_score.data(), res.data());
+    HeapResultHandler<CompareMin<f32, i32>> result_handler(1 /*query_n*/, result_n, res_score.data(), res.data());
     for (const auto &[row_id, score] : scores) {
         if (score < 0) {
             continue;
@@ -85,7 +85,7 @@ Pair<Vector<u32>, Vector<f32>> LinScan::SearchBF(const SparseVecRef &query, u32 
     return {res, res_score};
 }
 
-Tuple<Vector<u32>, Vector<f32>, i32> LinScan::SearchKnn(const SparseVecRef &query, u32 top_k, i32 budget) const {
+Tuple<Vector<i32>, Vector<f32>, i32> LinScan::SearchKnn(const SparseVecRef<f32, i32> &query, u32 top_k, i32 budget) const {
     if (budget <= 0) {
         return {};
     }
@@ -112,9 +112,9 @@ Tuple<Vector<u32>, Vector<f32>, i32> LinScan::SearchKnn(const SparseVecRef &quer
         }
     }
 
-    Vector<u32> result(result_n);
+    Vector<i32> result(result_n);
     Vector<f32> result_score(result_n);
-    HeapResultHandler<CompareMin<f32, u32>> result_handler(1 /*query_n*/, result_n, result_score.data(), result.data());
+    HeapResultHandler<CompareMin<f32, i32>> result_handler(1 /*query_n*/, result_n, result_score.data(), result.data());
     for (const auto &[row_id, score] : scores) {
         if (score < 0) {
             continue;

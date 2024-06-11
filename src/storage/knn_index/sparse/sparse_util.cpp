@@ -64,13 +64,13 @@ void SparseMatrix::Save(FileHandler &file_handler) const {
     file_handler.Write(data_.get(), sizeof(f32) * nnz_);
 }
 
-Pair<Vector<u32>, Vector<f32>> SparseVecUtil::Rerank(const SparseMatrix &mat, const SparseVecRef &query, Vector<u32> candidates, u32 topk) {
-    Vector<u32> result(topk);
+Pair<Vector<i32>, Vector<f32>> SparseVecUtil::Rerank(const SparseMatrix &mat, const SparseVecRef<f32, i32> &query, Vector<i32> candidates, u32 topk) {
+    Vector<i32> result(topk);
     Vector<f32> result_score(topk);
 
-    HeapResultHandler<CompareMin<f32, u32>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
+    HeapResultHandler<CompareMin<f32, i32>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
     for (u32 row_id : candidates) {
-        SparseVecRef vec = mat.at(row_id);
+        SparseVecRef<f32, i32> vec = mat.at(row_id);
         f32 score = SparseVecUtil::DistanceIP(query, vec);
         result_handler.AddResult(0 /*query_id*/, score, row_id);
     }

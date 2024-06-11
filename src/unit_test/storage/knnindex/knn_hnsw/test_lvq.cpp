@@ -24,6 +24,7 @@ import data_store;
 import vec_store_type;
 import stl;
 import infinity_exception;
+import hnsw_common;
 
 using namespace infinity;
 
@@ -105,7 +106,8 @@ TEST_F(HnswLVQTest, test1) {
     // dump_ = true;
     {
         auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
-        auto [start_i, end_i] = lvq_store.OptAddVec(data.get(), vec_n_);
+        auto iter = DenseVectorIter<float, LabelT>(data.get(), dim_, vec_n_);
+        auto [start_i, end_i] = lvq_store.OptAddVec(std::move(iter));
         EXPECT_EQ(start_i, 0u);
         EXPECT_EQ(end_i, vec_n_);
         CheckStore(lvq_store, data.get());
@@ -115,14 +117,16 @@ TEST_F(HnswLVQTest, test1) {
         size_t idx = 0;
         auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
         {
-            auto [start_i, end_i] = lvq_store.OptAddVec(data.get(), vec_n_ / 2);
+            auto iter = DenseVectorIter<float, LabelT>(data.get(), dim_, vec_n_ / 2);
+            auto [start_i, end_i] = lvq_store.OptAddVec(std::move(iter));
             EXPECT_EQ(start_i, 0u);
             EXPECT_EQ(end_i, vec_n_ / 2);
             idx = end_i;
         }
 
         {
-            auto [start_i, end_i] = lvq_store.AddVec(data.get() + idx * dim_, vec_n_ - idx);
+            auto iter = DenseVectorIter<float, LabelT>(data.get() + idx * dim_, dim_, vec_n_ - idx);
+            auto [start_i, end_i] = lvq_store.AddVec(std::move(iter));
             EXPECT_EQ(start_i, vec_n_ / 2);
             EXPECT_EQ(end_i, vec_n_);
         }
@@ -135,14 +139,16 @@ TEST_F(HnswLVQTest, test1) {
         size_t idx = 0;
         auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
         {
-            auto [start_i, end_i] = lvq_store.AddVec(data.get(), vec_n_ / 2);
+            auto iter = DenseVectorIter<float, LabelT>(data.get(), dim_, vec_n_ / 2);
+            auto [start_i, end_i] = lvq_store.AddVec(std::move(iter));
             EXPECT_EQ(start_i, 0u);
             EXPECT_EQ(end_i, vec_n_ / 2);
             idx = end_i;
         }
 
         {
-            auto [start_i, end_i] = lvq_store.OptAddVec(data.get() + idx * dim_, vec_n_ - idx);
+            auto iter = DenseVectorIter<float, LabelT>(data.get() + idx * dim_, dim_, vec_n_ - idx);
+            auto [start_i, end_i] = lvq_store.OptAddVec(std::move(iter));
             EXPECT_EQ(start_i, vec_n_ / 2);
             EXPECT_EQ(end_i, vec_n_);
         }
@@ -153,7 +159,8 @@ TEST_F(HnswLVQTest, test1) {
         auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
         {
             for (SizeT i = 0; i < vec_n_; ++i) {
-                auto [start_i, end_i] = lvq_store.OptAddVec(data.get() + i * dim_, 1);
+                auto iter = DenseVectorIter<float, LabelT>(data.get() + i * dim_, dim_, 1);
+                auto [start_i, end_i] = lvq_store.OptAddVec(std::move(iter));
                 EXPECT_EQ(start_i, i);
                 EXPECT_EQ(end_i, i + 1);
                 CheckStore(lvq_store, data.get());
@@ -175,10 +182,12 @@ TEST_F(HnswLVQTest, test1) {
             }
 
             auto lvq_store = DataStore::Make(vec_n_, 1 /*chunk_n*/, dim_, 0 /*Mmax0*/, 0 /*Mmax*/);
-            auto [start_i, end_i] = lvq_store.OptAddVec(data.get(), vec_n_ / 2);
+            auto iter = DenseVectorIter<float, LabelT>(data.get(), dim_, vec_n_ / 2);
+            auto [start_i, end_i] = lvq_store.OptAddVec(std::move(iter));
             EXPECT_EQ(start_i, 0u);
             EXPECT_EQ(end_i, vec_n_ / 2);
-            lvq_store.AddVec(data.get() + vec_n_ / 2 * dim_, vec_n_ - vec_n_ / 2);
+            auto iter2 = DenseVectorIter<float, LabelT>(data.get() + vec_n_ / 2 * dim_, dim_, vec_n_ - vec_n_ / 2);
+            lvq_store.AddVec(std::move(iter2));
 
             lvq_store.Save(*file_handler);
         }

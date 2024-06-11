@@ -80,7 +80,8 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     int ef_construction = 200;
     Hnsw hnsw_index = Hnsw::Make(base_embedding_count, max_chunk_n, dimension, M, ef_construction);
 
-    hnsw_index.InsertVecsRaw(base_embedding.get(), base_embedding_count);
+    auto iter = DenseVectorIter<f32, LabelT>(base_embedding.get(), dimension, base_embedding_count);
+    hnsw_index.InsertVecs(std::move(iter));
 
     Vector<f32> distance_array(top_k);
     Vector<u64> id_array(top_k);

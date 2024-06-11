@@ -35,11 +35,11 @@ struct Posting {
 
 export class LinScan {
 public:
-    void Insert(const SparseVecRef &vec, u32 doc_id);
+    void Insert(const SparseVecRef<f32, i32> &vec, u32 doc_id);
 
-    Pair<Vector<u32>, Vector<f32>> SearchBF(const SparseVecRef &query, u32 top_k) const;
+    Pair<Vector<i32>, Vector<f32>> SearchBF(const SparseVecRef<f32, i32> &query, u32 top_k) const;
 
-    Tuple<Vector<u32>, Vector<f32>, i32> SearchKnn(const SparseVecRef &query, u32 top_k, i32 budget) const;
+    Tuple<Vector<i32>, Vector<f32>, i32> SearchKnn(const SparseVecRef<f32, i32> &query, u32 top_k, i32 budget) const;
 
     u32 row_num() const { return row_num_; }
 
