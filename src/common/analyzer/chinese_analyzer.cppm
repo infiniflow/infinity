@@ -19,6 +19,7 @@ export module chinese_analyzer;
 import stl;
 import jieba;
 import term;
+import analyzer;
 import common_analyzer;
 import third_party;
 import status;
