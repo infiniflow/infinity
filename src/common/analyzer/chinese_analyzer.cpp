@@ -45,10 +45,10 @@ static const String STOP_WORD_PATH = "jieba/dict/stop_words.utf8";
 
 namespace fs = std::filesystem;
 
-ChineseAnalyzer::ChineseAnalyzer(const String &path) : dict_path_(path) { chinese_ = true; }
+ChineseAnalyzer::ChineseAnalyzer(const String &path) : dict_path_(path) { cjk_ = true; }
 
 ChineseAnalyzer::ChineseAnalyzer(const ChineseAnalyzer &other) {
-    chinese_ = true;
+    cjk_ = true;
     own_jieba_ = false;
     jieba_ = other.jieba_;
     stopwords_ = other.stopwords_;

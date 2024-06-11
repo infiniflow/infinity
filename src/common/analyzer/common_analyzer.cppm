@@ -82,7 +82,7 @@ protected:
     bool contain_lower_{false};
     bool extract_eng_stem_{true};
     bool extract_synonym_{false};
-    bool chinese_{false};
+    bool cjk_{false};
     bool remove_stopwords_{false};
 };
 
