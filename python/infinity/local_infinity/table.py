@@ -19,7 +19,7 @@ from typing import Optional, Union, List, Any
 import numpy as np
 from embedded_infinity import ConflictType as LocalConflictType
 from embedded_infinity import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, \
-    ParsedExprType, WrapUpdateExpr
+    ParsedExprType, WrapUpdateExpr, ExportOptions
 from infinity.common import ConflictType
 from infinity.common import INSERT_DATA, VEC, InfinityException
 from infinity.errors import ErrorCode
@@ -235,8 +235,8 @@ class LocalTable(Table, ABC):
             raise InfinityException(res.error_code, res.error_msg)
 
     def export_data(self, file_path: str, export_options: {} = None):
-        options = ExportOption()
-        options.has_header = False
+        options = ExportOptions()
+        options.header = False
         options.delimiter = ','
         options.copy_file_type = CopyFileType.kCSV
         if export_options != None:
@@ -257,7 +257,7 @@ class LocalTable(Table, ABC):
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
-                        options.has_header = v
+                        options.header = v
                     else:
                         raise InfinityException(3037, "Boolean value is expected in header field")
                 else:

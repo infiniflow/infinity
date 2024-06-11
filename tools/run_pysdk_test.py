@@ -13,7 +13,7 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print(f"start pysdk test with {pytest_mark}")
     process = subprocess.Popen(
         # ["python", "-m", "pytest", "--tb=line", '-s', '-x', '-m', pytest_mark, f'{python_test_dir}/test'],
-        ["python", "-m", "pytest", "--tb=line", '-x', '-m', pytest_mark, f'{python_test_dir}/test'],
+        ["python", "-m", "pytest", "--tb=line", '-x', '-m', pytest_mark, f'{python_test_dir}/test/local_infinity'],
         stdout=sys.stdout,
         stderr=sys.stderr,
         universal_newlines=True,
@@ -29,7 +29,7 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
 if __name__ == "__main__":
     print("Note: this script must be run under root directory of the project.")
     current_path = os.getcwd()
-    python_test_dir = current_path + "/python/"
+    python_test_dir = current_path + "/python"
     parser = argparse.ArgumentParser(description="Python SDK Test For Infinity")
     parser.add_argument(
         "-m",
