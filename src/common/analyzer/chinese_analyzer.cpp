@@ -110,8 +110,11 @@ void ChineseAnalyzer::LoadStopwordsDict(const String &stopwords_path) {
 void ChineseAnalyzer::Parse(const String &input) {
     if (cut_grain_ == CutGrain::kCoarse)
         jieba_->Cut(input, cut_words_, true);
-    else
+    else if (cut_grain_ == CutGrain::kFine)
         jieba_->CutHMM(input, cut_words_);
+    else
+        jieba_->CutForSearch(input, cut_words_, true);
+
     local_offset_ = -1;
     cursor_ = -1;
     cut_size_ = cut_words_.size();
