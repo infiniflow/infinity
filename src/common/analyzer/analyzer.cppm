@@ -26,7 +26,6 @@ namespace infinity {
 export enum class CutGrain {
     kCoarse,
     kFine,
-    kAll,
 };
 
 export class Analyzer {
