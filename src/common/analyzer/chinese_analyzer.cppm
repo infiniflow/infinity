@@ -35,8 +35,15 @@ public:
 
     Status Load();
 
+    void SetCutGrain(CutGrain cut_grain) { cut_grain_ = cut_grain; }
+
 protected:
-    inline void Parse(const String &input) { jieba_->CutForSearch(input, cut_words_, true); }
+    void Parse(const String &input) {
+        if (cut_grain_ == CutGrain::kCoarse)
+            jieba_->Cut(input, cut_words_, true);
+        else
+            jieba_->CutHMM(input, cut_words_);
+    }
     bool IsJiebaSpecialize() override { return true; }
     int AnalyzeImpl(const Term &input, void *data, HookTypeForJieba func) override;
 
@@ -50,5 +57,6 @@ private:
     bool own_jieba_{};
     Vector<cppjieba::Word> cut_words_;
     SharedPtr<FlatHashSet<String>> stopwords_{};
+    CutGrain cut_grain_{CutGrain::kCoarse};
 };
 } // namespace infinity
