@@ -68,6 +68,14 @@ class Jieba {
   string LookupTag(const string &str) const {
     return mix_seg_.LookupTag(str);
   }
+
+  bool IsAlpha(const string &str) const {
+      string tag = mix_seg_.LookupTag(str);
+      return tag == POS_ENG || tag == POS_M;
+  }
+
+  bool IsPunch(const string &str) const { return mix_seg_.LookupTag(str) == POS_X; }
+
   bool InsertUserWord(const string& word, const string& tag = UNKNOWN_TAG) {
     return dict_trie_.InsertUserWord(word, tag);
   }

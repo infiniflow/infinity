@@ -19,13 +19,13 @@ export module chinese_analyzer;
 import stl;
 import jieba;
 import term;
-import analyzer;
+import common_analyzer;
 import third_party;
 import status;
 
 namespace infinity {
 
-export class ChineseAnalyzer : public Analyzer {
+export class ChineseAnalyzer : public CommonLanguageAnalyzer {
 public:
     ChineseAnalyzer(const String &path);
 
@@ -36,19 +36,28 @@ public:
     Status Load();
 
 protected:
-    inline void Parse(const String &input) { jieba_->CutForSearch(input, cut_words_, true); }
-    bool IsJiebaSpecialize() override { return true; }
-    int AnalyzeImpl(const Term &input, void *data, HookTypeForJieba func) override;
+    void Parse(const String &input) override;
+
+    bool NextToken() override;
+
+    bool IsAlpha() override { return jieba_->IsAlpha(cut_words_[cursor_].word); }
+
+    bool IsSpecialChar() override { return jieba_->IsPunch(cut_words_[cursor_].word); }
 
 private:
     void LoadStopwordsDict(const String &stopwords_path);
+
     bool Accept_token(const String &term) { return !stopwords_->contains(term); }
+
+    bool DoNext();
 
 private:
     cppjieba::Jieba *jieba_{nullptr};
     String dict_path_;
     bool own_jieba_{};
     Vector<cppjieba::Word> cut_words_;
+    i32 cursor_{};
+    i32 cut_size_{};
     SharedPtr<FlatHashSet<String>> stopwords_{};
 };
 } // namespace infinity

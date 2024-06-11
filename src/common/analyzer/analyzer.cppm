@@ -37,25 +37,14 @@ public:
 
     int Analyze(const Term &input, TermList &output) {
         void *array[2] = {&output, this};
-        if (IsJiebaSpecialize()) {
-            return AnalyzeImpl(input, &array, &Analyzer::AppendTermListForJieba);
-        }
-        else {
-            return AnalyzeImpl(input, &array, &Analyzer::AppendTermList);
-        }
+        return AnalyzeImpl(input, &array, &Analyzer::AppendTermList);
     }
 
 protected:
     typedef void (
         *HookType)(void *data, const char *text, const u32 len, const u32 offset, const u8 and_or_bit, const u8 level, const bool is_special_char);
 
-    typedef void (*HookTypeForJieba)(void *data, cppjieba::Word &cut_words);
-
-    virtual bool IsJiebaSpecialize() { return false; }
-
     virtual int AnalyzeImpl(const Term &input, void *data, HookType func) { return -1; }
-
-    virtual int AnalyzeImpl(const Term &input, void *data, HookTypeForJieba func) { return -1; }
 
     static void
     AppendTermList(void *data, const char *text, const u32 len, const u32 offset, const u8 and_or_bit, const u8 level, const bool is_special_char) {
