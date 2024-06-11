@@ -45,9 +45,10 @@ static const String STOP_WORD_PATH = "jieba/dict/stop_words.utf8";
 
 namespace fs = std::filesystem;
 
-ChineseAnalyzer::ChineseAnalyzer(const String &path) : dict_path_(path) {}
+ChineseAnalyzer::ChineseAnalyzer(const String &path) : dict_path_(path) { cjk_ = true; }
 
 ChineseAnalyzer::ChineseAnalyzer(const ChineseAnalyzer &other) {
+    cjk_ = true;
     own_jieba_ = false;
     jieba_ = other.jieba_;
     stopwords_ = other.stopwords_;
@@ -106,14 +107,40 @@ void ChineseAnalyzer::LoadStopwordsDict(const String &stopwords_path) {
     }
 }
 
-int ChineseAnalyzer::AnalyzeImpl(const Term &input, void *data, HookTypeForJieba func) {
-    Parse(input.text_);
-    for (u32 i = 0; i < cut_words_.size(); ++i) {
-        if (!Accept_token(cut_words_[i].word))
-            continue;
-        func(data, cut_words_[i]);
-    }
-    return cut_words_.back().offset + 1;
+void ChineseAnalyzer::Parse(const String &input) {
+    if (cut_grain_ == CutGrain::kCoarse)
+        jieba_->Cut(input, cut_words_, true);
+    else
+        jieba_->CutHMM(input, cut_words_);
+    local_offset_ = -1;
+    cursor_ = -1;
+    cut_size_ = cut_words_.size();
+    ResetToken();
 }
 
+bool ChineseAnalyzer::NextToken() {
+    while (DoNext()) {
+        is_index_ = true;
+        offset_ = local_offset_;
+        token_ = cut_words_[cursor_].word.c_str();
+        len_ = cut_words_[cursor_].word.length();
+
+        return true;
+    }
+    ResetToken();
+    return false;
+}
+
+bool ChineseAnalyzer::DoNext() {
+    while (cursor_ < (cut_size_ - 1)) {
+        cursor_++;
+        if (Accept_token(cut_words_[cursor_].word)) {
+            ++local_offset_;
+            return true;
+        } else {
+            continue;
+        }
+    }
+    return false;
+}
 } // namespace infinity

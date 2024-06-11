@@ -20,12 +20,13 @@ import stl;
 import jieba;
 import term;
 import analyzer;
+import common_analyzer;
 import third_party;
 import status;
 
 namespace infinity {
 
-export class ChineseAnalyzer : public Analyzer {
+export class ChineseAnalyzer : public CommonLanguageAnalyzer {
 public:
     ChineseAnalyzer(const String &path);
 
@@ -38,24 +39,28 @@ public:
     void SetCutGrain(CutGrain cut_grain) { cut_grain_ = cut_grain; }
 
 protected:
-    void Parse(const String &input) {
-        if (cut_grain_ == CutGrain::kCoarse)
-            jieba_->Cut(input, cut_words_, true);
-        else
-            jieba_->CutHMM(input, cut_words_);
-    }
-    bool IsJiebaSpecialize() override { return true; }
-    int AnalyzeImpl(const Term &input, void *data, HookTypeForJieba func) override;
+    void Parse(const String &input) override;
+
+    bool NextToken() override;
+
+    bool IsAlpha() override { return jieba_->IsAlpha(cut_words_[cursor_].word); }
+
+    bool IsSpecialChar() override { return jieba_->IsPunch(cut_words_[cursor_].word); }
 
 private:
     void LoadStopwordsDict(const String &stopwords_path);
+
     bool Accept_token(const String &term) { return !stopwords_->contains(term); }
+
+    bool DoNext();
 
 private:
     cppjieba::Jieba *jieba_{nullptr};
     String dict_path_;
     bool own_jieba_{};
     Vector<cppjieba::Word> cut_words_;
+    i32 cursor_{};
+    i32 cut_size_{};
     SharedPtr<FlatHashSet<String>> stopwords_{};
     CutGrain cut_grain_{CutGrain::kCoarse};
 };

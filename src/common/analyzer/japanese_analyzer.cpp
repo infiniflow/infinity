@@ -70,7 +70,7 @@ public:
 };
 
 JapaneseAnalyzer::JapaneseAnalyzer(const String &base_path) {
-    chinese_ = true;
+    cjk_ = true;
     jma::JMA_Factory *factory = jma::JMA_Factory::instance();
     analyzer_ = factory->createAnalyzer();
     fs::path root(base_path);
@@ -80,7 +80,7 @@ JapaneseAnalyzer::JapaneseAnalyzer(const String &base_path) {
 }
 
 JapaneseAnalyzer::JapaneseAnalyzer(const JapaneseAnalyzer &other) : knowledge_(other.knowledge_) {
-    chinese_ = true;
+    cjk_ = true;
     jma::JMA_Factory *factory = jma::JMA_Factory::instance();
     analyzer_ = factory->createAnalyzer();
     analyzer_->setKnowledge(knowledge_);
