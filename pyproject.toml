@@ -18,6 +18,8 @@ dependencies = [
     "polars~=0.20.23",
     "openpyxl~=3.1.2"
 ]
+description = "infinity"
+readme = "README.md"
 
 [tool.scikit-build]
 minimum-version = "0.4"
@@ -25,7 +27,7 @@ minimum-version = "0.4"
 build-dir = "build/{wheel_tag}"
 
 # Build stable ABI wheels for CPython 3.12+
-wheel.py-api = "cp312"
+wheel.py-api = "cp310"
 wheel.packages = ["src/embedded_infinity", "python/infinity"]
 
 [tool.cibuildwheel]
@@ -34,3 +36,25 @@ build-verbosity = 1
 # Needed for full C++17 support
 [tool.cibuildwheel.macos.environment]
 MACOSX_DEPLOYMENT_TARGET = "10.14"
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+markers = [
+    "L0",
+    "L1",
+    "L2",
+    "L3",
+    "complex",
+    "slow",
+    "nightly",
+]
+
+#filterwarnings = [
+#    "error",
+#    "ignore::UserWarning",
+#    "ignore::ResourceWarning",
+#    "ignore:pkg_resources is deprecated as an API:DeprecationWarning",
+#    # "ignore::thrift.transport.TTransport",
+#    # note the use of single quote below to denote "raw" strings in TOML
+#    'ignore:function ham\(\) is deprecated:DeprecationWarning',
+#]

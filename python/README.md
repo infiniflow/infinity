@@ -8,9 +8,9 @@
 - install new python SDK
 
 # build python SDK
-
+Execute the following command under the root path of infinity project.
 ```shell
-rm -f dist/* && python setup.py sdist bdist_wheel
+rm -f dist/* && pip wheel . -w dist
 ```
 
 # install python SDK
