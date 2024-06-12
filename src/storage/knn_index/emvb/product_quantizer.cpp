@@ -14,7 +14,9 @@
 
 module;
 
+#include "CControl_svd.h"
 #include "inc/mlas.h"
+
 module emvb_product_quantization;
 import stl;
 import mlas_matrix_multiply;
@@ -107,6 +109,9 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
     const auto transformed_embedding = MakeUniqueForOverwrite<f32[]>(embedding_num * this->dimension_);
     const auto encoded_transformed = MakeUniqueForOverwrite<Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>[]>(embedding_num);
     const auto square_for_svd = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
+    const auto svd_u = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
+    const auto svd_s = MakeUniqueForOverwrite<f32[]>(this->dimension_);
+    const auto svd_v = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
     for (u32 iter = iter_cnt; iter > 0; --iter) {
         matrixA_multiply_matrixB_output_to_C(embedding_data,
                                              matrix_R_.get(),
@@ -114,8 +119,14 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
                                              this->dimension_,
                                              this->dimension_,
                                              transformed_embedding.get());
-        const u32 base_pq_iter_cnt = (iter == 1) ? iter_cnt : 1; // only iterate 1 time except the last loop
-        PQ_BASE::Train(transformed_embedding.get(), embedding_num, base_pq_iter_cnt);
+        if (iter == 1) {
+            // final loop
+            PQ_BASE::Train(transformed_embedding.get(), embedding_num, iter_cnt);
+            return; // no update to R
+        }
+        // not the final loop
+        PQ_BASE::Train(transformed_embedding.get(), embedding_num, 1);
+        // update R
         PQ_BASE::EncodeEmbedding(transformed_embedding.get(), embedding_num, encoded_transformed.get());
         const auto decoded_encoded = PQ_BASE::DecodeEmbedding(encoded_transformed.get(), embedding_num); // embedding_num * dimension_
         transpose_matrixA_multiply_matrixB_output_to_C(embedding_data,
@@ -124,7 +135,15 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
                                                        this->dimension_,
                                                        embedding_num,
                                                        square_for_svd.get());
-        //TODO:svd
+        // TODO:svd
+        svd(square_for_svd.get(), this->dimension_, this->dimension_, svd_u.get(), svd_s.get(), svd_v.get());
+        // TODO: VT?
+        matrixA_multiply_transpose_matrixB_output_to_C(svd_u.get(),
+                                                       svd_v.get(),
+                                                       this->dimension_,
+                                                       this->dimension_,
+                                                       this->dimension_,
+                                                       matrix_R_.get());
     }
 }
 
