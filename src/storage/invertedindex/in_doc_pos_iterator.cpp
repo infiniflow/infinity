@@ -1,5 +1,7 @@
 module;
 
+#include <cassert>
+
 module in_doc_pos_iterator;
 
 import stl;
@@ -39,8 +41,14 @@ void InDocPositionIterator::Init(const InDocPositionState &state) {
 }
 
 void InDocPositionIterator::SeekPosition(pos_t pos, pos_t &result) {
+    assert(pos != INVALID_POSITION && pos >= 0);
+    if (current_pos_ != i64(-1) && (i64)pos <= current_pos_) {
+        // seek backwards is disallowed, while seek to current position or forward is allowed
+        result = (pos_t)current_pos_;
+        return;
+    }
     pos = pos >= (current_pos_ + 1) ? pos : (current_pos_ + 1);
-    while (pos > current_pos_) {
+    while ((i64)pos > current_pos_) {
         if (++visited_pos_in_doc_ > (i32)total_pos_count_) {
             result = INVALID_POSITION;
             return;
@@ -59,7 +67,7 @@ void InDocPositionIterator::SeekPosition(pos_t pos, pos_t &result) {
         }
         current_pos_ += pos_buffer_[visited_pos_in_buffer_];
     }
-    result = current_pos_;
+    result = (pos_t)current_pos_;
 }
 
 } // namespace infinity
