@@ -329,8 +329,6 @@ nanobind_disable_stack_protector(embedded_infinity_ext)
 nanobind_opt_size(embedded_infinity_ext)
 nanobind_strip(embedded_infinity_ext)
 
-#nanobind_set_visibility(embedded_infinity_ext)
-
 install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity)
 
 ### unit test

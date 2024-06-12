@@ -49,12 +49,12 @@ markers = [
     "nightly",
 ]
 
-#filterwarnings = [
-#    "error",
-#    "ignore::UserWarning",
-#    "ignore::ResourceWarning",
-#    "ignore:pkg_resources is deprecated as an API:DeprecationWarning",
-#    # "ignore::thrift.transport.TTransport",
-#    # note the use of single quote below to denote "raw" strings in TOML
-#    'ignore:function ham\(\) is deprecated:DeprecationWarning',
-#]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::ResourceWarning",
+    "ignore:pkg_resources is deprecated as an API:DeprecationWarning",
+    # "ignore::thrift.transport.TTransport",
+    # note the use of single quote below to denote "raw" strings in TOML
+    'ignore:function ham\(\) is deprecated:DeprecationWarning',
+]
