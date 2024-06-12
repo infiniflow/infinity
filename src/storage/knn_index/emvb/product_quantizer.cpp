@@ -128,7 +128,7 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, c
         auto &norms = this->subspace_centroid_norms_neg_half[i];
         const f32 *centroid_data = subspace_centroids_[i].data();
         for (u32 j = 0; j < subspace_centroid_num_; ++j) {
-            norms[j] = -0.5f * L2NormSquare<f32>(centroid_data, subspace_dimension_);
+            norms[j] = -0.5f * L2NormSquare<f32, f32, u32>(centroid_data, subspace_dimension_);
             centroid_data += subspace_dimension_;
         }
     }
