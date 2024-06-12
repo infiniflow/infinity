@@ -105,15 +105,13 @@ void BlockMaxPhraseDocIterator::SeekDoc(RowID doc_id, RowID seek_end) {
 }
 
 bool BlockMaxPhraseDocIterator::CheckBeginPosition(pos_t position) {
-    pos_t now_position = position;
     for (SizeT i = 1; i < pos_iters_.size(); ++i) {
         auto& iter = pos_iters_[i];
-        pos_t next_position = 0;
-        iter->SeekPosition(now_position, next_position);
-        if (next_position != now_position + 1) {
+        pos_t next_position = INVALID_POSITION;
+        iter->SeekPosition(position + i, next_position);
+        if (next_position != position + i) {
             return false;
         }
-        now_position = next_position;
     }
     return true;
 }

@@ -96,9 +96,11 @@ public:
                 ASSERT_EQ(doc_id, expected.doc_ids[j]);
                 u32 tf = post_iter->GetCurrentTF();
                 ASSERT_EQ(tf, expected.tfs[j]);
+                pos_t cur_pos = 0;
                 pos_t res_pos = INVALID_POSITION;
                 do {
-                    post_iter->SeekPosition(0, res_pos);
+                    post_iter->SeekPosition(cur_pos, res_pos);
+                    cur_pos = res_pos + 1;
                 } while(res_pos != INVALID_POSITION);
             }
             if (doc_id != INVALID_ROWID) {
