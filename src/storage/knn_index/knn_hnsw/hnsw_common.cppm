@@ -22,6 +22,7 @@ export module hnsw_common;
 import stl;
 import file_system;
 import infinity_exception;
+import sparse_util;
 
 namespace infinity {
 
@@ -36,9 +37,9 @@ export using VertexType = i32;
 export using VertexListSize = i32;
 export using LayerSize = i32;
 
-export template <typename Iterator, typename DataType, typename LabelType>
+export template <typename Iterator, typename RtnType, typename LabelType>
 concept DataIteratorConcept = requires(Iterator iter) {
-    { iter.Next() } -> std::same_as<Optional<Pair<DataType, LabelType>>>;
+    { iter.Next() } -> std::same_as<Optional<Pair<RtnType, LabelType>>>;
 };
 
 export template <typename DataType, typename LabelType>
@@ -59,6 +60,30 @@ public:
         }
         ptr_ += dim_;
         return std::make_pair(ret, label_++);
+    }
+};
+
+export template <typename DataType, typename IdxType, typename LabelType>
+class SparseVectorIter {
+    const i64 *indptr_;
+    const IdxType *indice_;
+    const DataType *data_;
+    const i64 *indptr_end_;
+    LabelType label_;
+
+public:
+    SparseVectorIter(const i64 *indptr, const IdxType *indice, const DataType *data, i32 vec_num, LabelType offset = 0)
+        : indptr_(indptr), indice_(indice), data_(data), indptr_end_(indptr_ + vec_num + 1), label_(offset) {}
+
+    Optional<Pair<SparseVecRef<DataType, IdxType>, LabelType>> Next() {
+        if (indptr_ + 1 == indptr_end_) {
+            return None;
+        }
+        i64 nnz = indptr_[1] - indptr_[0];
+        const IdxType *indice = indice_ + indptr_[0];
+        const DataType *data = data_ + indptr_[0];
+        ++indptr_;
+        return std::make_pair(SparseVecRef<DataType, IdxType>(nnz, indice, data), label_++);
     }
 };
 
