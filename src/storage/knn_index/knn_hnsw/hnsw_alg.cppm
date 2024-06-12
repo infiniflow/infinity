@@ -43,7 +43,9 @@ class KnnHnsw {
 public:
     using This = KnnHnsw<VecStoreType, LabelType>;
     using DataType = typename VecStoreType::DataType;
+    using QueryVecType = typename VecStoreType::QueryVecType;
     using StoreType = typename VecStoreType::StoreType;
+    using QueryType = typename VecStoreType::QueryType;
     using DataStore = DataStore<VecStoreType, LabelType>;
     using Distance = typename VecStoreType::Distance;
 
@@ -284,8 +286,8 @@ private:
     LabelType GetLabel(VertexType vertex_i) const { return data_store_.GetLabel(vertex_i); }
 
     template <bool WithLock, FilterConcept<LabelType> Filter = NoneType>
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>> KnnSearchInner(const DataType *q, SizeT k, const Filter &filter) const {
-        auto query = data_store_.MakeQuery(q);
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>> KnnSearchInner(const QueryVecType &q, SizeT k, const Filter &filter) const {
+        QueryType query = data_store_.MakeQuery(q);
         auto [max_layer, ep] = data_store_.GetEnterPoint();
         if (ep == -1) {
             return {0, nullptr, nullptr};
@@ -297,8 +299,8 @@ private:
     }
 
 public:
-    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    Pair<SizeT, SizeT> InsertVecs(Iterator &&iter, const HnswInsertConfig &config) {
+    template <DataIteratorConcept<QueryVecType, LabelType> Iterator>
+    Pair<SizeT, SizeT> InsertVecs(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
         auto [start_i, end_i] = StoreData(std::move(iter), config);
         for (VertexType vertex_i = start_i; vertex_i < end_i; ++vertex_i) {
             Build(vertex_i);
@@ -306,14 +308,8 @@ public:
         return {start_i, end_i};
     }
 
-    // This function for test
-    Pair<SizeT, SizeT>
-    InsertVecsRaw(const DataType *query, SizeT insert_n, LabelType offset = 0, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
-        return InsertVecs(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n, offset), config);
-    }
-
-    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    Pair<VertexType, VertexType> StoreData(Iterator &&iter, const HnswInsertConfig &config) {
+    template <DataIteratorConcept<QueryVecType, LabelType> Iterator>
+    Pair<VertexType, VertexType> StoreData(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
         if (config.optimize_) {
             return data_store_.OptAddVec(std::move(iter));
         }
@@ -321,11 +317,6 @@ public:
     }
 
     void Optimize() { data_store_.Optimize(); }
-
-    Pair<VertexType, VertexType>
-    StoreDataRaw(const DataType *query, SizeT insert_n, LabelType offset = 0, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
-        return StoreData(DenseVectorIter<DataType, LabelType>(query, data_store_.dim(), insert_n, offset), config);
-    }
 
     void Build(VertexType vertex_i) {
         i32 q_layer = GenerateRandomLayer();
@@ -355,7 +346,7 @@ public:
     }
 
     template <FilterConcept<LabelType> Filter = NoneType, bool WithLock = true>
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k, const Filter &filter) const {
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const QueryVecType &q, SizeT k, const Filter &filter) const {
         auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter);
         auto labels = MakeUniqueForOverwrite<LabelType[]>(result_n);
         for (SizeT i = 0; i < result_n; ++i) {
@@ -365,13 +356,13 @@ public:
     }
 
     template <bool WithLock = true>
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k) const {
+    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const QueryVecType &q, SizeT k) const {
         return KnnSearch<NoneType, WithLock>(q, k, None);
     }
 
     // function for test, add sort for convenience
     template <FilterConcept<LabelType> Filter = NoneType, bool WithLock = true>
-    Vector<Pair<DataType, LabelType>> KnnSearchSorted(const DataType *q, SizeT k, const Filter &filter) const {
+    Vector<Pair<DataType, LabelType>> KnnSearchSorted(const QueryVecType &q, SizeT k, const Filter &filter) const {
         auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter);
         Vector<Pair<DataType, LabelType>> result(result_n);
         for (SizeT i = 0; i < result_n; ++i) {
@@ -382,7 +373,7 @@ public:
     }
 
     // function for test
-    Vector<Pair<DataType, LabelType>> KnnSearchSorted(const DataType *q, SizeT k) const { return KnnSearchSorted<NoneType>(q, k, None); }
+    Vector<Pair<DataType, LabelType>> KnnSearchSorted(const QueryVecType &q, SizeT k) const { return KnnSearchSorted<NoneType>(q, k, None); }
 
     void SetEf(SizeT ef) { ef_ = ef; }
 

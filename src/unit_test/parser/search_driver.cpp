@@ -187,6 +187,7 @@ _exists_:"author" AND page_count:zzz^1.3 AND (name:星空^0.1 OR name:邓肯^1.2
 吉祥物“羽宝”头部
 nanjing吉祥物"羽宝"头部head "DS-K3AJ303/Dm140"
 吉祥物nanjing"DS-K3AJ303/Dm140"头部
+graphic cards
     )##";
 
     Map<String, String> column2analyzer;

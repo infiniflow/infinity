@@ -65,7 +65,8 @@ public:
         {
             Hnsw hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
 
-            hnsw_index.InsertVecsRaw(data.get(), element_size);
+            auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
+            hnsw_index.InsertVecs(std::move(iter));
             // std::ofstream os("tmp/dump.txt");
             // hnsw_index.Dump(os);
             // os.flush();
@@ -86,7 +87,7 @@ public:
 
             u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
             auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
-            if(!status.ok()) {
+            if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
             hnsw_index.Save(*file_handler);
@@ -96,7 +97,7 @@ public:
         {
             u8 file_flags = FileFlags::READ_FLAG;
             auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
-            if(!status.ok()) {
+            if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
 
@@ -175,13 +176,15 @@ public:
                 auto w_lck = UniqueOptLck();
                 HnswInsertConfig config;
                 config.optimize_ = true;
-                std::tie(start_i, end_i) = hnsw_index.StoreDataRaw(data.get(), element_size / 2, 0 /*offset*/, config);
+                auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size / 2);
+                std::tie(start_i, end_i) = hnsw_index.StoreData(std::move(iter));
             }
             {
                 auto write_thread2 = std::thread([&] {
                     int insert_n = element_size - element_size / 2;
                     for (int i = element_size / 2; i < element_size; ++i) {
-                        hnsw_index.InsertVecsRaw(data.get() + i * dim, 1 /*offset*/, i);
+                        DenseVectorIter<float, LabelT> iter(data.get(), dim, 1 /*insert_n*/);
+                        hnsw_index.InsertVecs(std::move(iter));
                         if ((i + 1) % (insert_n / 4) == 0) {
                             auto w_lck = UniqueOptLck();
                             hnsw_index.Optimize();
