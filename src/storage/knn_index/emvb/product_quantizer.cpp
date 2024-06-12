@@ -21,6 +21,7 @@ module emvb_product_quantization;
 import stl;
 import mlas_matrix_multiply;
 import kmeans_partition;
+import vector_distance;
 import index_base;
 import third_party;
 import logger;
@@ -123,6 +124,13 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, c
             LOG_ERROR(error_info);
             UnrecoverableError(error_info);
         }
+        // compute norms
+        auto &norms = this->subspace_centroid_norms_neg_half[i];
+        const f32 *centroid_data = subspace_centroids_[i].data();
+        for (u32 j = 0; j < subspace_centroid_num_; ++j) {
+            norms[j] = -0.5f * L2NormSquare<f32>(centroid_data, subspace_dimension_);
+            centroid_data += subspace_dimension_;
+        }
     }
 }
 
@@ -153,7 +161,8 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
             return; // no update to R
         }
         // not the final loop
-        PQ_BASE::Train(transformed_embedding.get(), embedding_num, 1);
+        const u32 train_iter_cnt = 1 + ((iter == 2) ? (iter_cnt / 2) : 0);
+        PQ_BASE::Train(transformed_embedding.get(), embedding_num, train_iter_cnt);
         // update R
         PQ_BASE::EncodeEmbedding(transformed_embedding.get(), embedding_num, encoded_transformed.get());
         const auto decoded_encoded = PQ_BASE::DecodeEmbedding(encoded_transformed.get(), embedding_num); // embedding_num * dimension_
