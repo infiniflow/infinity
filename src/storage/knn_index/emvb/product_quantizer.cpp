@@ -20,6 +20,11 @@ module;
 module emvb_product_quantization;
 import stl;
 import mlas_matrix_multiply;
+import kmeans_partition;
+import index_base;
+import third_party;
+import logger;
+import infinity_exception;
 
 namespace infinity {
 
@@ -95,7 +100,30 @@ OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::OPQ(const u32 subspace_dimension) : PQ
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
 void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, const u32 embedding_num, const u32 iter_cnt) {
-    // TODO:
+    const auto part_train_data = MakeUniqueForOverwrite<f32[]>(embedding_num * subspace_dimension_);
+    for (u32 i = 0; i < SUBSPACE_NUM; ++i) {
+        // copy subspace data
+        const f32 *copy_src = embedding_data + i * subspace_dimension_;
+        f32 *copy_dst = part_train_data.get();
+        for (u32 j = 0; j < embedding_num; ++j) {
+            std::copy_n(copy_src, subspace_dimension_, copy_dst);
+            copy_src += this->dimension_;
+            copy_dst += subspace_dimension_;
+        }
+        // k-means
+        const auto centroid_cnt_result = GetKMeansCentroids<f32>(MetricType::kMetricL2,
+                                                                 this->subspace_dimension_,
+                                                                 embedding_num,
+                                                                 part_train_data.get(),
+                                                                 subspace_centroids_[i],
+                                                                 subspace_centroid_num_,
+                                                                 iter_cnt);
+        if (centroid_cnt_result != subspace_centroid_num_) {
+            const auto error_info = fmt::format("KMeans failed to find {} centroids for subspace", subspace_centroid_num_);
+            LOG_ERROR(error_info);
+            UnrecoverableError(error_info);
+        }
+    }
 }
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
