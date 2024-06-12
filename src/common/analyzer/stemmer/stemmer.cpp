@@ -28,6 +28,7 @@ import stl;
 #include "stem_UTF_8_hungarian.h"
 #include "stem_UTF_8_italian.h"
 #include "stem_UTF_8_norwegian.h"
+#include "stem_UTF_8_porter.h"
 #include "stem_UTF_8_portuguese.h"
 #include "stem_UTF_8_romanian.h"
 #include "stem_UTF_8_russian.h"
@@ -67,6 +68,7 @@ StemFunc STEM_FUNCTION[STEM_LANG_EOS] = {
     {hungarian_UTF_8_create_env, hungarian_UTF_8_close_env, hungarian_UTF_8_stem, 0},
     {italian_UTF_8_create_env, italian_UTF_8_close_env, italian_UTF_8_stem, 0},
     {norwegian_UTF_8_create_env, norwegian_UTF_8_close_env, norwegian_UTF_8_stem, 0},
+    {porter_UTF_8_create_env, porter_UTF_8_close_env, porter_UTF_8_stem, 0},
     {portuguese_UTF_8_create_env, portuguese_UTF_8_close_env, portuguese_UTF_8_stem, 0},
     {romanian_UTF_8_create_env, romanian_UTF_8_close_env, romanian_UTF_8_stem, 0},
     {russian_UTF_8_create_env, russian_UTF_8_close_env, russian_UTF_8_stem, 0},
