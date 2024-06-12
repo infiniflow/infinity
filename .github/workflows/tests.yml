@@ -169,7 +169,7 @@ jobs:
 
       - name: pysdk local infinity test release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && python3 tools/run_pysdk_local_infinity_test.py" && sleep 1s
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity/* && python3 tools/run_pysdk_local_infinity_test.py" && sleep 1s
 
       - name: Start infinity pysdk & http_api release version
         if: ${{ !cancelled() && !failure() }}
