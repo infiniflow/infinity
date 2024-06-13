@@ -14,7 +14,7 @@ ENV CXX=/usr/bin/clang++-17
 RUN apt install -y wget curl emacs-nox vim git build-essential ninja-build bison flex thrift-compiler postgresql-client python3-full tree rpm
 
 # build dependencies
-RUN apt install -y liblz4-dev zlib1g-dev libboost1.81-dev liburing-dev libgflags-dev libevent-dev libjemalloc-dev
+RUN apt install -y liblz4-dev zlib1g-dev libboost1.81-dev liburing-dev libgflags-dev libevent-dev libjemalloc-dev python3-dev
 
 # CMake 3.28+ is requrired for C++20 modules.
 # download https://github.com/Kitware/CMake/releases/download/v3.29.3/cmake-3.29.3-linux-x86_64.tar.gz

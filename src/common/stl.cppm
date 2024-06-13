@@ -223,6 +223,7 @@ export namespace std {
     using std::exception;
     using std::unordered_set;
 
+    using std::distance;
     using std::back_inserter;
     using std::hash;
 
@@ -235,6 +236,7 @@ export namespace std {
     using std::get;
     using std::visit;
 
+    using std::unsigned_integral;
     using std::is_integral_v;
     using std::is_floating_point_v;
     using std::common_type_t;

@@ -290,8 +290,8 @@ std::shared_ptr<DataType> DataType::ReadAdv(char *&ptr, int32_t maxbytes) {
         case LogicalType::kSparse: {
             EmbeddingDataType data_type = ReadBufAdv<EmbeddingDataType>(ptr);
             EmbeddingDataType index_type = ReadBufAdv<EmbeddingDataType>(ptr);
-            SparseStoreType store_type = ReadBufAdv<SparseStoreType>(ptr);
             int64_t dimension = ReadBufAdv<int64_t>(ptr);
+            SparseStoreType store_type = ReadBufAdv<SparseStoreType>(ptr);
             auto sparse_info = SparseInfo::Make(data_type, dimension, store_type);
             if (index_type != sparse_info->IndexType()) {
                 ParserError("Sparse index type is not consistent.");
