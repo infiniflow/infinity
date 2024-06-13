@@ -22,7 +22,7 @@ namespace infinity {
 export class EMVBProductQuantizer {
 public:
     virtual ~EMVBProductQuantizer() = default;
-    virtual void Train(const f32 *embedding_data, u32 embedding_num, u32 iter_cnt = 20) = 0;
+    virtual void Train(const f32 *embedding_data, u32 embedding_num, u32 iter_cnt) = 0;
     virtual void AddEmbeddings(const f32 *embedding_data, u32 embedding_num) = 0;
     virtual UniquePtr<f32[]> GetIPDistanceTable(const f32 *query_data, u32 query_num) const = 0;
     virtual f32 GetSingleIPDistance(u32 embedding_id, u32 query_id, u32 query_num, const f32 *ip_table) const = 0;
@@ -73,5 +73,7 @@ public:
 
     UniquePtr<f32[]> GetIPDistanceTable(const f32 *query_data, u32 query_num) const override;
 };
+
+export UniquePtr<EMVBProductQuantizer> GetEMVBOPQ(u32 pq_subspace_num, u32 pq_subspace_bits, u32 embedding_dimension);
 
 } // namespace infinity

@@ -30,9 +30,12 @@ import emvb_result_handler;
 import emvb_simd_funcs;
 import mlas_matrix_multiply;
 import emvb_product_quantization;
+import emvb_shared_vec;
 import infinity_exception;
 
 namespace infinity {
+
+extern template class EMVBSharedVec<u32>;
 
 using UniquePtrF32Aligned = std::unique_ptr<f32[], decltype([](f32 *p) { std::free(p); })>;
 
@@ -87,7 +90,14 @@ auto EMVBSearch<FIXED_QUERY_TOKEN_NUM>::find_candidate_docs(const f32 *centroids
     std::vector<u32> candidate_docs;
     for (const auto &cid : closest_centroids_ids) {
         if (const auto [_, success] = remove_dup_cid.insert(cid); success) {
-            for (const auto &doc_id : centroids_to_docid_[cid]) {
+            const auto [docid_shared, size] = centroids_to_docid_[cid].GetData();
+            const auto docid_ptr = docid_shared.get();
+            for (u32 i = 0; i < size; ++i) {
+                const auto doc_id = docid_ptr[i];
+                if (doc_id >= n_docs_) {
+                    // new added doc
+                    break;
+                }
                 if (!doc_visited[doc_id]) {
                     candidate_docs.push_back(doc_id);
                     doc_visited[doc_id] = true;
@@ -228,7 +238,7 @@ auto EMVBSearch<FIXED_QUERY_TOKEN_NUM>::compute_topk_documents_selected(const f3
                                                                         auto selected_docs_centroid_scores,
                                                                         const u32 k,
                                                                         const f32 th) const {
-    const auto residual_pq_ip_table = product_quantizer_.GetIPDistanceTable(query_ptr, FIXED_QUERY_TOKEN_NUM);
+    const auto residual_pq_ip_table = product_quantizer_->GetIPDistanceTable(query_ptr, FIXED_QUERY_TOKEN_NUM);
     using ResultHandler = EMVBReservoirResultHandler<f32, u32>;
     ResultHandler result_handler(k);
     auto &[selected_num, docs_centroid_scores_ptr] = selected_docs_centroid_scores;
@@ -255,10 +265,10 @@ auto EMVBSearch<FIXED_QUERY_TOKEN_NUM>::compute_topk_documents_selected(const f3
                 auto distances_ptr_end = distances_ptr;
                 for (auto copy_embedding_id_ptr = embedding_id_ptr; copy_embedding_id_ptr < embedding_id_ptr_end; ++copy_embedding_id_ptr) {
                     const auto embedding_id = *copy_embedding_id_ptr;
-                    *distances_ptr_end = distances_ptr[embedding_id] + product_quantizer_.GetSingleIPDistance(doc_offset + embedding_id,
-                                                                                                              query_token_id,
-                                                                                                              FIXED_QUERY_TOKEN_NUM,
-                                                                                                              residual_pq_ip_table.get());
+                    *distances_ptr_end = distances_ptr[embedding_id] + product_quantizer_->GetSingleIPDistance(doc_offset + embedding_id,
+                                                                                                               query_token_id,
+                                                                                                               FIXED_QUERY_TOKEN_NUM,
+                                                                                                               residual_pq_ip_table.get());
                     ++distances_ptr_end;
                 }
                 maxs[query_token_id] = *std::max_element(distances_ptr, distances_ptr_end);
@@ -266,12 +276,12 @@ auto EMVBSearch<FIXED_QUERY_TOKEN_NUM>::compute_topk_documents_selected(const f3
                 // exhausitive search
                 residual_distances_buffer.Resize(doclen);
                 const auto residual_distances_ptr = residual_distances_buffer.GetPtr();
-                product_quantizer_.GetMultipleIPDistance(doc_offset,
-                                                         doclen,
-                                                         query_token_id,
-                                                         FIXED_QUERY_TOKEN_NUM,
-                                                         residual_pq_ip_table.get(),
-                                                         residual_distances_ptr);
+                product_quantizer_->GetMultipleIPDistance(doc_offset,
+                                                          doclen,
+                                                          query_token_id,
+                                                          FIXED_QUERY_TOKEN_NUM,
+                                                          residual_pq_ip_table.get(),
+                                                          residual_distances_ptr);
                 f32 max_val = std::numeric_limits<f32>::lowest();
                 for (size_t j = 0; j < doclen; j++) {
                     const f32 sum_v = distances_ptr[j] + residual_distances_ptr[j];
@@ -295,8 +305,8 @@ EMVBSearch<FIXED_QUERY_TOKEN_NUM>::EMVBSearch(const u32 embedding_dimension,
                                               const u32 *doc_offsets,
                                               const u32 *centroid_id_assignments,
                                               const f32 *centroids_data,
-                                              const Vector<Vector<u32>> &centroids_to_docid,
-                                              const EMVBProductQuantizer &product_quantizer)
+                                              const EMVBSharedVec<u32> *centroids_to_docid,
+                                              const EMVBProductQuantizer *product_quantizer)
     : embedding_dimension_(embedding_dimension), n_docs_(n_docs), n_centroids_(n_centroids), doc_lens_(doc_lens), doc_offsets_(doc_offsets),
       centroid_id_assignments_(centroid_id_assignments), centroids_data_(centroids_data), centroids_to_docid_(centroids_to_docid),
       product_quantizer_(product_quantizer) {}
@@ -328,11 +338,12 @@ std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> EMVBSearch<FIXED
 }
 
 template class EMVBSearch<32>;
-
 template class EMVBSearch<64>;
-
 template class EMVBSearch<96>;
-
 template class EMVBSearch<128>;
+template class EMVBSearch<160>;
+template class EMVBSearch<192>;
+template class EMVBSearch<224>;
+template class EMVBSearch<256>;
 
 } // namespace infinity

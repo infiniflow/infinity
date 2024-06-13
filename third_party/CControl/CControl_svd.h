@@ -7,8 +7,8 @@
 #include <cstring>
 
 // macros from original repo
-#define MIN_VALUE 1e-11f				/* Tuning parameter for the smalles value that can be allowed */
-#define MAX_ITERATIONS 10000U			/* For all iteration algorithm */
+#define MIN_VALUE 1e-11f      /* Tuning parameter for the smalles value that can be allowed */
+#define MAX_ITERATIONS 10000U /* For all iteration algorithm */
 
 // for compatibility with C code
 
@@ -326,8 +326,10 @@ bool svd_golub_reinsch(const float A[], size_t row, size_t column, float U[], fl
 	return ok; /* Solved */
 }
 
-static void Householders_Reduction_to_Bidiagonal_Form(const float* A, size_t nrows, size_t ncols, float* U, float* V, float* diagonal, float* superdiagonal) {
-    uint32_t i, j, k, ip1;
+static void Householders_Reduction_to_Bidiagonal_Form(const float* A, size_t unrows, size_t uncols, float* U, float* V, float* diagonal, float* superdiagonal) {
+        int32_t i, j, k, ip1;
+	const int nrows = unrows;
+	const int ncols = uncols;
 	float s, s2, si, scale;
 	float* pu, * pui, * pv, * pvi;
 	float half_norm_squared;
@@ -488,9 +490,11 @@ static bool Givens_Reduction_to_Diagonal_Form(size_t unrows, size_t uncols, floa
 	float f, g, h;
 	float x, y, z;
 	float* pu, * pv;
-	int32_t i, j, k, m, nrows = unrows, ncols = uncols;
+	int32_t i, j, k, m;
+	const int nrows = unrows;
+	const int ncols = uncols;
 	int32_t rotation_test;
-	uint32_t iteration_count;
+	int32_t iteration_count;
 
 	for (i = 0, x = 0.0f; i < ncols; i++) {
 		y = fabsf(diagonal[i]) + fabsf(superdiagonal[i]);
@@ -545,7 +549,7 @@ static bool Givens_Reduction_to_Diagonal_Form(size_t unrows, size_t uncols, floa
 				break;
 			}
 			else {
-				if (iteration_count >= MAX_ITERATIONS) {
+				if (iteration_count >= int(MAX_ITERATIONS)) {
 					return false;
 				}
 				iteration_count++;
