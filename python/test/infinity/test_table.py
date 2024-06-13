@@ -7,9 +7,16 @@ from infinity.common import ConflictType
 from src.test_table import TestTable
 from src.utils import trace_expected_exceptions
 
-class TestLocalInfinity():
+@pytest.mark.usefixtures("local_infinity")
+class TestInfinity:
+    @pytest.fixture(autouse=True)
+    def setup(self, local_infinity):
+        if local_infinity:
+            self.uri = common_values.TEST_LOCAL_PATH
+        else:
+            self.uri = common_values.TEST_REMOTE_HOST
     def test_table(self):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_version()
         test_table_obj._test_table()
         test_table_obj._test_show_tables()
@@ -29,14 +36,14 @@ class TestLocalInfinity():
 
     # todo fix
     # local infinity disconnect = uninit, db obj cannot know weather disconnected
-    @pytest.mark.skip(reason="todo fix")
+    @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_table_test_after_disconnect_use_table(self):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_after_disconnect_use_table()
 
     @pytest.mark.parametrize("column_name", common_values.invalid_name_array)
     def test_table_test_create_table_with_invalid_column_name_python(self, column_name):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_create_table_with_invalid_column_name_python(column_name)
 
     # create/drop table with different invalid options
@@ -54,25 +61,25 @@ class TestLocalInfinity():
         pytest.param(''.join('x' for i in range(65536 + 1))),
         None,
     ])
-    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
     def test_table_test_table_with_different_invalid_options(self, get_infinity_db, invalid_option_array):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_table_with_different_invalid_options(get_infinity_db, invalid_option_array)
 
     # create/drop/show/get 1000 tables with 10000 columns with various column types.
     @pytest.mark.slow
     @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST") != "1", reason="Cost too much time")
     def test_table_create_10k_table(self):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_create_10K_table()
 
     @trace_expected_exceptions
     def test_table_create_or_drop_same_table_in_different_thread(self):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_create_or_drop_same_table_in_different_thread()
 
     def test_table_create_empty_column_table(self):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_create_empty_column_table()
 
     @pytest.mark.parametrize("types", [
@@ -83,7 +90,7 @@ class TestLocalInfinity():
         "vector, 3, float"
     ])
     def test_table_create_valid_option(self, types):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_create_valid_option(types)
 
     @pytest.mark.parametrize("types", [
@@ -95,21 +102,21 @@ class TestLocalInfinity():
     ])
     @pytest.mark.parametrize("boolean", [True, False])
     def test_table_drop_option(self, types, boolean):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_drop_option(types, boolean)
 
     def test_table_create_same_name_table(self):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_create_same_name_table()
 
     # todo fix: why return TABLE_NOT_EXIST error
-    @pytest.mark.skip()
+    @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_table_drop_same_name_table(self):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_drop_same_name_table()
 
     def test_table_same_column_name(self):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_same_column_name()
 
     @pytest.mark.parametrize("types", [
@@ -122,7 +129,7 @@ class TestLocalInfinity():
         0, 1, pow(2, 63) - 1
     ]])
     def test_table_column_numbers(self, types, column_number):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_column_numbers(types, column_number)
 
     @pytest.mark.parametrize("conflict_type", [
@@ -133,9 +140,9 @@ class TestLocalInfinity():
         1,
         2,
     ])
-    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
     def test_table_create_valid_option(self, get_infinity_db, conflict_type):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_table_create_valid_option(get_infinity_db, conflict_type)
 
     @pytest.mark.parametrize("conflict_type", [
@@ -145,9 +152,9 @@ class TestLocalInfinity():
         pytest.param({}),
         pytest.param(()),
     ])
-    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
     def test_table_create_invalid_option(self, get_infinity_db, conflict_type):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_table_create_invalid_option(get_infinity_db, conflict_type)
 
     @pytest.mark.parametrize("conflict_type", [
@@ -156,9 +163,9 @@ class TestLocalInfinity():
         0,
         1,
     ])
-    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
     def test_table_drop_valid_option(self, get_infinity_db, conflict_type):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_table_drop_valid_option(get_infinity_db, conflict_type)
 
     @pytest.mark.parametrize("conflict_type", [
@@ -170,22 +177,22 @@ class TestLocalInfinity():
         pytest.param({}),
         pytest.param(()),
     ])
-    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
     def test_table_drop_invalid_option(self, get_infinity_db, conflict_type):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_table_drop_invalid_option(get_infinity_db, conflict_type)
 
-    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
     def test_table_create_duplicated_table_with_ignore_option(self, get_infinity_db):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_create_duplicated_table_with_ignore_option(get_infinity_db)
 
-    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
     def test_table_create_duplicated_table_with_error_option(self, get_infinity_db):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_create_duplicated_table_with_error_option(get_infinity_db)
 
-    @pytest.mark.parametrize("get_infinity_db", [common_values.TEST_LOCAL_PATH], indirect=True)
+    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
     def test_table_create_duplicated_table_with_replace_option(self, get_infinity_db):
-        test_table_obj = TestTable(common_values.TEST_LOCAL_PATH)
+        test_table_obj = TestTable(self.uri)
         test_table_obj._test_create_duplicated_table_with_replace_option(get_infinity_db)

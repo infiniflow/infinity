@@ -22,7 +22,7 @@ from infinity.remote_thrift.client import ThriftInfinityClient
 from common import common_values
 from src.test_sdkbase import TestSdk
 
-class TestInfinity(TestSdk):
+class InfinityTest(TestSdk):
 
     def _test_get_database(self):
         infinity_obj = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)

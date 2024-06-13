@@ -7,52 +7,60 @@ from infinity.errors import ErrorCode
 import infinity.index as index
 import os
 
-class TestRemoteInfinity():
+@pytest.mark.usefixtures("local_infinity")
+class TestInfinity:
+    @pytest.fixture(autouse=True)
+    def setup(self, local_infinity):
+        if local_infinity:
+            self.uri = common_values.TEST_LOCAL_PATH
+        else:
+            self.uri = common_values.TEST_REMOTE_HOST
+
     def test_version(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_version()
     def test_update(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update()
     @trace_expected_exceptions
     def test_update_empty_table(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_empty_table()
     def test_update_non_existent_table(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_non_existent_table()
     @trace_expected_exceptions
     def test_update_no_row_is_met_the_condition(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_no_row_is_met_the_condition()
     @trace_expected_exceptions
     def test_update_all_row_is_met_the_condition(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_all_row_is_met_the_condition()
     def test_update_table_with_one_block(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_table_with_one_block()
     def test_update_table_with_one_segment(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_table_with_one_segment()
     def test_update_before_delete(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_before_delete()
     def test_update_inserted_data(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_inserted_data()
     @pytest.mark.slow
     @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Taking too much time.")
     def test_update_inserted_long_before(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_inserted_long_before()
     def test_update_dropped_table(self):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_dropped_table()
     @pytest.mark.parametrize("types", ["varchar"])
     @pytest.mark.parametrize("types_example", [[1, 2, 3]])
     def test_update_invalid_value(self, types, types_example):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_invalid_value(types, types_example)
     @pytest.mark.parametrize("types", ["int", "float"])
     @pytest.mark.parametrize("types_example", [
@@ -61,14 +69,14 @@ class TestRemoteInfinity():
         "1",
     ])
     def test_update_new_value(self, types, types_example):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_new_value(types, types_example)
     @pytest.mark.parametrize("types", ["int", "float"])
     @pytest.mark.parametrize("types_example", [
         pytest.param([1, 2, 3])
     ])
     def test_update_invalid_value(self, types, types_example):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_update_invalid_value(types, types_example)
     @pytest.mark.parametrize("filter_list", [
         "c1 > 10",
@@ -80,8 +88,9 @@ class TestRemoteInfinity():
         "c1 = 0",
     ])
     @pytest.mark.parametrize("types_example", [1, 1.333])
+    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
     def test_valid_filter_expression(self, get_infinity_db, filter_list, types_example):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_valid_filter_expression(get_infinity_db, filter_list, types_example)
     @pytest.mark.parametrize("filter_list", [
         pytest.param("c1"),
@@ -93,6 +102,7 @@ class TestRemoteInfinity():
         pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
     ])
     @pytest.mark.parametrize("types_example", [1, 1.333])
+    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
     def test_invalid_filter_expression(self, get_infinity_db, filter_list, types_example):
-        test_infinity_obj = TestUpdate(common_values.TEST_REMOTE_HOST)
+        test_infinity_obj = TestUpdate(self.uri)
         test_infinity_obj._test_invalid_filter_expression(get_infinity_db, filter_list, types_example)

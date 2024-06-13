@@ -36,7 +36,7 @@ def disconnect_infinity():
 
 
 @pytest.fixture(scope="function")
-def get_infinity_db(request):
+def get_infinity_db_param(request):
     uri = request.param if hasattr(request, 'param') else common_values.TEST_REMOTE_HOST
     # connect
     infinity_obj = infinity.connect(uri)
@@ -46,6 +46,27 @@ def get_infinity_db(request):
     # disconnect
     res = infinity_obj.disconnect()
     assert res.error_code == ErrorCode.OK
+
+@pytest.fixture(scope="function")
+def get_infinity_db(request):
+    if request.config.getoption("--local-infinity"):
+        uri = common_values.TEST_LOCAL_PATH
+    else:
+        uri = common_values.TEST_REMOTE_HOST
+
+    # connect
+    infinity_obj = infinity.connect(uri)
+
+    yield infinity_obj.get_database("default_db")
+
+    # disconnect
+    res = infinity_obj.disconnect()
+    assert res.error_code == ErrorCode.OK
+
+@pytest.fixture(scope="function")
+def skip_if_local_infinity(request):
+    if request.config.getoption("--local-infinity"):
+        pytest.skip("Skipping local-infinity test")
 
 @pytest.fixture(scope="function", autouse=False)
 def get_infinity_connection_pool():
@@ -73,6 +94,9 @@ def disable_items_with_mark(items, mark, reason):
         if mark in item.keywords:
             item.add_marker(skipper)
 
+@pytest.fixture
+def local_infinity(request):
+    return request.config.getoption("--local-infinity")
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -80,4 +104,11 @@ def pytest_addoption(parser):
         action="store_true",
         default=False,
         help="Run integration tests (requires S3 buckets to be setup with access)",
+    )
+
+    parser.addoption(
+        "--local-infinity",
+        action="store_true",
+        default=False,
+        help="Run local infinity tests (default is remote)",
     )
