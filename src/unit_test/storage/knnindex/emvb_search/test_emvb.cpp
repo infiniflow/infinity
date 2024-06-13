@@ -20,10 +20,21 @@ import emvb_search;
 import emvb_product_quantization;
 using namespace infinity;
 
+class FakePQ final : public EMVBProductQuantizer {
+public:
+    void Train(const f32 *embedding_data, u32 embedding_num, u32 iter_cnt) override {}
+    void AddEmbeddings(const f32 *embedding_data, u32 embedding_num) override {}
+    UniquePtr<f32[]> GetIPDistanceTable(const f32 *query_data, u32 query_num) const override { return nullptr; }
+    f32 GetSingleIPDistance(u32 embedding_id, u32 query_id, u32 query_num, const f32 *ip_table) const override { return 0.0f; }
+    void
+    GetMultipleIPDistance(u32 embedding_offset, u32 embedding_num, u32 query_id, u32 query_num, const f32 *ip_table, f32 *output_ptr) const override {
+        std::fill_n(output_ptr, embedding_num, 0.0f);
+    }
+};
+
 class EMVBTest : public BaseTest {};
 
-TEST_F(EMVBTest, test1) {
-    GTEST_SKIP() << "not enough data for product quantization";
+TEST_F(EMVBTest, test_fakepq) {
     constexpr u32 embedding_dimension = 128;
     constexpr u32 centroid_num = 8;
     constexpr u32 docs_in_one_centroid = 10;
@@ -55,7 +66,7 @@ TEST_F(EMVBTest, test1) {
             centroids_to_docid[i].push_back(i * docs_in_one_centroid + j);
         }
     }
-    OPQ<u8, 16> opq(embedding_dimension / 16);
+    FakePQ fake_pq;
     auto emvb = EMVBSearch<FIXED_QUERY_TOKEN_NUM>(embedding_dimension,
                                                   n_docs,
                                                   centroid_num,
@@ -64,7 +75,7 @@ TEST_F(EMVBTest, test1) {
                                                   centroid_id_assignments.data(),
                                                   centroids_data.data(),
                                                   centroids_to_docid,
-                                                  opq);
+                                                  fake_pq);
     Vector<f32> query(FIXED_QUERY_TOKEN_NUM * embedding_dimension);
     for (u32 i = 0; i < FIXED_QUERY_TOKEN_NUM; ++i) {
         query[i * embedding_dimension + 3] = 1.0f;
