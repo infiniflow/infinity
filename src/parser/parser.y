@@ -1183,6 +1183,49 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     }
     delete $7;
 }
+| COPY table_name '(' identifier_array ')' TO file_path WITH '(' copy_option_list ')' {
+    $$ = new infinity::CopyStatement();
+
+    // Copy To
+    $$->copy_from_ = false;
+
+    // table_name
+    if($2->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $2->schema_name_ptr_;
+        free($2->schema_name_ptr_);
+    }
+    $$->table_name_ = $2->table_name_ptr_;
+    free($2->table_name_ptr_);
+    delete $2;
+
+    $$->columns_ = $4;
+
+    // file path
+    $$->file_path_ = $7;
+    free($7);
+
+    // copy options
+    size_t option_count = (*$10).size();
+    for(size_t idx = 0; idx < option_count; ++ idx) {
+        infinity::CopyOption* option_ptr = (*$10)[idx];
+        switch(option_ptr->option_type_) {
+            case infinity::CopyOptionType::kFormat: {
+                $$->copy_file_type_ = option_ptr->file_type_;
+                break;
+            }
+            case infinity::CopyOptionType::kDelimiter: {
+                $$->delimiter_ = option_ptr->delimiter_;
+                break;
+            }
+            case infinity::CopyOptionType::kHeader: {
+                $$->header_ = option_ptr->header_;
+                break;
+            }
+        }
+        delete option_ptr;
+    }
+    delete $10;
+}
 | COPY table_name FROM file_path WITH '(' copy_option_list ')' {
     $$ = new infinity::CopyStatement();
 
