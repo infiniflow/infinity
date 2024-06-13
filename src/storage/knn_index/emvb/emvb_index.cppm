@@ -22,16 +22,23 @@ namespace infinity {
 
 extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
+class FileHandler;
+struct RowID;
+struct SegmentEntry;
+class ColumnDef;
+class BufferManager;
 
 using EMVBQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;
 
 // created with fixed embedding dimension and number of centroids
+// should be trained with embeddings no less than ExpectLeastTrainingDataNum() before use
+// after training, the index is append only
 export class EMVBIndex {
     const u32 start_segment_offset_ = 0;                 // start offset of the index in the segment
     const u32 embedding_dimension_ = 0;                  // dimension of the embeddings
-    const u32 n_centroids_ = 0;                          // number of centroids, need to be a multiple of 8
     const u32 residual_pq_subspace_num_ = 0;             // number of subspaces in the residual product quantizer
     const u32 residual_pq_subspace_bits_ = 0;            // number of bits for each centroid representation in the residual product quantizer
+    u32 n_centroids_ = 0;                                // number of centroids, need to be a multiple of 8
     Vector<f32> centroids_data_;                         // centroids data
     Vector<f32> centroid_norms_neg_half_;                // (-0.5 * norm) for each centroid
     atomic_u32 n_docs_ = 0;                              // number of documents in the entire collection
@@ -41,14 +48,19 @@ export class EMVBIndex {
     EMVBSharedVec<u32> centroid_id_assignments_;         // centroid id assignments for each embedding
     UniquePtr<EMVBSharedVec<u32>[]> centroids_to_docid_; // docids belonging to each centroid
     UniquePtr<EMVBProductQuantizer> product_quantizer_;  // product quantizer for residuals of the embeddings
-    std::mutex append_mutex_;                            // mutex for append all embeddings for one doc
+    mutable std::shared_mutex rw_mutex_;                 // mutex for append all embeddings for one doc
 
 public:
-    EMVBIndex(u32 start_segment_offset, u32 embedding_dimension, u32 n_centroids, u32 residual_pq_subspace_num, u32 residual_pq_subspace_bits);
+    EMVBIndex(u32 start_segment_offset, u32 embedding_dimension, u32 residual_pq_subspace_num, u32 residual_pq_subspace_bits);
 
-    [[nodiscard]] u32 ExpectLeastTrainingDataNum() const;
+    void BuildEMVBIndex(RowID base_rowid,
+                        u32 row_count,
+                        const SegmentEntry *segment_entry,
+                        const SharedPtr<ColumnDef> &column_def,
+                        BufferManager *buffer_mgr,
+                        u32 embedding_count = 0);
 
-    void Train(const f32 *embedding_data, u32 embedding_num, u32 iter_cnt = 20);
+    void Train(u32 centroids_num, const f32 *embedding_data, u32 embedding_num, u32 iter_cnt = 20);
 
     void AddOneDocEmbeddings(const f32 *embedding_data, u32 embedding_num);
 
@@ -66,7 +78,18 @@ public:
                                        f32 threshold_final   // step 3, threshold to reduce maxsim calculation
     ) const;
 
+    void SaveIndexInner(FileHandler &file_handler);
+
+    void ReadIndexInner(FileHandler &file_handler);
+
+    u32 GetDocNum() const;
+
+    u32 GetTotalEmbeddingNum() const;
+
+    EMVBIndex &operator=(EMVBIndex &&other); // used only in memindex dump
 private:
+    [[nodiscard]] u32 ExpectLeastTrainingDataNum() const;
+
     template <u32 I, u32... J>
     EMVBQueryResultType query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto... query_args) const;
 
