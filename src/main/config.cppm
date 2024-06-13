@@ -41,7 +41,9 @@ public:
 
     void SetCPULimit(i64 new_cpu_limit);
     i64 CPULimit();
-    bool RecordRunningQuery();
+    inline bool RecordRunningQuery() {
+        return record_running_query_;
+    }
     void SetRecordRunningQuery(bool flag);
 
     // Network

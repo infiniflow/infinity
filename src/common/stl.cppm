@@ -157,6 +157,7 @@ export namespace std {
     using std::numeric_limits;
 
     namespace chrono {
+        using std::chrono::duration_cast;
         using std::chrono::duration;
         using std::chrono::microseconds;
         using std::chrono::milliseconds;
@@ -179,6 +180,8 @@ export namespace std {
 
         using std::chrono::steady_clock;
         using std::chrono::time_point;
+        using std::chrono::system_clock;
+
     } // namespace chrono
 
     using std::cout;
@@ -265,6 +268,10 @@ export namespace std {
 
     using std::strncmp;
     using std::memset;
+
+    // using std::literals;
+    using std::put_time;
+    using std::localtime;
 } // namespace std
 
 namespace infinity {

@@ -1555,10 +1555,6 @@ i64 Config::CPULimit() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kWorkerCPULimit);
 }
 
-bool Config::RecordRunningQuery() {
-    return record_running_query_;
-}
-
 void Config::SetRecordRunningQuery(bool flag) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kRecordRunningQuery);

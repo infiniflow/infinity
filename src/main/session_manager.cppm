@@ -17,8 +17,16 @@ export module session_manager;
 
 import stl;
 import session;
+import profiler;
 
 namespace infinity {
+
+export struct QueryInfo {
+    u64 query_id_;
+    String query_kind_;
+    String query_text_;
+    BaseProfiler profiler_;
+};
 
 export class SessionManager {
 
@@ -69,6 +77,33 @@ public:
 
     u64 total_query_count() const { return total_query_count_; }
 
+    void AddQueryRecord(u64 session_id, u64 query_id, const String& query_kind, const String& query_text) {
+        std::unique_lock<std::mutex> lock(query_record_locker_);
+        SharedPtr<QueryInfo> query_info = MakeShared<QueryInfo>(query_id, query_kind, query_text, BaseProfiler());
+        query_info->profiler_.Begin();
+        query_record_container_.emplace(session_id, std::move(query_info));
+    }
+
+    void RemoveQueryRecord(u64 session_id) {
+        std::unique_lock<std::mutex> lock(query_record_locker_);
+        query_record_container_.erase(session_id);
+    }
+
+    Map<u64, SharedPtr<QueryInfo>> QueryRecords() {
+        std::unique_lock<std::mutex> lock(query_record_locker_);
+        return query_record_container_;
+    }
+
+    QueryInfo* GetQueryRecord(u64 session_id) {
+        std::unique_lock<std::mutex> lock(query_record_locker_);
+        return query_record_container_[session_id].get();
+    }
+
+    void ClearQueryRecord() {
+        std::unique_lock<std::mutex> lock(query_record_locker_);
+        query_record_container_.clear();
+    }
+
 private:
     std::shared_mutex rw_locker_{};
     HashMap<u64, BaseSession*> sessions_;
@@ -77,6 +112,10 @@ private:
     atomic_u64 session_id_generator_{};
 
     Atomic<u64> total_query_count_{0};
+
+    // session id -> query info
+    std::mutex query_record_locker_{};
+    Map<u64, SharedPtr<QueryInfo>> query_record_container_;
 };
 
 }

@@ -74,6 +74,10 @@ String ToString(ShowType type) {
             return "Show config";
         case ShowType::kShowBuffer:
             return "Show buffer";
+        case ShowType::kShowQueries:
+            return "Show queries";
+        case ShowType::kShowQuery:
+            return "Show query";
         case ShowType::kInvalid: {
             String error_message = "Invalid chunk scan type";
             LOG_CRITICAL(error_message);

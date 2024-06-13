@@ -395,6 +395,30 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowQueries: {
+            output_names_->reserve(5);
+            output_types_->reserve(5);
+            output_names_->emplace_back("session_id");
+            output_names_->emplace_back("query_id");
+            output_names_->emplace_back("query_kind");
+            output_names_->emplace_back("start_time");
+            output_names_->emplace_back("time_consumption");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowType::kShowQuery: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             LOG_ERROR(status.message());
@@ -498,6 +522,14 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowBuffer: {
             ExecuteShowBuffer(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowQueries: {
+            ExecuteShowQueries(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowQuery: {
+            ExecuteShowQuery(query_context, show_operator_state);
             break;
         }
         default: {
@@ -4333,5 +4365,96 @@ void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorSt
     operator_state->output_.emplace_back(std::move(output_block_ptr));
     return ;
 }
+
+void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, bigint_type, "session_id", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, bigint_type, "query_id", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "query_kind", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "start_time", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "time_consumption", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_queries"), column_defs);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        bigint_type,
+        varchar_type,
+        varchar_type,
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    SessionManager *session_manager = query_context->session_manager();
+    Map<u64, SharedPtr<QueryInfo>> query_map = session_manager->QueryRecords();
+    for(auto& query_pair: query_map) {
+        u64 session_id = query_pair.first;
+        QueryInfo& query_info = *query_pair.second;
+
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // session_id
+            Value value = Value::MakeBigInt(session_id);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // query_id
+            Value value = Value::MakeBigInt(query_info.query_id_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // query_kind
+            Value value = Value::MakeVarchar(query_info.query_kind_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+        {
+            // start_time
+//            const std::time_t t_c = std::chrono::system_clock::to_time_t(query_info.begin_ts_ - std::literals::24h);
+//            String begin_ts = std::put_time(std::localtime(&t_c), "%F %T.\n");
+            Value value = Value::MakeVarchar("begin_ts");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+        {
+            // time_consumption
+//            auto time_consumption = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - query_info.begin_ts_);
+            Value value = Value::MakeVarchar("std::to_string(time_consumption)");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        ++ row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return ;
+}
+
+void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorState *operator_state) {
+
+}
+
 
 } // namespace infinity

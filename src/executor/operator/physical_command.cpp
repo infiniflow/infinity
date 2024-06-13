@@ -149,7 +149,12 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             break;
                         }
                         case GlobalOptionIndex::kRecordRunningQuery: {
-                            config->SetRecordRunningQuery(set_command->value_bool());
+                            bool flag = set_command->value_bool();
+                            if(config->RecordRunningQuery() && !flag) {
+                                // turn off the query recording and clean all query record.
+                                query_context->session_manager()->ClearQueryRecord();
+                            }
+                            config->SetRecordRunningQuery(flag);
                             break;
                         }
                         case GlobalOptionIndex::kInvalid: {

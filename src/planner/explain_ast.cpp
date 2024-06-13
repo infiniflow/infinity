@@ -642,8 +642,16 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW CONFIGS"));
             break;
         }
+        case ShowStmtType::kQueries: {
+            result->emplace_back(MakeShared<String>("SHOW QUERIES"));
+            break;
+        }
+        case ShowStmtType::kQuery: {
+            result->emplace_back(MakeShared<String>("SHOW QUERY"));
+            break;
+        }
         case ShowStmtType::kProfiles: {
-            result->emplace_back(MakeShared<String>("SHOW PROFILES"));
+            result->emplace_back(MakeShared<String>("SHOW QUERIES"));
             break;
         }
         case ShowStmtType::kSessionVariable: {
