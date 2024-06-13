@@ -20,6 +20,7 @@ import emvb_shared_vec;
 
 namespace infinity {
 
+extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
 
 using EMVBQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;

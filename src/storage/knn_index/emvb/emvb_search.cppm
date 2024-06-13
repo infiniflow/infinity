@@ -16,11 +16,12 @@ module;
 
 export module emvb_search;
 import stl;
+import emvb_shared_vec;
 
 namespace infinity {
+
+extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
-template <typename T>
-class EMVBSharedVec;
 
 // REQUIREMENTS:
 // FIXED_QUERY_TOKEN_NUM % 8 == 0, to simplify alignment

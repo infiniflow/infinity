@@ -35,6 +35,8 @@ import infinity_exception;
 
 namespace infinity {
 
+extern template class EMVBSharedVec<u32>;
+
 using UniquePtrF32Aligned = std::unique_ptr<f32[], decltype([](f32 *p) { std::free(p); })>;
 
 // For avx
@@ -336,19 +338,12 @@ std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> EMVBSearch<FIXED
 }
 
 template class EMVBSearch<32>;
-
 template class EMVBSearch<64>;
-
 template class EMVBSearch<96>;
-
 template class EMVBSearch<128>;
-
 template class EMVBSearch<160>;
-
 template class EMVBSearch<192>;
-
 template class EMVBSearch<224>;
-
 template class EMVBSearch<256>;
 
 } // namespace infinity
