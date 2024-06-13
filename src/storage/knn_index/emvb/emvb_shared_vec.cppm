@@ -59,7 +59,7 @@ public:
         ReserveUnderLockForNewSize(size_ + 1);
         data_[size_++] = std::forward<decltype(val)>(val);
     }
-    void Pushback(auto IterBegin, auto IterEnd) {
+    void PushBack(auto IterBegin, auto IterEnd) {
         std::unique_lock lock(rw_mutex_);
         const u32 append_size = std::distance(IterBegin, IterEnd);
         const u32 new_size = size_ + append_size;

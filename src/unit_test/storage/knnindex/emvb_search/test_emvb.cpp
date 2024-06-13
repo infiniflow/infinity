@@ -18,6 +18,7 @@ import infinity_exception;
 import stl;
 import emvb_search;
 import emvb_product_quantization;
+import emvb_shared_vec;
 using namespace infinity;
 
 class FakePQ final : public EMVBProductQuantizer {
@@ -60,10 +61,10 @@ TEST_F(EMVBTest, test_fakepq) {
     for (u32 i = 0; i < centroid_num; ++i) {
         centroids_data[i * embedding_dimension + i] = 1.0f;
     }
-    Vector<Vector<u32>> centroids_to_docid(centroid_num);
+    Vector<EMVBSharedVec<u32>> centroids_to_docid(centroid_num);
     for (u32 i = 0; i < centroid_num; ++i) {
         for (u32 j = 0; j < docs_in_one_centroid; ++j) {
-            centroids_to_docid[i].push_back(i * docs_in_one_centroid + j);
+            centroids_to_docid[i].PushBack(i * docs_in_one_centroid + j);
         }
     }
     FakePQ fake_pq;
@@ -74,8 +75,8 @@ TEST_F(EMVBTest, test_fakepq) {
                                                   doc_offsets.data(),
                                                   centroid_id_assignments.data(),
                                                   centroids_data.data(),
-                                                  centroids_to_docid,
-                                                  fake_pq);
+                                                  centroids_to_docid.data(),
+                                                  &fake_pq);
     Vector<f32> query(FIXED_QUERY_TOKEN_NUM * embedding_dimension);
     for (u32 i = 0; i < FIXED_QUERY_TOKEN_NUM; ++i) {
         query[i * embedding_dimension + 3] = 1.0f;

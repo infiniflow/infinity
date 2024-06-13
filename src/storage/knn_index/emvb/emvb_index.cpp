@@ -160,7 +160,7 @@ void EMVBIndex::AddOneDocEmbeddings(const f32 *embedding_data, const u32 embeddi
             }
         }
     }
-    centroid_id_assignments_.Pushback(centroid_id_assignments.get(), centroid_id_assignments.get() + embedding_num);
+    centroid_id_assignments_.PushBack(centroid_id_assignments.get(), centroid_id_assignments.get() + embedding_num);
     for (u32 i = 0; i < embedding_num; ++i) {
         const u32 centroid_id = centroid_id_assignments[i];
         centroids_to_docid_[centroid_id].PushBackIfDifferentFromLast(old_doc_num);
