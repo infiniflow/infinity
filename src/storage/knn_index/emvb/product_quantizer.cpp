@@ -190,14 +190,11 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::AddEmbeddings(const f32 *embeddin
     const auto input_buffer = MakeUniqueForOverwrite<f32[]>(embedding_num * this->dimension_);
     matrixA_multiply_matrixB_output_to_C(embedding_data, matrix_R_.get(), embedding_num, this->dimension_, this->dimension_, input_buffer.get());
     // step 2. use PQ encoder
-    u32 old_embedding_cnt = 0;
-    {
-        std::lock_guard lock(this->write_mutex_);
-        old_embedding_cnt = this->next_embedding_id_;
-        const u32 next_end = old_embedding_cnt + embedding_num;
-        this->next_embedding_id_ = next_end;
-        this->encoded_embedding_data_.resize(next_end);
-    }
+    std::lock_guard lock(this->write_mutex_);
+    const u32 old_embedding_cnt = this->next_embedding_id_;
+    const u32 next_end = old_embedding_cnt + embedding_num;
+    this->next_embedding_id_ = next_end;
+    this->encoded_embedding_data_.resize(next_end);
     auto encoded_embedding_output_iter = this->encoded_embedding_data_.begin() + old_embedding_cnt;
     PQ_BASE::EncodeEmbedding(input_buffer.get(), embedding_num, encoded_embedding_output_iter);
 }
@@ -267,8 +264,69 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetMultipleIPDistance(const u32 em
     }
 }
 
+template class OPQ<u8, 2>;
+
+template class OPQ<u8, 4>;
+
+template class OPQ<u8, 8>;
+
 template class OPQ<u8, 16>;
 
 template class OPQ<u8, 32>;
+
+template class OPQ<u8, 64>;
+
+template class OPQ<u8, 128>;
+
+constexpr u32 current_max_subspace_num = 128;
+
+template <std::unsigned_integral T>
+UniquePtr<EMVBProductQuantizer> GetEMVBOPQT_Helper(const u32 pq_subspace_num, const u32 subspace_dimension) {
+    auto error_msg = fmt::format("requested pq_subspace_num {} bigger than max value: {}.", pq_subspace_num, current_max_subspace_num);
+    error_msg += " Please Add instantiation of OPQ with a bigger SUBSPACE_NUM value.";
+    LOG_ERROR(error_msg);
+    return nullptr;
+}
+
+template <std::unsigned_integral T, u32 I, u32... J>
+UniquePtr<EMVBProductQuantizer> GetEMVBOPQT_Helper(const u32 pq_subspace_num, const u32 subspace_dimension) {
+    if (pq_subspace_num == I) {
+        return MakeUnique<OPQ<T, I>>(subspace_dimension);
+    }
+    if (pq_subspace_num < I) {
+        auto error_info = fmt::format("unsupported pq subspace num: {}", pq_subspace_num);
+        error_info += " Please Add instantiation of OPQ with your SUBSPACE_NUM value.";
+        LOG_ERROR(error_info);
+        UnrecoverableError(error_info);
+        return nullptr;
+    }
+    return GetEMVBOPQT_Helper<T, J...>(pq_subspace_num, subspace_dimension);
+}
+
+template <std::unsigned_integral T>
+UniquePtr<EMVBProductQuantizer> GetEMVBOPQT(const u32 pq_subspace_num, const u32 subspace_dimension) {
+    return GetEMVBOPQT_Helper<T, 2, 4, 8, 16, 32, 64, 128>(pq_subspace_num, subspace_dimension);
+}
+
+UniquePtr<EMVBProductQuantizer> GetEMVBOPQ(const u32 pq_subspace_num, const u32 pq_subspace_bits, const u32 embedding_dimension) {
+    if (embedding_dimension % pq_subspace_num != 0) {
+        const auto error_info = fmt::format("embedding dimension {} is not a multiple of subspace number {}", embedding_dimension, pq_subspace_num);
+        LOG_ERROR(error_info);
+        UnrecoverableError(error_info);
+    }
+    const u32 subspace_dimension = embedding_dimension / pq_subspace_num;
+    if (pq_subspace_bits == 8) {
+        return GetEMVBOPQT<u8>(pq_subspace_num, subspace_dimension);
+    }
+    if (pq_subspace_bits == 16) {
+        return GetEMVBOPQT<u16>(pq_subspace_num, subspace_dimension);
+    }
+    {
+        const auto error_info = fmt::format("unsupported pq subspace bits num: {}, now support: 8, 16.", pq_subspace_bits);
+        LOG_ERROR(error_info);
+        UnrecoverableError(error_info);
+        return nullptr;
+    }
+}
 
 } // namespace infinity

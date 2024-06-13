@@ -16,8 +16,11 @@ module;
 
 export module emvb_search;
 import stl;
+import emvb_shared_vec;
 
 namespace infinity {
+
+extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
 
 // REQUIREMENTS:
@@ -36,8 +39,8 @@ class EMVBSearch {
     const u32 *doc_offsets_;                        // start offsets of each document in all the embeddings
     const u32 *centroid_id_assignments_;            // centroid id assignments for each embedding
     const f32 *centroids_data_;                     // centroids data
-    const Vector<Vector<u32>> &centroids_to_docid_; // docids belonging to each centroid
-    const EMVBProductQuantizer &product_quantizer_; // product quantizer for residuals of the embeddings
+    const EMVBSharedVec<u32> *centroids_to_docid_;  // docids belonging to each centroid
+    const EMVBProductQuantizer *product_quantizer_; // product quantizer for residuals of the embeddings
 
 public:
     EMVBSearch(u32 embedding_dimension,
@@ -47,8 +50,8 @@ public:
                const u32 *doc_offsets,
                const u32 *centroid_id_assignments,
                const f32 *centroids_data,
-               const Vector<Vector<u32>> &centroids_to_docid,
-               const EMVBProductQuantizer &product_quantizer);
+               const EMVBSharedVec<u32> *centroids_to_docid,
+               const EMVBProductQuantizer *product_quantizer);
 
     Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>
     GetQueryResult(const f32 *query_ptr, u32 nprobe, f32 thresh, u32 n_doc_to_score, u32 out_second_stage, u32 k, f32 thresh_query) const;
