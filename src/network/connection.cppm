@@ -36,6 +36,15 @@ public:
 
     inline SharedPtr<boost::asio::ip::tcp::socket> socket() { return socket_; }
 
+    inline void GetClientInfo(String &ip_address, u16 &port) {
+        if (session_.get() != nullptr) {
+            session_->GetClientInfo(ip_address, port);
+        } else {
+            ip_address = "";
+            port = 0;
+        }
+    }
+
 private:
     void HandleConnection();
 
