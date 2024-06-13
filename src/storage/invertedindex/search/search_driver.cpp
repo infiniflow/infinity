@@ -143,6 +143,7 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
     Term input_term;
     input_term.text_ = std::move(text);
     TermList terms;
+
     // 1. analyze
     std::string analyzer_name = "standard";
     if (!field.empty()) {
@@ -155,40 +156,37 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
-    if (analyzer_name == AnalyzerPool::STANDARD) {
-        TermList temp_output_terms;
-        analyzer->Analyze(input_term, temp_output_terms);
-        // remove duplicates and only keep the root words for query
-        const u32 INVALID_TERM_OFFSET = -1;
-        Term last_term;
-        last_term.word_offset_ = INVALID_TERM_OFFSET;
-        for (const Term &term : temp_output_terms) {
-            if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-                assert(term.word_offset_ >= last_term.word_offset_);
-            }
-            if (last_term.word_offset_ != term.word_offset_) {
-                if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-                    terms.emplace_back(last_term);
-                }
-                last_term.text_ = term.text_;
-                last_term.word_offset_ = term.word_offset_;
-                last_term.stats_ = term.stats_;
-            } else {
-                if (term.text_.size() < last_term.text_.size()) {
-                    last_term.text_ = term.text_;
-                    last_term.stats_ = term.stats_;
-                }
-            }
-        }
+    TermList temp_output_terms;
+    analyzer->Analyze(input_term, temp_output_terms);
+    // remove duplicates and only keep the root words for query
+    const u32 INVALID_TERM_OFFSET = -1;
+    Term last_term;
+    last_term.word_offset_ = INVALID_TERM_OFFSET;
+    for (const Term &term : temp_output_terms) {
         if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-            terms.emplace_back(last_term);
+            assert(term.word_offset_ >= last_term.word_offset_);
         }
-    } else {
-        analyzer->Analyze(input_term, terms);
+        if (last_term.word_offset_ != term.word_offset_) {
+            if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
+                terms.emplace_back(last_term);
+            }
+            last_term.text_ = term.text_;
+            last_term.word_offset_ = term.word_offset_;
+            last_term.stats_ = term.stats_;
+        } else {
+            if (term.text_.size() < last_term.text_.size()) {
+                last_term.text_ = term.text_;
+                last_term.stats_ = term.stats_;
+            }
+        }
+    }
+    if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
+        terms.emplace_back(last_term);
     }
     if (terms.empty()) {
         std::cerr << "Analyzer " << analyzer_name << " analyzes following text as empty terms: " << input_term.text_ << std::endl;
     }
+
     // 2. build query node
     if (terms.empty()) {
         auto result = std::make_unique<TermQueryNode>();

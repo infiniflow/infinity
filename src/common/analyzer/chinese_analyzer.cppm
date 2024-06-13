@@ -43,9 +43,9 @@ protected:
 
     bool NextToken() override;
 
-    bool IsAlpha() override { return jieba_->IsAlpha(cut_words_[cursor_].word); }
+    bool IsAlpha() override { return jieba_->IsAlpha(token_); }
 
-    bool IsSpecialChar() override { return jieba_->IsPunch(cut_words_[cursor_].word); }
+    bool IsSpecialChar() override { return false; }
 
 private:
     void LoadStopwordsDict(const String &stopwords_path);
