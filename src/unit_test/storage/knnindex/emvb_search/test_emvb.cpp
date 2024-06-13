@@ -61,7 +61,7 @@ TEST_F(EMVBTest, test_fakepq) {
     for (u32 i = 0; i < centroid_num; ++i) {
         centroids_data[i * embedding_dimension + i] = 1.0f;
     }
-    Vector<EMVBSharedVec<u32>> centroids_to_docid(centroid_num);
+    const auto centroids_to_docid = MakeUnique<EMVBSharedVec<u32>[]>(centroid_num);
     for (u32 i = 0; i < centroid_num; ++i) {
         for (u32 j = 0; j < docs_in_one_centroid; ++j) {
             centroids_to_docid[i].PushBack(i * docs_in_one_centroid + j);
@@ -75,7 +75,7 @@ TEST_F(EMVBTest, test_fakepq) {
                                                   doc_offsets.data(),
                                                   centroid_id_assignments.data(),
                                                   centroids_data.data(),
-                                                  centroids_to_docid.data(),
+                                                  centroids_to_docid.get(),
                                                   &fake_pq);
     Vector<f32> query(FIXED_QUERY_TOKEN_NUM * embedding_dimension);
     for (u32 i = 0; i < FIXED_QUERY_TOKEN_NUM; ++i) {
