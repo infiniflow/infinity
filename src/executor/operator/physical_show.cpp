@@ -4424,16 +4424,13 @@ void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorS
         }
         {
             // start_time
-//            const std::time_t t_c = std::chrono::system_clock::to_time_t(query_info.begin_ts_ - std::literals::24h);
-//            String begin_ts = std::put_time(std::localtime(&t_c), "%F %T.\n");
-            Value value = Value::MakeVarchar("begin_ts");
+            Value value = Value::MakeVarchar(query_info.profiler_.BeginTime());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
         }
         {
             // time_consumption
-//            auto time_consumption = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - query_info.begin_ts_);
-            Value value = Value::MakeVarchar("std::to_string(time_consumption)");
+            Value value = Value::MakeVarchar(query_info.profiler_.ElapsedToString());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }

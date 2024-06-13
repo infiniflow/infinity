@@ -46,7 +46,7 @@ std::string BaseProfiler::BeginTime() {
     std::tm* now_tm = std::localtime(&now_time_t);
 
     char buffer[128];
-    strftime(buffer, sizeof(buffer), "%F %T", now_tm);
+    strftime(buffer, sizeof(buffer), "%T", now_tm);
 
     std::ostringstream ss;
     ss.fill('0');
@@ -79,7 +79,7 @@ std::string BaseProfiler::EndTime() {
     ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_ts_.time_since_epoch()) % 1000;
     cs = std::chrono::duration_cast<std::chrono::microseconds>(end_ts_.time_since_epoch()) % 1000000;
     ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_ts_.time_since_epoch()) % 1000000000;
-    ss << buffer << ":" << ms.count() << ":" << cs.count() % 1000 << ":" << ns.count() % 1000;
+    ss << buffer << "." << ms.count() << "." << cs.count() % 1000 << "." << ns.count() % 1000;
     return ss.str();
 }
 
