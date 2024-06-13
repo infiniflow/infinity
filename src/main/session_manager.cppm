@@ -96,7 +96,11 @@ public:
 
     QueryInfo* GetQueryRecord(u64 session_id) {
         std::unique_lock<std::mutex> lock(query_record_locker_);
-        return query_record_container_[session_id].get();
+        auto iter = query_record_container_.find(session_id);
+        if(iter == query_record_container_.end()) {
+            return nullptr;
+        }
+        return iter->second.get();
     }
 
     void ClearQueryRecord() {
