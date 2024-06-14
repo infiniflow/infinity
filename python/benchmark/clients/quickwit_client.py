@@ -17,8 +17,8 @@ class WrapQuickwitClient:
     def create_index(self, index_config):
         response = requests.post(
             f"{self.base_url}/api/v1/indexes",
-            headers={'Content-Type': 'application/json'},
-            data=json.dumps(index_config)
+            headers={'Content-Type': 'application/yaml'},
+            data=index_config
         )
         if response.status_code == 201:
             return response.json()
@@ -44,13 +44,10 @@ class WrapQuickwitClient:
             response.raise_for_status()
 
     def upload_batch(self, index, data):
-        bulk_url = f'{self.base_url}/api/v1/{index}/ingest'
+        bulk_url = f'{self.base_url}/api/v1/{index}/ingest?commit=force'
         response = requests.post(
-            # f"{self.base_url}/api/v1/_elastic/{index}/_bulk",
-            # headers={'Content-Type': 'application/json'},
             bulk_url,
-            headers={'Content-Type': 'application/json'},
-            data=json.dumps(data)
+            data=data
         )
         if response.status_code == 200:
             return response.json()
@@ -93,11 +90,12 @@ class QuickwitClient(BaseClient):
         """
         if self.client.index_exists(index=self.table_name):
             self.client.delete_index(index=self.table_name)
-        res = self.client.create_index(index_config=self.data["index"])
-        print(f"res = {res}")
-        print(f"after create index, exist={self.client.index_exists(index=self.table_name)}")
-        print(f"quick wit created index {self.table_name}")
-        # return
+
+        index_config_path = os.path.join(self.path_prefix, self.data["index_config_path"])
+        with open(index_config_path, 'rb') as file:
+            yaml_data = file.read()
+            self.client.create_index(index_config=yaml_data)
+
         batch_size = self.data["insert_batch_size"]
         dataset_path = os.path.join(self.path_prefix, self.data["data_path"])
         if not os.path.exists(dataset_path):
@@ -138,7 +136,7 @@ class QuickwitClient(BaseClient):
                 if actions:
                     self.upload_batch(actions)
         elif ext == ".csv":
-            print("quick wit csv upload")
+            # print("quick wit csv upload")
             custom_headers = []
             headers = self.data["index"]["doc_mapping"]["field_mappings"]
             for key in headers:
@@ -146,7 +144,6 @@ class QuickwitClient(BaseClient):
             with open(
                 dataset_path, "r", encoding="utf-8", errors="replace"
             ) as data_file:
-                current_batch = []
                 bulk_request = ""
                 cnt = 0
                 for i, line in enumerate(data_file):
@@ -156,14 +153,9 @@ class QuickwitClient(BaseClient):
                             f"row = {i}, row_len = {len(row)}, not equal headers len, skip"
                         )
                         continue
-                    doc = {headers[j]["name"]: row[j] for j in range(len(headers))}
-                    doc_id = doc.get("id", str(i))
-                    # print(f"doc_id = {doc_id}")
-                    # index_action = json.dumps({"index": {"_id": doc_id}})
-                    create_action = json.dumps({"create": {"_index": self.table_name, "_id": doc_id}})
-
-                    document = json.dumps(doc)
-                    bulk_request += f"{create_action}\n{document}\n"
+                    row_dict = {header["name"]: value for header, value in zip(headers, row)}
+                    document = json.dumps(row_dict)
+                    bulk_request += f"{document}\n"
                     cnt += 1
                     if cnt >= batch_size:
                         self.upload_batch(bulk_request)
@@ -171,20 +163,24 @@ class QuickwitClient(BaseClient):
                         cnt = 0
 
                 if cnt != 0:
-                    # print(f"quick wit upload batch, current batch = {bulk_request}")
-                    print(f"index exist: {self.client.index_exists(index=self.table_name)}")
                     self.upload_batch(bulk_request)
                     cnt = 0
         else:
             raise TypeError("Unsupported file type")
-        body = self.get_fulltext_query_content("every fictional")
+        body = self.get_fulltext_query_content("Organizational")
         body["size"] = self.data["topK"]
+
         result = self.client.search(
             index=self.table_name,
             query=body,
         )
-        print(result)
-        print(result["hits"]["hits"])
+
+        # print(json.dumps(result, indent=4))
+        # print(result)
+        print(len(result["hits"]["hits"]))
+        # for hit in result["hits"]["hits"]:
+        #     print(hit["_id"])
+        # print(result["hits"]["hits"])
         # self.client.indices.forcemerge(index=self.table_name, wait_for_completion=True)
 
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query.html
@@ -198,7 +194,17 @@ class QuickwitClient(BaseClient):
                 }
             }
         else:
-            ret = {"query": {"match": {"body": query}}}
+            # ret = {"query": {"match": {"body": query}}}
+            ret = {
+                "query": {
+                    "match": {
+                        "body": {
+                            "query": query,
+                            "zero_terms_query": "all"
+                        }
+                    }
+                }
+            }
         return ret
 
     def setup_clients(self, num_threads=1):
