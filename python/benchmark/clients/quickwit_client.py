@@ -1,5 +1,4 @@
 from typing import Any
-# from elasticsearch import Elasticsearch, helpers
 import json
 from typing import List
 import os
@@ -10,6 +9,7 @@ import requests
 import sys
 
 from .base_client import BaseClient
+
 
 class WrapQuickwitClient:
     def __init__(self, base_url):
@@ -56,7 +56,6 @@ class WrapQuickwitClient:
             response.raise_for_status()
 
     def search(self, index, query):
-        # search_url = f"{self.base_url}/api/v1/{index}/search"
         search_url = f"{self.base_url}/api/v1/_elastic/{index}/_search/"
 
         response = requests.get(
@@ -68,6 +67,7 @@ class WrapQuickwitClient:
             return response.json()
         else:
             response.raise_for_status()
+
 
 class QuickwitClient(BaseClient):
     def __init__(self, conf_path: str) -> None:
@@ -108,11 +108,6 @@ class QuickwitClient(BaseClient):
             with open(dataset_path, "r") as f:
                 bulk_request = ""
                 for i, line in enumerate(f):
-                    # if i % batch_size == 0 and i != 0:
-                    #     print(f"upload data size {sys.getsizeof(bulk_request) / 1024 / 1024} MB")
-                    #     self.upload_batch(bulk_request)
-                    #     bulk_request = ""
-
                     record = json.dumps(json.loads(line))
                     record_str = f"{record}\n"
                     if sys.getsizeof(bulk_request) + sys.getsizeof(record_str) >= MAX_DATA_SIZE:
@@ -123,9 +118,7 @@ class QuickwitClient(BaseClient):
 
                     if i % 1000000 == 0 and i != 0:
                         logging.info(f"row {i}")
-
                 if len(bulk_request) != 0:
-                    # print(f"bulk_request:\n {bulk_request}")
                     self.upload_batch(bulk_request)
         elif ext == ".hdf5" and self.data["mode"] == "vector":
             with h5py.File(dataset_path, "r") as f:
@@ -145,13 +138,12 @@ class QuickwitClient(BaseClient):
                 if actions:
                     self.upload_batch(actions)
         elif ext == ".csv":
-            # print("quick wit csv upload")
             custom_headers = []
             headers = self.data["index"]["doc_mapping"]["field_mappings"]
             for key in headers:
                 custom_headers.append(key["name"])
             with open(
-                dataset_path, "r", encoding="utf-8", errors="replace"
+                    dataset_path, "r", encoding="utf-8", errors="replace"
             ) as data_file:
                 bulk_request = ""
                 cnt = 0
@@ -172,27 +164,11 @@ class QuickwitClient(BaseClient):
                         cnt = 0
 
                 if cnt != 0:
-                    print("bulk_request: \n", bulk_request)
                     self.upload_batch(bulk_request)
                     cnt = 0
         else:
             raise TypeError("Unsupported file type")
 
-        # body = self.get_fulltext_query_content("hello")
-        # body["size"] = self.data["topK"]
-        # print(f"query = {body}")
-        # result = self.client.search(
-        #     index=self.table_name,
-        #     query=body,
-        # )
-        #
-        # print(json.dumps(result, indent=4))
-        # print(len(result["hits"]["hits"]))
-        # print(result["hits"])
-
-        # self.client.indices.forcemerge(index=self.table_name, wait_for_completion=True)
-
-    # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query.html
     def get_fulltext_query_content(self, query: str, is_and: bool = False) -> Any:
         ret = None
         if is_and:
@@ -203,7 +179,6 @@ class QuickwitClient(BaseClient):
                 }
             }
         else:
-            # ret = {"query": {"match": {"body": query}}}
             ret = {
                 "query": {
                     "query_string": {
@@ -214,18 +189,6 @@ class QuickwitClient(BaseClient):
                     }
                 },
                 "sort": ["_score"]
-                # "query": {
-                #     "match": {
-                #         "body": {
-                #             "query": query,
-                #             # "fields": [
-                #             #     "doctitle", "docdate"
-                #             # ],
-                #             "zero_terms_query": "all"
-                #         }
-                #     }
-                # },
-                # "sort": ["_score"]
             }
         return ret
 
@@ -248,7 +211,6 @@ class QuickwitClient(BaseClient):
             )
             result = [
                 # todo add _id
-                # _score = hit["sort"][0]
                 (0, hit["sort"][0])
                 for hit in result["hits"]["hits"]
             ]

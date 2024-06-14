@@ -1,0 +1,36 @@
+{
+  "name": "elasticsearch_tantivy",
+  "app": "elasticsearch",
+  "app_path": "servers/elasticsearch/",
+  "connection_url": "http://localhost:9200",
+  "data_path": "datasets/tantivy/wiki-articles.json",
+  "insert_batch_size": 8192,
+  "query_path": "datasets/tantivy/operations.txt",
+  "result_path": "datasets/tantivy/elasticsearch_result.jsonl",
+  "mode": "fulltext",
+  "topK": 10,
+  "index": {
+    "settings": {
+      "index.number_of_shards": 5,
+      "index.number_of_replicas": 0,
+      "index.requests.cache.enable": false
+    },
+    "mappings": {
+      "_source": {
+        "enabled": true
+      },
+      "dynamic": "strict",
+      "properties": {
+        "url": {
+          "type": "text"
+        },
+        "title": {
+          "type": "text"
+        },
+        "body": {
+          "type": "text"
+        }
+      }
+    }
+  }
+}

@@ -10,7 +10,7 @@ from clients.quickwit_client import QuickwitClient
 from generate_queries import generate_query_txt
 
 ENGINES = ["infinity", "qdrant", "elasticsearch", "quickwit"]
-DATA_SETS = ["gist", "sift", "geonames", "enwiki"]
+DATA_SETS = ["gist", "sift", "geonames", "enwiki", "tantivy"]
 
 
 def parse_args() -> argparse.Namespace:

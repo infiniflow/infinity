@@ -62,6 +62,9 @@ docker run -d --name qdrant --network host -v $HOME/qdrant/storage:/qdrant/stora
 
 mkdir -p $HOME/infinity
 docker run -d --name infinity -v $HOME/infinity:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:0.1.0
+
+mkdir -p $HOME/quickwit
+docker run -d --rm -v $HOME/quickwit/qwdata:/quickwit/qwdata -p 127.0.0.1:7280:7280 quickwit/quickwit run
 ```
 
 4. Run Benchmark:
