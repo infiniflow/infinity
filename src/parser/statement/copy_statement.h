@@ -32,9 +32,11 @@ struct CopyOption {
     char delimiter_{','};
 };
 
-class CopyStatement : public BaseStatement {
+class CopyStatement final : public BaseStatement {
 public:
     CopyStatement() : BaseStatement(StatementType::kCopy) {}
+
+    ~CopyStatement() final;
 
     [[nodiscard]] std::string ToString() const final;
 
@@ -45,6 +47,9 @@ public:
     bool header_{false};
     CopyFileType copy_file_type_{CopyFileType::kCSV};
     char delimiter_{','};
+
+    // EXPORT columns
+    std::vector<std::string> *columns_{nullptr};
 };
 
 } // namespace infinity

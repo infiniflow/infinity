@@ -12,28 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "base_table_reference.h"
+module;
+
+module emvb_shared_vec;
+import stl;
 
 namespace infinity {
 
-TableAlias::~TableAlias() {
-
-    if (alias_ != nullptr) {
-        free(alias_);
-        alias_ = nullptr;
+// It seems that 'MakeShared' cannot be put into the cppm file.
+template <typename T>
+void EMVBSharedVec<T>::ReserveUnderLock(u32 new_capacity) {
+    if (new_capacity <= capacity_) {
+        return;
     }
-
-    if (column_alias_array_ != nullptr) {
-        delete column_alias_array_;
-        column_alias_array_ = nullptr;
-    }
+    auto new_data = MakeShared<T[]>(new_capacity);
+    std::copy_n(data_.get(), size_, new_data.get());
+    data_ = std::move(new_data);
+    capacity_ = new_capacity;
 }
 
-BaseTableReference::~BaseTableReference() {
-    if (alias_ != nullptr) {
-        delete alias_;
-        alias_ = nullptr;
-    }
-}
+template class EMVBSharedVec<u32>;
 
 } // namespace infinity

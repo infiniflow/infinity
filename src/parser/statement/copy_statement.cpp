@@ -17,6 +17,13 @@
 
 namespace infinity {
 
+CopyStatement::~CopyStatement() {
+    if(columns_ != nullptr) {
+        delete columns_;
+        columns_ = nullptr;
+    }
+}
+
 std::string CopyStatement::ToString() const {
     std::stringstream ss;
     std::string copy_direction;

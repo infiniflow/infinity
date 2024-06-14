@@ -33,6 +33,8 @@ import file_system_type;
 import defer_op;
 import stl;
 import logical_type;
+import embedding_info;
+import status;
 
 namespace infinity {
 
@@ -48,6 +50,10 @@ bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operato
         }
         case CopyFileType::kJSONL: {
             exported_row_count = ExportToJSONL(query_context, export_op_state);
+            break;
+        }
+        case CopyFileType::kFVECS: {
+            exported_row_count = ExportToFVECS(query_context, export_op_state);
             break;
         }
         default: {
@@ -189,6 +195,72 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
         }
     }
     LOG_DEBUG(fmt::format("Export to JSONL, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
+    return row_count;
+}
+
+SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorState *export_op_state) {
+
+    if(column_idx_array_.size() != 1) {
+        String error_message = "Only one column with embedding data type can be exported as FVECS file";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+
+    u64 exported_column_idx = column_idx_array_[0];
+    const Vector<SharedPtr<ColumnDef>>& column_defs = table_entry_->column_defs();
+    DataType* data_type = column_defs[exported_column_idx]->type().get();
+    if(data_type->type() != LogicalType::kEmbedding) {
+        String error_message = fmt::format("Only embedding column can be exported as FVECS file, but it is {}", data_type->ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+
+    EmbeddingInfo* embedding_type_info = static_cast<EmbeddingInfo*>(data_type->type_info().get());
+    if(embedding_type_info->Type() != EmbeddingDataType::kElemFloat) {
+        Status status = Status::NotSupport("Only float element type embedding is supported now.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+
+    i32 dimension = embedding_type_info->Dimension();
+
+    LocalFileSystem fs;
+    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+    if(!status.ok()) {
+        RecoverableError(status);
+    }
+    DeferFn file_defer([&]() { fs.Close(*file_handler); });
+
+    SizeT row_count{0};
+    Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
+
+    // Write header
+    LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
+    for(auto& [segment_id, segment_snapshot]: segment_block_index_ref) {
+        SizeT block_count = segment_snapshot.block_map_.size();
+        LOG_DEBUG(fmt::format("Export segment_id: {}, with block count: {}", segment_id, block_count));
+        for(SizeT block_idx = 0; block_idx < block_count; ++ block_idx) {
+            LOG_DEBUG(fmt::format("Export block_idx: {}", block_idx));
+            BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];
+            SizeT block_row_count = block_entry->row_count();
+
+            ColumnVector exported_column_vector = block_entry->GetColumnBlockEntry(exported_column_idx)->GetColumnVector(query_context->storage()->buffer_manager());
+            if(exported_column_vector.Size() != block_row_count) {
+                String error_message = "Unmatched row_count between block and block_column";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+
+            for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
+                Value v = exported_column_vector.GetValue(row_idx);
+                Span<char> embedding = v.GetEmbedding();
+                fs.Write(*file_handler, &dimension, sizeof(dimension));
+                fs.Write(*file_handler, embedding.data(), embedding.size_bytes());
+                ++ row_count;
+            }
+        }
+    }
+    LOG_DEBUG(fmt::format("Export to FVECS, db {}, table {}, file: {}, row: {}", schema_name_, table_name_, file_path_, row_count));
     return row_count;
 }
 

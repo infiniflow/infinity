@@ -136,7 +136,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     }
     DeferFn defer_fn([&]() { fs.Close(*file_handler); });
 
-    int dimension = 0;
+    i32 dimension = 0;
     i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
     fs.Seek(*file_handler, 0);
     if (nbytes == 0) {
