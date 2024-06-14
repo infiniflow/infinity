@@ -25,6 +25,7 @@ from generate_mem_hnsw import generate as generate14
 from generate_big_sparse import generate as generate15
 from generate_csr import generate as generate16
 from generate_bvecs import generate as generate17
+from generate_emvb_test_data import generate as generate18
 
 class SpinnerThread(threading.Thread):
     def __init__(self):
@@ -160,6 +161,7 @@ if __name__ == "__main__":
     generate15(args.generate_if_exists, args.copy)
     generate16(args.generate_if_exists, args.copy)
     generate17(args.generate_if_exists, args.copy)
+    generate18(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
 
     if os.path.exists("/var/infinity/test_data/test_export_jsonl.jsonl"):
