@@ -72,7 +72,20 @@ bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operato
 
 SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorState *export_op_state) {
     const Vector<SharedPtr<ColumnDef>>& column_defs = table_entry_->column_defs();
-    SizeT column_count = column_defs.size();
+
+    Vector<ColumnID> select_columns;
+    // export all columns or export specific column index
+    if(column_idx_array_.empty()) {
+        SizeT column_count = column_defs.size();
+        select_columns.reserve(column_count);
+        for(ColumnID idx = 0; idx < column_count; ++ idx) {
+            select_columns.emplace_back(idx);
+        }
+    } else {
+        select_columns = column_idx_array_;
+    }
+
+    SizeT select_column_count = select_columns.size();
 
     LocalFileSystem fs;
     auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
@@ -84,10 +97,11 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
     if(header_) {
         // Output CSV header
         String header;
-        for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
+        for(SizeT select_column_idx = 0; select_column_idx < select_column_count; ++ select_column_idx) {
+            ColumnID column_idx = select_columns[select_column_idx];
             ColumnDef* column_def = column_defs[column_idx].get();
             header += column_def->name();
-            if(column_idx != column_count - 1) {
+            if(select_column_idx != select_column_count - 1) {
                 header += delimiter_;
             } else {
                 header += '\n';
@@ -107,8 +121,8 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
             SizeT block_row_count = block_entry->row_count();
 
             Vector<ColumnVector> column_vectors;
-            column_vectors.reserve(column_count);
-            for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
+            column_vectors.reserve(select_column_count);
+            for(ColumnID column_idx: select_columns) {
                 column_vectors.emplace_back(block_entry->GetColumnBlockEntry(column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
                 if(column_vectors[column_idx].Size() != block_row_count) {
                     String error_message = "Unmatched row_count between block and block_column";
@@ -119,7 +133,9 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
             for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
                 String line;
-                for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
+                for(SizeT select_column_idx = 0; select_column_idx < select_column_count; ++ select_column_idx) {
+                    ColumnID column_idx = select_columns[select_column_idx];
+                    // TODO: Check the visibility
                     Value v = column_vectors[column_idx].GetValue(row_idx);
                     switch(v.type().type()) {
                         case LogicalType::kEmbedding: {
@@ -130,7 +146,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                             line += v.ToString();
                         }
                     }
-                    if(column_idx == column_count - 1) {
+                    if(column_idx == select_column_count - 1) {
                         line += "\n";
                     } else {
                         line += delimiter_;
@@ -148,7 +164,20 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorState *export_op_state) {
 
     const Vector<SharedPtr<ColumnDef>>& column_defs = table_entry_->column_defs();
-    SizeT column_count = column_defs.size();
+
+    Vector<ColumnID> select_columns;
+    // export all columns or export specific column index
+    if(column_idx_array_.empty()) {
+        SizeT column_count = column_defs.size();
+        select_columns.reserve(column_count);
+        for(ColumnID idx = 0; idx < column_count; ++ idx) {
+            select_columns.emplace_back(idx);
+        }
+    } else {
+        select_columns = column_idx_array_;
+    }
+
+    SizeT select_column_count = select_columns.size();
 
     LocalFileSystem fs;
     auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
@@ -170,8 +199,8 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
             SizeT block_row_count = block_entry->row_count();
 
             Vector<ColumnVector> column_vectors;
-            column_vectors.reserve(column_count);
-            for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
+            column_vectors.reserve(select_column_count);
+            for(ColumnID column_idx: select_columns) {
                 column_vectors.emplace_back(block_entry->GetColumnBlockEntry(column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
                 if(column_vectors[column_idx].Size() != block_row_count) {
                     String error_message = "Unmatched row_count between block and block_column";
@@ -182,8 +211,9 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
 
             for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
                 nlohmann::json line_json;
-                for(SizeT column_idx = 0; column_idx < column_count; ++ column_idx) {
+                for(ColumnID column_idx: select_columns) {
                     ColumnDef* column_def = column_defs[column_idx].get();
+                    // TODO: Need to check visibility
                     Value v = column_vectors[column_idx].GetValue(row_idx);
                     v.AppendToJson(column_def->name(), line_json);
                 }
