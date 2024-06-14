@@ -454,6 +454,12 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         names_ptr->emplace_back(column_def->name_);
         columns.emplace_back(idx);
     }
+    const auto *catalog = query_context_ptr_->storage()->catalog();
+    for (const auto &[name, column_def] : catalog->special_columns_) {
+        types_ptr->emplace_back(column_def->column_type_);
+        names_ptr->emplace_back(name);
+        columns.emplace_back(column_def->id_);
+    }
 
     Txn *txn = query_context->GetTxn();
 

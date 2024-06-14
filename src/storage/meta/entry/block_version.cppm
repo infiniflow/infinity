@@ -21,6 +21,8 @@ import file_system;
 
 namespace infinity {
 
+struct ColumnVector;
+
 struct CreateField {
     //    CreateField(TxnTimeStamp create_ts, i32 row_count) : create_ts_(create_ts), row_count_(row_count) {}
 
@@ -54,6 +56,8 @@ export struct BlockVersion {
     void SpillToFile(FileHandler &file_handler) const;
 
     static UniquePtr<BlockVersion> LoadFromFile(FileHandler &file_handler);
+
+    void GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) const;
 
     // void Cleanup(const String &version_path);
 

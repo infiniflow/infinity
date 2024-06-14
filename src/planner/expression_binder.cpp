@@ -19,7 +19,7 @@ module;
 module expression_binder;
 
 import stl;
-
+import default_values;
 import type_info;
 import infinity_exception;
 import bind_context;
@@ -799,14 +799,35 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         String column_name = special_function_ptr->name();
 
         TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
-        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function_ptr->data_type(),
-                                                                               table_name,
-                                                                               bind_context_ptr->table_name2table_index_[table_name],
-                                                                               column_name,
-                                                                               table_entry->ColumnCount() + special_function_ptr->extra_idx(),
-                                                                               depth,
-                                                                               special_function_ptr->special_type());
-        return bound_column_expr;
+        switch (special_function_ptr->special_type()) {
+            case SpecialType::kCreateTs: {
+                return ColumnExpression::Make(special_function_ptr->data_type(),
+                                              table_name,
+                                              bind_context_ptr->table_name2table_index_[table_name],
+                                              column_name,
+                                              COLUMN_IDENTIFIER_CREATE,
+                                              depth,
+                                              special_function_ptr->special_type());
+            }
+            case SpecialType::kDeleteTs: {
+                return ColumnExpression::Make(special_function_ptr->data_type(),
+                                              table_name,
+                                              bind_context_ptr->table_name2table_index_[table_name],
+                                              column_name,
+                                              COLUMN_IDENTIFIER_DELETE,
+                                              depth,
+                                              special_function_ptr->special_type());
+            }
+            default: {
+                return ColumnExpression::Make(special_function_ptr->data_type(),
+                                              table_name,
+                                              bind_context_ptr->table_name2table_index_[table_name],
+                                              column_name,
+                                              table_entry->ColumnCount() + special_function_ptr->extra_idx(),
+                                              depth,
+                                              special_function_ptr->special_type());
+            }
+        }
     } else {
         return None;
     }

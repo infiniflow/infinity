@@ -156,6 +156,10 @@ public:
 
     Vector<UniquePtr<BlockColumnEntry>> &columns() { return columns_; }
 
+    ColumnVector GetCreateTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
+
+    ColumnVector GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
+
 public:
     // Setter
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
