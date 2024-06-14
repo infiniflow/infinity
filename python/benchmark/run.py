@@ -6,10 +6,11 @@ import sys
 from clients.elasticsearch_client import ElasticsearchClient
 from clients.infinity_client import InfinityClient
 from clients.qdrant_client import QdrantClient
+from clients.quickwit_client import QuickwitClient
 from generate_queries import generate_query_txt
 
-ENGINES = ["infinity", "qdrant", "elasticsearch"]
-DATA_SETS = ["gist", "sift", "geonames", "enwiki"]
+ENGINES = ["infinity", "qdrant", "elasticsearch", "quickwit"]
+DATA_SETS = ["gist", "sift", "geonames", "enwiki", "tantivy"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -74,6 +75,8 @@ def get_client(engine: str, conf_path: str):
         return ElasticsearchClient(conf_path)
     elif engine == "infinity":
         return InfinityClient(conf_path)
+    elif engine == "quickwit":
+        return QuickwitClient(conf_path)
     else:
         raise ValueError(f"Unknown engine: {engine}")
 

@@ -1,0 +1,25 @@
+{
+  "name": "quickwit_enwiki",
+  "app": "quickwit",
+  "app_path": "servers/quickwit/",
+  "connection_url": "http://localhost:7280",
+  "data_path": "datasets/enwiki/enwiki.csv",
+  "insert_batch_size": 8192,
+  "query_path": "datasets/enwiki/operations.txt",
+  "result_path": "datasets/enwiki/quickwit_result.jsonl",
+  "mode": "fulltext",
+  "topK": 10,
+  "index_config_path": "configs/quickwit_enwiki_index.yaml",
+  "index": {
+    "version": "0.8",
+    "index_id": "quickwit_enwiki",
+    "doc_mapping": {
+      "mode": "lenient",
+      "field_mappings": [
+        { "name": "doctitle", "type": "text" },
+        { "name": "docdate", "type": "text" },
+        { "name": "body", "type": "text" }
+      ]
+    }
+  }
+}
