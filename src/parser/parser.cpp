@@ -871,7 +871,7 @@ static const yytype_int16 yyrline[] =
     2815,  2821,  2827,  2833,  2839,  2850,  2854,  2859,  2887,  2897,
     2903,  2907,  2908,  2910,  2911,  2913,  2914,  2926,  2934,  2938,
     2941,  2945,  2948,  2952,  2956,  2961,  2967,  2977,  2984,  2995,
-    3043,  3092
+    3045,  3094
 };
 #endif
 
@@ -7508,6 +7508,8 @@ Return:
         index_type = infinity::IndexType::kHnsw;
     } else if (strcmp((yyvsp[-1].str_value), "ivfflat") == 0) {
         index_type = infinity::IndexType::kIVFFlat;
+    } else if (strcmp((yyvsp[-1].str_value), "emvb") == 0) {
+        index_type = infinity::IndexType::kEMVB;
     } else {
         free((yyvsp[-1].str_value));
         delete (yyvsp[-4].identifier_array_t);
@@ -7547,11 +7549,11 @@ Return:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 7551 "parser.cpp"
+#line 7553 "parser.cpp"
     break;
 
   case 420: /* index_info_list: index_info_list '(' identifier_array ')' USING IDENTIFIER with_index_param_list  */
-#line 3043 "parser.y"
+#line 3045 "parser.y"
                                                                                   {
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -7601,11 +7603,11 @@ Return:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 7605 "parser.cpp"
+#line 7607 "parser.cpp"
     break;
 
   case 421: /* index_info_list: '(' identifier_array ')'  */
-#line 3092 "parser.y"
+#line 3094 "parser.y"
                            {
     infinity::IndexType index_type = infinity::IndexType::kSecondary;
     size_t index_count = (yyvsp[-1].identifier_array_t)->size();
@@ -7619,11 +7621,11 @@ Return:
     }
     delete (yyvsp[-1].identifier_array_t);
 }
-#line 7623 "parser.cpp"
+#line 7625 "parser.cpp"
     break;
 
 
-#line 7627 "parser.cpp"
+#line 7629 "parser.cpp"
 
       default: break;
     }
@@ -7852,7 +7854,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 3106 "parser.y"
+#line 3108 "parser.y"
 
 
 void
