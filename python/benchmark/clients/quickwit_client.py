@@ -7,6 +7,7 @@ import h5py
 import uuid
 import logging
 import requests
+import sys
 
 from .base_client import BaseClient
 
@@ -101,23 +102,31 @@ class QuickwitClient(BaseClient):
         if not os.path.exists(dataset_path):
             self.download_data(self.data["data_link"], dataset_path)
         _, ext = os.path.splitext(dataset_path)
+        # quickwit import data every batch cannot exceed 10MB
+        MAX_DATA_SIZE = 10 * 1024 * 1024
         if ext == ".json":
             with open(dataset_path, "r") as f:
-                actions = []
+                bulk_request = ""
                 for i, line in enumerate(f):
-                    if i % batch_size == 0 and i != 0:
-                        self.upload_batch(actions)
-                        actions = []
-                    record = json.loads(line)
-                    actions.append(
-                        {
-                            "_index": self.table_name,
-                            "_id": uuid.UUID(int=i).hex,
-                            "_source": record,
-                        }
-                    )
-                if actions:
-                    self.upload_batch(actions)
+                    # if i % batch_size == 0 and i != 0:
+                    #     print(f"upload data size {sys.getsizeof(bulk_request) / 1024 / 1024} MB")
+                    #     self.upload_batch(bulk_request)
+                    #     bulk_request = ""
+
+                    record = json.dumps(json.loads(line))
+                    record_str = f"{record}\n"
+                    if sys.getsizeof(bulk_request) + sys.getsizeof(record_str) >= MAX_DATA_SIZE:
+                        self.upload_batch(bulk_request)
+                        bulk_request = record_str
+                    else:
+                        bulk_request += record_str
+
+                    if i % 1000000 == 0 and i != 0:
+                        logging.info(f"row {i}")
+
+                if len(bulk_request) != 0:
+                    # print(f"bulk_request:\n {bulk_request}")
+                    self.upload_batch(bulk_request)
         elif ext == ".hdf5" and self.data["mode"] == "vector":
             with h5py.File(dataset_path, "r") as f:
                 actions = []
@@ -163,26 +172,24 @@ class QuickwitClient(BaseClient):
                         cnt = 0
 
                 if cnt != 0:
+                    print("bulk_request: \n", bulk_request)
                     self.upload_batch(bulk_request)
                     cnt = 0
         else:
             raise TypeError("Unsupported file type")
-        body = self.get_fulltext_query_content("Organizational hello")
-        body["size"] = self.data["topK"]
-        print(body)
 
-        result = self.client.search(
-            index=self.table_name,
-            query=body,
-        )
+        # body = self.get_fulltext_query_content("hello")
+        # body["size"] = self.data["topK"]
+        # print(f"query = {body}")
+        # result = self.client.search(
+        #     index=self.table_name,
+        #     query=body,
+        # )
+        #
+        # print(json.dumps(result, indent=4))
+        # print(len(result["hits"]["hits"]))
+        # print(result["hits"])
 
-        print(json.dumps(result, indent=4))
-        # print(result)
-        print(len(result["hits"]["hits"]))
-        print(result["hits"])
-        # for hit in result["hits"]["hits"]:
-        #     print(hit["_id"])
-        # print(result["hits"]["hits"])
         # self.client.indices.forcemerge(index=self.table_name, wait_for_completion=True)
 
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query.html
@@ -202,8 +209,6 @@ class QuickwitClient(BaseClient):
                     "query_string": {
                         "query": query,
                         "fields": [
-                            # "doctitle",
-                            # "docdate",
                             "body"
                         ]
                     }
