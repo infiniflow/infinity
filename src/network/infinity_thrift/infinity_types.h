@@ -146,7 +146,9 @@ struct CopyFileType {
     CSV = 0,
     JSON = 1,
     JSONL = 2,
-    FVECS = 3
+    FVECS = 3,
+    CSR = 4,
+    BVECS = 5
   };
 };
 

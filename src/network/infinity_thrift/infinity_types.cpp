@@ -278,15 +278,19 @@ int _kCopyFileTypeValues[] = {
   CopyFileType::CSV,
   CopyFileType::JSON,
   CopyFileType::JSONL,
-  CopyFileType::FVECS
+  CopyFileType::FVECS,
+  CopyFileType::CSR,
+  CopyFileType::BVECS
 };
 const char* _kCopyFileTypeNames[] = {
   "CSV",
   "JSON",
   "JSONL",
-  "FVECS"
+  "FVECS",
+  "CSR",
+  "BVECS"
 };
-const std::map<int, const char*> _CopyFileType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(4, _kCopyFileTypeValues, _kCopyFileTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _CopyFileType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(6, _kCopyFileTypeValues, _kCopyFileTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const CopyFileType::type& val) {
   std::map<int, const char*>::const_iterator it = _CopyFileType_VALUES_TO_NAMES.find(val);
