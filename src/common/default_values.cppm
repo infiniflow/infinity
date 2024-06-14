@@ -198,6 +198,8 @@ export {
     constexpr std::string_view WAL_FLUSH_OPTION_NAME = "wal_flush";
     constexpr std::string_view RESOURCE_DIR_OPTION_NAME = "resource_dir";
 
+    constexpr std::string_view RECORD_RUNNING_QUERY_OPTION_NAME = "record_running_query";
+
     // Variable name
     constexpr std::string_view QUERY_COUNT_VAR_NAME = "query_count";        // global and session
     constexpr std::string_view SESSION_COUNT_VAR_NAME = "session_count";    // global
@@ -210,6 +212,7 @@ export {
     constexpr std::string_view ACTIVE_TXN_COUNT_VAR_NAME = "active_txn_count";    // global
     constexpr std::string_view CURRENT_TS_VAR_NAME = "current_timestamp";    // global
     constexpr std::string_view TOTAL_COMMIT_COUNT_VAR_NAME = "total_commit_count"; // global and session
+    constexpr std::string_view TOTAL_ROLLBACK_COUNT_VAR_NAME = "total_rollback_count"; // global and session
     constexpr std::string_view CONNECTED_TS_VAR_NAME = "connected_timestamp"; // session
     constexpr std::string_view CATALOG_VERSION_VAR_NAME = "catalog_version";   // global
     constexpr std::string_view ACTIVE_WAL_FILENAME_VAR_NAME = "active_wal_filename";   // global
@@ -218,6 +221,9 @@ export {
     constexpr std::string_view BG_TASK_COUNT_VAR_NAME = "bg_task_count";  // global
     constexpr std::string_view RUNNING_BG_TASK_VAR_NAME = "running_bg_task";  // global
     constexpr std::string_view RUNNING_COMPACT_TASK_VAR_NAME = "running_compact_task";  // global
+    constexpr std::string_view SYSTEM_MEMORY_USAGE_VAR_NAME = "system_memory_usage";  // global
+    constexpr std::string_view OPEN_FILE_COUNT_VAR_NAME = "open_file_count";  // global
+    constexpr std::string_view CPU_USAGE_VAR_NAME = "cpu_usage";  // global
 
 }
 

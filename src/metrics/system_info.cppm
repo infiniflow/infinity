@@ -1,4 +1,4 @@
-// Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+// Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,14 +14,17 @@
 
 module;
 
-#include "base_statement.h"
+export module system_info;
 
-export module base_statement;
+import stl;
 
 namespace infinity {
 
-export using infinity::StatementType;
-export using infinity::BaseStatement;
-export using infinity::StatementType2Str;
+export class SystemInfo {
+public:
+    static i64 MemoryUsage();
+    static f64 CPUUsage();
+    static i64 OpenFileCount();
+};
 
-} // namespace infinity
+}

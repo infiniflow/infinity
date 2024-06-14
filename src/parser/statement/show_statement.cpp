@@ -96,6 +96,14 @@ std::string ShowStatement::ToString() const {
             ss << "Show profiles";
             break;
         }
+        case ShowStmtType::kQueries: {
+            ss << "Show queries";
+            break;
+        }
+        case ShowStmtType::kQuery: {
+            ss << "Show query";
+            break;
+        }
         case ShowStmtType::kGlobalVariable: {
             ss << "Show global variable";
             break;

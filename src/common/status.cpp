@@ -432,6 +432,10 @@ Status Status::QueryTooBig(const String &query_text, u64 ast_node) {
     return Status(ErrorCode::kQueryIsTooComplex, MakeUnique<String>(fmt::format("Query: {} is too complex with {} AST nodes", query_text, ast_node)));
 }
 
+Status Status::FailToGetSysInfo(const String &detailed_info) {
+    return Status(ErrorCode::kFailToGetSysInfo, MakeUnique<String>(detailed_info));
+}
+
 // 6. Operation intervention
 Status Status::QueryCancelled(const String &query_text) {
     return Status(ErrorCode::kQueryCancelled, MakeUnique<String>(fmt::format("Query: {} is cancelled", query_text)));

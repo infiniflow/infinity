@@ -110,6 +110,18 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        metrics_cpp
+        CONFIGURE_DEPENDS
+        metrics/*.cpp
+        )
+
+file(GLOB_RECURSE
+        metrics_cppm
+        CONFIGURE_DEPENDS
+        metrics/*.cppm
+        )
+
+file(GLOB_RECURSE
         planner_cpp
         CONFIGURE_DEPENDS
         planner/*.cpp
@@ -177,6 +189,7 @@ add_library(infinity_core
         ${function_cpp}
         ${expression_cpp}
         ${executor_cpp}
+        ${metrics_cpp}
         ${common_cpp}
         storage/buffer/file_worker/file_worker_type.cppm)
 
@@ -193,6 +206,7 @@ target_sources(infinity_core
         ${function_cppm}
         ${expression_cppm}
         ${executor_cppm}
+        ${metrics_cppm}
 )
 
 
