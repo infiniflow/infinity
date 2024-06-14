@@ -166,24 +166,6 @@ bool BlockEntry::CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts
     return deleted[block_offset] == 0 || deleted[block_offset] > check_ts;
 }
 
-bool BlockEntry::CheckDeleteVisible(Vector<BlockOffset> &block_offsets, TxnTimeStamp check_ts) const {
-    Vector<BlockOffset> new_block_offsets;
-
-    std::shared_lock lock(rw_locker_);
-    auto block_version_handle = this->block_version_->Load();
-    const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
-    const auto &deleted = block_version->deleted_;
-    for (BlockOffset block_offset : block_offsets) {
-        if (deleted[block_offset] > check_ts) {
-            return false;
-        } else if (deleted[block_offset] == 0) {
-            new_block_offsets.push_back(block_offset);
-        }
-    }
-    block_offsets = std::move(new_block_offsets);
-    return true;
-}
-
 void BlockEntry::SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const {
     BlockOffset read_offset = 0;
     while (true) {
@@ -331,7 +313,7 @@ void BlockEntry::FlushData(SizeT start_row_count, SizeT checkpoint_row_count) {
 bool BlockEntry::FlushVersion(TxnTimeStamp checkpoint_ts) {
     std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
     // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
-    if (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts) {
+    if (this->max_row_ts_ != 0 && (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts)) {
         return false;
     }
 

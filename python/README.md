@@ -10,6 +10,7 @@
 # build python SDK
 
 ```shell
+pip install wheel
 rm -f dist/* && python setup.py sdist bdist_wheel
 ```
 

@@ -246,8 +246,6 @@ public:
         return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
     }
 
-    bool CheckDeleteVisible(DeleteState &delete_state, Txn *txn);
-
 private:
     TableMeta *const table_meta_{};
 
