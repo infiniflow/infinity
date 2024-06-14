@@ -14,6 +14,7 @@
 
 module;
 
+#include <algorithm>
 #include <cmath>
 #include <random>
 module emvb_index;
@@ -74,8 +75,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                                const u32 row_count,
                                const SegmentEntry *segment_entry,
                                const SharedPtr<ColumnDef> &column_def,
-                               BufferManager *buffer_mgr,
-                               u32 embedding_count) {
+                               BufferManager *buffer_mgr) {
     {
         const SegmentID expected_segment_id = base_rowid.segment_id_;
         if (const SegmentID segment_id = segment_entry->segment_id(); segment_id != expected_segment_id) {
@@ -91,7 +91,9 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
     }
     const SegmentOffset start_segment_offset = base_rowid.segment_offset_;
     const ColumnID column_id = column_def->id();
-    if (embedding_count == 0) {
+    u32 embedding_count = 0;
+    Deque<Pair<u32, u32>> all_embedding_pos;
+    {
         // read the segment to get total embedding count
         BlockID block_id = start_segment_offset / DEFAULT_BLOCK_CAPACITY;
         BlockOffset block_offset = start_segment_offset % DEFAULT_BLOCK_CAPACITY;
@@ -109,6 +111,9 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
             }
             const auto [embedding_num, chunk_id, chunk_offset] = tensor_ptr[block_offset];
             embedding_count += embedding_num;
+            for (u32 j = 0; j < embedding_num; ++j) {
+                all_embedding_pos.emplace_back(i, j);
+            }
         }
     }
     // prepare centroid count
@@ -130,40 +135,28 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
         const auto training_data = MakeUniqueForOverwrite<f32[]>(training_embedding_num * embedding_dimension_);
         // prepare training data
         {
+            Vector<Pair<u32, u32>> sample_result;
+            sample_result.reserve(training_embedding_num);
             std::random_device rd;
             std::mt19937 gen(rd());
-            std::uniform_int_distribution<u32> dis(0, row_count - 1);
-            std::unordered_set<u64> selected;
+            std::ranges::sample(all_embedding_pos, std::back_inserter(sample_result), training_embedding_num, gen);
+            if (sample_result.size() != training_embedding_num) {
+                const auto error_msg = fmt::format("EMVBIndex::BuildEMVBIndex: sample failed to get {} samples.", training_embedding_num);
+                LOG_ERROR(error_msg);
+                UnrecoverableError(error_msg);
+            }
             for (u32 i = 0; i < training_embedding_num; ++i) {
-                bool found = false;
-                // TODO: select sample
-                constexpr u32 max_try = 100000;
-                for (int try_num = max_try; try_num > 0; --try_num) {
-                    const u32 random_row = dis(gen);
-                    const SegmentOffset new_segment_offset = start_segment_offset + random_row;
-                    const BlockID block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY;
-                    const BlockOffset block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
-                    auto column_vector = block_entries[block_id]->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
-                    const TensorT *tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
-                    const auto [embedding_num, chunk_id, chunk_offset] = tensor_ptr[block_offset];
-                    std::uniform_int_distribution<u32> dis2(0, embedding_num - 1);
-                    const u32 random_embedding = dis2(gen);
-                    if (const u64 key = ((static_cast<u64>(random_row)) << 32) | static_cast<u64>(random_embedding); !selected.contains(key)) {
-                        selected.insert(key);
-                        const auto embedding_ptr = column_vector.buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-                        std::copy_n(reinterpret_cast<const f32 *>(embedding_ptr) + random_embedding * embedding_dimension_,
-                                    embedding_dimension_,
-                                    training_data.get() + i * embedding_dimension_);
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    const auto error_msg =
-                        fmt::format("EMVBIndex::BuildEMVBIndex: failed to find a valid training embedding after {} random try.", max_try);
-                    LOG_ERROR(error_msg);
-                    UnrecoverableError(error_msg);
-                }
+                const auto [sample_row, sample_id] = sample_result[i];
+                const SegmentOffset new_segment_offset = start_segment_offset + sample_row;
+                const BlockID block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY;
+                const BlockOffset block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
+                auto column_vector = block_entries[block_id]->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
+                const TensorT *tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
+                const auto [embedding_num, chunk_id, chunk_offset] = tensor_ptr[block_offset];
+                const auto embedding_ptr = column_vector.buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
+                std::copy_n(reinterpret_cast<const f32 *>(embedding_ptr) + sample_id * embedding_dimension_,
+                            embedding_dimension_,
+                            training_data.get() + i * embedding_dimension_);
             }
         }
         // call train

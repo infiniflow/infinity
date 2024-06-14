@@ -57,8 +57,7 @@ public:
                         u32 row_count,
                         const SegmentEntry *segment_entry,
                         const SharedPtr<ColumnDef> &column_def,
-                        BufferManager *buffer_mgr,
-                        u32 embedding_count = 0);
+                        BufferManager *buffer_mgr);
 
     void Train(u32 centroids_num, const f32 *embedding_data, u32 embedding_num, u32 iter_cnt = 20);
 

@@ -92,7 +92,7 @@ void EMVBIndexInMem::Insert(u16 block_id, BlockColumnEntry *block_column_entry, 
         }
         // build index if have enough data
         if (embedding_count_ >= build_index_threshold_) {
-            emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_entry_, column_def_, buffer_manager, embedding_count_);
+            emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_entry_, column_def_, buffer_manager);
             if (emvb_index_->GetDocNum() != row_count || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {
                 UnrecoverableError("EMVBIndexInMem Insert doc num or embedding num not consistent!");
             }
