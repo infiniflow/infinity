@@ -656,6 +656,7 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
         switch (index_base->index_type_) {
             case IndexType::kHnsw:
             case IndexType::kFullText:
+            case IndexType::kEMVB:
             case IndexType::kSecondary: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {
                     MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
@@ -881,6 +882,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 break;
             }
             case IndexType::kHnsw:
+            case IndexType::kEMVB:
             case IndexType::kSecondary: {
                 TxnTimeStamp begin_ts = txn->BeginTS();
                 auto segment_index_guard = table_index_entry->GetSegmentIndexesGuard();
