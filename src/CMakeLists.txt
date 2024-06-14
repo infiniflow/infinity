@@ -110,6 +110,18 @@ file(GLOB_RECURSE
 )
 
 file(GLOB_RECURSE
+        metrics_cpp
+        CONFIGURE_DEPENDS
+        metrics/*.cpp
+        )
+
+file(GLOB_RECURSE
+        metrics_cppm
+        CONFIGURE_DEPENDS
+        metrics/*.cppm
+        )
+
+file(GLOB_RECURSE
         planner_cpp
         CONFIGURE_DEPENDS
         planner/*.cpp
@@ -177,6 +189,7 @@ add_library(infinity_core
         ${function_cpp}
         ${expression_cpp}
         ${executor_cpp}
+        ${metrics_cpp}
         ${common_cpp}
         storage/buffer/file_worker/file_worker_type.cppm)
 
@@ -193,6 +206,7 @@ target_sources(infinity_core
         ${function_cppm}
         ${expression_cppm}
         ${executor_cppm}
+        ${metrics_cppm}
 )
 
 
@@ -220,6 +234,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/xor_singleheader/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/base64/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/oatpp/src")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/CControl")
 
 if (NOT SUPPORT_FMA EQUAL 0)
         message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")

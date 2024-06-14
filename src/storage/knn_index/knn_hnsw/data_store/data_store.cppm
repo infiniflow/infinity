@@ -24,6 +24,7 @@ import hnsw_common;
 import file_system;
 import vec_store_type;
 import graph_store;
+import infinity_exception;
 
 namespace infinity {
 
@@ -38,6 +39,7 @@ class DataStore {
 public:
     using This = DataStore<VecStoreT, LabelType>;
     using DataType = typename VecStoreT::DataType;
+    using QueryVecType = typename VecStoreT::QueryVecType;
     using Inner = DataStoreInner<VecStoreT, LabelType>;
     using VecStoreMeta = typename VecStoreT::Meta;
     using VecStoreInner = typename VecStoreT::Inner;
@@ -59,18 +61,6 @@ public:
           chunk_shift_(std::exchange(other.chunk_shift_, 0)), cur_vec_num_(other.cur_vec_num_.exchange(0)),
           vec_store_meta_(std::move(other.vec_store_meta_)), graph_store_meta_(std::move(other.graph_store_meta_)),
           inners_(std::exchange(other.inners_, nullptr)) {}
-    DataStore &operator=(This &&other) {
-        if (this != &other) {
-            chunk_size_ = std::exchange(other.chunk_size_, 0);
-            max_chunk_n_ = std::exchange(other.max_chunk_n_, 0);
-            chunk_shift_ = std::exchange(other.chunk_shift_, 0);
-            cur_vec_num_ = other.cur_vec_num_.exchange(0);
-            vec_store_meta_ = std::move(other.vec_store_meta_);
-            graph_store_meta_ = std::move(other.graph_store_meta_);
-            inners_ = std::exchange(other.inners_, nullptr);
-        }
-        return *this;
-    }
     ~DataStore() {
         if (!inners_) {
             return;
@@ -134,10 +124,7 @@ public:
         return ret;
     }
 
-    // vec store
-    Pair<SizeT, SizeT> AddVec(const DataType *vec, SizeT vec_num) { return AddVec(DenseVectorIter<DataType, LabelType>(vec, dim(), vec_num)); }
-
-    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
+    template <DataIteratorConcept<QueryVecType, LabelType> Iterator>
     Pair<SizeT, SizeT> AddVec(Iterator &&query_iter) {
         SizeT cur_vec_num = this->cur_vec_num();
         SizeT start_idx = cur_vec_num;
@@ -162,11 +149,9 @@ public:
         return {start_idx, cur_vec_num};
     }
 
-    Pair<SizeT, SizeT> OptAddVec(const DataType *vec, SizeT vec_num) { return OptAddVec(DenseVectorIter<DataType, LabelType>(vec, dim(), vec_num)); }
-
-    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
+    template <DataIteratorConcept<QueryVecType, LabelType> Iterator>
     Pair<SizeT, SizeT> OptAddVec(Iterator &&query_iter) {
-        if constexpr (!This::IsPlain()) {
+        if constexpr (VecStoreT::HasOptimize) {
             SizeT cur_vec_num = this->cur_vec_num();
             auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
             if (chunk_num > 0) {
@@ -183,7 +168,7 @@ public:
     }
 
     void Optimize() {
-        if constexpr (This::IsPlain()) {
+        if constexpr (!VecStoreT::HasOptimize) {
             return;
         }
         DenseVectorIter<DataType, LabelType> empty_iter(nullptr, dim(), 0);
@@ -195,7 +180,7 @@ public:
         return inner.GetVec(idx, vec_store_meta_);
     }
 
-    typename VecStoreT::QueryType MakeQuery(const DataType *vec) const { return vec_store_meta_.MakeQuery(vec); }
+    typename VecStoreT::QueryType MakeQuery(QueryVecType query) const { return vec_store_meta_.MakeQuery(query); }
 
     void PrefetchVec(SizeT vec_i) const {
         const auto &[inner, idx] = GetInner(vec_i);
@@ -247,10 +232,6 @@ public:
     SizeT cur_vec_num() const { return cur_vec_num_.load(); }
 
 private:
-    constexpr static bool IsPlain() {
-        return std::is_same_v<VecStoreT, PlainL2VecStoreType<DataType>> || std::is_same_v<VecStoreT, PlainIPVecStoreType<DataType>>;
-    }
-
     Pair<Inner &, SizeT> GetInner(SizeT vec_i) { return {inners_[vec_i >> chunk_shift_], vec_i & (chunk_size_ - 1)}; }
 
     Pair<const Inner &, SizeT> GetInner(SizeT vec_i) const { return {inners_[vec_i >> chunk_shift_], vec_i & (chunk_size_ - 1)}; }
@@ -287,7 +268,9 @@ public:
             max_l = std::max(max_l, max_l1);
         }
         auto [max_layer, ep] = GetEnterPoint();
-        assert(max_l == max_layer);
+        if (max_l != max_layer) {
+            UnrecoverableError("max_l != max_layer");
+        }
     }
 
     void Dump(std::ostream &os) const {
@@ -321,6 +304,7 @@ class DataStoreInner {
 public:
     using This = DataStoreInner<VecStoreT, LabelType>;
     using DataType = typename VecStoreT::DataType;
+    using QueryVecType = typename VecStoreT::QueryVecType;
     using VecStoreInner = typename VecStoreT::Inner;
     using VecStoreMeta = typename VecStoreT::Meta;
 
@@ -355,7 +339,7 @@ public:
     }
 
     // vec store
-    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
+    template <DataIteratorConcept<QueryVecType, LabelType> Iterator>
     Pair<SizeT, bool> AddVec(Iterator &&query_iter, VertexType start_idx, SizeT remain_num, const VecStoreMeta &meta) {
         SizeT insert_n = 0;
         bool used_up = false;

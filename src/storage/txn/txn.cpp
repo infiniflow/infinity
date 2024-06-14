@@ -405,8 +405,6 @@ WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 // }
 
 TxnTimeStamp Txn::Commit() {
-    txn_store_.PrepareCommit1();
-
     if (wal_entry_->cmds_.empty() && txn_store_.Empty()) {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampR(this);
@@ -420,6 +418,8 @@ TxnTimeStamp Txn::Commit() {
     // LOG_INFO(fmt::format("Txn: {} is committing, committing ts: {}", txn_id_, commit_ts));
 
     this->SetTxnCommitting(commit_ts);
+
+    txn_store_.PrepareCommit1();
     // LOG_INFO(fmt::format("Txn {} commit ts: {}", txn_id_, commit_ts));
 
     if (txn_mgr_->CheckConflict(this)) {

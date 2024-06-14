@@ -22,8 +22,10 @@ TableAlias::~TableAlias() {
         free(alias_);
         alias_ = nullptr;
     }
+
     if (column_alias_array_ != nullptr) {
         delete column_alias_array_;
+        column_alias_array_ = nullptr;
     }
 }
 

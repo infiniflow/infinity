@@ -886,6 +886,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     // Currently export only support jsonl and CSV
     switch(statement->copy_file_type_) {
         case CopyFileType::kJSONL:
+        case CopyFileType::kFVECS:
         case CopyFileType::kCSV: {
             break;
         }
@@ -913,6 +914,34 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
         RecoverableError(status);
     }
 
+    Vector<u64> column_idx_array;
+    if(statement->columns_ != nullptr) {
+        // Export columns
+        Vector<String>& column_names = *statement->columns_;
+        column_idx_array.reserve(column_names.size());
+        for(const auto& column_name: column_names) {
+            u64 column_idx = table_entry->GetColumnIdByName(column_name);
+            column_idx_array.emplace_back(column_idx);
+        }
+
+        if(statement->copy_file_type_ == CopyFileType::kFVECS)  {
+            if(column_idx_array.size() != 1) {
+                Status status = Status::ColumnCountMismatch(fmt::format("Attempt to export {} columns as FVECS file", column_idx_array.size()));
+                LOG_ERROR(status.message());
+                RecoverableError(status);
+            }
+
+            const ColumnDef* column_def = table_entry->GetColumnDefByID(column_idx_array[0]);
+            if(column_def->type()->type() != LogicalType::kEmbedding) {
+                Status status = Status::NotSupport(fmt::format("Attempt to export column: {} with type: {} as FVECS file",
+                                                               column_def->name(),
+                                                               column_def->type()->ToString()));
+                LOG_ERROR(status.message());
+                RecoverableError(status);
+            }
+        }
+    }
+
     SharedPtr<BlockIndex> block_index = table_entry->GetBlockIndex(txn);
 
     SharedPtr<LogicalNode> logical_export = MakeShared<LogicalExport>(bind_context_ptr->GetNewLogicalNodeId(),
@@ -923,6 +952,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                                                                       statement->header_,
                                                                       statement->delimiter_,
                                                                       statement->copy_file_type_,
+                                                                      column_idx_array,
                                                                       block_index);
 
     this->logical_plan_ = logical_export;
@@ -974,7 +1004,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             auto [db_entry, status] = txn->GetDatabase(use_command_info->db_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
-                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
                 this->logical_plan_ = logical_command;
             } else {
@@ -984,14 +1014,14 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kSet: {
             SharedPtr<LogicalNode> logical_command =
-                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
+                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
             this->logical_plan_ = logical_command;
             break;
         }
         case CommandType::kExport: {
             SharedPtr<LogicalNode> logical_command =
-                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
+                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
             this->logical_plan_ = logical_command;
             break;
@@ -1001,7 +1031,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             auto [table_entry, status] = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
-                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
                 this->logical_plan_ = logical_command;
             } else {
@@ -1065,6 +1095,12 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kProfiles: {
             return BuildShowProfiles(statement, bind_context_ptr);
         }
+        case ShowStmtType::kQueries: {
+            return BuildShowQueries(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kQuery: {
+            return BuildShowQuery(statement, bind_context_ptr);
+        }
         case ShowStmtType::kSegments: {
             return BuildShowSegments(statement, bind_context_ptr);
         }
@@ -1123,6 +1159,32 @@ Status LogicalPlanner::BuildShowProfiles(const ShowStatement *statement, SharedP
                                                                   statement->schema_name_,
                                                                   statement->table_name_,
                                                                   bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowQueries(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowQueries,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowQuery(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowQuery,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  statement->session_id_);
     this->logical_plan_ = logical_show;
     return Status::OK();
 }

@@ -397,16 +397,16 @@ static int r_perfective_gerund(struct SN_env *z) {
             if (!(eq_s_b(z, 2, s_1)))
                 return 0;
         }
-        lab0: {
-            int ret = slice_del(z); /* delete, line 76 */
-            if (ret < 0)
-                return ret;
-        } break;
-        case 2: {
-            int ret = slice_del(z); /* delete, line 83 */
-            if (ret < 0)
-                return ret;
-        } break;
+            lab0: {
+                int ret = slice_del(z); /* delete, line 76 */
+                if (ret < 0)
+                    return ret;
+            } break;
+            case 2: {
+                int ret = slice_del(z); /* delete, line 83 */
+                if (ret < 0)
+                    return ret;
+            } break;
     }
     return 1;
 }
@@ -466,16 +466,16 @@ static int r_adjectival(struct SN_env *z) {
                     goto lab0;
                 }
             }
-            lab1: {
-                int ret = slice_del(z); /* delete, line 115 */
-                if (ret < 0)
-                    return ret;
-            } break;
-            case 2: {
-                int ret = slice_del(z); /* delete, line 122 */
-                if (ret < 0)
-                    return ret;
-            } break;
+                lab1: {
+                    int ret = slice_del(z); /* delete, line 115 */
+                    if (ret < 0)
+                        return ret;
+                } break;
+                case 2: {
+                    int ret = slice_del(z); /* delete, line 122 */
+                    if (ret < 0)
+                        return ret;
+                } break;
         }
     lab0:;
     }
@@ -524,16 +524,16 @@ static int r_verb(struct SN_env *z) {
             if (!(eq_s_b(z, 2, s_5)))
                 return 0;
         }
-        lab0: {
-            int ret = slice_del(z); /* delete, line 143 */
-            if (ret < 0)
-                return ret;
-        } break;
-        case 2: {
-            int ret = slice_del(z); /* delete, line 151 */
-            if (ret < 0)
-                return ret;
-        } break;
+            lab0: {
+                int ret = slice_del(z); /* delete, line 143 */
+                if (ret < 0)
+                    return ret;
+            } break;
+            case 2: {
+                int ret = slice_del(z); /* delete, line 151 */
+                if (ret < 0)
+                    return ret;
+            } break;
     }
     return 1;
 }

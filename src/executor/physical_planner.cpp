@@ -567,6 +567,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExport(const SharedPtr<Logical
                                       logical_export->header(),
                                       logical_export->delimiter(),
                                       logical_export->FileType(),
+                                      logical_export->column_idx_array(),
                                       logical_export->block_index(),
                                       logical_operator->load_metas());
 }
@@ -871,6 +872,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildShow(const SharedPtr<LogicalNo
                                     logical_show->chunk_id(),
                                     logical_show->column_id(),
                                     logical_show->index_name(),
+                                    logical_show->session_id(),
                                     logical_operator->load_metas());
 }
 

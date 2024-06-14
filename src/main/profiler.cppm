@@ -34,6 +34,10 @@ public:
     // End the profiler
     void End();
 
+    String BeginTime();
+
+    String EndTime();
+
     [[nodiscard]] String ElapsedToString(i64 scale = 1) const;
 
     static String ElapsedToString(NanoSeconds duration, i64 scale = 1);

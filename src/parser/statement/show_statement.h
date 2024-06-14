@@ -42,6 +42,8 @@ enum class ShowStmtType {
     kGlobalVariables,
     kConfig,
     kBuffer,
+    kQueries,
+    kQuery,
     kIndexSegment,
     kIndexChunk,
 };
@@ -60,6 +62,7 @@ public:
     std::optional<int64_t> block_id_{};
     std::optional<int64_t> chunk_id_{};
     std::optional<u_int64_t> column_id_{};
+    std::optional<u_int64_t> session_id_{};
     std::string var_name_{};
 };
 

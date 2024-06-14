@@ -978,19 +978,6 @@ SharedPtr<IndexIndex> TableEntry::GetIndexIndex(Txn *txn) {
     return result;
 }
 
-bool TableEntry::CheckDeleteVisible(DeleteState &delete_state, Txn *txn) {
-    for (auto &[segment_id, block_offsets_map] : delete_state.rows_) {
-        auto *segment_entry = GetSegmentByID(segment_id, txn).get();
-        if (segment_entry == nullptr) {
-            return false;
-        }
-        if (!segment_entry->CheckDeleteVisible(block_offsets_map, txn)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 

@@ -157,6 +157,7 @@ export namespace std {
     using std::numeric_limits;
 
     namespace chrono {
+        using std::chrono::duration_cast;
         using std::chrono::duration;
         using std::chrono::microseconds;
         using std::chrono::milliseconds;
@@ -179,6 +180,8 @@ export namespace std {
 
         using std::chrono::steady_clock;
         using std::chrono::time_point;
+        using std::chrono::system_clock;
+
     } // namespace chrono
 
     using std::cout;
@@ -220,6 +223,7 @@ export namespace std {
     using std::exception;
     using std::unordered_set;
 
+    using std::distance;
     using std::back_inserter;
     using std::hash;
 
@@ -232,6 +236,7 @@ export namespace std {
     using std::get;
     using std::visit;
 
+    using std::unsigned_integral;
     using std::is_integral_v;
     using std::is_floating_point_v;
     using std::common_type_t;
@@ -253,6 +258,7 @@ export namespace std {
 
     using std::stof;
     using std::stod;
+    using std::strtoull;
 
     using std::construct_at;
 
@@ -261,6 +267,13 @@ export namespace std {
     using std::all_of;
     using std::any_of;
     using std::none_of;
+
+    using std::strncmp;
+    using std::memset;
+
+    // using std::literals;
+    using std::put_time;
+    using std::localtime;
 } // namespace std
 
 namespace infinity {

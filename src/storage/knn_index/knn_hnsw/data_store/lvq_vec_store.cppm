@@ -77,16 +77,6 @@ public:
     LVQVecStoreMeta(This &&other)
         : dim_(std::exchange(other.dim_, 0)), compress_data_size_(std::exchange(other.compress_data_size_, 0)), mean_(std::move(other.mean_)),
           global_cache_(std::exchange(other.global_cache_, GlobalCacheType())) {}
-    This &operator=(This &&other) {
-        if (this != &other) {
-            dim_ = std::exchange(other.dim_, 0);
-            compress_data_size_ = std::exchange(other.compress_data_size_, 0);
-            mean_ = std::move(other.mean_);
-            global_cache_ = std::exchange(other.global_cache_, GlobalCacheType());
-        }
-        return *this;
-    }
-    ~LVQVecStoreMeta() = default;
 
     static This Make(SizeT dim) { return This(dim); }
 

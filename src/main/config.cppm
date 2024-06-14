@@ -41,6 +41,10 @@ public:
 
     void SetCPULimit(i64 new_cpu_limit);
     i64 CPULimit();
+    inline bool RecordRunningQuery() {
+        return record_running_query_;
+    }
+    void SetRecordRunningQuery(bool flag);
 
     // Network
     String ServerAddress();
@@ -109,6 +113,9 @@ private:
 private:
     std::mutex mutex_;
     GlobalOptions global_options_;
+
+    // record running query flag
+    Atomic<bool> record_running_query_{false};
 };
 
 } // namespace infinity
