@@ -330,12 +330,11 @@ class TestIndex(TestSdk):
     def test_create_index_on_different_type_of_column(self, get_infinity_db, types, index_type):
         # connect
         db_obj = get_infinity_db
-        res = db_obj.drop_table(
-            "test_create_index_on_different_type_of_column", ConflictType.Ignore)
+        res = db_obj.drop_table("test_create_index_on_different_type_of_column", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
-        table_obj = db_obj.create_table("test_create_index_on_different_type_of_column", {
-            "c1": {"type": types}}, ConflictType.Error)
+        table_obj = db_obj.create_table("test_create_index_on_different_type_of_column", {"c1": {"type": types}}, ConflictType.Error)
+
         # create created index
         if not index_type[1]:
             with pytest.raises(InfinityException) as e:
@@ -355,8 +354,7 @@ class TestIndex(TestSdk):
                                                            index.InitParameter("metric", "l2")])], ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
-        res = db_obj.drop_table(
-            "test_create_index_on_different_type_of_column", ConflictType.Error)
+        res = db_obj.drop_table("test_create_index_on_different_type_of_column", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     # insert data, then create index

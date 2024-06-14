@@ -95,3 +95,6 @@ SELECT c1 FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], '
 4
 4
 4
+
+statement ok
+DROP TABLE test_knn_sparse;

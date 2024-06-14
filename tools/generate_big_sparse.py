@@ -82,6 +82,11 @@ def generate(generate_if_exists: bool, copy_dir: str):
                     import_slt_file.write(", ")
             import_slt_file.write("\n")
 
+        import_slt_file.write("\n")
+        import_slt_file.write("statement ok\n")
+        import_slt_file.write("DROP TABLE {};\n".format(table_name))
+        import_slt_file.write("\n")
+
     insert_batch = 10
 
     with open(insert_slt_path, "w") as insert_slt_file:

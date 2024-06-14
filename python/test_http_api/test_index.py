@@ -196,6 +196,7 @@ class TestIndex(HttpTest):
                     "metric": "l2",
                 },
             )
+        self.drop_table(db_name, table_name)
         return
 
     @pytest.mark.parametrize("column_name", [
@@ -405,6 +406,7 @@ class TestIndex(HttpTest):
             db_name, table_name, idxname,
             ["c1"], {"type": index_type, "centroids_count": "128", "metric": "l2", }
         )
+        self.drop_table(db_name, table_name)
         return
 
     def test_http_import_data_create_index(self):
