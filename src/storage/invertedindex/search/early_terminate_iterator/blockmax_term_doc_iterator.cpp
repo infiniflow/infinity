@@ -63,11 +63,13 @@ bool BlockMaxTermDocIterator::InitPostingIterator(SharedPtr<Vector<SegmentPostin
 bool BlockMaxTermDocIterator::NextShallow(RowID doc_id){
     ++block_skip_cnt_;
     if (threshold_ > BM25ScoreUpperBound()) [[unlikely]] {
+        doc_id_ = INVALID_ROWID;
         return false;
     }
     while (true) {
         ++block_skip_cnt_inner_;
         if (!iter_.SkipTo(doc_id)) {
+            doc_id_ = INVALID_ROWID;
             return false;
         }
         if (BlockMaxBM25Score() > threshold_) {

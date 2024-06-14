@@ -56,12 +56,14 @@ public:
     };
 
     // Move block cursor to ensure its last_doc_id is no less than given doc_id.
-    // Note that this routine decode skip_list only, and doesn't update doc_id_.
+    // Returns false and update doc_id_ to INVALID_ROWID if the iterator is exhausted.
+    // Note that this routine decode skip_list only, and doesn't update doc_id_ when returns true.
     // Caller may invoke BlockMaxBM25Score() after this routine.
     virtual bool NextShallow(RowID doc_id) = 0;
 
     // Update doc_id_ to one no less than given doc_id and its BM25 score is larger than current threshold.
-    // Note that this routine decode skip_list and doc_list, and doesn't decode tf_list.
+    // Returns false and update doc_id_ to INVALID_ROWID if the iterator is exhausted.
+    // Note that this routine decode skip_list and doc_list, and doesn't decode tf_list when returns true.
     // Caller may invoke BlockMaxBM25Score() and BM25Score() after this routine.
     virtual bool Next(RowID doc_id) = 0;
 

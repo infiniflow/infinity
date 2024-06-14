@@ -49,6 +49,7 @@ BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<EarlyTerminateIterat
     for (SizeT i = 0; i < num_iterators; i++){
         bm25_score_upper_bound_ += sorted_iterators_[i]->BM25ScoreUpperBound();
     }
+    next_sum_score_bm_low_cnt_dist_.resize(100, 0);
 }
 
 void BlockMaxWandIterator::UpdateScoreThreshold(const float threshold) {
@@ -91,6 +92,7 @@ bool BlockMaxWandIterator::NextShallow(RowID doc_id){
     if (sorted_iterators_.empty())[[unlikely]] {
         common_block_min_possible_doc_id_ = INVALID_ROWID;
         common_block_last_doc_id_ = INVALID_ROWID;
+        doc_id_ = INVALID_ROWID;
         return false;
     } else {
         common_block_min_possible_doc_id_ = doc_id;
@@ -124,10 +126,11 @@ bool BlockMaxWandIterator::Next(RowID doc_id){
         });
         // remove exhausted lists
         for (int i = int(num_iterators) - 1; i >= 0 && sorted_iterators_[i]->DocID() == INVALID_ROWID; i--) {
+            bm25_score_upper_bound_ -= sorted_iterators_[i]->BM25ScoreUpperBound();
             sorted_iterators_.pop_back();
             num_iterators --;
         }
-        if (num_iterators == 0)[[unlikely]] {
+        if (bm25_score_upper_bound_ <= threshold_) [[unlikely]] {
             doc_id_ = INVALID_ROWID;
             return false;
         }
@@ -142,7 +145,7 @@ bool BlockMaxWandIterator::Next(RowID doc_id){
                 break;
             }
         }
-        if (pivot >= num_iterators){
+        if (pivot >= num_iterators) [[unlikely]] {
             doc_id_ = INVALID_ROWID;
             return false;
         }
@@ -151,11 +154,24 @@ bool BlockMaxWandIterator::Next(RowID doc_id){
             pivot++;
         }
 
+        // NextShallow iterators 0..pivot to d, sum the blockmax score, and purge exhausted lists
         float sum_score_bm = 0.0f;
+        bool found_exhausted_it = false;
         for(SizeT i=0; i<=pivot; i++){
-            sorted_iterators_[i]->NextShallow(d);
-            sum_score_bm += sorted_iterators_[i]->BlockMaxBM25Score();
+            bool ok = sorted_iterators_[i]->NextShallow(d);
+            if (ok) [[likely]] {
+                sum_score_bm += sorted_iterators_[i]->BlockMaxBM25Score();
+            } else {
+                sorted_iterators_.erase(sorted_iterators_.begin() + i);
+                num_iterators = sorted_iterators_.size();
+                found_exhausted_it = true;
+                break;
+            }
         }
+        if (found_exhausted_it) [[unlikely]] {
+            continue;
+        }
+
         if (sum_score_bm > threshold_) {
             if (sorted_iterators_[0]->DocID() == d) {
                 // EvaluatePartial(d , p);
@@ -186,24 +202,53 @@ bool BlockMaxWandIterator::Next(RowID doc_id){
             next_sum_score_bm_low_cnt_++;
             // d′ = GetNewCandidate();
             // Choose one list from the lists before and including lists[p] with the largest IDF, move it by calling Next(list, d′)
-            RowID new_candidate = INVALID_ROWID;
+            RowID up_to = INVALID_ROWID;
             if (pivot + 1 < num_iterators)
-                new_candidate = sorted_iterators_[pivot + 1]->DocID();
-            for (SizeT i = 0; i <= pivot; i++) {
-                new_candidate = std::min(new_candidate, sorted_iterators_[i]->BlockLastDocID() + 1);
+                up_to = sorted_iterators_[pivot + 1]->DocID();
+            RowID shallowed_did = INVALID_ROWID;
+            std::partial_sort(sorted_iterators_.begin(),
+                              sorted_iterators_.begin() + 1,
+                              sorted_iterators_.begin() + pivot + 1,
+                              [](const auto &a, const auto &b) { return a->BlockLastDocID() < b->BlockLastDocID(); });
+            // sum_score_bm_0 is the sum of block_max of [1..pivot]
+            float sum_score_bm_0 = sum_score_bm - sorted_iterators_[0]->BlockMaxBM25Score();
+            RowID block_last_doc_id_0 = sorted_iterators_[0]->BlockLastDocID();
+            SizeT cnt_next_shallow = 0;
+            while (block_last_doc_id_0 < up_to) {
+                shallowed_did = block_last_doc_id_0 + 1;
+                cnt_next_shallow++;
+                bool ok = sorted_iterators_[0]->NextShallow(block_last_doc_id_0 + 1);
+                if (!ok)
+                    break;
+                block_last_doc_id_0 = sorted_iterators_[0]->BlockLastDocID();
+                if (block_last_doc_id_0 == INVALID_ROWID)
+                    break;
+                sum_score_bm = sum_score_bm_0 + sorted_iterators_[0]->BlockMaxBM25Score();
+                if (sum_score_bm > threshold_)
+                    break;
+                std::partial_sort(sorted_iterators_.begin(),
+                                  sorted_iterators_.begin() + 1,
+                                  sorted_iterators_.begin() + pivot + 1,
+                                  [](const auto &a, const auto &b) { return a->BlockLastDocID() < b->BlockLastDocID(); });
+                // sum_score_bm_0 is the sum of block_max of [1..pivot]
+                sum_score_bm_0 = sum_score_bm - sorted_iterators_[0]->BlockMaxBM25Score();
+                block_last_doc_id_0 = sorted_iterators_[0]->BlockLastDocID();
             }
-            SizeT smallest_df = sorted_iterators_[0]->DocFreq();
-            SizeT smallest_df_idx = 0;
-            for (SizeT i = 1; i <= pivot; i++) {
-                if(sorted_iterators_[i]->DocID() >= new_candidate)
-                    continue;
-                SizeT df = sorted_iterators_[i]->DocFreq();
-                if (df < smallest_df) {
-                    smallest_df = df;
-                    smallest_df_idx = i;
+            if (cnt_next_shallow >= 100) [[unlikely]] {
+                next_sum_score_bm_low_cnt_dist_[99]++;
+            } else {
+                next_sum_score_bm_low_cnt_dist_[cnt_next_shallow]++;
+            }
+            if (shallowed_did != INVALID_ROWID) {
+                for (SizeT i = 0; i <= pivot; i++) {
+                    if (sorted_iterators_[i]->DocID() < shallowed_did)
+                        sorted_iterators_[i]->Next(shallowed_did);
+                }
+            } else {
+                for (SizeT i = 0; i <= pivot; i++) {
+                    sorted_iterators_[i]->Next(up_to);
                 }
             }
-            sorted_iterators_[smallest_df_idx]->Next(new_candidate);
         }
     }
 
