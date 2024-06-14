@@ -183,6 +183,8 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
                                                        this->dimension_,
                                                        embedding_num,
                                                        square_for_svd.get());
+        continue;
+        // TODO: fix svd
         // TODO:svd
         svd(square_for_svd.get(), this->dimension_, this->dimension_, svd_u.get(), svd_s.get(), svd_v.get());
         // TODO: VT?

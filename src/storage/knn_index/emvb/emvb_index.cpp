@@ -113,7 +113,8 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
     }
     // prepare centroid count
     const u32 sqrt_embedding_num = std::sqrt(embedding_count);
-    const u32 centroid_count = std::min<u32>(sqrt_embedding_num, embedding_count / 32);
+    const u32 centroid_count_before_8 = std::min<u32>(sqrt_embedding_num, embedding_count / 32);
+    const u32 centroid_count = (centroid_count_before_8 + 7) & (~(7u));
     // prepare training data
     n_centroids_ = centroid_count;
     const u32 least_training_data_num = ExpectLeastTrainingDataNum();
@@ -131,11 +132,12 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
         {
             std::random_device rd;
             std::mt19937 gen(rd());
-            std::uniform_int_distribution<u32> dis(0, row_count);
+            std::uniform_int_distribution<u32> dis(0, row_count - 1);
             std::unordered_set<u64> selected;
             for (u32 i = 0; i < training_embedding_num; ++i) {
                 bool found = false;
-                constexpr u32 max_try = 1000;
+                // TODO: select sample
+                constexpr u32 max_try = 100000;
                 for (int try_num = max_try; try_num > 0; --try_num) {
                     const u32 random_row = dis(gen);
                     const SegmentOffset new_segment_offset = start_segment_offset + random_row;
