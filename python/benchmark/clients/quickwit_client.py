@@ -167,17 +167,19 @@ class QuickwitClient(BaseClient):
                     cnt = 0
         else:
             raise TypeError("Unsupported file type")
-        body = self.get_fulltext_query_content("Organizational")
+        body = self.get_fulltext_query_content("Organizational hello")
         body["size"] = self.data["topK"]
+        print(body)
 
         result = self.client.search(
             index=self.table_name,
             query=body,
         )
 
-        # print(json.dumps(result, indent=4))
+        print(json.dumps(result, indent=4))
         # print(result)
         print(len(result["hits"]["hits"]))
+        print(result["hits"])
         # for hit in result["hits"]["hits"]:
         #     print(hit["_id"])
         # print(result["hits"]["hits"])
@@ -197,13 +199,28 @@ class QuickwitClient(BaseClient):
             # ret = {"query": {"match": {"body": query}}}
             ret = {
                 "query": {
-                    "match": {
-                        "body": {
-                            "query": query,
-                            "zero_terms_query": "all"
-                        }
+                    "query_string": {
+                        "query": query,
+                        "fields": [
+                            # "doctitle",
+                            # "docdate",
+                            "body"
+                        ]
                     }
-                }
+                },
+                "sort": ["_score"]
+                # "query": {
+                #     "match": {
+                #         "body": {
+                #             "query": query,
+                #             # "fields": [
+                #             #     "doctitle", "docdate"
+                #             # ],
+                #             "zero_terms_query": "all"
+                #         }
+                #     }
+                # },
+                # "sort": ["_score"]
             }
         return ret
 
@@ -225,7 +242,9 @@ class QuickwitClient(BaseClient):
                 query=body,
             )
             result = [
-                (uuid.UUID(hex=hit["_id"]).int, hit["_score"])
+                # todo add _id
+                # _score = hit["sort"][0]
+                (0, hit["sort"][0])
                 for hit in result["hits"]["hits"]
             ]
             return result

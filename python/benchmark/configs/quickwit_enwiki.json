@@ -5,7 +5,7 @@
   "connection_url": "http://localhost:7280",
   "data_path": "datasets/enwiki/enwiki-10k.csv",
   "insert_batch_size": 8192,
-  "query_path": "datasets/enwiki/operations.txt",
+  "query_path": "datasets/enwiki/operations-10.txt",
   "result_path": "datasets/enwiki/quickwit_result.jsonl",
   "mode": "fulltext",
   "topK": 10,
