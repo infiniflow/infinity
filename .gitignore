@@ -86,6 +86,9 @@ test/data/fvecs/test.fvecs
 test/data/csr/test.csr
 test/data/fvecs/pysdk_test.fvecs
 test/data/csv/pysdk_test_import_with_different_size.csv
+test/data/bvecs/
+test/sql/dml/import/test_bvecs.slt
+
 invalid/*
 
 benchmark/toml/toml_config.h

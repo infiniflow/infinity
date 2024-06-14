@@ -213,12 +213,16 @@ class CopyFileType(object):
     JSON = 1
     JSONL = 2
     FVECS = 3
+    CSR = 4
+    BVECS = 5
 
     _VALUES_TO_NAMES = {
         0: "CSV",
         1: "JSON",
         2: "JSONL",
         3: "FVECS",
+        4: "CSR",
+        5: "BVECS",
     }
 
     _NAMES_TO_VALUES = {
@@ -226,6 +230,8 @@ class CopyFileType(object):
         "JSON": 1,
         "JSONL": 2,
         "FVECS": 3,
+        "CSR": 4,
+        "BVECS": 5,
     }
 
 

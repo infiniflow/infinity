@@ -225,6 +225,8 @@ CSV,
 JSON,
 JSONL,
 FVECS,
+CSR,
+BVECS,
 }
 
 enum ColumnType {

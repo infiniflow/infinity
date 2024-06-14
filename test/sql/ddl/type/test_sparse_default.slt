@@ -63,3 +63,6 @@ SELECT * FROM test_sparse_default;
 1 10000: 1.000000, 20000: 2.000000 10000, 20000
 3 3000: 3.000000 3000
 0 0: 0.000000 0
+
+statement ok
+DROP TABLE test_sparse_default;

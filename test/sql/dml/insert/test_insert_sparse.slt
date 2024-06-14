@@ -93,3 +93,6 @@ SELECT * FROM test_insert_sparse;
 1 10000, 20000
 3 3000
 0 (empty)
+
+statement ok
+DROP TABLE test_insert_sparse;
