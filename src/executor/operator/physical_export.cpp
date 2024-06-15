@@ -35,6 +35,7 @@ import stl;
 import logical_type;
 import embedding_info;
 import status;
+import default_values;
 
 namespace infinity {
 
@@ -99,8 +100,23 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
         String header;
         for(SizeT select_column_idx = 0; select_column_idx < select_column_count; ++ select_column_idx) {
             ColumnID column_idx = select_columns[select_column_idx];
-            ColumnDef* column_def = column_defs[column_idx].get();
-            header += column_def->name();
+            switch(column_idx) {
+                case COLUMN_IDENTIFIER_ROW_ID: {
+                    header += "_row_id";
+                    break;
+                }
+                case COLUMN_IDENTIFIER_CREATE:
+                case COLUMN_IDENTIFIER_DELETE: {
+                    Status status = Status::NotSupport("Not implemented");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
+                    break;
+                }
+                default: {
+                    ColumnDef* column_def = column_defs[column_idx].get();
+                    header += column_def->name();
+                }
+            }
             if(select_column_idx != select_column_count - 1) {
                 header += delimiter_;
             } else {
@@ -125,11 +141,31 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
             for(ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++ block_column_idx) {
                 ColumnID select_column_idx = select_columns[block_column_idx];
-                column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
-                if(column_vectors[block_column_idx].Size() != block_row_count) {
-                    String error_message = "Unmatched row_count between block and block_column";
-                    LOG_CRITICAL(error_message);
-                    UnrecoverableError(error_message);
+                switch(select_column_idx) {
+                    case COLUMN_IDENTIFIER_ROW_ID: {
+                        u16 block_id = block_entry->block_id();
+                        u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+                        auto column_vector = ColumnVector(MakeShared<DataType>(LogicalType::kRowID));
+                        column_vector.Initialize();
+                        column_vector.AppendWith(RowID(segment_id, segment_offset), block_row_count);
+                        column_vectors.emplace_back(column_vector);
+                        break;
+                    }
+                    case COLUMN_IDENTIFIER_CREATE:
+                    case COLUMN_IDENTIFIER_DELETE: {
+                        Status status = Status::NotSupport("Not implemented");
+                        LOG_ERROR(status.message());
+                        RecoverableError(status);
+                        break;
+                    }
+                    default: {
+                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
+                        if(column_vectors[block_column_idx].Size() != block_row_count) {
+                            String error_message = "Unmatched row_count between block and block_column";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                        }
+                    }
                 }
             }
 
@@ -201,22 +237,63 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
 
             Vector<ColumnVector> column_vectors;
             column_vectors.reserve(select_column_count);
-            for(ColumnID column_idx: select_columns) {
-                column_vectors.emplace_back(block_entry->GetColumnBlockEntry(column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
-                if(column_vectors[column_idx].Size() != block_row_count) {
-                    String error_message = "Unmatched row_count between block and block_column";
-                    LOG_CRITICAL(error_message);
-                    UnrecoverableError(error_message);
+
+            for(ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++ block_column_idx) {
+                ColumnID select_column_idx = select_columns[block_column_idx];
+                switch(select_column_idx) {
+                    case COLUMN_IDENTIFIER_ROW_ID: {
+                        u16 block_id = block_entry->block_id();
+                        u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
+                        auto column_vector = ColumnVector(MakeShared<DataType>(LogicalType::kRowID));
+                        column_vector.Initialize();
+                        column_vector.AppendWith(RowID(segment_id, segment_offset), block_row_count);
+                        column_vectors.emplace_back(column_vector);
+                        break;
+                    }
+                    case COLUMN_IDENTIFIER_CREATE:
+                    case COLUMN_IDENTIFIER_DELETE: {
+                        Status status = Status::NotSupport("Not implemented");
+                        LOG_ERROR(status.message());
+                        RecoverableError(status);
+                        break;
+                    }
+                    default: {
+                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
+                        if(column_vectors[block_column_idx].Size() != block_row_count) {
+                            String error_message = "Unmatched row_count between block and block_column";
+                            LOG_CRITICAL(error_message);
+                            UnrecoverableError(error_message);
+                        }
+                    }
                 }
             }
 
             for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
                 nlohmann::json line_json;
-                for(ColumnID column_idx: select_columns) {
-                    ColumnDef* column_def = column_defs[column_idx].get();
-                    // TODO: Need to check visibility
-                    Value v = column_vectors[column_idx].GetValue(row_idx);
-                    v.AppendToJson(column_def->name(), line_json);
+
+                // TODO: Need to check visibility
+
+                for(ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++ block_column_idx) {
+                    ColumnID select_column_idx = select_columns[block_column_idx];
+                    switch(select_column_idx) {
+                        case COLUMN_IDENTIFIER_ROW_ID: {
+                            Value v = column_vectors[block_column_idx].GetValue(row_idx);
+                            v.AppendToJson("_row_id", line_json);
+                            break;
+                        }
+                        case COLUMN_IDENTIFIER_CREATE:
+                        case COLUMN_IDENTIFIER_DELETE: {
+                            Status status = Status::NotSupport("Not implemented");
+                            LOG_ERROR(status.message());
+                            RecoverableError(status);
+                            break;
+                        }
+                        default: {
+                            ColumnDef* column_def = column_defs[select_column_idx].get();
+                            Value v = column_vectors[block_column_idx].GetValue(row_idx);
+                            v.AppendToJson(column_def->name(), line_json);
+                        }
+                    }
                 }
                 LOG_DEBUG(line_json.dump());
                 String to_write = line_json.dump() + "\n";
