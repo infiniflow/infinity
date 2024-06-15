@@ -122,9 +122,11 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
             Vector<ColumnVector> column_vectors;
             column_vectors.reserve(select_column_count);
-            for(ColumnID column_idx: select_columns) {
-                column_vectors.emplace_back(block_entry->GetColumnBlockEntry(column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
-                if(column_vectors[column_idx].Size() != block_row_count) {
+
+            for(ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++ block_column_idx) {
+                ColumnID select_column_idx = select_columns[block_column_idx];
+                column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
+                if(column_vectors[block_column_idx].Size() != block_row_count) {
                     String error_message = "Unmatched row_count between block and block_column";
                     LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
@@ -134,9 +136,8 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
             for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
                 String line;
                 for(SizeT select_column_idx = 0; select_column_idx < select_column_count; ++ select_column_idx) {
-                    ColumnID column_idx = select_columns[select_column_idx];
                     // TODO: Check the visibility
-                    Value v = column_vectors[column_idx].GetValue(row_idx);
+                    Value v = column_vectors[select_column_idx].GetValue(row_idx);
                     switch(v.type().type()) {
                         case LogicalType::kEmbedding: {
                             line += fmt::format("\"{}\"", v.ToString());
@@ -146,7 +147,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                             line += v.ToString();
                         }
                     }
-                    if(column_idx == select_column_count - 1) {
+                    if(select_column_idx == select_column_count - 1) {
                         line += "\n";
                     } else {
                         line += delimiter_;
