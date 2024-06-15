@@ -159,6 +159,16 @@ public:
                 return IsValidColumnExpression(expression->arguments()[0], sub_expr_depth + 1, is_valid_column_expression);
             }
             case ExpressionType::kColumn: {
+                auto column_expr = std::static_pointer_cast<ColumnExpression>(expression);
+                auto special = column_expr->special();
+                if (special.has_value()) {
+                    // TODO: now special column expr will not have any index or minmax info
+                    LOG_TRACE(
+                        fmt::format("Expression depth: {}. In IsValidColumnExpression(), unsupported expression {}. Expecting column expression.",
+                                    sub_expr_depth,
+                                    expression->Name()));
+                    return false;
+                }
                 return is_valid_column_expression(expression, sub_expr_depth);
             }
             default: {
