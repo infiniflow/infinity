@@ -17,10 +17,10 @@ statement ok
 COPY test_select_ts FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH ( DELIMITER ',' );
 
 statement ok
-SELECT ROW_ID(), CREATE_TS() FROM test_select_ts;
+SELECT ROW_ID(), CREATE_TIMESTAMP() FROM test_select_ts;
 
 statement ok
 DELETE FROM test_select_ts WHERE c1 = 1;
 
 statement ok
-SELECT ROW_ID(), DELETE_TS() FROM test_select_ts;
+SELECT ROW_ID(), DELETE_TIMESTAMP() FROM test_select_ts;
