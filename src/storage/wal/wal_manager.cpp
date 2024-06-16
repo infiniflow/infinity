@@ -530,12 +530,14 @@ i64 WalManager::ReplayWalFile() {
         ReplayWalEntry(*replay_entries[replay_count]);
     }
 
-    LOG_INFO(fmt::format("System start ts: {}, lastest txn id: {}", system_start_ts, last_txn_id));
+    LOG_INFO(fmt::format("System start ts: {}, latest txn id: {}", system_start_ts, last_txn_id));
     storage_->catalog()->next_txn_id_ = last_txn_id;
     this->max_commit_ts_ = system_start_ts;
 
     storage_->catalog()->InitDeltaEntry(max_commit_ts_);
     LOG_INFO(fmt::format("System start ts: {}", system_start_ts));
+
+    // start mem index comment thread
     return system_start_ts;
 }
 

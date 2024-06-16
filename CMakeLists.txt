@@ -92,11 +92,19 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS "-O0 -g")
     set(CMAKE_C_FLAGS "-O0 -g")
 
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-stack-protector -fno-omit-frame-pointer -fno-var-tracking ")
-    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=memory -fno-omit-frame-pointer")
-    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=thread -fno-omit-frame-pointer")
-    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=undefined -fno-omit-frame-pointer")
-    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=cfi -fno-omit-frame-pointer")
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fno-stack-protector -fno-var-tracking ")
+    add_compile_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
+    add_link_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
+
+    add_compile_options("-fno-omit-frame-pointer")
+    add_link_options("-fno-omit-frame-pointer")
+
+#    add_compile_options("-fsanitize=undefined")
+#    add_link_options("-fsanitize=undefined")
+
+#    add_compile_options("-fsanitize=thread")
+#    add_link_options("-fsanitize=thread")
+
     set(CMAKE_DEBUG_POSTFIX "")
 
 else ()
