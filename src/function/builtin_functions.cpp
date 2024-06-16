@@ -129,11 +129,11 @@ void BuiltinFunctions::RegisterSpecialFunction() {
     Catalog::AddSpecialFunction(catalog_ptr_.get(), score_function);
 
     auto createts_function =
-        MakeShared<SpecialFunction>("CREATE_TS", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_CREATE, SpecialType::kCreateTs);
+        MakeShared<SpecialFunction>("CREATE_TIMESTAMP", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_CREATE, SpecialType::kCreateTs);
     Catalog::AddSpecialFunction(catalog_ptr_.get(), createts_function);
 
     auto deletets_function =
-        MakeShared<SpecialFunction>("DELETE_TS", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_DELETE, SpecialType::kDeleteTs);
+        MakeShared<SpecialFunction>("DELETE_TIMESTAMP", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_DELETE, SpecialType::kDeleteTs);
     Catalog::AddSpecialFunction(catalog_ptr_.get(), deletets_function);
 }
 
