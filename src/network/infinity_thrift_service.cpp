@@ -15,6 +15,7 @@
 module;
 
 #include <cstring>
+#include <string>
 #include <vector>
 
 module infinity_thrift_service;
@@ -381,6 +382,30 @@ void InfinityThriftService::Export(infinity_thrift_rpc::CommonResponse &response
         ProcessStatus(response, status);
     }
 
+    Vector<ParsedExpr *> *export_columns = new Vector<ParsedExpr *>();
+    export_columns->reserve(request.columns.size());
+
+    for (String column_name : request.columns) {
+        ToLower(column_name);
+        if(column_name == "_row_id") {
+            FunctionExpr* expr = new FunctionExpr();
+            expr->func_name_ = "row_id";
+            export_columns->emplace_back(expr);
+        } else if(column_name == "_begin_timestamp") {
+            FunctionExpr* expr = new FunctionExpr();
+            expr->func_name_ = "create_ts";
+            export_columns->emplace_back(expr);
+        } else if(column_name == "_delete_timestamp") {
+            FunctionExpr* expr = new FunctionExpr();
+            expr->func_name_ = "delete_ts";
+            export_columns->emplace_back(expr);
+        } else {
+            ColumnExpr* expr = new ColumnExpr();
+            expr->names_.emplace_back(column_name);
+            export_columns->emplace_back(expr);
+        }
+    }
+
     ExportOptions export_options;
     export_options.copy_file_type_ = copy_file_type;
     auto &delimiter_string = request.export_option.delimiter;
@@ -389,7 +414,7 @@ void InfinityThriftService::Export(infinity_thrift_rpc::CommonResponse &response
     }
     export_options.delimiter_ = delimiter_string[0];
 
-    const QueryResult result = infinity->Export(request.db_name, request.table_name, request.file_name.c_str(), export_options);
+    const QueryResult result = infinity->Export(request.db_name, request.table_name, export_columns, request.file_name.c_str(), export_options);
     ProcessQueryResult(response, result);
 }
 
@@ -1447,6 +1472,7 @@ Status InfinityThriftService::GetAndRemoveSessionID(i64 session_id) {
     }
     iter->second->RemoteDisconnect();
     infinity_session_map_.erase(session_id);
+    LOG_TRACE(fmt::format("THRIFT: Remove session {}", session_id));
     return Status::OK();
 }
 

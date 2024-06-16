@@ -25,6 +25,7 @@ from infinity.common import InfinityException
 
 class ThriftInfinityClient:
     def __init__(self, uri: URI):
+        self.session_id = -1
         self.uri = uri
         self.transport = None
         self.reconnect()
@@ -171,10 +172,11 @@ class ThriftInfinityClient:
                                                 file_name=file_name,
                                                 import_option=import_options))
 
-    def export_data(self, db_name: str, table_name: str, file_name: str, export_options):
+    def export_data(self, db_name: str, table_name: str, file_name: str, export_options: {}, columns: [str]):
         return self.client.Export(ExportRequest(session_id=self.session_id,
                                                 db_name=db_name,
                                                 table_name=table_name,
+                                                columns=columns,
                                                 file_name=file_name,
                                                 export_option=export_options))
 

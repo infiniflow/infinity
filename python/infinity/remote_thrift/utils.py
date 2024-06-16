@@ -102,7 +102,7 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
             constant_expr.literal_type = ttypes.LiteralType.String
             constant_expr.str_value = cons.output_name
         else:
-            raise InfinityException(3069, f"Unknown literal type: {cons}")
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Unknown literal type: {cons}")
 
         parser_expr_type = ttypes.ParsedExprType()
         parser_expr_type.constant_expr = constant_expr
@@ -124,7 +124,7 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
                 constant_expr.literal_type = ttypes.LiteralType.Double
                 constant_expr.f64_value = -float(cons.hashable_args[0].output_name)
             else:
-                raise InfinityException(3069, f"unknown literal type: {cons}")
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown literal type: {cons}")
 
             parser_expr_type = ttypes.ParsedExprType()
             parser_expr_type.constant_expr = constant_expr
@@ -132,7 +132,7 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
 
             return parsed_expr
     else:
-        raise InfinityException(3069, f"unknown condition type: {cons}")
+        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown condition type: {cons}")
 
 
 def parse_expr(expr) -> ttypes.ParsedExpr:
@@ -160,7 +160,7 @@ def parse_expr(expr) -> ttypes.ParsedExpr:
             parsed_expr = ttypes.ParsedExpr(type=expr_type)
             return parsed_expr
         else:
-            raise InfinityException(3069, f"unknown expression type: {expr}")
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {expr}")
 
 
 # invalid_name_array = [

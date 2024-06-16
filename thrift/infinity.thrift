@@ -455,9 +455,10 @@ struct ImportRequest{
 struct ExportRequest{
 1:  string db_name,
 2:  string table_name,
-3:  string file_name,
-4:  ExportOption export_option,
-5:  i64 session_id,
+3:  list<string> columns,
+4:  string file_name,
+5:  ExportOption export_option,
+6:  i64 session_id,
 }
 
 enum ExplainType {
