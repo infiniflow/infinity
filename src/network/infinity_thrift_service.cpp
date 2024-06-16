@@ -69,6 +69,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[3] = String("0.2.0.dev4");
     client_version_map_[4] = String("0.2.0.dev5");
     client_version_map_[5] = String("0.2.0.dev6");
+    client_version_map_[6] = String("0.2.0.dev7");
 }
 
 Pair<const char*, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -393,11 +394,11 @@ void InfinityThriftService::Export(infinity_thrift_rpc::CommonResponse &response
             export_columns->emplace_back(expr);
         } else if(column_name == "_begin_timestamp") {
             FunctionExpr* expr = new FunctionExpr();
-            expr->func_name_ = "create_ts";
+            expr->func_name_ = "create_timestamp";
             export_columns->emplace_back(expr);
         } else if(column_name == "_delete_timestamp") {
             FunctionExpr* expr = new FunctionExpr();
-            expr->func_name_ = "delete_ts";
+            expr->func_name_ = "delete_timestamp";
             export_columns->emplace_back(expr);
         } else {
             ColumnExpr* expr = new ColumnExpr();

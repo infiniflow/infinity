@@ -609,11 +609,11 @@ public:
                             export_columns->emplace_back(expr);
                         } else if(column_name == "_create_timestamp") {
                             FunctionExpr* expr = new FunctionExpr();
-                            expr->func_name_ = "create_ts";
+                            expr->func_name_ = "create_timestamp";
                             export_columns->emplace_back(expr);
                         } else if(column_name == "_delete_timestamp") {
                             FunctionExpr* expr = new FunctionExpr();
-                            expr->func_name_ = "delete_ts";
+                            expr->func_name_ = "delete_timestamp";
                             export_columns->emplace_back(expr);
                         } else {
                             ColumnExpr* expr = new ColumnExpr();

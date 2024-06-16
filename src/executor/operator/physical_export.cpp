@@ -35,6 +35,7 @@ import stl;
 import logical_type;
 import embedding_info;
 import status;
+import buffer_manager;
 import default_values;
 
 namespace infinity {
@@ -105,11 +106,12 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                     header += "_row_id";
                     break;
                 }
-                case COLUMN_IDENTIFIER_CREATE:
+                case COLUMN_IDENTIFIER_CREATE: {
+                    header += "_create_timestamp";
+                    break;
+                }
                 case COLUMN_IDENTIFIER_DELETE: {
-                    Status status = Status::NotSupport("Not implemented");
-                    LOG_ERROR(status.message());
-                    RecoverableError(status);
+                    header += "_delete_timestamp";
                     break;
                 }
                 default: {
@@ -128,6 +130,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
     SizeT row_count{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
+    BufferManager* buffer_manager = query_context->storage()->buffer_manager();
     for(auto& [segment_id, segment_snapshot]: segment_block_index_ref) {
         LOG_DEBUG(fmt::format("Export segment_id: {}", segment_id));
         SizeT block_count = segment_snapshot.block_map_.size();
@@ -151,15 +154,18 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                         column_vectors.emplace_back(column_vector);
                         break;
                     }
-                    case COLUMN_IDENTIFIER_CREATE:
+                    case COLUMN_IDENTIFIER_CREATE: {
+                        ColumnVector column_vector = block_entry->GetCreateTSVector(buffer_manager, 0, block_row_count);
+                        column_vectors.emplace_back(column_vector);
+                        break;
+                    }
                     case COLUMN_IDENTIFIER_DELETE: {
-                        Status status = Status::NotSupport("Not implemented");
-                        LOG_ERROR(status.message());
-                        RecoverableError(status);
+                        ColumnVector column_vector = block_entry->GetDeleteTSVector(buffer_manager, 0, block_row_count);
+                        column_vectors.emplace_back(column_vector);
                         break;
                     }
                     default: {
-                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
+                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(buffer_manager));
                         if(column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
                             LOG_CRITICAL(error_message);
@@ -225,7 +231,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
 
     SizeT row_count{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
-
+    BufferManager* buffer_manager = query_context->storage()->buffer_manager();
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
     for(auto& [segment_id, segment_snapshot]: segment_block_index_ref) {
         SizeT block_count = segment_snapshot.block_map_.size();
@@ -250,15 +256,18 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                         column_vectors.emplace_back(column_vector);
                         break;
                     }
-                    case COLUMN_IDENTIFIER_CREATE:
+                    case COLUMN_IDENTIFIER_CREATE: {
+                        ColumnVector column_vector = block_entry->GetCreateTSVector(buffer_manager, 0, block_row_count);
+                        column_vectors.emplace_back(column_vector);
+                        break;
+                    }
                     case COLUMN_IDENTIFIER_DELETE: {
-                        Status status = Status::NotSupport("Not implemented");
-                        LOG_ERROR(status.message());
-                        RecoverableError(status);
+                        ColumnVector column_vector = block_entry->GetDeleteTSVector(buffer_manager, 0, block_row_count);
+                        column_vectors.emplace_back(column_vector);
                         break;
                     }
                     default: {
-                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(query_context->storage()->buffer_manager()));
+                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(buffer_manager));
                         if(column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
                             LOG_CRITICAL(error_message);
@@ -281,11 +290,14 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                             v.AppendToJson("_row_id", line_json);
                             break;
                         }
-                        case COLUMN_IDENTIFIER_CREATE:
+                        case COLUMN_IDENTIFIER_CREATE: {
+                            Value v = column_vectors[block_column_idx].GetValue(row_idx);
+                            v.AppendToJson("_create_timestamp", line_json);
+                            break;
+                        }
                         case COLUMN_IDENTIFIER_DELETE: {
-                            Status status = Status::NotSupport("Not implemented");
-                            LOG_ERROR(status.message());
-                            RecoverableError(status);
+                            Value v = column_vectors[block_column_idx].GetValue(row_idx);
+                            v.AppendToJson("_delete_timestamp", line_json);
                             break;
                         }
                         default: {
@@ -341,7 +353,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
     SizeT row_count{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
-
+    BufferManager* buffer_manager = query_context->storage()->buffer_manager();
     // Write header
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
     for(auto& [segment_id, segment_snapshot]: segment_block_index_ref) {
@@ -352,7 +364,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
             BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];
             SizeT block_row_count = block_entry->row_count();
 
-            ColumnVector exported_column_vector = block_entry->GetColumnBlockEntry(exported_column_idx)->GetColumnVector(query_context->storage()->buffer_manager());
+            ColumnVector exported_column_vector = block_entry->GetColumnBlockEntry(exported_column_idx)->GetColumnVector(buffer_manager);
             if(exported_column_vector.Size() != block_row_count) {
                 String error_message = "Unmatched row_count between block and block_column";
                 LOG_CRITICAL(error_message);
