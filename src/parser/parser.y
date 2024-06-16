@@ -1183,7 +1183,7 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     }
     delete $7;
 }
-| COPY table_name '(' identifier_array ')' TO file_path WITH '(' copy_option_list ')' {
+| COPY table_name '(' expr_array ')' TO file_path WITH '(' copy_option_list ')' {
     $$ = new infinity::CopyStatement();
 
     // Copy To
@@ -1198,7 +1198,7 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     free($2->table_name_ptr_);
     delete $2;
 
-    $$->columns_ = $4;
+    $$->expr_array_ = $4;
 
     // file path
     $$->file_path_ = $7;
