@@ -21,7 +21,7 @@ import base_expression;
 import column_expression;
 import reference_expression;
 import special_function;
-
+import default_values;
 import third_party;
 import logger;
 
@@ -88,6 +88,10 @@ SharedPtr<BaseExpression> BindingRemapper::VisitReplace(const SharedPtr<ColumnEx
                                                  expression->column_name(),
                                                  expression->alias_,
                                                  column_cnt_ - 2);
+            }
+            case SpecialType::kCreateTs: 
+            case SpecialType::kDeleteTs: {
+                break;
             }
             default: {
                 LOG_ERROR(fmt::format("Unknown special function: {}", expression->Name()));

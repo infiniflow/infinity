@@ -164,14 +164,28 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
         read_offset = row_begin;
         SizeT output_column_id{0};
+        auto *buffer_mgr = query_context->storage()->buffer_manager();
         for (auto column_id : column_ids) {
-            if (column_id == COLUMN_IDENTIFIER_ROW_ID) {
-                u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + read_offset;
-                output_ptr->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), write_size);
-            } else {
-                ColumnVector column_vector =
-                    current_block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(query_context->storage()->buffer_manager());
-                output_ptr->column_vectors[output_column_id++]->AppendWith(column_vector, read_offset, write_size);
+            switch(column_id) {
+                case COLUMN_IDENTIFIER_ROW_ID: {
+                    u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY + read_offset;
+                    output_ptr->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), write_size);
+                    break;
+                }
+                case COLUMN_IDENTIFIER_CREATE: {
+                    ColumnVector create_ts_vec = current_block_entry->GetCreateTSVector(buffer_mgr, read_offset, write_size);
+                    output_ptr->column_vectors[output_column_id++]->AppendWith(create_ts_vec);
+                    break;
+                }
+                case COLUMN_IDENTIFIER_DELETE: {
+                    ColumnVector delete_ts_vec = current_block_entry->GetDeleteTSVector(buffer_mgr, read_offset, write_size);
+                    output_ptr->column_vectors[output_column_id++]->AppendWith(delete_ts_vec);
+                    break;
+                }
+                default: {
+                    ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
+                    output_ptr->column_vectors[output_column_id++]->AppendWith(column_vector, read_offset, write_size);
+                }
             }
         }
 

@@ -1018,6 +1018,9 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
         segment_candidates.reserve(this->segment_map_.size());
         for (const auto &[segment_id, segment_entry] : this->segment_map_) {
+            if (segment_entry->commit_ts_ > max_commit_ts or segment_entry->deprecate_ts() <= max_commit_ts) {
+                continue;
+            }
             segment_candidates.emplace_back(segment_entry.get());
         }
 
@@ -1031,9 +1034,6 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
-        if (segment_entry->commit_ts_ > max_commit_ts or segment_entry->deprecate_ts() <= max_commit_ts) {
-            continue;
-        }
         json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
         checkpoint_row_count += segment_entry->checkpoint_row_count();
     }
