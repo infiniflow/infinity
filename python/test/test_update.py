@@ -101,37 +101,6 @@ class TestUpdate(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    # update empty table
-    @trace_expected_exceptions
-    def test_update_empty_table(self):
-
-        # connect
-        infinity_obj = infinity.connect(common_values.TEST_REMOTE_HOST)
-        db_obj = infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_empty_table", ConflictType.Ignore)
-
-        try:
-            db_obj.create_table("test_update_empty_table", {}, ConflictType.Error)
-        except Exception as e:
-            print(e)
-
-        tb_obj = db_obj.get_table("test_update_empty_table")
-
-        try:
-            tb_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
-        except Exception as e:
-            print(e)
-
-        # res = tb_obj.output["*"].to_df()
-        # print(res)
-
-        res = db_obj.drop_table("test_update_empty_table", ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     # update non-existent table
     def test_update_non_existent_table(self):
 
@@ -568,3 +537,5 @@ class TestUpdate(TestSdk):
 
         res = db_obj.drop_table("test_invalid_filter_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    # update empty table
