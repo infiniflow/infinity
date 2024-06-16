@@ -56,7 +56,7 @@ public:
 
     UniquePtr<BoundCompactStatement> BindCompact(const CompactStatement &statement);
 
-    SharedPtr<BaseTableRef> GetTableRef(const String &db_name, const String &table_name);
+    SharedPtr<BaseTableRef> GetTableRef(const String &db_name, const String &table_name, bool update = false);
 
     QueryContext *query_context_ptr_;
 
@@ -73,7 +73,7 @@ private:
 
     SharedPtr<TableRef> BuildCTE(QueryContext *query_context, const String &name);
 
-    SharedPtr<BaseTableRef> BuildBaseTable(QueryContext *query_context, const TableReference *table_reference);
+    SharedPtr<BaseTableRef> BuildBaseTable(QueryContext *query_context, const TableReference *table_reference, bool update = false);
 
     SharedPtr<TableRef> BuildView(QueryContext *query_context, const TableReference *from_table);
 

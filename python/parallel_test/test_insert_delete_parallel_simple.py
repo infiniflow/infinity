@@ -29,9 +29,7 @@ class TestInsertDeleteParallelSimple:
         count_num = [0]
         threads = []
         for i in range(kNumThread):
-            threads.append(
-                Thread(target=worker_thread, args=[connection_pool, count_num, i])
-            )
+            threads.append(Thread(target=worker_thread, args=[connection_pool, count_num, i]))
         for i in range(len(threads)):
             threads[i].start()
         for i in range(len(threads)):

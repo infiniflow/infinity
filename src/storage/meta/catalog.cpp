@@ -22,7 +22,7 @@ module catalog;
 
 import stl;
 import defer_op;
-
+import data_type;
 import txn_manager;
 import logger;
 import third_party;
@@ -32,7 +32,7 @@ import function_set;
 import table_function;
 import special_function;
 import buffer_manager;
-
+import column_def;
 import local_file_system;
 import file_system_type;
 import file_system;
@@ -59,18 +59,18 @@ namespace infinity {
 
 void ProfileHistory::Resize(SizeT new_size) {
     std::unique_lock<std::mutex> lk(lock_);
-    if(new_size == 0) {
+    if (new_size == 0) {
         deque_.clear();
         return;
     }
 
-    if(new_size == max_size_) {
+    if (new_size == max_size_) {
         return;
     }
 
-    if(new_size < deque_.size()) {
+    if (new_size < deque_.size()) {
         SizeT diff = max_size_ - new_size;
-        for(SizeT i = 0; i < diff; ++ i) {
+        for (SizeT i = 0; i < diff; ++i) {
             deque_.pop_back();
         }
     }
@@ -442,6 +442,22 @@ void Catalog::AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFuncti
         UnrecoverableError(error_message);
     }
     catalog->special_functions_.emplace(name, special_function);
+    switch (special_function->special_type()) {
+        case SpecialType::kRowID:
+        case SpecialType::kDistance:
+        case SpecialType::kSimilarity:
+        case SpecialType::kScore: {
+            return;
+        }
+        default: {
+            break;
+        }
+    }
+    auto special_column_def = MakeUnique<ColumnDef>(special_function->extra_idx(),
+                                                    MakeShared<DataType>(special_function->data_type()),
+                                                    special_function->name(),
+                                                    std::set<ConstraintType>());
+    catalog->special_columns_.emplace(name, std::move(special_column_def));
 }
 
 Tuple<SpecialFunction *, Status> Catalog::GetSpecialFunctionByNameNoExcept(Catalog *catalog, String function_name) {
@@ -518,7 +534,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
 
     LocalFileSystem fs;
     auto [catalog_file_handler, status] = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
@@ -906,7 +922,7 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
 
     LocalFileSystem fs;
     auto [catalog_file_handler, status] = fs.OpenFile(catalog_path, FileFlags::READ_FLAG, FileLockType::kReadLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
@@ -955,7 +971,7 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
     u8 fileflags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
 
     auto [catalog_file_handler, status] = fs.OpenFile(catalog_tmp_path, fileflags, FileLockType::kWriteLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }

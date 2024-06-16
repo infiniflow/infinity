@@ -31,6 +31,7 @@ import logical_match_tensor_scan;
 import logical_match_scan_base;
 import base_table_ref;
 import load_meta;
+import special_function;
 
 namespace infinity {
 
@@ -85,8 +86,19 @@ void RefencecColumnCollection::VisitNode(LogicalNode &op) {
 }
 
 SharedPtr<BaseExpression> RefencecColumnCollection::VisitReplace(const SharedPtr<ColumnExpression> &expression) {
-    if (expression->special()) {
-        return expression;
+    auto special_type = expression->special();
+    if (special_type.has_value()) {
+        switch (*special_type) {
+            case SpecialType::kRowID:
+            case SpecialType::kDistance:
+            case SpecialType::kSimilarity:
+            case SpecialType::kScore: {
+                return expression;
+            }
+            default: {
+                break;
+            }
+        }
     }
 
     for (auto &[_, scan_bindings] : scan_bindings_) {

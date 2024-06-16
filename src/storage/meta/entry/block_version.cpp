@@ -22,7 +22,8 @@ import stl;
 import infinity_exception;
 import logger;
 import third_party;
-
+import default_values;
+import column_vector;
 import serialize;
 import local_file_system;
 
@@ -116,6 +117,26 @@ UniquePtr<BlockVersion> BlockVersion::LoadFromFile(FileHandler &file_handler) {
         file_handler.Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
     }
     return block_version;
+}
+
+void BlockVersion::GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) const {
+    // find the first create_field that has row_count_ >= offset
+    auto iter =
+        std::lower_bound(created_.begin(), created_.end(), offset, [](const CreateField &field, i64 offset) { return field.row_count_ < offset; });
+    SizeT i = 0;
+    for (; i < size; ++i) {
+        if (iter == created_.end()) {
+            break;
+        }
+        res.AppendByPtr(reinterpret_cast<const char *>(&iter->create_ts_));
+        if (iter->row_count_ == (i64)(i + offset)) {
+            ++iter;
+        }
+    }
+    TxnTimeStamp empty_ts = MAX_TIMESTAMP;
+    for (; i < size; ++i) {
+        res.AppendByPtr(reinterpret_cast<const char *>(&empty_ts));
+    }
 }
 
 // void BlockVersion::Cleanup(const String &version_path) {
