@@ -200,12 +200,12 @@ class TestCase(TestSdk):
 
             if os.path.exists(common_values.TEST_TMP_DIR + test_export_csv_file_part):
                 os.remove(common_values.TEST_TMP_DIR + test_export_csv_file_part)
-            res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_csv_file_part, {"file_type": "csv"}, ["c2", "c1", "_row_id"])
+            res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_csv_file_part, {"file_type": "csv"}, ["c2", "c1", "_row_id", "_create_timestamp", "_delete_timestamp"])
             assert res.error_code == ErrorCode.OK
 
             if os.path.exists(common_values.TEST_TMP_DIR + test_export_jsonl_file_part):
                 os.remove(common_values.TEST_TMP_DIR + test_export_jsonl_file_part)
-            res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_jsonl_file_part, {"file_type": "jsonl"}, ["c2", "c1", "_row_id"])
+            res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_jsonl_file_part, {"file_type": "jsonl"}, ["c2", "c1", "_row_id", "_create_timestamp", "_delete_timestamp"])
             assert res.error_code == ErrorCode.OK
 
             db_obj.drop_table("my_table_export", ConflictType.Ignore)
