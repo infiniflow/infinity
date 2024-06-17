@@ -45,7 +45,11 @@ bool MultiPostingDecoder::SkipTo(RowID start_row_id, RowID &prev_last_doc_id, Ro
         if (SkipInOneSegment(start_row_id, prev_last_doc_id, lowest_possible_doc_id, last_doc_id, current_ttf)) {
             return true;
         }
-        if (!MoveToSegment(start_row_id)) {
+        if (!MoveToSegment(start_row_id)) [[unlikely]] {
+            prev_last_doc_id = INVALID_ROWID;
+            lowest_possible_doc_id = INVALID_ROWID;
+            last_doc_id = INVALID_ROWID;
+            current_ttf = 0;
             return false;
         }
     }

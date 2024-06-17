@@ -74,6 +74,7 @@ private:
     u32 next_it0_docid_mismatch_cnt_ = 0;
     u32 next_sum_score_low_cnt_ = 0;
     u32 next_sum_score_bm_low_cnt_ = 0;
+    Vector<SizeT> next_sum_score_bm_low_cnt_dist_{};
 };
 
 } // namespace infinity

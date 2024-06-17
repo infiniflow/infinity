@@ -105,6 +105,11 @@ public:
         client_port_ = port;
     }
 
+    inline void GetClientInfo(String &ip_address, u16 &port) {
+        ip_address = client_address_;
+        port = client_port_;
+    }
+
 private:
     // User / Tenant information
     String tenant_name_{};

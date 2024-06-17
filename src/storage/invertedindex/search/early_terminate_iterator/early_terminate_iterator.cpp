@@ -59,6 +59,7 @@ void MultiQueryEarlyTerminateIteratorCommonPrintTree(const EarlyTerminateIterato
     os << " (children count: " << children.size() << ")";
     os << " (doc_freq: " << this_iter->DocFreq() << ")";
     os << " (bm25_score_upper_bound: " << this_iter->BM25ScoreUpperBound() << ")";
+    os << " (threshold: " << this_iter->Threshold() << ")";
     os << '\n';
     const String next_prefix = prefix + (is_final ? "    " : "│   ");
     for (u32 i = 0; i + 1 < children.size(); ++i) {
