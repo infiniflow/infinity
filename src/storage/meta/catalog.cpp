@@ -107,7 +107,7 @@ Catalog::Catalog(SharedPtr<String> data_dir)
     if (!fs.Exists(*catalog_dir_)) {
         fs.CreateDirectory(*catalog_dir_);
     }
-    mem_index_commit_thread_ = Thread([this] { MemIndexCommitLoop(); });
+
     ResizeProfileHistory(DEFAULT_PROFILER_HISTORY_SIZE);
 }
 
@@ -118,7 +118,11 @@ Catalog::~Catalog() {
         LOG_INFO("Catalog MemIndexCommitLoop was stopped...");
         return;
     }
-    mem_index_commit_thread_.join();
+
+    if(mem_index_commit_thread_.get() != nullptr) {
+        mem_index_commit_thread_->join();
+        mem_index_commit_thread_.reset();
+    }
 }
 
 // do not only use this method to create database
@@ -1097,6 +1101,10 @@ void Catalog::MemIndexRecover(BufferManager *buffer_manager) {
             db_entry->MemIndexRecover(buffer_manager);
         }
     }
+}
+
+void Catalog::StartMemoryIndexCommit() {
+    mem_index_commit_thread_ = MakeUnique<Thread>([this] { MemIndexCommitLoop(); });
 }
 
 Tuple<TxnTimeStamp, i64> Catalog::GetCheckpointState() const { return global_catalog_delta_entry_->GetCheckpointState(); }
