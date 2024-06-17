@@ -38,6 +38,19 @@ class EMVBSharedVec {
     }
 
 public:
+    EMVBSharedVec &operator=(EMVBSharedVec &&other) noexcept {
+        if (this != &other) {
+            std::scoped_lock lock(rw_mutex_, other.rw_mutex_);
+            data_ = std::move(other.data_);
+            capacity_ = other.capacity_;
+            size_ = other.size_;
+            other.data_.reset();
+            other.capacity_ = 0;
+            other.size_ = 0;
+        }
+        return *this;
+    }
+
     [[nodiscard]] Pair<SharedPtr<T[]>, u32> GetData() const {
         std::shared_lock lock(rw_mutex_);
         return {data_, size_};

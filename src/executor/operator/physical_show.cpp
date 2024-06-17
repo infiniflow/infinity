@@ -1058,6 +1058,14 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
                 }
+                case IndexType::kEMVB: {
+                    auto [chunk_index_entries, _] = segment_index_entry->GetEMVBIndexSnapshot();
+
+                    Value value = Value::MakeVarchar(std::to_string(chunk_index_entries.size()));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                    break;
+                }
                 case IndexType::kInvalid: {
                     Status status3 = Status::InvalidIndexName(index_type_name);
                     LOG_ERROR(fmt::format("{} is invalid.", index_type_name));
@@ -1126,6 +1134,11 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
         }
         case IndexType::kSecondary: {
             auto [chunk_index_entries, _] = segment_index_entry->GetSecondaryIndexSnapshot();
+            chunk_indexes = chunk_index_entries;
+            break;
+        }
+        case IndexType::kEMVB: {
+            auto [chunk_index_entries, _] = segment_index_entry->GetEMVBIndexSnapshot();
             chunk_indexes = chunk_index_entries;
             break;
         }

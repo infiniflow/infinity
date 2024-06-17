@@ -70,6 +70,7 @@ import index_base;
 import index_ivfflat;
 import index_hnsw;
 import index_secondary;
+import index_emvb;
 import index_full_text;
 import base_table_ref;
 import table_ref;
@@ -709,6 +710,15 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             IndexSecondary::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
             base_index_ptr =
                 IndexSecondary::Make(index_name, fmt::format("{}_{}", create_index_info->table_name_, *index_name), {index_info->column_name_});
+            break;
+        }
+        case IndexType::kEMVB: {
+            assert(index_info->index_param_list_ != nullptr);
+            IndexEMVB::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr = IndexEMVB::Make(index_name,
+                                             fmt::format("{}_{}", create_index_info->table_name_, *index_name),
+                                             {index_info->column_name_},
+                                             *(index_info->index_param_list_));
             break;
         }
         case IndexType::kInvalid: {
