@@ -2,7 +2,7 @@
 
 function kill_process()
 {
-    kill -s SIGTERM $(pgrep $1)
+    kill -s SIGUSR1 $(pgrep $1)
 }
 
 STATUS=$(kill_process "infinity" )
