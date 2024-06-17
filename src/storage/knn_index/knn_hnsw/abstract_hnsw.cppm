@@ -36,22 +36,28 @@ namespace infinity {
 
 export template <typename DataType, typename LabelType>
 class AbstractHnsw {
-    using Hnsw1 = KnnHnsw<PlainIPVecStoreType<DataType>, LabelType>;
-    using Hnsw2 = KnnHnsw<PlainL2VecStoreType<DataType>, LabelType>;
-    using Hnsw3 = KnnHnsw<LVQIPVecStoreType<DataType, i8>, LabelType>;
-    using Hnsw4 = KnnHnsw<LVQL2VecStoreType<DataType, i8>, LabelType>;
+    using Hnsw1 = KnnHnsw<PlainCosVecStoreType<DataType>, LabelType>;
+    using Hnsw2 = KnnHnsw<PlainIPVecStoreType<DataType>, LabelType>;
+    using Hnsw3 = KnnHnsw<PlainL2VecStoreType<DataType>, LabelType>;
+    using Hnsw4 = KnnHnsw<LVQCosVecStoreType<DataType, i8>, LabelType>;
+    using Hnsw5 = KnnHnsw<LVQIPVecStoreType<DataType, i8>, LabelType>;
+    using Hnsw6 = KnnHnsw<LVQL2VecStoreType<DataType, i8>, LabelType>;
 
 public:
     AbstractHnsw(void *ptr, const IndexHnsw *index_hnsw) {
         switch (index_hnsw->encode_type_) {
             case HnswEncodeType::kPlain: {
                 switch (index_hnsw->metric_type_) {
-                    case MetricType::kMetricInnerProduct: {
+                    case MetricType::kMetricCosine: {
                         knn_hnsw_ptr_ = reinterpret_cast<Hnsw1 *>(ptr);
                         break;
                     }
-                    case MetricType::kMetricL2: {
+                    case MetricType::kMetricInnerProduct: {
                         knn_hnsw_ptr_ = reinterpret_cast<Hnsw2 *>(ptr);
+                        break;
+                    }
+                    case MetricType::kMetricL2: {
+                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw3 *>(ptr);
                         break;
                     }
                     default: {
@@ -64,12 +70,16 @@ public:
             }
             case HnswEncodeType::kLVQ: {
                 switch (index_hnsw->metric_type_) {
+                    case MetricType::kMetricCosine: {
+                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw4 *>(ptr);
+                        break;
+                    }
                     case MetricType::kMetricInnerProduct: {
-                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw3 *>(ptr);
+                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw5 *>(ptr);
                         break;
                     }
                     case MetricType::kMetricL2: {
-                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw4 *>(ptr);
+                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw6 *>(ptr);
                         break;
                     }
                     default: {
@@ -172,7 +182,7 @@ public:
     }
 
 private:
-    std::variant<Hnsw1 *, Hnsw2 *, Hnsw3 *, Hnsw4 *> knn_hnsw_ptr_;
+    std::variant<Hnsw1 *, Hnsw2 *, Hnsw3 *, Hnsw4 *, Hnsw5 *, Hnsw6 *> knn_hnsw_ptr_;
 };
 
 } // namespace infinity

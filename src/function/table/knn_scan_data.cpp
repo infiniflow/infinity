@@ -52,6 +52,10 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
             dist_func_ = L2Distance<f32, f32, f32, SizeT>;
             break;
         }
+        case KnnDistanceType::kCosine: {
+            dist_func_ = CosineDistance<f32, f32, f32, SizeT>;
+            break;
+        }
         case KnnDistanceType::kInnerProduct: {
             dist_func_ = IPDistance<f32, f32, f32, SizeT>;
             break;

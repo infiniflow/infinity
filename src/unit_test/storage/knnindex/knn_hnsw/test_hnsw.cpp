@@ -14,6 +14,8 @@
 
 #include "unit_test/base_test.h"
 #include <fstream>
+#include <gtest/gtest.h>
+#include <iostream>
 #include <thread>
 
 import stl;
@@ -30,6 +32,7 @@ import data_store;
 
 import dist_func_l2;
 import dist_func_ip;
+import dist_func_cos;
 import vec_store_type;
 import hnsw_common;
 import infinity_exception;
@@ -255,4 +258,9 @@ TEST_F(HnswAlgTest, test3) {
 TEST_F(HnswAlgTest, test4) {
     using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
     TestParallel<Hnsw>();
+}
+
+TEST_F(HnswAlgTest, test5) {
+    using Hnsw = KnnHnsw<PlainCosVecStoreType<float>, LabelT>;
+    TestSimple<Hnsw>();
 }

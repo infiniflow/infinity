@@ -73,12 +73,17 @@ private:
     }
 
 public:
-    LVQVecStoreMeta() : dim_(0), compress_data_size_(0) {}
+    LVQVecStoreMeta() : dim_(0), compress_data_size_(0), normalize_(false) {}
     LVQVecStoreMeta(This &&other)
         : dim_(std::exchange(other.dim_, 0)), compress_data_size_(std::exchange(other.compress_data_size_, 0)), mean_(std::move(other.mean_)),
-          global_cache_(std::exchange(other.global_cache_, GlobalCacheType())) {}
+          global_cache_(std::exchange(other.global_cache_, GlobalCacheType())), normalize_(other.normalize_) {}
 
     static This Make(SizeT dim) { return This(dim); }
+    static This Make(SizeT dim, bool normalize) {
+        This ret(dim);
+        ret.normalize_ = normalize;
+        return ret;
+    }
 
     void Save(FileHandler &file_handler) const {
         file_handler.Write(&dim_, sizeof(dim_));
@@ -101,7 +106,23 @@ public:
         return query;
     }
 
-    void CompressTo(const DataType *src, LVQData *dest) const {
+    virtual void CompressTo(const DataType *src, LVQData *dest) const {
+        if (normalize_) {
+            DataType norm = 0;
+            DataType *src_without_const = const_cast<DataType *>(src);
+            for (SizeT j = 0; j < this->dim_; ++j) {
+                norm += src_without_const[j] * src_without_const[j];
+            }
+            norm = std::sqrt(norm);
+            if (norm == 0) {
+                std::fill(dest->compress_vec_, dest->compress_vec_ + this->dim_, 0);
+            } else {
+                for (SizeT j = 0; j < this->dim_; ++j) {
+                    src_without_const[j] /= norm;
+                }
+            }
+        }
+
         CompressType *compress = dest->compress_vec_;
 
         DataType lower = std::numeric_limits<DataType>::max();
@@ -187,12 +208,14 @@ private:
 
     void DecompressTo(const LVQData *src, DataType *dest) const { DecompressByMeanTo(src, mean_.get(), dest); };
 
-private:
+protected:
     SizeT dim_;
     SizeT compress_data_size_;
 
     UniquePtr<MeanType[]> mean_;
     GlobalCacheType global_cache_;
+
+    bool normalize_;
 
 public:
     void Dump(std::ostream &os) const {

@@ -25,6 +25,7 @@ namespace infinity {
 
 // TODO shenyushi: use definition in knn_exprs.h
 export enum class MetricType {
+    kMetricCosine,
     kMetricInnerProduct,
     kMetricL2,
     kInvalid,
