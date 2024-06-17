@@ -675,73 +675,6 @@ WrapQueryResult WrapUpdate(Infinity &instance,
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult WrapExplain(Infinity &instance,
-                            const String &db_name,
-                            const String &table_name,
-                            ExplainType explain_type,
-                            Vector<WrapParsedExpr> wrap_output_columns,
-                            WrapSearchExpr *wrap_search_expr,
-                            WrapParsedExpr *wrap_filter) {
-    SearchExpr *search_expr = nullptr;
-    if (wrap_search_expr != nullptr) {
-        Status status;
-        search_expr = dynamic_cast<SearchExpr *>(wrap_search_expr->GetParsedExpr(status));
-        if (status.code_ != ErrorCode::kOk) {
-            if (search_expr != nullptr) {
-                delete search_expr;
-                search_expr = nullptr;
-            }
-            return WrapQueryResult(status.code_, status.msg_->c_str());
-        }
-    }
-    ParsedExpr *filter = nullptr;
-    if (wrap_filter != nullptr) {
-        Status status;
-        filter = wrap_filter->GetParsedExpr(status);
-        if (status.code_ != ErrorCode::kOk) {
-            if (filter != nullptr) {
-                delete filter;
-                filter = nullptr;
-            }
-            if (search_expr != nullptr) {
-                delete search_expr;
-                search_expr = nullptr;
-            }
-            return WrapQueryResult(status.code_, status.msg_->c_str());
-        }
-    }
-    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
-    output_columns->reserve(wrap_output_columns.size());
-    for (SizeT i = 0; i < wrap_output_columns.size(); ++i) {
-        Status status;
-        output_columns->emplace_back(wrap_output_columns[i].GetParsedExpr(status));
-        if (status.code_ != ErrorCode::kOk) {
-            if (output_columns != nullptr) {
-                for (SizeT j = 0; j <= i; ++j) {
-                    if ((*output_columns)[j] != nullptr) {
-                        delete (*output_columns)[j];
-                        (*output_columns)[j] = nullptr;
-                    }
-                }
-                delete output_columns;
-                output_columns = nullptr;
-            }
-            if (filter != nullptr) {
-                delete filter;
-                filter = nullptr;
-            }
-            if (search_expr != nullptr) {
-                delete search_expr;
-                search_expr = nullptr;
-            }
-            return WrapQueryResult(status.code_, status.msg_->c_str());
-        }
-    }
-
-    auto query_result = instance.Explain(db_name, table_name, explain_type, search_expr, filter, output_columns);
-    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
-}
-
 // WrapSearch related function
 void HandleBoolType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     String dst;
@@ -1083,6 +1016,83 @@ WrapQueryResult WrapSearch(Infinity &instance,
     ProcessDataBlocks(query_result, wrap_query_result, columns);
     return wrap_query_result;
 }
+
+
+WrapQueryResult WrapExplain(Infinity &instance,
+                            const String &db_name,
+                            const String &table_name,
+                            ExplainType explain_type,
+                            Vector<WrapParsedExpr> wrap_output_columns,
+                            WrapSearchExpr *wrap_search_expr,
+                            WrapParsedExpr *wrap_filter) {
+    SearchExpr *search_expr = nullptr;
+    if (wrap_search_expr != nullptr) {
+        Status status;
+        search_expr = dynamic_cast<SearchExpr *>(wrap_search_expr->GetParsedExpr(status));
+        if (status.code_ != ErrorCode::kOk) {
+            if (search_expr != nullptr) {
+                delete search_expr;
+                search_expr = nullptr;
+            }
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+    ParsedExpr *filter = nullptr;
+    if (wrap_filter != nullptr) {
+        Status status;
+        filter = wrap_filter->GetParsedExpr(status);
+        if (status.code_ != ErrorCode::kOk) {
+            if (filter != nullptr) {
+                delete filter;
+                filter = nullptr;
+            }
+            if (search_expr != nullptr) {
+                delete search_expr;
+                search_expr = nullptr;
+            }
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+    Vector<ParsedExpr *> *output_columns = new Vector<ParsedExpr *>();
+    output_columns->reserve(wrap_output_columns.size());
+    for (SizeT i = 0; i < wrap_output_columns.size(); ++i) {
+        Status status;
+        output_columns->emplace_back(wrap_output_columns[i].GetParsedExpr(status));
+        if (status.code_ != ErrorCode::kOk) {
+            if (output_columns != nullptr) {
+                for (SizeT j = 0; j <= i; ++j) {
+                    if ((*output_columns)[j] != nullptr) {
+                        delete (*output_columns)[j];
+                        (*output_columns)[j] = nullptr;
+                    }
+                }
+                delete output_columns;
+                output_columns = nullptr;
+            }
+            if (filter != nullptr) {
+                delete filter;
+                filter = nullptr;
+            }
+            if (search_expr != nullptr) {
+                delete search_expr;
+                search_expr = nullptr;
+            }
+            return WrapQueryResult(status.code_, status.msg_->c_str());
+        }
+    }
+
+    auto query_result = instance.Explain(db_name, table_name, explain_type, search_expr, filter, output_columns);
+
+    if (!query_result.IsOk()) {
+        return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+    }
+    auto wrap_query_result = WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+    auto &columns = wrap_query_result.column_fields;
+    columns.resize(query_result.result_table_->ColumnCount());
+    ProcessDataBlocks(query_result, wrap_query_result, columns);
+    return wrap_query_result;
+}
+
 
 WrapQueryResult WrapShowColumns(Infinity &instance, const String &db_name, const String &table_name) {
     auto query_result = instance.ShowColumns(db_name, table_name);

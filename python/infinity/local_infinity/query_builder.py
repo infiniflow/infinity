@@ -14,6 +14,7 @@ from infinity.common import VEC, InfinityException
 from embedded_infinity import *
 from infinity.local_infinity.types import logic_type_to_dtype
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
+from infinity.table import ExplainType as BaseExplainType
 
 class Query(ABC):
     def __init__(self, columns: Optional[List[WrapParsedExpr]], search: Optional[WrapSearchExpr], filter: Optional[WrapParsedExpr],
@@ -27,7 +28,7 @@ class Query(ABC):
 
 class ExplainQuery(Query):
     def __init__(self, columns: Optional[List[WrapParsedExpr]], search: Optional[WrapSearchExpr], filter: Optional[WrapParsedExpr],
-                 limit: Optional[WrapParsedExpr], offset: Optional[WrapParsedExpr], explain_type: Optional[ExplainType]):
+                 limit: Optional[WrapParsedExpr], offset: Optional[WrapParsedExpr], explain_type: Optional[BaseExplainType]):
         super().__init__(columns, search, filter, limit, offset)
         self.explain_type = explain_type
 
@@ -136,7 +137,6 @@ class InfinityLocalQueryBuilder(ABC):
         self._search.knn_exprs = self._search.knn_exprs + knn_exprs
 
         assert(len(self._search.knn_exprs) > 0)
-        print("knn exprs: ", self._search.knn_exprs)
         return self
 
     def match(self, fields: str, matching_text: str, options_text: str = '') -> InfinityLocalQueryBuilder:

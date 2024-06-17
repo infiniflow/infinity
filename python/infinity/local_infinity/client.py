@@ -136,18 +136,16 @@ class LocalInfinityClient:
 
     def select(self, db_name: str, table_name: str, select_list: list[WrapParsedExpr], search_expr,
                where_expr, limit_expr, offset_expr, group_by_list=None):
-        print("search expr: ", search_expr)
-        print("select_list: ", select_list)
         return self.convert_res(self.client.Search(db_name, table_name, select_list,
                                                    wrap_search_expr=search_expr, where_expr=where_expr,
                                                    limit_expr=limit_expr, offset_expr=offset_expr),
                                 has_result_data=True)
 
-    def explain(self, db_name: str, table_name: str, select_list, search_expr,
-                where_expr, group_by_list, limit_expr, offset_expr, explain_type):
-        return self.convert_res(self.client.Explain(db_name, table_name, select_list,
-                                                    search_expr, where_expr, group_by_list, limit_expr, offset_expr,
-                                                    explain_type))
+    def explain(self, db_name: str, table_name: str, explain_type, select_list, search_expr,
+                where_expr, group_by_list, limit_expr, offset_expr):
+        return self.convert_res(self.client.Explain(db_name, table_name, explain_type, select_list,
+                                                    search_expr, where_expr),
+                                has_result_data=True)
 
     def delete(self, db_name: str, table_name: str, where_expr):
         return self.convert_res(self.client.Delete(db_name, table_name, where_expr))

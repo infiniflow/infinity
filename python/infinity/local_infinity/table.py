@@ -403,13 +403,13 @@ class LocalTable(Table, ABC):
     def _explain_query(self, query: ExplainQuery) -> Any:
         res = self._conn.explain(db_name=self._db_name,
                                  table_name=self._table_name,
+                                 explain_type=query.explain_type.to_local_ttype(),
                                  select_list=query.columns,
                                  search_expr=query.search,
                                  where_expr=query.filter,
                                  group_by_list=None,
                                  limit_expr=query.limit,
-                                 offset_expr=query.offset,
-                                 explain_type=query.explain_type.to_ttype())
+                                 offset_expr=query.offset)
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
