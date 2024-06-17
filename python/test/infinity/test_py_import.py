@@ -19,26 +19,8 @@ def setup_class(request, local_infinity):
     yield
     request.cls.test_infinity_obj.disconnect()
 
-# @pytest.mark.usefixtures("setup_class")
-@pytest.mark.usefixtures("local_infinity")
+@pytest.mark.usefixtures("setup_class")
 class TestInfinity:
-    @pytest.fixture(autouse=True)
-    def setup(self, request, local_infinity):
-        if 'skip_setup' in request.keywords:
-            yield
-        else:
-            if local_infinity:
-                self.uri = common_values.TEST_LOCAL_PATH
-            else:
-                self.uri = common_values.TEST_REMOTE_HOST
-            self.test_infinity_obj = TestImport(self.uri)
-            yield
-            self.teardown()
-
-    def teardown(self):
-        if hasattr(self, 'test_infinity_obj'):
-            self.test_infinity_obj.disconnect()
-
     @pytest.fixture
     def skip_setup_marker(self, request):
         request.node.skip_setup = True
