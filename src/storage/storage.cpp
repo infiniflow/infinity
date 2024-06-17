@@ -97,6 +97,7 @@ void Storage::Init() {
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
+    new_catalog_->StartMemoryIndexCommit();
     new_catalog_->MemIndexRecover(buffer_mgr_.get());
 
     bg_processor_->Start();
