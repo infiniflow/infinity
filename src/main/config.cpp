@@ -138,7 +138,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<StringOption> version_option = MakeUnique<StringOption>(VERSION_OPTION_NAME, current_version);
         status = global_options_.AddOption(std::move(version_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -147,7 +147,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<StringOption> time_zone_option = MakeUnique<StringOption>(TIME_ZONE_OPTION_NAME, time_zone_str);
         status = global_options_.AddOption(std::move(time_zone_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -156,7 +156,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<IntegerOption> time_zone_bias_option = MakeUnique<IntegerOption>(TIME_ZONE_BIAS_OPTION_NAME, time_zone_bias, 12, -12);
         status = global_options_.AddOption(std::move(time_zone_bias_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -164,7 +164,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<IntegerOption> cpu_limit_option = MakeUnique<IntegerOption>(CPU_LIMIT_OPTION_NAME, Thread::hardware_concurrency(), 16384, 1);
         status = global_options_.AddOption(std::move(cpu_limit_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -174,7 +174,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<BooleanOption> record_running_query_option = MakeUnique<BooleanOption>(RECORD_RUNNING_QUERY_OPTION_NAME, record_running_query);
         status = global_options_.AddOption(std::move(record_running_query_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -183,7 +183,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_address_str);
         status = global_options_.AddOption(std::move(server_address_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -192,7 +192,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<IntegerOption> pg_port_option = MakeUnique<IntegerOption>(POSTGRES_PORT_OPTION_NAME, pg_port, 65535, 1024);
         status = global_options_.AddOption(std::move(pg_port_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -201,7 +201,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<IntegerOption> http_port_option = MakeUnique<IntegerOption>(HTTP_PORT_OPTION_NAME, http_port, 65535, 1024);
         status = global_options_.AddOption(std::move(http_port_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -210,7 +210,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<IntegerOption> client_port_option = MakeUnique<IntegerOption>(CLIENT_PORT_OPTION_NAME, rpc_client_port, 65535, 1024);
         status = global_options_.AddOption(std::move(client_port_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -219,7 +219,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<IntegerOption> connection_pool_size_option = MakeUnique<IntegerOption>(CONNECTION_POOL_SIZE_OPTION_NAME, connection_pool_size, 65536, 1);
         status = global_options_.AddOption(std::move(connection_pool_size_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -228,7 +228,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<StringOption> log_file_name_option = MakeUnique<StringOption>(LOG_FILENAME_OPTION_NAME, log_filename);
         status = global_options_.AddOption(std::move(log_file_name_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -237,7 +237,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<StringOption> log_dir_option = MakeUnique<StringOption>(LOG_DIR_OPTION_NAME, log_dir);
         status = global_options_.AddOption(std::move(log_dir_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -246,7 +246,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<BooleanOption> log_to_stdout_option = MakeUnique<BooleanOption>(LOG_TO_STDOUT_OPTION_NAME, log_to_stdout);
         status = global_options_.AddOption(std::move(log_to_stdout_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -256,7 +256,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             MakeUnique<IntegerOption>(LOG_FILE_MAX_SIZE_OPTION_NAME, log_file_max_size, std::numeric_limits<i64>::max(), 1024lu * 1024lu);
         status = global_options_.AddOption(std::move(log_file_max_size_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -265,7 +265,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<IntegerOption> log_file_rotate_count_option = MakeUnique<IntegerOption>(LOG_FILE_ROTATE_COUNT_OPTION_NAME, log_file_rotate_count, 65536, 1);
         status = global_options_.AddOption(std::move(log_file_rotate_count_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -274,7 +274,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>(LOG_LEVEL_OPTION_NAME, log_level);
         status = global_options_.AddOption(std::move(log_level_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -283,7 +283,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
         status = global_options_.AddOption(std::move(data_dir_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -293,7 +293,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             MakeUnique<IntegerOption>(CLEANUP_INTERVAL_OPTION_NAME, cleanup_interval, MAX_CLEANUP_INTERVAL_SEC, MIN_CLEANUP_INTERVAL_SEC);
         status = global_options_.AddOption(std::move(cleanup_interval_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -303,7 +303,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             MakeUnique<IntegerOption>(COMPACT_INTERVAL_OPTION_NAME, compact_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
         status = global_options_.AddOption(std::move(compact_interval_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -313,7 +313,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             MakeUnique<IntegerOption>(OPTIMIZE_INTERVAL_OPTION_NAME, optimize_index_interval, MAX_COMPACT_INTERVAL_SEC, MIN_COMPACT_INTERVAL_SEC);
         status = global_options_.AddOption(std::move(optimize_interval_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -323,7 +323,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             MakeUnique<IntegerOption>(MEM_INDEX_CAPACITY_OPTION_NAME, mem_index_capacity, MAX_MEMINDEX_CAPACITY, MIN_MEMINDEX_CAPACITY);
         status = global_options_.AddOption(std::move(mem_index_capacity_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -333,7 +333,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             MakeUnique<IntegerOption>(BUFFER_MANAGER_SIZE_OPTION_NAME, buffer_manager_size, std::numeric_limits<i64>::max(), 0);
         status = global_options_.AddOption(std::move(buffer_manager_size_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -342,7 +342,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
         status = global_options_.AddOption(std::move(temp_dir_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -351,7 +351,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         UniquePtr<StringOption> wal_dir_option = MakeUnique<StringOption>(WAL_DIR_OPTION_NAME, wal_dir);
         status = global_options_.AddOption(std::move(wal_dir_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -361,7 +361,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             MakeUnique<IntegerOption>(WAL_COMPACT_THRESHOLD_OPTION_NAME, wal_compact_threshold, MAX_WAL_FILE_SIZE_THRESHOLD, MIN_WAL_FILE_SIZE_THRESHOLD);
         status = global_options_.AddOption(std::move(wal_compact_threshold_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -373,7 +373,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                                                                                              MIN_FULL_CHECKPOINT_INTERVAL_SEC);
         status = global_options_.AddOption(std::move(full_checkpoint_interval_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -385,7 +385,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                                                                                               MIN_DELTA_CHECKPOINT_INTERVAL_SEC);
         status = global_options_.AddOption(std::move(delta_checkpoint_interval_option));
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
+            fmt::print("Fatal: {}", status.message());
             UnrecoverableError(status.message());
         }
 
@@ -541,21 +541,21 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kVersion) == nullptr) {
                     // Version
                     String error_message = "Missing version field";
-                    LOG_CRITICAL(error_message);
+                    fmt::print("Fatal: {}",error_message);
                     UnrecoverableError(error_message);
                 }
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZone) == nullptr) {
                     // Time zone
                     String error_message = "Missing time zone field";
-                    LOG_CRITICAL(error_message);
+                    fmt::print("Fatal: {}",error_message);
                     UnrecoverableError(error_message);
                 }
 
                 if (global_options_.GetOptionByIndex(GlobalOptionIndex::kTimeZoneBias) == nullptr) {
                     // Time zone bias
                     String error_message = "Missing time zone field";
-                    LOG_CRITICAL(error_message);
+                    fmt::print("Fatal: {}",error_message);
                     UnrecoverableError(error_message);
                 }
 
