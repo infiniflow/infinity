@@ -13,7 +13,11 @@ class TestInfinity:
             self.uri = common_values.TEST_LOCAL_PATH
         else:
             self.uri = common_values.TEST_REMOTE_HOST
+        self.test_infinity_obj = TestConnectionPool(self.uri)
+
+    def teardown(self):
+        self.test_infinity_obj.disconnect()
+
     def test_connection_pool(self):
-        test_connection_pool_obj = TestConnectionPool(self.uri)
-        test_connection_pool_obj._test_basic()
-        # test_connection_pool_obj._test_time_out()
+        self.test_infinity_obj._test_basic()
+        # self.test_infinity_obj._test_time_out()

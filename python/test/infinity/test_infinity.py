@@ -10,10 +10,13 @@ class TestInfinity:
             self.uri = common_values.TEST_LOCAL_PATH
         else:
             self.uri = common_values.TEST_REMOTE_HOST
+        self.test_infinity_obj = InfinityTest(self.uri)
+
+    def teardown(self):
+        self.test_infinity_obj.disconnect()
+
     @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_get_infinity(self):
-        test_infinity_obj = InfinityTest(self.uri)
-        test_infinity_obj._test_get_database()
+        self.test_infinity_obj._test_get_database()
     def test_list_infinity(self):
-        test_infinity_obj = InfinityTest(self.uri)
-        test_infinity_obj._test_list_database()
+        self.test_infinity_obj._test_list_database()

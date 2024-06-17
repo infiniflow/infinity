@@ -73,8 +73,7 @@ class TestQuery(TestSdk):
 
     def _test_query_builder(self):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_query_builder",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table(
@@ -83,7 +82,4 @@ class TestQuery(TestSdk):
         query_builder.output(["*"]).to_df()
 
         res = db_obj.drop_table("test_query_builder", ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-        res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK

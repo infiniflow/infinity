@@ -81,8 +81,7 @@ class TestSelect(TestSdk):
             - 'test_select'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
 
         # infinity
         db_obj.drop_table("test_select", ConflictType.Ignore)
@@ -156,10 +155,6 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_select", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     def _test_select_aggregate(self):
         """
         target: test table select apis
@@ -196,8 +191,7 @@ class TestSelect(TestSdk):
             - select avg(c2) from test_select_aggregate
                 - 2.387692308
         """
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
 
         # infinity
         db_obj.drop_table("test_select_aggregate", ConflictType.Ignore)
@@ -233,10 +227,6 @@ class TestSelect(TestSdk):
         print(res)
 
         res = db_obj.drop_table("test_select_aggregate", ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-        # disconnect
-        res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
     def _test_select_varchar(self):
@@ -288,8 +278,7 @@ class TestSelect(TestSdk):
         expect: all operations successfully
 
         """
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_varchar", ConflictType.Ignore)
         db_obj.create_table("test_select_varchar",
                             {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
@@ -320,13 +309,8 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_select_varchar")
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     def _test_select_big(self):
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_select_big", ConflictType.Ignore)
         db_obj.create_table("test_select_big", {
             "c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
@@ -339,10 +323,6 @@ class TestSelect(TestSdk):
                 [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'}])
 
         res = db_obj.drop_table("test_select_big", ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-        # disconnect
-        res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
     def _test_select_embedding_int32(self, check_data):
@@ -361,8 +341,7 @@ class TestSelect(TestSdk):
         test_obj.test_select_embedding()
 
         """
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
 
         db_obj.drop_table("test_select_embedding", ConflictType.Ignore)
 
@@ -393,10 +372,6 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_select_embedding", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     def _test_select_embedding_float(self, check_data):
         """
         Method: test_select_embedding_float
@@ -412,8 +387,7 @@ class TestSelect(TestSdk):
         test_select_embedding_float()
 
         """
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
 
         db_obj.drop_table("test_select_embedding_float", ConflictType.Ignore)
 
@@ -451,10 +425,6 @@ class TestSelect(TestSdk):
             "test_select_embedding_float", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     def _test_select_big_embedding(self, check_data):
         """
         Method: test_select_big_embedding
@@ -473,8 +443,7 @@ class TestSelect(TestSdk):
         Example Usage:
         test_select_big_embedding()
         """
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
 
         db_obj.drop_table("test_select_big_embedding", ConflictType.Ignore)
 
@@ -497,13 +466,8 @@ class TestSelect(TestSdk):
             "test_select_big_embedding", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     def _test_select_same_output(self):
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_same_output", ConflictType.Ignore)
         db_obj.create_table("test_select_same_output", {
             "c1": {"type": "int"}, "c2": {"type": "int"}}, ConflictType.Error)
@@ -521,13 +485,8 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_select_same_output", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     def _test_empty_table(self):
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_empty_table", ConflictType.Ignore)
         db_obj.create_table("test_empty_table", {
             "c1": {"type": "int"}, "c2": {"type": "int"}}, ConflictType.Error)
@@ -547,14 +506,9 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_empty_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     def _test_valid_filter_expression(self, filter_list):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_valid_filter_expression", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_valid_filter_expression", {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
@@ -571,14 +525,9 @@ class TestSelect(TestSdk):
             "test_valid_filter_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     def _test_invalid_filter_expression(self, filter_list):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_invalid_filter_expression",
                           ConflictType.Ignore)
         table_obj = db_obj.create_table("test_invalid_filter_expression", {
@@ -595,10 +544,6 @@ class TestSelect(TestSdk):
 
         res = db_obj.drop_table(
             "test_invalid_filter_expression", ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-        # disconnect
-        res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
     # create a table with all types supported, each column can be output correctly.

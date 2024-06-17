@@ -27,7 +27,6 @@ TEST_DATA_DIR = "/test/data/"
 
 
 class TestIndex(TestSdk):
-
     def _test_create_index_IVFFlat(self, get_infinity_db):
         db_obj = get_infinity_db
         res = db_obj.drop_table("test_index_ivfflat", ConflictType.Ignore)

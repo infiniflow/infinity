@@ -34,8 +34,7 @@ class TestExplain(TestSdk):
             # Pipeline = 6
             # Fragment = 7
         """
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_explain_default", ConflictType.Ignore)
         table = db_obj.create_table("test_explain_default", {
             "c1": {"type": "varchar", "constraints": ["primary key"]}, "c2": {"type": "float"}}, ConflictType.Error)

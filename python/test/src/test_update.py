@@ -62,8 +62,7 @@ class TestUpdate(TestSdk):
             - 'table_4'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
 
         db_obj.drop_table(table_name="test_update", conflict_type=ConflictType.Ignore)
 
@@ -97,16 +96,12 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update empty table
     def _test_update_empty_table(self):
 
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_empty_table", ConflictType.Ignore)
 
         try:
@@ -127,16 +122,12 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_empty_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update non-existent table
     def _test_update_non_existent_table(self):
 
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_non_existent_table", ConflictType.Ignore)
 
         db_obj.create_table("test_update_non_existent_table",
@@ -157,16 +148,12 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_non_existent_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update table, no row is met the condition
     def _test_update_no_row_is_met_the_condition(self):
 
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         for i in range(len(common_values.types_array)):
             db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i), ConflictType.Ignore)
 
@@ -200,16 +187,12 @@ class TestUpdate(TestSdk):
         for i in range(len(common_values.types_array)):
             db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i), ConflictType.Error)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update table, all rows are met the condition
     def _test_update_all_row_is_met_the_condition(self):
 
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         for i in range(len(common_values.types_array)):
             db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i), ConflictType.Ignore)
 
@@ -243,16 +226,12 @@ class TestUpdate(TestSdk):
         for i in range(len(common_values.types_array)):
             db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i), ConflictType.Error)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update table with only one block
 
     def _test_update_table_with_one_block(self):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_table_with_one_block", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_table_with_one_block",
                                         {"c1": {"type": "int"}, "c2": {"type": "int"}},
@@ -273,15 +252,11 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_table_with_one_block", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update table with multiple blocks, but only one segment
     def _test_update_table_with_one_segment(self):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_table_with_one_segment", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_table_with_one_segment",
                                         {"c1": {"type": "int"}, "c2": {"type": "int"}},
@@ -302,15 +277,11 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_table_with_one_segment", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update before delete, select after delete and check the change.
     def _test_update_before_delete(self):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_before_delete", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_before_delete", {"c1": {"type": "int"}, "c2": {"type": "int"}},
                                         ConflictType.Error)
@@ -334,15 +305,11 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_before_delete", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update just inserted data and select to check
     def _test_update_inserted_data(self):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_inserted_data", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_inserted_data", {"c1": {"type": "int"}, "c2": {"type": "int"}},
                                         ConflictType.Error)
@@ -361,15 +328,11 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_inserted_data", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update inserted long before and select to check
     def _test_update_inserted_long_before(self):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_inserted_long_before", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_inserted_long_before",
                                         {"c1": {"type": "int"}, "c2": {"type": "int"}},
@@ -391,15 +354,11 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_inserted_long_before", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update dropped table
     def _test_update_dropped_table(self):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_dropped_table", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_dropped_table", {"c1": {"type": "int"}, "c2": {"type": "int"}},
                                         ConflictType.Error)
@@ -415,15 +374,11 @@ class TestUpdate(TestSdk):
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update new value is invalid
     def _test_update_invalid_value(self, types, types_example):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_invalid_value", {"c1": {"type": "int"}, "c2": {"type": types}},
                                         ConflictType.Error)
@@ -435,15 +390,11 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_invalid_value", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # update new value type is not match with table
     def _test_update_new_value(self, types, types_example):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_new_value", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_new_value", {"c1": {"type": "int"}, "c2": {"type": types}},
                                         ConflictType.Error)
@@ -456,14 +407,10 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_new_value", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     def _test_update_invalid_value(self, types, types_example):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_update_invalid_value", {"c1": {"type": "int"}, "c2": {"type": types}},
                                         ConflictType.Error)
@@ -481,9 +428,6 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_invalid_value", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     def _test_valid_filter_expression(self, get_infinity_db, filter_list, types_example):
         # connect

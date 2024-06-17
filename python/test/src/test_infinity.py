@@ -34,7 +34,6 @@ class InfinityTest(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     def _test_list_database(self):
-        infinity_obj = infinity.connect(self.uri)
-        database_res = infinity_obj.list_databases()
+        database_res = self.infinity_obj.list_databases()
         assert database_res.db_names[0] == "default_db"
 

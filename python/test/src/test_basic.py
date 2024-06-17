@@ -76,29 +76,29 @@ class TestCase(TestSdk):
         12.
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(self.uri)
-        assert infinity_obj
+        # infinity_obj = infinity.connect(self.uri)
+        # assert infinity_obj
 
-        res = infinity_obj.list_databases()
+        res = self.infinity_obj.list_databases()
         assert res.error_code == ErrorCode.OK
         for db_name in res.db_names:
             if db_name != "default_db":
-                infinity_obj.drop_database(db_name, ConflictType.Error)
+                self.infinity_obj.drop_database(db_name, ConflictType.Error)
 
         # infinity
-        db_obj = infinity_obj.create_database("my_db", ConflictType.Error)
+        db_obj = self.infinity_obj.create_database("my_db", ConflictType.Error)
         assert db_obj is not None
 
-        res = infinity_obj.list_databases()
+        res = self.infinity_obj.list_databases()
         assert res.error_code == ErrorCode.OK
 
         for db in res.db_names:
             assert db in ['my_db', "default_db"]
 
-        res = infinity_obj.drop_database("my_db", ConflictType.Error)
+        res = self.infinity_obj.drop_database("my_db", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("my_table1", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "my_table1", {"c1": {"type": "int", "constraints": ["primary key"]}}, ConflictType.Error)
@@ -218,5 +218,5 @@ class TestCase(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
+        # res = infinity_obj.disconnect()
+        # assert res.error_code == ErrorCode.OK

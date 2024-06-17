@@ -56,7 +56,7 @@ def get_infinity_db(request):
 
     # connect
     infinity_obj = infinity.connect(uri)
-
+    print("get_infinity_db")
     yield infinity_obj.get_database("default_db")
 
     # disconnect

@@ -39,13 +39,9 @@ class TestImport(TestSdk):
         method: connect server, create table, import data, search, drop table, disconnect
         expect: all operations successfully
         """
-
-        infinity_obj = infinity.connect(self.uri)
-        assert infinity_obj
-
         # infinity
 
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         assert db_obj
 
         # import
@@ -75,9 +71,7 @@ class TestImport(TestSdk):
                                              "jsonl",
                                              "fvecs"])
     def _test_import_different_file_format_data(self, file_format, check_data):
-        # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
 
         db_obj.drop_table("test_import_different_file_format_data", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_import_different_file_format_data",
@@ -104,16 +98,10 @@ class TestImport(TestSdk):
         res = db_obj.drop_table("test_import_different_file_format_data", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     # import empty FVECS file
     @pytest.mark.parametrize("file_format", ["fvecs", "fvecs", "fvecs"])
     def _test_import_empty_file_fvecs(self, file_format):
-        # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_empty_file_fvecs", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_import_empty_file_fvecs",
                                         {"c1": {"type": "vector,128,float"}}, ConflictType.Error)
@@ -123,16 +111,10 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_import_empty_file_fvecs", ConflictType.Error)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     # import empty CSV file
     @pytest.mark.parametrize("file_format", ["csv", "csv", "csv"])
     def _test_import_empty_file_csv(self, file_format):
-        # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_empty_file_csv", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_import_empty_file_csv",
                                         {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
@@ -142,16 +124,10 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_import_empty_file_csv", ConflictType.Error)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     # import empty JSONL file
     @pytest.mark.parametrize("file_format", ["jsonl", "jsonl", "jsonl"])
     def _test_import_empty_file_jsonl(self, file_format):
-        # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_empty_file_jsonl", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_import_empty_file_jsonl",
                                         {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
@@ -161,9 +137,6 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_import_empty_file_jsonl", ConflictType.Error)
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     # import format unrecognized data
     @pytest.mark.parametrize("file_format", [

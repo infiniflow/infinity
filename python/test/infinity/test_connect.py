@@ -16,14 +16,23 @@ class TestInfinity:
             self.uri = common_values.TEST_LOCAL_PATH
         else:
             self.uri = common_values.TEST_REMOTE_HOST
-    def test_connect(self):
-        test_connection_obj = TestConnection(self.uri)
-        test_connection_obj._test_connect_and_disconnect_ok()
-        test_connection_obj._test_repeat_connect()
-        test_connection_obj._test_multiple_connect()
-        test_connection_obj._test_repeat_disconnect()
+        self.test_infinity_obj = TestConnection(self.uri)
+
+    def teardown(self):
+        self.test_infinity_obj.disconnect()
+
+    def test_connect_and_disconnect_ok(self):
+        self.test_infinity_obj._test_connect_and_disconnect_ok()
+
+    def test_repeat_connect(self):
+        self.test_infinity_obj._test_repeat_connect()
+
+    def test_multiple_connect(self):
+        self.test_infinity_obj._test_multiple_connect()
+
+    def test_repeat_disconnect(self):
+        self.test_infinity_obj._test_repeat_disconnect()
 
     @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_connect_invalid_address(self):
-        test_connection_obj = TestConnection(self.uri)
-        test_connection_obj._test_connect_invalid_address()
+        self.test_infinity_obj._test_connect_invalid_address()

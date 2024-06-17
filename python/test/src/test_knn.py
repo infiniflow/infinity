@@ -32,12 +32,10 @@ class TestKnn(TestSdk):
         print(infinity.__version__)
 
     def _test_knn(self, check_data):
-        infinity_obj = infinity.connect(self.uri)
-        # assert infinity_obj
         #
         # infinity
         #
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
 
         db_obj.drop_table("fix_tmp_20240116",
                           conflict_type=ConflictType.Ignore)
@@ -83,15 +81,9 @@ class TestKnn(TestSdk):
         res = db_obj.drop_table("fix_tmp_20240116", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     def _test_insert_multi_column(self):
-        infinity_obj = infinity.connect(self.uri)
-
         with pytest.raises(Exception, match=r".*value count mismatch*"):
-            db_obj = infinity_obj.get_database("default_db")
+            db_obj = self.infinity_obj.get_database("default_db")
             db_obj.drop_table("test_insert_multi_column",
                               conflict_type=ConflictType.Ignore)
             table = db_obj.create_table("test_insert_multi_column", {
@@ -119,9 +111,6 @@ class TestKnn(TestSdk):
                            }])
 
         res = db_obj.drop_table("test_insert_multi_column", ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-        res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
     # knn various column name

@@ -10,6 +10,10 @@ class TestInfinity:
             self.uri = common_values.TEST_LOCAL_PATH
         else:
             self.uri = common_values.TEST_REMOTE_HOST
+        self.test_infinity_obj = TestCondition(self.uri)
+
+    def teardown(self):
+        self.test_infinity_obj.disconnect()
+
     def test_condition(self):
-        test_condition_obj = TestCondition(self.uri)
-        test_condition_obj._test_traverse_conditions()
+        self.test_infinity_obj._test_traverse_conditions()

@@ -56,8 +56,7 @@ class TestDelete(TestSdk):
             - 'table_3'
         expect: all operations successfully
         """
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
 
         # infinity
         db_obj.drop_table(table_name="test_delete", conflict_type=ConflictType.Ignore)
@@ -88,11 +87,6 @@ class TestDelete(TestSdk):
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
         res = db_obj.drop_table("test_delete")
-        assert res.error_code == ErrorCode.OK
-
-        # disconnect
-        res = infinity_obj.disconnect()
-
         assert res.error_code == ErrorCode.OK
 
     # delete empty table

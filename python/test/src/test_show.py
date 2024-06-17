@@ -23,9 +23,7 @@ from src.test_sdkbase import TestSdk
 class TestDescribe(TestSdk):
 
     def _test_show_table(self):
-        infinity_obj = infinity.connect(self.uri)
-
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
         db_obj.create_table(
             "test_show_table",
@@ -38,14 +36,8 @@ class TestDescribe(TestSdk):
         res = db_obj.drop_table("test_show_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     def _test_show_columns(self):
-        infinity_obj = infinity.connect(self.uri)
-
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_columns", ConflictType.Ignore)
         db_obj.create_table(
             "test_show_columns",
@@ -60,21 +52,15 @@ class TestDescribe(TestSdk):
         res = db_obj.drop_table("test_show_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
-
     def _test_show_big_databases(self):
-        infinity_obj = infinity.connect(self.uri)
+        for i in range(8193):
+            self.infinity_obj.drop_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
 
         for i in range(8193):
-            infinity_obj.drop_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
+            self.infinity_obj.create_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
 
-        for i in range(8193):
-            infinity_obj.create_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
-
-        res = infinity_obj.list_databases()
+        res = self.infinity_obj.list_databases()
         assert res.error_code == ErrorCode.OK
 
         for i in range(8193):
-            infinity_obj.drop_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
+            self.infinity_obj.drop_database(f"test_show_big_databases_{i}", ConflictType.Ignore)

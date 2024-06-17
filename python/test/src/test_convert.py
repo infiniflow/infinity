@@ -10,8 +10,7 @@ from src.test_sdkbase import TestSdk
 
 class TestConvert(TestSdk):
     def _test_to_pl(self):
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_to_pl", ConflictType.Ignore)
         db_obj.create_table("test_to_pl", {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
@@ -28,8 +27,7 @@ class TestConvert(TestSdk):
         db_obj.drop_table("test_to_pl", ConflictType.Error)
 
     def _test_to_pa(self):
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_to_pa", ConflictType.Ignore)
         db_obj.create_table("test_to_pa", {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
@@ -46,8 +44,7 @@ class TestConvert(TestSdk):
         db_obj.drop_table("test_to_pa", ConflictType.Error)
 
     def _test_to_df(self):
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_to_df", ConflictType.Ignore)
         db_obj.create_table("test_to_df", {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
@@ -65,8 +62,7 @@ class TestConvert(TestSdk):
 
     def _test_without_output_select_list(self):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_without_output_select_list", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_without_output_select_list", {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
@@ -83,14 +79,10 @@ class TestConvert(TestSdk):
         assert e.value.args[0] == ErrorCode.EMPTY_SELECT_FIELDS
 
         db_obj.drop_table("test_without_output_select_list", ConflictType.Error)
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     def _test_with_valid_select_list_output(self, condition_list):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_with_valid_select_list_output", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_valid_select_list_output", {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
@@ -104,14 +96,10 @@ class TestConvert(TestSdk):
         print(insert_res_df)
 
         db_obj.drop_table("test_with_valid_select_list_output", ConflictType.Error)
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     def _test_with_invalid_select_list_output(self, condition_list):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_with_invalid_select_list_output", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_invalid_select_list_output", {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
@@ -126,14 +114,10 @@ class TestConvert(TestSdk):
             print(insert_res_df)
 
         db_obj.drop_table("test_with_invalid_select_list_output", ConflictType.Error)
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     def _test_output_with_valid_filter_function(self, filter_list):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_output_with_valid_filter_function", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_output_with_valid_filter_function", {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
@@ -147,14 +131,10 @@ class TestConvert(TestSdk):
         print(str(insert_res_df))
 
         db_obj.drop_table("test_output_with_valid_filter_function", ConflictType.Error)
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
 
     def _test_output_with_invalid_filter_function(self, filter_list):
         # connect
-        infinity_obj = infinity.connect(self.uri)
-        db_obj = infinity_obj.get_database("default_db")
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_output_with_invalid_filter_function", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_output_with_invalid_filter_function", {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
@@ -171,6 +151,3 @@ class TestConvert(TestSdk):
         print(e.type)
 
         db_obj.drop_table("test_output_with_invalid_filter_function", ConflictType.Error)
-        # disconnect
-        res = infinity_obj.disconnect()
-        assert res.error_code == ErrorCode.OK
