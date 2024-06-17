@@ -123,6 +123,9 @@ public:
 
     DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    // Start memory index commit thread
+    void StartMemoryIndexCommit();
+
     // List databases
     Vector<DBEntry *> Databases(TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -291,7 +294,7 @@ private: // TODO: remove this
     HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
 
     Atomic<bool> running_{};
-    Thread mem_index_commit_thread_{};
+    UniquePtr<Thread> mem_index_commit_thread_{};
 
     void MemIndexCommit();
 
