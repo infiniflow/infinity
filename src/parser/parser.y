@@ -3001,6 +3001,8 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
         index_type = infinity::IndexType::kHnsw;
     } else if (strcmp($5, "ivfflat") == 0) {
         index_type = infinity::IndexType::kIVFFlat;
+    } else if (strcmp($5, "emvb") == 0) {
+        index_type = infinity::IndexType::kEMVB;
     } else {
         free($5);
         delete $2;

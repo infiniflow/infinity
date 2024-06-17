@@ -26,6 +26,7 @@ import index_base;
 import third_party;
 import logger;
 import infinity_exception;
+import file_system;
 
 namespace infinity {
 
@@ -124,6 +125,15 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, c
             LOG_ERROR(error_info);
             UnrecoverableError(error_info);
         }
+        {
+            const u32 subspace_centroid_data_size = subspace_centroid_num_ * subspace_dimension_;
+            if (subspace_centroids_[i].size() != subspace_centroid_data_size) {
+                const auto error_info =
+                    fmt::format("centroids size {} not equal to expected size {}", subspace_centroids_[i].size(), subspace_centroid_data_size);
+                LOG_ERROR(error_info);
+                UnrecoverableError(error_info);
+            }
+        }
         // compute norms
         auto &norms = this->subspace_centroid_norms_neg_half[i];
         const f32 *centroid_data = subspace_centroids_[i].data();
@@ -136,6 +146,7 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, c
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
 void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, const u32 embedding_num, const u32 iter_cnt) {
+    std::unique_lock lock(this->rw_mutex_);
     // step 1. set R to I
     std::fill_n(matrix_R_.get(), this->dimension_ * this->dimension_, 0.0f);
     for (u32 i = 0; i < this->dimension_; ++i) {
@@ -172,6 +183,8 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
                                                        this->dimension_,
                                                        embedding_num,
                                                        square_for_svd.get());
+        continue;
+        // TODO: fix svd
         // TODO:svd
         svd(square_for_svd.get(), this->dimension_, this->dimension_, svd_u.get(), svd_s.get(), svd_v.get());
         // TODO: VT?
@@ -186,21 +199,26 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
 void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::AddEmbeddings(const f32 *embedding_data, const u32 embedding_num) {
+    { std::shared_lock lock(this->rw_mutex_); }
     // step 1. rotate by R
     const auto input_buffer = MakeUniqueForOverwrite<f32[]>(embedding_num * this->dimension_);
     matrixA_multiply_matrixB_output_to_C(embedding_data, matrix_R_.get(), embedding_num, this->dimension_, this->dimension_, input_buffer.get());
     // step 2. use PQ encoder
-    std::lock_guard lock(this->write_mutex_);
+    const auto encoded_buffer = MakeUniqueForOverwrite<Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>[]>(embedding_num);
+    PQ_BASE::EncodeEmbedding(input_buffer.get(), embedding_num, encoded_buffer.get());
+    // step 3. save encoded data
+    std::unique_lock lock(this->rw_mutex_);
     const u32 old_embedding_cnt = this->next_embedding_id_;
     const u32 next_end = old_embedding_cnt + embedding_num;
     this->next_embedding_id_ = next_end;
     this->encoded_embedding_data_.resize(next_end);
     auto encoded_embedding_output_iter = this->encoded_embedding_data_.begin() + old_embedding_cnt;
-    PQ_BASE::EncodeEmbedding(input_buffer.get(), embedding_num, encoded_embedding_output_iter);
+    std::copy_n(encoded_buffer.get(), embedding_num, encoded_embedding_output_iter);
 }
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
 UniquePtr<f32[]> OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetIPDistanceTable(const f32 *query_data, const u32 query_num) const {
+    { std::shared_lock lock(this->rw_mutex_); }
     auto result = MakeUniqueForOverwrite<f32[]>(SUBSPACE_NUM * this->subspace_centroid_num_ * query_num);
     // step 1. rotate by R
     const auto q_buffer = MakeUniqueForOverwrite<f32[]>(this->dimension_ * query_num);
@@ -236,7 +254,12 @@ f32 PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetSingleIPDistance(const u32 embed
     f32 result = 0.0f;
     ip_table += query_id;
     const u32 stride = subspace_centroid_num_ * query_num;
-    for (const auto &encoded_embedding = encoded_embedding_data_[embedding_id]; const auto centroid_id : encoded_embedding) {
+    const Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> *encoded_embedding_ptr_ = nullptr;
+    {
+        std::shared_lock lock(this->rw_mutex_);
+        encoded_embedding_ptr_ = &encoded_embedding_data_[embedding_id];
+    }
+    for (const auto centroid_id : *encoded_embedding_ptr_) {
         result += ip_table[centroid_id * query_num];
         ip_table += stride;
     }
@@ -252,10 +275,19 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetMultipleIPDistance(const u32 em
                                                                     f32 *output_ptr) const {
     ip_table += query_id;
     const u32 stride = subspace_centroid_num_ * query_num;
+    using PtrT = const Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM> *;
+    const auto encoded_embedding_ptrs = MakeUniqueForOverwrite<PtrT[]>(embedding_num);
+    {
+        std::shared_lock lock(this->rw_mutex_);
+        std::transform(encoded_embedding_data_.begin() + embedding_offset,
+                       encoded_embedding_data_.begin() + embedding_offset + embedding_num,
+                       encoded_embedding_ptrs.get(),
+                       [](const auto &encoded_embedding) -> PtrT { return &encoded_embedding; });
+    }
     for (u32 i = 0; i < embedding_num; ++i) {
         auto copy_ip_table = ip_table;
         f32 result_i = 0.0f;
-        for (const auto &encoded_embedding = encoded_embedding_data_[embedding_offset + i]; const auto centroid_id : encoded_embedding) {
+        for (const auto centroid_id : *encoded_embedding_ptrs[i]) {
             result_i += copy_ip_table[centroid_id * query_num];
             copy_ip_table += stride;
         }
@@ -264,19 +296,62 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::GetMultipleIPDistance(const u32 em
     }
 }
 
-template class OPQ<u8, 2>;
+template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
+void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Save(FileHandler &file_handler) {
+    std::unique_lock lock(this->rw_mutex_);
+    const u32 subspace_centroid_data_size = this->subspace_centroid_num_ * this->subspace_dimension_;
+    for (const auto &centroids_v : this->subspace_centroids_) {
+        if (centroids_v.size() != subspace_centroid_data_size) {
+            const auto error_info = fmt::format("centroids size {} not equal to expected size {}", centroids_v.size(), subspace_centroid_data_size);
+            LOG_ERROR(error_info);
+            UnrecoverableError(error_info);
+        }
+        file_handler.Write(centroids_v.data(), subspace_centroid_data_size * sizeof(typename std::decay_t<decltype(centroids_v)>::value_type));
+    }
+    for (const auto &norms_v : this->subspace_centroid_norms_neg_half) {
+        file_handler.Write(norms_v.data(), norms_v.size() * sizeof(typename std::decay_t<decltype(norms_v)>::value_type));
+    }
+    const u32 encoded_embedding_data_size = this->encoded_embedding_data_.size();
+    if (encoded_embedding_data_size != this->next_embedding_id_) {
+        const auto error_info =
+            fmt::format("encoded_embedding_data size {} not equal to expected size {}", encoded_embedding_data_size, this->next_embedding_id_);
+        LOG_ERROR(error_info);
+        UnrecoverableError(error_info);
+    }
+    file_handler.Write(&encoded_embedding_data_size, sizeof(encoded_embedding_data_size));
+    for (const auto &encoded_embedding : this->encoded_embedding_data_) {
+        file_handler.Write(encoded_embedding.data(),
+                           encoded_embedding.size() * sizeof(typename std::decay_t<decltype(encoded_embedding)>::value_type));
+    }
+    file_handler.Write(&this->next_embedding_id_, sizeof(this->next_embedding_id_));
+}
 
-template class OPQ<u8, 4>;
-
-template class OPQ<u8, 8>;
-
-template class OPQ<u8, 16>;
-
-template class OPQ<u8, 32>;
-
-template class OPQ<u8, 64>;
-
-template class OPQ<u8, 128>;
+template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
+void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Load(FileHandler &file_handler) {
+    std::unique_lock lock(this->rw_mutex_);
+    const u32 subspace_centroid_data_size = this->subspace_centroid_num_ * this->subspace_dimension_;
+    for (auto &centroids_v : this->subspace_centroids_) {
+        centroids_v.resize(subspace_centroid_data_size);
+        file_handler.Read(centroids_v.data(), subspace_centroid_data_size * sizeof(typename std::decay_t<decltype(centroids_v)>::value_type));
+    }
+    for (auto &norms_v : this->subspace_centroid_norms_neg_half) {
+        file_handler.Read(norms_v.data(), norms_v.size() * sizeof(typename std::decay_t<decltype(norms_v)>::value_type));
+    }
+    u32 encoded_embedding_data_size = 0;
+    file_handler.Read(&encoded_embedding_data_size, sizeof(encoded_embedding_data_size));
+    this->encoded_embedding_data_.resize(encoded_embedding_data_size);
+    for (auto &encoded_embedding : this->encoded_embedding_data_) {
+        file_handler.Read(encoded_embedding.data(),
+                          encoded_embedding.size() * sizeof(typename std::decay_t<decltype(encoded_embedding)>::value_type));
+    }
+    file_handler.Read(&this->next_embedding_id_, sizeof(this->next_embedding_id_));
+    if (encoded_embedding_data_size != this->next_embedding_id_) {
+        const auto error_info =
+            fmt::format("encoded_embedding_data size {} not equal to expected size {}", encoded_embedding_data_size, this->next_embedding_id_);
+        LOG_ERROR(error_info);
+        UnrecoverableError(error_info);
+    }
+}
 
 constexpr u32 current_max_subspace_num = 128;
 
@@ -305,7 +380,7 @@ UniquePtr<EMVBProductQuantizer> GetEMVBOPQT_Helper(const u32 pq_subspace_num, co
 
 template <std::unsigned_integral T>
 UniquePtr<EMVBProductQuantizer> GetEMVBOPQT(const u32 pq_subspace_num, const u32 subspace_dimension) {
-    return GetEMVBOPQT_Helper<T, 2, 4, 8, 16, 32, 64, 128>(pq_subspace_num, subspace_dimension);
+    return GetEMVBOPQT_Helper<T, 1, 2, 4, 8, 16, 32, 64, 128>(pq_subspace_num, subspace_dimension);
 }
 
 UniquePtr<EMVBProductQuantizer> GetEMVBOPQ(const u32 pq_subspace_num, const u32 pq_subspace_bits, const u32 embedding_dimension) {

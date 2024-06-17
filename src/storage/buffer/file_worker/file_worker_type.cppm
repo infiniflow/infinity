@@ -31,6 +31,7 @@ export enum class FileWorkerType {
     kSecondaryIndexPartFile,
     kVersionDataFile,
     kIndexFile,
+    kEMVBIndexFile,
     kInvalid,
 };
 
@@ -59,6 +60,9 @@ export String FileWorkerType2Str(FileWorkerType type) {
         }
         case FileWorkerType::kIndexFile: {
             return "index";
+        }
+        case FileWorkerType::kEMVBIndexFile: {
+            return "EMVB index";
         }
         case FileWorkerType::kInvalid: {
             String error_message = "Invalid file worker type";
