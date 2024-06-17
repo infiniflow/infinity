@@ -15,7 +15,6 @@
 module;
 
 #include <iostream>
-
 module infinity;
 
 import stl;
@@ -58,10 +57,13 @@ import drop_index_info;
 import drop_table_info;
 
 import infinity_exception;
+import third_party;
 
 namespace infinity {
 
 u64 Infinity::GetSessionId() { return session_->session_id(); }
+
+void Infinity::Hello() { std::cout << "hello infinity" << std::endl; }
 
 void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
@@ -112,7 +114,6 @@ QueryResult Infinity::CreateDatabase(const String &db_name, const CreateDatabase
     SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
     create_schema_info->schema_name_ = db_name;
     create_statement->create_info_ = create_schema_info;
-
     create_statement->create_info_->conflict_type_ = create_db_options.conflict_type_;
     QueryResult query_result = query_context_ptr->QueryStatement(create_statement.get());
     return query_result;
@@ -265,7 +266,7 @@ QueryResult Infinity::ShowVariable(const String &variable_name, SetScope scope) 
 
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->var_name_ = variable_name;
-    switch(scope) {
+    switch (scope) {
         case SetScope::kGlobal: {
             show_statement->show_type_ = ShowStmtType::kGlobalVariable;
             break;
@@ -294,7 +295,7 @@ QueryResult Infinity::ShowVariables(SetScope scope) {
                             InfinityContext::instance().session_manager());
 
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
-    switch(scope) {
+    switch (scope) {
         case SetScope::kGlobal: {
             show_statement->show_type_ = ShowStmtType::kGlobalVariables;
             break;
@@ -555,7 +556,8 @@ QueryResult Infinity::ShowIndexSegment(const String &db_name, const String &tabl
     return result;
 }
 
-QueryResult Infinity::ShowIndexChunk(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, ChunkID chunk_id) {
+QueryResult
+Infinity::ShowIndexChunk(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, ChunkID chunk_id) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -673,7 +675,6 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
     insert_statement->table_name_ = table_name;
     insert_statement->columns_ = columns;
     insert_statement->values_ = values;
-
     QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
     return result;
 }

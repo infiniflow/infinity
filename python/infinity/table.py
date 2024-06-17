@@ -19,7 +19,7 @@ from typing import Optional, Union
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.index import IndexInfo
 from infinity.common import InfinityException
-
+from embedded_infinity import ExplainType as LocalExplainType
 
 class ExplainType(Enum):
     Analyze = 1
@@ -47,8 +47,23 @@ class ExplainType(Enum):
             return ttypes.ExplainType.Fragment
         else:
             raise InfinityException(3081, "Unknown explain type")
-
-
+    def to_local_ttype(self):
+        if self is ExplainType.Ast:
+            return LocalExplainType.kAst
+        elif self is ExplainType.Analyze:
+            return LocalExplainType.kAnalyze
+        elif self is ExplainType.UnOpt:
+            return LocalExplainType.kUnOpt
+        elif self is ExplainType.Opt:
+            return LocalExplainType.kOpt
+        elif self is ExplainType.Physical:
+            return LocalExplainType.kPhysical
+        elif self is ExplainType.Pipeline:
+            return LocalExplainType.kPipeline
+        elif self is ExplainType.Fragment:
+            return LocalExplainType.kFragment
+        else:
+            raise InfinityException(3081, "Unknown explain type")
 class Table(ABC):
 
     @abstractmethod

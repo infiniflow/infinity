@@ -17,24 +17,24 @@ add_subdirectory(parser)
 # add_definitions(-mavx2 -mf16c -mpopcnt)
 
 execute_process(COMMAND grep -q fma /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_FMA
-                OUTPUT_QUIET
-                ERROR_QUIET)
+        RESULT_VARIABLE SUPPORT_FMA
+        OUTPUT_QUIET
+        ERROR_QUIET)
 
 execute_process(COMMAND grep -q sse4_2 /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_SSE42
-                OUTPUT_QUIET
-                ERROR_QUIET)
+        RESULT_VARIABLE SUPPORT_SSE42
+        OUTPUT_QUIET
+        ERROR_QUIET)
 
 execute_process(COMMAND grep -q avx2 /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_AVX2  
-                OUTPUT_QUIET
-                ERROR_QUIET)
+        RESULT_VARIABLE SUPPORT_AVX2
+        OUTPUT_QUIET
+        ERROR_QUIET)
 
 execute_process(COMMAND grep -q avx512 /proc/cpuinfo
-                RESULT_VARIABLE SUPPORT_AVX512
-                OUTPUT_QUIET
-                ERROR_QUIET)
+        RESULT_VARIABLE SUPPORT_AVX512
+        OUTPUT_QUIET
+        ERROR_QUIET)
 
 
 file(GLOB_RECURSE
@@ -209,7 +209,6 @@ target_sources(infinity_core
         ${metrics_cppm}
 )
 
-
 add_dependencies(infinity_core thrift thriftnb)
 
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -237,23 +236,22 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/CControl")
 
 if (NOT SUPPORT_FMA EQUAL 0)
-        message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
-endif()
+    message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
+endif ()
 
 if (NOT SUPPORT_SSE42 EQUAL 0)
-        message(FATAL_ERROR "This project requires the processor support sse4_2 instructions.")
-endif()
+    message(FATAL_ERROR "This project requires the processor support sse4_2 instructions.")
+endif ()
 
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
-        message("Compiled by AVX2 or AVX512")
-        add_definitions(-march=native)
-        target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
-else()
-        message("Compiled by SSE")
-        add_definitions(-msse4.2 -mfma)
-        target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
-endif()
-
+    message("Compiled by AVX2 or AVX512")
+    add_definitions(-march=native)
+    target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-march=native>)
+else ()
+    message("Compiled by SSE")
+    add_definitions(-msse4.2 -mfma)
+    target_compile_options(infinity_core PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+endif ()
 
 add_executable(infinity
         ${main_cpp}
@@ -274,6 +272,7 @@ target_sources(infinity
 
 add_dependencies(infinity oatpp)
 
+message("Python3_LIBRARIES = ${Python3_LIBRARIES}")
 target_link_libraries(infinity
         infinity_core
         sql_parser
@@ -291,9 +290,9 @@ target_link_libraries(infinity
         jma
 )
 
-if(ENABLE_JEMALLOC)
+if (ENABLE_JEMALLOC)
     target_link_libraries(infinity jemalloc.a)
-endif()
+endif ()
 
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -301,6 +300,51 @@ target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/s
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
+
+add_library(embedded_infinity_ext MODULE
+        embedded_infinity_ext.cpp
+        embedded_infinity/wrap_infinity.cpp
+)
+
+target_sources(embedded_infinity_ext
+        PRIVATE
+        FILE_SET core_cxx_modules TYPE CXX_MODULES FILES
+        embedded_infinity/wrap_infinity.cppm
+)
+
+nanobind_compile_options(embedded_infinity_ext)
+nanobind_link_options(embedded_infinity_ext)
+set_target_properties(embedded_infinity_ext PROPERTIES LINKER_LANGUAGE CXX)
+set(ARG_NB_STATIC TRUE)
+set(ARG_STABLE_ABI FALSE)
+set(libname "nanobind-static")
+nanobind_build_library(${libname})
+nanobind_extension(embedded_infinity_ext)
+add_dependencies(embedded_infinity_ext oatpp)
+
+target_link_libraries(embedded_infinity_ext PRIVATE
+        ${libname}
+        infinity_core
+        sql_parser
+        onnxruntime_mlas
+        zsv_parser
+        roaring
+        newpfor
+        fastpfor
+        lz4.a
+        atomic.a
+        event.a
+        oatpp.a
+        jma
+)
+
+target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
+nanobind_disable_stack_protector(embedded_infinity_ext)
+nanobind_opt_size(embedded_infinity_ext)
+nanobind_strip(embedded_infinity_ext)
+
+install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity)
 
 ### unit test
 
@@ -439,11 +483,11 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/goo
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
-        message("Compiled by AVX2 or AVX512")
-        add_definitions(-mavx2 -mfma -mf16c -mpopcnt)
-        target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
-else()
-        message("Compiled by SSE")
-        add_definitions(-msse4.2 -mfma)
-        target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
-endif()
+    message("Compiled by AVX2 or AVX512")
+    add_definitions(-mavx2 -mfma -mf16c -mpopcnt)
+    target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+else ()
+    message("Compiled by SSE")
+    add_definitions(-msse4.2 -mfma)
+    target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-msse4.2 -mfma>)
+endif ()

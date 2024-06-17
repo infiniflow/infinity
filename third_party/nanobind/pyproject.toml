@@ -1,0 +1,7 @@
+[build-system]
+requires = ["setuptools>=42", "wheel", "scikit-build", "cmake>=3.17", "ninja", "typing_extensions"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.pytest.ini_options]
+testpaths = [ "tests" ]
