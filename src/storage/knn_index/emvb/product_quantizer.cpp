@@ -155,45 +155,79 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
     // step 2. train R for iter_cnt times
     const auto transformed_embedding = MakeUniqueForOverwrite<f32[]>(embedding_num * this->dimension_);
     const auto encoded_transformed = MakeUniqueForOverwrite<Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>[]>(embedding_num);
-    const auto square_for_svd = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
-    const auto svd_u = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
-    const auto svd_s = MakeUniqueForOverwrite<f32[]>(this->dimension_);
-    const auto svd_v = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
-    for (u32 iter = iter_cnt; iter > 0; --iter) {
+    {
+        // TODO: Fix svd, and remove this code block.
         matrixA_multiply_matrixB_output_to_C(embedding_data,
                                              matrix_R_.get(),
                                              embedding_num,
                                              this->dimension_,
                                              this->dimension_,
                                              transformed_embedding.get());
-        if (iter == 1) {
-            // final loop
-            PQ_BASE::Train(transformed_embedding.get(), embedding_num, iter_cnt);
-            return; // no update to R
+        PQ_BASE::Train(transformed_embedding.get(), embedding_num, iter_cnt);
+        // diff
+        {
+            PQ_BASE::EncodeEmbedding(transformed_embedding.get(), embedding_num, encoded_transformed.get());
+            const auto decoded_encoded = PQ_BASE::DecodeEmbedding(encoded_transformed.get(), embedding_num); // embedding_num * dimension_
+            const auto rotate_error = L2Distance<f32>(transformed_embedding.get(), decoded_encoded.get(), embedding_num * this->dimension_);
+            LOG_INFO(fmt::format("OPQ encode_decode error: {}", rotate_error));
+            LOG_INFO(fmt::format("OPQ encode_decode error avg: {}", rotate_error / (embedding_num * this->dimension_)));
         }
-        // not the final loop
-        const u32 train_iter_cnt = 1 + ((iter == 2) ? (iter_cnt / 2) : 0);
+        return;
+    }
+    const auto square_for_svd = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
+    const auto svd_u = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
+    const auto svd_s = MakeUniqueForOverwrite<f32[]>(this->dimension_);
+    const auto svd_v = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
+    auto old_R = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
+    for (u32 i = 0; i < 6; ++i) {
+        matrixA_multiply_matrixB_output_to_C(embedding_data,
+                                             matrix_R_.get(),
+                                             embedding_num,
+                                             this->dimension_,
+                                             this->dimension_,
+                                             transformed_embedding.get());
+        const u32 train_iter_cnt = i < 3 ? ((iter_cnt + 1) / 2) : iter_cnt;
         PQ_BASE::Train(transformed_embedding.get(), embedding_num, train_iter_cnt);
         // update R
         PQ_BASE::EncodeEmbedding(transformed_embedding.get(), embedding_num, encoded_transformed.get());
         const auto decoded_encoded = PQ_BASE::DecodeEmbedding(encoded_transformed.get(), embedding_num); // embedding_num * dimension_
+        {
+            const auto rotate_error = L2Distance<f32>(transformed_embedding.get(), decoded_encoded.get(), embedding_num * this->dimension_);
+            LOG_INFO(fmt::format("OPQ loop: {}, encode_decode error: {}", i, rotate_error));
+            LOG_INFO(fmt::format("OPQ loop: {}, encode_decode error avg: {}", i, rotate_error / (embedding_num * this->dimension_)));
+        }
+        std::swap(old_R, matrix_R_);
         transpose_matrixA_multiply_matrixB_output_to_C(embedding_data,
                                                        decoded_encoded.get(),
                                                        this->dimension_,
                                                        this->dimension_,
                                                        embedding_num,
                                                        square_for_svd.get());
-        continue;
-        // TODO: fix svd
-        // TODO:svd
+        //  TODO: fix svd
         svd(square_for_svd.get(), this->dimension_, this->dimension_, svd_u.get(), svd_s.get(), svd_v.get());
-        // TODO: VT?
         matrixA_multiply_transpose_matrixB_output_to_C(svd_u.get(),
                                                        svd_v.get(),
                                                        this->dimension_,
                                                        this->dimension_,
                                                        this->dimension_,
                                                        matrix_R_.get());
+        {
+            const auto R_diff = L2Distance<f32>(old_R.get(), matrix_R_.get(), this->dimension_ * this->dimension_);
+            LOG_INFO(fmt::format("OPQ loop: {}, old R diff: {}", i, R_diff));
+            const auto L2Norm = L2NormSquare<f32>(matrix_R_.get(), this->dimension_ * this->dimension_);
+            LOG_INFO(fmt::format("OPQ loop: {}, R L2Norm: {}", i, L2Norm));
+            matrixA_multiply_matrixB_output_to_C(embedding_data,
+                                                 matrix_R_.get(),
+                                                 embedding_num,
+                                                 this->dimension_,
+                                                 this->dimension_,
+                                                 transformed_embedding.get());
+            PQ_BASE::EncodeEmbedding(transformed_embedding.get(), embedding_num, encoded_transformed.get());
+            const auto decoded_encoded_1 = PQ_BASE::DecodeEmbedding(encoded_transformed.get(), embedding_num); // embedding_num * dimension_
+            const auto rotate_error_1 = L2Distance<f32>(transformed_embedding.get(), decoded_encoded_1.get(), embedding_num * this->dimension_);
+            LOG_INFO(fmt::format("OPQ loop: {}, encode_decode error: {}", i, rotate_error_1));
+            LOG_INFO(fmt::format("OPQ loop: {}, encode_decode error avg: {}", i, rotate_error_1 / (embedding_num * this->dimension_)));
+        }
     }
 }
 

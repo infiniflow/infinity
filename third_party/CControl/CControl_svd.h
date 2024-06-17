@@ -37,7 +37,7 @@ bool issymmetric(const float A[], const size_t row, const size_t column) {
     for (i = 0; i < row; i++) {
         B = B0;
         for (j = 0; j < column; j++) {
-            if (fabsf(A[j] - B[i]) > MIN_VALUE) {
+            if (std::abs(A[j] - B[i]) > MIN_VALUE) {
                 return false;
             }
             /*printf("A[%i] = %f, B[%i] = %f\n", j, A[j], i, B[i]);*/
@@ -145,7 +145,7 @@ bool svd_jacobi_one_sided(const float A[], size_t row, float U[], float S[], flo
 				}
 
 				/* Compute the error */
-				error = vmax(error, fabsf(c) / sqrtf(al * b));
+				error = vmax(error, std::abs(c) / std::sqrt(al * b));
 				if (error < MIN_VALUE) {
 					exit = true;
 					break;
@@ -157,8 +157,8 @@ bool svd_jacobi_one_sided(const float A[], size_t row, float U[], float S[], flo
 				if (l < 0.0f) {
 					sign = -1.0f;
 				}
-				t = sign / ((sign * l) + sqrtf(1.0f + l * l));
-				cs = 1.0f / sqrtf(1.0f + t * t);
+				t = sign / ((sign * l) + std::sqrt(1.0f + l * l));
+				cs = 1.0f / std::sqrt(1.0f + t * t);
 				sn = cs * t;
 
 				/* Change columns i and j only */
@@ -210,7 +210,7 @@ bool svd_jacobi_one_sided(const float A[], size_t row, float U[], float S[], flo
 			/* S[j] += A[row*i + j] * A[row*i + j]; */
 		}
 		tmp = S[j];
-		S[j] = sqrtf(tmp);
+		S[j] = std::sqrt(tmp);
 	}
 
 	/* Sort the singular values largest to smallest, and the right matrix accordingly */
@@ -349,7 +349,7 @@ static void Householders_Reduction_to_Bidiagonal_Form(const float* A, size_t unr
 			   row i.
 		*/
 		for (j = i, pu = pui, scale = 0.0f; j < nrows; j++, pu += ncols) {
-			scale += fabsf(pu[i]);
+			scale += std::abs(pu[i]);
 		}
 
 		if (scale > 0.0f) {
@@ -358,7 +358,7 @@ static void Householders_Reduction_to_Bidiagonal_Form(const float* A, size_t unr
 				s2 += pu[i] * pu[i];
 			}
 			/* Chose sign of s which maximizes the norm */
-			s = (pu[i] < 0.0f) ? sqrtf(s2) : -sqrtf(s2);
+			s = (pu[i] < 0.0f) ? std::sqrt(s2) : -std::sqrt(s2);
 
 			/* Calculate -2/u'u */
 			half_norm_squared = pui[i] * s - s2;
@@ -388,14 +388,14 @@ static void Householders_Reduction_to_Bidiagonal_Form(const float* A, size_t unr
 			continue;
 		}
 		for (j = ip1; j < ncols; j++) {
-			scale += fabsf(pui[j]);
+			scale += std::abs(pui[j]);
 		}
 		if (scale > 0.0) {
 			for (j = ip1, s2 = 0.0f; j < ncols; j++) {
 				pui[j] /= scale;
 				s2 += pui[j] * pui[j];
 			}
-			s = (pui[ip1] < 0.0) ? sqrtf(s2) : -sqrtf(s2);
+			s = (pui[ip1] < 0.0) ? std::sqrt(s2) : -std::sqrt(s2);
 			/* Calculate -2/u'u */
 			half_norm_squared = pui[ip1] * s - s2;
 			/* Transform the rows by the Householder transform. */
@@ -427,7 +427,7 @@ static void Householders_Reduction_to_Bidiagonal_Form(const float* A, size_t unr
 	s = superdiagonal[ncols - 1];
 	pvi -= ncols;
 	for (i = ncols - 2, ip1 = ncols - 1; i >= 0; i--, pui -= ncols, pvi -= ncols, ip1--) {
-		if (fabsf(s) > MIN_VALUE) {
+		if (std::abs(s) > MIN_VALUE) {
 			pv = pvi + ncols;
 			for (j = ip1; j < ncols; j++, pv += ncols) {
 				pv[i] = (pui[j] / pui[ip1]) / s;
@@ -459,7 +459,7 @@ static void Householders_Reduction_to_Bidiagonal_Form(const float* A, size_t unr
 		for (j = ip1; j < ncols; j++) {
 			pui[j] = 0.0f;
 		}
-		if (fabsf(s) > MIN_VALUE) {
+		if (std::abs(s) > MIN_VALUE) {
 			for (j = ip1; j < ncols; j++) {
 				si = 0.0;
 				pu = pui + ncols;
@@ -497,7 +497,7 @@ static bool Givens_Reduction_to_Diagonal_Form(size_t unrows, size_t uncols, floa
 	int32_t iteration_count;
 
 	for (i = 0, x = 0.0f; i < ncols; i++) {
-		y = fabsf(diagonal[i]) + fabsf(superdiagonal[i]);
+		y = std::abs(diagonal[i]) + std::abs(superdiagonal[i]);
 		if (x < y) {
 			x = y;
 		}
@@ -508,11 +508,11 @@ static bool Givens_Reduction_to_Diagonal_Form(size_t unrows, size_t uncols, floa
 		while (1) {
 			rotation_test = 1;
 			for (m = k; m >= 0; m--) {
-				if (fabsf(superdiagonal[m]) <= epsilon) {
+				if (std::abs(superdiagonal[m]) <= epsilon) {
 					rotation_test = 0;
 					break;
 				}
-				if (fabsf(diagonal[m - 1]) <= epsilon) {
+				if (std::abs(diagonal[m - 1]) <= epsilon) {
 					break;
 				}
 			}
@@ -522,11 +522,11 @@ static bool Givens_Reduction_to_Diagonal_Form(size_t unrows, size_t uncols, floa
 				for (i = m; i <= k; i++) {
 					f = s * superdiagonal[i];
 					superdiagonal[i] *= c;
-					if (fabsf(f) <= epsilon) {
+					if (std::abs(f) <= epsilon) {
 						break;
 					}
 					g = diagonal[i];
-					h = sqrtf(f * f + g * g);
+					h = std::sqrt(f * f + g * g);
 					diagonal[i] = h;
 					c = g / h;
 					s = -f / h;
@@ -558,7 +558,7 @@ static bool Givens_Reduction_to_Diagonal_Form(size_t unrows, size_t uncols, floa
 				g = superdiagonal[k - 1];
 				h = superdiagonal[k];
 				f = ((y - z) * (y + z) + (g - h) * (g + h)) / (2.0f * h * y);
-				g = sqrtf(f * f + 1.0f);
+				g = std::sqrt(f * f + 1.0f);
 				if (f < 0.0f) {
 					g = -g;
 				}
@@ -571,7 +571,7 @@ static bool Givens_Reduction_to_Diagonal_Form(size_t unrows, size_t uncols, floa
 					y = diagonal[i];
 					h = s * g;
 					g *= c;
-					z = sqrtf(f * f + h * h);
+					z = std::sqrt(f * f + h * h);
 					superdiagonal[i - 1] = z;
 					c = f / z;
 					s = h / z;
@@ -585,7 +585,7 @@ static bool Givens_Reduction_to_Diagonal_Form(size_t unrows, size_t uncols, floa
 						pv[i - 1] = x * c + z * s;
 						pv[i] = -x * s + z * c;
 					}
-					z = sqrtf(f * f + h * h);
+					z = std::sqrt(f * f + h * h);
 					diagonal[i - 1] = z;
 					if (z > MIN_VALUE) {
 						c = f / z;
