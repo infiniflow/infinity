@@ -52,6 +52,8 @@ struct Posting {
 export template <typename DataType, typename IdxType>
 class LinScan {
 public:
+    LinScan(SizeT max_col) : inverted_idx_(max_col) {}
+
     void Insert(const SparseVecRef<DataType, IdxType> &vec, u32 doc_id) {
         for (i32 i = 0; i < vec.nnz_; ++i) {
             u32 indice = vec.indices_[i];
@@ -60,7 +62,7 @@ public:
                 continue;
             }
             Posting<DataType> posting{doc_id, val};
-            inverted_idx_[indice].push_back(posting);
+            inverted_idx_[indice].push_back(std::move(posting));
         }
         ++row_num_;
     }
@@ -73,11 +75,7 @@ public:
             u32 indice = query.indices_[i];
             DataType val = query.data_[i];
 
-            auto it = inverted_idx_.find(indice);
-            if (it == inverted_idx_.end()) {
-                continue;
-            }
-            const Vector<Posting<DataType>> &posting_list = it->second;
+            const Vector<Posting<DataType>> &posting_list = inverted_idx_[indice];
             for (const auto &posting : posting_list) {
                 scores[posting.doc_id_] += val * posting.val_;
             }
@@ -114,11 +112,7 @@ public:
             u32 indice = query.indices_[query_vec_idx[budget_i]];
             DataType val = query.data_[query_vec_idx[budget_i]];
 
-            auto it = inverted_idx_.find(indice);
-            if (it == inverted_idx_.end()) {
-                continue;
-            }
-            const Vector<Posting<DataType>> &posting_list = it->second;
+            const Vector<Posting<DataType>> &posting_list = inverted_idx_[indice];
             cur_budget += posting_list.size();
             for (const auto &posting : posting_list) {
                 scores[posting.doc_id_] += val * posting.val_;
@@ -150,7 +144,6 @@ public:
     }
 
     static LinScan Load(FileHandler &file_handler) {
-        LinScan linscan;
         SizeT bytes;
         file_handler.Read(&bytes, sizeof(bytes));
         auto buffer = MakeUnique<char[]>(bytes);
@@ -164,7 +157,8 @@ private:
         WriteBufAdv<u32>(p, row_num_);
         SizeT inverted_idx_size = inverted_idx_.size();
         WriteBufAdv<SizeT>(p, inverted_idx_size);
-        for (const auto &[indice, posting_list] : inverted_idx_) {
+        for (SizeT indice = 0; indice < inverted_idx_size; ++indice) {
+            const auto &posting_list = inverted_idx_[indice];
             WriteBufAdv<u32>(p, indice);
             SizeT posting_size = posting_list.size();
             WriteBufAdv<SizeT>(p, posting_size);
@@ -175,9 +169,10 @@ private:
     }
 
     static LinScan ReadAdv(char *&p) {
-        LinScan res;
-        res.row_num_ = ReadBufAdv<u32>(p);
+        SizeT row_num = ReadBufAdv<u32>(p);
         SizeT inverted_idx_size = ReadBufAdv<SizeT>(p);
+        LinScan res(inverted_idx_size);
+        res.row_num_ = row_num;
         for (SizeT i = 0; i < inverted_idx_size; ++i) {
             u32 indice = ReadBufAdv<u32>(p);
             SizeT posting_size = ReadBufAdv<SizeT>(p);
@@ -188,10 +183,10 @@ private:
                     UnrecoverableError("Duplicate doc_id in posting list");
                 }
             }
-            auto [iter, insert_ok] = res.inverted_idx_.emplace(indice, std::move(posting_list));
-            if (!insert_ok) {
+            if (!res.inverted_idx_.empty()) {
                 UnrecoverableError("Duplicate indice in inverted index");
             }
+            res.inverted_idx_[indice] = std::move(posting_list);
         }
         return res;
     }
@@ -200,8 +195,7 @@ private:
         SizeT bytes = 0;
         bytes += sizeof(row_num_);
         bytes += sizeof(SizeT);
-        for (const auto &[indice, posting_list] : inverted_idx_) {
-            bytes += sizeof(u32);
+        for (const auto &posting_list : inverted_idx_) {
             bytes += sizeof(SizeT);
             bytes += posting_list.size() * Posting<DataType>::GetSizeInBytes();
         }
@@ -209,7 +203,7 @@ private:
     }
 
 private:
-    HashMap<IdxType, Vector<Posting<DataType>>> inverted_idx_;
+    Vector<Vector<Posting<DataType>>> inverted_idx_;
     u32 row_num_{};
 };
 

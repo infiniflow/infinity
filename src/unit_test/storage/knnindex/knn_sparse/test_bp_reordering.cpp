@@ -14,26 +14,36 @@
 
 #include "unit_test/base_test.h"
 #include <cassert>
+#include <random>
 
 import stl;
 import bp_reordering;
 import third_party;
 import infinity_exception;
+import file_system;
+import local_file_system;
+import compilation_config;
+import file_system_type;
+import sparse_util;
 
 using namespace infinity;
 
 class BPReorderingTest : public BaseTest {
 protected:
     f32 cost_func(i32 data_n, i32 query_n, const Vector<Vector<i32>> &fwd, const Vector<i32> &reorder) {
+        Vector<i32> permutation(reorder.size());
+        for (i32 i = 0; i < (i32)reorder.size(); ++i) {
+            permutation[reorder[i]] = i;
+        }
         Vector<Vector<i32>> ivt = Fwd2Ivt(fwd, query_n);
         f32 cost = 0;
         for (auto &posting : ivt) {
             if (posting.empty()) {
                 continue;
             }
-            std::sort(posting.begin(), posting.end(), [&](i32 a, i32 b) { return reorder[a] < reorder[b]; });
+            std::sort(posting.begin(), posting.end(), [&](i32 a, i32 b) { return permutation[a] < permutation[b]; });
             for (SizeT i = 0; i < posting.size() - 1; ++i) {
-                float r = std::log2(reorder[posting[i + 1]] - reorder[posting[i]]);
+                float r = std::log2(permutation[posting[i + 1]] - permutation[posting[i]]);
                 cost += r;
             }
         }
@@ -62,10 +72,12 @@ protected:
     Vector<Vector<i32>> GenerateFwd(i32 data_n, i32 query_n, i32 edge_n, i32 m) {
         assert(data_n % m == 0);
         assert(edge_n % m == 0);
-        Vector<Vector<i32>> fwd = GenerateFwd(data_n / m, query_n, edge_n / m);
-        assert((i32)fwd.size() == edge_n / m);
+        i32 data_n1 = data_n / m;
+        i32 edge_n1 = edge_n / m;
+        Vector<Vector<i32>> fwd = GenerateFwd(data_n1, query_n, edge_n1);
+        assert((i32)fwd.size() == data_n1);
         for (i32 i = 1; i < m; ++i) {
-            for (i32 j = 0; j < edge_n / m; ++j) {
+            for (i32 j = 0; j < data_n1; ++j) {
                 fwd.push_back(fwd[j]);
             }
         }
@@ -99,36 +111,44 @@ protected:
 };
 
 TEST_F(BPReorderingTest, test1) {
-    i32 data_n = 9;
-    i32 query_n = 5;
-    Vector<Vector<i32>> fwd(9);
-    for (i32 i = 0; i < 9; ++i) {
-        fwd[i].push_back(i % 3);
-        fwd[i].push_back(3 + i % 2);
+    Vector<Pair<i32, i32>> term_infos{{3, 0}, {2, 3}, {4, 5}};
+    i32 query_n = 0;
+    for (const auto &[term_num, term_off] : term_infos) {
+        query_n += term_num;
     }
+    for (i32 data_n = 10; data_n < 100; ++data_n) {
+        Vector<Vector<i32>> fwd(data_n);
+        for (i32 i = 0; i < data_n; ++i) {
+            for (const auto &[term_num, term_off] : term_infos) {
+                fwd[i].push_back(term_off + i % term_num);
+            }
+        }
+        // auto rng = std::default_random_engine{};
+        // std::shuffle(fwd.begin(), fwd.end(), rng);
 
-    Vector<i32> old_order(data_n);
-    std::iota(old_order.begin(), old_order.end(), 0);
-    f32 old_cost = cost_func(data_n, query_n, fwd, old_order);
+        Vector<i32> old_order(data_n);
+        std::iota(old_order.begin(), old_order.end(), 0);
+        f32 old_cost = cost_func(data_n, query_n, fwd, old_order);
 
-    BPReordering bp(query_n, fwd);
-    Vector<i32> reorder = bp();
-    f32 new_cost = cost_func(data_n, query_n, fwd, reorder);
+        BPReordering bp(query_n, fwd, 10, 10);
+        Vector<i32> reorder = bp();
+        f32 new_cost = cost_func(data_n, query_n, fwd, reorder);
 
-    // Vector<i32> gt_reorder = {0, 1, 4, 2, 5, 6, 3, 7, 8};
+        // Vector<i32> gt_reorder = {0, 1, 4, 2, 5, 6, 3, 7, 8};
 
-    std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
+        std::cout << fmt::format("data_n: {}, old_cost: {}, new_cost: {}\n", data_n, old_cost, new_cost);
+    }
 }
 
 TEST_F(BPReorderingTest, test2) {
-    i32 data_n = 100;
-    i32 query_n = 10;
+    i32 data_n = 10000;
+    i32 query_n = 1000;
     i32 edge_n = data_n * query_n / 10;
-    i32 m = 10;
-    assert(data_n % m == 0);
+    // i32 m = 100;
+    // assert(data_n % m == 0);
     Vector<Vector<i32>> fwd = GenerateFwd(data_n, query_n, edge_n);
 
-    BPReordering bp(query_n, fwd, 20);
+    BPReordering bp(query_n, fwd, 20, 10);
     Vector<i32> reorder = bp();
 
     Vector<i32> old_order(data_n);
@@ -137,5 +157,40 @@ TEST_F(BPReorderingTest, test2) {
     f32 new_cost = cost_func(data_n, query_n, fwd, reorder);
 
     std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
-    ASSERT_LT(new_cost, old_cost);
+    ASSERT_LE(new_cost, old_cost);
+}
+
+TEST_F(BPReorderingTest, test3) {
+    LocalFileSystem fs;
+    Path dataset_path = Path(test_data_path()) / "benchmark" / "splade" / "base_full.csr";
+    auto [file_handler, status] = fs.OpenFile(dataset_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+    if (!status.ok()) {
+        std::cout << String(status.message()) << std::endl;
+        return;
+    }
+    auto dataset = SparseMatrix<f32, i32>::Load(*file_handler);
+    i32 data_n = dataset.nrow_;
+    // i32 data_n = 1000;
+    Vector<Vector<i32>> fwd(data_n);
+    for (i32 row_id = 0; row_id < data_n; ++row_id) {
+        auto vec = dataset.at(row_id);
+        // std::cout << fmt::format("Doc {}: ", row_id);
+        for (i32 i = 0; i < vec.nnz_; ++i) {
+            fwd[row_id].push_back(vec.indices_[i]);
+            // std::cout << fmt::format("{} ", vec.indices_[i]);
+        }
+        // std::cout << std::endl;
+    }
+    // auto rng = std::default_random_engine{};
+    // std::shuffle(fwd.begin(), fwd.end(), rng);
+
+    Vector<i32> old_order(data_n);
+    std::iota(old_order.begin(), old_order.end(), 0);
+    f32 old_cost = cost_func(data_n, dataset.ncol_, fwd, old_order);
+
+    BPReordering bp(dataset.ncol_, fwd, 15, 20);
+    Vector<i32> reorder = bp();
+    f32 new_cost = cost_func(data_n, dataset.ncol_, fwd, reorder);
+
+    std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
 }

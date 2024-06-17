@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
+#pragma once
 
 #include <cassert>
-
-export module sparse_test_util;
+#include <cstdlib>
+#include <iostream>
 
 import stl;
 import sparse_vector_distance;
@@ -25,10 +25,64 @@ import file_system;
 import linscan_alg;
 import sparse_util;
 import infinity_exception;
+import third_party;
 
 namespace infinity {
 
-export struct SparseTestUtil {
+struct SparseTestUtil {
+    static bool CheckAccurateKnn(const i32 *gt_indices,
+                                 const f32 *gt_scores,
+                                 u32 gt_size,
+                                 const Vector<i32> &indices,
+                                 const Vector<f32> &scores,
+                                 f32 error_bound) {
+        if (gt_size < indices.size()) {
+            return false;
+        }
+        for (u32 i = 0; i < indices.size(); ++i) {
+            if (gt_scores[i] == 0.0) {
+                break;
+            }
+            if (std::abs(gt_scores[i] - scores[i]) > error_bound || gt_indices[i] != indices[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static Pair<u32, u32>
+    CheckApproximateKnn(const i32 *gt_indices, const f32 *gt_scores, u32 gt_size, const Vector<i32> &indices, const Vector<f32> &scores) {
+        HashSet<u32> gt_set;
+        for (u32 i = 0; i < gt_size; ++i) {
+            if (gt_scores[i] == 0.0) {
+                break;
+            }
+            gt_set.emplace(gt_indices[i]);
+        }
+        u32 hit = 0;
+        for (u32 i = 0; i < indices.size(); ++i) {
+            if (gt_set.find(indices[i]) != gt_set.end()) {
+                ++hit;
+            }
+        }
+        return {hit, gt_set.size()};
+    }
+
+    static void
+    PrintQuery(u32 query_id, const i32 *gt_indices, const f32 *gt_scores, u32 gt_size, const Vector<i32> &indices, const Vector<f32> &scores) {
+        std::cout << fmt::format("Query {}\n", query_id);
+        std::cout << "Result:\n";
+        for (u32 i = 0; i < indices.size(); ++i) {
+            std::cout << fmt::format("{} {}, ", indices[i], scores[i]);
+        }
+        std::cout << "\n";
+        std::cout << "Groundtruth:\n";
+        for (u32 i = 0; i < gt_size; ++i) {
+            std::cout << fmt::format("{} {}, ", gt_indices[i], gt_scores[i]);
+        }
+        std::cout << "\n";
+    }
+
     static SparseMatrix<f32, i32> GenerateDataset(u32 nrow, u32 ncol, f32 sparsity = 0.01, f32 data_min = -10.0, f32 data_max = 10.0) {
         std::mt19937 rng{std::random_device{}()};
 
@@ -102,7 +156,7 @@ export struct SparseTestUtil {
         auto gt_indices = MakeUnique<i32[]>(query.nrow_ * topk);
         auto gt_scores = MakeUnique<f32[]>(query.nrow_ * topk);
         if (use_linscan) {
-            LinScan<f32, i32> index;
+            LinScan<f32, i32> index(mat.ncol_);
             for (auto iter = SparseMatrixIter<f32, i32>(mat); iter.HasNext(); iter.Next()) {
                 SparseVecRef vec = iter.val();
                 u32 row_id = iter.row_id();

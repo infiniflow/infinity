@@ -63,13 +63,6 @@ public:
     void Dump(std::ostream &os) const { os << "[CONST] max dim: " << max_dim_ << std::endl; }
 };
 
-template <typename DataType, typename IdxType>
-struct SparseVecEle {
-    i32 nnz_{};
-    UniquePtr<IdxType[]> indices_;
-    UniquePtr<DataType[]> data_;
-};
-
 export template <typename DataType, typename IdxType>
 class SparseVecStoreInner {
 public:

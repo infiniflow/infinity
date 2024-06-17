@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <iostream>
 #include <vector>
 
@@ -26,60 +27,63 @@ namespace infinity {
 
 export class BPReordering {
 public:
-    BPReordering(i32 query_n, const Vector<Vector<i32>> &fwd, i32 iter_n = 20) : query_n_(query_n), fwd_(fwd), iter_n_(iter_n) {}
+    BPReordering(i32 query_n, const Vector<Vector<i32>> &fwd, i32 iter_n, i32 rdepth)
+        : query_n_(query_n), rdepth_(rdepth), iter_n_(iter_n), fwd_(fwd) {}
 
     Vector<i32> operator()() {
         i32 data_n = fwd_.size();
-        Vector<i32> ret(data_n);
-        std::iota(ret.begin(), ret.end(), 0);
-        inner(0, data_n, ret);
-        return ret;
+        res_map_.resize(data_n);
+        std::iota(res_map_.begin(), res_map_.end(), 0);
+        inner(0, data_n, 0);
+        return std::move(res_map_);
     }
 
 private:
-    void inner(i32 start, i32 end, Vector<i32> &res) {
-        if (end - start <= 1) {
+    void inner(i32 start, i32 end, i32 d) {
+        if (end - start <= 1 || d > rdepth_) {
             return;
         }
         i32 mid = (start + end) / 2;
         i32 n1 = mid - start;
         i32 n2 = end - mid;
 
-        for (i32 iter_i = 0; iter_i < iter_n_; ++iter_i) {
-            HashMap<i32, Pair<i32, i32>> degs;
-            for (i32 i = start; i < end; ++i) {
-                i32 data_i = res[i];
-                for (i32 query_i : fwd_[data_i]) {
-                    if (i < mid) {
-                        ++degs[query_i].first;
-                    } else {
-                        ++degs[query_i].second;
-                    }
+        Vector<Pair<i32, i32>> degs(query_n_, {0, 0});
+        Vector<Pair<f32, f32>> gain_diff(query_n_, {0, 0});
+        for (i32 i = start; i < end; ++i) {
+            i32 data_i = res_map_[i];
+            for (i32 query_i : fwd_[data_i]) {
+                if (i < mid) {
+                    ++degs[query_i].first;
+                } else {
+                    ++degs[query_i].second;
                 }
             }
-            auto cost = [](i32 deg1, i32 n1, i32 deg2, i32 n2) {
-                return deg1 * std::log2(static_cast<f32>(n1) / (deg1 + 1)) + deg2 * std::log2(static_cast<f32>(n2) / (deg2 + 1));
-            };
-            auto cal_gain = [&](i32 deg_from, i32 n_from, i32 deg_to, i32 n_to) {
-                f32 cost_old = cost(deg_from, n_from, deg_to, n_to);
-                f32 cost_new = cost(deg_from - 1, n_from, deg_to + 1, n_to);
-                return cost_old - cost_new;
-            };
-            HashMap<i32, Pair<f32, f32>> diff;
-            for (const auto &[query_i, deg] : degs) {
-                const auto &[deg1, deg2] = deg;
-                diff[query_i] = {cal_gain(deg1, n1, deg2, n2), cal_gain(deg2, n2, deg1, n1)};
+        }
+        auto cost = [](i32 deg1, i32 n1, i32 deg2, i32 n2) {
+            return deg1 * std::log2(static_cast<f32>(n1) / (deg1 + 1)) + deg2 * std::log2(static_cast<f32>(n2) / (deg2 + 1));
+        };
+        auto cal_gain = [&](i32 deg_from, i32 n_from, i32 deg_to, i32 n_to) {
+            f32 cost_old = cost(deg_from, n_from, deg_to, n_to);
+            f32 cost_new = cost(deg_from - 1, n_from, deg_to + 1, n_to);
+            return cost_old - cost_new;
+        };
+        for (i32 query_i = 0; query_i < query_n_; ++query_i) {
+            const auto &[deg1, deg2] = degs[query_i];
+            if (deg1 || deg2) {
+                gain_diff[query_i] = {cal_gain(deg1, n1, deg2, n2), cal_gain(deg2, n2, deg1, n1)};
             }
+        }
 
+        for (i32 iter_i = 0; iter_i < iter_n_; ++iter_i) {
             Vector<f32> gains(end - start, 0.0);
             for (i32 i = start; i < end; ++i) {
-                i32 data_i = res[i];
+                i32 data_i = res_map_[i];
                 for (i32 query_i : fwd_[data_i]) {
-                    const auto &[diff1, diff2] = diff[query_i];
+                    const auto &[gains1, gains2] = gain_diff[query_i];
                     if (i < mid) {
-                        gains[i - start] += diff1;
+                        gains[i - start] += gains1;
                     } else {
-                        gains[i - start] += diff2;
+                        gains[i - start] += gains2;
                     }
                 }
             }
@@ -91,34 +95,52 @@ private:
             std::sort(idx1.begin(), idx1.end(), [&](i32 i1, i32 i2) { return gains[i1] > gains[i2]; });
             std::sort(idx2.begin(), idx2.end(), [&](i32 i1, i32 i2) { return gains[i1 + n1] > gains[i2 + n1]; });
 
-            bool converge = true;
+            HashSet<i32> recalulate;
             for (i32 i = 0; i < std::min(n1, n2); ++i) {
-                i32 &data_i1 = res[idx1[i] + start];
-                i32 &data_i2 = res[idx2[i] + mid];
+                i32 &data_i1 = res_map_[idx1[i] + start];
+                i32 &data_i2 = res_map_[idx2[i] + mid];
                 f32 gain1 = gains[idx1[i]];
                 f32 gain2 = gains[idx2[i] + n1];
-                if (gain1 + gain2 > 0) {
-                    converge = false;
-                    std::cout << fmt::format("Swap {} with {}", data_i1, data_i2) << std::endl;
-                    std::swap(data_i1, data_i2);
-                } else {
+                if (gain1 + gain2 <= 0) {
                     break;
                 }
+                for (i32 query_i : fwd_[data_i1]) {
+                    --degs[query_i].first;
+                    ++degs[query_i].second;
+                    recalulate.insert(query_i);
+                }
+                for (i32 query_i : fwd_[data_i2]) {
+                    --degs[query_i].second;
+                    ++degs[query_i].first;
+                    recalulate.insert(query_i);
+                }
+                // std::cout << fmt::format("Swap {} with {}", data_i1, data_i2) << std::endl;
+                std::swap(data_i1, data_i2);
             }
-            if (converge) {
+            if (recalulate.empty()) {
                 break;
+            }
+            for (i32 query_i : recalulate) {
+                const auto &[deg1, deg2] = degs[query_i];
+                if (deg1 || deg2) {
+                    gain_diff[query_i] = {cal_gain(deg1, n1, deg2, n2), cal_gain(deg2, n2, deg1, n1)};
+                } else {
+                    gain_diff[query_i] = {0, 0};
+                }
             }
         }
 
-        inner(start, mid, res);
-        inner(mid, end, res);
+        inner(start, mid, d + 1);
+        inner(mid, end, d + 1);
     }
 
 private:
     i32 query_n_;
+    i32 rdepth_;
+    i32 iter_n_;
     const Vector<Vector<i32>> &fwd_;
 
-    i32 iter_n_;
+    Vector<i32> res_map_;
 };
 
 } // namespace infinity
