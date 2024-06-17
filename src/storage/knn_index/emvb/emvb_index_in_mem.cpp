@@ -43,6 +43,8 @@ import type_info;
 import embedding_info;
 import emvb_product_quantization;
 import column_vector;
+import block_index;
+import bitmask;
 
 namespace infinity {
 
@@ -53,7 +55,6 @@ EMVBIndexInMem::EMVBIndexInMem(const u32 residual_pq_subspace_num,
                                SharedPtr<ColumnDef> column_def)
     : residual_pq_subspace_num_(residual_pq_subspace_num), residual_pq_subspace_bits_(residual_pq_subspace_bits),
       embedding_dimension_(embedding_dimension), begin_row_id_(begin_row_id), column_def_(std::move(column_def)) {
-    emvb_index_ = MakeUnique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
     // build_index_threshold_
     // need embedding num:
     // 1. (32 ~ 256) * n_centroids_ for centroids
@@ -92,6 +93,8 @@ void EMVBIndexInMem::Insert(u16 block_id, BlockColumnEntry *block_column_entry, 
         }
         // build index if have enough data
         if (embedding_count_ >= build_index_threshold_) {
+            emvb_index_ =
+                MakeUnique<EMVBIndex>(begin_row_id_.segment_offset_, embedding_dimension_, residual_pq_subspace_num_, residual_pq_subspace_bits_);
             emvb_index_->BuildEMVBIndex(begin_row_id_, row_count_, segment_entry_, column_def_, buffer_manager);
             if (emvb_index_->GetDocNum() != row_count || emvb_index_->GetTotalEmbeddingNum() != embedding_count_) {
                 UnrecoverableError("EMVBIndexInMem Insert doc num or embedding num not consistent!");
@@ -111,6 +114,7 @@ SharedPtr<ChunkIndexEntry> EMVBIndexInMem::Dump(SegmentIndexEntry *segment_index
     BufferHandle handle = new_chunk_index_entry->GetIndex();
     auto data_ptr = static_cast<EMVBIndex *>(handle.GetDataMut());
     *data_ptr = std::move(*emvb_index_); // call move in lock
+    emvb_index_.reset();
     return new_chunk_index_entry;
 }
 
@@ -132,6 +136,39 @@ EMVBIndexInMem::NewEMVBIndexInMem(const SharedPtr<IndexBase> &index_base, const 
     }
     const u32 embedding_dimension = embedding_type->Dimension();
     return MakeShared<EMVBIndexInMem>(residual_pq_subspace_num, residual_pq_subspace_bits, embedding_dimension, begin_row_id, column_def);
+}
+
+// return id: offset in the segment
+std::variant<Pair<u32, u32>, EMVBInMemQueryResultType> EMVBIndexInMem::SearchWithBitmask(const f32 *query_ptr,
+                                                                                         const u32 query_embedding_num,
+                                                                                         const u32 top_n,
+                                                                                         Bitmask &bitmask,
+                                                                                         const SegmentEntry *segment_entry,
+                                                                                         const BlockIndex *block_index,
+                                                                                         const TxnTimeStamp begin_ts,
+                                                                                         const u32 centroid_nprobe,
+                                                                                         const f32 threshold_first,
+                                                                                         const u32 n_doc_to_score,
+                                                                                         const u32 out_second_stage,
+                                                                                         const f32 threshold_final) const {
+    std::shared_lock lock(rw_mutex_);
+    if (is_built_.test(std::memory_order_acquire)) {
+        // use index
+        return emvb_index_->SearchWithBitmask(query_ptr,
+                                              query_embedding_num,
+                                              top_n,
+                                              bitmask,
+                                              segment_entry,
+                                              block_index,
+                                              begin_ts,
+                                              centroid_nprobe,
+                                              threshold_first,
+                                              n_doc_to_score,
+                                              out_second_stage,
+                                              threshold_final);
+    }
+    // execute exhaustive search
+    return std::make_pair(begin_row_id_.segment_offset_, row_count_);
 }
 
 } // namespace infinity

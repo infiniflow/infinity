@@ -38,6 +38,7 @@ import column_vector;
 import column_def;
 import buffer_manager;
 import default_values;
+import block_index;
 
 namespace infinity {
 
@@ -325,6 +326,36 @@ void EMVBIndex::AddOneDocEmbeddings(const f32 *embedding_data, const u32 embeddi
     ++n_docs_;
 }
 
+// return id: offset in the segment
+EMVBQueryResultType EMVBIndex::SearchWithBitmask(const f32 *query_ptr,
+                                                 const u32 query_embedding_num,
+                                                 const u32 top_n,
+                                                 Bitmask &bitmask,
+                                                 const SegmentEntry *segment_entry,
+                                                 const BlockIndex *block_index,
+                                                 const TxnTimeStamp begin_ts,
+                                                 const u32 centroid_nprobe,
+                                                 const f32 threshold_first,
+                                                 const u32 n_doc_to_score,
+                                                 const u32 out_second_stage,
+                                                 const f32 threshold_final) const {
+    // template argument should be in ascending order
+    // keep consistent with emvb_search.cpp
+    return query_token_num_helper<32, 64, 96, 128, 160, 192, 224, 256>(query_ptr,
+                                                                       query_embedding_num,
+                                                                       centroid_nprobe,
+                                                                       threshold_first,
+                                                                       n_doc_to_score,
+                                                                       out_second_stage,
+                                                                       top_n,
+                                                                       threshold_final,
+                                                                       bitmask,
+                                                                       start_segment_offset_,
+                                                                       segment_entry,
+                                                                       block_index,
+                                                                       begin_ts);
+}
+
 // the two thresholds are for every (query embedding, candidate embedding) pair
 // candidate embeddings are centroids
 // unqualified pairs will not be scored
@@ -332,6 +363,7 @@ void EMVBIndex::AddOneDocEmbeddings(const f32 *embedding_data, const u32 embeddi
 
 constexpr u32 current_max_query_token_num = 256;
 
+// return id: offset from start_segment_offset_
 EMVBQueryResultType EMVBIndex::GetQueryResult(const f32 *query_ptr,
                                               const u32 query_embedding_num,
                                               const u32 centroid_nprobe,  // step 1, centroid candidates for every query embedding
@@ -354,26 +386,26 @@ EMVBQueryResultType EMVBIndex::GetQueryResult(const f32 *query_ptr,
 }
 
 template <u32 I, u32... J>
-EMVBQueryResultType EMVBIndex::query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto... query_args) const {
+EMVBQueryResultType EMVBIndex::query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto &&...query_args) const {
     if (query_embedding_num <= I) {
-        return GetQueryResultT<I>(query_ptr, query_embedding_num, query_args...);
+        return GetQueryResultT<I>(query_ptr, query_embedding_num, std::forward<decltype(query_args)>(query_args)...);
     }
-    return query_token_num_helper<J...>(query_ptr, query_embedding_num, query_args...);
+    return query_token_num_helper<J...>(query_ptr, query_embedding_num, std::forward<decltype(query_args)>(query_args)...);
 }
 
 template <>
-EMVBQueryResultType EMVBIndex::query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto... query_args) const {
+EMVBQueryResultType EMVBIndex::query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto &&...query_args) const {
     auto error_msg = fmt::format("EMVBIndex::GetQueryResult: query_embedding_num max value: {}, got {} instead.",
                                  current_max_query_token_num,
                                  query_embedding_num);
     error_msg += fmt::format(" Embeddings after {} will not be used for search.", current_max_query_token_num);
     error_msg += " Please Add instantiation of EMVBSearch with a bigger FIXED_QUERY_TOKEN_NUM value.";
     LOG_ERROR(error_msg);
-    return GetQueryResultT<current_max_query_token_num>(query_ptr, query_embedding_num, query_args...);
+    return GetQueryResultT<current_max_query_token_num>(query_ptr, query_embedding_num, std::forward<decltype(query_args)>(query_args)...);
 }
 
 template <u32 FIXED_QUERY_TOKEN_NUM>
-EMVBQueryResultType EMVBIndex::GetQueryResultT(const f32 *query_ptr, const u32 query_embedding_num, auto... query_args) const {
+EMVBQueryResultType EMVBIndex::GetQueryResultT(const f32 *query_ptr, const u32 query_embedding_num, auto &&...query_args) const {
     UniquePtr<f32[]> extended_query_ptr;
     const f32 *query_ptr_to_use = query_ptr;
     // extend query to FIXED_QUERY_TOKEN_NUM
@@ -400,7 +432,7 @@ EMVBQueryResultType EMVBIndex::GetQueryResultT(const f32 *query_ptr, const u32 q
                                                     centroids_data_.data(),
                                                     centroids_to_docid_.get(),
                                                     product_quantizer_.get());
-    return search_helper.GetQueryResult(query_ptr_to_use, query_args...);
+    return search_helper.GetQueryResult(query_ptr_to_use, std::forward<decltype(query_args)>(query_args)...);
 }
 
 template <typename T>

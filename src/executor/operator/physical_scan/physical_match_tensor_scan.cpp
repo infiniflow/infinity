@@ -31,7 +31,9 @@ import column_vector;
 import expression_evaluator;
 import expression_state;
 import base_expression;
+import column_expression;
 import knn_expr;
+import create_index_info;
 import match_tensor_expr;
 import match_tensor_expression;
 import default_values;
@@ -48,6 +50,10 @@ import physical_index_scan;
 import filter_value_type_classification;
 import bitmask;
 import segment_entry;
+import segment_index_entry;
+import chunk_index_entry;
+import emvb_index_in_mem;
+import emvb_index;
 import knn_filter;
 import global_block_id;
 import block_index;
@@ -57,6 +63,7 @@ import fix_heap;
 import type_info;
 import embedding_info;
 import buffer_manager;
+import buffer_handle;
 import match_tensor_scan_function_data;
 import mlas_matrix_multiply;
 import physical_fusion;
@@ -76,29 +83,7 @@ PhysicalMatchTensorScan::PhysicalMatchTensorScan(u64 id,
     search_column_id_ = std::numeric_limits<ColumnID>::max();
 }
 
-void PhysicalMatchTensorScan::Init() {
-    search_column_id_ = match_tensor_expr_->column_expr_->binding().column_idx;
-    const ColumnDef *column_def = base_table_ref_->table_entry_ptr_->GetColumnDefByID(search_column_id_);
-    const auto &column_type_ptr = column_def->type();
-    if (const auto l_type = column_type_ptr->type(); l_type != LogicalType::kTensor and l_type != LogicalType::kTensorArray) {
-        String error_message = fmt::format("Column {} is not a tensor or tensorarray column", column_def->name());
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
-    }
-    const auto &type_info = column_type_ptr->type_info();
-    if (type_info->type() != TypeInfoType::kEmbedding) {
-        String error_message = fmt::format("Column {} is not a tensor column", column_def->name());
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
-    }
-    const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
-    if (embedding_info->Dimension() != match_tensor_expr_->tensor_basic_embedding_dimension_) {
-        String error_message =
-            fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), match_tensor_expr_->ToString());
-        LOG_CRITICAL(error_message);
-        UnrecoverableError(error_message);
-    }
-}
+void PhysicalMatchTensorScan::Init() {}
 
 SharedPtr<Vector<String>> PhysicalMatchTensorScan::GetOutputNames() const {
     SharedPtr<Vector<String>> result_names = MakeShared<Vector<String>>();
@@ -131,6 +116,83 @@ ColumnID PhysicalMatchTensorScan::SearchColumnID() const {
     return search_column_id_;
 }
 
+void PhysicalMatchTensorScan::CheckColumn() {
+    search_column_id_ = match_tensor_expr_->column_expr_->binding().column_idx;
+    const ColumnDef *column_def = base_table_ref_->table_entry_ptr_->GetColumnDefByID(search_column_id_);
+    const auto &column_type_ptr = column_def->type();
+    if (const auto l_type = column_type_ptr->type(); l_type != LogicalType::kTensor and l_type != LogicalType::kTensorArray) {
+        String error_message = fmt::format("Column {} is not a tensor or tensorarray column", column_def->name());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    const auto &type_info = column_type_ptr->type_info();
+    if (type_info->type() != TypeInfoType::kEmbedding) {
+        String error_message = fmt::format("Column {} is not a tensor column", column_def->name());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
+    if (embedding_info->Dimension() != match_tensor_expr_->tensor_basic_embedding_dimension_) {
+        String error_message =
+            fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), match_tensor_expr_->ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+}
+
+void PhysicalMatchTensorScan::PlanWithIndex(QueryContext *query_context) {
+    Txn *txn = query_context->GetTxn();
+    const TransactionID txn_id = txn->TxnID();
+    const TxnTimeStamp begin_ts = txn->BeginTS();
+    const auto search_column_id = SearchColumnID();
+
+    TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
+    Map<u32, SharedPtr<SegmentIndexEntry>> index_entry_map;
+
+    for (auto map_guard = table_entry->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
+        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+        if (!status.ok()) {
+            // Table index entry isn't found
+            LOG_ERROR(status.message());
+            continue;
+        }
+        if (const String column_name = table_index_entry->index_base()->column_name();
+            table_entry->GetColumnIdByName(column_name) != search_column_id) {
+            // search_column_id isn't in this table index
+            continue;
+        }
+        // check index type
+        if (auto index_type = table_index_entry->index_base()->index_type_; index_type != IndexType::kEMVB) {
+            // Skip non-EMVB index
+            continue;
+        }
+        // Fill the segment with index
+        index_entry_map = table_index_entry->index_by_segment();
+        // found one index
+        break;
+    }
+
+    // Generate task set: index segment and no index block
+    for (BlockIndex *block_index = base_table_ref_->block_index_.get(); const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
+        if (auto iter = index_entry_map.find(segment_id); iter != index_entry_map.end()) {
+            index_entries_.emplace_back(iter->second.get());
+        } else {
+            for (const auto &block_map = segment_info.block_map_; const auto *block_entry : block_map) {
+                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id);
+                block_column_entries_.emplace_back(block_column_entry);
+            }
+        }
+    }
+    LOG_TRACE(fmt::format("MatchTensorScan: brute force task: {}, index task: {}", block_column_entries_.size(), index_entries_.size()));
+}
+
+Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalMatchTensorScan::PlanBlockEntries(i64 parallel_count) const {
+    UnrecoverableError("PhysicalMatchTensorScan:: use PlanWithIndex instead of PlanBlockEntries!");
+    return {};
+}
+
+SizeT PhysicalMatchTensorScan::TaskletCount() { return block_column_entries_.size() + index_entries_.size(); }
+
 bool PhysicalMatchTensorScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *match_tensor_scan_operator_state = static_cast<MatchTensorScanOperatorState *>(operator_state);
     ExecuteInner(query_context, match_tensor_scan_operator_state);
@@ -140,6 +202,7 @@ bool PhysicalMatchTensorScan::Execute(QueryContext *query_context, OperatorState
 void CalculateScoreOnColumnVector(ColumnVector &column_vector,
                                   SegmentID segment_id,
                                   BlockID block_id,
+                                  u32 start_offset,
                                   u32 row_count,
                                   const Bitmask &bitmask,
                                   const MatchTensorExpression &match_tensor_expr,
@@ -164,27 +227,131 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
-    const auto search_column_id = SearchColumnID();
-    const BlockIndex *block_index = function_data.block_index_;
-    const Vector<GlobalBlockID> &block_ids = *function_data.global_block_ids_;
-    auto &block_ids_idx = function_data.current_block_ids_idx_;
-    if (const auto task_id = block_ids_idx; task_id < block_ids.size()) {
-        ++block_ids_idx;
-        const auto [segment_id, block_id] = block_ids[task_id];
-        const BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-
+    const BlockIndex *block_index = base_table_ref_->block_index_.get();
+    if (const u32 task_job_index = task_executed_++; task_job_index < index_entries_.size()) {
+        // use index
+        auto *index_entry = index_entries_[task_job_index];
+        const auto segment_id = index_entry->segment_id();
+        SegmentEntry *segment_entry = nullptr;
+        const auto &segment_index_hashmap = base_table_ref_->block_index_->segment_block_index_;
+        if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
+            String error_message = fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        } else {
+            segment_entry = iter->second.segment_entry_;
+        }
+        if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
+            LOG_TRACE(fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, index_entries_.size()));
+            const auto segment_row_count = segment_entry->row_count();
+            Bitmask segment_bitmask;
+            const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
+            if (std::holds_alternative<Vector<u32>>(filter_result)) {
+                const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
+                segment_bitmask.Initialize(std::ceil(segment_row_count));
+                segment_bitmask.SetAllFalse();
+                for (u32 row_id : filter_result_vector) {
+                    segment_bitmask.SetTrue(row_id);
+                }
+            } else {
+                segment_bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+            }
+            // TODO: now only have EMVB index
+            const Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<EMVBIndexInMem>> emvb_snapshot = index_entry->GetEMVBIndexSnapshot();
+            // 1. in mem index
+            {
+                const EMVBIndexInMem *emvb_index_in_mem = std::get<1>(emvb_snapshot).get();
+                // TODO: fix the parameters
+                const auto result = emvb_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(match_tensor_expr_->query_embedding_.ptr),
+                                                                         match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                                                                         topn_,
+                                                                         segment_bitmask,
+                                                                         segment_entry,
+                                                                         block_index,
+                                                                         begin_ts,
+                                                                         2,
+                                                                         0.4f,
+                                                                         topn_ * 10,
+                                                                         topn_ * 5,
+                                                                         0.5f);
+                std::visit(Overload{[segment_id, &function_data](const Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> &index_result) {
+                                        const auto &[result_num, score_ptr, row_id_ptr] = index_result;
+                                        for (u32 i = 0; i < result_num; ++i) {
+                                            function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                                        }
+                                    },
+                                    [this, buffer_mgr, begin_ts, segment_id, &segment_entry, &function_data](const Pair<u32, u32> &in_mem_result) {
+                                        const auto &[start_offset, total_row_count] = in_mem_result;
+                                        BlockID block_id = start_offset / DEFAULT_BLOCK_CAPACITY;
+                                        BlockOffset block_offset = start_offset % DEFAULT_BLOCK_CAPACITY;
+                                        u32 row_leftover = total_row_count;
+                                        BlocksGuard block_guard = segment_entry->GetBlocksGuard();
+                                        do {
+                                            const u32 row_to_read = std::min<u32>(row_leftover, DEFAULT_BLOCK_CAPACITY - block_offset);
+                                            Bitmask block_bitmask;
+                                            if (this->CalculateFilterBitmask(segment_id, block_id, row_to_read, block_bitmask)) {
+                                                const BlockEntry *block_entry = block_guard.block_entries_[block_id].get();
+                                                block_entry->SetDeleteBitmask(begin_ts, block_bitmask);
+                                                BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(this->search_column_id_);
+                                                auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                                                // output score will always be float type
+                                                CalculateScoreOnColumnVector(column_vector,
+                                                                             segment_id,
+                                                                             block_id,
+                                                                             block_offset,
+                                                                             row_to_read,
+                                                                             block_bitmask,
+                                                                             *(this->match_tensor_expr_),
+                                                                             function_data);
+                                            }
+                                            // prepare next block
+                                            row_leftover -= row_to_read;
+                                            ++block_id;
+                                            block_offset = 0;
+                                        } while (row_leftover);
+                                    }},
+                           result);
+            }
+            // 2. chunk index
+            for (const auto &chunk_index_entry : std::get<0>(emvb_snapshot)) {
+                if (chunk_index_entry->CheckVisible(txn)) {
+                    const BufferHandle index_handle = chunk_index_entry->GetIndex();
+                    const auto *emvb_index = static_cast<const EMVBIndex *>(index_handle.GetData());
+                    // TODO: fix the parameters
+                    const auto [result_num, score_ptr, row_id_ptr] =
+                        emvb_index->SearchWithBitmask(reinterpret_cast<const f32 *>(match_tensor_expr_->query_embedding_.ptr),
+                                                      match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                                                      topn_,
+                                                      segment_bitmask,
+                                                      segment_entry,
+                                                      block_index,
+                                                      begin_ts,
+                                                      2,
+                                                      0.4f,
+                                                      topn_ * 10,
+                                                      topn_ * 5,
+                                                      0.5f);
+                    for (u32 i = 0; i < result_num; ++i) {
+                        function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
+                    }
+                }
+            }
+        }
+    } else if (const u32 task_job_block = task_job_index - index_entries_.size(); task_job_block < block_column_entries_.size()) {
+        auto *block_column_entry = block_column_entries_[task_job_block];
+        const BlockEntry *block_entry = block_column_entry->GetBlockEntry();
+        const BlockID block_id = block_entry->block_id();
+        const SegmentEntry *segment_entry = block_entry->GetSegmentEntry();
+        const SegmentID segment_id = segment_entry->segment_id();
         BlockOffset row_count = block_index->GetBlockOffset(segment_id, block_id);
         Bitmask bitmask;
         if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
             block_entry->SetDeleteBitmask(begin_ts, bitmask);
-            auto *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id);
             auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
             // output score will always be float type
-            CalculateScoreOnColumnVector(column_vector, segment_id, block_id, row_count, bitmask, *match_tensor_expr_, function_data);
+            CalculateScoreOnColumnVector(column_vector, segment_id, block_id, 0, row_count, bitmask, *match_tensor_expr_, function_data);
         }
-    }
-    if (block_ids_idx >= block_ids.size()) {
-        LOG_TRACE(fmt::format("MatchTensorScan: {} task finished", block_ids_idx));
+    } else {
         // all task Complete
         const u32 result_n = function_data.End();
         const auto output_type_ptr = GetOutputTypes();
@@ -437,6 +604,7 @@ template <typename CalcutateScoreOfRowOp>
 void ExecuteScanOnColumn(ColumnVector &column_vector,
                          const SegmentID segment_id,
                          const BlockID block_id,
+                         const u32 start_block_offset,
                          const u32 row_count,
                          const Bitmask &bitmask,
                          const MatchTensorExpression &match_tensor_expr,
@@ -445,7 +613,8 @@ void ExecuteScanOnColumn(ColumnVector &column_vector,
     const u32 query_embedding_num = match_tensor_expr.num_of_embedding_in_query_tensor_;
     const u32 basic_embedding_dimension = match_tensor_expr.tensor_basic_embedding_dimension_;
     const u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
-    for (u32 i = 0; i < row_count; ++i) {
+    const u32 end_block_offset = start_block_offset + row_count;
+    for (u32 i = start_block_offset; i < end_block_offset; ++i) {
         if (bitmask.IsTrue(i)) {
             const float maxsim_score =
                 CalcutateScoreOfRowOp::Execute(column_vector, i, query_tensor_ptr, query_embedding_num, basic_embedding_dimension);
@@ -458,6 +627,7 @@ struct TensorScanParameterPack {
     ColumnVector &column_vector_;
     const SegmentID segment_id_;
     const BlockID block_id_;
+    const u32 start_block_offset_;
     const u32 row_count_;
     const Bitmask &bitmask_;
     const MatchTensorExpression &match_tensor_expr_;
@@ -465,12 +635,13 @@ struct TensorScanParameterPack {
     TensorScanParameterPack(ColumnVector &column_vector,
                             const SegmentID segment_id,
                             const BlockID block_id,
+                            const u32 start_block_offset,
                             const u32 row_count,
                             const Bitmask &bitmask,
                             const MatchTensorExpression &match_tensor_expr,
                             MatchTensorScanFunctionData &function_data)
-        : column_vector_(column_vector), segment_id_(segment_id), block_id_(block_id), row_count_(row_count), bitmask_(bitmask),
-          match_tensor_expr_(match_tensor_expr), function_data_(function_data) {}
+        : column_vector_(column_vector), segment_id_(segment_id), block_id_(block_id), start_block_offset_(start_block_offset), row_count_(row_count),
+          bitmask_(bitmask), match_tensor_expr_(match_tensor_expr), function_data_(function_data) {}
 };
 
 template <template <typename> typename CalcutateScoreOfRow, typename ColumnElemT, typename QueryElemT>
@@ -480,6 +651,7 @@ void CalculateScoreOnColumnVectorT(TensorScanParameterPack &parameter_pack) {
             return ExecuteScanOnColumn<CalcutateScoreOfRow<MaxSimOp<ColumnElemT, QueryElemT>>>(parameter_pack.column_vector_,
                                                                                                parameter_pack.segment_id_,
                                                                                                parameter_pack.block_id_,
+                                                                                               parameter_pack.start_block_offset_,
                                                                                                parameter_pack.row_count_,
                                                                                                parameter_pack.bitmask_,
                                                                                                parameter_pack.match_tensor_expr_,
@@ -564,11 +736,12 @@ void ElemTypeDispatch(Params &parameter_pack, EmbeddingDataType type_enum, Args.
 void CalculateScoreOnColumnVector(ColumnVector &column_vector,
                                   const SegmentID segment_id,
                                   const BlockID block_id,
+                                  const u32 start_offset,
                                   const u32 row_count,
                                   const Bitmask &bitmask,
                                   const MatchTensorExpression &match_tensor_expr,
                                   MatchTensorScanFunctionData &function_data) {
-    TensorScanParameterPack parameter_pack(column_vector, segment_id, block_id, row_count, bitmask, match_tensor_expr, function_data);
+    TensorScanParameterPack parameter_pack(column_vector, segment_id, block_id, start_offset, row_count, bitmask, match_tensor_expr, function_data);
     auto column_elem_type = static_cast<const EmbeddingInfo *>(parameter_pack.column_vector_.data_type()->type_info().get())->Type();
     auto query_elem_type = parameter_pack.match_tensor_expr_.embedding_data_type_;
     ElemTypeDispatch<ExecuteMatchTensorScanTypes, TypeList<>>(parameter_pack, column_elem_type, query_elem_type);

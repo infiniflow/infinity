@@ -113,11 +113,8 @@ UniquePtr<OperatorState> MakeMatchTensorScanState(const PhysicalMatchTensorScan 
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
-    auto *match_tensor_scan_source_state = static_cast<MatchTensorScanSourceState *>(source_state);
     auto operator_state = MakeUnique<MatchTensorScanOperatorState>();
-    operator_state->match_tensor_scan_function_data_ = MakeUnique<MatchTensorScanFunctionData>(physical_match_tensor_scan->GetBlockIndex(),
-                                                                                               match_tensor_scan_source_state->global_ids_,
-                                                                                               physical_match_tensor_scan->GetTopN());
+    operator_state->match_tensor_scan_function_data_ = MakeUnique<MatchTensorScanFunctionData>(physical_match_tensor_scan->GetTopN());
     return operator_state;
 }
 
@@ -962,11 +959,8 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
                 LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
-            // Partition the hash range to each source state
-            auto *match_tensor_scan_operator = (PhysicalMatchTensorScan *)first_operator;
-            Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = match_tensor_scan_operator->PlanBlockEntries(parallel_count);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->source_state_ = MakeUnique<MatchTensorScanSourceState>(std::move(blocks_group[task_id]));
+                tasks_[task_id]->source_state_ = MakeUnique<MatchTensorScanSourceState>();
             }
             break;
         }
