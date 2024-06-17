@@ -48,6 +48,8 @@ public:
 
     inline float BM25ScoreUpperBound() const { return bm25_score_upper_bound_; }
 
+    inline float Threshold() const { return threshold_; }
+
     Pair<RowID, float> BlockNextWithThreshold(float threshold);
 
     virtual void UpdateScoreThreshold(float threshold){

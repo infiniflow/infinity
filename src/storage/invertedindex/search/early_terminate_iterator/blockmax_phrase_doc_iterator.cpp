@@ -222,6 +222,7 @@ void BlockMaxPhraseDocIterator::PrintTree(std::ostream &os, const String &prefix
     os << ")";
     os << " (doc_freq: " << DocFreq() << ")";
     os << " (bm25_score_upper_bound: " << BM25ScoreUpperBound() << ")";
+    os << " (threshold: " << threshold_ << ")";
     os << '\n';
 }
 
