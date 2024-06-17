@@ -18,8 +18,8 @@ class WrapQuickwitClient:
     def create_index(self, index_config):
         response = requests.post(
             f"{self.base_url}/api/v1/indexes",
-            headers={'Content-Type': 'application/yaml'},
-            data=index_config
+            headers={"Content-Type": "application/yaml"},
+            data=index_config,
         )
         if response.status_code == 201:
             return response.json()
@@ -45,11 +45,8 @@ class WrapQuickwitClient:
             response.raise_for_status()
 
     def upload_batch(self, index, data):
-        bulk_url = f'{self.base_url}/api/v1/{index}/ingest?commit=force'
-        response = requests.post(
-            bulk_url,
-            data=data
-        )
+        bulk_url = f"{self.base_url}/api/v1/{index}/ingest?commit=force"
+        response = requests.post(bulk_url, data=data)
         if response.status_code == 200:
             return response.json()
         else:
@@ -60,8 +57,8 @@ class WrapQuickwitClient:
 
         response = requests.get(
             search_url,
-            headers={'Content-Type': 'application/json'},
-            data=json.dumps(query)
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(query),
         )
         if response.status_code == 200:
             return response.json()
@@ -92,8 +89,10 @@ class QuickwitClient(BaseClient):
         if self.client.index_exists(index=self.table_name):
             self.client.delete_index(index=self.table_name)
 
-        index_config_path = os.path.join(self.path_prefix, self.data["index_config_path"])
-        with open(index_config_path, 'rb') as file:
+        index_config_path = os.path.join(
+            self.path_prefix, self.data["index_config_path"]
+        )
+        with open(index_config_path, "rb") as file:
             yaml_data = file.read()
             self.client.create_index(index_config=yaml_data)
 
@@ -110,7 +109,10 @@ class QuickwitClient(BaseClient):
                 for i, line in enumerate(f):
                     record = json.dumps(json.loads(line))
                     record_str = f"{record}\n"
-                    if sys.getsizeof(bulk_request) + sys.getsizeof(record_str) >= MAX_DATA_SIZE:
+                    if (
+                        sys.getsizeof(bulk_request) + sys.getsizeof(record_str)
+                        >= MAX_DATA_SIZE
+                    ):
                         self.upload_batch(bulk_request)
                         bulk_request = record_str
                     else:
@@ -143,10 +145,9 @@ class QuickwitClient(BaseClient):
             for key in headers:
                 custom_headers.append(key["name"])
             with open(
-                    dataset_path, "r", encoding="utf-8", errors="replace"
+                dataset_path, "r", encoding="utf-8", errors="replace"
             ) as data_file:
                 bulk_request = ""
-                cnt = 0
                 for i, line in enumerate(data_file):
                     row = line.strip().split("\t")
                     if len(row) != len(headers):
@@ -154,18 +155,24 @@ class QuickwitClient(BaseClient):
                             f"row = {i}, row_len = {len(row)}, not equal headers len, skip"
                         )
                         continue
-                    row_dict = {header["name"]: value for header, value in zip(headers, row)}
+                    row_dict = {
+                        header["name"]: value for header, value in zip(headers, row)
+                    }
                     document = json.dumps(row_dict)
-                    bulk_request += f"{document}\n"
-                    cnt += 1
-                    if cnt >= batch_size:
+                    record_str = f"{document}\n"
+                    if (
+                        sys.getsizeof(bulk_request) + sys.getsizeof(record_str)
+                        >= MAX_DATA_SIZE
+                    ):
                         self.upload_batch(bulk_request)
-                        bulk_request = ""
-                        cnt = 0
+                        bulk_request = record_str
+                    else:
+                        bulk_request += record_str
 
-                if cnt != 0:
+                    if i % 1000000 == 0 and i != 0:
+                        logging.info(f"row {i}")
+                if len(bulk_request) != 0:
                     self.upload_batch(bulk_request)
-                    cnt = 0
         else:
             raise TypeError("Unsupported file type")
 
@@ -180,15 +187,8 @@ class QuickwitClient(BaseClient):
             }
         else:
             ret = {
-                "query": {
-                    "query_string": {
-                        "query": query,
-                        "fields": [
-                            "body"
-                        ]
-                    }
-                },
-                "sort": ["_score"]
+                "query": {"query_string": {"query": query, "fields": ["body"]}},
+                "sort": ["_score"],
             }
         return ret
 
