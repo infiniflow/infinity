@@ -46,6 +46,8 @@ public:
 
     Vector<f32> GetScores(i32 block_id, const SparseVecRef<f32, i32> &query) const;
 
+    void Prefetch(i32 block_id) const;
+
     i32 block_size() const { return block_size_; }
 
     i32 block_num() const { return block_terms_.size(); }

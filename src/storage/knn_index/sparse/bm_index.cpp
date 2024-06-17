@@ -15,6 +15,7 @@
 module;
 
 #include <vector>
+#include <xmmintrin.h>
 
 module bm_index;
 
@@ -95,6 +96,11 @@ Vector<f32> BlockFwd::GetScores(i32 block_id, const SparseVecRef<f32, i32> &quer
         }
     }
     return res;
+}
+
+void BlockFwd::Prefetch(i32 block_id) const {
+    const auto *ptr = reinterpret_cast<const char *>(block_terms_[block_id].data());
+    _mm_prefetch(ptr, _MM_HINT_T0);
 }
 
 SizeT BlockFwd::GetSizeInBytes() const {
@@ -273,17 +279,25 @@ Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn(const SparseVecRef<f32, i32> &
     Vector<i32> result(topk);
     Vector<f32> result_score(topk);
     HeapResultHandler<CompareMin<f32, i32>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
-    for (const auto &[ub_score, block_id] : block_scores) {
-        i32 off = block_id * block_fwd_.block_size();
-        Vector<f32> scores = block_fwd_.GetScores(block_id, query_ref);
+
+    SizeT block_scores_num = block_scores.size();
+    f32 prev_ub_score = block_scores[0].first;
+    i32 prev_block_id = block_scores[0].second;
+    for (SizeT i = 1; i < block_scores_num; ++i) {
+        const auto &[next_ub_score, next_block_id] = block_scores[i];
+        block_fwd_.Prefetch(next_block_id);
+        i32 off = prev_block_id * block_fwd_.block_size();
+        Vector<f32> scores = block_fwd_.GetScores(prev_block_id, query_ref);
         for (SizeT block_off = 0; block_off < scores.size(); ++block_off) {
             i32 doc_id = off + block_off;
             f32 score = scores[block_off];
             result_handler.AddResult(0 /*query_id*/, score, doc_id);
         }
-        if (ub_score * alpha < result_handler.GetDistance0(0 /*query_id*/)) {
+        if (prev_ub_score * alpha < result_handler.GetDistance0(0 /*query_id*/)) {
             break;
         }
+        prev_ub_score = next_ub_score;
+        prev_block_id = next_block_id;
     }
     result_handler.End(0 /*query_id*/);
     return {result, result_score};

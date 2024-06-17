@@ -177,6 +177,7 @@ public:
         ParseInner(app_);
         app_.parse(argc, argv);
 
+        String index_name = IndexName();
         Path dataset_dir = Path(test_data_path()) / "benchmark" / "splade";
         query_path_ = dataset_dir / "queries.dev.csr";
         data_path_ = dataset_dir;
@@ -186,19 +187,19 @@ public:
             case DataSetType::kSmall: {
                 data_path_ /= "base_small.csr";
                 groundtruth_path_ /= "base_small.dev.gt";
-                index_save_path_ /= "small_linscan.bin";
+                index_save_path_ /= fmt::format("small_{}.bin", index_name);
                 break;
             }
             case DataSetType::k1M: {
                 data_path_ /= "base_1M.csr";
                 groundtruth_path_ /= "base_1M.dev.gt";
-                index_save_path_ /= "1M_linscan.bin";
+                index_save_path_ /= fmt::format("1M_{}.bin", index_name);
                 break;
             }
             case DataSetType::kFull: {
                 data_path_ /= "base_full.csr";
                 groundtruth_path_ /= "base_full.dev.gt";
-                index_save_path_ /= "full_linscan.bin";
+                index_save_path_ /= fmt::format("full_{}.bin", index_name);
                 break;
             }
             default: {
@@ -210,6 +211,8 @@ public:
     int Exit(const CLI::ParseError &e) { return app_.exit(e); }
 
     virtual void ParseInner(CLI::App &app_) = 0;
+
+    virtual String IndexName() const = 0;
 
 public:
     ModeType mode_type_ = ModeType::kImport;
@@ -234,6 +237,8 @@ public:
         app_.add_option("--budget_ratio", budget_ratio_, "Budget radio")->required(false)->transform(CLI::Range(0.0, 100.0));
     }
 
+    String IndexName() const override { return "linscan"; }
+
 public:
     bool bf_ = false;
     f32 candidate_ratio_ = 1.5;
@@ -247,6 +252,8 @@ public:
         app_.add_option("--alpha", alpha_, "Alpha")->required(false)->transform(CLI::Range(0.0, 100.0));
         app_.add_option("--beta", beta_, "Beta")->required(false)->transform(CLI::Range(0.0, 100.0));
     }
+
+    String IndexName() const override { return fmt::format("bmp_block{}", block_size_); }
 
 public:
     i8 block_size_ = 8;
