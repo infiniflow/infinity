@@ -37,6 +37,7 @@ import block_version;
 import cleanup_scanner;
 import buffer_manager;
 import buffer_obj;
+import logical_type;
 
 namespace infinity {
 
@@ -297,6 +298,32 @@ void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
             column->CommitColumn(txn_id, commit_ts);
         }
     }
+}
+
+ColumnVector BlockEntry::GetCreateTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const {
+    ColumnVector column_vector(MakeShared<DataType>(LogicalType::kBigInt));
+    column_vector.Initialize(ColumnVectorType::kFlat, size);
+    {
+        std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
+        auto block_version_handle = this->block_version_->Load();
+        const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
+        block_version->GetCreateTS(offset, size, column_vector);
+    }
+    return column_vector;
+}
+
+ColumnVector BlockEntry::GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const {
+    ColumnVector column_vector(MakeShared<DataType>(LogicalType::kBigInt));
+    column_vector.Initialize(ColumnVectorType::kFlat, size);
+    {
+        std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
+        auto block_version_handle = this->block_version_->Load();
+        const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
+        for (SizeT i = offset; i < offset + size; ++i) {
+            column_vector.AppendByPtr(reinterpret_cast<const char *>(&block_version->deleted_[i]));
+        }
+    }
+    return column_vector;
 }
 
 void BlockEntry::FlushData(SizeT start_row_count, SizeT checkpoint_row_count) {

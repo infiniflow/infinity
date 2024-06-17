@@ -701,7 +701,7 @@ QueryResult Infinity::Import(const String &db_name, const String &table_name, co
     return result;
 }
 
-QueryResult Infinity::Export(const String &db_name, const String &table_name, const String &path, ExportOptions export_options) {
+QueryResult Infinity::Export(const String &db_name, const String &table_name, Vector<ParsedExpr *> *columns, const String &path, ExportOptions export_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -714,6 +714,7 @@ QueryResult Infinity::Export(const String &db_name, const String &table_name, co
     export_statement->file_path_ = path;
     export_statement->schema_name_ = db_name;
     export_statement->table_name_ = table_name;
+    export_statement->expr_array_ = columns;
 
     export_statement->header_ = export_options.header_;
     export_statement->copy_file_type_ = export_options.copy_file_type_;

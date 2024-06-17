@@ -46,6 +46,8 @@ import extra_ddl_info;
 import update_statement;
 import http_search;
 import knn_expr;
+import function_expr;
+import column_expr;
 import type_info;
 import logical_type;
 import embedding_info;
@@ -582,7 +584,52 @@ public:
             }
             String file_path = http_body_json["file_path"];
 
-            auto result = infinity->Export(database_name, table_name, file_path, export_options);
+            Vector<ParsedExpr *> *export_columns{nullptr};
+            DeferFn defer_fn([&]() {
+                if (export_columns != nullptr) {
+                    for (auto &column_expr : *export_columns) {
+                        delete column_expr;
+                        column_expr = nullptr;
+                    }
+                    delete export_columns;
+                    export_columns = nullptr;
+                }
+            });
+
+            if (http_body_json.contains("columns")) {
+                export_columns = new Vector<ParsedExpr *>();
+
+                for(const auto& column: http_body_json["columns"]) {
+                    if(column.is_string()) {
+                        String column_name = column;
+                        ToLower(column_name);
+                        if(column_name == "_row_id") {
+                            FunctionExpr* expr = new FunctionExpr();
+                            expr->func_name_ = "row_id";
+                            export_columns->emplace_back(expr);
+                        } else if(column_name == "_create_timestamp") {
+                            FunctionExpr* expr = new FunctionExpr();
+                            expr->func_name_ = "create_timestamp";
+                            export_columns->emplace_back(expr);
+                        } else if(column_name == "_delete_timestamp") {
+                            FunctionExpr* expr = new FunctionExpr();
+                            expr->func_name_ = "delete_timestamp";
+                            export_columns->emplace_back(expr);
+                        } else {
+                            ColumnExpr* expr = new ColumnExpr();
+                            expr->names_.emplace_back(column_name);
+                            export_columns->emplace_back(expr);
+                        }
+                    } else {
+                        json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
+                        json_response["error_message"] = "Export data isn't a column";
+                    }
+                }
+            }
+
+            auto result = infinity->Export(database_name, table_name, export_columns, file_path, export_options);
+
+            export_columns = nullptr;
             if (result.IsOk()) {
                 json_response["error_code"] = 0;
                 http_status = HTTPStatus::CODE_200;

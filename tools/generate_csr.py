@@ -65,6 +65,9 @@ def generate(generate_if_exists: bool, copy_dir: str):
                     slt_file.write(", ")
             slt_file.write("\n")
         slt_file.write("\n")
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE {};\n".format(table_name))
+        slt_file.write("\n")
 
     with open(csr_path, "wb") as csr_file:
         csr_file.write(row_n.to_bytes(8, "little"))

@@ -1183,7 +1183,7 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     }
     delete $7;
 }
-| COPY table_name '(' identifier_array ')' TO file_path WITH '(' copy_option_list ')' {
+| COPY table_name '(' expr_array ')' TO file_path WITH '(' copy_option_list ')' {
     $$ = new infinity::CopyStatement();
 
     // Copy To
@@ -1198,7 +1198,7 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
     free($2->table_name_ptr_);
     delete $2;
 
-    $$->columns_ = $4;
+    $$->expr_array_ = $4;
 
     // file path
     $$->file_path_ = $7;
@@ -2874,6 +2874,9 @@ copy_option : FORMAT IDENTIFIER {
     } else if (strcasecmp($2, "csr") == 0) {
         $$->file_type_ = infinity::CopyFileType::kCSR;
         free($2);
+    } else if (strcasecmp($2, "bvecs") == 0) {
+        $$->file_type_ = infinity::CopyFileType::kBVECS;
+        free($2);
     } else {
         free($2);
         delete $$;
@@ -2998,6 +3001,8 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
         index_type = infinity::IndexType::kHnsw;
     } else if (strcmp($5, "ivfflat") == 0) {
         index_type = infinity::IndexType::kIVFFlat;
+    } else if (strcmp($5, "emvb") == 0) {
+        index_type = infinity::IndexType::kEMVB;
     } else {
         free($5);
         delete $2;

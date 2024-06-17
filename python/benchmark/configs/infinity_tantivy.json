@@ -1,0 +1,30 @@
+{
+  "name": "infinity_tantivy",
+  "app": "infinity",
+  "host": "127.0.0.1:23817",
+  "data_path": "datasets/tantivy/wiki-articles.json",
+  "data_link": "http://192.168.200.183:8000/wiki-articles.json.bz2",
+  "insert_batch_size": 8192,
+  "query_path": "datasets/tantivy/operations.txt",
+  "result_path": "datasets/tantivy/infinity_result.jsonl",
+  "query_link": "to_be_set",
+  "mode": "fulltext",
+  "topK": 10,
+  "use_import": false,
+  "schema": {
+    "url": {"type": "varchar", "default":""},
+    "title": {"type": "varchar", "default":""},
+    "body": {"type": "varchar", "default":""}
+  },
+  "index": {
+    "url": {
+      "type": "text"
+    },
+    "title": {
+      "type": "text"
+    },
+    "body": {
+      "type": "text"
+    }
+  }
+}

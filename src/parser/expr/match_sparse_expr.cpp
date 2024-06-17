@@ -49,6 +49,8 @@ void MatchSparseExpr::SetOptParams(size_t topn, std::vector<InitParameter *> *&o
         opt_params_[i].reset(param);
         param = nullptr;
     }
+    delete opt_params;
+    opt_params = nullptr;
 }
 
 std::string MatchSparseExpr::ToString() const {

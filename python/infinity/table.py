@@ -64,11 +64,11 @@ class Table(ABC):
         pass
 
     @abstractmethod
-    def import_data(self, file_path: str, options=None):
+    def import_data(self, file_path: str, import_options: {} = None):
         pass
 
     @abstractmethod
-    def export_data(self, file_path: str, options=None):
+    def export_data(self, file_path: str, export_options: {} = None, columns: [str] = None):
         pass
 
     @abstractmethod

@@ -39,11 +39,9 @@ protected:
     SharedPtr<IndexBase> index_base_{};
 
 public:
-    explicit IndexFileWorker(SharedPtr<String> file_dir,
-                             SharedPtr<String> file_name,
-                             SharedPtr<IndexBase> index_base,
-                             SharedPtr<ColumnDef> column_def)
-        : FileWorker(file_dir, file_name), column_def_(column_def), index_base_(index_base) {}
+    explicit
+    IndexFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, SharedPtr<IndexBase> index_base, SharedPtr<ColumnDef> column_def)
+        : FileWorker(std::move(file_dir), std::move(file_name)), column_def_(std::move(column_def)), index_base_(std::move(index_base)) {}
 
     SizeT GetMemoryCost() const override { return 0; }
 

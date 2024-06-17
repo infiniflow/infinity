@@ -39,7 +39,7 @@ import segment_entry;
 import db_meta;
 import meta_map;
 import base_entry;
-
+import column_def;
 import meta_entry_interface;
 import cleanup_scanner;
 import log_file;
@@ -122,6 +122,9 @@ public:
                             TxnTimeStamp begin_ts);
 
     DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    // Start memory index commit thread
+    void StartMemoryIndexCommit();
 
     // List databases
     Vector<DBEntry *> Databases(TransactionID txn_id, TxnTimeStamp begin_ts);
@@ -281,6 +284,7 @@ public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
+    HashMap<String, UniquePtr<ColumnDef>> special_columns_{};
 
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
 
@@ -290,7 +294,7 @@ private: // TODO: remove this
     HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
 
     Atomic<bool> running_{};
-    Thread mem_index_commit_thread_{};
+    UniquePtr<Thread> mem_index_commit_thread_{};
 
     void MemIndexCommit();
 

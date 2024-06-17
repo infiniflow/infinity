@@ -96,6 +96,8 @@ public:
 
     void ImportCSR(QueryContext *query_context, ImportOperatorState *import_op_state);
 
+    void ImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state);
+
     /// for push based execution
     void ImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state);
 

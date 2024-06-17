@@ -16,6 +16,7 @@
 
 #include "base_statement.h"
 #include "statement_common.h"
+#include "expr/parsed_expr.h"
 
 namespace infinity {
 
@@ -49,7 +50,7 @@ public:
     char delimiter_{','};
 
     // EXPORT columns
-    std::vector<std::string> *columns_{nullptr};
+    std::vector<ParsedExpr *> *expr_array_{nullptr};
 };
 
 } // namespace infinity

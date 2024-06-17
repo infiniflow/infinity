@@ -40,6 +40,7 @@ import infinity_exception;
 import index_defines;
 import local_file_system;
 import secondary_index_file_worker;
+import emvb_index_file_worker;
 import column_def;
 
 namespace infinity {
@@ -143,6 +144,27 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewSecondaryIndexChunkIndexEntry(Chu
     return chunk_index_entry;
 }
 
+SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewEMVBIndexChunkIndexEntry(ChunkID chunk_id,
+                                                                        SegmentIndexEntry *segment_index_entry,
+                                                                        const String &base_name,
+                                                                        RowID base_rowid,
+                                                                        u32 row_count,
+                                                                        BufferManager *buffer_mgr) {
+    auto chunk_index_entry = MakeShared<ChunkIndexEntry>(chunk_id, segment_index_entry, base_name, base_rowid, row_count);
+    const auto &index_dir = segment_index_entry->index_dir();
+    assert(index_dir.get() != nullptr);
+    if (buffer_mgr != nullptr) {
+        SegmentID segment_id = segment_index_entry->segment_id();
+        auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
+        const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
+        const auto &column_def = segment_index_entry->table_index_entry()->column_def();
+        const auto segment_start_offset = base_rowid.segment_offset_;
+        auto file_worker = MakeUnique<EMVBIndexFileWorker>(index_dir, emvb_index_file_name, index_base, column_def, segment_start_offset);
+        chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+    }
+    return chunk_index_entry;
+}
+
 SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chunk_id,
                                                                      SegmentIndexEntry *segment_index_entry,
                                                                      CreateIndexParam *param,
@@ -167,6 +189,15 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
         auto file_worker = MakeUnique<SecondaryIndexFileWorker>(index_dir, secondary_index_file_name, index_base, column_def, row_count);
         chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
         chunk_index_entry->LoadPartsReader(buffer_mgr);
+    } else if (param->index_base_->index_type_ == IndexType::kEMVB) {
+        const auto &index_dir = segment_index_entry->index_dir();
+        SegmentID segment_id = segment_index_entry->segment_id();
+        auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
+        const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
+        const auto &column_def = segment_index_entry->table_index_entry()->column_def();
+        const auto segment_start_offset = base_rowid.segment_offset_;
+        auto file_worker = MakeUnique<EMVBIndexFileWorker>(index_dir, emvb_index_file_name, index_base, column_def, segment_start_offset);
+        chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
     } else {
         const auto &index_dir = segment_index_entry->index_dir();
         const auto &index_base = param->index_base_;

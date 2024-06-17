@@ -44,7 +44,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         elif conflict_type == ConflictType.Replace:
             create_database_conflict = ttypes.CreateConflict.Replace
         else:
-            raise InfinityException(3066, "Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
         res = self._client.create_database(db_name=db_name, conflict_type=create_database_conflict)
         if res.error_code == ErrorCode.OK:
@@ -75,7 +75,7 @@ class RemoteThriftInfinityConnection(InfinityConnection, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_database_conflict = ttypes.DropConflict.Ignore
         else:
-            raise InfinityException(3066, "Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
         res = self._client.drop_database(db_name=db_name, conflict_type = drop_database_conflict)
         if res.error_code == ErrorCode.OK:

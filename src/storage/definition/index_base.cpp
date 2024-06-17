@@ -25,6 +25,7 @@ import index_ivfflat;
 import index_hnsw;
 import index_full_text;
 import index_secondary;
+import index_emvb;
 import third_party;
 import status;
 
@@ -139,6 +140,12 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             res = MakeShared<IndexSecondary>(index_name, file_name, std::move(column_names));
             break;
         }
+        case IndexType::kEMVB: {
+            u32 residual_pq_subspace_num = ReadBufAdv<u32>(ptr);
+            u32 residual_pq_subspace_bits = ReadBufAdv<u32>(ptr);
+            res = MakeShared<IndexEMVB>(index_name, file_name, std::move(column_names), residual_pq_subspace_num, residual_pq_subspace_bits);
+            break;
+        }
         case IndexType::kInvalid: {
             String error_message = "Error index method while reading";
             LOG_CRITICAL(error_message);
@@ -214,6 +221,12 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
         case IndexType::kSecondary: {
             auto ptr = MakeShared<IndexSecondary>(index_name, file_name, std::move(column_names));
             res = std::static_pointer_cast<IndexBase>(ptr);
+            break;
+        }
+        case IndexType::kEMVB: {
+            u32 residual_pq_subspace_num = index_def_json["pq_subspace_num"];
+            u32 residual_pq_subspace_bits = index_def_json["pq_subspace_bits"];
+            res = MakeShared<IndexEMVB>(index_name, file_name, std::move(column_names), residual_pq_subspace_num, residual_pq_subspace_bits);
             break;
         }
         case IndexType::kInvalid: {
