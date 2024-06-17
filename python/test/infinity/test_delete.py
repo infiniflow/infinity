@@ -6,25 +6,23 @@ from src.utils import trace_expected_exceptions
 import numpy as np
 import pandas as pd
 
-@pytest.mark.usefixtures("local_infinity")
+@pytest.fixture(scope="class")
+def local_infinity(request):
+    return request.config.getoption("--local-infinity")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity):
+    if local_infinity:
+        uri = common_values.TEST_LOCAL_PATH
+    else:
+        uri = common_values.TEST_REMOTE_HOST
+    request.cls.uri = uri
+    request.cls.test_infinity_obj = TestDelete(uri)
+    yield
+    request.cls.test_infinity_obj.disconnect()
+
+@pytest.mark.usefixtures("setup_class")
 class TestInfinity:
-    @pytest.fixture(autouse=True)
-    def setup(self, request, local_infinity):
-        if 'skip_setup' in request.keywords:
-            yield
-        else:
-            if local_infinity:
-                self.uri = common_values.TEST_LOCAL_PATH
-            else:
-                self.uri = common_values.TEST_REMOTE_HOST
-            self.test_infinity_obj = TestDelete(self.uri)
-            yield
-            self.teardown()
-
-    def teardown(self):
-        if hasattr(self, 'test_infinity_obj'):
-            self.test_infinity_obj.disconnect()
-
     @pytest.fixture
     def skip_setup_marker(self, request):
         request.node.skip_setup = True
@@ -33,49 +31,39 @@ class TestInfinity:
         self.test_infinity_obj._test_version()
         self.test_infinity_obj._test_delete()
 
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_empty_table(self, get_infinity_db, skip_setup_marker):
-        self.test_infinity_obj._test_delete_empty_table(get_infinity_db)
+    def test_delete_empty_table(self):
+        self.test_infinity_obj._test_delete_empty_table()
 
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_non_existent_table(self, get_infinity_db, skip_setup_marker):
-        self.test_infinity_obj._test_delete_non_existent_table(get_infinity_db)
+    def test_delete_non_existent_table(self):
+        self.test_infinity_obj._test_delete_non_existent_table()
 
     @trace_expected_exceptions
     @pytest.mark.parametrize('column_types', common_values.types_array)
     @pytest.mark.parametrize('column_types_example', common_values.types_example_array)
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_table_all_row_met_the_condition(self, get_infinity_db, skip_setup_marker, column_types, column_types_example):
-        self.test_infinity_obj._test_delete_table_all_row_met_the_condition(get_infinity_db, column_types, column_types_example)
+    def test_delete_table_all_row_met_the_condition(self, column_types, column_types_example):
+        self.test_infinity_obj._test_delete_table_all_row_met_the_condition(column_types, column_types_example)
 
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_table_no_rows_met_condition(self, get_infinity_db, skip_setup_marker):
-        self.test_infinity_obj._test_delete_table_no_rows_met_condition(get_infinity_db)
+    def test_delete_table_no_rows_met_condition(self):
+        self.test_infinity_obj._test_delete_table_no_rows_met_condition()
 
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_table_with_one_block(self, get_infinity_db, skip_setup_marker):
-        self.test_infinity_obj._test_delete_table_with_one_block(get_infinity_db)
+    def test_delete_table_with_one_block(self):
+        self.test_infinity_obj._test_delete_table_with_one_block()
 
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_table_with_one_segment(self, get_infinity_db, skip_setup_marker):
-        self.test_infinity_obj._test_delete_table_with_one_segment(get_infinity_db)
+    def test_delete_table_with_one_segment(self):
+        self.test_infinity_obj._test_delete_table_with_one_segment()
 
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_table_with_one_block_and_one_segment(self, get_infinity_db, skip_setup_marker):
-        self.test_infinity_obj._test_select_before_after_delete(get_infinity_db)
+    def test_delete_table_with_one_block_and_one_segment(self):
+        self.test_infinity_obj._test_select_before_after_delete()
 
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_table_with_one_block_and_one_segment(self, get_infinity_db, skip_setup_marker):
-        self.test_infinity_obj._test_delete_insert_data(get_infinity_db)
+    def test_delete_table_with_one_block_and_one_segment(self):
+        self.test_infinity_obj._test_delete_insert_data()
 
     @pytest.mark.slow
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_inserted_long_before_data(self, get_infinity_db, skip_setup_marker):
-        self.test_infinity_obj._test_delete_inserted_long_before_data(get_infinity_db)
+    def test_delete_inserted_long_before_data(self):
+        self.test_infinity_obj._test_delete_inserted_long_before_data()
 
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_dropped_table(self, get_infinity_db, skip_setup_marker):
-        self.test_infinity_obj._test_delete_dropped_table(get_infinity_db)
+    def test_delete_dropped_table(self):
+        self.test_infinity_obj._test_delete_dropped_table()
 
     @trace_expected_exceptions
     @pytest.mark.parametrize('column_types', ["int", "int8", "int16", "int32", "int64", "integer",
@@ -89,17 +77,14 @@ class TestInfinity:
                                                       "^789$ test insert varchar",
                                                       True,
                                                       np.array([1.1, 2.2, 3.3]), [1, 2, 3]])
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_various_expression_in_where_clause(self, get_infinity_db, skip_setup_marker, column_types, column_types_example):
-        self.test_infinity_obj._test_various_expression_in_where_clause(get_infinity_db, column_types, column_types_example)
+    def test_various_expression_in_where_clause(self, column_types, column_types_example):
+        self.test_infinity_obj._test_various_expression_in_where_clause(column_types, column_types_example)
 
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_one_block_without_expression(self, get_infinity_db, skip_setup_marker):
-        self.test_infinity_obj._test_delete_one_block_without_expression(get_infinity_db)
+    def test_delete_one_block_without_expression(self):
+        self.test_infinity_obj._test_delete_one_block_without_expression()
 
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_delete_one_segment_without_expression(self, get_infinity_db, skip_setup_marker):
-        self.test_infinity_obj._test_delete_one_segment_without_expression(get_infinity_db)
+    def test_delete_one_segment_without_expression(self):
+        self.test_infinity_obj._test_delete_one_segment_without_expression()
 
     @pytest.mark.parametrize("filter_list", [
         "c1 > 10",
@@ -110,9 +95,8 @@ class TestInfinity:
         "c1 < 0.1 and c1 > 1.0",
         "c1 = 0",
     ])
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_filter_with_valid_expression(self, get_infinity_db, skip_setup_marker, filter_list):
-        self.test_infinity_obj._test_filter_with_valid_expression(get_infinity_db, filter_list)
+    def test_filter_with_valid_expression(self, filter_list):
+        self.test_infinity_obj._test_filter_with_valid_expression(filter_list)
     @pytest.mark.parametrize("filter_list", [
         pytest.param("c1"),
         pytest.param("_row_id"),
@@ -122,6 +106,5 @@ class TestInfinity:
         pytest.param("c1 * 0.1 and c2 / 1.0"),
         pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
     ])
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_filter_with_invalid_expression(self, get_infinity_db, skip_setup_marker, filter_list):
-        self.test_infinity_obj._test_filter_with_invalid_expression(get_infinity_db, filter_list)
+    def test_filter_with_invalid_expression(self, filter_list):
+        self.test_infinity_obj._test_filter_with_invalid_expression(filter_list)

@@ -429,9 +429,9 @@ class TestUpdate(TestSdk):
         assert res.error_code == ErrorCode.OK
 
 
-    def _test_valid_filter_expression(self, get_infinity_db, filter_list, types_example):
+    def _test_valid_filter_expression(self, filter_list, types_example):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_filter_expression", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_filter_expression", {"c1": {"type": "int"}, "c2": {"type": "float"}},
                                         ConflictType.Error)
@@ -451,9 +451,9 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_filter_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_invalid_filter_expression(self, get_infinity_db, filter_list, types_example):
+    def _test_invalid_filter_expression(self, filter_list, types_example):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_invalid_filter_expression", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_invalid_filter_expression",
                                         {"c1": {"type": "int"}, "c2": {"type": "float"}},

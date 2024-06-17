@@ -5,19 +5,23 @@ from infinity.common import ConflictType
 
 from src.test_database import TestDatabase
 
-@pytest.mark.usefixtures("local_infinity")
+@pytest.fixture(scope="class")
+def local_infinity(request):
+    return request.config.getoption("--local-infinity")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity):
+    if local_infinity:
+        uri = common_values.TEST_LOCAL_PATH
+    else:
+        uri = common_values.TEST_REMOTE_HOST
+    request.cls.uri = uri
+    request.cls.test_infinity_obj = TestDatabase(uri)
+    yield
+    request.cls.test_infinity_obj.disconnect()
+
+@pytest.mark.usefixtures("setup_class")
 class TestInfinity:
-    @pytest.fixture(autouse=True)
-    def setup(self, local_infinity):
-        if local_infinity:
-            self.uri = common_values.TEST_LOCAL_PATH
-        else:
-            self.uri = common_values.TEST_REMOTE_HOST
-        self.test_infinity_obj = TestDatabase(self.uri)
-
-    def teardown(self):
-        self.test_infinity_obj.disconnect()
-
     def test_database(self):
         self.test_infinity_obj._test_version()
         self.test_infinity_obj._test_database()
@@ -72,9 +76,9 @@ class TestInfinity:
         self.test_infinity_obj._test_drop_option(conflict_type)
 
     @pytest.mark.parametrize("table_name", ["test_show_table"])
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_show_valid_table(self, get_infinity_db, table_name):
-        self.test_infinity_obj._test_show_valid_table(get_infinity_db, table_name)
+    # @pytest.mark.parametrize("", [""], indirect=True)
+    def test_show_valid_table(self, table_name):
+        self.test_infinity_obj._test_show_valid_table(table_name)
 
     @pytest.mark.parametrize("table_name", [pytest.param("Invalid name"),
                                             pytest.param(1),
@@ -84,19 +88,19 @@ class TestInfinity:
                                             pytest.param(()),
                                             pytest.param({}),
                                             ])
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_show_invalid_table(self, get_infinity_db, table_name):
-        self.test_infinity_obj._test_show_invalid_table(get_infinity_db, table_name)
+    # @pytest.mark.parametrize("", [""], indirect=True)
+    def test_show_invalid_table(self, table_name):
+        self.test_infinity_obj._test_show_invalid_table(table_name)
 
     @pytest.mark.parametrize("table_name", [pytest.param("not_exist_name")])
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_show_not_exist_table(self, get_infinity_db, table_name):
-        self.test_infinity_obj._test_show_not_exist_table(get_infinity_db, table_name)
+    # @pytest.mark.parametrize("", [""], indirect=True)
+    def test_show_not_exist_table(self, table_name):
+        self.test_infinity_obj._test_show_not_exist_table(table_name)
 
     @pytest.mark.parametrize("column_name", ["test_show_table_columns"])
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_show_table_columns_with_valid_name(self, get_infinity_db, column_name):
-        self.test_infinity_obj._test_show_table_columns_with_valid_name(get_infinity_db, column_name)
+    # @pytest.mark.parametrize("", [""], indirect=True)
+    def test_show_table_columns_with_valid_name(self, column_name):
+        self.test_infinity_obj._test_show_table_columns_with_valid_name(column_name)
 
     @pytest.mark.parametrize("column_name", [pytest.param("Invalid name"),
                                              pytest.param("not_exist_name"),
@@ -107,9 +111,9 @@ class TestInfinity:
                                              pytest.param(()),
                                              pytest.param({}),
                                              ])
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_show_table_columns_with_invalid_name(self, get_infinity_db, column_name):
-        self.test_infinity_obj._test_show_table_columns_with_invalid_name(get_infinity_db, column_name)
+    # @pytest.mark.parametrize("", [""], indirect=True)
+    def test_show_table_columns_with_invalid_name(self, column_name):
+        self.test_infinity_obj._test_show_table_columns_with_invalid_name(column_name)
 
     @pytest.mark.slow
     def test_create_drop_show_1M_databases(self):

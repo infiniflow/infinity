@@ -114,8 +114,8 @@ class TestKnn(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # knn various column name
-    def _test_knn_on_vector_column(self, get_infinity_db, check_data, column_name):
-        db_obj = get_infinity_db
+    def _test_knn_on_vector_column(self, check_data, column_name):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_knn_on_vector_column",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_knn_on_vector_column", {
@@ -142,8 +142,8 @@ class TestKnn(TestSdk):
             "test_knn_on_vector_column", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_knn_on_non_vector_column(self, get_infinity_db, check_data, column_name):
-        db_obj = get_infinity_db
+    def _test_knn_on_non_vector_column(self, check_data, column_name):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_knn_on_non_vector_column",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_knn_on_non_vector_column", {
@@ -172,8 +172,8 @@ class TestKnn(TestSdk):
             "test_knn_on_non_vector_column", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_valid_embedding_data(self, get_infinity_db, check_data, embedding_data):
-        db_obj = get_infinity_db
+    def _test_valid_embedding_data(self, check_data, embedding_data):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_valid_embedding_data",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_valid_embedding_data", {
@@ -200,8 +200,8 @@ class TestKnn(TestSdk):
             "test_valid_embedding_data", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_invalid_embedding_data(self, get_infinity_db, check_data, embedding_data):
-        db_obj = get_infinity_db
+    def _test_invalid_embedding_data(self, check_data, embedding_data):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_invalid_embedding_data",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_invalid_embedding_data", {
@@ -229,8 +229,8 @@ class TestKnn(TestSdk):
             "test_invalid_embedding_data", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_valid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
-        db_obj = get_infinity_db
+    def _test_valid_embedding_data_type(self, check_data, embedding_data, embedding_data_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_valid_embedding_data_type",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_valid_embedding_data_type", {
@@ -263,8 +263,8 @@ class TestKnn(TestSdk):
             "test_valid_embedding_data_type", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_invalid_embedding_data_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type):
-        db_obj = get_infinity_db
+    def _test_invalid_embedding_data_type(self, check_data, embedding_data, embedding_data_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_invalid_embedding_data_type",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_invalid_embedding_data_type", {
@@ -297,9 +297,9 @@ class TestKnn(TestSdk):
             "test_invalid_embedding_data_type", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_various_distance_type(self, get_infinity_db, check_data, embedding_data, embedding_data_type,
+    def _test_various_distance_type(self, check_data, embedding_data, embedding_data_type,
                                    distance_type):
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_various_distance_type",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_distance_type", {
@@ -336,8 +336,8 @@ class TestKnn(TestSdk):
             "test_various_distance_type", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_various_topn(self, get_infinity_db, check_data, topn):
-        db_obj = get_infinity_db
+    def _test_various_topn(self, check_data, topn):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_various_topn",
                           conflict_type=ConflictType.Ignore)
         table_obj = db_obj.create_table("test_various_topn", {
@@ -371,9 +371,9 @@ class TestKnn(TestSdk):
         res = db_obj.drop_table("test_various_topn", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_with_index_before(self, get_infinity_db, check_data, index_column_name, knn_column_name,
+    def _test_with_index_before(self, check_data, index_column_name, knn_column_name,
                                index_distance_type, knn_distance_type):
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_with_index", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_index", {
             "variant_id": {"type": "varchar"},
@@ -417,10 +417,10 @@ class TestKnn(TestSdk):
         res = db_obj.drop_table("test_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_with_index_after(self, get_infinity_db, check_data,
+    def _test_with_index_after(self, check_data,
                               index_column_name, knn_column_name,
                               index_distance_type, knn_distance_type):
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_with_index_after", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_index_after", {
             "variant_id": {"type": "varchar"},
@@ -463,8 +463,8 @@ class TestKnn(TestSdk):
         res = db_obj.drop_table("test_with_index_after", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_with_fulltext_match_with_valid_columns(self, get_infinity_db, check_data, match_param_1):
-        db_obj = get_infinity_db
+    def _test_with_fulltext_match_with_valid_columns(self, check_data, match_param_1):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_with_fulltext_match_with_valid_columns", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_valid_columns",
@@ -501,8 +501,8 @@ class TestKnn(TestSdk):
             "test_with_fulltext_match_with_valid_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_with_fulltext_match_with_invalid_columns(self, get_infinity_db, check_data, match_param_1):
-        db_obj = get_infinity_db
+    def _test_with_fulltext_match_with_invalid_columns(self, check_data, match_param_1):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_columns", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_invalid_columns",
@@ -540,8 +540,8 @@ class TestKnn(TestSdk):
             "test_with_fulltext_match_with_invalid_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_with_fulltext_match_with_valid_words(self, get_infinity_db, check_data, match_param_2):
-        db_obj = get_infinity_db
+    def _test_with_fulltext_match_with_valid_words(self, check_data, match_param_2):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_with_fulltext_match_with_valid_words", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_valid_words",
@@ -578,8 +578,8 @@ class TestKnn(TestSdk):
             "test_with_fulltext_match_with_valid_words", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_with_fulltext_match_with_invalid_words(self, get_infinity_db, check_data, match_param_2):
-        db_obj = get_infinity_db
+    def _test_with_fulltext_match_with_invalid_words(self, check_data, match_param_2):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_words", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_invalid_words",
@@ -618,8 +618,8 @@ class TestKnn(TestSdk):
             "test_with_fulltext_match_with_invalid_words", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_with_fulltext_match_with_options(self, get_infinity_db, check_data, match_param_3):
-        db_obj = get_infinity_db
+    def _test_with_fulltext_match_with_options(self, check_data, match_param_3):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_with_fulltext_match_with_options", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_options",
@@ -656,8 +656,8 @@ class TestKnn(TestSdk):
             "test_with_fulltext_match_with_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_with_fulltext_match_with_invalid_options(self, get_infinity_db, check_data, match_param_3):
-        db_obj = get_infinity_db
+    def _test_with_fulltext_match_with_invalid_options(self, check_data, match_param_3):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_with_fulltext_match_with_invalid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_fulltext_match_with_invalid_options",
@@ -696,8 +696,8 @@ class TestKnn(TestSdk):
             "test_with_fulltext_match_with_invalid_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_tensor_scan(self, get_infinity_db, check_data):
-        db_obj = get_infinity_db
+    def _test_tensor_scan(self, check_data):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_tensor_scan", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_tensor_scan",
                                         {"title": {"type": "varchar"},
@@ -717,8 +717,8 @@ class TestKnn(TestSdk):
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_with_multiple_fusion(self, get_infinity_db, check_data):
-        db_obj = get_infinity_db
+    def _test_with_multiple_fusion(self, check_data):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_with_multiple_fusion", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_with_multiple_fusion",
                                         {"title": {"type": "varchar"},

@@ -27,8 +27,8 @@ TEST_DATA_DIR = "/test/data/"
 
 
 class TestIndex(TestSdk):
-    def _test_create_index_IVFFlat(self, get_infinity_db):
-        db_obj = get_infinity_db
+    def _test_create_index_IVFFlat(self):
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_index_ivfflat", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table("test_index_ivfflat", {
@@ -47,9 +47,9 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_index_ivfflat", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_index_HNSW(self, get_infinity_db):
+    def _test_create_index_HNSW(self):
         # CREATE INDEX idx1 ON test_hnsw (col1) USING Hnsw WITH (M = 16, ef_construction = 50, ef = 50, metric = l2);
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_index_hnsw", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table(
@@ -77,9 +77,9 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_index_hnsw", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_index_fulltext(self, get_infinity_db):
+    def _test_create_index_fulltext(self):
         # CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT;
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_index_fulltext", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table(
@@ -103,9 +103,9 @@ class TestIndex(TestSdk):
 
         # drop non-existent index
 
-    def _test_drop_non_existent_index(self, get_infinity_db):
+    def _test_drop_non_existent_index(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_drop_non_existent_index", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -126,9 +126,9 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # create created index
-    def _test_create_created_index(self, get_infinity_db):
+    def _test_create_created_index(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_create_created_index", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -160,9 +160,9 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # create / drop index with invalid options
-    def _test_create_drop_vector_index_invalid_options(self, get_infinity_db, column_name, index_type, params, types):
+    def _test_create_drop_vector_index_invalid_options(self, column_name, index_type, params, types):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_create_drop_vector_index_invalid_options", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -182,10 +182,10 @@ class TestIndex(TestSdk):
             "test_create_drop_vector_index_invalid_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_drop_different_fulltext_index_invalid_options(self, get_infinity_db, column_name, index_type,
+    def _test_create_drop_different_fulltext_index_invalid_options(self, column_name, index_type,
                                                                   params, types):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_create_drop_different_fulltext_index_invalid_options", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -207,9 +207,9 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # create index on dropped table instance
-    def _test_create_index_on_dropped_table(self, get_infinity_db):
+    def _test_create_index_on_dropped_table(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_create_drop_index_invalid_options", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -231,9 +231,9 @@ class TestIndex(TestSdk):
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
     # create index then show index
-    def _test_create_index_show_index(self, get_infinity_db):
+    def _test_create_index_show_index(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_create_index_show_index", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -254,9 +254,9 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # drop index then show index
-    def _test_drop_index_show_index(self, get_infinity_db):
+    def _test_drop_index_show_index(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_create_index_show_index", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -285,9 +285,9 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # create index on different type of column and show index
-    def _test_create_index_on_different_type_of_column(self, get_infinity_db, types, index_type):
+    def _test_create_index_on_different_type_of_column(self, types, index_type):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_create_index_on_different_type_of_column", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
@@ -316,9 +316,9 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # insert data, then create index
-    def _test_insert_data_create_index(self, get_infinity_db, index_type):
+    def _test_insert_data_create_index(self, index_type):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_insert_data_create_index", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_insert_data_create_index", {
             "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
@@ -336,9 +336,9 @@ class TestIndex(TestSdk):
             "test_insert_data_create_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_import_data_create_index(self, get_infinity_db, index_type, file_format):
+    def _test_import_data_create_index(self, index_type, file_format):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_import_data_create_index", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -371,9 +371,9 @@ class TestIndex(TestSdk):
             "test_import_data_create_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_vector_index_import_data(self, get_infinity_db, index_type, file_format):
+    def _test_create_vector_index_import_data(self, index_type, file_format):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_create_vector_index_import_data", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -394,9 +394,9 @@ class TestIndex(TestSdk):
             "test_create_vector_index_import_data", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_index_import_data(self, get_infinity_db, index_type, file_format):
+    def _test_create_index_import_data(self, index_type, file_format):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_create_index_import_data", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -422,7 +422,7 @@ class TestIndex(TestSdk):
             "test_create_index_import_data", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_data_fulltext_index_search(self, get_infinity_db, file_format):
+    def _test_insert_data_fulltext_index_search(self, file_format):
         # prepare data for insert
         column_names = ["doctitle", "docdate", "body"]
         df = pandas.read_csv(os.getcwd() + TEST_DATA_DIR + file_format + "/enwiki_99." + file_format,
@@ -432,7 +432,7 @@ class TestIndex(TestSdk):
         data = {key: list(value.values())
                 for key, value in df.to_dict().items()}
 
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
             "test_insert_data_fulltext_index_search", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
@@ -463,8 +463,8 @@ class TestIndex(TestSdk):
             "test_insert_data_fulltext_index_search", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_fulltext_match_with_invalid_analyzer(self, get_infinity_db, check_data):
-        db_obj = get_infinity_db
+    def _test_fulltext_match_with_invalid_analyzer(self, check_data):
+        db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_fulltext_match_with_invalid_analyzer", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
@@ -486,8 +486,8 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # create index on all data are deleted table.
-    def _test_create_index_on_deleted_table(self, get_infinity_db):
-        db_obj = get_infinity_db
+    def _test_create_index_on_deleted_table(self):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_create_index_on_deleted_table", ConflictType.Ignore)
 
@@ -520,8 +520,8 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # create index on all data are updated.
-    def _test_create_index_on_update_table(self, get_infinity_db):
-        db_obj = get_infinity_db
+    def _test_create_index_on_update_table(self):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_create_index_on_update_table",
                           ConflictType.Ignore)
         table_obj = db_obj.create_table("test_create_index_on_update_table", {
@@ -547,8 +547,8 @@ class TestIndex(TestSdk):
             "test_create_index_on_update_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_index_with_valid_options(self, get_infinity_db, conflict_type):
-        db_obj = get_infinity_db
+    def _test_create_index_with_valid_options(self, conflict_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_create_index_with_valid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
@@ -578,8 +578,8 @@ class TestIndex(TestSdk):
             "test_create_index_with_valid_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_index_with_invalid_options(self, get_infinity_db, conflict_type):
-        db_obj = get_infinity_db
+    def _test_create_index_with_invalid_options(self, conflict_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_create_index_with_invalid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
@@ -609,8 +609,8 @@ class TestIndex(TestSdk):
             "test_create_index_with_invalid_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_duplicated_index_with_valid_options(self, get_infinity_db, conflict_type):
-        db_obj = get_infinity_db
+    def _test_create_duplicated_index_with_valid_options(self, conflict_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_create_duplicated_index_with_valid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
@@ -641,8 +641,8 @@ class TestIndex(TestSdk):
             "test_create_duplicated_index_with_valid_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_duplicated_index_with_valid_error_options(self, get_infinity_db, conflict_type):
-        db_obj = get_infinity_db
+    def _test_create_duplicated_index_with_valid_error_options(self, conflict_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_create_duplicated_index_with_valid_error_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
@@ -691,8 +691,8 @@ class TestIndex(TestSdk):
             "test_create_duplicated_index_with_valid_error_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_duplicated_index_with_invalid_options(self, get_infinity_db, conflict_type):
-        db_obj = get_infinity_db
+    def _test_create_duplicated_index_with_invalid_options(self, conflict_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_create_duplicated_index_with_invalid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
@@ -742,8 +742,8 @@ class TestIndex(TestSdk):
             "test_create_duplicated_index_with_invalid_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_show_index(self, get_infinity_db):
-        db_obj = get_infinity_db
+    def _test_show_index(self):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_show_index",
@@ -775,8 +775,8 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_show_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_show_valid_name_index(self, get_infinity_db, index_name):
-        db_obj = get_infinity_db
+    def _test_show_valid_name_index(self, index_name):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_various_name_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_show_various_name_index",
@@ -806,8 +806,8 @@ class TestIndex(TestSdk):
             "test_show_various_name_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_show_invalid_name_index(self, get_infinity_db, index_name):
-        db_obj = get_infinity_db
+    def _test_show_invalid_name_index(self, index_name):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_invalid_name_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_show_invalid_name_index",
@@ -836,8 +836,8 @@ class TestIndex(TestSdk):
             "test_show_invalid_name_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_list_index(self, get_infinity_db):
-        db_obj = get_infinity_db
+    def _test_list_index(self):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_list_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(
             "test_list_index",
@@ -870,8 +870,8 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_list_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_drop_index_with_valid_options(self, get_infinity_db, conflict_type):
-        db_obj = get_infinity_db
+    def _test_drop_index_with_valid_options(self, conflict_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_drop_index_with_valid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
@@ -902,8 +902,8 @@ class TestIndex(TestSdk):
             "test_drop_index_with_valid_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_drop_index_with_invalid_options(self, get_infinity_db, conflict_type):
-        db_obj = get_infinity_db
+    def _test_drop_index_with_invalid_options(self, conflict_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_drop_index_with_invalid_options", ConflictType.Ignore)
         table_obj = db_obj.create_table(
@@ -938,8 +938,8 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # create index on same column with different parameters
-    def _test_supported_vector_index(self, get_infinity_db, index_distance_type):
-        db_obj = get_infinity_db
+    def _test_supported_vector_index(self, index_distance_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_supported_vector_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(
@@ -971,8 +971,8 @@ class TestIndex(TestSdk):
             "test_supported_vector_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_unsupported_vector_index(self, get_infinity_db, index_distance_type):
-        db_obj = get_infinity_db
+    def _test_unsupported_vector_index(self, index_distance_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
             "test_unsupported_vector_index", ConflictType.Ignore)
         table_obj = db_obj.create_table(

@@ -18,30 +18,7 @@ from typing import Any, Tuple, Dict, List
 import polars as pl
 from numpy import dtype
 
-# import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from embedded_infinity import *
-
-# def column_type_to_dtype(ttype: ttypes.ColumnType):
-#     match ttype:
-#         case ttypes.ColumnType.ColumnBool:
-#             return dtype('bool')
-#         case ttypes.ColumnType.ColumnInt8:
-#             return dtype('int8')
-#         case ttypes.ColumnType.ColumnInt16:
-#             return dtype('int16')
-#         case ttypes.ColumnType.ColumnInt32:
-#             return dtype('int32')
-#         case ttypes.ColumnType.ColumnInt64:
-#             return dtype('int64')
-#         case ttypes.ColumnType.ColumnFloat32:
-#             return dtype('float32')
-#         case ttypes.ColumnType.ColumnFloat64:
-#             return dtype('float64')
-#         case ttypes.ColumnType.ColumnVarchar:
-#             return dtype('str')
-#         case _:
-#             raise NotImplementedError(f"Unsupported type {ttype}")
-
 
 def logic_type_to_dtype(ttype: WrapDataType):
     match ttype.logical_type:
@@ -81,44 +58,6 @@ def logic_type_to_dtype(ttype: WrapDataType):
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
 
-#
-# def logic_type_to_pl_type(ttype: WrapDataType):
-#     match ttype.logic_type:
-#         case LogicalType.kBoolean:
-#             return pl.Boolean
-#         case LogicalType.kTinyInt:
-#             return pl.Int8
-#         case LogicalType.kSmallInt:
-#             return pl.Int16
-#         case LogicalType.kInteger:
-#             return pl.Int32
-#         case LogicalType.kBigInt:
-#             return pl.Int64
-#         case LogicalType.kFloat:
-#             return pl.Float32
-#         case LogicalType.kDouble:
-#             return pl.Float64
-#         case LogicalType.kVarchar:
-#             return pl.Utf8
-#         case LogicalType.kEmbedding:
-#             if ttype.physical_type.embedding_type is not None:
-#                 match ttype.physical_type.embedding_type.element_type:
-#                     case EmbeddingDataType.kElemInt8:
-#                         return pl.List
-#                     case EmbeddingDataType.kElemInt16:
-#                         return pl.List
-#                     case EmbeddingDataType.kElemInt32:
-#                         return pl.List
-#                     case EmbeddingDataType.kElemFloat:
-#                         return pl.List
-#                     case EmbeddingDataType.kElemDouble:
-#                         return pl.List
-#                     case EmbeddingDataType.kElemBit:
-#                         return pl.List
-#                     case _:
-#                         raise NotImplementedError(f"Unsupported type {ttype}")
-#
-#
 def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
         list[Any, ...]:
     column_vector = b''.join(column_vectors)
@@ -191,14 +130,6 @@ def parse_bytes(bytes_data):
         offset += length
     return results
 
-#
-# def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> ttypes.DataType:
-#     for column_def in column_defs:
-#         if column_def.name == column_name:
-#             return column_def.data_type
-#     raise KeyError(f"column name {column_name} not found in column defs")
-#
-#
 def build_result(res: WrapQueryResult) -> tuple[dict[str | Any, list[Any, Any]], dict[str | Any, Any]]:
     data_dict = {}
     data_type_dict = {}

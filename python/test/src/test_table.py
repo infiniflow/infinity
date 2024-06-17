@@ -435,13 +435,13 @@ class TestTable(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # create/drop table with different invalid options
-    def _test_table_with_different_invalid_options(self, get_infinity_db, invalid_option_array):
+    def _test_table_with_different_invalid_options(self, invalid_option_array):
         """
         target: create/drop table with different invalid options.
         methods: create table with various options
         expect: all operations successfully
         """
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_table_with_different_invalid_options", ConflictType.Ignore)
 
         with pytest.raises(InfinityException) as e:
@@ -767,15 +767,15 @@ class TestTable(TestSdk):
         res = db_obj.drop_table("test_column_numbers", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_table_create_valid_option(self, get_infinity_db, conflict_type):
-        db_obj = get_infinity_db
+    def _test_table_create_valid_option(self, conflict_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_table_create_valid_option", ConflictType.Ignore)
         db_obj.create_table("test_table_create_valid_option", {"c1": {"type": "int"}}, conflict_type)
         res = db_obj.drop_table("test_table_create_valid_option", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_table_create_invalid_option(self, get_infinity_db, conflict_type):
-        db_obj = get_infinity_db
+    def _test_table_create_invalid_option(self, conflict_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_various_table_create_option", ConflictType.Ignore)
         with pytest.raises(InfinityException) as e:
             db_obj.create_table("test_various_table_create_option", {"c1": {"type": "int"}}, conflict_type)
@@ -783,13 +783,13 @@ class TestTable(TestSdk):
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
 
-    def _test_table_drop_valid_option(self, get_infinity_db, conflict_type):
-        db_obj = get_infinity_db
+    def _test_table_drop_valid_option(self, conflict_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.create_table("test_table_drop_valid_option", {"c1": {"type": "int"}}, ConflictType.Ignore)
         db_obj.drop_table("test_table_drop_valid_option", conflict_type)
 
-    def _test_table_drop_invalid_option(self, get_infinity_db, conflict_type):
-        db_obj = get_infinity_db
+    def _test_table_drop_invalid_option(self, conflict_type):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.create_table("test_various_table_drop_option", {"c1": {"type": "int"}}, ConflictType.Ignore)
         with pytest.raises(InfinityException) as e:
             db_obj.drop_table("test_various_table_drop_option", conflict_type)
@@ -800,8 +800,8 @@ class TestTable(TestSdk):
         res = db_obj.drop_table("test_various_table_drop_option", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_duplicated_table_with_ignore_option(self, get_infinity_db):
-        db_obj = get_infinity_db
+    def _test_create_duplicated_table_with_ignore_option(self):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_create_duplicated_table_with_ignore_option", ConflictType.Ignore)
 
         for i in range(100):
@@ -811,8 +811,8 @@ class TestTable(TestSdk):
         res = db_obj.drop_table("test_create_duplicated_table_with_ignore_option", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_duplicated_table_with_error_option(self, get_infinity_db):
-        db_obj = get_infinity_db
+    def _test_create_duplicated_table_with_error_option(self):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_create_duplicated_table_with_error_option", ConflictType.Ignore)
 
         with pytest.raises(InfinityException) as e:
@@ -826,8 +826,8 @@ class TestTable(TestSdk):
         res = db_obj.drop_table("test_create_duplicated_table_with_error_option", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_create_duplicated_table_with_replace_option(self, get_infinity_db):
-        db_obj = get_infinity_db
+    def _test_create_duplicated_table_with_replace_option(self):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_create_duplicated_table_with_replace_option", ConflictType.Ignore)
 
         with pytest.raises(InfinityException) as e:

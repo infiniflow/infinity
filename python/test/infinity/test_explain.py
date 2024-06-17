@@ -19,6 +19,5 @@ class TestInfinity:
     def teardown(self):
         self.test_infinity_obj.disconnect()
 
-    # @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_explain(self):
         self.test_infinity_obj._test_explain_default()

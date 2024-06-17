@@ -7,19 +7,23 @@ from infinity.errors import ErrorCode
 import infinity.index as index
 import os
 
-@pytest.mark.usefixtures("local_infinity")
+@pytest.fixture(scope="class")
+def local_infinity(request):
+    return request.config.getoption("--local-infinity")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity):
+    if local_infinity:
+        uri = common_values.TEST_LOCAL_PATH
+    else:
+        uri = common_values.TEST_REMOTE_HOST
+    request.cls.uri = uri
+    request.cls.test_infinity_obj = TestUpdate(uri)
+    yield
+    request.cls.test_infinity_obj.disconnect()
+
+@pytest.mark.usefixtures("setup_class")
 class TestInfinity:
-    @pytest.fixture(autouse=True)
-    def setup(self, local_infinity):
-        if local_infinity:
-            self.uri = common_values.TEST_LOCAL_PATH
-        else:
-            self.uri = common_values.TEST_REMOTE_HOST
-        self.test_infinity_obj = TestUpdate(self.uri)
-
-    def teardown(self):
-        self.test_infinity_obj.disconnect()
-
     def test_version(self):
         self.test_infinity_obj._test_version()
     def test_update(self):
@@ -77,9 +81,8 @@ class TestInfinity:
         "c1 = 0",
     ])
     @pytest.mark.parametrize("types_example", [1, 1.333])
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_valid_filter_expression(self, get_infinity_db, filter_list, types_example):
-        self.test_infinity_obj._test_valid_filter_expression(get_infinity_db, filter_list, types_example)
+    def test_valid_filter_expression(self, filter_list, types_example):
+        self.test_infinity_obj._test_valid_filter_expression(filter_list, types_example)
     @pytest.mark.parametrize("filter_list", [
         pytest.param("c1"),
         pytest.param("_row_id"),
@@ -90,6 +93,5 @@ class TestInfinity:
         pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
     ])
     @pytest.mark.parametrize("types_example", [1, 1.333])
-    @pytest.mark.parametrize("get_infinity_db", [""], indirect=True)
-    def test_invalid_filter_expression(self, get_infinity_db, filter_list, types_example):
-        self.test_infinity_obj._test_invalid_filter_expression(get_infinity_db, filter_list, types_example)
+    def test_invalid_filter_expression(self, filter_list, types_example):
+        self.test_infinity_obj._test_invalid_filter_expression(filter_list, types_example)

@@ -480,7 +480,6 @@ class TestDatabase(TestSdk):
     ])
     def _test_drop_option(self, conflict_type):
         # create db
-
         self.infinity_obj.drop_database("test_drop_option", ConflictType.Ignore)
         self.infinity_obj.create_database("test_drop_option")
         with pytest.raises(InfinityException) as e:
@@ -493,8 +492,8 @@ class TestDatabase(TestSdk):
 
 
     @pytest.mark.parametrize("table_name", ["test_show_table"])
-    def _test_show_valid_table(self, get_infinity_db, table_name):
-        db_obj = get_infinity_db
+    def _test_show_valid_table(self, table_name):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
         db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
                             ConflictType.Error)
@@ -511,8 +510,8 @@ class TestDatabase(TestSdk):
                                             pytest.param(()),
                                             pytest.param({}),
                                             ])
-    def _test_show_invalid_table(self, get_infinity_db, table_name):
-        db_obj = get_infinity_db
+    def _test_show_invalid_table(self, table_name):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
         db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
                             ConflictType.Error)
@@ -529,8 +528,8 @@ class TestDatabase(TestSdk):
         db_obj.drop_table("test_show_table", ConflictType.Error)
 
     @pytest.mark.parametrize("table_name", [pytest.param("not_exist_name")])
-    def _test_show_not_exist_table(self, get_infinity_db, table_name):
-        db_obj = get_infinity_db
+    def _test_show_not_exist_table(self, table_name):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
         db_obj.create_table("test_show_table", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
                             ConflictType.Error)
@@ -544,8 +543,8 @@ class TestDatabase(TestSdk):
         db_obj.drop_table("test_show_table", ConflictType.Error)
 
     @pytest.mark.parametrize("column_name", ["test_show_table_columns"])
-    def _test_show_table_columns_with_valid_name(self, get_infinity_db, column_name):
-        db_obj = get_infinity_db
+    def _test_show_table_columns_with_valid_name(self, column_name):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
 
         db_obj.create_table("test_show_table_columns", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
@@ -564,8 +563,8 @@ class TestDatabase(TestSdk):
                                              pytest.param(()),
                                              pytest.param({}),
                                              ])
-    def _test_show_table_columns_with_invalid_name(self, get_infinity_db, column_name):
-        db_obj = get_infinity_db
+    def _test_show_table_columns_with_invalid_name(self, column_name):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
 
         db_obj.create_table("test_show_table_columns", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}})

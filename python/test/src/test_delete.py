@@ -90,9 +90,9 @@ class TestDelete(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # delete empty table
-    def _test_delete_empty_table(self, get_infinity_db):
+    def _test_delete_empty_table(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
 
         tb = db_obj.drop_table("test_delete_empty_table", ConflictType.Ignore)
         assert tb
@@ -110,9 +110,9 @@ class TestDelete(TestSdk):
         db_obj.drop_table("test_delete_empty_table", ConflictType.Error)
 
     # delete non-existent table
-    def _test_delete_non_existent_table(self, get_infinity_db):
+    def _test_delete_non_existent_table(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
 
         table_obj = db_obj.drop_table("test_delete_non_existent_table", ConflictType.Ignore)
         assert table_obj
@@ -127,8 +127,8 @@ class TestDelete(TestSdk):
     @trace_expected_exceptions
     @pytest.mark.parametrize('column_types', common_values.types_array)
     @pytest.mark.parametrize('column_types_example', common_values.types_example_array)
-    def _test_delete_table_all_row_met_the_condition(self, get_infinity_db, column_types, column_types_example):
-        db_obj = get_infinity_db
+    def _test_delete_table_all_row_met_the_condition(self, column_types, column_types_example):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_delete_table_all_row_met_the_condition", ConflictType.Ignore)
         db_obj.create_table("test_delete_table_all_row_met_the_condition", {"c1": {"type": column_types}},
                             ConflictType.Error)
@@ -147,9 +147,9 @@ class TestDelete(TestSdk):
         db_obj.drop_table("test_delete_table_all_row_met_the_condition", ConflictType.Error)
 
     # delete table, no row is met the condition
-    def _test_delete_table_no_rows_met_condition(self, get_infinity_db):
+    def _test_delete_table_no_rows_met_condition(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         for i in range(len(common_values.types_array)):
             db_obj.drop_table("test_delete_table_no_rows_met_condition" + str(i))
 
@@ -178,8 +178,8 @@ class TestDelete(TestSdk):
             db_obj.drop_table("test_delete_table_no_rows_met_condition" + str(i), ConflictType.Error)
 
     # delete table with only one block
-    def _test_delete_table_with_one_block(self, get_infinity_db):
-        db_obj = get_infinity_db
+    def _test_delete_table_with_one_block(self):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_delete_table_with_one_block", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_delete_table_with_one_block", {"c1": {"type": "int"}}, ConflictType.Error)
 
@@ -196,9 +196,9 @@ class TestDelete(TestSdk):
         db_obj.drop_table("test_delete_table_with_one_block", ConflictType.Error)
 
     # delete table with multiple blocks, but only one segment
-    def _test_delete_table_with_one_segment(self, get_infinity_db):
+    def _test_delete_table_with_one_segment(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_delete_table_with_one_segment", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_delete_table_with_one_segment", {"c1": {"type": "int"}},
                                         ConflictType.Error)
@@ -219,8 +219,8 @@ class TestDelete(TestSdk):
         print(delete_res)
 
     # select before delete, select after delete and check the change.
-    def _test_select_before_after_delete(self, get_infinity_db):
-        db_obj = get_infinity_db
+    def _test_select_before_after_delete(self):
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_before_after_delete", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_select_before_after_delete", {"c1": {"type": "int"}}, ConflictType.Error)
 
@@ -238,9 +238,9 @@ class TestDelete(TestSdk):
         db_obj.drop_table("test_select_before_after_delete", ConflictType.Error)
 
     # delete just inserted data and select to check
-    def _test_delete_insert_data(self, get_infinity_db):
+    def _test_delete_insert_data(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_delete_insert_data", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_delete_insert_data", {"c1": {"type": "int"}}, ConflictType.Error)
 
@@ -255,9 +255,9 @@ class TestDelete(TestSdk):
         db_obj.drop_table("test_delete_insert_data", ConflictType.Error)
 
     # delete inserted long before and select to check
-    def _test_delete_inserted_long_before_data(self, get_infinity_db):
+    def _test_delete_inserted_long_before_data(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_delete_inserted_long_before_data", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_delete_inserted_long_before_data", {"c1": {"type": "int"}},
                                         ConflictType.Error)
@@ -276,9 +276,9 @@ class TestDelete(TestSdk):
         db_obj.drop_table("test_delete_inserted_long_before_data", ConflictType.Error)
 
     # delete dropped table
-    def _test_delete_dropped_table(self, get_infinity_db):
+    def _test_delete_dropped_table(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
 
         with pytest.raises(InfinityException) as e:
             db_obj.drop_table("test_delete_dropped_table")
@@ -292,9 +292,9 @@ class TestDelete(TestSdk):
 
 
     # various expression will be given in where clause, and check result correctness
-    def _test_various_expression_in_where_clause(self, get_infinity_db, column_types, column_types_example):
+    def _test_various_expression_in_where_clause(self, column_types, column_types_example):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_various_expression_in_where_clause", ConflictType.Ignore)
         db_obj.create_table("test_various_expression_in_where_clause", {"c1": {"type": column_types}},
                             ConflictType.Error)
@@ -317,9 +317,9 @@ class TestDelete(TestSdk):
         res = db_obj.drop_table("test_various_expression_in_where_clause", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_delete_one_block_without_expression(self, get_infinity_db):
+    def _test_delete_one_block_without_expression(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_delete_one_block_without_expression", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_delete_one_block_without_expression", {"c1": {"type": "int"}},
                                         ConflictType.Error)
@@ -337,9 +337,9 @@ class TestDelete(TestSdk):
         res = db_obj.drop_table("test_delete_one_block_without_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_delete_one_segment_without_expression(self, get_infinity_db):
+    def _test_delete_one_segment_without_expression(self):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_delete_one_segment_without_expression", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_delete_one_segment_without_expression", {"c1": {"type": "int"}},
                                         ConflictType.Error)
@@ -357,9 +357,9 @@ class TestDelete(TestSdk):
         print(delete_res)
         db_obj.drop_table("test_delete_one_segment_without_expression", ConflictType.Error)
 
-    def _test_filter_with_valid_expression(self, get_infinity_db, filter_list):
+    def _test_filter_with_valid_expression(self, filter_list):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_filter_expression", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_filter_expression", {"c1": {"type": "int"}, "c2": {"type": "float"}},
                                         ConflictType.Error)
@@ -377,9 +377,9 @@ class TestDelete(TestSdk):
         print(delete_res)
         db_obj.drop_table("test_filter_expression", ConflictType.Error)
 
-    def _test_filter_with_invalid_expression(self, get_infinity_db, filter_list):
+    def _test_filter_with_invalid_expression(self, filter_list):
         # connect
-        db_obj = get_infinity_db
+        db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_filter_expression", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_filter_expression", {"c1": {"type": "int"}, "c2": {"type": "float"}},
                                         ConflictType.Error)

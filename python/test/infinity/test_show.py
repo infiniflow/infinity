@@ -2,19 +2,23 @@ import pytest
 from common import common_values
 from src.test_show import TestDescribe
 
-@pytest.mark.usefixtures("local_infinity")
+@pytest.fixture(scope="class")
+def local_infinity(request):
+    return request.config.getoption("--local-infinity")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity):
+    if local_infinity:
+        uri = common_values.TEST_LOCAL_PATH
+    else:
+        uri = common_values.TEST_REMOTE_HOST
+    request.cls.uri = uri
+    request.cls.test_infinity_obj = TestDescribe(uri)
+    yield
+    request.cls.test_infinity_obj.disconnect()
+
+@pytest.mark.usefixtures("setup_class")
 class TestInfinity:
-    @pytest.fixture(autouse=True)
-    def setup(self, local_infinity):
-        if local_infinity:
-            self.uri = common_values.TEST_LOCAL_PATH
-        else:
-            self.uri = common_values.TEST_REMOTE_HOST
-        self.test_infinity_obj = TestDescribe(self.uri)
-
-    def teardown(self):
-        self.test_infinity_obj.disconnect()
-
     def test_show(self):
         self.test_infinity_obj._test_show_table()
         self.test_infinity_obj._test_show_columns()
