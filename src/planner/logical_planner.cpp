@@ -70,11 +70,12 @@ import index_base;
 import index_ivfflat;
 import index_hnsw;
 import index_secondary;
+import index_emvb;
 import index_full_text;
 import base_table_ref;
 import table_ref;
 import logical_type;
-
+import parsed_expr;
 import extra_ddl_info;
 import create_schema_info;
 import create_table_info;
@@ -90,6 +91,10 @@ import column_def;
 import logger;
 import statement_common;
 import block_index;
+import column_expr;
+import function_expr;
+import catalog;
+import special_function;
 
 namespace {
 
@@ -707,6 +712,15 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
                 IndexSecondary::Make(index_name, fmt::format("{}_{}", create_index_info->table_name_, *index_name), {index_info->column_name_});
             break;
         }
+        case IndexType::kEMVB: {
+            assert(index_info->index_param_list_ != nullptr);
+            IndexEMVB::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr = IndexEMVB::Make(index_name,
+                                             fmt::format("{}_{}", create_index_info->table_name_, *index_name),
+                                             {index_info->column_name_},
+                                             *(index_info->index_param_list_));
+            break;
+        }
         case IndexType::kInvalid: {
             String error_message = "Invalid index type.";
             LOG_CRITICAL(error_message);
@@ -915,13 +929,110 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     }
 
     Vector<u64> column_idx_array;
-    if(statement->columns_ != nullptr) {
+    if(statement->expr_array_ != nullptr) {
         // Export columns
-        Vector<String>& column_names = *statement->columns_;
-        column_idx_array.reserve(column_names.size());
-        for(const auto& column_name: column_names) {
-            u64 column_idx = table_entry->GetColumnIdByName(column_name);
-            column_idx_array.emplace_back(column_idx);
+        Vector<ParsedExpr*>& expr_array = *statement->expr_array_;
+        column_idx_array.reserve(expr_array.size());
+
+        for(ParsedExpr* expr: expr_array) {
+            switch(expr->type_) {
+                case ParsedExprType::kColumn: {
+                    ColumnExpr* column_expr = static_cast<ColumnExpr*>(expr);
+                    if(column_expr->star_) {
+                        Status status = Status::NotSupport("Not support to export STAR expression");
+                        LOG_ERROR(status.message());
+                        RecoverableError(status);
+                    }
+                    if(column_expr->generated_) {
+                        String error_message = "Column expression shouldn't be generated here";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
+                    }
+
+                    SizeT name_count = column_expr->names_.size();
+                    switch(name_count) {
+                        case 1: {
+                            u64 column_idx = table_entry->GetColumnIdByName(column_expr->names_[0]);
+                            column_idx_array.emplace_back(column_idx);
+                            break;
+                        }
+                        case 2: {
+                            if(statement->table_name_ != column_expr->names_[0]) {
+                                Status status = Status::InvalidTableName(column_expr->names_[0]);
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
+                            u64 column_idx = table_entry->GetColumnIdByName(column_expr->names_[1]);
+                            column_idx_array.emplace_back(column_idx);
+                            break;
+                        }
+                        case 3: {
+                            if(statement->schema_name_ != column_expr->names_[0]) {
+                                Status status = Status::InvalidTableName(column_expr->names_[0]);
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
+                            if(statement->table_name_ != column_expr->names_[1]) {
+                                Status status = Status::InvalidTableName(column_expr->names_[1]);
+                                LOG_ERROR(status.message());
+                                RecoverableError(status);
+                            }
+                            u64 column_idx = table_entry->GetColumnIdByName(column_expr->names_[2]);
+                            column_idx_array.emplace_back(column_idx);
+                            break;
+                        }
+                        case 0: {
+                            Status status = Status::UnexpectedError("No column name is given");
+                            LOG_ERROR(status.message());
+                            RecoverableError(status);
+                        }
+                        default: {
+                            std::stringstream ss;
+                            for(SizeT i = 0; i < name_count - 1; ++ i) {
+                                ss << column_expr->names_[i] << ".";
+                            }
+                            ss << column_expr->names_[name_count - 1];
+
+                            Status status = Status::InvalidColumnName(ss.str());
+                            LOG_ERROR(status.message());
+                            RecoverableError(status);
+                        }
+                    }
+                    break;
+                }
+                case ParsedExprType::kFunction: {
+                    FunctionExpr* function_expr = static_cast<FunctionExpr*>(expr);
+                    auto [special_function_ptr, status] = Catalog::GetSpecialFunctionByNameNoExcept(query_context_ptr_->storage()->catalog(), function_expr->func_name_);
+                    if (status.ok()) {
+                        switch (special_function_ptr->special_type()) {
+                            case SpecialType::kRowID: {
+                                column_idx_array.emplace_back(COLUMN_IDENTIFIER_ROW_ID);
+                                break;
+                            }
+                            case SpecialType::kCreateTs: {
+                                column_idx_array.emplace_back(COLUMN_IDENTIFIER_CREATE);
+                                break;
+                            }
+                            case SpecialType::kDeleteTs: {
+                                column_idx_array.emplace_back(COLUMN_IDENTIFIER_DELETE);
+                                break;
+                            }
+                            default: {
+                                Status error_status = Status::NotSupport(fmt::format("Not support to export: {}", special_function_ptr->ToString()));
+                                LOG_ERROR(error_status.message());
+                                RecoverableError(error_status);
+                            }
+                        }
+                    } else {
+                        LOG_ERROR(status.message());
+                        RecoverableError(status);
+                    }
+                    break;
+                }
+                default: {
+                    Status status = Status::NotSupport("Only column or some special functions are supported to export");
+                }
+            }
         }
 
         if(statement->copy_file_type_ == CopyFileType::kFVECS)  {
@@ -1004,7 +1115,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             auto [db_entry, status] = txn->GetDatabase(use_command_info->db_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
-                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
                 this->logical_plan_ = logical_command;
             } else {
@@ -1014,14 +1125,14 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
         }
         case CommandType::kSet: {
             SharedPtr<LogicalNode> logical_command =
-                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
+                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
             this->logical_plan_ = logical_command;
             break;
         }
         case CommandType::kExport: {
             SharedPtr<LogicalNode> logical_command =
-                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
+                MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
             this->logical_plan_ = logical_command;
             break;
@@ -1031,7 +1142,7 @@ Status LogicalPlanner::BuildCommand(const CommandStatement *statement, SharedPtr
             auto [table_entry, status] = txn->GetTableByName(query_context_ptr_->schema_name(), check_table->table_name());
             if (status.ok()) {
                 SharedPtr<LogicalNode> logical_command =
-                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), std::move(command_statement->command_info_));
+                    MakeShared<LogicalCommand>(bind_context_ptr->GetNewLogicalNodeId(), command_statement->command_info_);
 
                 this->logical_plan_ = logical_command;
             } else {
@@ -1095,6 +1206,12 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kProfiles: {
             return BuildShowProfiles(statement, bind_context_ptr);
         }
+        case ShowStmtType::kQueries: {
+            return BuildShowQueries(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kQuery: {
+            return BuildShowQuery(statement, bind_context_ptr);
+        }
         case ShowStmtType::kSegments: {
             return BuildShowSegments(statement, bind_context_ptr);
         }
@@ -1153,6 +1270,32 @@ Status LogicalPlanner::BuildShowProfiles(const ShowStatement *statement, SharedP
                                                                   statement->schema_name_,
                                                                   statement->table_name_,
                                                                   bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowQueries(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowQueries,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowQuery(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowQuery,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  statement->session_id_);
     this->logical_plan_ = logical_show;
     return Status::OK();
 }

@@ -41,6 +41,7 @@ import internal_types;
 import table_def;
 import third_party;
 import logger;
+import query_options;
 
 namespace infinity {
 
@@ -609,8 +610,33 @@ WrapQueryResult WrapImport(Infinity &instance, const String &db_name, const Stri
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
-WrapQueryResult WrapExport(Infinity &instance, const String &db_name, const String &table_name, const String &path, ExportOptions export_options) {
-    auto query_result = instance.Export(db_name, table_name, path, export_options);
+WrapQueryResult WrapExport(Infinity &instance, const String &db_name, const String &table_name, Vector<String> &columns, const String &path, ExportOptions export_options) {
+    Vector<ParsedExpr *> *export_columns = new Vector<ParsedExpr *>();
+    export_columns->reserve(columns.size());
+
+    for (SizeT i = 0; i < columns.size(); ++i) {
+        auto& column_name = columns[i];
+        ToLower(column_name);
+        if(column_name == "_row_id") {
+            FunctionExpr* expr = new FunctionExpr();
+            expr->func_name_ = "row_id";
+            export_columns->emplace_back(expr);
+        } else if(column_name == "_create_timestamp") {
+            FunctionExpr* expr = new FunctionExpr();
+            expr->func_name_ = "create_timestamp";
+            export_columns->emplace_back(expr);
+        } else if(column_name == "_delete_timestamp") {
+            FunctionExpr* expr = new FunctionExpr();
+            expr->func_name_ = "delete_timestamp";
+            export_columns->emplace_back(expr);
+        } else {
+            ColumnExpr* expr = new ColumnExpr();
+            expr->names_.emplace_back(column_name);
+            export_columns->emplace_back(expr);
+        }
+    }
+
+    auto query_result = instance.Export(db_name, table_name, export_columns, path, export_options);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 

@@ -146,6 +146,7 @@ PRIMARY         { return PRIMARY; }
 PROFILE         { return PROFILE; }
 PROFILES        { return PROFILES; }
 PROPERTIES      { return PROPERTIES; }
+QUERIES         { return QUERIES; }
 QUERY           { return QUERY; }
 RAW             { return RAW; }
 REAL            { return REAL; }

@@ -18,9 +18,12 @@
 namespace infinity {
 
 CopyStatement::~CopyStatement() {
-    if(columns_ != nullptr) {
-        delete columns_;
-        columns_ = nullptr;
+    if (expr_array_ != nullptr) {
+        for (auto &expr_ptr : *expr_array_) {
+            delete expr_ptr;
+        }
+        delete expr_array_;
+        expr_array_ = nullptr;
     }
 }
 
@@ -51,12 +54,16 @@ std::string CopyStatement::ToString() const {
             file_format = "JSONL";
             break;
         }
-        case CopyFileType::kInvalid: {
-            file_format = "Invalid";
-            break;
-        }
         case CopyFileType::kCSR: {
             file_format = "CSR";
+            break;
+        }
+        case CopyFileType::kBVECS: {
+            file_format = "BVECS";
+            break;
+        }
+        case CopyFileType::kInvalid: {
+            file_format = "Invalid";
             break;
         }
     }

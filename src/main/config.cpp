@@ -168,6 +168,16 @@ Status Config::Init(const SharedPtr<String> &config_path) {
             UnrecoverableError(status.message());
         }
 
+        // Record running query
+        bool record_running_query = false;
+        record_running_query_ = record_running_query;
+        UniquePtr<BooleanOption> record_running_query_option = MakeUnique<BooleanOption>(RECORD_RUNNING_QUERY_OPTION_NAME, record_running_query);
+        status = global_options_.AddOption(std::move(record_running_query_option));
+        if(!status.ok()) {
+            LOG_CRITICAL(status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Server address
         String server_address_str = "0.0.0.0";
         UniquePtr<StringOption> server_address_option = MakeUnique<StringOption>(SERVER_ADDRESS_OPTION_NAME, server_address_str);
@@ -507,6 +517,21 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                             }
                             break;
                         }
+                        case GlobalOptionIndex::kRecordRunningQuery: {
+                            bool record_running_query = false;
+                            if (elem.second.is_boolean()) {
+                                record_running_query = elem.second.value_or(record_running_query);
+                            } else {
+                                return Status::InvalidConfig("'record_running_query' field isn't boolean.");
+                            }
+                            record_running_query_ = record_running_query;
+                            UniquePtr<BooleanOption> record_running_query_option = MakeUnique<BooleanOption>(RECORD_RUNNING_QUERY_OPTION_NAME, record_running_query);
+                            Status status = global_options_.AddOption(std::move(record_running_query_option));
+                            if(!status.ok()) {
+                                UnrecoverableError(status.message());
+                            }
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'general' field", var_name));
                         }
@@ -538,6 +563,17 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                     // CPU limit
                     UniquePtr<IntegerOption> cpu_limit_option = MakeUnique<IntegerOption>(CPU_LIMIT_OPTION_NAME, Thread::hardware_concurrency(), 16384, 1);
                     Status status = global_options_.AddOption(std::move(cpu_limit_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+
+                if(global_options_.GetOptionByIndex(GlobalOptionIndex::kRecordRunningQuery) == nullptr) {
+                    // Record running query
+                    bool record_running_query = false;
+                    record_running_query_ = record_running_query;
+                    UniquePtr<BooleanOption> record_running_query_option = MakeUnique<BooleanOption>(RECORD_RUNNING_QUERY_OPTION_NAME, record_running_query);
+                    Status status = global_options_.AddOption(std::move(record_running_query_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -1517,6 +1553,19 @@ i64 Config::TimeZoneBias() {
 i64 Config::CPULimit() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kWorkerCPULimit);
+}
+
+void Config::SetRecordRunningQuery(bool flag) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kRecordRunningQuery);
+    if (base_option->data_type_ != BaseOptionDataType::kBoolean) {
+        String error_message = "Attempt to fetch bool value from record running query data type option";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    BooleanOption *record_running_query_option = static_cast<BooleanOption *>(base_option);
+    record_running_query_option->value_ = flag;
+    record_running_query_ = flag;
 }
 
 // Network

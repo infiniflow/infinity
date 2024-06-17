@@ -656,6 +656,7 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
         switch (index_base->index_type_) {
             case IndexType::kHnsw:
             case IndexType::kFullText:
+            case IndexType::kEMVB:
             case IndexType::kSecondary: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {
                     MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
@@ -881,6 +882,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 break;
             }
             case IndexType::kHnsw:
+            case IndexType::kEMVB:
             case IndexType::kSecondary: {
                 TxnTimeStamp begin_ts = txn->BeginTS();
                 auto segment_index_guard = table_index_entry->GetSegmentIndexesGuard();
@@ -978,19 +980,6 @@ SharedPtr<IndexIndex> TableEntry::GetIndexIndex(Txn *txn) {
     return result;
 }
 
-bool TableEntry::CheckDeleteVisible(DeleteState &delete_state, Txn *txn) {
-    for (auto &[segment_id, block_offsets_map] : delete_state.rows_) {
-        auto *segment_entry = GetSegmentByID(segment_id, txn).get();
-        if (segment_entry == nullptr) {
-            return false;
-        }
-        if (!segment_entry->CheckDeleteVisible(block_offsets_map, txn)) {
-            return false;
-        }
-    }
-    return true;
-}
-
 nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
@@ -1031,6 +1020,9 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
         segment_candidates.reserve(this->segment_map_.size());
         for (const auto &[segment_id, segment_entry] : this->segment_map_) {
+            if (segment_entry->commit_ts_ > max_commit_ts or segment_entry->deprecate_ts() <= max_commit_ts) {
+                continue;
+            }
             segment_candidates.emplace_back(segment_entry.get());
         }
 
@@ -1044,9 +1036,6 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
 
     // Serialize segments
     for (const auto &segment_entry : segment_candidates) {
-        if (segment_entry->commit_ts_ > max_commit_ts or segment_entry->deprecate_ts() <= max_commit_ts) {
-            continue;
-        }
         json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
         checkpoint_row_count += segment_entry->checkpoint_row_count();
     }

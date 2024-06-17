@@ -54,7 +54,7 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
     elif datatype == "bool":
         proto_column_type.logic_type = ttypes.LogicType.Boolean
     else:
-        raise InfinityException(3051, f"Unknown datatype: {datatype}")
+        raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
 
     # process constraints
     proto_column_def.data_type = proto_column_type
@@ -70,7 +70,7 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
             elif constraint == "unique":
                 proto_column_def.constraints.append(ttypes.Constraint.Unique)
             else:
-                raise InfinityException(3055, f"Unknown constraint: {constraint}")
+                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Unknown constraint: {constraint}")
 
     # process constant expression
     default = None
@@ -101,7 +101,7 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                 constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
                                                           f64_array_value=default)
         else:
-            raise InfinityException(3069, "Invalid constant expression")
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
         proto_column_def.constant_expr = constant_expression
     column_defs.append(proto_column_def)
 
@@ -177,7 +177,7 @@ def get_embedding_info(column_info, column_defs, column_name, index):
                 constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
                                                           f64_array_value=default)
         else:
-            raise InfinityException(3069, "Invalid constant expression")
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
         proto_column_def.constant_expr = constant_expression
 
     column_defs.append(proto_column_def)
@@ -224,7 +224,7 @@ class RemoteDatabase(Database, ABC):
         elif conflict_type == ConflictType.Replace:
             create_table_conflict = ttypes.CreateConflict.Replace
         else:
-            raise InfinityException(3066, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
         res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                       column_defs=column_defs,
@@ -244,7 +244,7 @@ class RemoteDatabase(Database, ABC):
             return self._conn.drop_table(db_name=self._db_name, table_name=table_name,
                                          conflict_type=ttypes.DropConflict.Ignore)
         else:
-            raise InfinityException(3066, "nvalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "nvalid conflict type")
 
     def list_tables(self):
         res = self._conn.list_tables(self._db_name)

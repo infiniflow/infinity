@@ -70,6 +70,7 @@ import compaction_process;
 import bg_task;
 import buffer_obj;
 import file_worker_type;
+import system_info;
 
 namespace infinity {
 
@@ -394,6 +395,30 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowQueries: {
+            output_names_->reserve(5);
+            output_types_->reserve(5);
+            output_names_->emplace_back("session_id");
+            output_names_->emplace_back("query_id");
+            output_names_->emplace_back("query_kind");
+            output_names_->emplace_back("start_time");
+            output_names_->emplace_back("time_consumption");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowType::kShowQuery: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             LOG_ERROR(status.message());
@@ -497,6 +522,14 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowBuffer: {
             ExecuteShowBuffer(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowQueries: {
+            ExecuteShowQueries(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowQuery: {
+            ExecuteShowQuery(query_context, show_operator_state);
             break;
         }
         default: {
@@ -1025,6 +1058,14 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
                     break;
                 }
+                case IndexType::kEMVB: {
+                    auto [chunk_index_entries, _] = segment_index_entry->GetEMVBIndexSnapshot();
+
+                    Value value = Value::MakeVarchar(std::to_string(chunk_index_entries.size()));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                    break;
+                }
                 case IndexType::kInvalid: {
                     Status status3 = Status::InvalidIndexName(index_type_name);
                     LOG_ERROR(fmt::format("{} is invalid.", index_type_name));
@@ -1093,6 +1134,11 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
         }
         case IndexType::kSecondary: {
             auto [chunk_index_entries, _] = segment_index_entry->GetSecondaryIndexSnapshot();
+            chunk_indexes = chunk_index_entries;
+            break;
+        }
+        case IndexType::kEMVB: {
+            auto [chunk_index_entries, _] = segment_index_entry->GetEMVBIndexSnapshot();
             chunk_indexes = chunk_index_entries;
             break;
         }
@@ -2251,6 +2297,28 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
     }
 
+
+    {
+        {
+            // option name
+            Value value = Value::MakeVarchar(RECORD_RUNNING_QUERY_OPTION_NAME);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // option name type
+            Value value = global_config->RecordRunningQuery() ? Value::MakeVarchar("true") : Value::MakeVarchar("false");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // option name type
+            Value value = Value::MakeVarchar("To record running query");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+    }
+
     {
         {
             // option name
@@ -2407,7 +2475,7 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
         }
         {
             // option name type
-            Value value = global_config->LogToStdout() ? Value::MakeVarchar("True") : Value::MakeVarchar("False");
+            Value value = global_config->LogToStdout() ? Value::MakeVarchar("true") : Value::MakeVarchar("false");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
@@ -3212,6 +3280,7 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
 void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOperatorState *operator_state) {
     SharedPtr<DataType> varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     SharedPtr<DataType> integer_type = MakeShared<DataType>(LogicalType::kBigInt);
+    SharedPtr<DataType> double_type = MakeShared<DataType>(LogicalType::kDouble);
     SharedPtr<DataType> bool_type = MakeShared<DataType>(LogicalType::kBoolean);
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
 
@@ -3554,6 +3623,66 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
 
             CompactionProcessor *compaction_processor = query_context->storage()->compaction_processor();
             Value value = Value::MakeBigInt(compaction_processor->RunningTaskCount());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case GlobalVariable::kSystemMemoryUsage: {
+            Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            };
+
+            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
+            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                integer_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+
+            i64 memory_usage = SystemInfo::MemoryUsage();
+            Value value = Value::MakeBigInt(memory_usage);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case GlobalVariable::kOpenFileCount: {
+            Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            };
+
+            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
+            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                integer_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+
+            i64 open_file_count = SystemInfo::OpenFileCount();
+            Value value = Value::MakeBigInt(open_file_count);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            break;
+        }
+        case GlobalVariable::kCPUUsage: {
+            Vector<SharedPtr<ColumnDef>> output_column_defs = {
+                MakeShared<ColumnDef>(0, integer_type, "value", std::set<ConstraintType>()),
+            };
+
+            SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("variables"), output_column_defs);
+            output_ = MakeShared<DataTable>(table_def, TableType::kResult);
+
+            Vector<SharedPtr<DataType>> output_column_types{
+                double_type,
+            };
+
+            output_block_ptr->Init(output_column_types);
+
+            f64 cpu_usage = SystemInfo::CPUUsage();
+            Value value = Value::MakeDouble(cpu_usage * 100);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -3972,6 +4101,72 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 break;
             }
+            case GlobalVariable::kSystemMemoryUsage: {
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+                    // option value
+                    i64 memory_usage = SystemInfo::MemoryUsage();
+                    Value value = Value::MakeVarchar(std::to_string(memory_usage));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("Infinity system memory usage.");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
+            case GlobalVariable::kOpenFileCount: {
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+                    // option value
+                    i64 open_file_count = SystemInfo::OpenFileCount();
+                    Value value = Value::MakeVarchar(std::to_string(open_file_count));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("File description opened count by Infinity.");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
+            case GlobalVariable::kCPUUsage: {
+                {
+                    // option name
+                    Value value = Value::MakeVarchar(var_name);
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+                }
+                {
+                    // option value
+                    f64 cpu_usage = SystemInfo::CPUUsage();
+                    Value value = Value::MakeVarchar(fmt::format("{:.{}f}", cpu_usage * 100, 2));
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+                }
+                {
+                    // option description
+                    Value value = Value::MakeVarchar("File description opened count by Infinity.");
+                    ValueExpression value_expr(value);
+                    value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+                }
+                break;
+            }
             default: {
                 operator_state->status_ = Status::NoSysVar(var_name);
                 LOG_ERROR(operator_state->status_.message());
@@ -4183,5 +4378,192 @@ void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorSt
     operator_state->output_.emplace_back(std::move(output_block_ptr));
     return ;
 }
+
+void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, bigint_type, "session_id", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, bigint_type, "query_id", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "query_kind", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "start_time", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "time_consumption", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_queries"), column_defs);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        bigint_type,
+        varchar_type,
+        varchar_type,
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    SessionManager *session_manager = query_context->session_manager();
+    Map<u64, SharedPtr<QueryInfo>> query_map = session_manager->QueryRecords();
+    for(auto& query_pair: query_map) {
+        u64 session_id = query_pair.first;
+        QueryInfo& query_info = *query_pair.second;
+
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // session_id
+            Value value = Value::MakeBigInt(session_id);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // query_id
+            Value value = Value::MakeBigInt(query_info.query_id_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // query_kind
+            Value value = Value::MakeVarchar(query_info.query_kind_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+        {
+            // start_time
+            Value value = Value::MakeVarchar(query_info.profiler_.BeginTime());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+        {
+            // time_consumption
+            Value value = Value::MakeVarchar(query_info.profiler_.ElapsedToString());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        ++ row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return ;
+}
+
+void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorState *operator_state) {
+
+    QueryInfo* query_info_ptr = query_context->session_manager()->GetQueryRecord(*session_id_);
+    if(query_info_ptr == nullptr) {
+        Status status = Status::SessionNotFound(*session_id_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    output_block_ptr->Init(column_types);
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("session_id");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(*session_id_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("query_id");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(query_info_ptr->query_id_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("start_time");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(query_info_ptr->profiler_.BeginTime());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("time_consumption");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(query_info_ptr->profiler_.ElapsedToString());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("query_text");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(query_info_ptr->query_text_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return ;
+}
+
 
 } // namespace infinity

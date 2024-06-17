@@ -419,7 +419,7 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
     return cte_table_ref_ptr;
 }
 
-SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, const TableReference *from_table) {
+SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, const TableReference *from_table, bool update) {
     String schema_name;
     if (from_table->db_name_.empty()) {
         schema_name = query_context->schema_name();
@@ -453,6 +453,14 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         types_ptr->emplace_back(column_def->column_type_);
         names_ptr->emplace_back(column_def->name_);
         columns.emplace_back(idx);
+    }
+    if (!update) {
+        const auto *catalog = query_context_ptr_->storage()->catalog();
+        for (const auto &[name, column_def] : catalog->special_columns_) {
+            types_ptr->emplace_back(column_def->column_type_);
+            names_ptr->emplace_back(name);
+            columns.emplace_back(column_def->id_);
+        }
     }
 
     Txn *txn = query_context->GetTxn();
@@ -992,11 +1000,11 @@ void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType or
     }
 }
 
-SharedPtr<BaseTableRef> QueryBinder::GetTableRef(const String &db_name, const String &table_name) {
+SharedPtr<BaseTableRef> QueryBinder::GetTableRef(const String &db_name, const String &table_name, bool update) {
     TableReference from_table;
     from_table.db_name_ = db_name;
     from_table.table_name_ = table_name;
-    return BuildBaseTable(this->query_context_ptr_, &from_table);
+    return BuildBaseTable(this->query_context_ptr_, &from_table, update);
 }
 
 UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &statement) {
@@ -1028,7 +1036,7 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
 UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &statement) {
     // refers to QueryBinder::BindSelect
     UniquePtr<BoundUpdateStatement> bound_update_statement = BoundUpdateStatement::Make(bind_context_ptr_);
-    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
+    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_, true);
 
     bound_update_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {

@@ -26,6 +26,7 @@ enum class CopyFileType {
     kJSONL,
     kFVECS,
     kCSR,
+    kBVECS,
     kInvalid,
 };
 
@@ -41,6 +42,8 @@ inline std::shared_ptr<std::string> CopyFileTypeToStr(CopyFileType copy_file_typ
             return std::make_shared<std::string>("JSONL");
         case CopyFileType::kCSR:
             return std::make_shared<std::string>("CSR");
+        case CopyFileType::kBVECS:
+            return std::make_shared<std::string>("BVECS");
         case CopyFileType::kInvalid:
             return std::make_shared<std::string>("Invalid");
     }

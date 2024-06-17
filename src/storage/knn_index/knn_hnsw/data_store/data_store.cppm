@@ -24,6 +24,7 @@ import hnsw_common;
 import file_system;
 import vec_store_type;
 import graph_store;
+import infinity_exception;
 
 namespace infinity {
 
@@ -267,7 +268,9 @@ public:
             max_l = std::max(max_l, max_l1);
         }
         auto [max_layer, ep] = GetEnterPoint();
-        assert(max_l == max_layer);
+        if (max_l != max_layer) {
+            UnrecoverableError("max_l != max_layer");
+        }
     }
 
     void Dump(std::ostream &os) const {

@@ -19,6 +19,7 @@ import stl;
 import emvb_search;
 import emvb_product_quantization;
 import emvb_shared_vec;
+import file_system;
 
 namespace infinity {
 extern template class EMVBSharedVec<u32>;
@@ -44,6 +45,8 @@ public:
     GetMultipleIPDistance(u32 embedding_offset, u32 embedding_num, u32 query_id, u32 query_num, const f32 *ip_table, f32 *output_ptr) const override {
         std::fill_n(output_ptr, embedding_num, 0.0f);
     }
+    void Save(FileHandler &file_handler) override {}
+    void Load(FileHandler &file_handler) override {}
 };
 
 class EMVBTest : public BaseTest {};

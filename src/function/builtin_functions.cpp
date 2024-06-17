@@ -46,7 +46,7 @@ import plus;
 import pow;
 import substring;
 import substract;
-
+import default_values;
 import special_function;
 import internal_types;
 import data_type;
@@ -121,11 +121,20 @@ void BuiltinFunctions::RegisterSpecialFunction() {
     SharedPtr<SpecialFunction> distance_function = MakeShared<SpecialFunction>("DISTANCE", DataType(LogicalType::kFloat), 2, SpecialType::kDistance);
     Catalog::AddSpecialFunction(catalog_ptr_.get(), distance_function);
 
-    SharedPtr<SpecialFunction> similarity_function = MakeShared<SpecialFunction>("SIMILARITY", DataType(LogicalType::kFloat), 3, SpecialType::kSimilarity);
+    SharedPtr<SpecialFunction> similarity_function =
+        MakeShared<SpecialFunction>("SIMILARITY", DataType(LogicalType::kFloat), 3, SpecialType::kSimilarity);
     Catalog::AddSpecialFunction(catalog_ptr_.get(), similarity_function);
 
     SharedPtr<SpecialFunction> score_function = MakeShared<SpecialFunction>("SCORE", DataType(LogicalType::kFloat), 4, SpecialType::kScore);
     Catalog::AddSpecialFunction(catalog_ptr_.get(), score_function);
+
+    auto createts_function =
+        MakeShared<SpecialFunction>("CREATE_TIMESTAMP", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_CREATE, SpecialType::kCreateTs);
+    Catalog::AddSpecialFunction(catalog_ptr_.get(), createts_function);
+
+    auto deletets_function =
+        MakeShared<SpecialFunction>("DELETE_TIMESTAMP", DataType(LogicalType::kBigInt), COLUMN_IDENTIFIER_DELETE, SpecialType::kDeleteTs);
+    Catalog::AddSpecialFunction(catalog_ptr_.get(), deletets_function);
 }
 
 } // namespace infinity

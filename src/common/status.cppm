@@ -125,6 +125,7 @@ export enum class ErrorCode : long {
     kInvalidAnalyzerFile = 3080,
     kInvalidExplainType = 3081,
     kChunkNotExist = 3082,
+    kNameMismatched = 3083,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -136,6 +137,7 @@ export enum class ErrorCode : long {
     kTooManyConnections = 5003,
     kConfigurationLimitExceed = 5004,
     kQueryIsTooComplex = 5005,
+    kFailToGetSysInfo = 5006,
 
     // 6. Query intervention
     kQueryCancelled = 6001,
@@ -268,6 +270,7 @@ public:
     static Status InvalidAnalyzerName(const String& name);
     static Status InvalidAnalyzerFile(const String& detailed_info);
     static Status ChunkNotExist(ChunkID chunk_id);
+    static Status NameMismatched(const String& name_left, const String& name_right);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
@@ -279,6 +282,7 @@ public:
     static Status TooManyConnections(const String &detailed_info);
     static Status ConfigurationLimitExceed(const String &config_name, const String &config_value, const String &valid_value_range);
     static Status QueryTooBig(const String &query_text, u64 ast_node);
+    static Status FailToGetSysInfo(const String &detailed_info);
 
     // 6. Operation intervention
     static Status QueryCancelled(const String &query_text);

@@ -1,0 +1,25 @@
+{
+  "name": "quickwit_tantivy",
+  "app": "quickwit",
+  "app_path": "servers/quickwit/",
+  "connection_url": "http://localhost:7280",
+  "data_path": "datasets/tantivy/wiki-articles.json",
+  "insert_batch_size": 8192,
+  "query_path": "datasets/tantivy/operations.txt",
+  "result_path": "datasets/tantivy/quickwit_result.jsonl",
+  "mode": "fulltext",
+  "topK": 10,
+  "index_config_path": "configs/quickwit_tantivy_index.yaml",
+  "index": {
+    "version": "0.8",
+    "index_id": "quickwit_tantivy",
+    "doc_mapping": {
+      "mode": "lenient",
+      "field_mappings": [
+        { "name": "url", "type": "text" },
+        { "name": "title", "type": "text" },
+        { "name": "body", "type": "text" }
+      ]
+    }
+  }
+}

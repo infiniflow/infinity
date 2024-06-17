@@ -97,6 +97,10 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
             ImportCSR(query_context, import_op_state);
             break;
         }
+        case CopyFileType::kBVECS: {
+            ImportBVECS(query_context, import_op_state);
+            break;
+        }
         case CopyFileType::kInvalid: {
             String error_message = "Invalid file type";
             LOG_CRITICAL(error_message);
@@ -174,7 +178,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     SizeT row_idx = 0;
     auto buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
     while (true) {
-        int dim;
+        i32 dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
             Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
@@ -183,6 +187,115 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         }
         ptr_t dst_ptr = buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension;
         fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
+        block_entry->IncreaseRowCount(1);
+        ++row_idx;
+
+        if (row_idx == vector_n) {
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+            SaveSegmentData(table_entry_, txn, segment_entry);
+            break;
+        }
+
+        if (block_entry->GetAvailableCapacity() <= 0) {
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+            if (segment_entry->Room() <= 0) {
+                SaveSegmentData(table_entry_, txn, segment_entry);
+
+                segment_id = Catalog::GetNextSegmentID(table_entry_);
+                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+            }
+
+            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+            buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
+            buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
+        }
+    }
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", vector_n));
+    import_op_state->result_msg_ = std::move(result_msg);
+}
+
+void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {
+    if (table_entry_->ColumnCount() != 1) {
+        Status status = Status::ImportFileFormatError("BVECS file must have only one column.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+    auto &column_type = table_entry_->GetColumnDefByID(0)->column_type_;
+    if (column_type->type() != kEmbedding) {
+        Status status = Status::ImportFileFormatError("BVECS file must have only one embedding column.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+    auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+    if (embedding_info->Type() != kElemFloat) {
+        Status status = Status::ImportFileFormatError("BVECS file must have only one embedding column with float element.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+
+    LocalFileSystem fs;
+
+    auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
+    DeferFn defer_fn([&]() { fs.Close(*file_handler); });
+
+    i32 dimension = 0;
+    i64 nbytes = fs.Read(*file_handler, &dimension, sizeof(dimension));
+    fs.Seek(*file_handler, 0);
+    if (nbytes == 0) {
+        // file is empty
+        auto result_msg = MakeUnique<String>("IMPORT 0 Rows");
+        import_op_state->result_msg_ = std::move(result_msg);
+        return;
+    }
+
+    if (nbytes != sizeof(dimension)) {
+        Status status = Status::ImportFileFormatError(fmt::format("Read dimension which length isn't {}.", nbytes));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+    if ((int)embedding_info->Dimension() != dimension) {
+        Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+    SizeT file_size = fs.GetFileSize(*file_handler);
+    SizeT row_size = dimension * sizeof(i8) + sizeof(dimension);
+    if (file_size % row_size != 0) {
+        String error_message = "Weird file size.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    SizeT vector_n = file_size / row_size;
+
+    Txn *txn = query_context->GetTxn();
+
+    SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+    BufferHandle buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
+    SizeT row_idx = 0;
+    auto buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
+
+    UniquePtr<i8[]> i8_buffer = MakeUniqueForOverwrite<i8[]>(sizeof(i8) * dimension);
+    while (true) {
+        i32 dim;
+        nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
+        if (dim != dimension or nbytes != sizeof(dimension)) {
+            Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
+        fs.Read(*file_handler, i8_buffer.get(), sizeof(i8) * dimension);
+
+        FloatT* dst_ptr = reinterpret_cast<FloatT*>(buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension);
+        for(i32 i = 0; i < dimension; ++ i) {
+            i8 value = (i8_buffer.get())[i];
+            dst_ptr[i] = static_cast<FloatT>(value);
+        }
+
         block_entry->IncreaseRowCount(1);
         ++row_idx;
 

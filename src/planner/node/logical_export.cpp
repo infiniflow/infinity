@@ -63,6 +63,10 @@ String LogicalExport::ToString(i64 &space) const {
             ss << "(CSR) ";
             break;
         }
+        case CopyFileType::kBVECS: {
+            ss << "(BVECS) ";
+            break;
+        }
         case CopyFileType::kInvalid: {
             ss << "(Invalid) ";
             break;

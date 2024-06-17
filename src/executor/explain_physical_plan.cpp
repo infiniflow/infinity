@@ -1379,6 +1379,42 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case ShowType::kShowQueries: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW QUERIES ";
+            } else {
+                show_str = "SHOW QUERIES ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [session_id, query_id, query_kind, start_time, time_consumption]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowQuery: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW QUERY ";
+            } else {
+                show_str = "SHOW QUERY ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [name, value]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowType::kShowSegments: {
             String show_str;
             if (intent_size != 0) {
@@ -1684,6 +1720,11 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, SharedPtr<V
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kBVECS: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: BVECS");
+            result->emplace_back(file_type);
+            break;
+        }
         case CopyFileType::kInvalid: {
             String error_message = "Invalid show type";
             LOG_CRITICAL(error_message);
@@ -1755,6 +1796,11 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, SharedPtr<V
         }
         case CopyFileType::kCSR: {
             auto file_type = MakeShared<String>(String(intent_size, ' ') + " - type: CSR");
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kBVECS: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: BVECS");
             result->emplace_back(file_type);
             break;
         }

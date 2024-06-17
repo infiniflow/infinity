@@ -25,6 +25,7 @@ from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
 from infinity.common import VEC, InfinityException
+from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import logic_type_to_dtype, make_match_tensor_expr
 from infinity.remote_thrift.utils import traverse_conditions, parse_expr
@@ -85,7 +86,7 @@ class InfinityThriftQueryBuilder(ABC):
         elif isinstance(embedding_data, np.ndarray):
             embedding_data = embedding_data.tolist()
         else:
-            raise InfinityException(3051, f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}")
+            raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}")
 
         if (embedding_data_type == 'tinyint' or
             embedding_data_type == 'smallint' or

@@ -42,28 +42,51 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
             arguments.append(expr)
         function_expr.arguments = arguments
 
-        paser_expr_type = ttypes.ParsedExprType()
-        paser_expr_type.function_expr = function_expr
+        parser_expr_type = ttypes.ParsedExprType()
+        parser_expr_type.function_expr = function_expr
 
-        parsed_expr.type = paser_expr_type
+        parsed_expr.type = parser_expr_type
 
         return parsed_expr
 
     elif isinstance(cons, exp.Column):
-        parsed_expr = ttypes.ParsedExpr()
-        column_expr = ttypes.ColumnExpr()
-        column_name = [cons.alias_or_name]
-        if cons.alias_or_name == "*":
-            column_expr.star = True
-        else:
-            column_expr.star = False
-        column_expr.column_name = column_name
 
-        paser_expr_type = ttypes.ParsedExprType()
-        paser_expr_type.column_expr = column_expr
+        match cons.alias_or_name:
+            case "_row_id":
+                func_expr = ttypes.FunctionExpr(function_name="row_id", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case "_score":
+                func_expr = ttypes.FunctionExpr(function_name="score", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case "_similarity":
+                func_expr = ttypes.FunctionExpr(function_name="similarity", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case "_distance":
+                func_expr = ttypes.FunctionExpr(function_name="distance", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case _:
+                parsed_expr = ttypes.ParsedExpr()
+                column_expr = ttypes.ColumnExpr()
+                column_name = [cons.alias_or_name]
+                if cons.alias_or_name == "*":
+                    column_expr.star = True
+                else:
+                    column_expr.star = False
+                column_expr.column_name = column_name
 
-        parsed_expr.type = paser_expr_type
-        return parsed_expr
+                parser_expr_type = ttypes.ParsedExprType()
+                parser_expr_type.column_expr = column_expr
+
+                parsed_expr.type = parser_expr_type
+                return parsed_expr
 
     elif isinstance(cons, exp.Literal):
         parsed_expr = ttypes.ParsedExpr()
@@ -79,12 +102,12 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
             constant_expr.literal_type = ttypes.LiteralType.String
             constant_expr.str_value = cons.output_name
         else:
-            raise InfinityException(3069, f"Unknown literal type: {cons}")
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Unknown literal type: {cons}")
 
-        paser_expr_type = ttypes.ParsedExprType()
-        paser_expr_type.constant_expr = constant_expr
+        parser_expr_type = ttypes.ParsedExprType()
+        parser_expr_type.constant_expr = constant_expr
 
-        parsed_expr.type = paser_expr_type
+        parsed_expr.type = parser_expr_type
         return parsed_expr
 
     elif isinstance(cons, exp.Paren):
@@ -101,15 +124,15 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
                 constant_expr.literal_type = ttypes.LiteralType.Double
                 constant_expr.f64_value = -float(cons.hashable_args[0].output_name)
             else:
-                raise InfinityException(3069, f"unknown literal type: {cons}")
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown literal type: {cons}")
 
-            paser_expr_type = ttypes.ParsedExprType()
-            paser_expr_type.constant_expr = constant_expr
-            parsed_expr.type = paser_expr_type
+            parser_expr_type = ttypes.ParsedExprType()
+            parser_expr_type.constant_expr = constant_expr
+            parsed_expr.type = parser_expr_type
 
             return parsed_expr
     else:
-        raise InfinityException(3069, f"unknown condition type: {cons}")
+        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown condition type: {cons}")
 
 
 def parse_expr(expr) -> ttypes.ParsedExpr:
@@ -137,7 +160,7 @@ def parse_expr(expr) -> ttypes.ParsedExpr:
             parsed_expr = ttypes.ParsedExpr(type=expr_type)
             return parsed_expr
         else:
-            raise InfinityException(3069, f"unknown expression type: {expr}")
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {expr}")
 
 
 # invalid_name_array = [

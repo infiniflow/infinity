@@ -399,6 +399,10 @@ Status Status::ChunkNotExist(ChunkID chunk_id) {
     return Status(ErrorCode::kChunkNotExist, MakeUnique<String>(fmt::format("Index chunk: {} doesn't exist", chunk_id)));
 }
 
+Status Status::NameMismatched(const String& name_left, const String& name_right) {
+    return Status(ErrorCode::kNameMismatched, MakeUnique<String>(fmt::format("It is {}, expects {}", name_left, name_right)));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));
@@ -430,6 +434,10 @@ Status Status::ConfigurationLimitExceed(const String &config_name, const String 
 
 Status Status::QueryTooBig(const String &query_text, u64 ast_node) {
     return Status(ErrorCode::kQueryIsTooComplex, MakeUnique<String>(fmt::format("Query: {} is too complex with {} AST nodes", query_text, ast_node)));
+}
+
+Status Status::FailToGetSysInfo(const String &detailed_info) {
+    return Status(ErrorCode::kFailToGetSysInfo, MakeUnique<String>(detailed_info));
 }
 
 // 6. Operation intervention

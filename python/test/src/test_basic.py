@@ -26,7 +26,9 @@ from src.test_sdkbase import TestSdk
 
 test_csv_file = "embedding_int_dim3.csv"
 test_export_csv_file = "export_embedding_int_dim3.csv"
+test_export_csv_file_part = "export_embedding_int_dim3_part.csv"
 test_export_jsonl_file = "export_embedding_int_dim3.jsonl"
+test_export_jsonl_file_part = "export_embedding_int_dim3_part.jsonl"
 
 class TestCase(TestSdk):
     def _test_version(self):
@@ -76,9 +78,6 @@ class TestCase(TestSdk):
         12.
         expect: all operations successfully
         """
-        # infinity_obj = infinity.connect(self.uri)
-        # assert infinity_obj
-
         res = self.infinity_obj.list_databases()
         assert res.error_code == ErrorCode.OK
         for db_name in res.db_names:
@@ -177,14 +176,25 @@ class TestCase(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         # export
-        if os.path.exists(common_values.TEST_TMP_DIR + test_export_csv_file):
-            os.remove(common_values.TEST_TMP_DIR + test_export_csv_file)
-        res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_csv_file)
+        test_export_csv_file_path = common_values.TEST_TMP_DIR + test_export_csv_file
+        if os.path.exists(test_export_csv_file_path):
+            os.remove(test_export_csv_file_path)
+        res = table_obj.export_data(test_export_csv_file_path, {"file_type": "csv"})
         assert res.error_code == ErrorCode.OK
 
         if os.path.exists(common_values.TEST_TMP_DIR + test_export_jsonl_file):
             os.remove(common_values.TEST_TMP_DIR + test_export_jsonl_file)
-        res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_jsonl_file)
+        res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_jsonl_file, {"file_type": "jsonl"})
+        assert res.error_code == ErrorCode.OK
+
+        if os.path.exists(common_values.TEST_TMP_DIR + test_export_csv_file_part):
+            os.remove(common_values.TEST_TMP_DIR + test_export_csv_file_part)
+        res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_csv_file_part, {"file_type": "csv"}, ["c2", "c1", "_row_id", "_create_timestamp", "_delete_timestamp"])
+        assert res.error_code == ErrorCode.OK
+
+        if os.path.exists(common_values.TEST_TMP_DIR + test_export_jsonl_file_part):
+            os.remove(common_values.TEST_TMP_DIR + test_export_jsonl_file_part)
+        res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_jsonl_file_part, {"file_type": "jsonl"}, ["c2", "c1", "_row_id", "_create_timestamp", "_delete_timestamp"])
         assert res.error_code == ErrorCode.OK
 
         db_obj.drop_table("my_table_export", ConflictType.Ignore)
@@ -200,7 +210,16 @@ class TestCase(TestSdk):
         assert res.error_code == ErrorCode.OK
         export_table_obj = db_obj.create_table("my_table_export", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
         assert export_table_obj is not None
-        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_jsonl_file)
+        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_jsonl_file, import_options = {"file_type":"jsonl"})
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
+        print(res)
+        res = db_obj.drop_table("my_table_export")
+        assert res.error_code == ErrorCode.OK
+
+        export_table_obj = db_obj.create_table("my_table_export", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
+        assert export_table_obj is not None
+        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_csv_file, import_options = {"file_type":"csv"})
         assert res.error_code == ErrorCode.OK
         res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
         print(res)
@@ -209,6 +228,8 @@ class TestCase(TestSdk):
 
         os.remove(common_values.TEST_TMP_DIR + test_export_csv_file)
         os.remove(common_values.TEST_TMP_DIR + test_export_jsonl_file)
+        os.remove(common_values.TEST_TMP_DIR + test_export_csv_file_part)
+        os.remove(common_values.TEST_TMP_DIR + test_export_jsonl_file_part)
 
         # search
         res = table_obj.output(
@@ -217,6 +238,3 @@ class TestCase(TestSdk):
         res = db_obj.drop_table("my_table4")
         assert res.error_code == ErrorCode.OK
 
-        # disconnect
-        # res = infinity_obj.disconnect()
-        # assert res.error_code == ErrorCode.OK

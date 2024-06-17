@@ -38,6 +38,8 @@ export enum class ShowType {
     kShowColumn,
     kShowConfigs,
     kShowProfiles,
+    kShowQueries,
+    kShowQuery,
     kShowIndexes,
     kShowSegments,
     kShowSegment,
@@ -65,9 +67,10 @@ public:
                          Optional<BlockID> block_id = None,
                          Optional<ChunkID> chunk_id = None,
                          Optional<ColumnID> column_id = None,
-                         Optional<String> index_name = None)
+                         Optional<String> index_name = None,
+                         Optional<u64> session_id = None)
         : LogicalNode(node_id, LogicalNodeType::kShow), scan_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
-          table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id), index_name_(index_name) {}
+          table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id), index_name_(index_name), session_id_(session_id) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -87,6 +90,8 @@ public:
 
     [[nodiscard]] inline const String &object_name() const { return object_name_; }
 
+    [[nodiscard]] inline const Optional<u64> session_id() const { return session_id_; }
+
     [[nodiscard]] inline const Optional<SegmentID> segment_id() const { return segment_id_; }
 
     [[nodiscard]] inline const Optional<BlockID> block_id() const { return block_id_; }
@@ -102,11 +107,13 @@ private:
     String schema_name_;
     String object_name_; // It could be table/collection/view name
     u64 table_index_{};
+
     Optional<SegmentID> segment_id_{};
     Optional<BlockID> block_id_{};
     Optional<ChunkID> chunk_id_{};
     Optional<ColumnID> column_id_{};
     Optional<String> index_name_{};
+    Optional<u64> session_id_{};
 };
 
 } // namespace infinity

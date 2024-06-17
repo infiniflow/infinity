@@ -39,7 +39,7 @@ import segment_entry;
 import db_meta;
 import meta_map;
 import base_entry;
-
+import column_def;
 import meta_entry_interface;
 import cleanup_scanner;
 import log_file;
@@ -281,6 +281,7 @@ public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
+    HashMap<String, UniquePtr<ColumnDef>> special_columns_{};
 
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
 

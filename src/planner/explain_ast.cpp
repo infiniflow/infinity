@@ -642,8 +642,16 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW CONFIGS"));
             break;
         }
+        case ShowStmtType::kQueries: {
+            result->emplace_back(MakeShared<String>("SHOW QUERIES"));
+            break;
+        }
+        case ShowStmtType::kQuery: {
+            result->emplace_back(MakeShared<String>("SHOW QUERY"));
+            break;
+        }
         case ShowStmtType::kProfiles: {
-            result->emplace_back(MakeShared<String>("SHOW PROFILES"));
+            result->emplace_back(MakeShared<String>("SHOW QUERIES"));
             break;
         }
         case ShowStmtType::kSessionVariable: {
@@ -734,6 +742,11 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
         }
         case CopyFileType::kCSR: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: CSR");
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kBVECS: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: BVECS");
             result->emplace_back(file_type);
             break;
         }

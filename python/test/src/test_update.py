@@ -475,3 +475,5 @@ class TestUpdate(TestSdk):
 
         res = db_obj.drop_table("test_invalid_filter_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    # update empty table

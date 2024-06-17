@@ -694,10 +694,11 @@ class TestTable(TestSdk):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("my_table", ConflictType.Ignore)
 
-        try:
-            db_obj.create_table("my_table", None, ConflictType.Error)
-        except Exception as e:
-            print(e)
+        with pytest.raises(InfinityException) as e:
+            db_obj.create_table("my_table", {}, ConflictType.Error)
+
+        assert e.type == InfinityException
+        assert e.value.args[0] == ErrorCode.NO_COLUMN_DEFINED
 
     def _test_create_valid_option(self, types):
         # connect

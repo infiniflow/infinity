@@ -26,6 +26,7 @@ enum class IndexType {
     kHnsw,
     kFullText,
     kSecondary,
+    kEMVB,
     kInvalid,
 };
 

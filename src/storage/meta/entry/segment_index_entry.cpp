@@ -58,6 +58,8 @@ import abstract_hnsw;
 import block_column_iter;
 import txn_store;
 import secondary_index_in_mem;
+import emvb_index;
+import emvb_index_in_mem;
 
 namespace infinity {
 
@@ -170,6 +172,7 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
     switch (index_base->index_type_) {
         case IndexType::kHnsw:
         case IndexType::kFullText:
+        case IndexType::kEMVB:
         case IndexType::kSecondary: {
             // these indexes don't use BufferManager
             return vector_file_worker;
@@ -327,6 +330,16 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             LOG_WARN(*err_msg);
             break;
         }
+        case IndexType::kEMVB: {
+            if (memory_emvb_index_.get() == nullptr) {
+                std::unique_lock<std::shared_mutex> lck(rw_locker_);
+                memory_emvb_index_ = EMVBIndexInMem::NewEMVBIndexInMem(index_base, column_def, begin_row_id);
+            }
+            auto block_id = block_entry->block_id();
+            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+            memory_emvb_index_->Insert(block_id, block_column_entry, buffer_manager, row_offset, row_count);
+            break;
+        }
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
@@ -375,10 +388,21 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
                 return nullptr;
             }
             std::unique_lock lck(rw_locker_);
-            SharedPtr<ChunkIndexEntry> chunk_index_entry = memory_secondary_index_->Dump(this, buffer_manager_);
+            chunk_index_entry = memory_secondary_index_->Dump(this, buffer_manager_);
             chunk_index_entry->SaveIndexFile();
             chunk_index_entries_.push_back(chunk_index_entry);
             memory_secondary_index_.reset();
+            return chunk_index_entry;
+        }
+        case IndexType::kEMVB: {
+            if (memory_emvb_index_.get() == nullptr) {
+                return nullptr;
+            }
+            std::unique_lock lck(rw_locker_);
+            chunk_index_entry = memory_emvb_index_->Dump(this, buffer_manager_);
+            chunk_index_entry->SaveIndexFile();
+            chunk_index_entries_.push_back(chunk_index_entry);
+            memory_emvb_index_.reset();
             return chunk_index_entry;
         }
         default: {
@@ -410,6 +434,9 @@ u32 SegmentIndexEntry::MemIndexRowCount() {
         }
         case IndexType::kSecondary: {
             return memory_secondary_index_.get() ? memory_secondary_index_->GetRowCount() : 0;
+        }
+        case IndexType::kEMVB: {
+            return memory_emvb_index_.get() ? memory_emvb_index_->GetRowCount() : 0;
         }
         default: {
             return 0;
@@ -521,6 +548,17 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             MemIndexDump();
             break;
         }
+        case IndexType::kEMVB: {
+            u32 seg_id = segment_entry->segment_id();
+            RowID base_row_id(seg_id, 0);
+            const u32 row_count = segment_entry->row_count();
+            SharedPtr<ChunkIndexEntry> emvb_chunk_index_entry = CreateEMVBIndexChunkIndexEntry(base_row_id, row_count, buffer_mgr);
+            this->AddChunkIndexEntry(emvb_chunk_index_entry);
+            BufferHandle handle = emvb_chunk_index_entry->GetIndex();
+            auto data_ptr = static_cast<EMVBIndex *>(handle.GetDataMut());
+            data_ptr->BuildEMVBIndex(base_row_id, row_count, segment_entry, column_def, buffer_mgr);
+            break;
+        }
         case IndexType::kIVFFlat: { // TODO
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("{} PopulateEntirely is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
@@ -590,6 +628,10 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
             break;
         }
         case IndexType::kSecondary: {
+            PopulateEntirely(segment_entry, txn, populate_entire_config);
+            break;
+        }
+        case IndexType::kEMVB: {
             PopulateEntirely(segment_entry, txn, populate_entire_config);
             break;
         }
@@ -754,6 +796,9 @@ SegmentIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT se
         case IndexType::kSecondary: {
             return MakeUnique<CreateSecondaryIndexParam>(index_base, column_def, seg_row_count);
         }
+        case IndexType::kEMVB: {
+            return MakeUnique<CreateIndexParam>(index_base, column_def);
+        }
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
@@ -859,6 +904,32 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             txn_table_store->AddChunkIndexStore(table_index_entry_, merged_chunk_index_entry.get());
             return merged_chunk_index_entry.get();
         }
+        case IndexType::kEMVB: {
+            // TODO: merge
+            BufferManager *buffer_mgr = txn->buffer_mgr();
+            Vector<ChunkIndexEntry *> old_chunks;
+            u32 row_count = 0;
+            {
+                std::shared_lock lock(rw_locker_);
+                if (chunk_index_entries_.size() <= 1) {
+                    return nullptr;
+                }
+                for (const auto &chunk_index_entry : chunk_index_entries_) {
+                    if (chunk_index_entry->CheckVisible(txn)) {
+                        row_count += chunk_index_entry->GetRowCount();
+                        old_chunks.push_back(chunk_index_entry.get());
+                    }
+                }
+            }
+            RowID base_rowid(segment_id_, 0);
+            SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = CreateEMVBIndexChunkIndexEntry(base_rowid, row_count, buffer_mgr);
+            BufferHandle handle = merged_chunk_index_entry->GetIndex();
+            auto data_ptr = static_cast<EMVBIndex *>(handle.GetDataMut());
+            data_ptr->BuildEMVBIndex(base_rowid, row_count, segment_entry, column_def, buffer_mgr);
+            ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
+            txn_table_store->AddChunkIndexStore(table_index_entry_, merged_chunk_index_entry.get());
+            return merged_chunk_index_entry.get();
+        }
         default: {
             String error_message = "RebuildChunkIndexEntries is not supported for this index type.";
             LOG_CRITICAL(error_message);
@@ -890,6 +961,11 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::CreateChunkIndexEntry(SharedPtr<Co
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::CreateSecondaryIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr) {
     ChunkID chunk_id = this->GetNextChunkID();
     return ChunkIndexEntry::NewSecondaryIndexChunkIndexEntry(chunk_id, this, "", base_rowid, row_count, buffer_mgr);
+}
+
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::CreateEMVBIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr) {
+    ChunkID chunk_id = this->GetNextChunkID();
+    return ChunkIndexEntry::NewEMVBIndexChunkIndexEntry(chunk_id, this, "", base_rowid, row_count, buffer_mgr);
 }
 
 void SegmentIndexEntry::AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry) {

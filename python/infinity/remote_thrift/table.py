@@ -78,7 +78,7 @@ class RemoteTable(Table, ABC):
         elif conflict_type == ConflictType.Replace:
             create_index_conflict = ttypes.CreateConflict.Replace
         else:
-            raise InfinityException(3066, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
 
         res = self._conn.create_index(db_name=self._db_name,
                                       table_name=self._table_name,
@@ -99,7 +99,7 @@ class RemoteTable(Table, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_index_conflict = ttypes.DropConflict.Ignore
         else:
-            raise InfinityException(3066, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
 
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name, conflict_type=drop_index_conflict)
@@ -232,9 +232,9 @@ class RemoteTable(Table, ABC):
                                 literal_type=ttypes.LiteralType.DoubleTensorArray,
                                 f64_tensor_array_value=float_list)
                     else:
-                        raise InfinityException(3069, f"Invalid list type: {type(value)}")
+                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid list type: {type(value)}")
                 else:
-                    raise InfinityException(3069, f"Invalid constant type: {type(value)}")
+                    raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
 
                 expr_type = ttypes.ParsedExprType(
                     constant_expr=constant_expression)
@@ -271,19 +271,19 @@ class RemoteTable(Table, ABC):
                     elif file_type == 'fvecs':
                         options.copy_file_type = ttypes.CopyFileType.FVECS
                     else:
-                        raise InfinityException(3037, f"Unrecognized export file type: {file_type}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
-                        raise InfinityException(3037, f"Unrecognized export file delimiter: {delimiter}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
                         options.has_header = v
                     else:
-                        raise InfinityException(3037, "Boolean value is expected in header field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
                 else:
-                    raise InfinityException(3037, f"Unknown export parameter: {k}")
+                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
 
         res = self._conn.import_data(db_name=self._db_name,
                                      table_name=self._table_name,
@@ -294,7 +294,7 @@ class RemoteTable(Table, ABC):
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
-    def export_data(self, file_path: str, export_options: {} = None):
+    def export_data(self, file_path: str, export_options: {} = None, columns: [str] = None):
         options = ttypes.ExportOption()
         options.has_header = False
         options.delimiter = ','
@@ -309,24 +309,25 @@ class RemoteTable(Table, ABC):
                     elif file_type == 'jsonl':
                         options.copy_file_type = ttypes.CopyFileType.JSONL
                     else:
-                        raise InfinityException(3037, f"Unrecognized export file type: {file_type}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
-                        raise InfinityException(3037, f"Unrecognized export file delimiter: {delimiter}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
                         options.has_header = v
                     else:
-                        raise InfinityException(3037, "Boolean value is expected in header field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
                 else:
-                    raise InfinityException(3037, f"Unknown export parameter: {k}")
+                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
 
         res = self._conn.export_data(db_name=self._db_name,
                                      table_name=self._table_name,
                                      file_name=file_path,
-                                     export_options=options)
+                                     export_options=options,
+                                     columns=columns)
         if res.error_code == ErrorCode.OK:
             return res
         else:
@@ -378,7 +379,7 @@ class RemoteTable(Table, ABC):
                                 constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
                                                                           f64_array_value=value)
                         else:
-                            raise InfinityException(3069, "Invalid constant expression")
+                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
 
                         expr_type = ttypes.ParsedExprType(
                             constant_expr=constant_expression)

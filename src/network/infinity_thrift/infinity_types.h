@@ -146,7 +146,9 @@ struct CopyFileType {
     CSV = 0,
     JSON = 1,
     JSONL = 2,
-    FVECS = 3
+    FVECS = 3,
+    CSR = 4,
+    BVECS = 5
   };
 };
 
@@ -3712,9 +3714,10 @@ void swap(ImportRequest &a, ImportRequest &b);
 std::ostream& operator<<(std::ostream& out, const ImportRequest& obj);
 
 typedef struct _ExportRequest__isset {
-  _ExportRequest__isset() : db_name(false), table_name(false), file_name(false), export_option(false), session_id(false) {}
+  _ExportRequest__isset() : db_name(false), table_name(false), columns(false), file_name(false), export_option(false), session_id(false) {}
   bool db_name :1;
   bool table_name :1;
+  bool columns :1;
   bool file_name :1;
   bool export_option :1;
   bool session_id :1;
@@ -3735,6 +3738,7 @@ class ExportRequest : public virtual ::apache::thrift::TBase {
   virtual ~ExportRequest() noexcept;
   std::string db_name;
   std::string table_name;
+  std::vector<std::string>  columns;
   std::string file_name;
   ExportOption export_option;
   int64_t session_id;
@@ -3744,6 +3748,8 @@ class ExportRequest : public virtual ::apache::thrift::TBase {
   void __set_db_name(const std::string& val);
 
   void __set_table_name(const std::string& val);
+
+  void __set_columns(const std::vector<std::string> & val);
 
   void __set_file_name(const std::string& val);
 
@@ -3756,6 +3762,8 @@ class ExportRequest : public virtual ::apache::thrift::TBase {
     if (!(db_name == rhs.db_name))
       return false;
     if (!(table_name == rhs.table_name))
+      return false;
+    if (!(columns == rhs.columns))
       return false;
     if (!(file_name == rhs.file_name))
       return false;

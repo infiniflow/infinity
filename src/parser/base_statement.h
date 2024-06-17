@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "parser_assert.h"
 #include <string>
 
 namespace infinity {
@@ -37,6 +38,8 @@ enum class StatementType {
     kCommand,
     kCompact,
 };
+
+extern std::string StatementType2Str(StatementType statement_type);
 
 class BaseStatement {
 public:

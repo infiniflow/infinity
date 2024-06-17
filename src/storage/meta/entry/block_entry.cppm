@@ -146,8 +146,6 @@ public:
 
     bool CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts, bool check_append) const;
 
-    bool CheckDeleteVisible(Vector<BlockOffset> &block_offsets, TxnTimeStamp check_ts) const;
-
     void SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const;
 
     i32 GetAvailableCapacity();
@@ -157,6 +155,10 @@ public:
     const SharedPtr<DataType> GetColumnType(u64 column_id) const;
 
     Vector<UniquePtr<BlockColumnEntry>> &columns() { return columns_; }
+
+    ColumnVector GetCreateTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
+
+    ColumnVector GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
 
 public:
     // Setter

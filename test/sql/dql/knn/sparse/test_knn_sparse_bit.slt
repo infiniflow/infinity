@@ -73,3 +73,6 @@ SELECT c1 FROM test_knn_sparse_bit SEARCH MATCH SPARSE (c2, [20,30,40,60], 'ip',
 1
 1
 1
+
+statement ok
+DROP TABLE test_knn_sparse_bit;
