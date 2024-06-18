@@ -26,6 +26,21 @@ import serialize;
 
 namespace infinity {
 
+template <bool UseSIMD>
+void PostingList::Calculate(Vector<f32> &upper_bounds, f32 query_score) const {
+    if constexpr (UseSIMD) {
+        UnrecoverableError("Not implemented");
+    } else {
+        for (SizeT i = 0; i < block_ids_.size(); ++i) {
+            i32 block_id = block_ids_[i];
+            f32 score = max_scores_[i];
+            upper_bounds[block_id] += score * query_score;
+        }
+    }
+}
+
+template void PostingList::Calculate<false>(Vector<f32> &upper_bounds, f32 query_score) const;
+
 void BMIvt::AddBlock(i32 block_id, const Vector<Vector<Pair<i32, f32>>> &tail_terms) {
     HashMap<i32, f32> max_scores;
     for (const auto &terms : tail_terms) {
@@ -34,7 +49,8 @@ void BMIvt::AddBlock(i32 block_id, const Vector<Vector<Pair<i32, f32>>> &tail_te
         }
     }
     for (const auto &[term_id, score] : max_scores) {
-        postings_[term_id].max_scores_.emplace_back(block_id, score);
+        postings_[term_id].block_ids_.push_back(block_id);
+        postings_[term_id].max_scores_.push_back(score);
     }
 }
 
@@ -60,7 +76,7 @@ i8 TailFwd::AddDoc(const SparseVecRef<f32, i32> &doc) {
     return tail_terms_.size();
 }
 
-Vector<Pair<i32, Vector<Pair<i8, f32>>>> TailFwd::ToBlockFwd() const {
+Vector<Tuple<i32, Vector<i8>, Vector<f32>>> TailFwd::ToBlockFwd() const {
     Vector<Tuple<i32, i8, f32>> term_pairs;
     i8 block_size = tail_terms_.size();
     for (i8 block_offset = 0; block_offset < block_size; ++block_offset) {
@@ -70,22 +86,22 @@ Vector<Pair<i32, Vector<Pair<i8, f32>>>> TailFwd::ToBlockFwd() const {
     }
     std::sort(term_pairs.begin(), term_pairs.end(), [](const auto &a, const auto &b) { return std::get<0>(a) < std::get<0>(b); });
 
-    Vector<Pair<i32, Vector<Pair<i8, f32>>>> res;
+    Vector<Tuple<i32, Vector<i8>, Vector<f32>>> res;
     i32 last_term_id = -1;
-    Vector<Pair<i8, f32>> inners;
+    Vector<i8> block_offsets;
+    Vector<f32> scores;
     for (const auto &[term_id, block_offset, score] : term_pairs) {
         if (term_id != last_term_id) {
             if (last_term_id != -1) {
-                Vector<Pair<i8, f32>> inners1;
-                std::swap(inners1, inners);
-                res.emplace_back(last_term_id, std::move(inners1));
+                res.emplace_back(last_term_id, std::move(block_offsets), std::move(scores));
             }
             last_term_id = term_id;
         }
-        inners.emplace_back(block_offset, score);
+        block_offsets.push_back(block_offset);
+        scores.push_back(score);
     }
-    if (!inners.empty()) {
-        res.emplace_back(last_term_id, std::move(inners));
+    if (!block_offsets.empty()) {
+        res.emplace_back(last_term_id, std::move(block_offsets), std::move(scores));
     }
     return res;
 }
@@ -121,7 +137,7 @@ Optional<TailFwd> BlockFwd::AddDoc(const SparseVecRef<f32, i32> &doc) {
     TailFwd tail_fwd1;
     std::swap(tail_fwd1, tail_fwd_);
 
-    Vector<Pair<i32, Vector<Pair<i8, f32>>>> block_terms = tail_fwd1.ToBlockFwd();
+    Vector<Tuple<i32, Vector<i8>, Vector<f32>>> block_terms = tail_fwd1.ToBlockFwd();
     block_terms_.emplace_back(std::move(block_terms));
     return tail_fwd1;
 }
@@ -129,9 +145,9 @@ Optional<TailFwd> BlockFwd::AddDoc(const SparseVecRef<f32, i32> &doc) {
 Vector<Vector<f32>> BlockFwd::GetIvtScores(i32 term_num) const {
     Vector<Vector<f32>> res(term_num);
     for (const auto &block_terms : block_terms_) {
-        for (const auto &[term_id, inners] : block_terms) {
-            for (const auto &[block_offset, block_score] : inners) {
-                res[term_id].emplace_back(block_score);
+        for (const auto &[term_id, block_offsets, scores] : block_terms) {
+            for (SizeT i = 0; i < scores.size(); ++i) {
+                res[term_id].push_back(scores[i]);
             }
         }
     }
@@ -140,22 +156,21 @@ Vector<Vector<f32>> BlockFwd::GetIvtScores(i32 term_num) const {
 
 Vector<f32> BlockFwd::GetScores(i32 block_id, const SparseVecRef<f32, i32> &query) const {
     const auto &block_terms = block_terms_[block_id];
+    // const auto &[term_id, block_offsets, scores] = block_terms[j];
     Vector<f32> res(block_size_, 0.0);
     SizeT j = 0;
     for (i32 i = 0; i < query.nnz_; ++i) {
         i32 query_term = query.indices_[i];
         f32 query_score = query.data_[i];
-        while (j < block_terms.size() && block_terms[j].first < query_term) {
+        while (j < block_terms.size() && std::get<0>(block_terms[j]) < query_term) {
             ++j;
         }
         if (j == block_terms.size()) {
             break;
         }
-        if (block_terms[j].first == query_term) {
-            const auto &inners = block_terms[j].second;
-            for (const auto &[block_offset, block_score] : inners) {
-                res[block_offset] += query_score * block_score;
-            }
+        if (std::get<0>(block_terms[j]) == query_term) {
+            const auto &[_, block_offsets, scores] = block_terms[j];
+            BlockFwd::Calculate(block_offsets, scores, res, query_score);
         }
     }
     return res;
@@ -167,6 +182,20 @@ void BlockFwd::Prefetch(i32 block_id) const {
     const auto *ptr = reinterpret_cast<const char *>(block_terms_[block_id].data());
     _mm_prefetch(ptr, _MM_HINT_T0);
 }
+
+template <bool UseSIMD>
+void BlockFwd::Calculate(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score) {
+    if constexpr (UseSIMD) {
+        UnrecoverableError("Not implemented");
+    } else {
+        for (SizeT i = 0; i < block_offsets.size(); ++i) {
+            i8 block_offset = block_offsets[i];
+            res[block_offset] += query_score * scores[i];
+        }
+    }
+}
+
+template void BlockFwd::Calculate<false>(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
 
 void BMIndex::AddDoc(const SparseVecRef<f32, i32> &doc) {
     Optional<TailFwd> tail_fwd = block_fwd_.AddDoc(doc);
@@ -184,6 +213,7 @@ void BMIndex::Optimize(i32 topk) {
     bm_ivt_.Optimize(topk, std::move(ivt_scores));
 }
 
+template <bool UseLock>
 Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const {
     SparseVecEle<f32, i32> keeped_query;
     if (beta < 1.0) {
@@ -216,9 +246,7 @@ Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn(const SparseVecRef<f32, i32> &
         f32 query_score = query_ref.data_[i];
         const auto &posting = postings[query_term];
         threshold = std::max(threshold, query_score * posting.kth(topk));
-        for (const auto &[block_id, score] : posting.max_scores_) {
-            upper_bounds[block_id] += score * query_score;
-        }
+        posting.Calculate(upper_bounds, query_score);
     }
 
     Vector<Pair<f32, i32>> block_scores;
@@ -261,5 +289,7 @@ Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn(const SparseVecRef<f32, i32> &
     result_handler.End(0 /*query_id*/);
     return {result, result_score};
 }
+
+template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<false>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
 
 } // namespace infinity

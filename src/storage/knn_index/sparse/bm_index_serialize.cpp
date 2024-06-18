@@ -39,10 +39,8 @@ void PostingList::WriteAdv(char *&p) const {
     WriteBufAdv<f32>(p, kth_score_);
     SizeT max_score_size = max_scores_.size();
     WriteBufAdv<SizeT>(p, max_score_size);
-    for (const auto &[block_id, score] : max_scores_) {
-        WriteBufAdv<i32>(p, block_id);
-        WriteBufAdv<f32>(p, score);
-    }
+    WriteBufCharsAdv(p, reinterpret_cast<const char *>(block_ids_.data()), sizeof(i32) * block_ids_.size());
+    WriteBufCharsAdv(p, reinterpret_cast<const char *>(max_scores_.data()), sizeof(f32) * max_scores_.size());
 }
 
 PostingList PostingList::ReadAdv(char *&p) {
@@ -50,10 +48,13 @@ PostingList PostingList::ReadAdv(char *&p) {
     res.kth_ = ReadBufAdv<i32>(p);
     res.kth_score_ = ReadBufAdv<f32>(p);
     SizeT max_score_size = ReadBufAdv<SizeT>(p);
+    res.block_ids_.resize(max_score_size);
     res.max_scores_.resize(max_score_size);
     for (SizeT i = 0; i < max_score_size; ++i) {
-        res.max_scores_[i].first = ReadBufAdv<i32>(p);
-        res.max_scores_[i].second = ReadBufAdv<f32>(p);
+        res.block_ids_[i] = ReadBufAdv<i32>(p);
+    }
+    for (SizeT i = 0; i < max_score_size; ++i) {
+        res.max_scores_[i] = ReadBufAdv<f32>(p);
     }
     return res;
 }
@@ -128,8 +129,8 @@ SizeT BlockFwd::GetSizeInBytes() const {
     SizeT size = sizeof(block_size_) + sizeof(SizeT);
     for (const auto &block_terms : block_terms_) {
         size += sizeof(SizeT);
-        for (const auto &[term_id, inners] : block_terms) {
-            size += sizeof(i32) + sizeof(SizeT) + inners.size() * (sizeof(i8) + sizeof(f32));
+        for (const auto &[term_id, block_offsets, scores] : block_terms) {
+            size += sizeof(i32) + sizeof(SizeT) + block_offsets.size() * sizeof(i8) + scores.size() * sizeof(f32);
         }
     }
     size += tail_fwd_.GetSizeInBytes();
@@ -143,14 +144,12 @@ void BlockFwd::WriteAdv(char *&p) const {
     for (const auto &block_terms : block_terms_) {
         SizeT term_num = block_terms.size();
         WriteBufAdv<SizeT>(p, term_num);
-        for (const auto &[term_id, inners] : block_terms) {
+        for (const auto &[term_id, block_offsets, scores] : block_terms) {
             WriteBufAdv<i32>(p, term_id);
-            SizeT inner_num = inners.size();
+            SizeT inner_num = block_offsets.size();
             WriteBufAdv<SizeT>(p, inner_num);
-            for (const auto &[block_offset, block_score] : inners) {
-                WriteBufAdv<i8>(p, block_offset);
-                WriteBufAdv<f32>(p, block_score);
-            }
+            WriteBufCharsAdv(p, reinterpret_cast<const char *>(block_offsets.data()), sizeof(i8) * block_offsets.size());
+            WriteBufCharsAdv(p, reinterpret_cast<const char *>(scores.data()), sizeof(f32) * scores.size());
         }
     }
     tail_fwd_.WriteAdv(p);
@@ -159,19 +158,22 @@ void BlockFwd::WriteAdv(char *&p) const {
 BlockFwd BlockFwd::ReadAdv(char *&p) {
     i32 block_size = ReadBufAdv<i8>(p);
     SizeT block_num = ReadBufAdv<SizeT>(p);
-    Vector<Vector<Pair<i32, Vector<Pair<i8, f32>>>>> block_terms(block_num);
+    Vector<Vector<Tuple<i32, Vector<i8>, Vector<f32>>>> block_terms(block_num);
     for (SizeT i = 0; i < block_num; ++i) {
         SizeT term_num = ReadBufAdv<SizeT>(p);
         block_terms[i].resize(term_num);
         for (SizeT j = 0; j < term_num; ++j) {
             i32 term_id = ReadBufAdv<i32>(p);
             SizeT inner_num = ReadBufAdv<SizeT>(p);
-            block_terms[i][j].first = term_id;
-            block_terms[i][j].second.resize(inner_num);
+            Vector<i8> block_offsets(inner_num);
+            Vector<f32> scores(inner_num);
             for (SizeT k = 0; k < inner_num; ++k) {
-                block_terms[i][j].second[k].first = ReadBufAdv<i8>(p);
-                block_terms[i][j].second[k].second = ReadBufAdv<f32>(p);
+                block_offsets[k] = ReadBufAdv<i8>(p);
             }
+            for (SizeT k = 0; k < inner_num; ++k) {
+                scores[k] = ReadBufAdv<f32>(p);
+            }
+            block_terms[i][j] = {term_id, std::move(block_offsets), std::move(scores)};
         }
     }
     TailFwd tail_fwd = TailFwd::ReadAdv(p);

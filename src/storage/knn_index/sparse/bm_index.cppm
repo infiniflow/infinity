@@ -28,6 +28,9 @@ struct PostingList {
 public:
     f32 kth(i32 topk) const { return topk == kth_ ? kth_score_ : 0.0; }
 
+    template <bool UseSIMD = false>
+    void Calculate(Vector<f32> &upper_bounds, f32 query_score) const;
+
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
     static PostingList ReadAdv(char *&p);
@@ -35,7 +38,8 @@ public:
 public:
     i32 kth_{-1};
     f32 kth_score_;
-    Vector<Pair<i32, f32>> max_scores_;
+    Vector<i32> block_ids_;
+    Vector<f32> max_scores_;
 };
 
 struct BMIvt {
@@ -72,7 +76,7 @@ public:
 
     const Vector<Vector<Pair<i32, f32>>> &GetTailTerms() const { return tail_terms_; }
 
-    Vector<Pair<i32, Vector<Pair<i8, f32>>>> ToBlockFwd() const;
+    Vector<Tuple<i32, Vector<i8>, Vector<f32>>> ToBlockFwd() const;
 
     Vector<f32> GetScores(const SparseVecRef<f32, i32> &query) const;
 
@@ -86,7 +90,7 @@ private:
 
 struct BlockFwd {
 private:
-    BlockFwd(i8 block_size, Vector<Vector<Pair<i32, Vector<Pair<i8, f32>>>>> block_terms, TailFwd tail_fwd)
+    BlockFwd(i8 block_size, Vector<Vector<Tuple<i32, Vector<i8>, Vector<f32>>>> block_terms, TailFwd tail_fwd)
         : block_size_(block_size), block_terms_(std::move(block_terms)), tail_fwd_(std::move(tail_fwd)) {}
 
 public:
@@ -111,8 +115,12 @@ public:
     static BlockFwd ReadAdv(char *&p);
 
 private:
+    template <bool UseSIMD = false>
+    static void Calculate(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
+
+private:
     i8 block_size_;
-    Vector<Vector<Pair<i32, Vector<Pair<i8, f32>>>>> block_terms_;
+    Vector<Vector<Tuple<i32, Vector<i8>, Vector<f32>>>> block_terms_;
     TailFwd tail_fwd_;
 };
 
@@ -127,6 +135,7 @@ public:
 
     void Optimize(i32 topk);
 
+    template <bool UseLock = false>
     Pair<Vector<i32>, Vector<f32>> SearchKnn(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
 
     void Save(FileHandler &file_handler) const;
@@ -141,6 +150,8 @@ private:
     static BMIndex ReadAdv(char *&p);
 
 private:
+    std::shared_mutex mtx_;
+
     BMIvt bm_ivt_;
     BlockFwd block_fwd_;
 };
