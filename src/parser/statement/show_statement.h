@@ -44,6 +44,8 @@ enum class ShowStmtType {
     kBuffer,
     kQueries,
     kQuery,
+    kTransactions,
+    kTransaction,
     kIndexSegment,
     kIndexChunk,
 };
@@ -63,6 +65,7 @@ public:
     std::optional<int64_t> chunk_id_{};
     std::optional<u_int64_t> column_id_{};
     std::optional<u_int64_t> session_id_{};
+    std::optional<u_int64_t> txn_id_{};
     std::string var_name_{};
 };
 

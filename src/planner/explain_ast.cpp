@@ -650,6 +650,14 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW QUERY"));
             break;
         }
+        case ShowStmtType::kTransactions: {
+            result->emplace_back(MakeShared<String>("SHOW TRANSACTIONS"));
+            break;
+        }
+        case ShowStmtType::kTransaction: {
+            result->emplace_back(MakeShared<String>("SHOW TRANSACTION"));
+            break;
+        }
         case ShowStmtType::kProfiles: {
             result->emplace_back(MakeShared<String>("SHOW QUERIES"));
             break;
