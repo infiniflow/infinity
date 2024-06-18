@@ -14,8 +14,9 @@
 
 module;
 
-#include "CControl_svd.h"
 #include "inc/mlas.h"
+#include <chrono>
+#include <iostream>
 
 module emvb_product_quantization;
 import stl;
@@ -27,6 +28,7 @@ import third_party;
 import logger;
 import infinity_exception;
 import file_system;
+import eigen_svd;
 
 namespace infinity {
 
@@ -155,7 +157,7 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
     // step 2. train R for iter_cnt times
     const auto transformed_embedding = MakeUniqueForOverwrite<f32[]>(embedding_num * this->dimension_);
     const auto encoded_transformed = MakeUniqueForOverwrite<Array<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>[]>(embedding_num);
-    {
+    if constexpr (false) {
         // TODO: Fix svd, and remove this code block.
         matrixA_multiply_matrixB_output_to_C(embedding_data,
                                              matrix_R_.get(),
@@ -176,18 +178,27 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
     }
     const auto square_for_svd = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
     const auto svd_u = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
-    const auto svd_s = MakeUniqueForOverwrite<f32[]>(this->dimension_);
     const auto svd_v = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
     auto old_R = MakeUniqueForOverwrite<f32[]>(this->dimension_ * this->dimension_);
+    const u32 loop_short = std::min<u32>(3, (iter_cnt + 1) / 2);
+    const u32 loop_middle = std::max<u32>(3, (iter_cnt + 1) / 2);
+    const u32 loop_long = iter_cnt;
     for (u32 i = 0; i < 6; ++i) {
+        const auto time_0 = std::chrono::high_resolution_clock::now();
         matrixA_multiply_matrixB_output_to_C(embedding_data,
                                              matrix_R_.get(),
                                              embedding_num,
                                              this->dimension_,
                                              this->dimension_,
                                              transformed_embedding.get());
-        const u32 train_iter_cnt = i < 3 ? ((iter_cnt + 1) / 2) : iter_cnt;
+        const u32 train_iter_cnt = i < 3 ? loop_short : (i < 5 ? loop_middle : loop_long);
         PQ_BASE::Train(transformed_embedding.get(), embedding_num, train_iter_cnt);
+        const auto time_1 = std::chrono::high_resolution_clock::now();
+        {
+            std::ostringstream oss;
+            oss << "OPQ loop: " << i << ", train time: " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_1 - time_0);
+            LOG_INFO(std::move(oss).str());
+        }
         // update R
         PQ_BASE::EncodeEmbedding(transformed_embedding.get(), embedding_num, encoded_transformed.get());
         const auto decoded_encoded = PQ_BASE::DecodeEmbedding(encoded_transformed.get(), embedding_num); // embedding_num * dimension_
@@ -196,38 +207,54 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, 
             LOG_INFO(fmt::format("OPQ loop: {}, encode_decode error: {}", i, rotate_error));
             LOG_INFO(fmt::format("OPQ loop: {}, encode_decode error avg: {}", i, rotate_error / (embedding_num * this->dimension_)));
         }
-        std::swap(old_R, matrix_R_);
+        const auto time_2 = std::chrono::high_resolution_clock::now();
+        {
+            std::ostringstream oss;
+            oss << "OPQ loop: " << i
+                << ", encode_decode time: " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_2 - time_1);
+            LOG_INFO(std::move(oss).str());
+        }
         transpose_matrixA_multiply_matrixB_output_to_C(embedding_data,
                                                        decoded_encoded.get(),
                                                        this->dimension_,
                                                        this->dimension_,
                                                        embedding_num,
                                                        square_for_svd.get());
-        //  TODO: fix svd
-        svd(square_for_svd.get(), this->dimension_, this->dimension_, svd_u.get(), svd_s.get(), svd_v.get());
+        //  TODO: verify svd
+        EMVBSVDSolve(this->dimension_, square_for_svd.get(), svd_u.get(), svd_v.get());
+        // update matrix R
+        std::swap(old_R, matrix_R_);
         matrixA_multiply_transpose_matrixB_output_to_C(svd_u.get(),
                                                        svd_v.get(),
                                                        this->dimension_,
                                                        this->dimension_,
                                                        this->dimension_,
                                                        matrix_R_.get());
+        const auto time_3 = std::chrono::high_resolution_clock::now();
+        {
+            std::ostringstream oss;
+            oss << "OPQ loop: " << i << ", svd time: " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_3 - time_2);
+            LOG_INFO(std::move(oss).str());
+        }
         {
             const auto R_diff = L2Distance<f32>(old_R.get(), matrix_R_.get(), this->dimension_ * this->dimension_);
             LOG_INFO(fmt::format("OPQ loop: {}, old R diff: {}", i, R_diff));
             const auto L2Norm = L2NormSquare<f32>(matrix_R_.get(), this->dimension_ * this->dimension_);
             LOG_INFO(fmt::format("OPQ loop: {}, R L2Norm: {}", i, L2Norm));
-            matrixA_multiply_matrixB_output_to_C(embedding_data,
-                                                 matrix_R_.get(),
-                                                 embedding_num,
-                                                 this->dimension_,
-                                                 this->dimension_,
-                                                 transformed_embedding.get());
-            PQ_BASE::EncodeEmbedding(transformed_embedding.get(), embedding_num, encoded_transformed.get());
-            const auto decoded_encoded_1 = PQ_BASE::DecodeEmbedding(encoded_transformed.get(), embedding_num); // embedding_num * dimension_
-            const auto rotate_error_1 = L2Distance<f32>(transformed_embedding.get(), decoded_encoded_1.get(), embedding_num * this->dimension_);
-            LOG_INFO(fmt::format("OPQ loop: {}, encode_decode error: {}", i, rotate_error_1));
-            LOG_INFO(fmt::format("OPQ loop: {}, encode_decode error avg: {}", i, rotate_error_1 / (embedding_num * this->dimension_)));
         }
+    }
+    {
+        matrixA_multiply_matrixB_output_to_C(embedding_data,
+                                             matrix_R_.get(),
+                                             embedding_num,
+                                             this->dimension_,
+                                             this->dimension_,
+                                             transformed_embedding.get());
+        PQ_BASE::EncodeEmbedding(transformed_embedding.get(), embedding_num, encoded_transformed.get());
+        const auto decoded_encoded_final = PQ_BASE::DecodeEmbedding(encoded_transformed.get(), embedding_num); // embedding_num * dimension_
+        const auto rotate_error_final = L2Distance<f32>(transformed_embedding.get(), decoded_encoded_final.get(), embedding_num * this->dimension_);
+        LOG_INFO(fmt::format("OPQ final result: encode_decode error: {}", rotate_error_final));
+        LOG_INFO(fmt::format("OPQ final result: encode_decode error avg: {}", rotate_error_final / (embedding_num * this->dimension_)));
     }
 }
 
