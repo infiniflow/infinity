@@ -25,7 +25,9 @@ if (CLANG_VERSION_STRING VERSION_GREATER 16)
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
 
 else ()
-    message(FATAL_ERROR, "Please use clang version 17.0 and above")
+
+    message(FATAL_ERROR, "Please use clang version 17.0 and above, current version: ", ${CLANG_VERSION_STRING})
+
 endif ()
 
 # Get current system time and print the build time

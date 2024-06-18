@@ -403,6 +403,10 @@ Status Status::NameMismatched(const String& name_left, const String& name_right)
     return Status(ErrorCode::kNameMismatched, MakeUnique<String>(fmt::format("It is {}, expects {}", name_left, name_right)));
 }
 
+Status Status::TransactionNotFound(TransactionID txn_id) {
+    return Status(ErrorCode::kTransactionNotFound, MakeUnique<String>(fmt::format("Transaction {} isn't found", txn_id)));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));

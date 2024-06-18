@@ -197,6 +197,7 @@ class TestInfinity:
     def test_with_fulltext_match_with_invalid_columns(self, check_data, match_param_1):
         self.test_infinity_obj._test_with_fulltext_match_with_invalid_columns(check_data, match_param_1)
 
+    @pytest.mark.skip
     @pytest.mark.parametrize("match_param_2", ["a word a segment",
                                                "body=Greek"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",

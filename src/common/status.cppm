@@ -126,6 +126,7 @@ export enum class ErrorCode : long {
     kInvalidExplainType = 3081,
     kChunkNotExist = 3082,
     kNameMismatched = 3083,
+    kTransactionNotFound = 3084,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -271,6 +272,7 @@ public:
     static Status InvalidAnalyzerFile(const String& detailed_info);
     static Status ChunkNotExist(ChunkID chunk_id);
     static Status NameMismatched(const String& name_left, const String& name_right);
+    static Status TransactionNotFound(TransactionID txn_id);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id);
