@@ -8,10 +8,12 @@
 - install new python SDK
 
 # build python SDK
-Execute the following command under the root path of infinity project.
+Execute the following command under the root path of infinity project, but not python SDK project root path.
+
 ```shell
 rm -f dist/* && pip wheel . -w dist
 ```
+
 Note: This command will compile C++ code, which may take a long time. You can use `-v` to display the compilation details, i.e. `rm -f dist/* && pip wheel . -v -w dist`
 
 # install python SDK

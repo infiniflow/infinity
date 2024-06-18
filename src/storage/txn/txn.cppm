@@ -71,7 +71,7 @@ public:
                  BGTaskProcessor *bg_task_processor,
                  TransactionID txn_id,
                  TxnTimeStamp begin_ts,
-                 UniquePtr<String> txn_text);
+                 SharedPtr<String> txn_text);
 
     // For replay txn
     explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
@@ -210,6 +210,10 @@ public:
 
     WalEntry *GetWALEntry() const;
 
+    const SharedPtr<String> GetTxnText() const {
+        return txn_text_;
+    }
+
 private:
     void CheckTxnStatus();
 
@@ -242,7 +246,7 @@ private:
     bool done_bottom_{false};
 
     // String
-    UniquePtr<String> txn_text_{nullptr};
+    SharedPtr<String> txn_text_{nullptr};
 };
 
 } // namespace infinity

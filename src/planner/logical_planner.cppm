@@ -151,6 +151,10 @@ public:
 
     Status BuildShowQuery(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowTransactions(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowTransaction(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     Status BuildShowBuffer(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowProfiles(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

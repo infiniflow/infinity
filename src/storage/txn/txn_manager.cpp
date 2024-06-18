@@ -53,7 +53,7 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
         UnrecoverableError(error_message);
     }
 
-    rw_locker_.lock();
+    locker_.lock();
 
     // Assign a new txn id
     u64 new_txn_id = ++catalog_->next_txn_id_;
@@ -67,26 +67,26 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
     beginned_txns_.emplace_back(new_txn);
-    rw_locker_.unlock();
+    locker_.unlock();
 
     // LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
     return new_txn.get();
 }
 
 Txn *TxnManager::GetTxn(TransactionID txn_id) {
-    std::lock_guard guard(rw_locker_);
+    std::lock_guard guard(locker_);
     Txn *res = txn_map_.at(txn_id).get();
     return res;
 }
 
 SharedPtr<Txn> TxnManager::GetTxnPtr(TransactionID txn_id) {
-    std::lock_guard guard(rw_locker_);
+    std::lock_guard guard(locker_);
     SharedPtr<Txn> res = txn_map_.at(txn_id);
     return res;
 }
 
 TxnState TxnManager::GetTxnState(TransactionID txn_id) {
-    std::lock_guard guard(rw_locker_);
+    std::lock_guard guard(locker_);
     auto iter = txn_map_.find(txn_id);
     if (iter == txn_map_.end()) {
         return TxnState::kCommitted;
@@ -96,7 +96,7 @@ TxnState TxnManager::GetTxnState(TransactionID txn_id) {
 }
 
 bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    std::lock_guard guard(rw_locker_);
+    std::lock_guard guard(locker_);
     auto iter = txn_map_.find(txn_id);
     if (iter == txn_map_.end()) {
         return true; // Txn is already committed
@@ -110,14 +110,14 @@ bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) 
 }
 
 TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
-    std::lock_guard guard(rw_locker_);
+    std::lock_guard guard(locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
     txn->SetTxnRead();
     return commit_ts;
 }
 
 TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
-    std::lock_guard guard(rw_locker_);
+    std::lock_guard guard(locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
     finishing_txns_.emplace(txn);
@@ -130,7 +130,7 @@ bool TxnManager::CheckConflict(Txn *txn) {
     TxnTimeStamp commit_ts = txn->CommitTS();
     Vector<Txn *> candidate_txns;
     {
-        std::lock_guard guard(rw_locker_);
+        std::lock_guard guard(locker_);
         // LOG_INFO(fmt::format("Txn {} check conflict", txn->TxnID()));
         for (auto *finishing_txn : finishing_txns_) {
             // LOG_INFO(fmt::format("Txn {} tries to test txn {}", txn->TxnID(), finishing_txn->TxnID()));
@@ -177,7 +177,7 @@ void TxnManager::SendToWAL(Txn *txn) {
     TxnTimeStamp commit_ts = txn->CommitTS();
     WalEntry *wal_entry = txn->GetWALEntry();
 
-    std::lock_guard guard(rw_locker_);
+    std::lock_guard guard(locker_);
     if (wait_conflict_ck_.empty()) {
         String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
         LOG_ERROR(error_message);
@@ -230,7 +230,7 @@ void TxnManager::Stop() {
     }
 
     LOG_INFO("Txn manager is stopping...");
-    std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+    std::unique_lock<std::mutex> w_locker(locker_);
     auto it = txn_map_.begin();
     while (it != txn_map_.end()) {
         // remove and notify the wal manager condition variable
@@ -258,14 +258,37 @@ void TxnManager::RollBackTxn(Txn *txn) {
 }
 
 SizeT TxnManager::ActiveTxnCount() {
-    std::unique_lock w_lock(rw_locker_);
+    std::unique_lock w_lock(locker_);
     return txn_map_.size();
+}
+
+Vector<TxnInfo> TxnManager::GetTxnInfoArray() const {
+    Vector<TxnInfo> res;
+    res.reserve(txn_map_.size());
+
+    std::unique_lock w_lock(locker_);
+    for(const auto& txn_pair: txn_map_) {
+        TxnInfo txn_info;
+        txn_info.txn_id_ = txn_pair.first;
+        txn_info.txn_text_ = txn_pair.second->GetTxnText();
+        res.emplace_back(txn_info);
+    }
+    return res;
+}
+
+UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
+    std::unique_lock w_lock(locker_);
+    auto iter = txn_map_.find(txn_id);
+    if(iter == txn_map_.end()) {
+        return nullptr;
+    }
+    return MakeUnique<TxnInfo>(iter->first, iter->second->GetTxnText());
 }
 
 TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
 
 TxnTimeStamp TxnManager::GetCleanupScanTS() {
-    std::lock_guard guard(rw_locker_);
+    std::lock_guard guard(locker_);
     TxnTimeStamp first_uncommitted_begin_ts = start_ts_;
     while (!beginned_txns_.empty()) {
         auto first_txn = beginned_txns_.front().lock();
@@ -282,7 +305,7 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
 // A Txn can be deleted when there is no uncommitted txn whose begin is less than the commit ts of the txn
 // So maintain the least uncommitted begin ts
 void TxnManager::FinishTxn(Txn *txn) {
-    std::lock_guard guard(rw_locker_);
+    std::lock_guard guard(locker_);
 
     if (txn->GetTxnType() == TxnType::kInvalid) {
         String error_message = "Txn type is invalid";
