@@ -28,6 +28,10 @@ class SegmentIndexEntry;
 class SegmentEntry;
 class IndexBase;
 class EMVBIndex;
+struct Bitmask;
+struct BlockIndex;
+
+using EMVBInMemQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;
 
 // 1. when data count is not enough for training centroids, just keep a record of the embeddings count
 // 2. when data count is enough, build the emvb index
@@ -60,6 +64,20 @@ public:
     void Insert(u16 block_id, BlockColumnEntry *block_column_entry, BufferManager *buffer_manager, u32 row_offset, u32 row_count);
 
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
+
+    // return id: offset in the segment
+    std::variant<Pair<u32, u32>, EMVBInMemQueryResultType> SearchWithBitmask(const f32 *query_ptr,
+                                                                             u32 query_embedding_num,
+                                                                             u32 top_n,
+                                                                             Bitmask &bitmask,
+                                                                             const SegmentEntry *segment_entry,
+                                                                             const BlockIndex *block_index,
+                                                                             TxnTimeStamp begin_ts,
+                                                                             u32 centroid_nprobe,
+                                                                             f32 threshold_first,
+                                                                             u32 n_doc_to_score,
+                                                                             u32 out_second_stage,
+                                                                             f32 threshold_final) const;
 };
 
 } // namespace infinity
