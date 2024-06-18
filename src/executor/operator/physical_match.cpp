@@ -589,6 +589,9 @@ void ExecuteFTSearch(UniquePtr<EarlyTerminateIterator> &et_iter,
                         et_iter->UpdateScoreThreshold(new_threshold);
                     }
                 }
+                if (blockmax_loop_cnt % 10 == 0) {
+                    LOG_DEBUG(fmt::format("ExecuteFTSearch has evaluated {} candidates", blockmax_loop_cnt));
+                }
             }
             break;
         }
@@ -607,6 +610,9 @@ void ExecuteFTSearch(UniquePtr<EarlyTerminateIterator> &et_iter,
                     if (const float new_threshold = result_heap.GetScoreThreshold(); new_threshold > 0.0f) {
                         et_iter->UpdateScoreThreshold(new_threshold);
                     }
+                }
+                if (blockmax_loop_cnt % 10 == 0) {
+                    LOG_DEBUG(fmt::format("ExecuteFTSearch has evaluated {} candidates", blockmax_loop_cnt));
                 }
             }
         }

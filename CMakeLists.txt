@@ -149,6 +149,19 @@ if(ENABLE_JEMALLOC AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
 endif()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+
+find_package(Python 3.8
+        REQUIRED COMPONENTS Interpreter Development.Module
+        OPTIONAL_COMPONENTS Development.SABIModule)
+
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif ()
+
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/nanobind)
+
 add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
 
@@ -180,7 +193,7 @@ set(CMAKE_INSTALL_PREFIX /usr)
 install(TARGETS infinity DESTINATION bin)
 install(FILES conf/infinity.service DESTINATION lib/systemd/system)
 install(FILES conf/infinity_conf.toml DESTINATION etc)
-install(DIRECTORY ../resource/jieba DESTINATION ../var/infinity/resource)
+#install(DIRECTORY ../resource/jieba DESTINATION ../var/infinity/resource)
 
 # https://cmake.org/cmake/help/latest/cpack_gen/rpm.html
 # Specify the post-install script for RPM

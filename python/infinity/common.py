@@ -33,6 +33,8 @@ INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]]]
 REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)
 LOCAL_HOST = NetworkAddress("0.0.0.0", 23817)
 
+# test embedded_infinity
+LOCAL_INFINITY_PATH = "/var/infinity"
 
 class ConflictType(object):
     Ignore = 0

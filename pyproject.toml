@@ -1,0 +1,60 @@
+[build-system]
+requires = ["scikit-build-core", "setuptools", "wheel", "nanobind"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "infinity_sdk"
+version = "0.2.0.dev7"
+requires-python = ">=3.10"
+dependencies = [
+    "sqlglot~=11.7.1",
+    "pydantic~=2.7.1",
+    "thrift~=0.20.0",
+    "setuptools~=69.5.1",
+    "pytest~=8.2.0",
+    "pandas~=2.2.2",
+    "numpy~=1.26.4",
+    "pyarrow~=16.0.0",
+    "polars~=0.20.23",
+    "openpyxl~=3.1.2"
+]
+description = "infinity"
+readme = "README.md"
+
+[tool.scikit-build]
+minimum-version = "0.4"
+
+#build-dir = "build/{wheel_tag}"
+build-dir = "cmake-build-release"
+
+wheel.py-api = "cp310"
+wheel.packages = ["src/embedded_infinity", "python/infinity"]
+
+[tool.cibuildwheel]
+build-verbosity = 1
+
+# Needed for full C++17 support
+[tool.cibuildwheel.macos.environment]
+MACOSX_DEPLOYMENT_TARGET = "10.14"
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+markers = [
+    "L0",
+    "L1",
+    "L2",
+    "L3",
+    "complex",
+    "slow",
+    "nightly",
+]
+
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::ResourceWarning",
+    "ignore:pkg_resources is deprecated as an API:DeprecationWarning",
+    # "ignore::thrift.transport.TTransport",
+    # note the use of single quote below to denote "raw" strings in TOML
+    'ignore:function ham\(\) is deprecated:DeprecationWarning',
+]

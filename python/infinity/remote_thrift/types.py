@@ -151,9 +151,6 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
             return list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
         case ttypes.ColumnType.ColumnEmbedding:
             dimension = column_data_type.physical_type.embedding_type.dimension
-            # print(dimension)
-            # print(len(column_vector))
-            # print(len(column_vector) // dimension)
             if column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt8:
                 all_list = list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]

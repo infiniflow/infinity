@@ -319,9 +319,9 @@ public:
     void Optimize() { data_store_.Optimize(); }
 
     void Build(VertexType vertex_i) {
-        i32 q_layer = GenerateRandomLayer();
-
         std::unique_lock<std::shared_mutex> lock = data_store_.UniqueLock(vertex_i);
+
+        i32 q_layer = GenerateRandomLayer();
         auto [max_layer, ep] = data_store_.TryUpdateEnterPoint(q_layer, vertex_i);
 
         StoreType query = data_store_.GetVec(vertex_i);
