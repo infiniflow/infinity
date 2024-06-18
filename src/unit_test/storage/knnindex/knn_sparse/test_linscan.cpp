@@ -14,12 +14,12 @@
 
 #include "unit_test/base_test.h"
 #include <cassert>
-#include "sparse_test_util.h"
 
 import stl;
 import linscan_alg;
 import sparse_util;
 import third_party;
+import sparse_test_util;
 
 using namespace infinity;
 

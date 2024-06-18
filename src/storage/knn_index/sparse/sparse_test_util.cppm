@@ -12,24 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+module;
 
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
 
+export module sparse_test_util;
+
 import stl;
 import sparse_vector_distance;
-import knn_result_handler;
 import file_system;
 import linscan_alg;
 import sparse_util;
 import infinity_exception;
-import third_party;
 
 namespace infinity {
 
-struct SparseTestUtil {
+export struct SparseTestUtil {
     static bool CheckAccurateKnn(const i32 *gt_indices,
                                  const f32 *gt_scores,
                                  u32 gt_size,
@@ -70,17 +70,17 @@ struct SparseTestUtil {
 
     static void
     PrintQuery(u32 query_id, const i32 *gt_indices, const f32 *gt_scores, u32 gt_size, const Vector<i32> &indices, const Vector<f32> &scores) {
-        std::cout << fmt::format("Query {}\n", query_id);
+        std::cout << "Query " << query_id << std::endl;
         std::cout << "Result:\n";
         for (u32 i = 0; i < indices.size(); ++i) {
-            std::cout << fmt::format("{} {}, ", indices[i], scores[i]);
+            std::cout << indices[i] << " " << scores[i] << ", ";
         }
-        std::cout << "\n";
+        std::cout << std::endl;
         std::cout << "Groundtruth:\n";
         for (u32 i = 0; i < gt_size; ++i) {
-            std::cout << fmt::format("{} {}, ", gt_indices[i], gt_scores[i]);
+            std::cout << gt_indices[i] << " " << gt_scores[i] << ", ";
         }
-        std::cout << "\n";
+        std::cout << std::endl;
     }
 
     static SparseMatrix<f32, i32> GenerateDataset(u32 nrow, u32 ncol, f32 sparsity = 0.01, f32 data_min = -10.0, f32 data_max = 10.0) {

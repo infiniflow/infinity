@@ -14,7 +14,6 @@
 
 #include "unit_test/base_test.h"
 #include <fstream>
-#include "../knn_sparse/sparse_test_util.h"
 
 import stl;
 import hnsw_alg;
@@ -27,6 +26,7 @@ import file_system_type;
 import compilation_config;
 import infinity_exception;
 import third_party;
+import sparse_test_util;
 
 using namespace infinity;
 

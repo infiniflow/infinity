@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sparse_test_util.h"
 #include "unit_test/base_test.h"
 #include <cassert>
 
@@ -24,6 +23,8 @@ import compilation_config;
 import file_system;
 import local_file_system;
 import file_system_type;
+import sparse_test_util;
+import infinity_exception;
 
 using namespace infinity;
 
