@@ -46,7 +46,7 @@ export template <typename DataType, typename CompressType, typename LVQCache>
 class LVQVecStoreMeta {
 public:
     // Compress type must be i8 temporarily
-    static_assert(std::is_same<CompressType, i8>());
+    static_assert(std::is_same<CompressType, i8>() || std::is_same<CompressType, void>());
     constexpr static SizeT max_bucket_idx_ = std::numeric_limits<CompressType>::max() - std::numeric_limits<CompressType>::min(); // 255 for i8
 
     using This = LVQVecStoreMeta<DataType, CompressType, LVQCache>;

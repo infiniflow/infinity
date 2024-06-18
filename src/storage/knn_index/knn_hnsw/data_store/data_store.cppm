@@ -84,7 +84,7 @@ public:
     static This Make(SizeT chunk_size, SizeT max_chunk_n, SizeT dim, SizeT Mmax0, SizeT Mmax) {
         bool normalize = false;
         if constexpr (has_compress_type<VecStoreT>::value) {
-            normalize = true;
+            normalize = std::is_same_v<VecStoreMeta, typename LVQCosVecStoreType<DataType, typename VecStoreT::CompressType>::Meta>;
         }
         VecStoreMeta vec_store_meta = VecStoreMeta::Make(dim, normalize);
         GraphStoreMeta graph_store_meta = GraphStoreMeta::Make(Mmax0, Mmax);
