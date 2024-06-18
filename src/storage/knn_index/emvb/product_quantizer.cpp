@@ -358,6 +358,8 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Save(FileHandler &file_handler) {
                            encoded_embedding.size() * sizeof(typename std::decay_t<decltype(encoded_embedding)>::value_type));
     }
     file_handler.Write(&this->next_embedding_id_, sizeof(this->next_embedding_id_));
+    // save matrix R
+    file_handler.Write(matrix_R_.get(), this->dimension_ * this->dimension_ * sizeof(typename decltype(matrix_R_)::element_type));
 }
 
 template <std::unsigned_integral SUBSPACE_CENTROID_TAG, u32 SUBSPACE_NUM>
@@ -385,6 +387,8 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Load(FileHandler &file_handler) {
         LOG_ERROR(error_info);
         UnrecoverableError(error_info);
     }
+    // load matrix R
+    file_handler.Read(matrix_R_.get(), this->dimension_ * this->dimension_ * sizeof(typename decltype(matrix_R_)::element_type));
 }
 
 constexpr u32 current_max_subspace_num = 128;
