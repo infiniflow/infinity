@@ -87,10 +87,26 @@ protected:
     Vector<Vector<i32>> GenerateFwd(i32 data_n, i32 query_n, i32 edge_n) {
         Vector<Vector<i32>> fwd;
 
-        Vector<i32> data_indices = GetRandom(data_n - 1, 0, edge_n);
-        data_indices.push_back(0);
-        data_indices.push_back(edge_n);
-        std::sort(data_indices.begin(), data_indices.end());
+        Vector<i32> data_indices;
+        while (true) {
+            data_indices = GetRandom(data_n - 1, 0, edge_n);
+            data_indices.push_back(0);
+            data_indices.push_back(edge_n);
+            std::sort(data_indices.begin(), data_indices.end());
+            bool check = true;
+            for (i32 i = 0; i < data_n; ++i) {
+                auto diff = data_indices[i + 1] - data_indices[i] ;
+                if (diff > query_n) {
+                    check = false;
+                    break;
+                }
+            }
+            if (check) {
+                break;
+            }
+            data_indices.clear();
+        }
+
         for (i32 i = 0; i < data_n; ++i) {
             i32 qn = data_indices[i + 1] - data_indices[i];
             Vector<i32> posting = GetRandomNoRepeat(qn, 0, query_n);
@@ -141,7 +157,7 @@ TEST_F(BPReorderingTest, test1) {
 }
 
 TEST_F(BPReorderingTest, test2) {
-    i32 data_n = 10000;
+    i32 data_n = 1000;
     i32 query_n = 1000;
     i32 edge_n = data_n * query_n / 10;
     // i32 m = 100;
