@@ -248,6 +248,7 @@ public:
 struct BMPOption : public BenchmarkOption {
 public:
     void ParseInner(CLI::App &app_) override {
+        app_.add_option("--topk", topk_, "Topk")->required(false)->transform(CLI::Range(1, 1024));
         app_.add_option("--block_size", block_size_, "Block size")->required(false)->transform(CLI::Range(1, 1024));
         app_.add_option("--alpha", alpha_, "Alpha")->required(false)->transform(CLI::Range(0.0, 100.0));
         app_.add_option("--beta", beta_, "Beta")->required(false)->transform(CLI::Range(0.0, 100.0));
@@ -256,6 +257,7 @@ public:
     String IndexName() const override { return fmt::format("bmp_block{}", block_size_); }
 
 public:
+    i32 topk_ = 10;
     i8 block_size_ = 8;
     f32 alpha_ = 1.0;
     f32 beta_ = 1.0;

@@ -48,24 +48,28 @@ int main(int argc, char *argv[]) {
         case ModeType::kImport: {
             SparseMatrix<f32, i32> data_mat = DecodeSparseDataset(opt.data_path_);
             profiler.Begin();
-            BMIndexBuilder builder(data_mat.ncol_, opt.block_size_);
+            // BMIndexBuilder builder(data_mat.ncol_, opt.block_size_);
+            BMIndex index(data_mat.ncol_, opt.block_size_);
             for (SparseMatrixIter<f32, i32> iter(data_mat); iter.HasNext(); iter.Next()) {
                 SparseVecRef vec = iter.val();
                 u32 doc_id = iter.row_id();
 
-                Vector<Pair<i32, f32>> doc;
-                for (i32 term_id = 0; term_id < vec.nnz_; ++term_id) {
-                    doc.emplace_back(vec.indices_[term_id], vec.data_[term_id]);
-                }
-                builder.AddDoc(std::move(doc));
+                // Vector<Pair<i32, f32>> doc;
+                // for (i32 term_id = 0; term_id < vec.nnz_; ++term_id) {
+                //     doc.emplace_back(vec.indices_[term_id], vec.data_[term_id]);
+                // }
+                // builder.AddDoc(std::move(doc));
+                index.AddDoc(vec);
 
                 if (LogInterval != 0 && doc_id % LogInterval == 0) {
                     std::cout << fmt::format("Imported {} docs\n", doc_id);
                 }
             }
             data_mat.Clear();
-            std::cout << "Building index...\n";
-            BMIndex index = std::move(builder).Build();
+            // std::cout << "Building index...\n";
+            // BMIndex index = std::move(builder).Build();
+            std::cout << "Optimizing index...\n";
+            index.Optimize(opt.topk_);
             std::cout << "Index built\n";
             profiler.End();
 
@@ -88,6 +92,9 @@ int main(int argc, char *argv[]) {
             BMIndex index = BMIndex::Load(*file_handler);
 
             auto [top_k, all_query_n, _1, _2] = DecodeGroundtruth(opt.groundtruth_path_, true);
+            if ((int)top_k != opt.topk_) {
+                UnrecoverableError(fmt::format("Topk mismatch: {} vs {}", top_k, opt.topk_));
+            }
             Vector<Pair<Vector<i32>, Vector<f32>>> query_result;
             {
                 SparseMatrix<f32, i32> query_mat = DecodeSparseDataset(opt.query_path_);

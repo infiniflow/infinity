@@ -81,18 +81,22 @@ TEST_F(BMIndexTest, test1) {
         }
     };
     {
-        BMIndexBuilder builder(ncol, block_size);
+        // BMIndexBuilder builder(ncol, block_size);
+        BMIndex index(ncol, block_size);
         for (SparseMatrixIter iter(dataset); iter.HasNext(); iter.Next()) {
             SparseVecRef vec = iter.val();
 
-            Vector<Pair<i32, f32>> doc;
-            for (i32 term_id = 0; term_id < vec.nnz_; ++term_id) {
-                doc.emplace_back(vec.indices_[term_id], vec.data_[term_id]);
-            }
-            builder.AddDoc(std::move(doc));
+            // Vector<Pair<i32, f32>> doc;
+            // for (i32 term_id = 0; term_id < vec.nnz_; ++term_id) {
+            //     doc.emplace_back(vec.indices_[term_id], vec.data_[term_id]);
+            // }
+            // builder.AddDoc(std::move(doc));
+            index.AddDoc(vec);
         }
-        BMIndex index = std::move(builder).Build();
+        // BMIndex index = std::move(builder).Build();
 
+        test_query(index);
+        index.Optimize(topk);
         test_query(index);
 
         auto [file_handler, status] = fs.OpenFile(save_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
