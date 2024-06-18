@@ -11,7 +11,7 @@ from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
 from infinity.common import VEC, InfinityException
-from embedded_infinity import *
+from infinity.embedded_infinity_ext import *
 from infinity.local_infinity.types import logic_type_to_dtype
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
 from infinity.table import ExplainType as BaseExplainType

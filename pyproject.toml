@@ -28,7 +28,7 @@ minimum-version = "0.4"
 build-dir = "cmake-build-release"
 
 wheel.py-api = "cp310"
-wheel.packages = ["src/embedded_infinity", "python/infinity"]
+wheel.packages = ["python/infinity"]
 
 [tool.cibuildwheel]
 build-verbosity = 1
