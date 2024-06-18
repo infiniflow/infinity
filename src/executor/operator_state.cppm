@@ -502,10 +502,7 @@ export struct TableScanSourceState : public SourceState {
 };
 
 export struct MatchTensorScanSourceState : public SourceState {
-    explicit MatchTensorScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
-        : SourceState(SourceStateType::kMatchTensorScan), global_ids_(std::move(global_ids)) {}
-
-    SharedPtr<Vector<GlobalBlockID>> global_ids_;
+    explicit MatchTensorScanSourceState() : SourceState(SourceStateType::kMatchTensorScan) {}
 };
 
 export struct MatchSparseScanSourceState : public SourceState {

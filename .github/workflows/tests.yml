@@ -51,7 +51,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:ubuntu2310
+          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
@@ -149,7 +149,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:ubuntu2310
+          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7
 
       - name: Build release version
         if: ${{ !cancelled() && !failure() }}

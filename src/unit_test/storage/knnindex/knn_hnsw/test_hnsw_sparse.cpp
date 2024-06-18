@@ -22,11 +22,11 @@ import file_system;
 import local_file_system;
 import hnsw_common;
 import sparse_util;
-import sparse_test_util;
 import file_system_type;
 import compilation_config;
 import infinity_exception;
 import third_party;
+import sparse_test_util;
 
 using namespace infinity;
 

@@ -32,6 +32,10 @@ import mlas_matrix_multiply;
 import emvb_product_quantization;
 import emvb_shared_vec;
 import infinity_exception;
+import bitmask;
+import segment_entry;
+import block_index;
+import knn_filter;
 
 namespace infinity {
 
@@ -311,6 +315,7 @@ EMVBSearch<FIXED_QUERY_TOKEN_NUM>::EMVBSearch(const u32 embedding_dimension,
       centroid_id_assignments_(centroid_id_assignments), centroids_data_(centroids_data), centroids_to_docid_(centroids_to_docid),
       product_quantizer_(product_quantizer) {}
 
+// return docid: start from 0
 template <u32 FIXED_QUERY_TOKEN_NUM>
 std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>::GetQueryResult(const f32 *query_ptr,
                                                                                                                   const u32 nprobe,
@@ -334,6 +339,71 @@ std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> EMVBSearch<FIXED
         second_stage_filtering(std::move(selected_cnt_and_docs), out_second_stage, std::move(query_token_centroids_scores));
     auto query_res = compute_topk_documents_selected(query_ptr, std::move(selected_docs_centroid_scores), k, thresh_query);
     static_assert(std::is_same_v<decltype(query_res), std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>>);
+    return query_res;
+}
+
+// return docid: start from start_segment_offset
+template <u32 FIXED_QUERY_TOKEN_NUM>
+Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>::GetQueryResult(const f32 *query_ptr,
+                                                                                                 const u32 nprobe,
+                                                                                                 const f32 thresh,
+                                                                                                 const u32 n_doc_to_score,
+                                                                                                 const u32 out_second_stage,
+                                                                                                 const u32 k,
+                                                                                                 const f32 thresh_query,
+                                                                                                 Bitmask &bitmask,
+                                                                                                 const u32 start_segment_offset,
+                                                                                                 const SegmentEntry *segment_entry,
+                                                                                                 const BlockIndex *block_index,
+                                                                                                 const TxnTimeStamp begin_ts) const {
+    assert(n_centroids_ % 8 == 0);
+    assert(nprobe > 0);
+    auto query_token_centroids_scores = Get256AlignedF32Array(FIXED_QUERY_TOKEN_NUM * n_centroids_);
+    matrixA_multiply_transpose_matrixB_output_to_C(query_ptr,
+                                                   centroids_data_,
+                                                   FIXED_QUERY_TOKEN_NUM,
+                                                   n_centroids_,
+                                                   embedding_dimension_,
+                                                   query_token_centroids_scores.get());
+    auto [candidate_docs, centroid_q_token_sim] = find_candidate_docs(query_token_centroids_scores.get(), nprobe, thresh);
+    std::vector<u32> candidate_docs_filtered;
+    auto filter_doc = [&candidate_docs_filtered, &candidate_docs, start_segment_offset](auto &&filter) {
+        candidate_docs_filtered.reserve(candidate_docs.size());
+        for (const auto doc_id : candidate_docs) {
+            if (filter(doc_id + start_segment_offset)) {
+                candidate_docs_filtered.push_back(doc_id);
+            }
+        }
+    };
+    if (const bool use_bitmask = !bitmask.IsAllTrue(); use_bitmask) {
+        if (segment_entry->CheckAnyDelete(begin_ts)) {
+            DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
+            filter_doc(filter);
+        } else {
+            BitmaskFilter<SegmentOffset> filter(bitmask);
+            filter_doc(filter);
+        }
+    } else {
+        if (segment_entry->CheckAnyDelete(begin_ts)) {
+            const auto segment_id = segment_entry->segment_id();
+            const SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
+            DeleteFilter filter(segment_entry, begin_ts, max_segment_offset);
+            filter_doc(filter);
+        } else {
+            // no delete
+            candidate_docs_filtered = std::move(candidate_docs);
+        }
+    }
+    auto selected_cnt_and_docs = compute_hit_frequency(std::move(candidate_docs_filtered), n_doc_to_score, std::move(centroid_q_token_sim));
+    auto selected_docs_centroid_scores =
+        second_stage_filtering(std::move(selected_cnt_and_docs), out_second_stage, std::move(query_token_centroids_scores));
+    auto query_res = compute_topk_documents_selected(query_ptr, std::move(selected_docs_centroid_scores), k, thresh_query);
+    static_assert(std::is_same_v<decltype(query_res), std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>>>);
+    // consider start_segment_offset
+    auto &[doc_num, scores, doc_ids] = query_res;
+    for (u32 i = 0; i < doc_num; ++i) {
+        doc_ids[i] += start_segment_offset;
+    }
     return query_res;
 }
 

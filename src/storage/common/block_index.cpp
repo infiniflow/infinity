@@ -59,7 +59,7 @@ SegmentOffset BlockIndex::GetSegmentOffset(SegmentID segment_id) const {
 
 BlockOffset BlockIndex::GetBlockOffset(SegmentID segment_id, BlockID block_id) const {
     SegmentOffset segment_offset = this->GetSegmentOffset(segment_id);
-    if ((SegmentOffset(block_id) + 1) * DEFAULT_BLOCK_CAPACITY < segment_offset) {
+    if ((SegmentOffset(block_id) + 1) * DEFAULT_BLOCK_CAPACITY <= segment_offset) {
         return DEFAULT_BLOCK_CAPACITY;
     }
     return segment_offset % DEFAULT_BLOCK_CAPACITY;
