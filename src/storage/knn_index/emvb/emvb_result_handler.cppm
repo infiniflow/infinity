@@ -34,7 +34,7 @@ struct EMVBCompareMin {
 };
 
 template <typename Compare>
-inline void HeapifyDown(typename Compare::DistanceType *distance, typename Compare::IDType *id, const u32 size, u32 index) {
+inline void EMVBHeapifyDown(typename Compare::DistanceType *distance, typename Compare::IDType *id, const u32 size, u32 index) {
     if (index == 0 || (index << 1) > size) {
         return;
     }
@@ -220,13 +220,13 @@ public:
             const auto dis_result = distance_ptr - 1;
             const auto id_result = id_ptr - 1;
             for (u32 index = result_size / 2; index > 0; --index) {
-                HeapifyDown<Compare>(dis_result, id_result, result_size, index);
+                EMVBHeapifyDown<Compare>(dis_result, id_result, result_size, index);
             }
             for (u32 j = result_size; j < size; ++j) {
                 if (Compare::Compare(distance_ptr[0], distance_ptr[j])) {
                     distance_ptr[0] = distance_ptr[j];
                     id_ptr[0] = std::move(id_ptr[j]);
-                    HeapifyDown<Compare>(dis_result, id_result, result_size, 1);
+                    EMVBHeapifyDown<Compare>(dis_result, id_result, result_size, 1);
                 }
             }
             size_ = result_size;
@@ -242,7 +242,7 @@ public:
             std::swap(dis_result[result_size], dis_result[1]);
             std::swap(id_result[result_size], id_result[1]);
             --result_size;
-            HeapifyDown<Compare>(dis_result, id_result, result_size, 1);
+            EMVBHeapifyDown<Compare>(dis_result, id_result, result_size, 1);
         }
     }
 };
