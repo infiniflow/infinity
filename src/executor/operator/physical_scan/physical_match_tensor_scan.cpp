@@ -259,8 +259,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             // TODO: now only have EMVB index
             const Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<EMVBIndexInMem>> emvb_snapshot = index_entry->GetEMVBIndexSnapshot();
             // 1. in mem index
-            {
-                const EMVBIndexInMem *emvb_index_in_mem = std::get<1>(emvb_snapshot).get();
+            if (const EMVBIndexInMem *emvb_index_in_mem = std::get<1>(emvb_snapshot).get(); emvb_index_in_mem) {
                 // TODO: fix the parameters
                 const auto result = emvb_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(match_tensor_expr_->query_embedding_.ptr),
                                                                          match_tensor_expr_->num_of_embedding_in_query_tensor_,
@@ -269,10 +268,10 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                                          segment_entry,
                                                                          block_index,
                                                                          begin_ts,
-                                                                         2,
+                                                                         3,
                                                                          0.4f,
-                                                                         topn_ * 10,
-                                                                         topn_ * 5,
+                                                                         topn_ * 100,
+                                                                         topn_ * 20,
                                                                          0.5f);
                 std::visit(Overload{[segment_id, &function_data](const Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> &index_result) {
                                         const auto &[result_num, score_ptr, row_id_ptr] = index_result;
@@ -326,10 +325,10 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                       segment_entry,
                                                       block_index,
                                                       begin_ts,
-                                                      2,
+                                                      3,
                                                       0.4f,
-                                                      topn_ * 10,
-                                                      topn_ * 5,
+                                                      topn_ * 100,
+                                                      topn_ * 20,
                                                       0.5f);
                     for (u32 i = 0; i < result_num; ++i) {
                         function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
