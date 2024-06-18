@@ -1212,6 +1212,12 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kQuery: {
             return BuildShowQuery(statement, bind_context_ptr);
         }
+        case ShowStmtType::kTransactions: {
+            return BuildShowTransactions(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kTransaction: {
+            return BuildShowTransaction(statement, bind_context_ptr);
+        }
         case ShowStmtType::kSegments: {
             return BuildShowSegments(statement, bind_context_ptr);
         }
@@ -1296,6 +1302,33 @@ Status LogicalPlanner::BuildShowQuery(const ShowStatement *statement, SharedPtr<
                                                                   None,
                                                                   None,
                                                                   statement->session_id_);
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowTransactions(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowTransactions,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowTransaction(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowTransaction,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  statement->txn_id_);
     this->logical_plan_ = logical_show;
     return Status::OK();
 }

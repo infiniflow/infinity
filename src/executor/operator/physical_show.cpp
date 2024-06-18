@@ -419,6 +419,24 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowTransactions: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("transaction_id");
+            output_names_->emplace_back("transaction_text");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowType::kShowTransaction: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("value");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             LOG_ERROR(status.message());
@@ -530,6 +548,14 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowQuery: {
             ExecuteShowQuery(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowTransactions: {
+            ExecuteShowTransactions(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowTransaction: {
+            ExecuteShowTransaction(query_context, show_operator_state);
             break;
         }
         default: {
@@ -4565,5 +4591,124 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
     return ;
 }
 
+void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, bigint_type, "transaction_id", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "transaction_text", std::set<ConstraintType>())
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_transactions"), column_defs);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    TxnManager *txn_manager = query_context->storage()->txn_manager();
+    Vector<TxnInfo> txn_info_array = txn_manager->GetTxnInfoArray();
+    for(const auto& txn_info: txn_info_array) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // txn_id
+            Value value = Value::MakeBigInt(txn_info.txn_id_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // txn_text
+            String txn_string;
+            if(txn_info.txn_text_.get() != nullptr) {
+                txn_string = *txn_info.txn_text_;
+            }
+            Value value = Value::MakeVarchar(txn_string);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        ++ row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return ;
+}
+
+void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOperatorState *operator_state) {
+
+    TxnManager *txn_manager = query_context->storage()->txn_manager();
+    UniquePtr<TxnInfo> txn_info = txn_manager->GetTxnInfoByID(*txn_id_);
+    if(txn_info.get() == nullptr) {
+        Status status = Status::TransactionNotFound(*txn_id_);
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+    };
+
+    output_block_ptr->Init(column_types);
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("transaction_id");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(*session_id_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("transaction_text");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            String txn_string;
+            if(txn_info->txn_text_.get() != nullptr) {
+                txn_string = *txn_info->txn_text_;
+            }
+            Value value = Value::MakeVarchar(txn_string);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return ;
+}
 
 } // namespace infinity

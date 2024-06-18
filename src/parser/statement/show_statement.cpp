@@ -104,6 +104,14 @@ std::string ShowStatement::ToString() const {
             ss << "Show query";
             break;
         }
+        case ShowStmtType::kTransactions: {
+            ss << "Show transactions";
+            break;
+        }
+        case ShowStmtType::kTransaction: {
+            ss << "Show transaction";
+            break;
+        }
         case ShowStmtType::kGlobalVariable: {
             ss << "Show global variable";
             break;

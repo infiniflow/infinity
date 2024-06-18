@@ -172,6 +172,8 @@ TIME            { return TIME; }
 TIMESTAMP       { return TIMESTAMP; }
 TINYINT         { return TINYINT; }
 TO              { return TO; }
+TRANSACTION     { return TRANSACTION; }
+TRANSACTIONS    { return TRANSACTIONS; }
 TRUE            { return TRUE; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }

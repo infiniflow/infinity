@@ -280,25 +280,27 @@ struct SQL_LTYPE {
     DATA = 408,                    /* DATA  */
     LOG = 409,                     /* LOG  */
     BUFFER = 410,                  /* BUFFER  */
-    KNN = 411,                     /* KNN  */
-    USING = 412,                   /* USING  */
-    SESSION = 413,                 /* SESSION  */
-    GLOBAL = 414,                  /* GLOBAL  */
-    OFF = 415,                     /* OFF  */
-    EXPORT = 416,                  /* EXPORT  */
-    PROFILE = 417,                 /* PROFILE  */
-    CONFIGS = 418,                 /* CONFIGS  */
-    CONFIG = 419,                  /* CONFIG  */
-    PROFILES = 420,                /* PROFILES  */
-    VARIABLES = 421,               /* VARIABLES  */
-    VARIABLE = 422,                /* VARIABLE  */
-    SEARCH = 423,                  /* SEARCH  */
-    MATCH = 424,                   /* MATCH  */
-    MAXSIM = 425,                  /* MAXSIM  */
-    QUERY = 426,                   /* QUERY  */
-    QUERIES = 427,                 /* QUERIES  */
-    FUSION = 428,                  /* FUSION  */
-    NUMBER = 429                   /* NUMBER  */
+    TRANSACTIONS = 411,            /* TRANSACTIONS  */
+    TRANSACTION = 412,             /* TRANSACTION  */
+    KNN = 413,                     /* KNN  */
+    USING = 414,                   /* USING  */
+    SESSION = 415,                 /* SESSION  */
+    GLOBAL = 416,                  /* GLOBAL  */
+    OFF = 417,                     /* OFF  */
+    EXPORT = 418,                  /* EXPORT  */
+    PROFILE = 419,                 /* PROFILE  */
+    CONFIGS = 420,                 /* CONFIGS  */
+    CONFIG = 421,                  /* CONFIG  */
+    PROFILES = 422,                /* PROFILES  */
+    VARIABLES = 423,               /* VARIABLES  */
+    VARIABLE = 424,                /* VARIABLE  */
+    SEARCH = 425,                  /* SEARCH  */
+    MATCH = 426,                   /* MATCH  */
+    MAXSIM = 427,                  /* MAXSIM  */
+    QUERY = 428,                   /* QUERY  */
+    QUERIES = 429,                 /* QUERIES  */
+    FUSION = 430,                  /* FUSION  */
+    NUMBER = 431                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -384,7 +386,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 388 "parser.h"
+#line 390 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

@@ -48,10 +48,11 @@ public:
                           Optional<ColumnID> column_id,
                           Optional<String> index_name,
                           Optional<u64> session_id,
+                          Optional<TransactionID> txn_id,
                           SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), scan_type_(type), db_name_(std::move(db_name)),
           object_name_(std::move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id),
-          index_name_(index_name), session_id_(session_id) {}
+          index_name_(index_name), session_id_(session_id), txn_id_(txn_id) {}
 
     ~PhysicalShow() override = default;
 
@@ -131,6 +132,10 @@ private:
 
     void ExecuteShowQuery(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowTransactions(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowTransaction(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String db_name_{};
@@ -143,6 +148,7 @@ private:
     Optional<ColumnID> column_id_{};
     Optional<String> index_name_{};
     Optional<u64> session_id_{};
+    Optional<TransactionID> txn_id_{};
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
