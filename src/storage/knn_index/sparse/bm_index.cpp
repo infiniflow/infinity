@@ -23,13 +23,14 @@ import infinity_exception;
 import third_party;
 import knn_result_handler;
 import serialize;
+import bm_simd_func;
 
 namespace infinity {
 
 template <bool UseSIMD>
 void PostingList::Calculate(Vector<f32> &upper_bounds, f32 query_score) const {
     if constexpr (UseSIMD) {
-        UnrecoverableError("Not implemented");
+        MultiF32StoreI32(block_ids_.data(), max_scores_.data(), upper_bounds.data(), query_score, block_ids_.size());
     } else {
         for (SizeT i = 0; i < block_ids_.size(); ++i) {
             i32 block_id = block_ids_[i];
@@ -40,6 +41,7 @@ void PostingList::Calculate(Vector<f32> &upper_bounds, f32 query_score) const {
 }
 
 template void PostingList::Calculate<false>(Vector<f32> &upper_bounds, f32 query_score) const;
+template void PostingList::Calculate<true>(Vector<f32> &upper_bounds, f32 query_score) const;
 
 void BMIvt::AddBlock(i32 block_id, const Vector<Vector<Pair<i32, f32>>> &tail_terms) {
     HashMap<i32, f32> max_scores;
@@ -246,7 +248,7 @@ Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn(const SparseVecRef<f32, i32> &
         f32 query_score = query_ref.data_[i];
         const auto &posting = postings[query_term];
         threshold = std::max(threshold, query_score * posting.kth(topk));
-        posting.Calculate(upper_bounds, query_score);
+        posting.Calculate<false>(upper_bounds, query_score);
     }
 
     Vector<Pair<f32, i32>> block_scores;
