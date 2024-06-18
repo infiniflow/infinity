@@ -182,7 +182,12 @@ BlockFwd BlockFwd::ReadAdv(char *&p) {
 
 // --------------------------BMIndex--------------------------
 
+template<bool UseLock>
 void BMIndex::Save(FileHandler &file_handler) const {
+    std::shared_lock lock(mtx_, std::defer_lock);
+    if constexpr (UseLock) {
+        lock.lock();
+    }
     SizeT size = GetSizeInBytes();
     auto buffer = MakeUnique<char[]>(sizeof(size) + size);
     char *p = buffer.get();
@@ -193,6 +198,8 @@ void BMIndex::Save(FileHandler &file_handler) const {
     }
     file_handler.Write(buffer.get(), sizeof(size) + size);
 }
+
+template void BMIndex::Save<false>(FileHandler &file_handler) const;
 
 BMIndex BMIndex::Load(FileHandler &file_handler) {
     SizeT size;

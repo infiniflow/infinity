@@ -131,13 +131,16 @@ private:
 public:
     BMIndex(i32 term_num, i8 block_size) : bm_ivt_(term_num), block_fwd_(block_size) {}
 
+    template <bool UseLock = false>
     void AddDoc(const SparseVecRef<f32, i32> &doc);
 
+    template <bool UseLock = false>
     void Optimize(i32 topk);
 
-    template <bool UseLock = false>
+    template <bool UseLock = false, bool CalTail = false>
     Pair<Vector<i32>, Vector<f32>> SearchKnn(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
 
+    template <bool UseLock = false>
     void Save(FileHandler &file_handler) const;
 
     static BMIndex Load(FileHandler &file_handler);
@@ -150,7 +153,7 @@ private:
     static BMIndex ReadAdv(char *&p);
 
 private:
-    std::shared_mutex mtx_;
+    mutable std::shared_mutex mtx_;
 
     BMIvt bm_ivt_;
     BlockFwd block_fwd_;

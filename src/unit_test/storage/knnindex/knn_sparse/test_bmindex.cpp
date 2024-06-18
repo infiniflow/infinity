@@ -62,7 +62,7 @@ TEST_F(BMIndexTest, test1) {
         for (SparseMatrixIter iter(query_set); iter.HasNext(); iter.Next()) {
             SparseVecRef vec = iter.val();
 
-            auto [indices, scores] = index.SearchKnn(vec, topk, alpha, beta);
+            auto [indices, scores] = index.SearchKnn<false, true>(vec, topk, alpha, beta);
 
             u32 query_id = iter.row_id();
             const i32 *gt_indices = gt_indices_list.get() + query_id * topk;

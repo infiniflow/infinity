@@ -198,8 +198,14 @@ void BlockFwd::Calculate(const Vector<i8> &block_offsets, const Vector<f32> scor
 }
 
 template void BlockFwd::Calculate<false>(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
+template void BlockFwd::Calculate<true>(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
 
+template <bool UseLock>
 void BMIndex::AddDoc(const SparseVecRef<f32, i32> &doc) {
+    std::unique_lock lock(mtx_, std::defer_lock);
+    if constexpr (UseLock) {
+        lock.lock();
+    }
     Optional<TailFwd> tail_fwd = block_fwd_.AddDoc(doc);
     if (!tail_fwd.has_value()) {
         return;
@@ -209,14 +215,31 @@ void BMIndex::AddDoc(const SparseVecRef<f32, i32> &doc) {
     bm_ivt_.AddBlock(block_id, tail_terms);
 }
 
+template void BMIndex::AddDoc<false>(const SparseVecRef<f32, i32> &doc);
+template void BMIndex::AddDoc<true>(const SparseVecRef<f32, i32> &doc);
+
+template <bool UseLock>
 void BMIndex::Optimize(i32 topk) {
+    std::unique_lock lock(mtx_, std::defer_lock);
+    if constexpr (UseLock) {
+        lock.lock();
+    }
     i32 term_num = bm_ivt_.term_num();
     Vector<Vector<f32>> ivt_scores = block_fwd_.GetIvtScores(term_num);
     bm_ivt_.Optimize(topk, std::move(ivt_scores));
 }
 
-template <bool UseLock>
+template void BMIndex::Optimize<false>(i32 topk);
+template void BMIndex::Optimize<true>(i32 topk);
+
+template <bool UseLock, bool CalTail>
 Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const {
+    std::shared_lock lock(mtx_, std::defer_lock);
+    if constexpr (UseLock) {
+        lock.lock();
+    }
+
+    i8 block_size = block_fwd_.block_size();
     SparseVecEle<f32, i32> keeped_query;
     if (beta < 1.0) {
         i32 terms_to_keep = std::ceil(query.nnz_ * beta);
@@ -270,7 +293,7 @@ Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn(const SparseVecRef<f32, i32> &
             block_fwd_.Prefetch(next_block_id);
         }
         const auto &[ub_score, block_id] = block_scores[i];
-        i32 off = block_id * block_fwd_.block_size();
+        i32 off = block_id * block_size;
         Vector<f32> scores = block_fwd_.GetScores(block_id, query_ref);
         for (SizeT block_off = 0; block_off < scores.size(); ++block_off) {
             i32 doc_id = off + block_off;
@@ -281,17 +304,22 @@ Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn(const SparseVecRef<f32, i32> &
             break;
         }
     }
-    Vector<f32> tail_scores = block_fwd_.GetScoresTail(query_ref);
-    for (i32 i = 0; i < (i32)tail_scores.size(); ++i) {
-        i32 doc_id = block_num * block_fwd_.block_size() + i;
-        f32 score = tail_scores[i];
-        result_handler.AddResult(0 /*query_id*/, score, doc_id);
+    if constexpr (CalTail) {
+        Vector<f32> tail_scores = block_fwd_.GetScoresTail(query_ref);
+        for (i32 i = 0; i < (i32)tail_scores.size(); ++i) {
+            i32 doc_id = block_num * block_size + i;
+            f32 score = tail_scores[i];
+            result_handler.AddResult(0 /*query_id*/, score, doc_id);
+        }
     }
 
     result_handler.End(0 /*query_id*/);
     return {result, result_score};
 }
 
-template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<false>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
+template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<false, false>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
+template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<true, false>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
+template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<false, true>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
+template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<true, true>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
 
 } // namespace infinity
