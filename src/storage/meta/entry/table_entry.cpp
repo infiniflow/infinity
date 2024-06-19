@@ -391,8 +391,8 @@ void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp 
         return;
     }
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
-    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
-    Txn *txn = txn_store_ptr->txn_;
+    AppendState *append_state_ptr = txn_store_ptr->GetAppendState();
+    Txn *txn = txn_store_ptr->GetTxn();
     if (append_state_ptr->Finished()) {
         // Import update row count
         if (append_state_ptr->blocks_.empty()) {
@@ -442,7 +442,7 @@ Status TableEntry::Delete(TransactionID txn_id, void *txn_store, TxnTimeStamp co
     SizeT row_count = 0;
 
     TxnTableStore *txn_store_ptr = (TxnTableStore *)txn_store;
-    Txn *txn = txn_store_ptr->txn_;
+    Txn *txn = txn_store_ptr->GetTxn();
     for (const auto &to_delete_seg_rows : delete_state.rows_) {
         SegmentID segment_id = to_delete_seg_rows.first;
         SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(segment_id, commit_ts);

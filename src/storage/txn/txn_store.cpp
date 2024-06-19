@@ -309,7 +309,7 @@ bool TxnTableStore::CheckConflict(const TxnTableStore *txn_table_store) const {
     return false;
 }
 
-void TxnTableStore::PrepareCommit1() {
+void TxnTableStore::PrepareCommit1() const {
     TxnTimeStamp commit_ts = txn_->CommitTS();
     for (auto *segment_entry : flushed_segments_) {
         segment_entry->CommitFlushed(commit_ts);
@@ -457,7 +457,7 @@ void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mg
         local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry, commit_ts));
     }
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        bool added = txn_tables_.contains(table_store->table_entry_);
+        bool added = txn_tables_.contains(table_store->GetTableEntry());
         table_store->AddDeltaOp(local_delta_ops, txn_mgr, commit_ts, added);
     }
 }

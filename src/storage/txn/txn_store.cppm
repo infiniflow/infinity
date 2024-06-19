@@ -108,18 +108,6 @@ public:
 
     Tuple<UniquePtr<String>, Status> Compact(Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
-    void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
-
-    bool CheckConflict(const TxnTableStore *txn_table_store) const;
-
-    void PrepareCommit1();
-
-    void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
-
-    void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
-
-    void MaintainCompactionAlg() const;
-
     void AddSegmentStore(SegmentEntry *segment_entry);
 
     void AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block_entry);
@@ -128,13 +116,59 @@ public:
 
     void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts, bool added) const;
 
-public: // Getter
+public:
+    // transaction related
+
+    void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
+
+    bool CheckConflict(const TxnTableStore *txn_table_store) const;
+
+    void PrepareCommit1() const;
+
+    void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
+
+    void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
+
+    void MaintainCompactionAlg() const;
+
+public: // Setter, Getter
     const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }
 
     const HashMap<SegmentID, TxnSegmentStore> &txn_segments() const { return txn_segments_store_; }
 
     const Vector<SegmentEntry *> &flushed_segments() const { return flushed_segments_; }
 
+    Txn* GetTxn() const {
+        return txn_;
+    }
+
+    TableEntry* GetTableEntry() const {
+        return table_entry_;
+    }
+
+    inline bool HasUpdate() const {
+        return has_update_;
+    }
+
+    DeleteState& GetDeleteStateRef() {
+        return delete_state_;
+    }
+
+    inline DeleteState* GetDeleteStatePtr() {
+        return &delete_state_;
+    }
+
+    inline const Vector<SharedPtr<DataBlock>>& GetBlocks() const {
+        return blocks_;
+    }
+
+    inline void SetAppendState(UniquePtr<AppendState> append_state) {
+        append_state_ = std::move(append_state);
+    }
+
+    inline AppendState* GetAppendState() const {
+        return append_state_.get();
+    }
 private:
     HashMap<SegmentID, TxnSegmentStore> txn_segments_store_{};
     Vector<SegmentEntry *> flushed_segments_{};
@@ -146,7 +180,6 @@ private:
 
     TxnCompactStore compact_state_;
 
-public:
     Txn *const txn_{};
     Vector<SharedPtr<DataBlock>> blocks_{};
 
@@ -156,6 +189,8 @@ public:
     SizeT current_block_id_{0};
 
     TableEntry *table_entry_{};
+
+    bool has_update_{false};
 };
 
 export class TxnStore {
