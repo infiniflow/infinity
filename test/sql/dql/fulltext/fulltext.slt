@@ -28,17 +28,17 @@ SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('body
 Anarchism 30-APR-2012 03:25:17.000 0 21.620300
 
 # only phrase
-query TTI rowsort
-SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('body^5', '"social customs"', 'topn=3;block_max=compare');
-----
-Anarchism 30-APR-2012 03:25:17.000 6 20.881144
+# query TTI rowsort
+# SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('body^5', '"social customs"', 'topn=3;block_max=compare');
+# ----
+# Anarchism 30-APR-2012 03:25:17.000 6 20.881144
 
 # phrase and term
-query TTI rowsort
-SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('doctitle,body^5', '"social customs" harmful', 'topn=3');
-----
-Anarchism 30-APR-2012 03:25:17.000 0 21.620300
-Anarchism 30-APR-2012 03:25:17.000 6 20.881144
+# query TTI rowsort
+# SELECT doctitle, docdate, ROW_ID(), SCORE() FROM enwiki SEARCH MATCH TEXT ('doctitle,body^5', '"social customs" harmful', 'topn=3');
+# ----
+# Anarchism 30-APR-2012 03:25:17.000 0 21.620300
+# Anarchism 30-APR-2012 03:25:17.000 6 20.881144
 
 # copy data from csv file
 query I

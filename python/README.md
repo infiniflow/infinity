@@ -56,3 +56,29 @@ print(res)
 ```shell
 pip install -e .
 ```
+Build the release version of infinity-sdk in the target location `cmake-build-release`
+```shell
+pip install . -v --config-settings=cmake.build-type="Release"  --config-settings=build-dir="cmake-build-release"
+```
+Build the debug version of infinity-sdk in the target location `cmake-build-debug`
+```shell
+pip install . -v --config-settings=cmake.build-type="Debug"  --config-settings=build-dir="cmake-build-debug"
+```
+Note: If you run with the debug version, you must set the **libasan** environment variable, for example
+```shell
+LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 python3 hello_infinity.py
+```
+Note: When running with the debug version infinity-sdk, you may find some memory leaks caused by arrow. You can use `ASAN_OPTIONS=detect_leaks=0` to disable memory leak detection, for example
+```shell
+LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 hello_infinity.py
+```
+
+# run pysdk test
+Run a local infinity test
+```shell
+pytest --local-infinity test/infinity/test_basic.py::TestInfinity::test_basic
+```
+Run a remote infinity test
+```shell
+pytest test/infinity/test_basic.py::TestInfinity::test_basic
+```
