@@ -18,7 +18,7 @@ from typing import Any, Tuple, Dict, List
 import polars as pl
 from numpy import dtype
 
-from embedded_infinity import *
+from infinity.embedded_infinity_ext import *
 
 def logic_type_to_dtype(ttype: WrapDataType):
     match ttype.logical_type:

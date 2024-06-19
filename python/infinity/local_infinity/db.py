@@ -8,8 +8,8 @@ from infinity.local_infinity.table import LocalTable
 from infinity.remote_thrift.utils import check_valid_name, name_validity_check
 from infinity.common import ConflictType, InfinityException
 from infinity.local_infinity.utils import select_res_to_polars
-from embedded_infinity import ConflictType as LocalConflictType
-from embedded_infinity import WrapColumnDef, WrapDataType, LogicalType, ConstraintType, LiteralType, WrapConstantExpr, \
+from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
+from infinity.embedded_infinity_ext import WrapColumnDef, WrapDataType, LogicalType, ConstraintType, LiteralType, WrapConstantExpr, \
     EmbeddingDataType, WrapEmbeddingType, WrapIndexInfo
 
 

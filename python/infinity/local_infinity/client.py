@@ -14,7 +14,7 @@
 
 from infinity.errors import ErrorCode as PyErrorCode
 from infinity.common import LOCAL_INFINITY_PATH
-from embedded_infinity import *
+from infinity.embedded_infinity_ext import *
 
 
 class LocalQueryResult:

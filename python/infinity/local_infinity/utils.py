@@ -19,11 +19,9 @@ import pandas as pd
 import polars as pl
 import sqlglot.expressions as exp
 
-# import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-# from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.local_infinity.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
-from embedded_infinity import WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapSearchExpr, WrapConstantExpr, ParsedExprType, LiteralType
+from infinity.embedded_infinity_ext import WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapSearchExpr, WrapConstantExpr, ParsedExprType, LiteralType
 
 
 def traverse_conditions(cons, fn=None):

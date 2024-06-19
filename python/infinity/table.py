@@ -19,7 +19,7 @@ from typing import Optional, Union
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.index import IndexInfo
 from infinity.common import InfinityException
-from embedded_infinity import ExplainType as LocalExplainType
+from infinity.embedded_infinity_ext import ExplainType as LocalExplainType
 
 class ExplainType(Enum):
     Analyze = 1
