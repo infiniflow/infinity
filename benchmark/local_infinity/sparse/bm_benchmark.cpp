@@ -27,6 +27,7 @@ import third_party;
 import profiler;
 import linscan_alg;
 import bm_index;
+import bm_posting;
 
 using namespace infinity;
 using namespace benchmark;
@@ -48,17 +49,10 @@ int main(int argc, char *argv[]) {
         case ModeType::kImport: {
             SparseMatrix<f32, i32> data_mat = DecodeSparseDataset(opt.data_path_);
             profiler.Begin();
-            // BMIndexBuilder builder(data_mat.ncol_, opt.block_size_);
-            BMIndex index(data_mat.ncol_, opt.block_size_);
+            BMIndex<BMCompressType::kCompressed> index(data_mat.ncol_, opt.block_size_);
             for (SparseMatrixIter<f32, i32> iter(data_mat); iter.HasNext(); iter.Next()) {
                 SparseVecRef vec = iter.val();
                 u32 doc_id = iter.row_id();
-
-                // Vector<Pair<i32, f32>> doc;
-                // for (i32 term_id = 0; term_id < vec.nnz_; ++term_id) {
-                //     doc.emplace_back(vec.indices_[term_id], vec.data_[term_id]);
-                // }
-                // builder.AddDoc(std::move(doc));
                 index.AddDoc(vec);
 
                 if (LogInterval != 0 && doc_id % LogInterval == 0) {
@@ -66,8 +60,6 @@ int main(int argc, char *argv[]) {
                 }
             }
             data_mat.Clear();
-            // std::cout << "Building index...\n";
-            // BMIndex index = std::move(builder).Build();
             std::cout << "Optimizing index...\n";
             index.Optimize(opt.topk_);
             std::cout << "Index built\n";
@@ -89,7 +81,7 @@ int main(int argc, char *argv[]) {
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
             }
-            BMIndex index = BMIndex::Load(*file_handler);
+            auto index = BMIndex<BMCompressType::kCompressed>::Load(*file_handler);
 
             auto [top_k, all_query_n, _1, _2] = DecodeGroundtruth(opt.groundtruth_path_, true);
             if ((int)top_k != opt.topk_) {

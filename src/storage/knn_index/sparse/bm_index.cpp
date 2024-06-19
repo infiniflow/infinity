@@ -23,27 +23,11 @@ import infinity_exception;
 import third_party;
 import knn_result_handler;
 import serialize;
-import bm_simd_func;
 
 namespace infinity {
 
-template <bool UseSIMD>
-void PostingList::Calculate(Vector<f32> &upper_bounds, f32 query_score) const {
-    if constexpr (UseSIMD) {
-        MultiF32StoreI32(block_ids_.data(), max_scores_.data(), upper_bounds.data(), query_score, block_ids_.size());
-    } else {
-        for (SizeT i = 0; i < block_ids_.size(); ++i) {
-            i32 block_id = block_ids_[i];
-            f32 score = max_scores_[i];
-            upper_bounds[block_id] += score * query_score;
-        }
-    }
-}
-
-template void PostingList::Calculate<false>(Vector<f32> &upper_bounds, f32 query_score) const;
-template void PostingList::Calculate<true>(Vector<f32> &upper_bounds, f32 query_score) const;
-
-void BMIvt::AddBlock(i32 block_id, const Vector<Vector<Pair<i32, f32>>> &tail_terms) {
+template <BMCompressType CompressType>
+void BMIvt<CompressType>::AddBlock(i32 block_id, const Vector<Vector<Pair<i32, f32>>> &tail_terms) {
     HashMap<i32, f32> max_scores;
     for (const auto &terms : tail_terms) {
         for (const auto &[term_id, score] : terms) {
@@ -51,12 +35,12 @@ void BMIvt::AddBlock(i32 block_id, const Vector<Vector<Pair<i32, f32>>> &tail_te
         }
     }
     for (const auto &[term_id, score] : max_scores) {
-        postings_[term_id].block_ids_.push_back(block_id);
-        postings_[term_id].max_scores_.push_back(score);
+        postings_[term_id].data_.AddBlock(block_id, score);
     }
 }
 
-void BMIvt::Optimize(i32 topk, Vector<Vector<f32>> ivt_scores) {
+template <BMCompressType CompressType>
+void BMIvt<CompressType>::Optimize(i32 topk, Vector<Vector<f32>> ivt_scores) {
     for (i32 term_id = 0; term_id < (i32)ivt_scores.size(); ++term_id) {
         auto &posting = postings_[term_id];
         auto &term_scores = ivt_scores[term_id];
@@ -68,6 +52,9 @@ void BMIvt::Optimize(i32 topk, Vector<Vector<f32>> ivt_scores) {
         posting.kth_score_ = term_scores[topk - 1];
     }
 }
+
+template class BMIvt<BMCompressType::kCompressed>;
+template class BMIvt<BMCompressType::kRaw>;
 
 i8 TailFwd::AddDoc(const SparseVecRef<f32, i32> &doc) {
     Vector<Pair<i32, f32>> doc_terms;
@@ -185,27 +172,28 @@ void BlockFwd::Prefetch(i32 block_id) const {
     _mm_prefetch(ptr, _MM_HINT_T0);
 }
 
-template <bool UseSIMD>
+// template <bool UseSIMD>
 void BlockFwd::Calculate(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score) {
-    if constexpr (UseSIMD) {
-        UnrecoverableError("Not implemented");
-    } else {
-        for (SizeT i = 0; i < block_offsets.size(); ++i) {
-            i8 block_offset = block_offsets[i];
-            res[block_offset] += query_score * scores[i];
-        }
+    // if constexpr (UseSIMD) {
+    // UnrecoverableError("Not implemented");
+    // } else {
+    for (SizeT i = 0; i < block_offsets.size(); ++i) {
+        i8 block_offset = block_offsets[i];
+        res[block_offset] += query_score * scores[i];
     }
+    // }
 }
 
-template void BlockFwd::Calculate<false>(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
-template void BlockFwd::Calculate<true>(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
+// template void BlockFwd::Calculate<false>(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
+// template void BlockFwd::Calculate<true>(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
 
-template <bool UseLock>
-void BMIndex::AddDoc(const SparseVecRef<f32, i32> &doc) {
-    std::unique_lock lock(mtx_, std::defer_lock);
-    if constexpr (UseLock) {
-        lock.lock();
-    }
+// template <bool UseLock>
+template <BMCompressType CompressType>
+void BMIndex<CompressType>::AddDoc(const SparseVecRef<f32, i32> &doc) {
+    // std::unique_lock lock(mtx_, std::defer_lock);
+    // if constexpr (UseLock) {
+    //     lock.lock();
+    // }
     Optional<TailFwd> tail_fwd = block_fwd_.AddDoc(doc);
     if (!tail_fwd.has_value()) {
         return;
@@ -215,29 +203,30 @@ void BMIndex::AddDoc(const SparseVecRef<f32, i32> &doc) {
     bm_ivt_.AddBlock(block_id, tail_terms);
 }
 
-template void BMIndex::AddDoc<false>(const SparseVecRef<f32, i32> &doc);
-template void BMIndex::AddDoc<true>(const SparseVecRef<f32, i32> &doc);
+// template void BMIndex::AddDoc<false>(const SparseVecRef<f32, i32> &doc);
+// template void BMIndex::AddDoc<true>(const SparseVecRef<f32, i32> &doc);
 
-template <bool UseLock>
-void BMIndex::Optimize(i32 topk) {
-    std::unique_lock lock(mtx_, std::defer_lock);
-    if constexpr (UseLock) {
-        lock.lock();
-    }
+// template <bool UseLock>
+template <BMCompressType CompressType>
+void BMIndex<CompressType>::Optimize(i32 topk) {
+    // std::unique_lock lock(mtx_, std::defer_lock);
+    // if constexpr (UseLock) {
+    //     lock.lock();
+    // }
     i32 term_num = bm_ivt_.term_num();
     Vector<Vector<f32>> ivt_scores = block_fwd_.GetIvtScores(term_num);
     bm_ivt_.Optimize(topk, std::move(ivt_scores));
 }
 
-template void BMIndex::Optimize<false>(i32 topk);
-template void BMIndex::Optimize<true>(i32 topk);
+// template void BMIndex::Optimize<false>(i32 topk);
+// template void BMIndex::Optimize<true>(i32 topk);
 
-template <bool UseLock, bool CalTail>
-Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const {
-    std::shared_lock lock(mtx_, std::defer_lock);
-    if constexpr (UseLock) {
-        lock.lock();
-    }
+template <BMCompressType CompressType>
+Pair<Vector<i32>, Vector<f32>> BMIndex<CompressType>::SearchKnn(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const {
+    // std::shared_lock lock(mtx_, std::defer_lock);
+    // if constexpr (UseLock) {
+    //     lock.lock();
+    // }
 
     i8 block_size = block_fwd_.block_size();
     SparseVecEle<f32, i32> keeped_query;
@@ -271,7 +260,7 @@ Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn(const SparseVecRef<f32, i32> &
         f32 query_score = query_ref.data_[i];
         const auto &posting = postings[query_term];
         threshold = std::max(threshold, query_score * posting.kth(topk));
-        posting.Calculate<false>(upper_bounds, query_score);
+        posting.data_.Calculate(upper_bounds, query_score);
     }
 
     Vector<Pair<f32, i32>> block_scores;
@@ -304,22 +293,25 @@ Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn(const SparseVecRef<f32, i32> &
             break;
         }
     }
-    if constexpr (CalTail) {
-        Vector<f32> tail_scores = block_fwd_.GetScoresTail(query_ref);
-        for (i32 i = 0; i < (i32)tail_scores.size(); ++i) {
-            i32 doc_id = block_num * block_size + i;
-            f32 score = tail_scores[i];
-            result_handler.AddResult(0 /*query_id*/, score, doc_id);
-        }
-    }
+    // if constexpr (CalTail) {
+    //     Vector<f32> tail_scores = block_fwd_.GetScoresTail(query_ref);
+    //     for (i32 i = 0; i < (i32)tail_scores.size(); ++i) {
+    //         i32 doc_id = block_num * block_size + i;
+    //         f32 score = tail_scores[i];
+    //         result_handler.AddResult(0 /*query_id*/, score, doc_id);
+    //     }
+    // }
 
     result_handler.End(0 /*query_id*/);
     return {result, result_score};
 }
 
-template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<false, false>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
-template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<true, false>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
-template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<false, true>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
-template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<true, true>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
+template class BMIndex<BMCompressType::kCompressed>;
+template class BMIndex<BMCompressType::kRaw>;
+
+// template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<false, false>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
+// template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<true, false>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
+// template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<false, true>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
+// template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<true, true>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
 
 } // namespace infinity

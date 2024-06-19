@@ -21,47 +21,14 @@ module bm_index;
 
 import infinity_exception;
 import third_party;
-import knn_result_handler;
 import serialize;
 
 namespace infinity {
 
-// --------------------------PostingList--------------------------
-
-SizeT PostingList::GetSizeInBytes() const {
-    SizeT size = sizeof(kth_) + sizeof(kth_score_);
-    size += sizeof(SizeT) + max_scores_.size() * (sizeof(i32) + sizeof(f32));
-    return size;
-}
-
-void PostingList::WriteAdv(char *&p) const {
-    WriteBufAdv<i32>(p, kth_);
-    WriteBufAdv<f32>(p, kth_score_);
-    SizeT max_score_size = max_scores_.size();
-    WriteBufAdv<SizeT>(p, max_score_size);
-    WriteBufCharsAdv(p, reinterpret_cast<const char *>(block_ids_.data()), sizeof(i32) * block_ids_.size());
-    WriteBufCharsAdv(p, reinterpret_cast<const char *>(max_scores_.data()), sizeof(f32) * max_scores_.size());
-}
-
-PostingList PostingList::ReadAdv(char *&p) {
-    PostingList res;
-    res.kth_ = ReadBufAdv<i32>(p);
-    res.kth_score_ = ReadBufAdv<f32>(p);
-    SizeT max_score_size = ReadBufAdv<SizeT>(p);
-    res.block_ids_.resize(max_score_size);
-    res.max_scores_.resize(max_score_size);
-    for (SizeT i = 0; i < max_score_size; ++i) {
-        res.block_ids_[i] = ReadBufAdv<i32>(p);
-    }
-    for (SizeT i = 0; i < max_score_size; ++i) {
-        res.max_scores_[i] = ReadBufAdv<f32>(p);
-    }
-    return res;
-}
-
 // --------------------------BMIvt--------------------------
 
-SizeT BMIvt::GetSizeInBytes() const {
+template <BMCompressType CompressType>
+SizeT BMIvt<CompressType>::GetSizeInBytes() const {
     SizeT size = sizeof(SizeT);
     for (const auto &posting : postings_) {
         size += posting.GetSizeInBytes();
@@ -69,7 +36,8 @@ SizeT BMIvt::GetSizeInBytes() const {
     return size;
 }
 
-void BMIvt::WriteAdv(char *&p) const {
+template <BMCompressType CompressType>
+void BMIvt<CompressType>::WriteAdv(char *&p) const {
     SizeT posting_size = postings_.size();
     WriteBufAdv<SizeT>(p, posting_size);
     for (const auto &posting : postings_) {
@@ -77,14 +45,18 @@ void BMIvt::WriteAdv(char *&p) const {
     }
 }
 
-BMIvt BMIvt::ReadAdv(char *&p) {
+template <BMCompressType CompressType>
+BMIvt<CompressType> BMIvt<CompressType>::ReadAdv(char *&p) {
     SizeT posting_size = ReadBufAdv<SizeT>(p);
-    Vector<PostingList> postings(posting_size);
+    Vector<BlockPostings<CompressType>> postings(posting_size);
     for (SizeT i = 0; i < posting_size; ++i) {
-        postings[i] = PostingList::ReadAdv(p);
+        postings[i] = BlockPostings<CompressType>::ReadAdv(p);
     }
     return BMIvt(std::move(postings));
 }
+
+template class BMIvt<BMCompressType::kCompressed>;
+template class BMIvt<BMCompressType::kRaw>;
 
 // --------------------------TailFwd--------------------------
 
@@ -182,12 +154,13 @@ BlockFwd BlockFwd::ReadAdv(char *&p) {
 
 // --------------------------BMIndex--------------------------
 
-template<bool UseLock>
-void BMIndex::Save(FileHandler &file_handler) const {
-    std::shared_lock lock(mtx_, std::defer_lock);
-    if constexpr (UseLock) {
-        lock.lock();
-    }
+// template <bool UseLock>
+template <BMCompressType CompressType>
+void BMIndex<CompressType>::Save(FileHandler &file_handler) const {
+    // std::shared_lock lock(mtx_, std::defer_lock);
+    // if constexpr (UseLock) {
+    //     lock.lock();
+    // }
     SizeT size = GetSizeInBytes();
     auto buffer = MakeUnique<char[]>(sizeof(size) + size);
     char *p = buffer.get();
@@ -199,9 +172,10 @@ void BMIndex::Save(FileHandler &file_handler) const {
     file_handler.Write(buffer.get(), sizeof(size) + size);
 }
 
-template void BMIndex::Save<false>(FileHandler &file_handler) const;
+// template void BMIndex::Save<false>(FileHandler &file_handler) const;
 
-BMIndex BMIndex::Load(FileHandler &file_handler) {
+template <BMCompressType CompressType>
+BMIndex<CompressType> BMIndex<CompressType>::Load(FileHandler &file_handler) {
     SizeT size;
     file_handler.Read(&size, sizeof(size));
     auto buffer = MakeUnique<char[]>(size);
@@ -210,22 +184,28 @@ BMIndex BMIndex::Load(FileHandler &file_handler) {
     return ReadAdv(p);
 }
 
-SizeT BMIndex::GetSizeInBytes() const {
+template <BMCompressType CompressType>
+SizeT BMIndex<CompressType>::GetSizeInBytes() const {
     SizeT size = 0;
     size += bm_ivt_.GetSizeInBytes();
     size += block_fwd_.GetSizeInBytes();
     return size;
 }
 
-void BMIndex::WriteAdv(char *&p) const {
+template <BMCompressType CompressType>
+void BMIndex<CompressType>::WriteAdv(char *&p) const {
     bm_ivt_.WriteAdv(p);
     block_fwd_.WriteAdv(p);
 }
 
-BMIndex BMIndex::ReadAdv(char *&p) {
-    BMIvt postings = BMIvt::ReadAdv(p);
+template <BMCompressType CompressType>
+BMIndex<CompressType> BMIndex<CompressType>::ReadAdv(char *&p) {
+    BMIvt postings = BMIvt<CompressType>::ReadAdv(p);
     BlockFwd block_fwd = BlockFwd::ReadAdv(p);
-    return BMIndex(std::move(postings), std::move(block_fwd));
+    return BMIndex<CompressType>(std::move(postings), std::move(block_fwd));
 }
+
+template class BMIndex<BMCompressType::kCompressed>;
+template class BMIndex<BMCompressType::kRaw>;
 
 } // namespace infinity

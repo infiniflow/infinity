@@ -19,32 +19,16 @@ export module bm_index;
 import stl;
 import sparse_util;
 import file_system;
+import bm_posting;
 
 namespace infinity {
 
 i32 ceil_div(i32 a, i32 b) { return (a + b - 1) / b; }
 
-struct PostingList {
-public:
-    f32 kth(i32 topk) const { return topk == kth_ ? kth_score_ : 0.0; }
-
-    template <bool UseSIMD = false>
-    void Calculate(Vector<f32> &upper_bounds, f32 query_score) const;
-
-    SizeT GetSizeInBytes() const;
-    void WriteAdv(char *&p) const;
-    static PostingList ReadAdv(char *&p);
-
-public:
-    i32 kth_{-1};
-    f32 kth_score_;
-    Vector<i32> block_ids_;
-    Vector<f32> max_scores_;
-};
-
-struct BMIvt {
+template <BMCompressType CompressType>
+class BMIvt {
 private:
-    BMIvt(Vector<PostingList> postings) : postings_(std::move(postings)) {}
+    BMIvt(Vector<BlockPostings<CompressType>> postings) : postings_(std::move(postings)) {}
 
 public:
     BMIvt(i32 term_num) : postings_(term_num) {}
@@ -53,7 +37,7 @@ public:
 
     void Optimize(i32 topk, Vector<Vector<f32>> ivt_scores);
 
-    const Vector<PostingList> &GetPostings() const { return postings_; }
+    const Vector<BlockPostings<CompressType>> &GetPostings() const { return postings_; }
 
     i32 term_num() const { return postings_.size(); }
 
@@ -62,7 +46,7 @@ public:
     static BMIvt ReadAdv(char *&p);
 
 private:
-    Vector<PostingList> postings_;
+    Vector<BlockPostings<CompressType>> postings_;
 };
 
 struct TailFwd {
@@ -115,7 +99,7 @@ public:
     static BlockFwd ReadAdv(char *&p);
 
 private:
-    template <bool UseSIMD = false>
+    // template <bool UseSIMD = false>
     static void Calculate(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
 
 private:
@@ -124,38 +108,39 @@ private:
     TailFwd tail_fwd_;
 };
 
-export class BMIndex {
+export template <BMCompressType CompressType>
+class BMIndex {
 private:
-    BMIndex(BMIvt bm_ivt, BlockFwd block_fwd) : bm_ivt_(std::move(bm_ivt)), block_fwd_(std::move(block_fwd)) {}
+    BMIndex(BMIvt<CompressType> bm_ivt, BlockFwd block_fwd) : bm_ivt_(std::move(bm_ivt)), block_fwd_(std::move(block_fwd)) {}
 
 public:
     BMIndex(i32 term_num, i8 block_size) : bm_ivt_(term_num), block_fwd_(block_size) {}
 
-    template <bool UseLock = false>
+    // template <bool UseLock = false>
     void AddDoc(const SparseVecRef<f32, i32> &doc);
 
-    template <bool UseLock = false>
+    // template <bool UseLock = false>
     void Optimize(i32 topk);
 
-    template <bool UseLock = false, bool CalTail = false>
+    // template <bool UseLock = false, bool CalTail = false>
     Pair<Vector<i32>, Vector<f32>> SearchKnn(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
 
-    template <bool UseLock = false>
+    // template <bool UseLock = false>
     void Save(FileHandler &file_handler) const;
 
-    static BMIndex Load(FileHandler &file_handler);
+    static BMIndex<CompressType> Load(FileHandler &file_handler);
 
 private:
     SizeT GetSizeInBytes() const;
 
     void WriteAdv(char *&p) const;
 
-    static BMIndex ReadAdv(char *&p);
+    static BMIndex<CompressType> ReadAdv(char *&p);
 
 private:
     mutable std::shared_mutex mtx_;
 
-    BMIvt bm_ivt_;
+    BMIvt<CompressType> bm_ivt_;
     BlockFwd block_fwd_;
 };
 
