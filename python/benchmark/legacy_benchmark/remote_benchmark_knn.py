@@ -177,9 +177,14 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
     results = []
     queries = fvecs_read_all(query_path)
 
+    conn = ThriftInfinityClient(REMOTE_HOST)
+    table = RemoteTable(conn, "default_db", table_name)
+    query_builder = InfinityThriftQueryBuilder(table)
+    query_builder.output(["_row_id"])
+    query_builder.knn('col1', queries[0], 'float', 'l2', 100, {'ef': '200'})
+    res, _ = query_builder.to_result()
+
     for i in range(rounds):
-        conn = ThriftInfinityClient(REMOTE_HOST)
-        table = RemoteTable(conn, "default_db", table_name)
 
         query_results = [[] for _ in range(len(queries))]
 
@@ -201,7 +206,7 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
             # print(len(res_list))
 
             for j in range(len(res_list)):
-                query_results[idx].append(res_list[j][0])
+                query_results[idx].append(res_list[j])
 
         ground_truth_sets_1, ground_truth_sets_10, ground_truth_sets_100 = read_groundtruth(ground_truth_path)
 

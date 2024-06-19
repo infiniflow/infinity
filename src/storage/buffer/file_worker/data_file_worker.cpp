@@ -138,7 +138,7 @@ void DataFileWorker::ReadFromFileImpl() {
     }
 
     // file body
-    data_ = static_cast<void *>(new char[buffer_size_]{});
+    data_ = static_cast<void *>(new char[buffer_size_]);
     nbytes = fs.Read(*file_handler_, data_, buffer_size_);
     if (nbytes != buffer_size_) {
         Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));
