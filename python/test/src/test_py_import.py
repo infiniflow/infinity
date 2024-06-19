@@ -28,8 +28,8 @@ from src.utils import generate_big_int_csv, copy_data, generate_big_rows_csv, ge
 
 class TestImport(TestSdk):
 
-    def _test_version(self):
-        print(infinity.__version__)
+    # def _test_version(self):
+    #     print(infinity.__version__)
 
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)

@@ -27,8 +27,8 @@ from src.test_sdkbase import TestSdk
 
 class TestDelete(TestSdk):
 
-    def _test_version(self):
-        print(infinity.__version__)
+    # def _test_version(self):
+    #     print(infinity.__version__)
 
     def _test_delete(self):
         """

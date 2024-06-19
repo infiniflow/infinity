@@ -28,8 +28,8 @@ from src.test_sdkbase import TestSdk
 
 class TestKnn(TestSdk):
 
-    def _test_version(self):
-        print(infinity.__version__)
+    # def _test_version(self):
+    #     print(infinity.__version__)
 
     def _test_knn(self, check_data):
         #

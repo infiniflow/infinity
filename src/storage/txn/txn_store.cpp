@@ -122,6 +122,8 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Import(SharedPtr<SegmentEntry> s
     this->AddSealedSegment(segment_entry.get());
     this->flushed_segments_.emplace_back(segment_entry.get());
     table_entry_->Import(std::move(segment_entry), txn);
+
+    has_update_ = true;
     return {nullptr, Status::OK()};
 }
 
@@ -168,10 +170,14 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Append(const SharedPtr<DataBlock
     }
     current_block->Finalize();
 
+    has_update_ = true;
     return {nullptr, Status::OK()};
 }
 
-void TxnTableStore::AddIndexStore(TableIndexEntry *table_index_entry) { txn_indexes_.emplace(table_index_entry, ptr_seq_n_++); }
+void TxnTableStore::AddIndexStore(TableIndexEntry *table_index_entry) {
+    txn_indexes_.emplace(table_index_entry, ptr_seq_n_++);
+    has_update_ = true;
+}
 
 void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, const Vector<SegmentIndexEntry *> &segment_index_entries) {
     auto *txn_index_store = this->GetIndexStore(table_index_entry);
@@ -183,11 +189,15 @@ void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, c
             UnrecoverableError(error_message);
         }
     }
+
+    has_update_ = true;
 }
 
 void TxnTableStore::AddChunkIndexStore(TableIndexEntry *table_index_entry, ChunkIndexEntry *chunk_index_entry) {
     auto *txn_index_store = this->GetIndexStore(table_index_entry);
     txn_index_store->chunk_index_entries_.push_back(chunk_index_entry);
+
+    has_update_ = true;
 }
 
 void TxnTableStore::DropIndexStore(TableIndexEntry *table_index_entry) {
@@ -198,6 +208,8 @@ void TxnTableStore::DropIndexStore(TableIndexEntry *table_index_entry) {
     } else {
         txn_indexes_.emplace(table_index_entry, ptr_seq_n_++);
     }
+
+    has_update_ = true;
 }
 
 TxnIndexStore *TxnTableStore::GetIndexStore(TableIndexEntry *table_index_entry) {
@@ -208,6 +220,8 @@ TxnIndexStore *TxnTableStore::GetIndexStore(TableIndexEntry *table_index_entry) 
     auto txn_index_store = MakeUnique<TxnIndexStore>(table_index_entry);
     auto *ptr = txn_index_store.get();
     txn_indexes_store_.emplace(index_name, std::move(txn_index_store));
+
+    has_update_ = true;
     return ptr;
 }
 
@@ -226,6 +240,7 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Delete(const Vector<RowID> &row_
         }
     }
 
+    has_update_ = true;
     return {nullptr, Status::OK()};
 }
 
@@ -246,6 +261,8 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
         this->flushed_segments_.emplace_back(new_segment.get());
         table_entry_->AddCompactNew(std::move(new_segment));
     }
+
+    has_update_ = true;
     return {nullptr, Status::OK()};
 }
 
@@ -351,7 +368,7 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
 /**
  * @brief Call for really commit the data to disk.
  */
-void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
+void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
     Catalog::CommitWrite(table_entry_, txn_id, commit_ts, txn_segments_store_, &delete_state_);
     for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
         Catalog::CommitCreateIndex(txn_index_store.get(), commit_ts);
@@ -362,13 +379,15 @@ void TxnTableStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
     }
 }
 
-void TxnTableStore::MaintainCompactionAlg() const {
+void TxnTableStore::MaintainCompactionAlg() {
     for (auto *sealed_segment : set_sealed_segments_) {
         table_entry_->AddSegmentToCompactionAlg(sealed_segment);
     }
     for (const auto &[segment_id, delete_map] : delete_state_.rows_) {
         table_entry_->AddDeleteToCompactionAlg(segment_id);
     }
+
+    has_update_ = true;
 }
 
 void TxnTableStore::AddSegmentStore(SegmentEntry *segment_entry) {
@@ -378,6 +397,7 @@ void TxnTableStore::AddSegmentStore(SegmentEntry *segment_entry) {
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
+    has_update_ = true;
 }
 
 void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block_entry) {
@@ -386,11 +406,21 @@ void TxnTableStore::AddBlockStore(SegmentEntry *segment_entry, BlockEntry *block
         iter = txn_segments_store_.emplace(segment_entry->segment_id(), TxnSegmentStore(segment_entry)).first;
     }
     iter->second.block_entries_.emplace(block_entry->block_id(), block_entry);
+    has_update_ = true;
 }
 
-void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) { set_sealed_segments_.emplace(segment_entry); }
+void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) {
+    set_sealed_segments_.emplace(segment_entry);
+    has_update_ = true;
+}
 
 void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts, bool added) const {
+    if(!has_update_) {
+        // No any option
+        LOG_TRACE("Not update on txn table store, no need to add delta op");
+        return ;
+    }
+
     if (!added) {
         local_delta_ops->AddOperation(MakeUnique<AddTableEntryOp>(table_entry_, commit_ts));
     }

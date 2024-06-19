@@ -30,8 +30,8 @@ from src.test_sdkbase import TestSdk
 
 class TestInsert(TestSdk):
 
-    def _test_version(self):
-        print(infinity.__version__)
+    # def _test_version(self):
+    #     print(infinity.__version__)
 
     def _test_insert_basic(self):
         """

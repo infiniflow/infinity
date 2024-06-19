@@ -127,9 +127,9 @@ public:
 
     void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
 
-    void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
+    void Commit(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    void MaintainCompactionAlg() const;
+    void MaintainCompactionAlg();
 
 public: // Setter, Getter
     const HashMap<String, UniquePtr<TxnIndexStore>> &txn_indexes_store() const { return txn_indexes_store_; }
@@ -233,7 +233,7 @@ private:
     HashMap<DBEntry *, int> txn_dbs_{};
     HashMap<TableEntry *, int> txn_tables_{};
     // Key: table name Value: TxnTableStore
-    HashMap<String, SharedPtr<TxnTableStore>> txn_tables_store_{};
+    HashMap<String, UniquePtr<TxnTableStore>> txn_tables_store_{};
 };
 
 } // namespace infinity
