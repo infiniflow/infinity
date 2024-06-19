@@ -51,7 +51,7 @@ public:
         int dim = 16;
         int M = 8;
         int ef_construction = 200;
-        int chunk_size = 16;
+        int chunk_size = 128;
         int max_chunk_n = 10;
         int element_size = max_chunk_n * chunk_size;
 
