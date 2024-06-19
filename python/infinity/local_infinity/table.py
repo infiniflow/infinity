@@ -17,8 +17,8 @@ from abc import ABC
 from typing import Optional, Union, List, Any
 
 import numpy as np
-from embedded_infinity import ConflictType as LocalConflictType
-from embedded_infinity import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, \
+from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
+from infinity.embedded_infinity_ext import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions
 from infinity.common import ConflictType
 from infinity.common import INSERT_DATA, VEC, InfinityException

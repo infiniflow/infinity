@@ -17,9 +17,9 @@ from enum import Enum
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.common import InfinityException
 
-from embedded_infinity import IndexType as LocalIndexType
-from embedded_infinity import InitParameter as LocalInitParameter
-from embedded_infinity import WrapIndexInfo as LocalIndexInfo
+from infinity.embedded_infinity_ext import IndexType as LocalIndexType
+from infinity.embedded_infinity_ext import InitParameter as LocalInitParameter
+from infinity.embedded_infinity_ext import WrapIndexInfo as LocalIndexInfo
 
 class IndexType(Enum):
     IVFFlat = 1

@@ -2,7 +2,7 @@ from infinity import InfinityConnection
 from abc import ABC
 from infinity.common import ConflictType, LOCAL_INFINITY_PATH, InfinityException
 from infinity.local_infinity.client import LocalInfinityClient
-from embedded_infinity import ConflictType as LocalConflictType
+from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.errors import ErrorCode
 from infinity.local_infinity.db import LocalDatabase
 from infinity.remote_thrift.utils import name_validity_check
