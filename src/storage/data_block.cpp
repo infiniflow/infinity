@@ -112,7 +112,7 @@ SharedPtr<DataBlock> DataBlock::MoveFrom(SharedPtr<DataBlock> &input) {
 
 void DataBlock::Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity) {
     if (initialized) {
-                String error_message = "Data block was initialized before.";
+        String error_message = "Data block was initialized before.";
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
@@ -249,8 +249,8 @@ void DataBlock::Finalize() {
                 }
             } else {
                 first_flat_column_vector = true;
-                row_count = column_vectors[idx]->Size();
             }
+            row_count = column_vectors[idx]->Size();
         }
     }
     row_count_ = row_count;

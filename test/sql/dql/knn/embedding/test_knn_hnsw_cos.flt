@@ -1,0 +1,64 @@
+statement ok
+DROP TABLE IF EXISTS test_knn_hnsw_cos;
+
+statement ok
+CREATE TABLE test_knn_hnsw_cos(c1 INT,  c2 EMBEDDING(FLOAT, 4));
+
+# copy to create one blocks
+# the csv has 4 rows, the inner product to target([0.3, 0.3, 0.2, 0.2]) is:
+# 1. (0.3*0.4+0.3*0.3+0.2*0.2+0.2*0.1) / sqrt((0.3^2+0.3^2+0.2^2+0.2^2) * (0.4^2+0.3^2+0.2^2+0.1^2)) = 0.96675508
+# 2. (0.3*0.3+0.3*0.2+0.2*0.1+0.2*0.4) / sqrt((0.3^2+0.3^2+0.2^2+0.2^2) * (0.3^2+0.2^2+0.1^2+0.4^2)) = 0.895143593
+# 3. (0.3*0.2+0.3*0.1+0.2*0.3+0.2*0.4) / sqrt((0.3^2+0.3^2+0.2^2+0.2^2) * (0.2^2+0.1^2+0.3^2+0.4^2)) = 0.823532105
+# 4. (0.3*0.1+0.3*0.2+0.2*0.3-0.2*0.2) / sqrt((0.3^2+0.3^2+0.2^2+0.2^2) * (0.1^2+0.2^2+0.3^2+(-0.2)^2)) = 0.50847518
+statement ok
+COPY test_knn_hnsw_cos FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+
+# mertic cos will order ascendingly. The query will return row 4, 3, 2
+query I
+SELECT c1 FROM test_knn_hnsw_cos SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3);
+----
+8
+6
+4
+
+# copy to create another new block
+# there will has 2 knn_scan operator to scan the blocks, and one merge_knn to merge
+statement ok
+COPY test_knn_hnsw_cos FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+
+# the query will return block 1 row 4, block 2 row 4, block 1 row 3
+query I
+SELECT c1 FROM test_knn_hnsw_cos SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3);
+----
+8
+8
+6
+
+# create hnsw index on existing 2 segments
+statement ok
+CREATE INDEX idx1 ON test_knn_hnsw_cos (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = cos);
+
+# the query will return block 1 row 4, block 2 row 4 and a row 3
+# select with 2 index segment
+query I
+SELECT c1 FROM test_knn_hnsw_cos SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3) WITH (ef = 4);
+----
+8
+8
+6
+
+# copy to create another new block with no index
+statement ok
+COPY test_knn_hnsw_cos FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+
+# the query will return row 4 from block 1, 2 and 3
+# select with 2 index segment and 1 non-index segment
+query I
+SELECT c1 FROM test_knn_hnsw_cos SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3) WITH (ef = 4);
+----
+8
+8
+8
+
+statement ok
+DROP TABLE test_knn_hnsw_cos;

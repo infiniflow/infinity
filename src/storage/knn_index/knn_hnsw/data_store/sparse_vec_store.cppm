@@ -43,6 +43,7 @@ private:
 
 public:
     static This Make(SizeT max_dim) { return This(max_dim); }
+    static This Make(SizeT max_dim, bool) { return This(max_dim); }
 
     void Save(FileHandler &file_handler) const { file_handler.Write(&max_dim_, sizeof(max_dim_)); }
 

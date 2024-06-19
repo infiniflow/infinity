@@ -436,7 +436,7 @@ class TestKnn(HttpTest):
                                            "query_price": 1.0
                                            }])
         for t in distance_type:
-            if t == 'l2':
+            if t != 'hamming':
                 self.select(db_name, table_name, ["variant_id"], "", {
                     "knn": {
                         "fields": ["gender_vector"],

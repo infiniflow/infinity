@@ -16,6 +16,7 @@ module;
 
 #include <cassert>
 #include <ostream>
+#include <type_traits>
 
 export module data_store;
 
@@ -43,6 +44,13 @@ public:
     using Inner = DataStoreInner<VecStoreT, LabelType>;
     using VecStoreMeta = typename VecStoreT::Meta;
     using VecStoreInner = typename VecStoreT::Inner;
+
+public:
+    template <typename T, typename = void>
+    struct has_compress_type : std::false_type {};
+
+    template <typename T>
+    struct has_compress_type<T, std::void_t<typename T::CompressType>> : std::true_type {};
 
 private:
     DataStore(SizeT chunk_size, SizeT max_chunk_n, VecStoreMeta &&vec_store_meta, GraphStoreMeta &&graph_store_meta)
@@ -74,7 +82,11 @@ public:
     }
 
     static This Make(SizeT chunk_size, SizeT max_chunk_n, SizeT dim, SizeT Mmax0, SizeT Mmax) {
-        VecStoreMeta vec_store_meta = VecStoreMeta::Make(dim);
+        bool normalize = false;
+        if constexpr (has_compress_type<VecStoreT>::value) {
+            normalize = std::is_same_v<VecStoreMeta, typename LVQCosVecStoreType<DataType, typename VecStoreT::CompressType>::Meta>;
+        }
+        VecStoreMeta vec_store_meta = VecStoreMeta::Make(dim, normalize);
         GraphStoreMeta graph_store_meta = GraphStoreMeta::Make(Mmax0, Mmax);
         This ret(chunk_size, max_chunk_n, std::move(vec_store_meta), std::move(graph_store_meta));
         ret.cur_vec_num_ = 0;
