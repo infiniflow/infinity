@@ -26,6 +26,8 @@ import index_hnsw;
 import index_full_text;
 import index_secondary;
 import index_emvb;
+import index_bmp;
+import bmp_util;
 import third_party;
 import status;
 
@@ -144,6 +146,12 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             u32 residual_pq_subspace_num = ReadBufAdv<u32>(ptr);
             u32 residual_pq_subspace_bits = ReadBufAdv<u32>(ptr);
             res = MakeShared<IndexEMVB>(index_name, file_name, std::move(column_names), residual_pq_subspace_num, residual_pq_subspace_bits);
+            break;
+        }
+        case IndexType::kBMP: {
+            SizeT block_size = ReadBufAdv<SizeT>(ptr);
+            BMPCompressType compress_type = ReadBufAdv<BMPCompressType>(ptr);
+            res = MakeShared<IndexBMP>(index_name, file_name, std::move(column_names), block_size, compress_type);
             break;
         }
         case IndexType::kInvalid: {

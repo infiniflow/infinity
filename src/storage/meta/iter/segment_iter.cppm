@@ -29,6 +29,8 @@ import block_entry;
 import logger;
 import sparse_util;
 import internal_types;
+import column_vector;
+import fix_heap;
 
 namespace infinity {
 
@@ -86,6 +88,8 @@ public:
         return Next();
     }
 
+    const SharedPtr<ColumnVector> &column_vector(SizeT col_id) const { return block_iter_->column_vector(col_id); }
+
 private:
     const SegmentEntry *const entry_;
     BufferManager *const buffer_mgr_;
@@ -129,7 +133,20 @@ public:
         }
         auto &[vec, offset] = *ret;
         const auto *v_ptr = reinterpret_cast<const SparseT *>(vec[0]);
-        SparseVecRef<DataType, IdxType> sparse_vec_ref(v_ptr->nnz_, nullptr, nullptr);
+        if (v_ptr->nnz_ == 0) {
+            SparseVecRef<DataType, IdxType> sparse_vec_ref(0, nullptr, nullptr);
+            return std::make_pair(sparse_vec_ref, offset);
+        }
+
+        const auto &column_vector = segment_iter_.column_vector(0);
+        const char *raw_data_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(v_ptr->chunk_id_, v_ptr->chunk_offset_);
+        const char *indice_ptr = raw_data_ptr;
+        const char *data_ptr = indice_ptr + v_ptr->nnz_ * sizeof(IdxType);
+
+        SparseVecRef<DataType, IdxType> sparse_vec_ref(v_ptr->nnz_,
+                                                       reinterpret_cast<const IdxType *>(indice_ptr),
+                                                       reinterpret_cast<const DataType *>(data_ptr));
+
         return std::make_pair(sparse_vec_ref, offset);
     }
 

@@ -17,7 +17,6 @@ module;
 export module bmp_util;
 
 import stl;
-import infinity_exception;
 
 namespace infinity {
 
@@ -33,13 +32,26 @@ export enum class BMPCompressType : i8 {
 };
 
 export BMPCompressType BMCompressTypeFromString(const String &compress_type_str) {
-    if (IsEqual(compress_type_str, "raw")) {
+    if (IsEqual(compress_type_str, "raww")) {
         return BMPCompressType::kRaw;
-    } else if (IsEqual(compress_type_str, "compressed")) {
+    } else if (IsEqual(compress_type_str, "compress")) {
         return BMPCompressType::kCompressed;
     } else {
-        UnrecoverableError("Invalid compress type");
         return BMPCompressType::kInvalid;
+    }
+}
+
+export String BMCompressTypeToString(BMPCompressType compress_type) {
+    switch (compress_type) {
+        case BMPCompressType::kRaw: {
+            return "raw";
+        }
+        case BMPCompressType::kCompressed: {
+            return "compress";
+        }
+        case BMPCompressType::kInvalid: {
+            return "Invalid";
+        }
     }
 }
 

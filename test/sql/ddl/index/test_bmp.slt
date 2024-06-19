@@ -17,10 +17,22 @@ statement error
 CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 0);
 
 statement error
-CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 129);
+CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 257);
 
 statement error
 CREATE INDEX idx1 ON test_bmp (col1) USING Bmp WITH (block_size = 16);
 
 statement ok
-CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16);
+CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 256);
+
+statement ok
+DROP INDEX idx1 ON test_bmp;
+
+statement error
+CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = wrong_compress_type);
+
+statement ok
+CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = compress);
+
+statement ok
+CREATE INDEX idx2 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = raww);

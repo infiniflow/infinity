@@ -50,6 +50,11 @@ IndexBMP::Make(SharedPtr<String> index_name, const String &file_name, Vector<Str
             RecoverableError(status);
         }
     }
+    if (compress_type == BMPCompressType::kInvalid) {
+        Status status = Status::InvalidIndexParam("Compress type");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
     return MakeShared<IndexBMP>(index_name, file_name, column_names, block_size, compress_type);
 }
 
@@ -85,29 +90,34 @@ void IndexBMP::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_
 i32 IndexBMP::GetSizeInBytes() const {
     i32 size = IndexBase::GetSizeInBytes();
     size += sizeof(block_size_);
+    size += sizeof(i8);
     return size;
 }
 
 void IndexBMP::WriteAdv(char *&ptr) const {
     IndexBase::WriteAdv(ptr);
     WriteBufAdv(ptr, block_size_);
+    WriteBufAdv(ptr, static_cast<i8>(compress_type_));
 }
 
 String IndexBMP::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << block_size_;
+    ss << ", " << BMCompressTypeToString(compress_type_);
     return ss.str();
 }
 
 String IndexBMP::BuildOtherParamsString() const {
     std::stringstream ss;
     ss << "block_size = " << block_size_;
+    ss << ", compress_type = " << BMCompressTypeToString(compress_type_);
     return ss.str();
 }
 
 nlohmann::json IndexBMP::Serialize() const {
     nlohmann::json res = IndexBase::Serialize();
     res["block_size"] = block_size_;
+    res["compress_type"] = static_cast<i8>(compress_type_);
     return res;
 }
 
