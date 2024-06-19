@@ -338,6 +338,10 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         jma
 )
 
+#if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+#    target_link_libraries(embedded_infinity_ext PRIVATE libasan.a)
+#endif ()
+
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 nanobind_disable_stack_protector(embedded_infinity_ext)
