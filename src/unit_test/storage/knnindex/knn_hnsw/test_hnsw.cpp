@@ -51,7 +51,7 @@ public:
         int dim = 16;
         int M = 8;
         int ef_construction = 200;
-        int chunk_size = 128;
+        int chunk_size = 16;
         int max_chunk_n = 10;
         int element_size = max_chunk_n * chunk_size;
 
@@ -70,7 +70,7 @@ public:
 
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
             hnsw_index.InsertVecs(std::move(iter));
-            // std::ofstream os("tmp/dump.txt");
+            // std::ofstream os("/home/xwg/dev/infinity/tmp/dump.txt");
             // hnsw_index.Dump(os);
             // os.flush();
             hnsw_index.Check();
@@ -97,34 +97,34 @@ public:
             file_handler->Close();
         }
 
-        // {
-        //     u8 file_flags = FileFlags::READ_FLAG;
-        //     auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
-        //     if (!status.ok()) {
-        //         UnrecoverableError(status.message());
-        //     }
+        {
+            u8 file_flags = FileFlags::READ_FLAG;
+            auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
 
-        //     auto hnsw_index = Hnsw::Load(*file_handler);
-        //     hnsw_index.SetEf(10);
+            auto hnsw_index = Hnsw::Load(*file_handler);
+            hnsw_index.SetEf(10);
 
-        //     std::ofstream os("tmp/dump2.txt");
-        //     hnsw_index.Dump(os);
-        //     os.flush();
-        //     hnsw_index.Check();
-        //     int correct = 0;
-        //     for (int i = 0; i < element_size; ++i) {
-        //         const float *query = data.get() + i * dim;
-        //         auto result = hnsw_index.KnnSearchSorted(query, 1);
-        //         if (result[0].second == (LabelT)i) {
-        //             ++correct;
-        //         }
-        //     }
-        //     float correct_rate = float(correct) / element_size;
-        //     // std::printf("correct rage: %f\n", correct_rate);
-        //     EXPECT_GE(correct_rate, 0.95);
+            // std::ofstream os("/home/xwg/dev/infinity/tmp/dump2.txt");
+            // hnsw_index.Dump(os);
+            // os.flush();
+            hnsw_index.Check();
+            int correct = 0;
+            for (int i = 0; i < element_size; ++i) {
+                const float *query = data.get() + i * dim;
+                auto result = hnsw_index.KnnSearchSorted(query, 1);
+                if (result[0].second == (LabelT)i) {
+                    ++correct;
+                }
+            }
+            float correct_rate = float(correct) / element_size;
+            // std::printf("correct rage: %f\n", correct_rate);
+            EXPECT_GE(correct_rate, 0.95);
 
-        //     file_handler->Close();
-        // }
+            file_handler->Close();
+        }
     }
 
     template <typename Hnsw>
