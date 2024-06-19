@@ -17,7 +17,7 @@
 
 import stl;
 import bm_index;
-import bm_posting;
+import bm_util;
 import sparse_util;
 import third_party;
 import compilation_config;
@@ -35,8 +35,10 @@ protected:
 
     void TearDown() override {}
 
-    template <typename BMIndex>
+    template <typename DataType, typename IdxType, BMCompressType CompressType>
     void TestFunc(u32 block_size) {
+        using BMIndex = BMIndex<DataType, IdxType, CompressType>;
+
         u32 nrow = 1000;
         u32 ncol = 1000;
         f32 sparsity = 0.05;
@@ -49,9 +51,9 @@ protected:
 
         f32 accuracy_all = 0.9;
 
-        const SparseMatrix dataset = SparseTestUtil::GenerateDataset(nrow, ncol, sparsity, 0.0, 10.0);
-        const SparseMatrix query_set = SparseTestUtil::GenerateDataset(query_n, ncol, sparsity, 0.0, 10.0);
-        const auto [gt_indices_list, gt_scores_list] = SparseTestUtil::GenerateGroundtruth(dataset, query_set, topk, false);
+        const SparseMatrix dataset = SparseTestUtil<DataType, IdxType>::GenerateDataset(nrow, ncol, sparsity, 0.0, 10.0);
+        const SparseMatrix query_set = SparseTestUtil<DataType, IdxType>::GenerateDataset(query_n, ncol, sparsity, 0.0, 10.0);
+        const auto [gt_indices_list, gt_scores_list] = SparseTestUtil<DataType, IdxType>::GenerateGroundtruth(dataset, query_set, topk, false);
 
         String save_path = String(tmp_data_path()) + "/bmindex_test1.index";
         LocalFileSystem fs;
@@ -66,13 +68,13 @@ protected:
 
                 u32 query_id = iter.row_id();
                 const i32 *gt_indices = gt_indices_list.get() + query_id * topk;
-                const f32 *gt_scores = gt_scores_list.get() + query_id * topk;
+                const DataType *gt_scores = gt_scores_list.get() + query_id * topk;
 
-                auto [hit, total] = SparseTestUtil::CheckApproximateKnn(gt_indices, gt_scores, topk, indices, scores);
+                auto [hit, total] = SparseTestUtil<DataType, IdxType>::CheckApproximateKnn(gt_indices, gt_scores, topk, indices, scores);
                 hit_all += hit;
                 total_all += total;
 
-                // SparseTestUtil::PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
+                // SparseTestUtil<DataType, IdxType>::PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
                 // std::cout << fmt::format("accuracy: {}\n", (f32)hit / total);
             }
             std::cout << fmt::format("hit: {}, total: {}\n", hit_all, total_all);
@@ -112,10 +114,18 @@ protected:
 TEST_F(BMIndexTest, test1) {
     {
         u32 block_size = 8;
-        TestFunc<BMIndex<BMCompressType::kCompressed>>(block_size);
+        TestFunc<f32, i32, BMCompressType::kCompressed>(block_size);
     }
     {
         u32 block_size = 64;
-        TestFunc<BMIndex<BMCompressType::kRaw>>(block_size);
+        TestFunc<f32, i32, BMCompressType::kRaw>(block_size);
+    }
+    {
+        u32 block_size = 8;
+        TestFunc<f32, i16, BMCompressType::kCompressed>(block_size);
+    }
+    {
+        u32 block_size = 8;
+        TestFunc<f64, i32, BMCompressType::kCompressed>(block_size);
     }
 }

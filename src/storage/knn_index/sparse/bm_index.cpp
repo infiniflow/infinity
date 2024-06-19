@@ -26,9 +26,10 @@ import serialize;
 
 namespace infinity {
 
-template <BMCompressType CompressType>
-void BMIvt<CompressType>::AddBlock(i32 block_id, const Vector<Vector<Pair<i32, f32>>> &tail_terms) {
-    HashMap<i32, f32> max_scores;
+template <typename DataType, BMCompressType CompressType>
+template <typename IdxType>
+void BMIvt<DataType, CompressType>::AddBlock(BMBlockID block_id, const Vector<Vector<Pair<IdxType, DataType>>> &tail_terms) {
+    HashMap<IdxType, DataType> max_scores;
     for (const auto &terms : tail_terms) {
         for (const auto &[term_id, score] : terms) {
             max_scores[term_id] = std::max(max_scores[term_id], score);
@@ -39,9 +40,9 @@ void BMIvt<CompressType>::AddBlock(i32 block_id, const Vector<Vector<Pair<i32, f
     }
 }
 
-template <BMCompressType CompressType>
-void BMIvt<CompressType>::Optimize(i32 topk, Vector<Vector<f32>> ivt_scores) {
-    for (i32 term_id = 0; term_id < (i32)ivt_scores.size(); ++term_id) {
+template <typename DataType, BMCompressType CompressType>
+void BMIvt<DataType, CompressType>::Optimize(i32 topk, Vector<Vector<DataType>> ivt_scores) {
+    for (SizeT term_id = 0; term_id < ivt_scores.size(); ++term_id) {
         auto &posting = postings_[term_id];
         auto &term_scores = ivt_scores[term_id];
         posting.kth_ = topk;
@@ -53,11 +54,14 @@ void BMIvt<CompressType>::Optimize(i32 topk, Vector<Vector<f32>> ivt_scores) {
     }
 }
 
-template class BMIvt<BMCompressType::kCompressed>;
-template class BMIvt<BMCompressType::kRaw>;
+template class BMIvt<f32, BMCompressType::kCompressed>;
+template class BMIvt<f32, BMCompressType::kRaw>;
+template class BMIvt<f64, BMCompressType::kCompressed>;
+template class BMIvt<f64, BMCompressType::kRaw>;
 
-i8 TailFwd::AddDoc(const SparseVecRef<f32, i32> &doc) {
-    Vector<Pair<i32, f32>> doc_terms;
+template <typename DataType, typename IdxType>
+SizeT TailFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
+    Vector<Pair<IdxType, DataType>> doc_terms;
     for (i32 i = 0; i < doc.nnz_; ++i) {
         doc_terms.emplace_back(doc.indices_[i], doc.data_[i]);
     }
@@ -65,20 +69,21 @@ i8 TailFwd::AddDoc(const SparseVecRef<f32, i32> &doc) {
     return tail_terms_.size();
 }
 
-Vector<Tuple<i32, Vector<i8>, Vector<f32>>> TailFwd::ToBlockFwd() const {
-    Vector<Tuple<i32, i8, f32>> term_pairs;
-    i8 block_size = tail_terms_.size();
-    for (i8 block_offset = 0; block_offset < block_size; ++block_offset) {
+template <typename DataType, typename IdxType>
+Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>> TailFwd<DataType, IdxType>::ToBlockFwd() const {
+    Vector<Tuple<IdxType, BMBlockOffset, DataType>> term_pairs;
+    SizeT block_size = tail_terms_.size();
+    for (SizeT block_offset = 0; block_offset < block_size; ++block_offset) {
         for (const auto &[term_id, score] : tail_terms_[block_offset]) {
             term_pairs.emplace_back(term_id, block_offset, score);
         }
     }
     std::sort(term_pairs.begin(), term_pairs.end(), [](const auto &a, const auto &b) { return std::get<0>(a) < std::get<0>(b); });
 
-    Vector<Tuple<i32, Vector<i8>, Vector<f32>>> res;
-    i32 last_term_id = -1;
-    Vector<i8> block_offsets;
-    Vector<f32> scores;
+    Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>> res;
+    IdxType last_term_id = -1;
+    Vector<BMBlockOffset> block_offsets;
+    Vector<DataType> scores;
     for (const auto &[term_id, block_offset, score] : term_pairs) {
         if (term_id != last_term_id) {
             if (last_term_id != -1) {
@@ -95,15 +100,16 @@ Vector<Tuple<i32, Vector<i8>, Vector<f32>>> TailFwd::ToBlockFwd() const {
     return res;
 }
 
-Vector<f32> TailFwd::GetScores(const SparseVecRef<f32, i32> &query) const {
-    i8 tail_size = tail_terms_.size();
-    Vector<f32> res(tail_size, 0.0);
-    for (i8 offset = 0; offset < tail_size; ++offset) {
+template <typename DataType, typename IdxType>
+Vector<DataType> TailFwd<DataType, IdxType>::GetScores(const SparseVecRef<DataType, IdxType> &query) const {
+    SizeT tail_size = tail_terms_.size();
+    Vector<DataType> res(tail_size, 0.0);
+    for (SizeT offset = 0; offset < tail_size; ++offset) {
         const auto &tail_terms = tail_terms_[offset];
         SizeT j = 0;
         for (i32 i = 0; i < query.nnz_; ++i) {
-            i32 query_term = query.indices_[i];
-            f32 query_score = query.data_[i];
+            IdxType query_term = query.indices_[i];
+            DataType query_score = query.data_[i];
             while (j < tail_terms.size() && tail_terms[j].first < query_term) {
                 ++j;
             }
@@ -118,21 +124,28 @@ Vector<f32> TailFwd::GetScores(const SparseVecRef<f32, i32> &query) const {
     return res;
 }
 
-Optional<TailFwd> BlockFwd::AddDoc(const SparseVecRef<f32, i32> &doc) {
-    i8 tail_size = tail_fwd_.AddDoc(doc);
+template class TailFwd<f32, i32>;
+template class TailFwd<f32, i16>;
+template class TailFwd<f64, i32>;
+template class TailFwd<f64, i16>;
+
+template <typename DataType, typename IdxType>
+Optional<TailFwd<DataType, IdxType>> BlockFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
+    SizeT tail_size = tail_fwd_.AddDoc(doc);
     if (tail_size < block_size_) {
         return None;
     }
-    TailFwd tail_fwd1;
+    TailFwd<DataType, IdxType> tail_fwd1;
     std::swap(tail_fwd1, tail_fwd_);
 
-    Vector<Tuple<i32, Vector<i8>, Vector<f32>>> block_terms = tail_fwd1.ToBlockFwd();
+    Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>> block_terms = tail_fwd1.ToBlockFwd();
     block_terms_.emplace_back(std::move(block_terms));
     return tail_fwd1;
 }
 
-Vector<Vector<f32>> BlockFwd::GetIvtScores(i32 term_num) const {
-    Vector<Vector<f32>> res(term_num);
+template <typename DataType, typename IdxType>
+Vector<Vector<DataType>> BlockFwd<DataType, IdxType>::GetIvtScores(SizeT term_num) const {
+    Vector<Vector<DataType>> res(term_num);
     for (const auto &block_terms : block_terms_) {
         for (const auto &[term_id, block_offsets, scores] : block_terms) {
             for (SizeT i = 0; i < scores.size(); ++i) {
@@ -143,14 +156,14 @@ Vector<Vector<f32>> BlockFwd::GetIvtScores(i32 term_num) const {
     return res;
 }
 
-Vector<f32> BlockFwd::GetScores(i32 block_id, const SparseVecRef<f32, i32> &query) const {
+template <typename DataType, typename IdxType>
+Vector<DataType> BlockFwd<DataType, IdxType>::GetScores(BMBlockID block_id, const SparseVecRef<DataType, IdxType> &query) const {
     const auto &block_terms = block_terms_[block_id];
-    // const auto &[term_id, block_offsets, scores] = block_terms[j];
-    Vector<f32> res(block_size_, 0.0);
+    Vector<DataType> res(block_size_, 0.0);
     SizeT j = 0;
     for (i32 i = 0; i < query.nnz_; ++i) {
-        i32 query_term = query.indices_[i];
-        f32 query_score = query.data_[i];
+        IdxType query_term = query.indices_[i];
+        DataType query_score = query.data_[i];
         while (j < block_terms.size() && std::get<0>(block_terms[j]) < query_term) {
             ++j;
         }
@@ -165,153 +178,127 @@ Vector<f32> BlockFwd::GetScores(i32 block_id, const SparseVecRef<f32, i32> &quer
     return res;
 }
 
-Vector<f32> BlockFwd::GetScoresTail(const SparseVecRef<f32, i32> &query) const { return tail_fwd_.GetScores(query); }
-
-void BlockFwd::Prefetch(i32 block_id) const {
+template <typename DataType, typename IdxType>
+void BlockFwd<DataType, IdxType>::Prefetch(BMBlockID block_id) const {
     const auto *ptr = reinterpret_cast<const char *>(block_terms_[block_id].data());
     _mm_prefetch(ptr, _MM_HINT_T0);
 }
 
-// template <bool UseSIMD>
-void BlockFwd::Calculate(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score) {
-    // if constexpr (UseSIMD) {
-    // UnrecoverableError("Not implemented");
-    // } else {
+template <typename DataType, typename IdxType>
+void BlockFwd<DataType, IdxType>::Calculate(const Vector<BMBlockOffset> &block_offsets,
+                                            const Vector<DataType> scores,
+                                            Vector<DataType> &res,
+                                            DataType query_score) {
     for (SizeT i = 0; i < block_offsets.size(); ++i) {
-        i8 block_offset = block_offsets[i];
+        BMBlockOffset block_offset = block_offsets[i];
         res[block_offset] += query_score * scores[i];
     }
-    // }
 }
 
-// template void BlockFwd::Calculate<false>(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
-// template void BlockFwd::Calculate<true>(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
+template class BlockFwd<f32, i32>;
+template class BlockFwd<f32, i16>;
+template class BlockFwd<f64, i32>;
+template class BlockFwd<f64, i16>;
 
-// template <bool UseLock>
-template <BMCompressType CompressType>
-void BMIndex<CompressType>::AddDoc(const SparseVecRef<f32, i32> &doc) {
-    // std::unique_lock lock(mtx_, std::defer_lock);
-    // if constexpr (UseLock) {
-    //     lock.lock();
-    // }
-    Optional<TailFwd> tail_fwd = block_fwd_.AddDoc(doc);
+template <typename DataType, typename IdxType, BMCompressType CompressType>
+void BMIndex<DataType, IdxType, CompressType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
+    Optional<TailFwd<DataType, IdxType>> tail_fwd = block_fwd_.AddDoc(doc);
     if (!tail_fwd.has_value()) {
         return;
     }
-    i32 block_id = block_fwd_.block_num() - 1;
+    BMBlockID block_id = block_fwd_.block_num() - 1;
     const auto &tail_terms = tail_fwd->GetTailTerms();
     bm_ivt_.AddBlock(block_id, tail_terms);
 }
 
-// template void BMIndex::AddDoc<false>(const SparseVecRef<f32, i32> &doc);
-// template void BMIndex::AddDoc<true>(const SparseVecRef<f32, i32> &doc);
-
-// template <bool UseLock>
-template <BMCompressType CompressType>
-void BMIndex<CompressType>::Optimize(i32 topk) {
-    // std::unique_lock lock(mtx_, std::defer_lock);
-    // if constexpr (UseLock) {
-    //     lock.lock();
-    // }
-    i32 term_num = bm_ivt_.term_num();
-    Vector<Vector<f32>> ivt_scores = block_fwd_.GetIvtScores(term_num);
+template <typename DataType, typename IdxType, BMCompressType CompressType>
+void BMIndex<DataType, IdxType, CompressType>::Optimize(i32 topk) {
+    SizeT term_num = bm_ivt_.term_num();
+    Vector<Vector<DataType>> ivt_scores = block_fwd_.GetIvtScores(term_num);
     bm_ivt_.Optimize(topk, std::move(ivt_scores));
 }
 
-// template void BMIndex::Optimize<false>(i32 topk);
-// template void BMIndex::Optimize<true>(i32 topk);
-
-template <BMCompressType CompressType>
-Pair<Vector<i32>, Vector<f32>> BMIndex<CompressType>::SearchKnn(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const {
-    // std::shared_lock lock(mtx_, std::defer_lock);
-    // if constexpr (UseLock) {
-    //     lock.lock();
-    // }
-
-    i8 block_size = block_fwd_.block_size();
-    SparseVecEle<f32, i32> keeped_query;
+template <typename DataType, typename IdxType, BMCompressType CompressType>
+Pair<Vector<BMDocID>, Vector<DataType>>
+BMIndex<DataType, IdxType, CompressType>::SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, f32 alpha, f32 beta) const {
+    SizeT block_size = block_fwd_.block_size();
+    SparseVecEle<DataType, IdxType> keeped_query;
     if (beta < 1.0) {
         i32 terms_to_keep = std::ceil(query.nnz_ * beta);
-        Vector<i32> query_term_idxes(query.nnz_);
+        Vector<SizeT> query_term_idxes(query.nnz_);
         std::iota(query_term_idxes.begin(), query_term_idxes.end(), 0);
-        std::partial_sort(query_term_idxes.begin(), query_term_idxes.begin() + terms_to_keep, query_term_idxes.end(), [&](i32 a, i32 b) {
+        std::partial_sort(query_term_idxes.begin(), query_term_idxes.begin() + terms_to_keep, query_term_idxes.end(), [&](SizeT a, SizeT b) {
             return query.data_[a] > query.data_[b];
         });
         query_term_idxes.resize(terms_to_keep);
-        std::sort(query_term_idxes.begin(), query_term_idxes.end(), [&](i32 a, i32 b) { return query.indices_[a] < query.indices_[b]; });
+        std::sort(query_term_idxes.begin(), query_term_idxes.end(), [&](SizeT a, SizeT b) { return query.indices_[a] < query.indices_[b]; });
 
-        keeped_query.Init(terms_to_keep);
-        i32 i = 0;
-        for (i32 query_term_idx : query_term_idxes) {
-            keeped_query.indices_[i] = query.indices_[query_term_idx];
-            keeped_query.data_[i] = query.data_[query_term_idx];
-            ++i;
-        }
+        keeped_query.Init(query_term_idxes, query.data_, query.indices_);
     }
-    const SparseVecRef<f32, i32> &query_ref =
-        beta < 1.0 ? SparseVecRef<f32, i32>(keeped_query.nnz_, keeped_query.indices_.get(), keeped_query.data_.get()) : query;
+    const SparseVecRef<DataType, IdxType> &query_ref =
+        beta < 1.0 ? SparseVecRef<DataType, IdxType>(keeped_query.nnz_, keeped_query.indices_.get(), keeped_query.data_.get()) : query;
 
     const auto &postings = bm_ivt_.GetPostings();
-    f32 threshold = 0.0;
-    i32 block_num = block_fwd_.block_num();
-    Vector<f32> upper_bounds(block_num, 0.0);
+    DataType threshold = 0.0;
+    SizeT block_num = block_fwd_.block_num();
+    Vector<DataType> upper_bounds(block_num, 0.0);
     for (i32 i = 0; i < query_ref.nnz_; ++i) {
-        i32 query_term = query_ref.indices_[i];
-        f32 query_score = query_ref.data_[i];
+        IdxType query_term = query_ref.indices_[i];
+        DataType query_score = query_ref.data_[i];
         const auto &posting = postings[query_term];
         threshold = std::max(threshold, query_score * posting.kth(topk));
         posting.data_.Calculate(upper_bounds, query_score);
     }
 
-    Vector<Pair<f32, i32>> block_scores;
-    for (i32 block_id = 0; block_id < block_num; ++block_id) {
+    Vector<Pair<DataType, BMBlockID>> block_scores;
+    for (SizeT block_id = 0; block_id < block_num; ++block_id) {
         if (upper_bounds[block_id] >= threshold) {
             block_scores.emplace_back(upper_bounds[block_id], block_id);
         }
     }
     std::sort(block_scores.begin(), block_scores.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
 
-    Vector<i32> result(topk);
-    Vector<f32> result_score(topk);
-    HeapResultHandler<CompareMin<f32, i32>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
+    Vector<BMDocID> result(topk);
+    Vector<DataType> result_score(topk);
+    HeapResultHandler<CompareMin<DataType, BMDocID>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
 
     SizeT block_scores_num = block_scores.size();
     for (SizeT i = 0; i < block_scores_num; ++i) {
         if (i + 1 < block_scores_num) {
-            i32 next_block_id = block_scores[i + 1].second;
+            BMBlockID next_block_id = block_scores[i + 1].second;
             block_fwd_.Prefetch(next_block_id);
         }
         const auto &[ub_score, block_id] = block_scores[i];
-        i32 off = block_id * block_size;
-        Vector<f32> scores = block_fwd_.GetScores(block_id, query_ref);
+        BMDocID off = block_id * block_size;
+        Vector<DataType> scores = block_fwd_.GetScores(block_id, query_ref);
         for (SizeT block_off = 0; block_off < scores.size(); ++block_off) {
-            i32 doc_id = off + block_off;
-            f32 score = scores[block_off];
+            BMDocID doc_id = off + block_off;
+            DataType score = scores[block_off];
             result_handler.AddResult(0 /*query_id*/, score, doc_id);
         }
         if (ub_score * alpha < result_handler.GetDistance0(0 /*query_id*/)) {
             break;
         }
     }
-    // if constexpr (CalTail) {
-    //     Vector<f32> tail_scores = block_fwd_.GetScoresTail(query_ref);
-    //     for (i32 i = 0; i < (i32)tail_scores.size(); ++i) {
-    //         i32 doc_id = block_num * block_size + i;
-    //         f32 score = tail_scores[i];
-    //         result_handler.AddResult(0 /*query_id*/, score, doc_id);
-    //     }
-    // }
+    Vector<DataType> tail_scores = block_fwd_.GetScoresTail(query_ref);
+    for (SizeT i = 0; i < tail_scores.size(); ++i) {
+        BMDocID doc_id = block_num * block_size + i;
+        DataType score = tail_scores[i];
+        result_handler.AddResult(0 /*query_id*/, score, doc_id);
+    }
 
     result_handler.End(0 /*query_id*/);
     return {result, result_score};
 }
 
-template class BMIndex<BMCompressType::kCompressed>;
-template class BMIndex<BMCompressType::kRaw>;
+template class BMIndex<f32, i32, BMCompressType::kCompressed>;
+template class BMIndex<f32, i32, BMCompressType::kRaw>;
+template class BMIndex<f32, i16, BMCompressType::kCompressed>;
+template class BMIndex<f32, i16, BMCompressType::kRaw>;
 
-// template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<false, false>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
-// template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<true, false>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
-// template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<false, true>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
-// template Pair<Vector<i32>, Vector<f32>> BMIndex::SearchKnn<true, true>(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
+template class BMIndex<f64, i32, BMCompressType::kCompressed>;
+template class BMIndex<f64, i32, BMCompressType::kRaw>;
+template class BMIndex<f64, i16, BMCompressType::kCompressed>;
+template class BMIndex<f64, i16, BMCompressType::kRaw>;
 
 } // namespace infinity

@@ -20,128 +20,126 @@ import stl;
 import sparse_util;
 import file_system;
 import bm_posting;
+import bm_util;
 
 namespace infinity {
 
-i32 ceil_div(i32 a, i32 b) { return (a + b - 1) / b; }
-
-template <BMCompressType CompressType>
+template <typename DataType, BMCompressType CompressType>
 class BMIvt {
 private:
-    BMIvt(Vector<BlockPostings<CompressType>> postings) : postings_(std::move(postings)) {}
+    BMIvt(Vector<BlockPostings<DataType, CompressType>> postings) : postings_(std::move(postings)) {}
 
 public:
-    BMIvt(i32 term_num) : postings_(term_num) {}
+    BMIvt(SizeT term_num) : postings_(term_num) {}
 
-    void AddBlock(i32 block_id, const Vector<Vector<Pair<i32, f32>>> &tail_terms);
+    template <typename IdxType>
+    void AddBlock(BMBlockID block_id, const Vector<Vector<Pair<IdxType, DataType>>> &tail_terms);
 
-    void Optimize(i32 topk, Vector<Vector<f32>> ivt_scores);
+    void Optimize(i32 topk, Vector<Vector<DataType>> ivt_scores);
 
-    const Vector<BlockPostings<CompressType>> &GetPostings() const { return postings_; }
+    const Vector<BlockPostings<DataType, CompressType>> &GetPostings() const { return postings_; }
 
-    i32 term_num() const { return postings_.size(); }
+    SizeT term_num() const { return postings_.size(); }
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
     static BMIvt ReadAdv(char *&p);
 
 private:
-    Vector<BlockPostings<CompressType>> postings_;
+    Vector<BlockPostings<DataType, CompressType>> postings_;
 };
 
-struct TailFwd {
+template <typename DataType, typename IdxType>
+class TailFwd {
 private:
-    TailFwd(Vector<Vector<Pair<i32, f32>>> tail_terms) : tail_terms_(std::move(tail_terms)) {}
+    TailFwd(Vector<Vector<Pair<IdxType, DataType>>> tail_terms) : tail_terms_(std::move(tail_terms)) {}
 
 public:
     TailFwd() = default;
 
-    i8 AddDoc(const SparseVecRef<f32, i32> &doc);
+    SizeT AddDoc(const SparseVecRef<DataType, IdxType> &doc);
 
-    const Vector<Vector<Pair<i32, f32>>> &GetTailTerms() const { return tail_terms_; }
+    const Vector<Vector<Pair<IdxType, DataType>>> &GetTailTerms() const { return tail_terms_; }
 
-    Vector<Tuple<i32, Vector<i8>, Vector<f32>>> ToBlockFwd() const;
+    Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>> ToBlockFwd() const;
 
-    Vector<f32> GetScores(const SparseVecRef<f32, i32> &query) const;
+    Vector<DataType> GetScores(const SparseVecRef<DataType, IdxType> &query) const;
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static TailFwd ReadAdv(char *&p);
+    static TailFwd<DataType, IdxType> ReadAdv(char *&p);
 
 private:
-    Vector<Vector<Pair<i32, f32>>> tail_terms_;
+    Vector<Vector<Pair<IdxType, DataType>>> tail_terms_;
 };
 
-struct BlockFwd {
+template <typename DataType, typename IdxType>
+class BlockFwd {
 private:
-    BlockFwd(i8 block_size, Vector<Vector<Tuple<i32, Vector<i8>, Vector<f32>>>> block_terms, TailFwd tail_fwd)
+    BlockFwd(SizeT block_size,
+             Vector<Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>>> block_terms,
+             TailFwd<DataType, IdxType> tail_fwd)
         : block_size_(block_size), block_terms_(std::move(block_terms)), tail_fwd_(std::move(tail_fwd)) {}
 
 public:
-    BlockFwd(i8 block_size) : block_size_(block_size) {}
+    BlockFwd(SizeT block_size) : block_size_(block_size) {}
 
-    Optional<TailFwd> AddDoc(const SparseVecRef<f32, i32> &doc);
+    Optional<TailFwd<DataType, IdxType>> AddDoc(const SparseVecRef<DataType, IdxType> &doc);
 
-    Vector<Vector<f32>> GetIvtScores(i32 term_num) const;
+    Vector<Vector<DataType>> GetIvtScores(SizeT term_num) const;
 
-    Vector<f32> GetScores(i32 block_id, const SparseVecRef<f32, i32> &query) const;
+    Vector<DataType> GetScores(BMBlockID block_id, const SparseVecRef<DataType, IdxType> &query) const;
 
-    Vector<f32> GetScoresTail(const SparseVecRef<f32, i32> &query) const;
+    Vector<DataType> GetScoresTail(const SparseVecRef<DataType, IdxType> &query) const { return tail_fwd_.GetScores(query); }
 
-    void Prefetch(i32 block_id) const;
+    void Prefetch(BMBlockID block_id) const;
 
-    i8 block_size() const { return block_size_; }
+    SizeT block_size() const { return block_size_; }
 
-    i32 block_num() const { return block_terms_.size(); }
+    SizeT block_num() const { return block_terms_.size(); }
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
     static BlockFwd ReadAdv(char *&p);
 
 private:
-    // template <bool UseSIMD = false>
-    static void Calculate(const Vector<i8> &block_offsets, const Vector<f32> scores, Vector<f32> &res, f32 query_score);
+    static void Calculate(const Vector<BMBlockOffset> &block_offsets, const Vector<DataType> scores, Vector<DataType> &res, DataType query_score);
 
 private:
-    i8 block_size_;
-    Vector<Vector<Tuple<i32, Vector<i8>, Vector<f32>>>> block_terms_;
-    TailFwd tail_fwd_;
+    SizeT block_size_;
+    Vector<Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>>> block_terms_;
+    TailFwd<DataType, IdxType> tail_fwd_;
 };
 
-export template <BMCompressType CompressType>
+export template <typename DataType, typename IdxType, BMCompressType CompressType>
 class BMIndex {
 private:
-    BMIndex(BMIvt<CompressType> bm_ivt, BlockFwd block_fwd) : bm_ivt_(std::move(bm_ivt)), block_fwd_(std::move(block_fwd)) {}
+    BMIndex(BMIvt<DataType, CompressType> bm_ivt, BlockFwd<DataType, IdxType> block_fwd)
+        : bm_ivt_(std::move(bm_ivt)), block_fwd_(std::move(block_fwd)) {}
 
 public:
-    BMIndex(i32 term_num, i8 block_size) : bm_ivt_(term_num), block_fwd_(block_size) {}
+    BMIndex(SizeT term_num, SizeT block_size) : bm_ivt_(term_num), block_fwd_(block_size) {}
 
-    // template <bool UseLock = false>
-    void AddDoc(const SparseVecRef<f32, i32> &doc);
+    void AddDoc(const SparseVecRef<DataType, IdxType> &doc);
 
-    // template <bool UseLock = false>
     void Optimize(i32 topk);
 
-    // template <bool UseLock = false, bool CalTail = false>
-    Pair<Vector<i32>, Vector<f32>> SearchKnn(const SparseVecRef<f32, i32> &query, i32 topk, f32 alpha, f32 beta) const;
+    Pair<Vector<BMDocID>, Vector<DataType>> SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, f32 alpha, f32 beta) const;
 
-    // template <bool UseLock = false>
     void Save(FileHandler &file_handler) const;
 
-    static BMIndex<CompressType> Load(FileHandler &file_handler);
+    static BMIndex<DataType, IdxType, CompressType> Load(FileHandler &file_handler);
 
 private:
     SizeT GetSizeInBytes() const;
 
     void WriteAdv(char *&p) const;
 
-    static BMIndex<CompressType> ReadAdv(char *&p);
+    static BMIndex<DataType, IdxType, CompressType> ReadAdv(char *&p);
 
 private:
-    mutable std::shared_mutex mtx_;
-
-    BMIvt<CompressType> bm_ivt_;
-    BlockFwd block_fwd_;
+    BMIvt<DataType, CompressType> bm_ivt_;
+    BlockFwd<DataType, IdxType> block_fwd_;
 };
 
 } // namespace infinity

@@ -42,10 +42,15 @@ struct SparseVecRef {
 export template <typename DataType, typename IdxType>
 struct SparseVecEle {
     SparseVecEle() = default;
-    void Init(i32 nnz) {
-        nnz_ = nnz;
-        indices_ = MakeUniqueForOverwrite<IdxType[]>(nnz);
-        data_ = MakeUniqueForOverwrite<DataType[]>(nnz);
+
+    void Init(const Vector<SizeT> &keep_idxes, const DataType *data, const IdxType *indices) {
+        nnz_ = keep_idxes.size();
+        indices_ = MakeUniqueForOverwrite<IdxType[]>(nnz_);
+        data_ = MakeUniqueForOverwrite<DataType[]>(nnz_);
+        for (i32 i = 0; i < nnz_; ++i) {
+            indices_[i] = indices[keep_idxes[i]];
+            data_[i] = data[keep_idxes[i]];
+        }
     }
 
     i32 nnz_{};
@@ -135,7 +140,7 @@ public:
     SparseVecRef<DataT, IdxT> val() const {
         i32 nnz = mat_.indptr_[row_i_ + 1] - offset_;
         const auto *indices = reinterpret_cast<const IdxT *>(mat_.indices_.get() + offset_);
-        const float *data = mat_.data_.get() + offset_;
+        const auto *data = mat_.data_.get() + offset_;
         return SparseVecRef<DataT, IdxT>(nnz, indices, data);
     }
 

@@ -21,77 +21,93 @@ import serialize;
 
 namespace infinity {
 
-// --------------------------BlockPostings--------------------------
-
-template <BMCompressType CompressType>
-SizeT BlockPostings<CompressType>::GetSizeInBytes() const {
-    return sizeof(kth_) + sizeof(kth_score_) + data_.GetSizeInBytes();
-}
-
-template <BMCompressType CompressType>
-void BlockPostings<CompressType>::WriteAdv(char *&p) const {
-    WriteBufAdv<i32>(p, kth_);
-    WriteBufAdv<f32>(p, kth_score_);
-    data_.WriteAdv(p);
-}
-
-template <BMCompressType CompressType>
-BlockPostings<CompressType> BlockPostings<CompressType>::ReadAdv(char *&p) {
-    BlockPostings res;
-    res.kth_ = ReadBufAdv<i32>(p);
-    res.kth_score_ = ReadBufAdv<f32>(p);
-    res.data_ = BlockData<CompressType>::ReadAdv(p);
-    return res;
-}
-
-template struct BlockPostings<BMCompressType::kCompressed>;
-template struct BlockPostings<BMCompressType::kRaw>;
-
 // --------------------------CompressedBlockData--------------------------
 
-SizeT BlockData<BMCompressType::kCompressed>::GetSizeInBytes() const {
-    return sizeof(SizeT) + block_ids_.size() * sizeof(i32) + max_scores_.size() * sizeof(f32);
+template <typename DataType>
+SizeT BlockData<DataType, BMCompressType::kCompressed>::GetSizeInBytes() const {
+    return sizeof(SizeT) + block_ids_.size() * sizeof(BMBlockID) + max_scores_.size() * sizeof(DataType);
 }
 
-void BlockData<BMCompressType::kCompressed>::WriteAdv(char *&p) const {
+template <typename DataType>
+void BlockData<DataType, BMCompressType::kCompressed>::WriteAdv(char *&p) const {
     SizeT max_score_size = max_scores_.size();
     WriteBufAdv<SizeT>(p, max_score_size);
-    WriteBufCharsAdv(p, reinterpret_cast<const char *>(block_ids_.data()), sizeof(i32) * block_ids_.size());
-    WriteBufCharsAdv(p, reinterpret_cast<const char *>(max_scores_.data()), sizeof(f32) * max_scores_.size());
+    WriteBufCharsAdv(p, reinterpret_cast<const char *>(block_ids_.data()), sizeof(BMBlockID) * block_ids_.size());
+    WriteBufCharsAdv(p, reinterpret_cast<const char *>(max_scores_.data()), sizeof(DataType) * max_scores_.size());
 }
 
-BlockData<BMCompressType::kCompressed> BlockData<BMCompressType::kCompressed>::ReadAdv(char *&p) {
-    BlockData<BMCompressType::kCompressed> res;
+template <typename DataType>
+BlockData<DataType, BMCompressType::kCompressed> BlockData<DataType, BMCompressType::kCompressed>::ReadAdv(char *&p) {
+    BlockData<DataType, BMCompressType::kCompressed> res;
     SizeT max_score_size = ReadBufAdv<SizeT>(p);
     res.block_ids_.resize(max_score_size);
     res.max_scores_.resize(max_score_size);
     for (SizeT i = 0; i < max_score_size; ++i) {
-        res.block_ids_[i] = ReadBufAdv<i32>(p);
+        res.block_ids_[i] = ReadBufAdv<BMBlockID>(p);
     }
     for (SizeT i = 0; i < max_score_size; ++i) {
-        res.max_scores_[i] = ReadBufAdv<f32>(p);
+        res.max_scores_[i] = ReadBufAdv<DataType>(p);
     }
     return res;
 }
 
-// // --------------------------RawBlockData--------------------------
+template struct BlockData<f32, BMCompressType::kCompressed>;
+template struct BlockData<f64, BMCompressType::kCompressed>;
 
-SizeT BlockData<BMCompressType::kRaw>::GetSizeInBytes() const { return sizeof(SizeT) + max_scores_.size() * sizeof(f32); }
+// --------------------------RawBlockData--------------------------
 
-void BlockData<BMCompressType::kRaw>::WriteAdv(char *&p) const {
-    SizeT max_score_size = max_scores_.size();
-    WriteBufAdv<SizeT>(p, max_score_size);
-    WriteBufCharsAdv(p, reinterpret_cast<const char *>(max_scores_.data()), sizeof(f32) * max_scores_.size());
+template <typename DataType>
+SizeT BlockData<DataType, BMCompressType::kRaw>::GetSizeInBytes() const {
+    return sizeof(SizeT) + max_scores_.size() * sizeof(DataType);
 }
 
-BlockData<BMCompressType::kRaw> BlockData<BMCompressType::kRaw>::ReadAdv(char *&p) {
-    BlockData<BMCompressType::kRaw> res;
+template <typename DataType>
+void BlockData<DataType, BMCompressType::kRaw>::WriteAdv(char *&p) const {
+    SizeT max_score_size = max_scores_.size();
+    WriteBufAdv<SizeT>(p, max_score_size);
+    WriteBufCharsAdv(p, reinterpret_cast<const char *>(max_scores_.data()), sizeof(DataType) * max_scores_.size());
+}
+
+template <typename DataType>
+BlockData<DataType, BMCompressType::kRaw> BlockData<DataType, BMCompressType::kRaw>::ReadAdv(char *&p) {
+    BlockData<DataType, BMCompressType::kRaw> res;
     SizeT max_score_size = ReadBufAdv<SizeT>(p);
     res.max_scores_.resize(max_score_size);
     for (SizeT i = 0; i < max_score_size; ++i) {
-        res.max_scores_[i] = ReadBufAdv<f32>(p);
+        res.max_scores_[i] = ReadBufAdv<DataType>(p);
     }
     return res;
 }
+
+template struct BlockData<f32, BMCompressType::kRaw>;
+template struct BlockData<f64, BMCompressType::kRaw>;
+
+// --------------------------BlockPostings--------------------------
+
+template <typename DataType, BMCompressType CompressType>
+SizeT BlockPostings<DataType, CompressType>::GetSizeInBytes() const {
+    return sizeof(kth_) + sizeof(kth_score_) + data_.GetSizeInBytes();
+}
+
+template <typename DataType, BMCompressType CompressType>
+void BlockPostings<DataType, CompressType>::WriteAdv(char *&p) const {
+    WriteBufAdv<i32>(p, kth_);
+    WriteBufAdv<DataType>(p, kth_score_);
+    data_.WriteAdv(p);
+}
+
+template <typename DataType, BMCompressType CompressType>
+BlockPostings<DataType, CompressType> BlockPostings<DataType, CompressType>::ReadAdv(char *&p) {
+    BlockPostings res;
+    res.kth_ = ReadBufAdv<i32>(p);
+    res.kth_score_ = ReadBufAdv<DataType>(p);
+    res.data_ = BlockData<DataType, CompressType>::ReadAdv(p);
+    return res;
+}
+
+template struct BlockPostings<f32, BMCompressType::kCompressed>;
+template struct BlockPostings<f32, BMCompressType::kRaw>;
+template struct BlockPostings<f64, BMCompressType::kCompressed>;
+template struct BlockPostings<f64, BMCompressType::kRaw>;
 
 } // namespace infinity

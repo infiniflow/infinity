@@ -17,53 +17,49 @@ module;
 export module bm_posting;
 
 import stl;
+import bm_util;
 
 namespace infinity {
 
-export enum class BMCompressType : i8 {
-    kRaw = 0,
-    kCompressed = 1,
-};
-
-export template <BMCompressType CompressType>
+export template <typename DataType, BMCompressType CompressType>
 struct BlockData {};
 
-template <>
-struct BlockData<BMCompressType::kCompressed> {
+template <typename DataType>
+struct BlockData<DataType, BMCompressType::kCompressed> {
 public:
-    void Calculate(Vector<f32> &upper_bounds, f32 query_score) const;
+    void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const;
 
-    void AddBlock(i32 block_id, f32 max_score);
+    void AddBlock(BMBlockID block_id, DataType max_score);
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BlockData<BMCompressType::kCompressed> ReadAdv(char *&p);
+    static BlockData<DataType, BMCompressType::kCompressed> ReadAdv(char *&p);
 
 private:
-    Vector<i32> block_ids_;
-    Vector<f32> max_scores_;
+    Vector<BMBlockID> block_ids_;
+    Vector<DataType> max_scores_;
 };
 
-export template <>
-struct BlockData<BMCompressType::kRaw> {
+export template <typename DataType>
+struct BlockData<DataType, BMCompressType::kRaw> {
 public:
     // template <bool UseSIMD = false>
-    void Calculate(Vector<f32> &upper_bounds, f32 query_score) const;
+    void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const;
 
-    void AddBlock(i32 block_id, f32 max_score);
+    void AddBlock(BMBlockID block_id, DataType max_score);
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BlockData<BMCompressType::kRaw> ReadAdv(char *&p);
+    static BlockData<DataType, BMCompressType::kRaw> ReadAdv(char *&p);
 
 public:
-    Vector<f32> max_scores_;
+    Vector<DataType> max_scores_;
 };
 
-export template <BMCompressType CompressType>
+export template <typename DataType, BMCompressType CompressType>
 struct BlockPostings {
 public:
-    f32 kth(i32 topk) const { return topk == kth_ ? kth_score_ : 0.0; }
+    DataType kth(i32 topk) const { return topk == kth_ ? kth_score_ : 0.0; }
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
@@ -71,8 +67,8 @@ public:
 
 public:
     i32 kth_{-1};
-    f32 kth_score_;
-    BlockData<CompressType> data_;
+    DataType kth_score_;
+    BlockData<DataType, CompressType> data_;
 };
 
 } // namespace infinity

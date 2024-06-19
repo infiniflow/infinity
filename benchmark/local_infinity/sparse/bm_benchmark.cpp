@@ -27,7 +27,7 @@ import third_party;
 import profiler;
 import linscan_alg;
 import bm_index;
-import bm_posting;
+import bm_util;
 
 using namespace infinity;
 using namespace benchmark;
@@ -49,11 +49,16 @@ int main(int argc, char *argv[]) {
         case ModeType::kImport: {
             SparseMatrix<f32, i32> data_mat = DecodeSparseDataset(opt.data_path_);
             profiler.Begin();
-            BMIndex<BMCompressType::kCompressed> index(data_mat.ncol_, opt.block_size_);
+            BMIndex<f32, i16, BMCompressType::kCompressed> index(data_mat.ncol_, opt.block_size_);
             for (SparseMatrixIter<f32, i32> iter(data_mat); iter.HasNext(); iter.Next()) {
                 SparseVecRef vec = iter.val();
                 u32 doc_id = iter.row_id();
-                index.AddDoc(vec);
+                Vector<i16> indices(vec.nnz_);
+                for (i32 i = 0; i < vec.nnz_; i++) {
+                    indices[i] = static_cast<i16>(vec.indices_[i]);
+                }
+                SparseVecRef<f32, i16> vec1(vec.nnz_, indices.data(), vec.data_);
+                index.AddDoc(vec1);
 
                 if (LogInterval != 0 && doc_id % LogInterval == 0) {
                     std::cout << fmt::format("Imported {} docs\n", doc_id);
@@ -66,7 +71,8 @@ int main(int argc, char *argv[]) {
             profiler.End();
 
             std::cout << fmt::format("Import data time: {}\n", profiler.ElapsedToString(1000));
-            auto [file_handler, status] = fs.OpenFile(opt.index_save_path_.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+            auto [file_handler, status] =
+                fs.OpenFile(opt.index_save_path_.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
             }
@@ -81,7 +87,7 @@ int main(int argc, char *argv[]) {
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
             }
-            auto index = BMIndex<BMCompressType::kCompressed>::Load(*file_handler);
+            auto index = BMIndex<f32, i16, BMCompressType::kCompressed>::Load(*file_handler);
 
             auto [top_k, all_query_n, _1, _2] = DecodeGroundtruth(opt.groundtruth_path_, true);
             if ((int)top_k != opt.topk_) {
@@ -102,7 +108,12 @@ int main(int argc, char *argv[]) {
 
                 profiler.Begin();
                 query_result = Search(thread_n, query_mat, top_k, query_n, [&](const SparseVecRef<f32, i32> &query, u32 topk) {
-                    return index.SearchKnn(query, topk, opt.alpha_, opt.beta_);
+                    Vector<i16> indices(query.nnz_);
+                    for (i32 i = 0; i < query.nnz_; i++) {
+                        indices[i] = static_cast<i16>(query.indices_[i]);
+                    }
+                    SparseVecRef<f32, i16> query1(query.nnz_, indices.data(), query.data_);
+                    return index.SearchKnn(query1, topk, opt.alpha_, opt.beta_);
                 });
                 profiler.End();
                 std::cout << fmt::format("Search time: {}\n", profiler.ElapsedToString(1000));

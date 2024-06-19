@@ -22,33 +22,43 @@ import infinity_exception;
 
 namespace infinity {
 
-void BlockData<BMCompressType::kCompressed>::Calculate(Vector<f32> &upper_bounds, f32 query_score) const {
+template <typename DataType>
+void BlockData<DataType, BMCompressType::kCompressed>::Calculate(Vector<DataType> &upper_bounds, DataType query_score) const {
     // MultiF32StoreI32(block_ids_.data(), max_scores_.data(), upper_bounds.data(), query_score, block_ids_.size());
     for (SizeT i = 0; i < block_ids_.size(); ++i) {
-        i32 block_id = block_ids_[i];
-        f32 score = max_scores_[i];
+        BMBlockID block_id = block_ids_[i];
+        DataType score = max_scores_[i];
         upper_bounds[block_id] += score * query_score;
     }
 }
 
-void BlockData<BMCompressType::kCompressed>::AddBlock(i32 block_id, f32 max_score) {
+template <typename DataType>
+void BlockData<DataType, BMCompressType::kCompressed>::AddBlock(BMBlockID block_id, DataType max_score) {
     block_ids_.push_back(block_id);
     max_scores_.push_back(max_score);
 }
 
-void BlockData<BMCompressType::kRaw>::Calculate(Vector<f32> &upper_bounds, f32 query_score) const {
-    for (i32 block_id = 0; block_id < (i32)max_scores_.size(); ++block_id) {
+template struct BlockData<f32, BMCompressType::kCompressed>;
+template struct BlockData<f64, BMCompressType::kCompressed>;
+
+template <typename DataType>
+void BlockData<DataType, BMCompressType::kRaw>::Calculate(Vector<DataType> &upper_bounds, DataType query_score) const {
+    for (BMBlockID block_id = 0; block_id < (BMBlockID)max_scores_.size(); ++block_id) {
         if (max_scores_[block_id] > 0.0) {
             upper_bounds[block_id] += max_scores_[block_id] * query_score;
         }
     }
 }
 
-void BlockData<BMCompressType::kRaw>::AddBlock(i32 block_id, f32 max_score) {
-    if (block_id >= (i32)max_scores_.size()) {
+template <typename DataType>
+void BlockData<DataType, BMCompressType::kRaw>::AddBlock(BMBlockID block_id, DataType max_score) {
+    if (block_id >= (BMBlockID)max_scores_.size()) {
         max_scores_.resize(block_id + 1, 0.0);
     }
     max_scores_[block_id] = max_score;
 }
+
+template struct BlockData<f32, BMCompressType::kRaw>;
+template struct BlockData<f64, BMCompressType::kRaw>;
 
 } // namespace infinity
