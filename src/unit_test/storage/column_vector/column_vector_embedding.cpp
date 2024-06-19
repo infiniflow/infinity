@@ -32,6 +32,7 @@ import logical_type;
 import embedding_info;
 import knn_expr;
 import data_type;
+import compilation_config;
 
 class ColumnVectorEmbeddingTest : public BaseTest {
     void SetUp() override {
@@ -39,7 +40,7 @@ class ColumnVectorEmbeddingTest : public BaseTest {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
+        auto config_path = std::make_shared<std::string>(std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml");
         infinity::InfinityContext::instance().Init(config_path);
     }
 
