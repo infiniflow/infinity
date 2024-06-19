@@ -221,7 +221,7 @@ public:
 
     void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
 
-    bool Empty() const;
+    bool ReadOnly() const;
 
     std::mutex mtx_{};
 

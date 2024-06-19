@@ -9,6 +9,7 @@ import time
 def http_api_test(http_api_dir: str,pytest_mark: str):
     print(f"start http api test with {pytest_mark}")
     process = subprocess.Popen(
+        # ["python", "-m", "pytest", "--tb=line", '-s', '-x', '-m', pytest_mark, f'{python_test_dir}/test_http_api'],
         ["python", "-m", "pytest", "--tb=line", '-x', '-m', pytest_mark, f'{python_test_dir}/test_http_api'],
         stdout=sys.stdout,
         stderr=sys.stderr,

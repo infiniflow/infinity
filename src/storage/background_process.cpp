@@ -131,7 +131,7 @@ void BGTaskProcessor::Process() {
                     break;
                 }
             }
-
+            task_text_.clear();
             bg_task->Complete();
         }
         task_count_ -= tasks.size();

@@ -1750,7 +1750,7 @@ Tuple<KnnExpr *, Status> InfinityThriftService::GetKnnExprFromProto(const infini
     if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemInvalid) {
         delete knn_expr;
         knn_expr = nullptr;
-        return {nullptr, Status::InvalidEmbeddingDataType()};
+        return {nullptr, Status::InvalidEmbeddingDataType("invalid")};
     }
 
     auto [embedding_data_ptr, dimension, status] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
@@ -1903,7 +1903,7 @@ Tuple<void *, i64, Status> InfinityThriftService::GetEmbeddingDataTypeDataPtrFro
     } else if (embedding_data.__isset.f64_array_value) {
         return {(void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size(), Status::OK()};
     } else {
-        return {nullptr, 0, Status::InvalidEmbeddingDataType()};
+        return {nullptr, 0, Status::InvalidEmbeddingDataType("unknown type")};
     }
 }
 

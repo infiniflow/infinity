@@ -171,7 +171,7 @@ Tuple<void *, i64> GetEmbeddingDataTypeDataPtrFromProto(const EmbeddingData &emb
     } else if (embedding_data.f64_array_value.size() != 0) {
         return {(void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size()};
     } else {
-        status = Status::InvalidEmbeddingDataType();
+        status = Status::InvalidEmbeddingDataType("unknown type");
         return {nullptr, 0};
     }
 }
@@ -192,7 +192,7 @@ ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
     if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemInvalid) {
         delete knn_expr;
         knn_expr = nullptr;
-        status = Status::InvalidEmbeddingDataType();
+        status = Status::InvalidEmbeddingDataType("unknown type");
         return nullptr;
     }
     auto [embedding_data_ptr, dimension] = GetEmbeddingDataTypeDataPtrFromProto(embedding_data, status);

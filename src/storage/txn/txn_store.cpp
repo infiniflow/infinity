@@ -565,6 +565,27 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     }
 }
 
-bool TxnStore::Empty() const { return txn_dbs_.empty() && txn_tables_.empty() && txn_tables_store_.empty(); }
+bool TxnStore::ReadOnly() const {
+    bool read_only = true;
+    if(!txn_dbs_.empty()) {
+        // CREATE or DROP DB
+        read_only = false;
+    }
+    if(!txn_tables_.empty()) {
+        // CREATE or DROP TABLE
+        read_only = false;
+    }
+    if(!txn_tables_store_.empty()) {
+        for(const auto& txn_table_store: txn_tables_store_) {
+            if(txn_table_store.second->HasUpdate()) {
+                read_only = false;
+                break;
+            }
+        }
+//        read_only = false;
+    }
+
+    return read_only;
+}
 
 } // namespace infinity
