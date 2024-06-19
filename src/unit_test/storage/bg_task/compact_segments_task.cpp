@@ -101,6 +101,17 @@ protected:
     }
 };
 
+class SilentLogTestCompactTaskTest : public CompactTaskTest {
+    void SetUp() override {
+        auto config_path = MakeShared<String>(String(test_data_path()) + "/config/test_cleanup_task_silent.toml");
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        RemoveDbDirs();
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+};
+
 TEST_F(CompactTaskTest, compact_to_single_segment) {
     {
         String table_name = "tbl1";
@@ -311,7 +322,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
     }
 }
 
-TEST_F(CompactTaskTest, delete_in_compact_process) {
+TEST_F(SilentLogTestCompactTaskTest, delete_in_compact_process) {
     {
         String table_name = "tbl1";
 

@@ -29,6 +29,7 @@ import infinity_context;
 import global_resource_usage;
 import logical_type;
 import data_type;
+import compilation_config;
 
 class ColumnVectorBoolTest : public BaseTest {
     void SetUp() override {
@@ -51,7 +52,18 @@ class ColumnVectorBoolTest : public BaseTest {
     }
 };
 
-TEST_F(ColumnVectorBoolTest, flat_boolean) {
+class SilentLogTestColumnVectorBoolTest : public ColumnVectorBoolTest {
+    void SetUp() override {
+        auto config_path = std::make_shared<std::string>(std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml");
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        RemoveDbDirs();
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+};
+
+TEST_F(SilentLogTestColumnVectorBoolTest, flat_boolean) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBoolean);
