@@ -22,6 +22,9 @@ namespace infinity {
 
 extern template class EMVBSharedVec<u32>;
 class EMVBProductQuantizer;
+struct Bitmask;
+struct BlockIndex;
+struct SegmentEntry;
 
 // REQUIREMENTS:
 // FIXED_QUERY_TOKEN_NUM % 8 == 0, to simplify alignment
@@ -53,8 +56,23 @@ public:
                const EMVBSharedVec<u32> *centroids_to_docid,
                const EMVBProductQuantizer *product_quantizer);
 
+    // return docid: start from 0
     Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>
     GetQueryResult(const f32 *query_ptr, u32 nprobe, f32 thresh, u32 n_doc_to_score, u32 out_second_stage, u32 k, f32 thresh_query) const;
+
+    // return docid: start from start_segment_offset
+    Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> GetQueryResult(const f32 *query_ptr,
+                                                                  u32 nprobe,
+                                                                  f32 thresh,
+                                                                  u32 n_doc_to_score,
+                                                                  u32 out_second_stage,
+                                                                  u32 k,
+                                                                  f32 thresh_query,
+                                                                  Bitmask &bitmask,
+                                                                  u32 start_segment_offset,
+                                                                  const SegmentEntry *segment_entry,
+                                                                  const BlockIndex *block_index,
+                                                                  TxnTimeStamp begin_ts) const;
 
 private:
     auto find_candidate_docs(const f32 *centroids_scores, u32 nprobe, f32 th) const;

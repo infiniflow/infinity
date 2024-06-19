@@ -27,6 +27,8 @@ struct RowID;
 struct SegmentEntry;
 class ColumnDef;
 class BufferManager;
+struct Bitmask;
+struct BlockIndex;
 
 using EMVBQueryResultType = Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>>;
 
@@ -63,6 +65,34 @@ public:
 
     void AddOneDocEmbeddings(const f32 *embedding_data, u32 embedding_num);
 
+    // return id: offset in the segment
+    EMVBQueryResultType SearchWithBitmask(const f32 *query_ptr,
+                                          u32 query_embedding_num,
+                                          u32 top_n,
+                                          Bitmask &bitmask,
+                                          const SegmentEntry *segment_entry,
+                                          const BlockIndex *block_index,
+                                          TxnTimeStamp begin_ts,
+                                          u32 centroid_nprobe,
+                                          f32 threshold_first,
+                                          u32 n_doc_to_score,
+                                          u32 out_second_stage,
+                                          f32 threshold_final) const;
+
+    void SaveIndexInner(FileHandler &file_handler);
+
+    void ReadIndexInner(FileHandler &file_handler);
+
+    u32 GetDocNum() const;
+
+    u32 GetTotalEmbeddingNum() const;
+
+    EMVBIndex &operator=(EMVBIndex &&other); // used only in memindex dump
+
+private:
+    [[nodiscard]] u32 ExpectLeastTrainingDataNum() const;
+
+    // return id: offset from start_segment_offset_
     // the two thresholds are for every (query embedding, candidate embedding) pair
     // candidate embeddings are centroids
     // unqualified pairs will not be scored
@@ -77,26 +107,14 @@ public:
                                        f32 threshold_final   // step 3, threshold to reduce maxsim calculation
     ) const;
 
-    void SaveIndexInner(FileHandler &file_handler);
-
-    void ReadIndexInner(FileHandler &file_handler);
-
-    u32 GetDocNum() const;
-
-    u32 GetTotalEmbeddingNum() const;
-
-    EMVBIndex &operator=(EMVBIndex &&other); // used only in memindex dump
-private:
-    [[nodiscard]] u32 ExpectLeastTrainingDataNum() const;
-
     template <u32 I, u32... J>
-    EMVBQueryResultType query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto... query_args) const;
+    EMVBQueryResultType query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto &&...query_args) const;
 
     template <>
-    EMVBQueryResultType query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto... query_args) const;
+    EMVBQueryResultType query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto &&...query_args) const;
 
     template <u32 FIXED_QUERY_TOKEN_NUM>
-    EMVBQueryResultType GetQueryResultT(const f32 *query_ptr, u32 query_embedding_num, auto... query_args) const;
+    EMVBQueryResultType GetQueryResultT(const f32 *query_ptr, u32 query_embedding_num, auto &&...query_args) const;
 };
 
 } // namespace infinity

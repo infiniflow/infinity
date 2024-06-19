@@ -15,7 +15,7 @@
 # jemalloc-5.3.0.tar.bz2
 # gperftools-2.15.tar.gz
 # openssl-1.1.1w.tar.gz
-# Python-3.12.3.tar.xz
+# Python-3.12.4.tar.xz
 
 FROM centos:7
 
@@ -136,6 +136,10 @@ RUN --mount=type=bind,source=gperftools-2.15.tar.gz,target=/root/gperftools-2.15
     && cd gperftools-2.15 && ./configure && make -j 8 && make install \
     && ldconfig && cd /root && rm -rf gperftools-2.15
 
+# download https://github.com/risinglightdb/sqllogictest-rs/releases/download/v0.20.2/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz
+RUN --mount=type=bind,source=sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz,target=/root/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz \
+    cd /tmp && tar xzf /root/sqllogictest-bin-v0.20.2-x86_64-unknown-linux-musl.tar.gz && cp -rf sqllogictest /usr/local/bin && rm -fr /tmp/*
+
 # OpenSSL
 # pyhton 3.6+ ssl module requires openssl 1.1.1+
 # "OpenSSL 1.1.x is not fully source compatible with OpenSSL 1.0.2." refers to https://github.com/openssl/openssl/issues/9772.
@@ -153,10 +157,10 @@ RUN yum install -y gdbm-devel sqlite-devel xz-devel libffi-devel libuuid-devel b
     && yum clean all
 
 # Install Python 3.12
-RUN --mount=type=bind,source=Python-3.12.3.tar.xz,target=/root/Python-3.12.3.tar.xz  \
-    cd /root && tar xJf Python-3.12.3.tar.xz \
-    && cd Python-3.12.3 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
-    && ldconfig && cd /root && rm -rf Python-3.12.3
+RUN --mount=type=bind,source=Python-3.12.4.tar.xz,target=/root/Python-3.12.4.tar.xz  \
+    cd /root && tar xJf Python-3.12.4.tar.xz \
+    && cd Python-3.12.4 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
+    && ldconfig && cd /root && rm -rf Python-3.12.4
 
 # Create a python virtual environment. Set PATH so that the shell activate this virtual environment automatically when entering a container from this image.
 RUN /usr/local/bin/python3 -m venv /usr/local/venv

@@ -940,15 +940,17 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatch(const SharedPtr<LogicalN
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPtr<LogicalNode> &logical_operator) const {
     const auto logical_match_tensor = static_pointer_cast<LogicalMatchTensorScan>(logical_operator);
-    if (auto match_tensor_scan_op =
-            MakeUnique<PhysicalMatchTensorScan>(logical_match_tensor->node_id(),
-                                                logical_match_tensor->TableIndex(),
-                                                logical_match_tensor->base_table_ref_,
-                                                std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
-                                                logical_match_tensor->common_query_filter_,
-                                                logical_match_tensor->topn_,
-                                                logical_operator->load_metas());
-        match_tensor_scan_op->TaskletCount() == 1) {
+    auto match_tensor_scan_op =
+        MakeUnique<PhysicalMatchTensorScan>(logical_match_tensor->node_id(),
+                                            logical_match_tensor->TableIndex(),
+                                            logical_match_tensor->base_table_ref_,
+                                            std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
+                                            logical_match_tensor->common_query_filter_,
+                                            logical_match_tensor->topn_,
+                                            logical_operator->load_metas());
+    match_tensor_scan_op->CheckColumn();
+    match_tensor_scan_op->PlanWithIndex(query_context_ptr_);
+    if (match_tensor_scan_op->TaskletCount() == 1) {
         return match_tensor_scan_op;
     } else {
         return MakeUnique<PhysicalMergeMatchTensor>(query_context_ptr_->GetNextNodeID(),

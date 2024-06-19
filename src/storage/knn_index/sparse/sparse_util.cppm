@@ -39,6 +39,20 @@ struct SparseVecRef {
     const DataType *data_;
 };
 
+export template <typename DataType, typename IdxType>
+struct SparseVecEle {
+    SparseVecEle() = default;
+    void Init(i32 nnz) {
+        nnz_ = nnz;
+        indices_ = MakeUniqueForOverwrite<IdxType[]>(nnz);
+        data_ = MakeUniqueForOverwrite<DataType[]>(nnz);
+    }
+
+    i32 nnz_{};
+    UniquePtr<IdxType[]> indices_;
+    UniquePtr<DataType[]> data_;
+};
+
 export template <typename DataT, typename IdxT>
 struct SparseMatrix {
 public:
@@ -86,6 +100,15 @@ public:
         file_handler.Write(indptr_.get(), sizeof(i64) * (nrow_ + 1));
         file_handler.Write(indices_.get(), sizeof(IdxT) * nnz_);
         file_handler.Write(data_.get(), sizeof(DataT) * nnz_);
+    }
+
+    void Clear() {
+        data_.reset();
+        indices_.reset();
+        indptr_.reset();
+        nrow_ = 0;
+        ncol_ = 0;
+        nnz_ = 0;
     }
 
 public:
