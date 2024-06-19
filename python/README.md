@@ -64,4 +64,17 @@ Build the debug version of infinity-sdk in the target location `cmake-build-debu
 ```shell
 pip install . -v --config-settings=cmake.build-type="Debug"  --config-settings=build-dir="cmake-build-debug"
 ```
+Note: If you run with the debug version, you must set the **libasan** environment variable, for example
+```shell
+LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 python3 hello_infinity.py
+```
 
+# run pysdk test
+Run a local infinity test
+```shell
+pytest --local-infinity test/infinity/test_basic.py::TestInfinity::test_basic
+```
+Run a remote infinity test
+```shell
+pytest test/infinity/test_basic.py::TestInfinity::test_basic
+```
