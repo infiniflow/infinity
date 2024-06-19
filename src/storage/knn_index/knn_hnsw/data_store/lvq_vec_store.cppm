@@ -106,7 +106,7 @@ public:
         return query;
     }
 
-    virtual void CompressTo(const DataType *src, LVQData *dest) const {
+    void CompressTo(const DataType *src, LVQData *dest) const {
         if (normalize_) {
             DataType norm = 0;
             DataType *src_without_const = const_cast<DataType *>(src);
@@ -208,14 +208,14 @@ private:
 
     void DecompressTo(const LVQData *src, DataType *dest) const { DecompressByMeanTo(src, mean_.get(), dest); };
 
-protected:
+private:
     SizeT dim_;
     SizeT compress_data_size_;
 
     UniquePtr<MeanType[]> mean_;
     GlobalCacheType global_cache_;
 
-    bool normalize_;
+    bool normalize_{false};
 
 public:
     void Dump(std::ostream &os) const {
