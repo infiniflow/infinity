@@ -38,7 +38,9 @@ class AnnIVFFlat final : public KnnDistance<typename Compare::DistanceType> {
     using DistType = typename Compare::DistanceType;
     using ResultHandler = ReservoirResultHandler<Compare>;
     static inline DistType Distance(const DistType *x, const DistType *y, u32 dimension) {
-        if constexpr (metric == MetricType::kMetricL2) {
+        if constexpr (metric == MetricType::kMetricCosine) {
+            return CosineDistance<DistType>(x, y, dimension);
+        } else if constexpr (metric == MetricType::kMetricL2) {
             return L2Distance<DistType>(x, y, dimension);
         } else if constexpr (metric == MetricType::kMetricInnerProduct) {
             return IPDistance<DistType>(x, y, dimension);
@@ -284,5 +286,8 @@ using AnnIVFFlatL2 = AnnIVFFlat<CompareMax<DistType, RowID>, MetricType::kMetric
 
 export template <typename DistType>
 using AnnIVFFlatIP = AnnIVFFlat<CompareMin<DistType, RowID>, MetricType::kMetricInnerProduct, KnnDistanceAlgoType::kKnnFlatIp>;
+
+export template <typename DistType>
+using AnnIVFFlatCOS = AnnIVFFlat<CompareMin<DistType, RowID>, MetricType::kMetricCosine, KnnDistanceAlgoType::kKnnFlatCosine>;
 
 }; // namespace infinity

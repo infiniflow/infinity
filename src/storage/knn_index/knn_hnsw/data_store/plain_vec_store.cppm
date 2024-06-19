@@ -45,6 +45,7 @@ public:
     PlainVecStoreMeta(This &&other) : dim_(std::exchange(other.dim_, 0)) {}
 
     static This Make(SizeT dim) { return This(dim); }
+    static This Make(SizeT dim, bool) { return This(dim); }
 
     void Save(FileHandler &file_handler) const { file_handler.Write(&dim_, sizeof(dim_)); }
 

@@ -116,7 +116,7 @@ class TestInfinity:
     ])
     @pytest.mark.parametrize("distance_type", [
         ("l2", True),
-        ("cosine", False),
+        ("cosine", True),
         ("ip", True),
         ("hamming", False),
     ])

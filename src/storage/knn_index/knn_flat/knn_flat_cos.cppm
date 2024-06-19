@@ -16,12 +16,11 @@ module;
 
 #include <functional>
 
-export module knn_flat_l2;
+export module knn_flat_cos;
 
 import stl;
 import knn_distance;
 import logger;
-
 import knn_result_handler;
 import infinity_exception;
 import default_values;
@@ -33,16 +32,15 @@ import internal_types;
 namespace infinity {
 
 export template <typename DistType>
-class KnnFlatL2 final : public KnnDistance<DistType> {
-    using ResultHandler = HeapResultHandler<CompareMax<DistType, RowID>>;
+class KnnFlatCOS final : public KnnDistance<DistType> {
+    using ResultHandler = HeapResultHandler<CompareMin<DistType, RowID>>;
 
 public:
-    explicit KnnFlatL2(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
-        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatL2, elem_data_type, query_count, dimension, topk), queries_(queries) {
+    explicit KnnFlatCOS(const DistType *queries, i64 query_count, i64 topk, i64 dimension, EmbeddingDataType elem_data_type)
+        : KnnDistance<DistType>(KnnDistanceAlgoType::kKnnFlatCosine, elem_data_type, query_count, dimension, topk), queries_(queries) {
 
         id_array_ = MakeUniqueForOverwrite<RowID[]>(topk * query_count);
         distance_array_ = MakeUniqueForOverwrite<DistType[]>(topk * query_count);
-
         result_handler_ = MakeUnique<ResultHandler>(query_count, topk, distance_array_.get(), id_array_.get());
     }
 
@@ -58,7 +56,7 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            String error_message = "KnnFlatL2 isn't begin";
+            String error_message = "KnnFlatCOS isn't begin";
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
@@ -76,8 +74,8 @@ public:
             const DistType *y_j = base;
 
             for (u16 j = 0; j < base_count; ++j, y_j += this->dimension_) {
-                auto l2 = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                result_handler_->AddResult(i, l2, RowID(segment_id, segment_offset_start + j));
+                auto cos = CosineDistance<DistType>(x_i, y_j, this->dimension_);
+                result_handler_->AddResult(i, cos, RowID(segment_id, segment_offset_start + j));
             }
         }
     }
@@ -88,7 +86,7 @@ public:
             return;
         }
         if (!begin_) {
-            String error_message = "KnnFlatL2 isn't begin";
+            String error_message = "KnnFlatCOS isn't begin";
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
@@ -105,19 +103,20 @@ public:
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
-            for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
+            for (u16 j = 0; j < base_count; ++j, y_j += this->dimension_) {
                 auto segment_offset = segment_offset_start + j;
                 if (bitmask.IsTrue(segment_offset)) {
-                    auto l2 = L2Distance<DistType>(x_i, y_j, this->dimension_);
-                    result_handler_->AddResult(i, l2, RowID(segment_id, segment_offset_start + j));
+                    auto cos = CosineDistance<DistType>(x_i, y_j, this->dimension_);
+                    result_handler_->AddResult(i, cos, RowID(segment_id, segment_offset_start + j));
                 }
             }
         }
     }
 
     void End() final {
-        if (!begin_)
+        if (!begin_) {
             return;
+        }
 
         result_handler_->End();
 
@@ -156,6 +155,6 @@ private:
     bool begin_{false};
 };
 
-template class KnnFlatL2<f32>;
+template class KnnFlatCOS<f32>;
 
 } // namespace infinity

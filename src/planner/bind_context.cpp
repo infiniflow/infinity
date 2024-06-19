@@ -376,17 +376,17 @@ void BindContext::BoundSearch(ParsedExpr *expr) {
     }
     auto search_expr = (SearchExpr *)expr;
 
-    if(!search_expr->knn_exprs_.empty() && search_expr->fusion_exprs_.empty()) {
+    if (!search_expr->knn_exprs_.empty() && search_expr->fusion_exprs_.empty()) {
         SizeT expr_count = search_expr->knn_exprs_.size();
-        KnnExpr* first_knn = search_expr->knn_exprs_[0];
+        KnnExpr *first_knn = search_expr->knn_exprs_[0];
         KnnDistanceType first_distance_type = first_knn->distance_type_;
-        for(SizeT idx = 1; idx < expr_count; ++ idx) {
-            if(search_expr->knn_exprs_[idx]->distance_type_ != first_distance_type) {
+        for (SizeT idx = 1; idx < expr_count; ++idx) {
+            if (search_expr->knn_exprs_[idx]->distance_type_ != first_distance_type) {
                 // Mixed distance type
-                return ;
+                return;
             }
         }
-        switch(first_distance_type) {
+        switch (first_distance_type) {
             case KnnDistanceType::kL2:
             case KnnDistanceType::kHamming: {
                 allow_distance = true;
