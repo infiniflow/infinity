@@ -70,6 +70,10 @@ export using spdlog::sinks::rotating_file_sink_mt;
 namespace details {
 export using spdlog::details::registry;
 }
+
+namespace level {
+export using spdlog::level::level_enum;
+}
 } // namespace spdlog
 
 namespace CLI {
@@ -153,31 +157,6 @@ export void SetLogLevel(LogLevel log_level) {
         case LogLevel::kCritical:
             return spdlog::details::registry::instance().set_level(spdlog::level::level_enum::critical);
     }
-}
-
-export bool ShouldLog(LogLevel log_level) {
-    spdlog::level::level_enum msg_level = spdlog::level::level_enum::info;
-    switch (log_level) {
-        case LogLevel::kTrace:
-            msg_level = spdlog::level::level_enum::trace;
-            break;
-        case LogLevel::kDebug:
-            msg_level = spdlog::level::level_enum::debug;
-            break;
-        case LogLevel::kInfo:
-            msg_level = spdlog::level::level_enum::info;
-            break;
-        case LogLevel::kWarning:
-            msg_level = spdlog::level::level_enum::warn;
-            break;
-        case LogLevel::kError:
-            msg_level = spdlog::level::level_enum::err;
-            break;
-        case LogLevel::kCritical:
-            msg_level = spdlog::level::level_enum::critical;
-            break;
-    }
-    return spdlog::should_log(msg_level);
 }
 
 export template <class T>
