@@ -345,7 +345,8 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
             case IndexType::kFullText:
             case IndexType::kSecondary:
             case IndexType::kEMVB:
-            case IndexType::kHnsw: {
+            case IndexType::kHnsw:
+            case IndexType::kBMP: {
                 // support realtime index
                 break;
             }

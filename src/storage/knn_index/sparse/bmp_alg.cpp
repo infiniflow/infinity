@@ -17,18 +17,19 @@ module;
 #include <vector>
 #include <xmmintrin.h>
 
-module bm_index;
+module bmp_alg;
 
 import infinity_exception;
 import third_party;
 import knn_result_handler;
 import serialize;
+import segment_iter;
 
 namespace infinity {
 
-template <typename DataType, BMCompressType CompressType>
+template <typename DataType, BMPCompressType CompressType>
 template <typename IdxType>
-void BMIvt<DataType, CompressType>::AddBlock(BMBlockID block_id, const Vector<Vector<Pair<IdxType, DataType>>> &tail_terms) {
+void BMPIvt<DataType, CompressType>::AddBlock(BMPBlockID block_id, const Vector<Vector<Pair<IdxType, DataType>>> &tail_terms) {
     HashMap<IdxType, DataType> max_scores;
     for (const auto &terms : tail_terms) {
         for (const auto &[term_id, score] : terms) {
@@ -40,8 +41,8 @@ void BMIvt<DataType, CompressType>::AddBlock(BMBlockID block_id, const Vector<Ve
     }
 }
 
-template <typename DataType, BMCompressType CompressType>
-void BMIvt<DataType, CompressType>::Optimize(i32 topk, Vector<Vector<DataType>> ivt_scores) {
+template <typename DataType, BMPCompressType CompressType>
+void BMPIvt<DataType, CompressType>::Optimize(i32 topk, Vector<Vector<DataType>> ivt_scores) {
     for (SizeT term_id = 0; term_id < ivt_scores.size(); ++term_id) {
         auto &posting = postings_[term_id];
         auto &term_scores = ivt_scores[term_id];
@@ -54,10 +55,10 @@ void BMIvt<DataType, CompressType>::Optimize(i32 topk, Vector<Vector<DataType>> 
     }
 }
 
-template class BMIvt<f32, BMCompressType::kCompressed>;
-template class BMIvt<f32, BMCompressType::kRaw>;
-template class BMIvt<f64, BMCompressType::kCompressed>;
-template class BMIvt<f64, BMCompressType::kRaw>;
+template class BMPIvt<f32, BMPCompressType::kCompressed>;
+template class BMPIvt<f32, BMPCompressType::kRaw>;
+template class BMPIvt<f64, BMPCompressType::kCompressed>;
+template class BMPIvt<f64, BMPCompressType::kRaw>;
 
 template <typename DataType, typename IdxType>
 SizeT TailFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
@@ -70,8 +71,8 @@ SizeT TailFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &
 }
 
 template <typename DataType, typename IdxType>
-Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>> TailFwd<DataType, IdxType>::ToBlockFwd() const {
-    Vector<Tuple<IdxType, BMBlockOffset, DataType>> term_pairs;
+Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> TailFwd<DataType, IdxType>::ToBlockFwd() const {
+    Vector<Tuple<IdxType, BMPBlockOffset, DataType>> term_pairs;
     SizeT block_size = tail_terms_.size();
     for (SizeT block_offset = 0; block_offset < block_size; ++block_offset) {
         for (const auto &[term_id, score] : tail_terms_[block_offset]) {
@@ -80,9 +81,9 @@ Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>> TailFwd<DataType
     }
     std::sort(term_pairs.begin(), term_pairs.end(), [](const auto &a, const auto &b) { return std::get<0>(a) < std::get<0>(b); });
 
-    Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>> res;
+    Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> res;
     IdxType last_term_id = -1;
-    Vector<BMBlockOffset> block_offsets;
+    Vector<BMPBlockOffset> block_offsets;
     Vector<DataType> scores;
     for (const auto &[term_id, block_offset, score] : term_pairs) {
         if (term_id != last_term_id) {
@@ -138,7 +139,7 @@ Optional<TailFwd<DataType, IdxType>> BlockFwd<DataType, IdxType>::AddDoc(const S
     TailFwd<DataType, IdxType> tail_fwd1;
     std::swap(tail_fwd1, tail_fwd_);
 
-    Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>> block_terms = tail_fwd1.ToBlockFwd();
+    Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> block_terms = tail_fwd1.ToBlockFwd();
     block_terms_.emplace_back(std::move(block_terms));
     return tail_fwd1;
 }
@@ -157,7 +158,7 @@ Vector<Vector<DataType>> BlockFwd<DataType, IdxType>::GetIvtScores(SizeT term_nu
 }
 
 template <typename DataType, typename IdxType>
-Vector<DataType> BlockFwd<DataType, IdxType>::GetScores(BMBlockID block_id, const SparseVecRef<DataType, IdxType> &query) const {
+Vector<DataType> BlockFwd<DataType, IdxType>::GetScores(BMPBlockID block_id, const SparseVecRef<DataType, IdxType> &query) const {
     const auto &block_terms = block_terms_[block_id];
     Vector<DataType> res(block_size_, 0.0);
     SizeT j = 0;
@@ -179,18 +180,18 @@ Vector<DataType> BlockFwd<DataType, IdxType>::GetScores(BMBlockID block_id, cons
 }
 
 template <typename DataType, typename IdxType>
-void BlockFwd<DataType, IdxType>::Prefetch(BMBlockID block_id) const {
+void BlockFwd<DataType, IdxType>::Prefetch(BMPBlockID block_id) const {
     const auto *ptr = reinterpret_cast<const char *>(block_terms_[block_id].data());
     _mm_prefetch(ptr, _MM_HINT_T0);
 }
 
 template <typename DataType, typename IdxType>
-void BlockFwd<DataType, IdxType>::Calculate(const Vector<BMBlockOffset> &block_offsets,
+void BlockFwd<DataType, IdxType>::Calculate(const Vector<BMPBlockOffset> &block_offsets,
                                             const Vector<DataType> scores,
                                             Vector<DataType> &res,
                                             DataType query_score) {
     for (SizeT i = 0; i < block_offsets.size(); ++i) {
-        BMBlockOffset block_offset = block_offsets[i];
+        BMPBlockOffset block_offset = block_offsets[i];
         res[block_offset] += query_score * scores[i];
     }
 }
@@ -200,27 +201,28 @@ template class BlockFwd<f32, i16>;
 template class BlockFwd<f64, i32>;
 template class BlockFwd<f64, i16>;
 
-template <typename DataType, typename IdxType, BMCompressType CompressType>
-void BMIndex<DataType, IdxType, CompressType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
+template <typename DataType, typename IdxType, BMPCompressType CompressType>
+void BMPAlg<DataType, IdxType, CompressType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc, BMPDocID doc_id) {
+    doc_ids_.push_back(doc_id);
     Optional<TailFwd<DataType, IdxType>> tail_fwd = block_fwd_.AddDoc(doc);
     if (!tail_fwd.has_value()) {
         return;
     }
-    BMBlockID block_id = block_fwd_.block_num() - 1;
+    BMPBlockID block_id = block_fwd_.block_num() - 1;
     const auto &tail_terms = tail_fwd->GetTailTerms();
     bm_ivt_.AddBlock(block_id, tail_terms);
 }
 
-template <typename DataType, typename IdxType, BMCompressType CompressType>
-void BMIndex<DataType, IdxType, CompressType>::Optimize(i32 topk) {
+template <typename DataType, typename IdxType, BMPCompressType CompressType>
+void BMPAlg<DataType, IdxType, CompressType>::Optimize(i32 topk) {
     SizeT term_num = bm_ivt_.term_num();
     Vector<Vector<DataType>> ivt_scores = block_fwd_.GetIvtScores(term_num);
     bm_ivt_.Optimize(topk, std::move(ivt_scores));
 }
 
-template <typename DataType, typename IdxType, BMCompressType CompressType>
-Pair<Vector<BMDocID>, Vector<DataType>>
-BMIndex<DataType, IdxType, CompressType>::SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, f32 alpha, f32 beta) const {
+template <typename DataType, typename IdxType, BMPCompressType CompressType>
+Pair<Vector<BMPDocID>, Vector<DataType>>
+BMPAlg<DataType, IdxType, CompressType>::SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, f32 alpha, f32 beta) const {
     SizeT block_size = block_fwd_.block_size();
     SparseVecEle<DataType, IdxType> keeped_query;
     if (beta < 1.0) {
@@ -250,7 +252,7 @@ BMIndex<DataType, IdxType, CompressType>::SearchKnn(const SparseVecRef<DataType,
         posting.data_.Calculate(upper_bounds, query_score);
     }
 
-    Vector<Pair<DataType, BMBlockID>> block_scores;
+    Vector<Pair<DataType, BMPBlockID>> block_scores;
     for (SizeT block_id = 0; block_id < block_num; ++block_id) {
         if (upper_bounds[block_id] >= threshold) {
             block_scores.emplace_back(upper_bounds[block_id], block_id);
@@ -258,21 +260,21 @@ BMIndex<DataType, IdxType, CompressType>::SearchKnn(const SparseVecRef<DataType,
     }
     std::sort(block_scores.begin(), block_scores.end(), [](const auto &a, const auto &b) { return a.first > b.first; });
 
-    Vector<BMDocID> result(topk);
+    Vector<BMPDocID> result(topk);
     Vector<DataType> result_score(topk);
-    HeapResultHandler<CompareMin<DataType, BMDocID>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
+    HeapResultHandler<CompareMin<DataType, BMPDocID>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
 
     SizeT block_scores_num = block_scores.size();
     for (SizeT i = 0; i < block_scores_num; ++i) {
         if (i + 1 < block_scores_num) {
-            BMBlockID next_block_id = block_scores[i + 1].second;
+            BMPBlockID next_block_id = block_scores[i + 1].second;
             block_fwd_.Prefetch(next_block_id);
         }
         const auto &[ub_score, block_id] = block_scores[i];
-        BMDocID off = block_id * block_size;
+        BMPDocID off = block_id * block_size;
         Vector<DataType> scores = block_fwd_.GetScores(block_id, query_ref);
         for (SizeT block_off = 0; block_off < scores.size(); ++block_off) {
-            BMDocID doc_id = off + block_off;
+            BMPDocID doc_id = off + block_off;
             DataType score = scores[block_off];
             result_handler.AddResult(0 /*query_id*/, score, doc_id);
         }
@@ -282,23 +284,25 @@ BMIndex<DataType, IdxType, CompressType>::SearchKnn(const SparseVecRef<DataType,
     }
     Vector<DataType> tail_scores = block_fwd_.GetScoresTail(query_ref);
     for (SizeT i = 0; i < tail_scores.size(); ++i) {
-        BMDocID doc_id = block_num * block_size + i;
+        BMPDocID doc_id = block_num * block_size + i;
         DataType score = tail_scores[i];
         result_handler.AddResult(0 /*query_id*/, score, doc_id);
     }
 
     result_handler.End(0 /*query_id*/);
-    return {result, result_score};
+    Vector<BMPDocID> result_docid(topk);
+    std::transform(result.begin(), result.end(), result_docid.begin(), [&](BMPDocID doc_id) { return doc_ids_[doc_id]; });
+    return {result_docid, result_score};
 }
 
-template class BMIndex<f32, i32, BMCompressType::kCompressed>;
-template class BMIndex<f32, i32, BMCompressType::kRaw>;
-template class BMIndex<f32, i16, BMCompressType::kCompressed>;
-template class BMIndex<f32, i16, BMCompressType::kRaw>;
+template class BMPAlg<f32, i32, BMPCompressType::kCompressed>;
+template class BMPAlg<f32, i32, BMPCompressType::kRaw>;
+template class BMPAlg<f32, i16, BMPCompressType::kCompressed>;
+template class BMPAlg<f32, i16, BMPCompressType::kRaw>;
 
-template class BMIndex<f64, i32, BMCompressType::kCompressed>;
-template class BMIndex<f64, i32, BMCompressType::kRaw>;
-template class BMIndex<f64, i16, BMCompressType::kCompressed>;
-template class BMIndex<f64, i16, BMCompressType::kRaw>;
+template class BMPAlg<f64, i32, BMPCompressType::kCompressed>;
+template class BMPAlg<f64, i32, BMPCompressType::kRaw>;
+template class BMPAlg<f64, i16, BMPCompressType::kCompressed>;
+template class BMPAlg<f64, i16, BMPCompressType::kRaw>;
 
 } // namespace infinity

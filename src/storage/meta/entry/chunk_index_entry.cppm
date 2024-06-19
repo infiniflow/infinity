@@ -28,6 +28,7 @@ import index_file_worker;
 import index_base;
 import buffer_handle;
 import default_values;
+import column_def;
 
 namespace infinity {
 
@@ -47,7 +48,8 @@ public:
 
     ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
 
-    static UniquePtr<IndexFileWorker> CreateFileWorker(const IndexBase *index_base,
+    static UniquePtr<IndexFileWorker> CreateFileWorker(const SharedPtr<IndexBase> index_base,
+                                                       const SharedPtr<ColumnDef> column_def,
                                                        const SharedPtr<String> &index_dir,
                                                        CreateIndexParam *param,
                                                        SegmentID segment_id,

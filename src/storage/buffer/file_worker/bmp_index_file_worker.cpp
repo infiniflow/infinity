@@ -34,12 +34,12 @@ BMPIndexFileWorker::~BMPIndexFileWorker() {
 template <typename DataType, typename IndexType>
 AbstractBMP GetAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse_info, void *data) {
     switch (index_bmp->compress_type_) {
-        case BMCompressType::kCompressed: {
-            using BMPIndex = BMIndex<DataType, IndexType, BMCompressType::kCompressed>;
+        case BMPCompressType::kCompressed: {
+            using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kCompressed>;
             return reinterpret_cast<BMPIndex *>(data);
         }
-        case BMCompressType::kRaw: {
-            using BMPIndex = BMIndex<DataType, IndexType, BMCompressType::kRaw>;
+        case BMPCompressType::kRaw: {
+            using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kRaw>;
             return reinterpret_cast<BMPIndex *>(data);
         }
         default: {
@@ -63,8 +63,7 @@ AbstractBMP GetAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse
     }
 }
 
-AbstractBMP BMPIndexFileWorker::GetAbstractIndex() const {
-    return nullptr;
+AbstractBMP BMPIndexFileWorker::GetAbstractIndex() {
     const auto *index_bmp = static_cast<const IndexBMP *>(index_base_.get());
     const auto *sparse_info = GetSparseInfo();
     switch (sparse_info->DataType()) {
@@ -78,6 +77,22 @@ AbstractBMP BMPIndexFileWorker::GetAbstractIndex() const {
             return nullptr;
         }
     }
+}
+
+ConstAbstractBMP BMPIndexFileWorker::GetConstAbstractIndex() const {
+    auto index = const_cast<BMPIndexFileWorker *>(this)->GetAbstractIndex();
+    ConstAbstractBMP res = nullptr;
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                UnrecoverableError("Invalid index type.");
+            } else {
+                res = index;
+            }
+        },
+        index);
+    return res;
 }
 
 void BMPIndexFileWorker::AllocateInMemory() {

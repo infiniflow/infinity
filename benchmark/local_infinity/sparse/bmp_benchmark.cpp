@@ -26,8 +26,8 @@ import compilation_config;
 import third_party;
 import profiler;
 import linscan_alg;
-import bm_index;
-import bm_util;
+import bmp_alg;
+import bmp_util;
 
 using namespace infinity;
 using namespace benchmark;
@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
         case ModeType::kImport: {
             SparseMatrix<f32, i32> data_mat = DecodeSparseDataset(opt.data_path_);
             profiler.Begin();
-            BMIndex<f32, i16, BMCompressType::kCompressed> index(data_mat.ncol_, opt.block_size_);
+            BMPAlg<f32, i16, BMPCompressType::kCompressed> index(data_mat.ncol_, opt.block_size_);
             for (SparseMatrixIter<f32, i32> iter(data_mat); iter.HasNext(); iter.Next()) {
                 SparseVecRef vec = iter.val();
                 u32 doc_id = iter.row_id();
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
                     indices[i] = static_cast<i16>(vec.indices_[i]);
                 }
                 SparseVecRef<f32, i16> vec1(vec.nnz_, indices.data(), vec.data_);
-                index.AddDoc(vec1);
+                index.AddDoc(vec1, doc_id);
 
                 if (LogInterval != 0 && doc_id % LogInterval == 0) {
                     std::cout << fmt::format("Imported {} docs\n", doc_id);
@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
             }
-            auto index = BMIndex<f32, i16, BMCompressType::kCompressed>::Load(*file_handler);
+            auto index = BMPAlg<f32, i16, BMPCompressType::kCompressed>::Load(*file_handler);
 
             auto [top_k, all_query_n, _1, _2] = DecodeGroundtruth(opt.groundtruth_path_, true);
             if ((int)top_k != opt.topk_) {

@@ -17,46 +17,46 @@ module;
 export module bm_posting;
 
 import stl;
-import bm_util;
+import bmp_util;
 
 namespace infinity {
 
-export template <typename DataType, BMCompressType CompressType>
+export template <typename DataType, BMPCompressType CompressType>
 struct BlockData {};
 
 template <typename DataType>
-struct BlockData<DataType, BMCompressType::kCompressed> {
+struct BlockData<DataType, BMPCompressType::kCompressed> {
 public:
     void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const;
 
-    void AddBlock(BMBlockID block_id, DataType max_score);
+    void AddBlock(BMPBlockID block_id, DataType max_score);
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BlockData<DataType, BMCompressType::kCompressed> ReadAdv(char *&p);
+    static BlockData<DataType, BMPCompressType::kCompressed> ReadAdv(char *&p);
 
 private:
-    Vector<BMBlockID> block_ids_;
+    Vector<BMPBlockID> block_ids_;
     Vector<DataType> max_scores_;
 };
 
 export template <typename DataType>
-struct BlockData<DataType, BMCompressType::kRaw> {
+struct BlockData<DataType, BMPCompressType::kRaw> {
 public:
     // template <bool UseSIMD = false>
     void Calculate(Vector<DataType> &upper_bounds, DataType query_score) const;
 
-    void AddBlock(BMBlockID block_id, DataType max_score);
+    void AddBlock(BMPBlockID block_id, DataType max_score);
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BlockData<DataType, BMCompressType::kRaw> ReadAdv(char *&p);
+    static BlockData<DataType, BMPCompressType::kRaw> ReadAdv(char *&p);
 
 public:
     Vector<DataType> max_scores_;
 };
 
-export template <typename DataType, BMCompressType CompressType>
+export template <typename DataType, BMPCompressType CompressType>
 struct BlockPostings {
 public:
     DataType kth(i32 topk) const { return topk == kth_ ? kth_score_ : 0.0; }

@@ -159,12 +159,12 @@ export struct SparseVecUtil {
     }
 
     template <typename DataT, typename IdxT>
-    static Pair<Vector<IdxT>, Vector<DataT>>
+    static Pair<Vector<u32>, Vector<DataT>>
     Rerank(const SparseMatrix<DataT, IdxT> &mat, const SparseVecRef<DataT, IdxT> &query, Vector<IdxT> candidates, u32 topk) {
-        Vector<IdxT> result(topk);
+        Vector<u32> result(topk);
         Vector<DataT> result_score(topk);
 
-        HeapResultHandler<CompareMin<DataT, IdxT>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
+        HeapResultHandler<CompareMin<DataT, u32>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
         for (u32 row_id : candidates) {
             SparseVecRef<DataT, IdxT> vec = mat.at(row_id);
             DataT score = SparseVecUtil::DistanceIP(query, vec);

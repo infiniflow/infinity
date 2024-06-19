@@ -48,6 +48,8 @@ import segment_iter;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
 import secondary_index_file_worker;
+import bmp_index_file_worker;
+import sparse_util;
 import index_full_text;
 import index_defines;
 import column_inverter;
@@ -563,6 +565,36 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("{} PopulateEntirely is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
             LOG_WARN(*err_msg);
+            break;
+        }
+        case IndexType::kBMP: {
+            RowID base_rowid(segment_entry->segment_id(), 0);
+            SharedPtr<ChunkIndexEntry> chunk_index_entry = CreateChunkIndexEntry(column_def, base_rowid, buffer_mgr);
+            this->AddChunkIndexEntry(chunk_index_entry);
+            BufferHandle handle = chunk_index_entry->GetIndex();
+            auto abstract_bmp = static_cast<BMPIndexFileWorker *>(handle.GetFileWorkerMut())->GetAbstractIndex();
+
+            SegmentOffset row_count = 0;
+            std::visit(
+                [&](auto &index) {
+                    using T = std::decay_t<decltype(index)>;
+                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                        UnrecoverableError("Invalid index type.");
+                    } else {
+                        using IndexT = std::decay_t<decltype(*index)>;
+                        using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
+
+                        if (config.check_ts_) {
+                            OneColumnIterator<SparseRefT> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
+                            row_count = index->AddDocs(std::move(iter));
+                        } else {
+                            OneColumnIterator<SparseRefT, false> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
+                            row_count = index->AddDocs(std::move(iter));
+                        }
+                    }
+                },
+                abstract_bmp);
+            chunk_index_entry->SetRowCount(row_count);
             break;
         }
         default: {

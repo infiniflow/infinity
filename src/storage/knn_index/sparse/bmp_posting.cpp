@@ -17,33 +17,33 @@ module;
 module bm_posting;
 
 import stl;
-import bm_simd_func;
+import bmp_simd_func;
 import infinity_exception;
 
 namespace infinity {
 
 template <typename DataType>
-void BlockData<DataType, BMCompressType::kCompressed>::Calculate(Vector<DataType> &upper_bounds, DataType query_score) const {
+void BlockData<DataType, BMPCompressType::kCompressed>::Calculate(Vector<DataType> &upper_bounds, DataType query_score) const {
     // MultiF32StoreI32(block_ids_.data(), max_scores_.data(), upper_bounds.data(), query_score, block_ids_.size());
     for (SizeT i = 0; i < block_ids_.size(); ++i) {
-        BMBlockID block_id = block_ids_[i];
+        BMPBlockID block_id = block_ids_[i];
         DataType score = max_scores_[i];
         upper_bounds[block_id] += score * query_score;
     }
 }
 
 template <typename DataType>
-void BlockData<DataType, BMCompressType::kCompressed>::AddBlock(BMBlockID block_id, DataType max_score) {
+void BlockData<DataType, BMPCompressType::kCompressed>::AddBlock(BMPBlockID block_id, DataType max_score) {
     block_ids_.push_back(block_id);
     max_scores_.push_back(max_score);
 }
 
-template struct BlockData<f32, BMCompressType::kCompressed>;
-template struct BlockData<f64, BMCompressType::kCompressed>;
+template struct BlockData<f32, BMPCompressType::kCompressed>;
+template struct BlockData<f64, BMPCompressType::kCompressed>;
 
 template <typename DataType>
-void BlockData<DataType, BMCompressType::kRaw>::Calculate(Vector<DataType> &upper_bounds, DataType query_score) const {
-    for (BMBlockID block_id = 0; block_id < (BMBlockID)max_scores_.size(); ++block_id) {
+void BlockData<DataType, BMPCompressType::kRaw>::Calculate(Vector<DataType> &upper_bounds, DataType query_score) const {
+    for (BMPBlockID block_id = 0; block_id < (BMPBlockID)max_scores_.size(); ++block_id) {
         if (max_scores_[block_id] > 0.0) {
             upper_bounds[block_id] += max_scores_[block_id] * query_score;
         }
@@ -51,14 +51,14 @@ void BlockData<DataType, BMCompressType::kRaw>::Calculate(Vector<DataType> &uppe
 }
 
 template <typename DataType>
-void BlockData<DataType, BMCompressType::kRaw>::AddBlock(BMBlockID block_id, DataType max_score) {
-    if (block_id >= (BMBlockID)max_scores_.size()) {
+void BlockData<DataType, BMPCompressType::kRaw>::AddBlock(BMPBlockID block_id, DataType max_score) {
+    if (block_id >= (BMPBlockID)max_scores_.size()) {
         max_scores_.resize(block_id + 1, 0.0);
     }
     max_scores_[block_id] = max_score;
 }
 
-template struct BlockData<f32, BMCompressType::kRaw>;
-template struct BlockData<f64, BMCompressType::kRaw>;
+template struct BlockData<f32, BMPCompressType::kRaw>;
+template struct BlockData<f64, BMPCompressType::kRaw>;
 
 } // namespace infinity

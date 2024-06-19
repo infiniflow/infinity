@@ -16,7 +16,7 @@ module;
 
 #include "../header.h"
 
-export module bm_simd_func;
+export module bmp_simd_func;
 
 namespace infinity {
 

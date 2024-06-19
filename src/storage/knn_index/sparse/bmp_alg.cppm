@@ -14,26 +14,27 @@
 
 module;
 
-export module bm_index;
+export module bmp_alg;
 
 import stl;
 import sparse_util;
 import file_system;
 import bm_posting;
-import bm_util;
+import bmp_util;
+import hnsw_common;
 
 namespace infinity {
 
-template <typename DataType, BMCompressType CompressType>
-class BMIvt {
+template <typename DataType, BMPCompressType CompressType>
+class BMPIvt {
 private:
-    BMIvt(Vector<BlockPostings<DataType, CompressType>> postings) : postings_(std::move(postings)) {}
+    BMPIvt(Vector<BlockPostings<DataType, CompressType>> postings) : postings_(std::move(postings)) {}
 
 public:
-    BMIvt(SizeT term_num) : postings_(term_num) {}
+    BMPIvt(SizeT term_num) : postings_(term_num) {}
 
     template <typename IdxType>
-    void AddBlock(BMBlockID block_id, const Vector<Vector<Pair<IdxType, DataType>>> &tail_terms);
+    void AddBlock(BMPBlockID block_id, const Vector<Vector<Pair<IdxType, DataType>>> &tail_terms);
 
     void Optimize(i32 topk, Vector<Vector<DataType>> ivt_scores);
 
@@ -43,7 +44,7 @@ public:
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BMIvt ReadAdv(char *&p);
+    static BMPIvt ReadAdv(char *&p);
 
 private:
     Vector<BlockPostings<DataType, CompressType>> postings_;
@@ -61,7 +62,7 @@ public:
 
     const Vector<Vector<Pair<IdxType, DataType>>> &GetTailTerms() const { return tail_terms_; }
 
-    Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>> ToBlockFwd() const;
+    Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> ToBlockFwd() const;
 
     Vector<DataType> GetScores(const SparseVecRef<DataType, IdxType> &query) const;
 
@@ -77,7 +78,7 @@ template <typename DataType, typename IdxType>
 class BlockFwd {
 private:
     BlockFwd(SizeT block_size,
-             Vector<Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>>> block_terms,
+             Vector<Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>>> block_terms,
              TailFwd<DataType, IdxType> tail_fwd)
         : block_size_(block_size), block_terms_(std::move(block_terms)), tail_fwd_(std::move(tail_fwd)) {}
 
@@ -88,11 +89,11 @@ public:
 
     Vector<Vector<DataType>> GetIvtScores(SizeT term_num) const;
 
-    Vector<DataType> GetScores(BMBlockID block_id, const SparseVecRef<DataType, IdxType> &query) const;
+    Vector<DataType> GetScores(BMPBlockID block_id, const SparseVecRef<DataType, IdxType> &query) const;
 
     Vector<DataType> GetScoresTail(const SparseVecRef<DataType, IdxType> &query) const { return tail_fwd_.GetScores(query); }
 
-    void Prefetch(BMBlockID block_id) const;
+    void Prefetch(BMPBlockID block_id) const;
 
     SizeT block_size() const { return block_size_; }
 
@@ -103,43 +104,67 @@ public:
     static BlockFwd ReadAdv(char *&p);
 
 private:
-    static void Calculate(const Vector<BMBlockOffset> &block_offsets, const Vector<DataType> scores, Vector<DataType> &res, DataType query_score);
+    static void Calculate(const Vector<BMPBlockOffset> &block_offsets, const Vector<DataType> scores, Vector<DataType> &res, DataType query_score);
 
 private:
     SizeT block_size_;
-    Vector<Vector<Tuple<IdxType, Vector<BMBlockOffset>, Vector<DataType>>>> block_terms_;
+    Vector<Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>>> block_terms_;
     TailFwd<DataType, IdxType> tail_fwd_;
 };
 
-export template <typename DataType, typename IdxType, BMCompressType CompressType>
-class BMIndex {
+export template <typename DataType, typename IdxType, BMPCompressType CompressType>
+class BMPAlg {
+public:
+    using DataT = DataType;
+    using IdxT = IdxType;
+
 private:
-    BMIndex(BMIvt<DataType, CompressType> bm_ivt, BlockFwd<DataType, IdxType> block_fwd)
-        : bm_ivt_(std::move(bm_ivt)), block_fwd_(std::move(block_fwd)) {}
+    BMPAlg(BMPIvt<DataType, CompressType> bm_ivt, BlockFwd<DataType, IdxType> block_fwd, Vector<BMPDocID> doc_ids)
+        : bm_ivt_(std::move(bm_ivt)), block_fwd_(std::move(block_fwd)), doc_ids_(std::move(doc_ids)) {}
 
 public:
-    BMIndex(SizeT term_num, SizeT block_size) : bm_ivt_(term_num), block_fwd_(block_size) {}
+    BMPAlg(SizeT term_num, SizeT block_size) : bm_ivt_(term_num), block_fwd_(block_size) {}
 
-    void AddDoc(const SparseVecRef<DataType, IdxType> &doc);
+    void AddDoc(const SparseVecRef<DataType, IdxType> &doc, BMPDocID doc_id);
+
+    template <DataIteratorConcept<SparseVecRef<DataType, IdxType>, BMPDocID> Iterator>
+    SizeT AddDocs(Iterator iter);
 
     void Optimize(i32 topk);
 
-    Pair<Vector<BMDocID>, Vector<DataType>> SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, f32 alpha, f32 beta) const;
+    Pair<Vector<BMPDocID>, Vector<DataType>> SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, f32 alpha, f32 beta) const;
 
     void Save(FileHandler &file_handler) const;
 
-    static BMIndex<DataType, IdxType, CompressType> Load(FileHandler &file_handler);
+    static BMPAlg<DataType, IdxType, CompressType> Load(FileHandler &file_handler);
 
 private:
     SizeT GetSizeInBytes() const;
 
     void WriteAdv(char *&p) const;
 
-    static BMIndex<DataType, IdxType, CompressType> ReadAdv(char *&p);
+    static BMPAlg<DataType, IdxType, CompressType> ReadAdv(char *&p);
 
 private:
-    BMIvt<DataType, CompressType> bm_ivt_;
+    BMPIvt<DataType, CompressType> bm_ivt_;
     BlockFwd<DataType, IdxType> block_fwd_;
+    Vector<BMPDocID> doc_ids_;
 };
+
+template <typename DataType, typename IdxType, BMPCompressType CompressType>
+template <DataIteratorConcept<SparseVecRef<DataType, IdxType>, BMPDocID> Iterator>
+SizeT BMPAlg<DataType, IdxType, CompressType>::AddDocs(Iterator iter) {
+    SizeT cnt = 0;
+    while (true) {
+        auto ret = iter.Next();
+        if (!ret.has_value()) {
+            break;
+        }
+        const auto &[sparse_ref, doc_id] = *ret;
+        AddDoc(sparse_ref, doc_id);
+        ++cnt;
+    }
+    return cnt;
+}
 
 } // namespace infinity

@@ -24,26 +24,26 @@ namespace infinity {
 // --------------------------CompressedBlockData--------------------------
 
 template <typename DataType>
-SizeT BlockData<DataType, BMCompressType::kCompressed>::GetSizeInBytes() const {
-    return sizeof(SizeT) + block_ids_.size() * sizeof(BMBlockID) + max_scores_.size() * sizeof(DataType);
+SizeT BlockData<DataType, BMPCompressType::kCompressed>::GetSizeInBytes() const {
+    return sizeof(SizeT) + block_ids_.size() * sizeof(BMPBlockID) + max_scores_.size() * sizeof(DataType);
 }
 
 template <typename DataType>
-void BlockData<DataType, BMCompressType::kCompressed>::WriteAdv(char *&p) const {
+void BlockData<DataType, BMPCompressType::kCompressed>::WriteAdv(char *&p) const {
     SizeT max_score_size = max_scores_.size();
     WriteBufAdv<SizeT>(p, max_score_size);
-    WriteBufCharsAdv(p, reinterpret_cast<const char *>(block_ids_.data()), sizeof(BMBlockID) * block_ids_.size());
+    WriteBufCharsAdv(p, reinterpret_cast<const char *>(block_ids_.data()), sizeof(BMPBlockID) * block_ids_.size());
     WriteBufCharsAdv(p, reinterpret_cast<const char *>(max_scores_.data()), sizeof(DataType) * max_scores_.size());
 }
 
 template <typename DataType>
-BlockData<DataType, BMCompressType::kCompressed> BlockData<DataType, BMCompressType::kCompressed>::ReadAdv(char *&p) {
-    BlockData<DataType, BMCompressType::kCompressed> res;
+BlockData<DataType, BMPCompressType::kCompressed> BlockData<DataType, BMPCompressType::kCompressed>::ReadAdv(char *&p) {
+    BlockData<DataType, BMPCompressType::kCompressed> res;
     SizeT max_score_size = ReadBufAdv<SizeT>(p);
     res.block_ids_.resize(max_score_size);
     res.max_scores_.resize(max_score_size);
     for (SizeT i = 0; i < max_score_size; ++i) {
-        res.block_ids_[i] = ReadBufAdv<BMBlockID>(p);
+        res.block_ids_[i] = ReadBufAdv<BMPBlockID>(p);
     }
     for (SizeT i = 0; i < max_score_size; ++i) {
         res.max_scores_[i] = ReadBufAdv<DataType>(p);
@@ -51,26 +51,26 @@ BlockData<DataType, BMCompressType::kCompressed> BlockData<DataType, BMCompressT
     return res;
 }
 
-template struct BlockData<f32, BMCompressType::kCompressed>;
-template struct BlockData<f64, BMCompressType::kCompressed>;
+template struct BlockData<f32, BMPCompressType::kCompressed>;
+template struct BlockData<f64, BMPCompressType::kCompressed>;
 
 // --------------------------RawBlockData--------------------------
 
 template <typename DataType>
-SizeT BlockData<DataType, BMCompressType::kRaw>::GetSizeInBytes() const {
+SizeT BlockData<DataType, BMPCompressType::kRaw>::GetSizeInBytes() const {
     return sizeof(SizeT) + max_scores_.size() * sizeof(DataType);
 }
 
 template <typename DataType>
-void BlockData<DataType, BMCompressType::kRaw>::WriteAdv(char *&p) const {
+void BlockData<DataType, BMPCompressType::kRaw>::WriteAdv(char *&p) const {
     SizeT max_score_size = max_scores_.size();
     WriteBufAdv<SizeT>(p, max_score_size);
     WriteBufCharsAdv(p, reinterpret_cast<const char *>(max_scores_.data()), sizeof(DataType) * max_scores_.size());
 }
 
 template <typename DataType>
-BlockData<DataType, BMCompressType::kRaw> BlockData<DataType, BMCompressType::kRaw>::ReadAdv(char *&p) {
-    BlockData<DataType, BMCompressType::kRaw> res;
+BlockData<DataType, BMPCompressType::kRaw> BlockData<DataType, BMPCompressType::kRaw>::ReadAdv(char *&p) {
+    BlockData<DataType, BMPCompressType::kRaw> res;
     SizeT max_score_size = ReadBufAdv<SizeT>(p);
     res.max_scores_.resize(max_score_size);
     for (SizeT i = 0; i < max_score_size; ++i) {
@@ -79,24 +79,24 @@ BlockData<DataType, BMCompressType::kRaw> BlockData<DataType, BMCompressType::kR
     return res;
 }
 
-template struct BlockData<f32, BMCompressType::kRaw>;
-template struct BlockData<f64, BMCompressType::kRaw>;
+template struct BlockData<f32, BMPCompressType::kRaw>;
+template struct BlockData<f64, BMPCompressType::kRaw>;
 
 // --------------------------BlockPostings--------------------------
 
-template <typename DataType, BMCompressType CompressType>
+template <typename DataType, BMPCompressType CompressType>
 SizeT BlockPostings<DataType, CompressType>::GetSizeInBytes() const {
     return sizeof(kth_) + sizeof(kth_score_) + data_.GetSizeInBytes();
 }
 
-template <typename DataType, BMCompressType CompressType>
+template <typename DataType, BMPCompressType CompressType>
 void BlockPostings<DataType, CompressType>::WriteAdv(char *&p) const {
     WriteBufAdv<i32>(p, kth_);
     WriteBufAdv<DataType>(p, kth_score_);
     data_.WriteAdv(p);
 }
 
-template <typename DataType, BMCompressType CompressType>
+template <typename DataType, BMPCompressType CompressType>
 BlockPostings<DataType, CompressType> BlockPostings<DataType, CompressType>::ReadAdv(char *&p) {
     BlockPostings res;
     res.kth_ = ReadBufAdv<i32>(p);
@@ -105,9 +105,9 @@ BlockPostings<DataType, CompressType> BlockPostings<DataType, CompressType>::Rea
     return res;
 }
 
-template struct BlockPostings<f32, BMCompressType::kCompressed>;
-template struct BlockPostings<f32, BMCompressType::kRaw>;
-template struct BlockPostings<f64, BMCompressType::kCompressed>;
-template struct BlockPostings<f64, BMCompressType::kRaw>;
+template struct BlockPostings<f32, BMPCompressType::kCompressed>;
+template struct BlockPostings<f32, BMPCompressType::kRaw>;
+template struct BlockPostings<f64, BMPCompressType::kCompressed>;
+template struct BlockPostings<f64, BMPCompressType::kRaw>;
 
 } // namespace infinity

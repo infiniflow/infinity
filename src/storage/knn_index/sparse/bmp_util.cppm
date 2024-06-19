@@ -14,32 +14,32 @@
 
 module;
 
-export module bm_util;
+export module bmp_util;
 
 import stl;
 import infinity_exception;
 
 namespace infinity {
 
-export using BMBlockID = i32;
-export using BMBlockOffset = u8;
+export using BMPBlockID = i32;
+export using BMPBlockOffset = u8;
 
-export using BMDocID = i32;
+export using BMPDocID = u32;
 
-export enum class BMCompressType : i8 {
+export enum class BMPCompressType : i8 {
     kRaw = 0,
     kCompressed = 1,
     kInvalid = 2,
 };
 
-export BMCompressType BMCompressTypeFromString(const String &compress_type_str) {
+export BMPCompressType BMCompressTypeFromString(const String &compress_type_str) {
     if (IsEqual(compress_type_str, "raw")) {
-        return BMCompressType::kRaw;
+        return BMPCompressType::kRaw;
     } else if (IsEqual(compress_type_str, "compressed")) {
-        return BMCompressType::kCompressed;
+        return BMPCompressType::kCompressed;
     } else {
         UnrecoverableError("Invalid compress type");
-        return BMCompressType::kInvalid;
+        return BMPCompressType::kInvalid;
     }
 }
 

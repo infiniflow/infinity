@@ -33,7 +33,7 @@ namespace infinity {
 SharedPtr<IndexBMP>
 IndexBMP::Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
     SizeT block_size = BMP_BLOCK_SIZE;
-    BMCompressType compress_type = BMCompressType::kCompressed;
+    BMPCompressType compress_type = BMPCompressType::kCompressed;
     for (const auto *para : index_param_list) {
         if (para->param_name_ == "block_size") {
             block_size = std::stoi(para->param_value_);

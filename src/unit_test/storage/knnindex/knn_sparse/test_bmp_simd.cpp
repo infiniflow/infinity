@@ -16,18 +16,18 @@
 #include "unit_test/base_test.h"
 #include <random>
 
-import bm_simd_func;
+import bmp_simd_func;
 import stl;
 
 using namespace infinity;
 
-class BMSIMDFunc : public BaseTest {
+class BMPSIMDTest : public BaseTest {
     void SetUp() override {}
 
     void TearDown() override {}
 };
 
-TEST_F(BMSIMDFunc, test1) {
+TEST_F(BMPSIMDTest, test1) {
     std::default_random_engine rng;
     std::uniform_real_distribution<float> rdist(0, 1);
 

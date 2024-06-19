@@ -27,6 +27,8 @@ import default_values;
 import infinity_exception;
 import block_entry;
 import logger;
+import sparse_util;
+import internal_types;
 
 namespace infinity {
 
@@ -103,11 +105,32 @@ public:
 
     Optional<Pair<const DataType *, SegmentOffset>> Next() {
         if (auto ret = segment_iter_.Next(); ret) {
-            auto [vec, offset] = *ret;
-            auto v_ptr = reinterpret_cast<const DataType *>(vec[0]);
+            auto &[vec, offset] = *ret;
+            const auto *v_ptr = reinterpret_cast<const DataType *>(vec[0]);
             return std::make_pair(v_ptr, offset);
         }
         return None;
+    }
+
+private:
+    SegmentIter<CheckTS> segment_iter_;
+};
+
+export template <typename DataType, typename IdxType, bool CheckTS>
+class OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS> {
+public:
+    OneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts)
+        : segment_iter_(entry, buffer_mgr, Vector<ColumnID>{column_id}, iterate_ts) {}
+
+    Optional<Pair<SparseVecRef<DataType, IdxType>, SegmentOffset>> Next() {
+        auto ret = segment_iter_.Next();
+        if (!ret) {
+            return None;
+        }
+        auto &[vec, offset] = *ret;
+        const auto *v_ptr = reinterpret_cast<const SparseT *>(vec[0]);
+        SparseVecRef<DataType, IdxType> sparse_vec_ref(v_ptr->nnz_, nullptr, nullptr);
+        return std::make_pair(sparse_vec_ref, offset);
     }
 
 private:

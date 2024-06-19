@@ -275,7 +275,8 @@ SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *seg
         case IndexType::kHnsw:
         case IndexType::kEMVB:
         case IndexType::kFullText:
-        case IndexType::kSecondary: {
+        case IndexType::kSecondary:
+        case IndexType::kBMP: {
             break;
         }
         default: {

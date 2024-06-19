@@ -22,6 +22,7 @@ export module buffer_handle;
 namespace infinity {
 
 class BufferObj;
+class FileWorker;
 
 export class BufferHandle {
 
@@ -44,6 +45,10 @@ public:
     [[nodiscard]] const void *GetData() const;
 
     [[nodiscard]] void *GetDataMut();
+
+    const FileWorker *GetFileWorker() const;
+
+    FileWorker *GetFileWorkerMut();
 
 private:
     BufferObj *buffer_obj_{};

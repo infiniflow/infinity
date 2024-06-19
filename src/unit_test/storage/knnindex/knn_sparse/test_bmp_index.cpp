@@ -16,8 +16,8 @@
 #include <cassert>
 
 import stl;
-import bm_index;
-import bm_util;
+import bmp_alg;
+import bmp_util;
 import sparse_util;
 import third_party;
 import compilation_config;
@@ -29,15 +29,15 @@ import infinity_exception;
 
 using namespace infinity;
 
-class BMIndexTest : public BaseTest {
+class BMPIndexTest : public BaseTest {
 protected:
     void SetUp() override {}
 
     void TearDown() override {}
 
-    template <typename DataType, typename IdxType, BMCompressType CompressType>
+    template <typename DataType, typename IdxType, BMPCompressType CompressType>
     void TestFunc(u32 block_size) {
-        using BMIndex = BMIndex<DataType, IdxType, CompressType>;
+        using BMPAlg = BMPAlg<DataType, IdxType, CompressType>;
 
         u32 nrow = 1000;
         u32 ncol = 1000;
@@ -58,7 +58,7 @@ protected:
         String save_path = String(tmp_data_path()) + "/bmindex_test1.index";
         LocalFileSystem fs;
 
-        auto test_query = [&](const BMIndex &index) {
+        auto test_query = [&](const BMPAlg &index) {
             u32 hit_all = 0;
             u32 total_all = 0;
             for (SparseMatrixIter iter(query_set); iter.HasNext(); iter.Next()) {
@@ -83,10 +83,11 @@ protected:
             }
         };
         {
-            BMIndex index(ncol, block_size);
+            BMPAlg index(ncol, block_size);
             for (SparseMatrixIter iter(dataset); iter.HasNext(); iter.Next()) {
                 SparseVecRef vec = iter.val();
-                index.AddDoc(vec);
+                auto row_id = iter.row_id();
+                index.AddDoc(vec, row_id);
             }
 
             test_query(index);
@@ -104,28 +105,28 @@ protected:
             if (!status.ok()) {
                 UnrecoverableError(fmt::format("Failed to open file: {}", save_path));
             }
-            auto index = BMIndex::Load(*file_handler);
+            auto index = BMPAlg::Load(*file_handler);
 
             test_query(index);
         }
     }
 };
 
-TEST_F(BMIndexTest, test1) {
+TEST_F(BMPIndexTest, test1) {
     {
         u32 block_size = 8;
-        TestFunc<f32, i32, BMCompressType::kCompressed>(block_size);
+        TestFunc<f32, i32, BMPCompressType::kCompressed>(block_size);
     }
     {
         u32 block_size = 64;
-        TestFunc<f32, i32, BMCompressType::kRaw>(block_size);
+        TestFunc<f32, i32, BMPCompressType::kRaw>(block_size);
     }
     {
         u32 block_size = 8;
-        TestFunc<f32, i16, BMCompressType::kCompressed>(block_size);
+        TestFunc<f32, i16, BMPCompressType::kCompressed>(block_size);
     }
     {
         u32 block_size = 8;
-        TestFunc<f64, i32, BMCompressType::kCompressed>(block_size);
+        TestFunc<f64, i32, BMPCompressType::kCompressed>(block_size);
     }
 }

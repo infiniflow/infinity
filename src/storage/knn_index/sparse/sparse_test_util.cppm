@@ -52,7 +52,7 @@ struct SparseTestUtil {
     }
 
     static Pair<u32, u32>
-    CheckApproximateKnn(const i32 *gt_indices, const DataType *gt_scores, SizeT gt_size, const Vector<i32> &indices, const Vector<DataType> &scores) {
+    CheckApproximateKnn(const i32 *gt_indices, const DataType *gt_scores, SizeT gt_size, const Vector<u32> &indices, const Vector<DataType> &scores) {
         HashSet<u32> gt_set;
         for (SizeT i = 0; i < gt_size; ++i) {
             if (gt_scores[i] == 0.0) {
