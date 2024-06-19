@@ -120,8 +120,9 @@ protected:
 
 export class SkipListReaderPostingByteSlice final : public SkipListReader {
 public:
-    SkipListReaderPostingByteSlice(const DocListFormatOption &doc_list_format_option)
-        : SkipListReader(doc_list_format_option) {}
+    explicit SkipListReaderPostingByteSlice(const DocListFormatOption &doc_list_format_option) : SkipListReader(doc_list_format_option) {}
+
+    explicit SkipListReaderPostingByteSlice(const PositionListFormatOption &pos_list_format_option) : SkipListReader(pos_list_format_option) {}
 
     ~SkipListReaderPostingByteSlice() override;
 

@@ -64,11 +64,12 @@ bool PostingIterator::SkipTo(RowID doc_id) {
 Pair<u32, u16> PostingIterator::GetBlockMaxInfo() const { return posting_decoder_->GetBlockMaxInfo(); }
 
 RowID PostingIterator::SeekDoc(RowID row_id) {
-    RowID current_row_id = finish_decode_docid_ ? current_row_id_ : INVALID_ROWID;
-    if (row_id == current_row_id) [[unlikely]] {
-        return current_row_id;
+    if (segment_postings_.get() == nullptr || segment_postings_->empty()) [[unlikely]] {
+        current_row_id_ = INVALID_ROWID;
+        return INVALID_ROWID;
     }
-    if (current_row_id != INVALID_ROWID and row_id < current_row_id) {
+    RowID current_row_id = finish_decode_docid_ ? current_row_id_ : INVALID_ROWID;
+    if (current_row_id != INVALID_ROWID and row_id <= current_row_id) [[unlikely]] {
         return current_row_id;
     }
     assert(row_id > current_row_id or current_row_id == INVALID_ROWID);

@@ -124,7 +124,7 @@ InMemPositionListDecoder *PositionListEncoder::GetInMemPositionListDecoder() con
     SkipListReaderPostingByteSlice *in_mem_skiplist_reader = nullptr;
     if (pos_skiplist_writer_.get()) {
         // not support tf bitmap in realtime segment
-        in_mem_skiplist_reader = new SkipListReaderPostingByteSlice(format_option_.GetDocListFormatOption());
+        in_mem_skiplist_reader = new SkipListReaderPostingByteSlice(format_option_.GetPosListFormatOption());
         in_mem_skiplist_reader->Load(pos_skiplist_writer_.get());
     }
     PostingByteSlice *posting_buffer = new PostingByteSlice();
