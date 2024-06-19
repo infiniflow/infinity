@@ -17,6 +17,7 @@ module;
 export module bm_util;
 
 import stl;
+import infinity_exception;
 
 namespace infinity {
 
@@ -28,6 +29,18 @@ export using BMDocID = i32;
 export enum class BMCompressType : i8 {
     kRaw = 0,
     kCompressed = 1,
+    kInvalid = 2,
 };
 
+export BMCompressType BMCompressTypeFromString(const String &compress_type_str) {
+    if (IsEqual(compress_type_str, "raw")) {
+        return BMCompressType::kRaw;
+    } else if (IsEqual(compress_type_str, "compressed")) {
+        return BMCompressType::kCompressed;
+    } else {
+        UnrecoverableError("Invalid compress type");
+        return BMCompressType::kInvalid;
+    }
 }
+
+} // namespace infinity

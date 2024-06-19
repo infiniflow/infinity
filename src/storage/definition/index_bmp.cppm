@@ -22,6 +22,7 @@ import statement_common;
 import third_party;
 import base_table_ref;
 import create_index_info;
+import bm_util;
 
 namespace infinity {
 
@@ -32,8 +33,8 @@ public:
 
     static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
 
-    IndexBMP(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, SizeT block_size)
-        : IndexBase(IndexType::kBMP, std::move(index_name), file_name, column_names), block_size_(block_size) {}
+    IndexBMP(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, SizeT block_size, BMCompressType compress_type)
+        : IndexBase(IndexType::kBMP, std::move(index_name), file_name, column_names), block_size_(block_size), compress_type_(compress_type) {}
 
 public:
     virtual i32 GetSizeInBytes() const override;
@@ -48,6 +49,7 @@ public:
 
 public:
     SizeT block_size_{};
+    BMCompressType compress_type_{BMCompressType::kCompressed};
 };
 
 } // namespace infinity

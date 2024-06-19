@@ -25,27 +25,32 @@ import infinity_exception;
 import default_values;
 import logical_type;
 import serialize;
+import sparse_info;
+import internal_types;
 
 namespace infinity {
 
 SharedPtr<IndexBMP>
 IndexBMP::Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
     SizeT block_size = BMP_BLOCK_SIZE;
+    BMCompressType compress_type = BMCompressType::kCompressed;
     for (const auto *para : index_param_list) {
         if (para->param_name_ == "block_size") {
             block_size = std::stoi(para->param_value_);
-            if (block_size <= 0 || block_size > std::numeric_limits<i8>::max()) {
+            if (block_size <= 0 || block_size > std::numeric_limits<u8>::max() + 1) {
                 Status status = Status::InvalidIndexParam("Block size");
                 LOG_ERROR(status.message());
                 RecoverableError(status);
             }
+        } else if (para->param_name_ == "compress_type") {
+            compress_type = BMCompressTypeFromString(para->param_value_);
         } else {
             Status status = Status::InvalidIndexParam(para->param_name_);
             LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
-    return MakeShared<IndexBMP>(index_name, file_name, column_names, block_size);
+    return MakeShared<IndexBMP>(index_name, file_name, column_names, block_size, compress_type);
 }
 
 void IndexBMP::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
@@ -56,7 +61,20 @@ void IndexBMP::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_
         Status status = Status::ColumnNotExist(column_name);
         LOG_ERROR(status.message());
         RecoverableError(status);
-    } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kSparse) {
+    }
+    bool error_type = false;
+    auto &data_type = column_types_vector[column_id];
+    if (data_type->type() != LogicalType::kSparse) {
+        error_type = true;
+    } else {
+        auto *sparse_info = static_cast<SparseInfo *>(data_type->type_info().get());
+        if (sparse_info->DataType() != EmbeddingDataType::kElemFloat && sparse_info->DataType() != EmbeddingDataType::kElemDouble) {
+            error_type = true;
+        } else if (sparse_info->IndexType() != EmbeddingDataType::kElemInt32 && sparse_info->IndexType() != EmbeddingDataType::kElemInt16) {
+            error_type = true;
+        }
+    }
+    if (error_type) {
         Status status = Status::InvalidIndexDefinition(
             fmt::format("Attempt to create HNSW index on column: {}, data type: {}.", column_name, data_type->ToString()));
         LOG_ERROR(status.message());
