@@ -58,14 +58,15 @@ void TaskScheduler::Init(Config *config_ptr) {
         cpu_select_step = 1;
     }
 
-    for (u64 cpu_id = 0; cpu_id < worker_count_; cpu_id += cpu_select_step) {
+    for (u64 cpu_id = 0, worker_id = 0; worker_id < worker_count_; ++worker_id) {
         UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>();
-        UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&TaskScheduler::WorkerLoop, this, worker_queue.get(), cpu_id);
+        UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&TaskScheduler::WorkerLoop, this, worker_queue.get(), worker_id);
         // Pin the thread to specific cpu
         ThreadUtil::pin(*worker_thread, cpu_id % cpu_count);
 
         worker_array_.emplace_back(cpu_id, std::move(worker_queue), std::move(worker_thread));
-        worker_workloads_[cpu_id] = 0;
+        worker_workloads_[worker_id] = 0;
+        cpu_id += cpu_select_step;
     }
 
     if (worker_array_.empty()) {
