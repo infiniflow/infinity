@@ -220,12 +220,12 @@ void BMPAlg<DataType, IdxType, CompressType>::AddDoc(const SparseVecRef<DataType
 }
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
-void BMPAlg<DataType, IdxType, CompressType>::Optimize(i32 topk) {
+void BMPAlg<DataType, IdxType, CompressType>::Optimize(const BMPOptimizeOptions &options) {
     std::unique_lock lock(mtx_);
 
     SizeT term_num = bm_ivt_.term_num();
     Vector<Vector<DataType>> ivt_scores = block_fwd_.GetIvtScores(term_num);
-    bm_ivt_.Optimize(topk, std::move(ivt_scores));
+    bm_ivt_.Optimize(options.topk_, std::move(ivt_scores));
 }
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>

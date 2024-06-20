@@ -20,10 +20,11 @@ module;
 module bmp_util;
 
 import logger;
+import third_party;
 
 namespace infinity {
 
-BmpSearchOptions ParseBmpSearchOptions(const Vector<UniquePtr<InitParameter>> &opt_params) {
+BmpSearchOptions BMPUtil::ParseBmpSearchOptions(const Vector<UniquePtr<InitParameter>> &opt_params) {
     BmpSearchOptions options;
     for (const auto &opt_param : opt_params) {
         if (opt_param->param_name_ == "alpha") {
@@ -56,5 +57,25 @@ BmpSearchOptions ParseBmpSearchOptions(const Vector<UniquePtr<InitParameter>> &o
     }
     return options;
 };
+
+Optional<BMPOptimizeOptions> BMPUtil::ParseBMPOptimizeOptions(const Vector<UniquePtr<InitParameter>> &opt_params) {
+    BMPOptimizeOptions options;
+    for (const auto &opt_param : opt_params) {
+        if (opt_param->param_name_ == "topk") {
+            i32 topk = std::stoi(opt_param->param_value_);
+            if (topk <= 0) {
+                continue;
+            }
+            if (topk > 1000) {
+                LOG_WARN(fmt::format("topk value is large {}", topk));
+            }
+            options.topk_ = topk;
+        }
+    }
+    if (options.topk_ == 0) {
+        return None;
+    }
+    return options;
+}
 
 } // namespace infinity

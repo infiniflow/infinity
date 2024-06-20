@@ -130,7 +130,7 @@ public:
     template <DataIteratorConcept<SparseVecRef<DataType, IdxType>, BMPDocID> Iterator>
     SizeT AddDocs(Iterator iter);
 
-    void Optimize(i32 topk);
+    void Optimize(const BMPOptimizeOptions &options);
 
     Pair<Vector<BMPDocID>, Vector<DataType>>
     SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options) const;

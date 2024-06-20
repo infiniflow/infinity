@@ -33,6 +33,7 @@ import cleanup_scanner;
 import chunk_index_entry;
 import memory_indexer;
 import default_values;
+import statement_common;
 
 namespace infinity {
 
@@ -94,6 +95,8 @@ public:
     void CommitSegmentIndex(TransactionID txn_id, TxnTimeStamp commit_ts);
 
     void CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<ChunkIndexEntry *> &old_chunks, TxnTimeStamp commit_ts);
+
+    void OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params);
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 

@@ -65,9 +65,12 @@ int main(int argc, char *argv[]) {
                 }
             }
             data_mat.Clear();
+
+            BMPOptimizeOptions optimize_options{.topk_ = opt.topk_};
             std::cout << "Optimizing index...\n";
-            index.Optimize(opt.topk_);
+            index.Optimize(optimize_options);
             std::cout << "Index built\n";
+
             profiler.End();
 
             std::cout << fmt::format("Import data time: {}\n", profiler.ElapsedToString(1000));
@@ -82,7 +85,7 @@ int main(int argc, char *argv[]) {
         case ModeType::kQuery: {
             i64 query_n = opt.query_n_;
             i32 thread_n = opt.thread_n_;
-            BmpSearchOptions options{.alpha_ = opt.alpha_, .beta_ = opt.beta_, .use_tail_ = true, .use_lock_ = false};
+            BmpSearchOptions search_options{.alpha_ = opt.alpha_, .beta_ = opt.beta_, .use_tail_ = true, .use_lock_ = false};
 
             auto [file_handler, status] = fs.OpenFile(opt.index_save_path_.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
             if (!status.ok()) {
@@ -115,7 +118,7 @@ int main(int argc, char *argv[]) {
                             indices[i] = static_cast<i16>(query.indices_[i]);
                         }
                         SparseVecRef<f32, i16> query1(query.nnz_, indices.data(), query.data_);
-                        return index.SearchKnn(query1, topk, options);
+                        return index.SearchKnn(query1, topk, search_options);
                     });
                 profiler.End();
                 std::cout << fmt::format("Search time: {}\n", profiler.ElapsedToString(1000));

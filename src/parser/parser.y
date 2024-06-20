@@ -1857,6 +1857,26 @@ optimize_statement: OPTIMIZE table_name {
     $$->table_name_ = $2->table_name_ptr_;
     free($2->table_name_ptr_);
     delete $2;
+}
+//   1         2      3        4            5
+| OPTIMIZE IDENTIFIER ON table_name with_index_param_list{
+    $$ = new infinity::OptimizeStatement();
+    if($4->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    $$->table_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    delete $4;
+
+    $$->index_name_ = $2;
+    free($2);
+
+    for (auto *&index_param : *$5) {
+        $$->opt_params_.emplace_back(std::unique_ptr<infinity::InitParameter>(index_param));
+        index_param = nullptr;
+    }
+    delete $5;
 };
 
 /*

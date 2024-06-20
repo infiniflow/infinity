@@ -436,7 +436,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                         using IndexT = std::decay_t<decltype(*index)>;
                         if constexpr (std::is_same_v<typename IndexT::DataT, typename DistFunc::DataT> &&
                                       std::is_same_v<typename IndexT::IdxT, typename DistFunc::IndexT>) {
-                            BmpSearchOptions options = ParseBmpSearchOptions(match_sparse_expr_->opt_params_);
+                            BmpSearchOptions options = BMPUtil::ParseBmpSearchOptions(match_sparse_expr_->opt_params_);
                             options.use_lock_ = with_lock;
                             auto [doc_ids, scores] = index->SearchKnn(query, topn, options);
                             for (SizeT i = 0; i < topn; ++i) {

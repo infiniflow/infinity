@@ -62,6 +62,15 @@ export struct BmpSearchOptions {
     bool use_lock_ = true;
 };
 
-export BmpSearchOptions ParseBmpSearchOptions(const Vector<UniquePtr<InitParameter>> &opt_params);
+export struct BMPOptimizeOptions {
+    i32 topk_ = 0;
+};
+
+export class BMPUtil {
+public:
+    static BmpSearchOptions ParseBmpSearchOptions(const Vector<UniquePtr<InitParameter>> &opt_params);
+
+    static Optional<BMPOptimizeOptions> ParseBMPOptimizeOptions(const Vector<UniquePtr<InitParameter>> &opt_params);
+};
 
 } // namespace infinity

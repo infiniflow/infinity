@@ -90,8 +90,9 @@ protected:
                 index.AddDoc(vec, row_id);
             }
 
+            BMPOptimizeOptions optimize_options{.topk_ = static_cast<i32>(topk)};
             test_query(index);
-            index.Optimize(topk);
+            index.Optimize(optimize_options);
             test_query(index);
 
             auto [file_handler, status] = fs.OpenFile(save_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
