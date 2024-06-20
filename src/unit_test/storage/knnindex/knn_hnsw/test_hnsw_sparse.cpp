@@ -47,8 +47,8 @@ protected:
         int max_chunk_n = 10;
         SizeT element_size = max_chunk_n * chunk_size;
 
-        SparseMatrix dataset = SparseTestUtil::GenerateDataset(element_size, max_dim, sparsity, 0, 1.0);
-        auto [gt_idx, gt_score] = SparseTestUtil::GenerateGroundtruth(dataset, dataset, 1);
+        SparseMatrix dataset = SparseTestUtil<f32, i32>::GenerateDataset(element_size, max_dim, sparsity, 0, 1.0);
+        auto [gt_idx, gt_score] = SparseTestUtil<f32, i32>::GenerateGroundtruth(dataset, dataset, 1);
 
         LocalFileSystem fs;
         {

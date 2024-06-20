@@ -25,6 +25,10 @@ import catalog;
 import buffer_manager;
 import column_vector;
 import block_entry;
+import sparse_util;
+import internal_types;
+import column_vector;
+import fix_heap;
 
 namespace infinity {
 
@@ -109,6 +113,42 @@ public:
     }
 
     SharedPtr<ColumnVector> column_vector() const { return column_vector_; }
+
+private:
+    SegmentOffset block_offset_;
+    SharedPtr<ColumnVector> column_vector_;
+    SizeT ele_size_;
+    SizeT cur_;
+    SizeT end_;
+};
+
+export template <typename DataType, typename IdxType>
+class MemIndexInserterIter<SparseVecRef<DataType, IdxType>> {
+public:
+    MemIndexInserterIter(SegmentOffset block_offset, BlockColumnEntry *entry, BufferManager *buffer_mgr, SizeT offset, SizeT size)
+        : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+          ele_size_(entry->column_type()->Size()), cur_(offset), end_(offset + size) {}
+
+    Optional<Pair<SparseVecRef<DataType, IdxType>, SegmentOffset>> Next() {
+        if (cur_ == end_) {
+            return None;
+        }
+        const void *ret = column_vector_->data() + cur_ * ele_size_;
+        const auto *v_ptr = reinterpret_cast<const SparseT *>(ret);
+        if (v_ptr->nnz_ == 0) {
+            SparseVecRef<DataType, IdxType> sparse_vec_ref(0, nullptr, nullptr);
+            return std::make_pair(sparse_vec_ref, block_offset_ + cur_++);
+        }
+
+        const char *raw_data_ptr = column_vector_->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(v_ptr->chunk_id_, v_ptr->chunk_offset_);
+        const char *indice_ptr = raw_data_ptr;
+        const char *data_ptr = indice_ptr + v_ptr->nnz_ * sizeof(IdxType);
+
+        SparseVecRef<DataType, IdxType> sparse_vec_ref(v_ptr->nnz_,
+                                                       reinterpret_cast<const IdxType *>(indice_ptr),
+                                                       reinterpret_cast<const DataType *>(data_ptr));
+        return std::make_pair(sparse_vec_ref, block_offset_ + cur_++);
+    }
 
 private:
     SegmentOffset block_offset_;

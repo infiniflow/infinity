@@ -177,8 +177,10 @@ TEST_F(BPReorderingTest, test2) {
 }
 
 TEST_F(BPReorderingTest, test3) {
+    GTEST_SKIP() << "Skip this test. This program is not a test but for preprocessing data.";
+
     LocalFileSystem fs;
-    Path dataset_path = Path(test_data_path()) / "benchmark" / "splade" / "base_full.csr";
+    Path dataset_path = Path(test_data_path()) / "benchmark" / "splade" / "base_small.csr";
     auto [file_handler, status] = fs.OpenFile(dataset_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
     if (!status.ok()) {
         std::cout << String(status.message()) << std::endl;

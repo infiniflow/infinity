@@ -874,7 +874,7 @@ static const yytype_int16 yyrline[] =
     2812,  2818,  2824,  2830,  2836,  2842,  2848,  2859,  2863,  2868,
     2896,  2906,  2912,  2916,  2917,  2919,  2920,  2922,  2923,  2935,
     2943,  2947,  2950,  2954,  2957,  2961,  2965,  2970,  2976,  2986,
-    2993,  3004,  3054,  3103
+    2993,  3004,  3056,  3105
 };
 #endif
 
@@ -7531,6 +7531,8 @@ Return:
         index_type = infinity::IndexType::kFullText;
     } else if (strcmp((yyvsp[-1].str_value), "hnsw") == 0) {
         index_type = infinity::IndexType::kHnsw;
+    } else if (strcmp((yyvsp[-1].str_value), "bmp") == 0) {
+        index_type = infinity::IndexType::kBMP;
     } else if (strcmp((yyvsp[-1].str_value), "ivfflat") == 0) {
         index_type = infinity::IndexType::kIVFFlat;
     } else if (strcmp((yyvsp[-1].str_value), "emvb") == 0) {
@@ -7574,11 +7576,11 @@ Return:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 7578 "parser.cpp"
+#line 7580 "parser.cpp"
     break;
 
   case 422: /* index_info_list: index_info_list '(' identifier_array ')' USING IDENTIFIER with_index_param_list  */
-#line 3054 "parser.y"
+#line 3056 "parser.y"
                                                                                   {
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -7628,11 +7630,11 @@ Return:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 7632 "parser.cpp"
+#line 7634 "parser.cpp"
     break;
 
   case 423: /* index_info_list: '(' identifier_array ')'  */
-#line 3103 "parser.y"
+#line 3105 "parser.y"
                            {
     infinity::IndexType index_type = infinity::IndexType::kSecondary;
     size_t index_count = (yyvsp[-1].identifier_array_t)->size();
@@ -7646,11 +7648,11 @@ Return:
     }
     delete (yyvsp[-1].identifier_array_t);
 }
-#line 7650 "parser.cpp"
+#line 7652 "parser.cpp"
     break;
 
 
-#line 7654 "parser.cpp"
+#line 7656 "parser.cpp"
 
       default: break;
     }
@@ -7879,7 +7881,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 3117 "parser.y"
+#line 3119 "parser.y"
 
 
 void

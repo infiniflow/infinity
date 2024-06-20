@@ -62,11 +62,6 @@ bool PhysicalMergeMatchSparse::Execute(QueryContext *query_context, OperatorStat
     auto *merge_match_sparse_state = static_cast<MergeMatchSparseOperatorState *>(operator_state);
     LOG_DEBUG("PhysicalMergeMatchSparse::Execute");
 
-    if (merge_match_sparse_state->data_block_array_.empty()) {
-        merge_match_sparse_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
-        merge_match_sparse_state->data_block_array_[0]->Init(*GetOutputTypes());
-    }
-
     switch (match_sparse_expr_->metric_type_) {
         case SparseMetricType::kInnerProduct: {
             ExecuteInner<CompareMin>(query_context, merge_match_sparse_state);
@@ -146,6 +141,11 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
     if (operator_state->input_complete_) {
         merge_knn->End(); // reorder the heap
         i64 result_n = std::min(topn, (SizeT)merge_knn->total_count());
+
+        if (operator_state->data_block_array_.empty()) {
+            operator_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
+            operator_state->data_block_array_[0]->Init(*GetOutputTypes());
+        }
 
         Vector<char *> result_dists_list;
         Vector<RowID *> row_ids_list;

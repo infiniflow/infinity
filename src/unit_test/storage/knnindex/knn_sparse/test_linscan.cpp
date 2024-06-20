@@ -40,9 +40,9 @@ TEST_F(LinScanAlgTest, accurate_scan) {
 
     u32 gt_size = std::min(nrow, topk);
 
-    const SparseMatrix dataset = SparseTestUtil::GenerateDataset(nrow, ncol, sparsity);
-    const SparseMatrix query_set = SparseTestUtil::GenerateDataset(query_n, ncol, sparsity);
-    const auto [gt_indices_list, gt_scores_list] = SparseTestUtil::GenerateGroundtruth(dataset, query_set, topk, false);
+    const SparseMatrix dataset = SparseTestUtil<f32, i32>::GenerateDataset(nrow, ncol, sparsity);
+    const SparseMatrix query_set = SparseTestUtil<f32, i32>::GenerateDataset(query_n, ncol, sparsity);
+    const auto [gt_indices_list, gt_scores_list] = SparseTestUtil<f32, i32>::GenerateGroundtruth(dataset, query_set, topk, false);
 
     LinScan<f32, i32> index(dataset.ncol_);
     for (auto iter = SparseMatrixIter(dataset); iter.HasNext(); iter.Next()) {
@@ -60,9 +60,9 @@ TEST_F(LinScanAlgTest, accurate_scan) {
         const i32 *gt_indices = gt_indices_list.get() + query_id * topk;
         const f32 *gt_scores = gt_scores_list.get() + query_id * topk;
 
-        bool ck = SparseTestUtil::CheckAccurateKnn(gt_indices, gt_scores, gt_size, indices, scores, error_bound);
+        bool ck = SparseTestUtil<f32, i32>::CheckAccurateKnn(gt_indices, gt_scores, gt_size, indices, scores, error_bound);
         if (!ck) {
-            SparseTestUtil::PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
+            SparseTestUtil<f32, i32>::PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
             EXPECT_TRUE(false);
         }
     }
@@ -82,9 +82,9 @@ TEST_F(LinScanAlgTest, approximate_scan) {
 
     u32 gt_size = std::min(nrow, topk);
 
-    const SparseMatrix dataset = SparseTestUtil::GenerateDataset(nrow, ncol, sparsity);
-    const SparseMatrix query = SparseTestUtil::GenerateDataset(query_n, ncol, sparsity);
-    const auto [gt_indices_list, gt_scores_list] = SparseTestUtil::GenerateGroundtruth(dataset, query, topk, false);
+    const SparseMatrix dataset = SparseTestUtil<f32, i32>::GenerateDataset(nrow, ncol, sparsity);
+    const SparseMatrix query = SparseTestUtil<f32, i32>::GenerateDataset(query_n, ncol, sparsity);
+    const auto [gt_indices_list, gt_scores_list] = SparseTestUtil<f32, i32>::GenerateGroundtruth(dataset, query, topk, false);
 
     LinScan<f32, i32> index(dataset.ncol_);
     for (auto iter = SparseMatrixIter(dataset); iter.HasNext(); iter.Next()) {
@@ -110,11 +110,11 @@ TEST_F(LinScanAlgTest, approximate_scan) {
         const i32 *gt_indices = gt_indices_list.get() + query_id * topk;
         const f32 *gt_scores = gt_scores_list.get() + query_id * topk;
 
-        auto [hit, total] = SparseTestUtil::CheckApproximateKnn(gt_indices, gt_scores, gt_size, indices, scores);
+        auto [hit, total] = SparseTestUtil<f32, i32>::CheckApproximateKnn(gt_indices, gt_scores, gt_size, indices, scores);
         hit_all += hit;
         total_all += total;
 
-        // SparseTestUtil::PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
+        // SparseTestUtil<f32, i32>::PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
         std::cout << fmt::format("accuracy: {}\n", (f32)hit / total);
     }
     if (hit_all < total_all * accuracy_all) {

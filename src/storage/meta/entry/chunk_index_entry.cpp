@@ -41,6 +41,7 @@ import index_defines;
 import local_file_system;
 import secondary_index_file_worker;
 import emvb_index_file_worker;
+import bmp_index_file_worker;
 import column_def;
 
 namespace infinity {
@@ -65,7 +66,8 @@ ChunkIndexEntry::ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_in
     : BaseEntry(EntryType::kChunkIndex, false, ChunkIndexEntry::EncodeIndex(chunk_id, segment_index_entry)), chunk_id_(chunk_id),
       segment_index_entry_(segment_index_entry), base_name_(base_name), base_rowid_(base_rowid), row_count_(row_count){};
 
-UniquePtr<IndexFileWorker> ChunkIndexEntry::CreateFileWorker(const IndexBase *index_base,
+UniquePtr<IndexFileWorker> ChunkIndexEntry::CreateFileWorker(const SharedPtr<IndexBase> index_base,
+                                                             const SharedPtr<ColumnDef> column_def,
                                                              const SharedPtr<String> &index_dir,
                                                              CreateIndexParam *param,
                                                              SegmentID segment_id,
@@ -75,6 +77,10 @@ UniquePtr<IndexFileWorker> ChunkIndexEntry::CreateFileWorker(const IndexBase *in
             auto *create_hnsw_param = static_cast<CreateHnswParam *>(param);
             auto index_file_name = MakeShared<String>(ChunkIndexEntry::IndexFileName(segment_id, chunk_id));
             return MakeUnique<HnswFileWorker>(index_dir, index_file_name, create_hnsw_param);
+        }
+        case IndexType::kBMP: {
+            auto index_file_name = MakeShared<String>(ChunkIndexEntry::IndexFileName(segment_id, chunk_id));
+            return MakeUnique<BMPIndexFileWorker>(index_dir, index_file_name, index_base, column_def);
         }
         default: {
             LOG_TRACE(fmt::format("index {} not store in index chunk entry by buffer obj", (u8)index_base->index_type_));
@@ -95,8 +101,9 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewChunkIndexEntry(ChunkID chunk_id,
     const auto &index_dir = segment_index_entry->index_dir();
     const auto &index_base = param->index_base_;
     SegmentID segment_id = segment_index_entry->segment_id();
+    const auto &column_def = segment_index_entry->table_index_entry()->column_def();
 
-    auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base.get(), index_dir, param, segment_id, chunk_id);
+    auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base, column_def, index_dir, param, segment_id, chunk_id);
     chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
     return chunk_index_entry;
 }
@@ -175,36 +182,48 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
                                                                      TxnTimeStamp deprecate_ts,
                                                                      BufferManager *buffer_mgr) {
     auto chunk_index_entry = SharedPtr<ChunkIndexEntry>(new ChunkIndexEntry(chunk_id, segment_index_entry, base_name, base_rowid, row_count));
-    if (param->index_base_->index_type_ == IndexType::kFullText) {
-        const auto &index_dir = segment_index_entry->index_dir();
-        auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
-        auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name, row_count * sizeof(u32));
-        chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
-    } else if (param->index_base_->index_type_ == IndexType::kSecondary) {
-        const auto &index_dir = segment_index_entry->index_dir();
-        SegmentID segment_id = segment_index_entry->segment_id();
-        auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-        const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
-        const auto &column_def = segment_index_entry->table_index_entry()->column_def();
-        auto file_worker = MakeUnique<SecondaryIndexFileWorker>(index_dir, secondary_index_file_name, index_base, column_def, row_count);
-        chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
-        chunk_index_entry->LoadPartsReader(buffer_mgr);
-    } else if (param->index_base_->index_type_ == IndexType::kEMVB) {
-        const auto &index_dir = segment_index_entry->index_dir();
-        SegmentID segment_id = segment_index_entry->segment_id();
-        auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
-        const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
-        const auto &column_def = segment_index_entry->table_index_entry()->column_def();
-        const auto segment_start_offset = base_rowid.segment_offset_;
-        auto file_worker = MakeUnique<EMVBIndexFileWorker>(index_dir, emvb_index_file_name, index_base, column_def, segment_start_offset);
-        chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
-    } else {
-        const auto &index_dir = segment_index_entry->index_dir();
-        const auto &index_base = param->index_base_;
-        SegmentID segment_id = segment_index_entry->segment_id();
+    const auto &column_def = segment_index_entry->table_index_entry()->column_def();
+    switch (param->index_base_->index_type_) {
+        case IndexType::kFullText: {
+            const auto &index_dir = segment_index_entry->index_dir();
+            auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
+            auto file_worker = MakeUnique<RawFileWorker>(index_dir, column_length_file_name, row_count * sizeof(u32));
+            chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+            break;
+        }
+        case IndexType::kSecondary: {
+            const auto &index_dir = segment_index_entry->index_dir();
+            SegmentID segment_id = segment_index_entry->segment_id();
+            auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
+            const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
+            auto file_worker = MakeUnique<SecondaryIndexFileWorker>(index_dir, secondary_index_file_name, index_base, column_def, row_count);
+            chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+            chunk_index_entry->LoadPartsReader(buffer_mgr);
+            break;
+        }
+        case IndexType::kEMVB: {
+            const auto &index_dir = segment_index_entry->index_dir();
+            SegmentID segment_id = segment_index_entry->segment_id();
+            auto emvb_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
+            const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
+            const auto segment_start_offset = base_rowid.segment_offset_;
+            auto file_worker = MakeUnique<EMVBIndexFileWorker>(index_dir, emvb_index_file_name, index_base, column_def, segment_start_offset);
+            chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+            break;
+        }
+        case IndexType::kHnsw:
+        case IndexType::kBMP: {
+            const auto &index_dir = segment_index_entry->index_dir();
+            const auto &index_base = param->index_base_;
+            SegmentID segment_id = segment_index_entry->segment_id();
 
-        auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base.get(), index_dir, param, segment_id, chunk_id);
-        chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+            auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base, column_def, index_dir, param, segment_id, chunk_id);
+            chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+            break;
+        }
+        default: {
+            UnrecoverableError(fmt::format("Unsupported index type: {}", (u8)param->index_base_->index_type_));
+        }
     }
     chunk_index_entry->commit_ts_ = commit_ts;
     chunk_index_entry->deprecate_ts_ = deprecate_ts;
