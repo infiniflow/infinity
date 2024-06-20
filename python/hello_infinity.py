@@ -17,7 +17,7 @@ import sys
 
 # remove local path, use the installed infinity sdk
 current_path = os.path.abspath(os.path.dirname(__file__))
-local_infinity_path = os.path.join(current_path, 'infinity')
+local_infinity_path = os.path.join(current_path, "infinity")
 if local_infinity_path in sys.path:
     sys.path.remove(local_infinity_path)
 if current_path in sys.path:
@@ -224,19 +224,19 @@ def test_chinese():
 
         print("------fulltext-------")
         questions = [
-            "芯片",
-            "苹果",
-            "羽毛",
-            "羽毛球",
-            '"羽毛球锦标赛"',
-            "2018年世界羽毛球锦标赛在哪个城市举办？",
-            "hi\-tech",
-            '"hi-tech"',
-            "graphics card",
-            '"graphics card"',
-            '"DS-K3AJ303/Dm140"',
-            "Bloom filter",
-            '"Bloom filter"',
+            r"芯片",
+            r"苹果",
+            r"羽毛",
+            r"羽毛球",
+            r'"羽毛球锦标赛"',
+            r"2018年世界羽毛球锦标赛在哪个城市举办？",
+            r"hi\-tech",
+            r'"hi-tech"',
+            r"graphics card",
+            r'"graphics card"',
+            r'"DS-K3AJ303/Dm140"',
+            r"Bloom filter",
+            r'"Bloom filter"',
         ]
         for question in questions:
             qb_result = (
