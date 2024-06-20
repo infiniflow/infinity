@@ -176,6 +176,11 @@ public:
         return {chunk_index_entries_, memory_hnsw_indexer_};
     }
 
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<ChunkIndexEntry>> GetBMPIndexSnapshot() {
+        std::shared_lock lock(rw_locker_);
+        return {chunk_index_entries_, memory_hnsw_indexer_};
+    }
+
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<SecondaryIndexInMem>> GetSecondaryIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
         return {chunk_index_entries_, memory_secondary_index_};

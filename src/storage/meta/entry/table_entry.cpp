@@ -345,7 +345,8 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
             case IndexType::kFullText:
             case IndexType::kSecondary:
             case IndexType::kEMVB:
-            case IndexType::kHnsw: {
+            case IndexType::kHnsw:
+            case IndexType::kBMP: {
                 // support realtime index
                 break;
             }
@@ -658,7 +659,8 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
             case IndexType::kHnsw:
             case IndexType::kFullText:
             case IndexType::kEMVB:
-            case IndexType::kSecondary: {
+            case IndexType::kSecondary:
+            case IndexType::kBMP: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {
                     MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
                 }
@@ -884,7 +886,8 @@ void TableEntry::OptimizeIndex(Txn *txn) {
             }
             case IndexType::kHnsw:
             case IndexType::kEMVB:
-            case IndexType::kSecondary: {
+            case IndexType::kSecondary:
+            case IndexType::kBMP: {
                 TxnTimeStamp begin_ts = txn->BeginTS();
                 auto segment_index_guard = table_index_entry->GetSegmentIndexesGuard();
                 for (auto &[segment_id, segment_index_entry] : segment_index_guard.index_by_segment_) {

@@ -22,7 +22,7 @@
 #include <vector>
 
 namespace infinity {
-//using String = std::string;
+// using String = std::string;
 
 template <typename T>
 concept POD = std::is_trivial_v<T> && std::is_standard_layout_v<T>;
@@ -98,6 +98,11 @@ inline void WriteBufAdv<std::string>(char *&buf, const std::string &value) {
     WriteBufAdv(buf, len);
     memcpy(buf, value.c_str(), len);
     buf += len;
+}
+
+inline void WriteBufCharsAdv(char *&buf, const char *data, size_t bytes) {
+    memcpy(buf, data, bytes);
+    buf += bytes;
 }
 
 } // namespace infinity

@@ -65,4 +65,12 @@ void *BufferHandle::GetDataMut() {
     buffer_obj_->GetMutPointer();
     return data_;
 }
+
+const FileWorker *BufferHandle::GetFileWorker() const { return buffer_obj_->file_worker(); }
+
+FileWorker *BufferHandle::GetFileWorkerMut() {
+    buffer_obj_->GetMutPointer();
+    return buffer_obj_->file_worker();
+}
+
 } // namespace infinity

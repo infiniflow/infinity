@@ -105,6 +105,8 @@ public:
 
     String GetFilename() const { return file_worker_->GetFilePath(); }
 
+    const FileWorker *file_worker() const { return file_worker_.get(); }
+
     FileWorker *file_worker() { return file_worker_.get(); }
 
 private:

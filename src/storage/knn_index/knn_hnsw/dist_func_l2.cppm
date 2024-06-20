@@ -14,7 +14,7 @@
 
 module;
 
-#include "header.h"
+#include "../header.h"
 #include <ostream>
 
 import stl;

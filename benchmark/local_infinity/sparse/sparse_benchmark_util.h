@@ -76,12 +76,12 @@ Tuple<u32, u32, UniquePtr<i32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path
 
 const int kQueryLogInterval = 100;
 
-Vector<Pair<Vector<i32>, Vector<f32>>> Search(i32 thread_n,
+Vector<Pair<Vector<u32>, Vector<f32>>> Search(i32 thread_n,
                                               const SparseMatrix<f32, i32> &query_mat,
                                               u32 top_k,
                                               i64 query_n,
-                                              std::function<Pair<Vector<i32>, Vector<f32>>(const SparseVecRef<f32, i32> &, u32)> search_fn) {
-    Vector<Pair<Vector<i32>, Vector<f32>>> res(query_n);
+                                              std::function<Pair<Vector<u32>, Vector<f32>>(const SparseVecRef<f32, i32> &, u32)> search_fn) {
+    Vector<Pair<Vector<u32>, Vector<f32>>> res(query_n);
     Atomic<i64> query_idx = 0;
     Vector<Thread> threads;
     for (i32 thread_id = 0; thread_id < thread_n; ++thread_id) {
@@ -121,7 +121,7 @@ void PrintQuery(u32 query_id, const i32 *gt_indices, const f32 *gt_scores, u32 g
     std::cout << "\n";
 }
 
-f32 CheckGroundtruth(i32 *gt_indices_list, f32 *gt_score_list, const Vector<Pair<Vector<i32>, Vector<f32>>> &results, u32 top_k) {
+f32 CheckGroundtruth(i32 *gt_indices_list, f32 *gt_score_list, const Vector<Pair<Vector<u32>, Vector<f32>>> &results, u32 top_k) {
     u32 query_n = results.size();
 
     SizeT recall_n = 0;
@@ -131,7 +131,7 @@ f32 CheckGroundtruth(i32 *gt_indices_list, f32 *gt_score_list, const Vector<Pair
 
         // const f32 *gt_score = gt_score_list + i * top_k;
         // PrintQuery(i, gt_indices, gt_score, top_k, indices, scores);
-        HashSet<i32> indices_set(indices.begin(), indices.end());
+        HashSet<u32> indices_set(indices.begin(), indices.end());
         for (u32 j = 0; j < top_k; ++j) {
             if (indices_set.contains(gt_indices[j])) {
                 ++recall_n;
@@ -248,6 +248,7 @@ public:
 struct BMPOption : public BenchmarkOption {
 public:
     void ParseInner(CLI::App &app_) override {
+        app_.add_option("--topk", topk_, "Topk")->required(false)->transform(CLI::Range(1, 1024));
         app_.add_option("--block_size", block_size_, "Block size")->required(false)->transform(CLI::Range(1, 1024));
         app_.add_option("--alpha", alpha_, "Alpha")->required(false)->transform(CLI::Range(0.0, 100.0));
         app_.add_option("--beta", beta_, "Beta")->required(false)->transform(CLI::Range(0.0, 100.0));
@@ -256,6 +257,7 @@ public:
     String IndexName() const override { return fmt::format("bmp_block{}", block_size_); }
 
 public:
+    i32 topk_ = 10;
     i8 block_size_ = 8;
     f32 alpha_ = 1.0;
     f32 beta_ = 1.0;

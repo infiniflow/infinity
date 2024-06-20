@@ -127,3 +127,5 @@ callgrind.out.*
 
 # ignore all benchmark datasets
 python/benchmark/datasets/
+
+.venv/

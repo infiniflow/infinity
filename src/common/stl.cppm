@@ -50,6 +50,7 @@ module;
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <variant>
 #include <vector>
 
 export module stl;
@@ -57,6 +58,9 @@ export module stl;
 export namespace std {
 
     using std::source_location;
+
+    using std::nullptr_t;
+    using std::monostate;
 
     // using std::stringstream;
     using std::forward;

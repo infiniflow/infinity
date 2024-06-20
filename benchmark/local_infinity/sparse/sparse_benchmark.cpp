@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
             break;
         }
         case ModeType::kQuery: {
-            Vector<Pair<Vector<i32>, Vector<f32>>> query_result;
+            Vector<Pair<Vector<u32>, Vector<f32>>> query_result;
             i64 query_n = opt.query_n_;
             i32 thread_n = opt.thread_n_;
             bool bf = opt.bf_;
@@ -105,9 +105,13 @@ int main(int argc, char *argv[]) {
 
                 if (bf) {
                     profiler.Begin();
-                    query_result = Search(thread_n, query_mat, top_k, query_n, [&](const SparseVecRef<f32, i32> &query, u32 top_k) {
-                        return index.SearchBF(query, top_k);
-                    });
+                    query_result = Search(thread_n,
+                                          query_mat,
+                                          top_k,
+                                          query_n,
+                                          [&](const SparseVecRef<f32, i32> &query, u32 top_k) -> Pair<Vector<u32>, Vector<f32>> {
+                                              return index.SearchBF(query, top_k);
+                                          });
                     profiler.End();
                 } else {
                     SparseMatrix<f32, i32> data_mat = DecodeSparseDataset(opt.data_path_);
@@ -118,11 +122,16 @@ int main(int argc, char *argv[]) {
                     SearchKnnOption option{.candidate_n_ = candidate_n, .budget_ = budget};
 
                     profiler.Begin();
-                    query_result = Search(thread_n, query_mat, top_k, query_n, [&](const SparseVecRef<f32, i32> &query, u32 top_k) {
-                        auto [candidate_indices, candidate_scores, used_budget] = index.SearchKnn(query, option.candidate_n_, option.budget_);
-                        used_budget_all += used_budget;
-                        return SparseVecUtil::Rerank(data_mat, query, candidate_indices, top_k);
-                    });
+                    query_result = Search(thread_n,
+                                          query_mat,
+                                          top_k,
+                                          query_n,
+                                          [&](const SparseVecRef<f32, i32> &query, u32 top_k) -> Pair<Vector<u32>, Vector<f32>> {
+                                              auto [candidate_indices, candidate_scores, used_budget] =
+                                                  index.SearchKnn(query, option.candidate_n_, option.budget_);
+                                              used_budget_all += used_budget;
+                                              return SparseVecUtil::Rerank(data_mat, query, candidate_indices, top_k);
+                                          });
                     profiler.End();
                     std::cout << fmt::format("avg budget: {}\n", (f32)used_budget_all / query_mat.nrow_);
                 }
