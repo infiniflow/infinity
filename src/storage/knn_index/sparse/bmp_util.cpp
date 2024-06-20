@@ -42,17 +42,17 @@ BmpSearchOptions BMPUtil::ParseBmpSearchOptions(const Vector<UniquePtr<InitParam
             }
             options.beta_ = beta;
         } else if (opt_param->param_name_ == "use_tail") {
-            if (!IsEqual(opt_param->param_value_, "true") && !IsEqual(opt_param->param_value_, "false")) {
-                LOG_WARN("Invalid use_tail value, should be true or false");
+            if (!IsEqual(opt_param->param_value_, "T") && !IsEqual(opt_param->param_value_, "F")) {
+                LOG_WARN("Invalid use_tail value, should be T or F");
                 continue;
             }
-            options.use_tail_ = IsEqual(opt_param->param_value_, "true");
+            options.use_tail_ = IsEqual(opt_param->param_value_, "T");
         } else if (opt_param->param_name_ == "use_lock") {
-            if (!IsEqual(opt_param->param_value_, "true") && !IsEqual(opt_param->param_value_, "false")) {
-                LOG_WARN("Invalid use_lock value, should be true or false");
+            if (!IsEqual(opt_param->param_value_, "T") && !IsEqual(opt_param->param_value_, "F")) {
+                LOG_WARN("Invalid use_lock value, should be T or F");
                 continue;
             }
-            options.use_lock_ = IsEqual(opt_param->param_value_, "true");
+            options.use_lock_ = IsEqual(opt_param->param_value_, "T");
         }
     }
     return options;

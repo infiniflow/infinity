@@ -28,7 +28,7 @@ SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80
 1
 
 query I
-SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3) WITH (alpha = 1.0, beta = 1.0, tail = true);
+SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3) WITH (alpha = 1.0, beta = 1.0, tail = T);
 ----
 4
 2
