@@ -46,8 +46,8 @@ protected:
         u32 topk = 10;
         // u32 gt_size = std::min(nrow, topk);
 
-        f32 alpha = 1.0;
-        f32 beta = 1.0;
+        BmpSearchOptions options;
+        options.use_lock_ = false;
 
         f32 accuracy_all = 0.9;
 
@@ -64,7 +64,7 @@ protected:
             for (SparseMatrixIter iter(query_set); iter.HasNext(); iter.Next()) {
                 SparseVecRef vec = iter.val();
 
-                auto [indices, scores] = index.SearchKnn(vec, topk, alpha, beta);
+                auto [indices, scores] = index.SearchKnn(vec, topk, options);
 
                 u32 query_id = iter.row_id();
                 const i32 *gt_indices = gt_indices_list.get() + query_id * topk;

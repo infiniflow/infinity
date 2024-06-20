@@ -132,7 +132,8 @@ public:
 
     void Optimize(i32 topk);
 
-    Pair<Vector<BMPDocID>, Vector<DataType>> SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, f32 alpha, f32 beta) const;
+    Pair<Vector<BMPDocID>, Vector<DataType>>
+    SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options) const;
 
     void Save(FileHandler &file_handler) const;
 
@@ -149,6 +150,8 @@ private:
     BMPIvt<DataType, CompressType> bm_ivt_;
     BlockFwd<DataType, IdxType> block_fwd_;
     Vector<BMPDocID> doc_ids_;
+
+    mutable std::shared_mutex mtx_;
 };
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>

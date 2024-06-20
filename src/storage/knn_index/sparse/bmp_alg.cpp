@@ -207,6 +207,8 @@ template class BlockFwd<f64, i8>;
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
 void BMPAlg<DataType, IdxType, CompressType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc, BMPDocID doc_id) {
+    std::unique_lock lock(mtx_);
+
     doc_ids_.push_back(doc_id);
     Optional<TailFwd<DataType, IdxType>> tail_fwd = block_fwd_.AddDoc(doc);
     if (!tail_fwd.has_value()) {
@@ -219,6 +221,8 @@ void BMPAlg<DataType, IdxType, CompressType>::AddDoc(const SparseVecRef<DataType
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
 void BMPAlg<DataType, IdxType, CompressType>::Optimize(i32 topk) {
+    std::unique_lock lock(mtx_);
+
     SizeT term_num = bm_ivt_.term_num();
     Vector<Vector<DataType>> ivt_scores = block_fwd_.GetIvtScores(term_num);
     bm_ivt_.Optimize(topk, std::move(ivt_scores));
@@ -226,11 +230,16 @@ void BMPAlg<DataType, IdxType, CompressType>::Optimize(i32 topk) {
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
 Pair<Vector<BMPDocID>, Vector<DataType>>
-BMPAlg<DataType, IdxType, CompressType>::SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, f32 alpha, f32 beta) const {
+BMPAlg<DataType, IdxType, CompressType>::SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options) const {
+    std::shared_lock lock(mtx_, std::defer_lock);
+    if (options.use_lock_) {
+        lock.lock();
+    }
+
     SizeT block_size = block_fwd_.block_size();
     SparseVecEle<DataType, IdxType> keeped_query;
-    if (beta < 1.0) {
-        i32 terms_to_keep = std::ceil(query.nnz_ * beta);
+    if (options.beta_ < 1.0) {
+        i32 terms_to_keep = std::ceil(query.nnz_ * options.beta_);
         Vector<SizeT> query_term_idxes(query.nnz_);
         std::iota(query_term_idxes.begin(), query_term_idxes.end(), 0);
         std::partial_sort(query_term_idxes.begin(), query_term_idxes.begin() + terms_to_keep, query_term_idxes.end(), [&](SizeT a, SizeT b) {
@@ -242,7 +251,7 @@ BMPAlg<DataType, IdxType, CompressType>::SearchKnn(const SparseVecRef<DataType, 
         keeped_query.Init(query_term_idxes, query.data_, query.indices_);
     }
     const SparseVecRef<DataType, IdxType> &query_ref =
-        beta < 1.0 ? SparseVecRef<DataType, IdxType>(keeped_query.nnz_, keeped_query.indices_.get(), keeped_query.data_.get()) : query;
+        options.beta_ < 1.0 ? SparseVecRef<DataType, IdxType>(keeped_query.nnz_, keeped_query.indices_.get(), keeped_query.data_.get()) : query;
 
     const auto &postings = bm_ivt_.GetPostings();
     DataType threshold = 0.0;
@@ -282,15 +291,18 @@ BMPAlg<DataType, IdxType, CompressType>::SearchKnn(const SparseVecRef<DataType, 
             DataType score = scores[block_off];
             result_handler.AddResult(0 /*query_id*/, score, doc_id);
         }
-        if (ub_score * alpha < result_handler.GetDistance0(0 /*query_id*/)) {
+        if (ub_score * options.alpha_ < result_handler.GetDistance0(0 /*query_id*/)) {
             break;
         }
     }
-    Vector<DataType> tail_scores = block_fwd_.GetScoresTail(query_ref);
-    for (SizeT i = 0; i < tail_scores.size(); ++i) {
-        BMPDocID doc_id = block_num * block_size + i;
-        DataType score = tail_scores[i];
-        result_handler.AddResult(0 /*query_id*/, score, doc_id);
+
+    if (options.use_tail_) {
+        Vector<DataType> tail_scores = block_fwd_.GetScoresTail(query_ref);
+        for (SizeT i = 0; i < tail_scores.size(); ++i) {
+            BMPDocID doc_id = block_num * block_size + i;
+            DataType score = tail_scores[i];
+            result_handler.AddResult(0 /*query_id*/, score, doc_id);
+        }
     }
 
     result_handler.End(0 /*query_id*/);

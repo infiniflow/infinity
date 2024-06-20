@@ -57,6 +57,7 @@ import bmp_index_file_worker;
 import segment_index_entry;
 import buffer_handle;
 import sparse_util;
+import bmp_util;
 
 namespace infinity {
 
@@ -373,7 +374,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
     auto task_id = block_ids_idx;
     while (task_id < block_ids.size()) {
         block_ids_idx++;
-        LOG_INFO(fmt::format("MatchSparseScan: block {}", task_id));
+        LOG_DEBUG(fmt::format("MatchSparseScan: block {}", task_id));
         const auto [segment_id, block_id] = block_ids[task_id];
 
         const BlockIndex *block_index = base_table_ref_->block_index_.get();
@@ -410,7 +411,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
     task_id = segment_ids_idx;
     while (task_id < segment_ids.size()) {
         segment_ids_idx++;
-        LOG_INFO(fmt::format("MatchSparseScan: segment {}", task_id));
+        LOG_DEBUG(fmt::format("MatchSparseScan: segment {}", task_id));
         SegmentID segment_id = segment_ids[task_id];
 
         const IndexIndex *index_index = base_table_ref_->index_index_.get();
@@ -435,9 +436,9 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                         using IndexT = std::decay_t<decltype(*index)>;
                         if constexpr (std::is_same_v<typename IndexT::DataT, typename DistFunc::DataT> &&
                                       std::is_same_v<typename IndexT::IdxT, typename DistFunc::IndexT>) {
-                            f32 alpha = 1.0;
-                            f32 beta = 1.0;
-                            auto [doc_ids, scores] = index->SearchKnn(query, topn, alpha, beta);
+                            BmpSearchOptions options = ParseBmpSearchOptions(match_sparse_expr_->opt_params_);
+                            options.use_lock_ = with_lock;
+                            auto [doc_ids, scores] = index->SearchKnn(query, topn, options);
                             for (SizeT i = 0; i < topn; ++i) {
                                 RowID row_id(segment_id, doc_ids[i]);
                                 ResultType d = scores[i];
@@ -467,7 +468,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         break;
     }
     if (block_ids_idx == block_ids.size() && segment_ids_idx == segment_ids.size()) {
-        LOG_INFO(fmt::format("MatchSparseScan: {} task finished", block_ids_idx));
+        LOG_DEBUG(fmt::format("MatchSparseScan: {} task finished", block_ids_idx));
         merge_heap->End();
         i64 result_n = std::min(topn, (SizeT)merge_heap->total_count());
 

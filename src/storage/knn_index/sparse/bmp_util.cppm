@@ -17,6 +17,7 @@ module;
 export module bmp_util;
 
 import stl;
+import statement_common;
 
 namespace infinity {
 
@@ -54,5 +55,13 @@ export String BMCompressTypeToString(BMPCompressType compress_type) {
         }
     }
 }
+export struct BmpSearchOptions {
+    f32 alpha_ = 1.0;
+    f32 beta_ = 1.0;
+    bool use_tail_ = true;
+    bool use_lock_ = true;
+};
+
+export BmpSearchOptions ParseBmpSearchOptions(const Vector<UniquePtr<InitParameter>> &opt_params);
 
 } // namespace infinity
