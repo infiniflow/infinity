@@ -28,6 +28,7 @@ import infinity_exception;
 import third_party;
 import knn_result_handler;
 import sparse_vector_distance;
+import sparse_util;
 
 namespace infinity {
 
@@ -36,6 +37,9 @@ export class SparseDistanceBase {};
 export template <typename DataType, typename IndexType, typename ResultType = DataType>
 class SparseDistance : public SparseDistanceBase {
 public:
+    using IndexT = IndexType;
+    using DataT = DataType;
+
     SparseDistance(SparseMetricType metric_type) {
         switch (metric_type) {
             case SparseMetricType::kInnerProduct: {
@@ -48,15 +52,8 @@ public:
         }
     }
 
-    ResultType Calculate(const char *raw1, SizeT nnz1, const char *raw2, SizeT nnz2) {
-        if (raw1 == nullptr || raw2 == nullptr) {
-            return 0;
-        }
-        const IndexType *index1 = reinterpret_cast<const IndexType *>(raw1);
-        const DataType *data1 = reinterpret_cast<const DataType *>(raw1 + nnz1 * sizeof(IndexType));
-        const IndexType *index2 = reinterpret_cast<const IndexType *>(raw2);
-        const DataType *data2 = reinterpret_cast<const DataType *>(raw2 + nnz2 * sizeof(IndexType));
-        return Calculate(data1, index1, nnz1, data2, index2, nnz2);
+    ResultType Calculate(const SparseVecRef<DataType, IndexType> &vec1, const SparseVecRef<DataType, IndexType> &vec2) {
+        return Calculate(vec1.data_, vec1.indices_, vec1.nnz_, vec2.data_, vec2.indices_, vec2.nnz_);
     }
 
     ResultType Calculate(const DataType *data, const IndexType *index, SizeT nnz, const DataType *data2, const IndexType *index2, SizeT nnz2) {
@@ -73,6 +70,9 @@ public:
 export template <typename IndexType, typename ResultType = IndexType>
 class SparseBitDistance : public SparseDistanceBase {
 public:
+    using IndexT = IndexType;
+    using DataT = bool; // not used
+
     SparseBitDistance(SparseMetricType metric_type) {
         switch (metric_type) {
             case SparseMetricType::kInnerProduct: {
@@ -85,13 +85,8 @@ public:
         }
     }
 
-    ResultType Calculate(const char *raw1, SizeT nnz1, const char *raw2, SizeT nnz2) {
-        if (raw1 == nullptr || raw2 == nullptr) {
-            return 0;
-        }
-        const IndexType *index1 = reinterpret_cast<const IndexType *>(raw1);
-        const IndexType *index2 = reinterpret_cast<const IndexType *>(raw2);
-        return Calculate(index1, nnz1, index2, nnz2);
+    ResultType Calculate(const SparseVecRef<DataT, IndexType> &vec1, const SparseVecRef<DataT, IndexType> &vec2) {
+        return Calculate(vec1.indices_, vec1.nnz_, vec2.indices_, vec2.nnz_);
     }
 
     ResultType Calculate(const IndexType *index1, SizeT nnz1, const IndexType *index2, SizeT nnz2) { return dist_func_(index1, nnz1, index2, nnz2); }
@@ -106,17 +101,18 @@ export class MatchSparseScanFunctionData : public TableFunctionData {
 public:
     MatchSparseScanFunctionData() = default;
 
-    MatchSparseScanFunctionData(const BlockIndex *block_index, const SharedPtr<Vector<GlobalBlockID>> &global_block_ids)
-        : block_index_(block_index), global_block_ids_(global_block_ids), query_data_(DataBlock::Make()) {}
+    MatchSparseScanFunctionData(const SharedPtr<Vector<GlobalBlockID>> &global_block_ids, const SharedPtr<Vector<SegmentID>> &segment_ids)
+        : global_block_ids_(global_block_ids), segment_ids_(segment_ids), query_data_(DataBlock::Make()) {}
 
 public:
-    const BlockIndex *block_index_{};
     SharedPtr<Vector<GlobalBlockID>> global_block_ids_;
+    SharedPtr<Vector<SegmentID>> segment_ids_;
 
     bool evaluated_ = false;
     SharedPtr<DataBlock> query_data_{};
 
     u32 current_block_ids_idx_ = 0;
+    u32 current_segment_ids_idx_ = 0;
     UniquePtr<MergeKnnBase> merge_knn_base_{};
     UniquePtr<SparseDistanceBase> sparse_distance_{};
 };

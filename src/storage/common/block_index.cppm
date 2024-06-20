@@ -69,7 +69,7 @@ export struct IndexSnapshot {
 
 export struct IndexIndex {
 public:
-    void Insert(TableIndexEntry *table_index_entry, Txn *txn);
+    SharedPtr<IndexSnapshot> Insert(TableIndexEntry *table_index_entry, Txn *txn);
 
     void Insert(String index_name, SharedPtr<IndexSnapshot> index_snapshot);
 

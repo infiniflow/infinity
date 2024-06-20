@@ -506,10 +506,11 @@ export struct MatchTensorScanSourceState : public SourceState {
 };
 
 export struct MatchSparseScanSourceState : public SourceState {
-    explicit MatchSparseScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
-        : SourceState(SourceStateType::kMatchSparseScan), global_ids_(std::move(global_ids)) {}
+    explicit MatchSparseScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids, SharedPtr<Vector<SegmentID>> segment_ids)
+        : SourceState(SourceStateType::kMatchSparseScan), global_ids_(std::move(global_ids)), segment_ids_(std::move(segment_ids)) {}
 
     SharedPtr<Vector<GlobalBlockID>> global_ids_;
+    SharedPtr<Vector<SegmentID>> segment_ids_;
 };
 
 export struct IndexScanSourceState : public SourceState {

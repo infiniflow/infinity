@@ -82,9 +82,9 @@ void IndexIndex::Insert(String index_name, SharedPtr<IndexSnapshot> index_snapsh
     index_snapshots_.emplace(std::move(index_name), index_snapshot);
 }
 
-void IndexIndex::Insert(TableIndexEntry *table_index_entry, Txn *txn) {
+SharedPtr<IndexSnapshot> IndexIndex::Insert(TableIndexEntry *table_index_entry, Txn *txn) {
     if (table_index_entry->CheckVisible(txn)) {
-        auto index_snapshot = MakeUnique<IndexSnapshot>();
+        auto index_snapshot = MakeShared<IndexSnapshot>();
         index_snapshot->table_index_entry_ = table_index_entry;
 
         SegmentIndexesGuard segment_index_guard = table_index_entry->GetSegmentIndexesGuard();
@@ -95,8 +95,10 @@ void IndexIndex::Insert(TableIndexEntry *table_index_entry, Txn *txn) {
         }
 
         String index_name = *table_index_entry->GetIndexName();
-        Insert(std::move(index_name), std::move(index_snapshot));
+        Insert(std::move(index_name), index_snapshot);
+        return index_snapshot;
     }
+    return nullptr;
 }
 
 void IndexIndex::Insert(TableIndexEntry *table_index_entry, SegmentIndexEntry *segment_index_entry) {

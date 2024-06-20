@@ -176,7 +176,8 @@ void BMPIndexFileWorker::ReadFromFileImpl() {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 UnrecoverableError("Invalid index type.");
             } else {
-                index->Load(*file_handler_);
+                using IndexT = std::decay_t<decltype(*index)>;
+                data_ = reinterpret_cast<void *>(new IndexT(IndexT::Load(*file_handler_)));
             }
         },
         index);

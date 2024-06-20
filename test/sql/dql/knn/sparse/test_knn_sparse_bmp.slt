@@ -9,3 +9,37 @@ COPY test_knn_sparse_bmp FROM '/var/infinity/test_data/sparse_knn.csv' WITH (FOR
 
 statement ok
 CREATE INDEX idx1 ON test_knn_sparse_bmp (col2) USING Bmp WITH (block_size = 8, compress_type = compress);
+
+query I
+SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+2
+1
+
+query I
+SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3) WITH (alpha = 1.0, beta = 1.0);
+----
+4
+2
+1
+
+statement ok
+COPY test_knn_sparse_bmp FROM '/var/infinity/test_data/sparse_knn.csv' WITH (FORMAT CSV);
+
+query I
+SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+4
+2
+
+statement ok
+COPY test_knn_sparse_bmp FROM '/var/infinity/test_data/sparse_knn.csv' WITH (FORMAT CSV);
+
+query I
+SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+4
+4
