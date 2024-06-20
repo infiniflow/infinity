@@ -17,8 +17,8 @@
 # __version__ = importlib.metadata.version("infinity_sdk")
 
 import os
-import pkg_resources
-__version__ = pkg_resources.get_distribution("infinity_sdk").version
+# import pkg_resources
+# __version__ = pkg_resources.get_distribution("infinity_sdk").version
 
 from infinity.common import URI, NetworkAddress, LOCAL_HOST, LOCAL_INFINITY_PATH, InfinityException
 from infinity.infinity import InfinityConnection

@@ -3626,7 +3626,7 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
 
             BGTaskProcessor *bg_processor = query_context->storage()->bg_processor();
-            Value value = Value::MakeVarchar(BGTaskTypeToString(bg_processor->RunningTaskType()));
+            Value value = Value::MakeVarchar(bg_processor->RunningTaskText());
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -4091,7 +4091,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 {
                     // option value
                     BGTaskProcessor *bg_processor = query_context->storage()->bg_processor();
-                    Value value = Value::MakeVarchar(BGTaskTypeToString(bg_processor->RunningTaskType()));
+                    Value value = Value::MakeVarchar(bg_processor->RunningTaskText());
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                 }

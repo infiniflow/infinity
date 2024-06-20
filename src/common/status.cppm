@@ -249,7 +249,7 @@ public:
     static Status UnknownFTSFault();
     static Status InvalidConstraintType();
     static Status InvalidKnnDistanceType();
-    static Status InvalidEmbeddingDataType();
+    static Status InvalidEmbeddingDataType(const String& type_str);
     static Status InvalidConstantType();
     static Status InvalidParsedExprType();
     static Status InvalidIndexType();

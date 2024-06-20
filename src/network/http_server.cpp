@@ -326,7 +326,12 @@ public:
                 } else if (etype == "double") {
                     e_data_type = EmbeddingDataType::kElemDouble;
                 } else {
-                    e_data_type = EmbeddingDataType::kElemInvalid;
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
                 }
                 type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
                 column_type = std::make_shared<DataType>(LogicalType::kEmbedding, type_info);

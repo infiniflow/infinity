@@ -24,8 +24,8 @@ def setup_class(request, local_infinity):
 
 @pytest.mark.usefixtures("setup_class")
 class TestInfinity:
-    def test_version(self):
-        self.test_infinity_obj._test_version()
+    # def test_version(self):
+    #     self.test_infinity_obj._test_version()
     def test_update(self):
         self.test_infinity_obj._test_update()
     @trace_expected_exceptions

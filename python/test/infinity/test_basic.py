@@ -15,8 +15,8 @@ class TestInfinity:
     def teardown(self):
         self.test_infinity_obj.disconnect()
 
-    def test_version(self):
-        self.test_infinity_obj._test_version()
+    # def test_version(self):
+    #     self.test_infinity_obj._test_version()
     def test_connection(self):
         self.test_infinity_obj._test_connection()
     def test_create_db_with_invalid_name(self):

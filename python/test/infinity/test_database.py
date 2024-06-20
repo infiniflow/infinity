@@ -23,7 +23,7 @@ def setup_class(request, local_infinity):
 @pytest.mark.usefixtures("setup_class")
 class TestInfinity:
     def test_database(self):
-        self.test_infinity_obj._test_version()
+        # self.test_infinity_obj._test_version()
         self.test_infinity_obj._test_database()
         self.test_infinity_obj._test_create_database_invalid_name()
         self.test_infinity_obj._test_create_drop_show_1K_databases()

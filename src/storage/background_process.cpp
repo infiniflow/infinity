@@ -58,10 +58,13 @@ void BGTaskProcessor::Process() {
     while (running) {
         task_queue_.DequeueBulk(tasks);
         for (const auto &bg_task : tasks) {
-            running_task_type_ = bg_task->type_;
             switch (bg_task->type_) {
                 case BGTaskType::kStopProcessor: {
                     LOG_INFO("Stop the background processor");
+                    {
+                        std::unique_lock<std::mutex> locker(task_mutex_);
+                        task_text_ = bg_task->ToString();
+                    }
                     running = false;
                     break;
                 }
@@ -69,12 +72,20 @@ void BGTaskProcessor::Process() {
                     LOG_DEBUG("Force checkpoint in background");
                     ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
                     auto [max_commit_ts, wal_size] = catalog_->GetCheckpointState();
+                    {
+                        std::unique_lock<std::mutex> locker(task_mutex_);
+                        task_text_ = force_ckp_task->ToString();
+                    }
                     wal_manager_->Checkpoint(force_ckp_task, max_commit_ts, wal_size);
                     LOG_DEBUG("Force checkpoint in background done");
                     break;
                 }
                 case BGTaskType::kAddDeltaEntry: {
                     auto *task = static_cast<AddDeltaEntryTask *>(bg_task.get());
+                    {
+                        std::unique_lock<std::mutex> locker(task_mutex_);
+                        task_text_ = task->ToString();
+                    }
                     catalog_->AddDeltaEntry(std::move(task->delta_entry_), task->wal_size_);
                     break;
                 }
@@ -83,6 +94,10 @@ void BGTaskProcessor::Process() {
                     auto *task = static_cast<CheckpointTask *>(bg_task.get());
                     bool is_full_checkpoint = task->is_full_checkpoint_;
                     auto [max_commit_ts, wal_size] = catalog_->GetCheckpointState();
+                    {
+                        std::unique_lock<std::mutex> locker(task_mutex_);
+                        task_text_ = task->ToString();
+                    }
                     wal_manager_->Checkpoint(is_full_checkpoint, max_commit_ts, wal_size);
                     LOG_DEBUG("Checkpoint in background done");
                     break;
@@ -90,6 +105,10 @@ void BGTaskProcessor::Process() {
                 case BGTaskType::kCleanup: {
                     LOG_DEBUG("Cleanup in background");
                     auto task = static_cast<CleanupTask *>(bg_task.get());
+                    {
+                        std::unique_lock<std::mutex> locker(task_mutex_);
+                        task_text_ = task->ToString();
+                    }
                     task->Execute();
                     LOG_DEBUG("Cleanup in background done");
                     break;
@@ -97,6 +116,10 @@ void BGTaskProcessor::Process() {
                 case BGTaskType::kUpdateSegmentBloomFilterData: {
                     LOG_DEBUG("Update segment bloom filter");
                     auto *task = static_cast<UpdateSegmentBloomFilterTask *>(bg_task.get());
+                    {
+                        std::unique_lock<std::mutex> locker(task_mutex_);
+                        task_text_ = task->ToString();
+                    }
                     task->Execute();
                     LOG_DEBUG("Update segment bloom filter done");
                     break;
@@ -108,12 +131,11 @@ void BGTaskProcessor::Process() {
                     break;
                 }
             }
-
+            task_text_.clear();
             bg_task->Complete();
         }
         task_count_ -= tasks.size();
         tasks.clear();
-        running_task_type_ = BGTaskType::kInvalid;
     }
 }
 

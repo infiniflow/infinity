@@ -41,8 +41,10 @@ class HttpTest:
     def tear_down(self, resp, expect={}):
         print("status_code:" + str(resp.status_code))
         if expect.get("status_code", None) is not None:
+            print(f"expect: {expect['status_code']}, actual: {resp.status_code}")
             assert resp.status_code == expect['status_code']
         else:
+            print(f"actual: {resp.status_code}, expect: {expected_status_code}")
             assert resp.status_code == expected_status_code
 
         resp_json = resp.json()
