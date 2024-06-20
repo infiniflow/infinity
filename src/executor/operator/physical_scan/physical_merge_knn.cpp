@@ -48,11 +48,6 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
         LOG_TRACE("PhysicalMergeKnn::Input is complete");
     }
 
-    if (merge_knn_op_state->data_block_array_.empty()) {
-        merge_knn_op_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
-        merge_knn_op_state->data_block_array_[0]->Init(*GetOutputTypes());
-    }
-
     auto &merge_knn_data = *merge_knn_op_state->merge_knn_function_data_;
     switch (merge_knn_data.elem_type_) {
         case kElemInvalid: {
@@ -120,6 +115,11 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
     if (merge_knn_state->input_complete_) {
         merge_knn->End(); // reorder the heap
         i64 result_n = std::min(merge_knn_data.topk_, merge_knn->total_count());
+
+        if (merge_knn_state->data_block_array_.empty()) {
+            merge_knn_state->data_block_array_.emplace_back(DataBlock::MakeUniquePtr());
+            merge_knn_state->data_block_array_[0]->Init(*GetOutputTypes());
+        }
 
         SizeT query_n = merge_knn_data.query_count_;
         Vector<char *> result_dists_list;
