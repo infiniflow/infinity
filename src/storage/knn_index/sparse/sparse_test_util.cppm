@@ -34,7 +34,7 @@ struct SparseTestUtil {
     static bool CheckAccurateKnn(const i32 *gt_indices,
                                  const DataType *gt_scores,
                                  SizeT gt_size,
-                                 const Vector<i32> &indices,
+                                 const Vector<u32> &indices,
                                  const Vector<DataType> &scores,
                                  f32 error_bound) {
         if (gt_size < indices.size()) {
@@ -44,7 +44,7 @@ struct SparseTestUtil {
             if (gt_scores[i] == 0.0) {
                 break;
             }
-            if (std::abs(gt_scores[i] - scores[i]) > error_bound || gt_indices[i] != indices[i]) {
+            if (std::abs(gt_scores[i] - scores[i]) > error_bound || gt_indices[i] != static_cast<i32>(indices[i])) {
                 return false;
             }
         }
@@ -73,7 +73,7 @@ struct SparseTestUtil {
                            const i32 *gt_indices,
                            const DataType *gt_scores,
                            SizeT gt_size,
-                           const Vector<i32> &indices,
+                           const Vector<u32> &indices,
                            const Vector<DataType> &scores) {
         std::cout << "Query " << query_id << std::endl;
         std::cout << "Result:\n";

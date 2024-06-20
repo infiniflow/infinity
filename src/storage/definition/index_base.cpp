@@ -237,6 +237,12 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             res = MakeShared<IndexEMVB>(index_name, file_name, std::move(column_names), residual_pq_subspace_num, residual_pq_subspace_bits);
             break;
         }
+        case IndexType::kBMP: {
+            SizeT block_size = index_def_json["block_size"];
+            auto compress_type = static_cast<BMPCompressType>(index_def_json["compress_type"]);
+            res = MakeShared<IndexBMP>(index_name, file_name, std::move(column_names), block_size, compress_type);
+            break;
+        }
         case IndexType::kInvalid: {
             String error_message = "Error index method while deserializing";
             LOG_CRITICAL(error_message);

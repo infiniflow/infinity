@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <vector>
 
 export module sparse_util;
 
@@ -160,7 +161,7 @@ export struct SparseVecUtil {
 
     template <typename DataT, typename IdxT>
     static Pair<Vector<u32>, Vector<DataT>>
-    Rerank(const SparseMatrix<DataT, IdxT> &mat, const SparseVecRef<DataT, IdxT> &query, Vector<IdxT> candidates, u32 topk) {
+    Rerank(const SparseMatrix<DataT, IdxT> &mat, const SparseVecRef<DataT, IdxT> &query, Vector<u32> candidates, u32 topk) {
         Vector<u32> result(topk);
         Vector<DataT> result_score(topk);
 

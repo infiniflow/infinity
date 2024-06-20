@@ -76,12 +76,12 @@ Tuple<u32, u32, UniquePtr<i32[]>, UniquePtr<f32[]>> DecodeGroundtruth(const Path
 
 const int kQueryLogInterval = 100;
 
-Vector<Pair<Vector<i32>, Vector<f32>>> Search(i32 thread_n,
+Vector<Pair<Vector<u32>, Vector<f32>>> Search(i32 thread_n,
                                               const SparseMatrix<f32, i32> &query_mat,
                                               u32 top_k,
                                               i64 query_n,
-                                              std::function<Pair<Vector<i32>, Vector<f32>>(const SparseVecRef<f32, i32> &, u32)> search_fn) {
-    Vector<Pair<Vector<i32>, Vector<f32>>> res(query_n);
+                                              std::function<Pair<Vector<u32>, Vector<f32>>(const SparseVecRef<f32, i32> &, u32)> search_fn) {
+    Vector<Pair<Vector<u32>, Vector<f32>>> res(query_n);
     Atomic<i64> query_idx = 0;
     Vector<Thread> threads;
     for (i32 thread_id = 0; thread_id < thread_n; ++thread_id) {
@@ -121,7 +121,7 @@ void PrintQuery(u32 query_id, const i32 *gt_indices, const f32 *gt_scores, u32 g
     std::cout << "\n";
 }
 
-f32 CheckGroundtruth(i32 *gt_indices_list, f32 *gt_score_list, const Vector<Pair<Vector<i32>, Vector<f32>>> &results, u32 top_k) {
+f32 CheckGroundtruth(i32 *gt_indices_list, f32 *gt_score_list, const Vector<Pair<Vector<u32>, Vector<f32>>> &results, u32 top_k) {
     u32 query_n = results.size();
 
     SizeT recall_n = 0;
@@ -131,7 +131,7 @@ f32 CheckGroundtruth(i32 *gt_indices_list, f32 *gt_score_list, const Vector<Pair
 
         // const f32 *gt_score = gt_score_list + i * top_k;
         // PrintQuery(i, gt_indices, gt_score, top_k, indices, scores);
-        HashSet<i32> indices_set(indices.begin(), indices.end());
+        HashSet<u32> indices_set(indices.begin(), indices.end());
         for (u32 j = 0; j < top_k; ++j) {
             if (indices_set.contains(gt_indices[j])) {
                 ++recall_n;

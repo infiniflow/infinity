@@ -67,7 +67,7 @@ public:
         ++row_num_;
     }
 
-    Pair<Vector<IdxType>, Vector<DataType>> SearchBF(const SparseVecRef<DataType, IdxType> &query, u32 top_k) const {
+    Pair<Vector<u32>, Vector<DataType>> SearchBF(const SparseVecRef<DataType, IdxType> &query, u32 top_k) const {
         u32 result_n = std::min(top_k, row_num_);
 
         HashMap<u32, DataType> scores;
@@ -81,9 +81,9 @@ public:
             }
         }
 
-        Vector<IdxType> res(result_n);
+        Vector<u32> res(result_n);
         Vector<DataType> res_score(result_n);
-        HeapResultHandler<CompareMin<DataType, IdxType>> result_handler(1 /*query_n*/, result_n, res_score.data(), res.data());
+        HeapResultHandler<CompareMin<DataType, u32>> result_handler(1 /*query_n*/, result_n, res_score.data(), res.data());
         for (const auto &[row_id, score] : scores) {
             if (score < 0) {
                 continue;
@@ -94,7 +94,7 @@ public:
         return {res, res_score};
     }
 
-    Tuple<Vector<IdxType>, Vector<DataType>, i32> SearchKnn(const SparseVecRef<DataType, IdxType> &query, u32 top_k, i32 budget) const {
+    Tuple<Vector<u32>, Vector<DataType>, i32> SearchKnn(const SparseVecRef<DataType, IdxType> &query, u32 top_k, i32 budget) const {
         if (budget <= 0) {
             return {};
         }
@@ -119,9 +119,9 @@ public:
             }
         }
 
-        Vector<IdxType> result(result_n);
+        Vector<u32> result(result_n);
         Vector<DataType> result_score(result_n);
-        HeapResultHandler<CompareMin<DataType, IdxType>> result_handler(1 /*query_n*/, result_n, result_score.data(), result.data());
+        HeapResultHandler<CompareMin<DataType, u32>> result_handler(1 /*query_n*/, result_n, result_score.data(), result.data());
         for (const auto &[row_id, score] : scores) {
             if (score < 0) {
                 continue;

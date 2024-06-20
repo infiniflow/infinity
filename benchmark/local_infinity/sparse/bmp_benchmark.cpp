@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
             if ((int)top_k != opt.topk_) {
                 UnrecoverableError(fmt::format("Topk mismatch: {} vs {}", top_k, opt.topk_));
             }
-            Vector<Pair<Vector<i32>, Vector<f32>>> query_result;
+            Vector<Pair<Vector<u32>, Vector<f32>>> query_result;
             {
                 SparseMatrix<f32, i32> query_mat = DecodeSparseDataset(opt.query_path_);
                 if (all_query_n != query_mat.nrow_) {
@@ -107,14 +107,15 @@ int main(int argc, char *argv[]) {
                 }
 
                 profiler.Begin();
-                query_result = Search(thread_n, query_mat, top_k, query_n, [&](const SparseVecRef<f32, i32> &query, u32 topk) {
-                    Vector<i16> indices(query.nnz_);
-                    for (i32 i = 0; i < query.nnz_; i++) {
-                        indices[i] = static_cast<i16>(query.indices_[i]);
-                    }
-                    SparseVecRef<f32, i16> query1(query.nnz_, indices.data(), query.data_);
-                    return index.SearchKnn(query1, topk, opt.alpha_, opt.beta_);
-                });
+                query_result =
+                    Search(thread_n, query_mat, top_k, query_n, [&](const SparseVecRef<f32, i32> &query, u32 topk) -> Pair<Vector<u32>, Vector<f32>> {
+                        Vector<i16> indices(query.nnz_);
+                        for (i32 i = 0; i < query.nnz_; i++) {
+                            indices[i] = static_cast<i16>(query.indices_[i]);
+                        }
+                        SparseVecRef<f32, i16> query1(query.nnz_, indices.data(), query.data_);
+                        return index.SearchKnn(query1, topk, opt.alpha_, opt.beta_);
+                    });
                 profiler.End();
                 std::cout << fmt::format("Search time: {}\n", profiler.ElapsedToString(1000));
             }
