@@ -1052,6 +1052,8 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         {
             IndexBase* index_base = table_index_entry->table_index_def().get();
             String index_type_name = IndexInfo::IndexTypeToString(index_base->index_type_);
+
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
             switch(index_base->index_type_) {
                 case IndexType::kIVFFlat: {
                     Status status3 = Status::InvalidIndexName(index_type_name);
@@ -1061,39 +1063,24 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
                     break;
                 }
                 case IndexType::kHnsw: {
-                    auto [chunk_index_entries, _] = segment_index_entry->GetHnswIndexSnapshot();
-
-                    Value value = Value::MakeVarchar(std::to_string(chunk_index_entries.size()));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                    chunk_index_entries = std::get<0>(segment_index_entry->GetHnswIndexSnapshot());
                     break;
                 }
                 case IndexType::kFullText: {
-                    auto [chunk_index_entries, _] = segment_index_entry->GetFullTextIndexSnapshot();
-
-                    Value value = Value::MakeVarchar(std::to_string(chunk_index_entries.size()));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                    chunk_index_entries = std::get<0>(segment_index_entry->GetFullTextIndexSnapshot());
                     break;
                 }
                 case IndexType::kSecondary: {
-                    auto [chunk_index_entries, _] = segment_index_entry->GetSecondaryIndexSnapshot();
-
-                    Value value = Value::MakeVarchar(std::to_string(chunk_index_entries.size()));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                    chunk_index_entries = std::get<0>(segment_index_entry->GetSecondaryIndexSnapshot());
                     break;
                 }
                 case IndexType::kEMVB: {
-                    auto [chunk_index_entries, _] = segment_index_entry->GetEMVBIndexSnapshot();
-
-                    Value value = Value::MakeVarchar(std::to_string(chunk_index_entries.size()));
-                    ValueExpression value_expr(value);
-                    value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+                    chunk_index_entries = std::get<0>(segment_index_entry->GetEMVBIndexSnapshot());
                     break;
                 }
                 case IndexType::kBMP: {
-                    UnrecoverableError("Not implemented");
+                    chunk_index_entries = std::get<0>(segment_index_entry->GetBMPIndexSnapshot());
+                    break;
                 }
                 case IndexType::kInvalid: {
                     Status status3 = Status::InvalidIndexName(index_type_name);
@@ -1102,6 +1089,9 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
                     break;
                 }
             }
+            Value value = Value::MakeVarchar(std::to_string(chunk_index_entries.size()));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
 
@@ -1172,7 +1162,8 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
             break;
         }
         case IndexType::kBMP: {
-            UnrecoverableError("Not implemented");
+            auto [chunk_index_entries, _] = segment_index_entry->GetBMPIndexSnapshot();
+            chunk_indexes = chunk_index_entries;
             break;
         }
         case IndexType::kInvalid: {

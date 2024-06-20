@@ -127,8 +127,10 @@ Vector<DataType> TailFwd<DataType, IdxType>::GetScores(const SparseVecRef<DataTy
 
 template class TailFwd<f32, i32>;
 template class TailFwd<f32, i16>;
+template class TailFwd<f32, i8>;
 template class TailFwd<f64, i32>;
 template class TailFwd<f64, i16>;
+template class TailFwd<f64, i8>;
 
 template <typename DataType, typename IdxType>
 Optional<TailFwd<DataType, IdxType>> BlockFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
@@ -198,8 +200,10 @@ void BlockFwd<DataType, IdxType>::Calculate(const Vector<BMPBlockOffset> &block_
 
 template class BlockFwd<f32, i32>;
 template class BlockFwd<f32, i16>;
+template class BlockFwd<f32, i8>;
 template class BlockFwd<f64, i32>;
 template class BlockFwd<f64, i16>;
+template class BlockFwd<f64, i8>;
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
 void BMPAlg<DataType, IdxType, CompressType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc, BMPDocID doc_id) {
@@ -299,10 +303,14 @@ template class BMPAlg<f32, i32, BMPCompressType::kCompressed>;
 template class BMPAlg<f32, i32, BMPCompressType::kRaw>;
 template class BMPAlg<f32, i16, BMPCompressType::kCompressed>;
 template class BMPAlg<f32, i16, BMPCompressType::kRaw>;
+template class BMPAlg<f32, i8, BMPCompressType::kCompressed>;
+template class BMPAlg<f32, i8, BMPCompressType::kRaw>;
 
 template class BMPAlg<f64, i32, BMPCompressType::kCompressed>;
 template class BMPAlg<f64, i32, BMPCompressType::kRaw>;
 template class BMPAlg<f64, i16, BMPCompressType::kCompressed>;
 template class BMPAlg<f64, i16, BMPCompressType::kRaw>;
+template class BMPAlg<f64, i8, BMPCompressType::kCompressed>;
+template class BMPAlg<f64, i8, BMPCompressType::kRaw>;
 
 } // namespace infinity

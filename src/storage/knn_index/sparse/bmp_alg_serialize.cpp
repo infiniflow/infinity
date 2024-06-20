@@ -102,8 +102,10 @@ TailFwd<DataType, IdxType> TailFwd<DataType, IdxType>::ReadAdv(char *&p) {
 
 template class TailFwd<f32, i32>;
 template class TailFwd<f32, i16>;
+template class TailFwd<f32, i8>;
 template class TailFwd<f64, i32>;
 template class TailFwd<f64, i16>;
+template class TailFwd<f64, i8>;
 
 // --------------------------BlockFwd--------------------------
 
@@ -167,8 +169,10 @@ BlockFwd<DataType, IdxType> BlockFwd<DataType, IdxType>::ReadAdv(char *&p) {
 
 template class BlockFwd<f32, i32>;
 template class BlockFwd<f32, i16>;
+template class BlockFwd<f32, i8>;
 template class BlockFwd<f64, i32>;
 template class BlockFwd<f64, i16>;
+template class BlockFwd<f64, i8>;
 
 // --------------------------BMPAlg--------------------------
 
@@ -230,10 +234,14 @@ template class BMPAlg<f32, i32, BMPCompressType::kCompressed>;
 template class BMPAlg<f32, i32, BMPCompressType::kRaw>;
 template class BMPAlg<f32, i16, BMPCompressType::kCompressed>;
 template class BMPAlg<f32, i16, BMPCompressType::kRaw>;
+template class BMPAlg<f32, i8, BMPCompressType::kCompressed>;
+template class BMPAlg<f32, i8, BMPCompressType::kRaw>;
 
 template class BMPAlg<f64, i32, BMPCompressType::kCompressed>;
 template class BMPAlg<f64, i32, BMPCompressType::kRaw>;
 template class BMPAlg<f64, i16, BMPCompressType::kCompressed>;
 template class BMPAlg<f64, i16, BMPCompressType::kRaw>;
+template class BMPAlg<f64, i8, BMPCompressType::kCompressed>;
+template class BMPAlg<f64, i8, BMPCompressType::kRaw>;
 
 } // namespace infinity

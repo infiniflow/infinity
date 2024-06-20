@@ -32,21 +32,29 @@ export using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompr
                                         BMPAlg<f32, i32, BMPCompressType::kRaw> *,
                                         BMPAlg<f32, i16, BMPCompressType::kCompressed> *,
                                         BMPAlg<f32, i16, BMPCompressType::kRaw> *,
+                                        BMPAlg<f32, i8, BMPCompressType::kCompressed> *,
+                                        BMPAlg<f32, i8, BMPCompressType::kRaw> *,
                                         BMPAlg<f64, i32, BMPCompressType::kCompressed> *,
                                         BMPAlg<f64, i32, BMPCompressType::kRaw> *,
                                         BMPAlg<f64, i16, BMPCompressType::kCompressed> *,
                                         BMPAlg<f64, i16, BMPCompressType::kRaw> *,
+                                        BMPAlg<f64, i8, BMPCompressType::kCompressed> *,
+                                        BMPAlg<f64, i8, BMPCompressType::kRaw> *,
                                         std::nullptr_t>;
 
 export using ConstAbstractBMP = std::variant<const BMPAlg<f32, i32, BMPCompressType::kCompressed> *,
-                                        const BMPAlg<f32, i32, BMPCompressType::kRaw> *,
-                                        const BMPAlg<f32, i16, BMPCompressType::kCompressed> *,
-                                        const BMPAlg<f32, i16, BMPCompressType::kRaw> *,
-                                        const BMPAlg<f64, i32, BMPCompressType::kCompressed> *,
-                                        const BMPAlg<f64, i32, BMPCompressType::kRaw> *,
-                                        const BMPAlg<f64, i16, BMPCompressType::kCompressed> *,
-                                        const BMPAlg<f64, i16, BMPCompressType::kRaw> *,
-                                        std::nullptr_t>;
+                                             const BMPAlg<f32, i32, BMPCompressType::kRaw> *,
+                                             const BMPAlg<f32, i16, BMPCompressType::kCompressed> *,
+                                             const BMPAlg<f32, i16, BMPCompressType::kRaw> *,
+                                             const BMPAlg<f32, i8, BMPCompressType::kCompressed> *,
+                                             const BMPAlg<f32, i8, BMPCompressType::kRaw> *,
+                                             const BMPAlg<f64, i32, BMPCompressType::kCompressed> *,
+                                             const BMPAlg<f64, i32, BMPCompressType::kRaw> *,
+                                             const BMPAlg<f64, i16, BMPCompressType::kCompressed> *,
+                                             const BMPAlg<f64, i16, BMPCompressType::kRaw> *,
+                                             const BMPAlg<f64, i8, BMPCompressType::kCompressed> *,
+                                             const BMPAlg<f64, i8, BMPCompressType::kRaw> *,
+                                             std::nullptr_t>;
 
 export class BMPIndexFileWorker final : public IndexFileWorker {
 public:

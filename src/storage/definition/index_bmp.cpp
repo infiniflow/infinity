@@ -75,13 +75,14 @@ void IndexBMP::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_
         auto *sparse_info = static_cast<SparseInfo *>(data_type->type_info().get());
         if (sparse_info->DataType() != EmbeddingDataType::kElemFloat && sparse_info->DataType() != EmbeddingDataType::kElemDouble) {
             error_type = true;
-        } else if (sparse_info->IndexType() != EmbeddingDataType::kElemInt32 && sparse_info->IndexType() != EmbeddingDataType::kElemInt16) {
+        } else if (sparse_info->IndexType() != EmbeddingDataType::kElemInt32 && sparse_info->IndexType() != EmbeddingDataType::kElemInt16 &&
+                   sparse_info->IndexType() != EmbeddingDataType::kElemInt8) {
             error_type = true;
         }
     }
     if (error_type) {
         Status status = Status::InvalidIndexDefinition(
-            fmt::format("Attempt to create HNSW index on column: {}, data type: {}.", column_name, data_type->ToString()));
+            fmt::format("Attempt to create BMP index on column: {}, data type: {}.", column_name, data_type->ToString()));
         LOG_ERROR(status.message());
         RecoverableError(status);
     }

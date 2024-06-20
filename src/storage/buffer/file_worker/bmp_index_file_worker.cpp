@@ -51,6 +51,9 @@ AbstractBMP GetAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse
 template <typename DataType>
 AbstractBMP GetAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse_info, void *data) {
     switch (sparse_info->IndexType()) {
+        case EmbeddingDataType::kElemInt8: {
+            return GetAbstractIndex<DataType, i8>(index_bmp, sparse_info, data);
+        }
         case EmbeddingDataType::kElemInt16: {
             return GetAbstractIndex<DataType, i16>(index_bmp, sparse_info, data);
         }

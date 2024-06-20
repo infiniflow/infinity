@@ -2,10 +2,10 @@ statement ok
 DROP TABLE IF EXISTS test_knn_sparse_bmp;
 
 statement ok
-CREATE TABLE test_knn_sparse_bmp (col1 INT, col2 SPARSE(FLOAT,30000));
+CREATE TABLE test_knn_sparse_bmp (col1 INT, col2 SPARSE(FLOAT,100));
 
 statement ok
-COPY test_knn_sparse_bmp FROM '/var/infinity/test_data/sparse_float.csv' WITH (FORMAT CSV);
+COPY test_knn_sparse_bmp FROM '/var/infinity/test_data/sparse_knn.csv' WITH (FORMAT CSV);
 
 statement ok
-CREATE INDEX idx1 ON test_knn_sparse_bmp (col2) USING Bmp WITH (block_size = 16);
+CREATE INDEX idx1 ON test_knn_sparse_bmp (col2) USING Bmp WITH (block_size = 8, compress_type = compress);

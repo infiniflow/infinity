@@ -93,6 +93,8 @@ public:
 
     void SetRowCount(u32 row_count) { row_count_ = row_count; }
 
+    void AddRowCount(u32 row_count) { row_count_ += row_count; }
+
     u32 GetRowCount() const { return row_count_; }
 
     // Only for fulltext

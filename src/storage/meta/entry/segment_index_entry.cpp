@@ -343,6 +343,36 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             memory_emvb_index_->Insert(block_id, block_column_entry, buffer_manager, row_offset, row_count);
             break;
         }
+        case IndexType::kBMP: {
+            if (memory_hnsw_indexer_.get() == nullptr) {
+                SharedPtr<ChunkIndexEntry> memory_hnsw_indexer = CreateChunkIndexEntry(column_def, begin_row_id, buffer_manager);
+
+                std::unique_lock<std::shared_mutex> lck(rw_locker_);
+                memory_hnsw_indexer_ = std::move(memory_hnsw_indexer);
+            }
+            BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
+
+            BufferHandle buffer_handle = memory_hnsw_indexer_->GetIndex();
+            auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
+
+            SizeT row_cnt = 0;
+            std::visit(
+                [&](auto &index) {
+                    using T = std::decay_t<decltype(index)>;
+                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                        UnrecoverableError("Invalid index type.");
+                    } else {
+                        using IndexT = std::decay_t<decltype(*index)>;
+                        using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
+
+                        MemIndexInserterIter<SparseRefT> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+                        row_cnt = index->AddDocs(std::move(iter));
+                    }
+                },
+                abstract_bmp);
+            memory_hnsw_indexer_->AddRowCount(row_cnt);
+            break;
+        }
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
@@ -572,8 +602,8 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             RowID base_rowid(segment_entry->segment_id(), 0);
             SharedPtr<ChunkIndexEntry> chunk_index_entry = CreateChunkIndexEntry(column_def, base_rowid, buffer_mgr);
             this->AddChunkIndexEntry(chunk_index_entry);
-            BufferHandle handle = chunk_index_entry->GetIndex();
-            auto abstract_bmp = static_cast<BMPIndexFileWorker *>(handle.GetFileWorkerMut())->GetAbstractIndex();
+            BufferHandle buffer_handle = chunk_index_entry->GetIndex();
+            auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
 
             SegmentOffset row_count = 0;
             std::visit(

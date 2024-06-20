@@ -659,7 +659,8 @@ void TableEntry::MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges) {
             case IndexType::kHnsw:
             case IndexType::kFullText:
             case IndexType::kEMVB:
-            case IndexType::kSecondary: {
+            case IndexType::kSecondary:
+            case IndexType::kBMP: {
                 for (auto &[seg_id, ranges] : seg_append_ranges) {
                     MemIndexInsertInner(table_index_entry, txn, seg_id, ranges);
                 }
