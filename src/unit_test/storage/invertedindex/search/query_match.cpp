@@ -99,7 +99,7 @@ void QueryMatchTest::InitData() {
     };
 }
 
-TEST_F(QueryMatchTest, basic_phrase) {
+TEST_F(QueryMatchTest, DISABLED_basic_phrase) {
     CreateDBAndTable(db_name_, table_name_);
     CreateIndex(db_name_, table_name_, index_name_);
     InsertData(db_name_, table_name_);

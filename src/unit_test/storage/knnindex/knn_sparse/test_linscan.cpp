@@ -28,61 +28,6 @@ protected:
     void SetUp() override {}
 
     void TearDown() override {}
-
-    bool CheckAccurateKnn(const i32 *gt_indices,
-                          const f32 *gt_scores,
-                          u32 gt_size,
-                          const Vector<i32> &indices,
-                          const Vector<f32> &scores,
-                          f32 error_bound) {
-        if (gt_size < indices.size()) {
-            return false;
-        }
-        for (u32 i = 0; i < indices.size(); ++i) {
-            if (gt_scores[i] == 0.0) {
-                break;
-            }
-            if (std::abs(gt_scores[i] - scores[i]) > error_bound || gt_indices[i] != indices[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    Pair<u32, u32>
-    CheckApproximateKnn(const i32 *gt_indices, const f32 *gt_scores, u32 gt_size, const Vector<i32> &indices, const Vector<f32> &scores) {
-        HashSet<u32> gt_set;
-        for (u32 i = 0; i < gt_size; ++i) {
-            if (gt_scores[i] == 0.0) {
-                break;
-            }
-            gt_set.emplace(gt_indices[i]);
-        }
-        u32 hit = 0;
-        for (u32 i = 0; i < indices.size(); ++i) {
-            if (gt_set.find(indices[i]) != gt_set.end()) {
-                ++hit;
-            }
-        }
-        return {hit, gt_set.size()};
-    }
-
-    void PrintQuery(u32 query_id, const i32 *gt_indices, const f32 *gt_scores, u32 gt_size, const Vector<i32> &indices, const Vector<f32> &scores) {
-        std::cout << fmt::format("Query {}\n", query_id);
-        std::cout << "Result:\n";
-        for (u32 i = 0; i < indices.size(); ++i) {
-            std::cout << fmt::format("{} {}, ", indices[i], scores[i]);
-        }
-        std::cout << "\n";
-        std::cout << "Groundtruth:\n";
-        for (u32 i = 0; i < gt_size; ++i) {
-            std::cout << fmt::format("{} {}, ", gt_indices[i], gt_scores[i]);
-        }
-        std::cout << "\n";
-    }
-
-private:
-    std::mt19937 rng_{std::random_device{}()};
 };
 
 TEST_F(LinScanAlgTest, accurate_scan) {
@@ -95,11 +40,11 @@ TEST_F(LinScanAlgTest, accurate_scan) {
 
     u32 gt_size = std::min(nrow, topk);
 
-    const SparseMatrix dataset = SparseTestUtil::GenerateDataset(nrow, ncol, sparsity);
-    const SparseMatrix query_set = SparseTestUtil::GenerateDataset(query_n, ncol, sparsity);
-    const auto [gt_indices_list, gt_scores_list] = SparseTestUtil::GenerateGroundtruth(dataset, query_set, topk, false);
+    const SparseMatrix dataset = SparseTestUtil<f32, i32>::GenerateDataset(nrow, ncol, sparsity);
+    const SparseMatrix query_set = SparseTestUtil<f32, i32>::GenerateDataset(query_n, ncol, sparsity);
+    const auto [gt_indices_list, gt_scores_list] = SparseTestUtil<f32, i32>::GenerateGroundtruth(dataset, query_set, topk, false);
 
-    LinScan<f32, i32> index;
+    LinScan<f32, i32> index(dataset.ncol_);
     for (auto iter = SparseMatrixIter(dataset); iter.HasNext(); iter.Next()) {
         SparseVecRef vec = iter.val();
         u32 row_id = iter.row_id();
@@ -115,9 +60,9 @@ TEST_F(LinScanAlgTest, accurate_scan) {
         const i32 *gt_indices = gt_indices_list.get() + query_id * topk;
         const f32 *gt_scores = gt_scores_list.get() + query_id * topk;
 
-        bool ck = CheckAccurateKnn(gt_indices, gt_scores, gt_size, indices, scores, error_bound);
+        bool ck = SparseTestUtil<f32, i32>::CheckAccurateKnn(gt_indices, gt_scores, gt_size, indices, scores, error_bound);
         if (!ck) {
-            PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
+            SparseTestUtil<f32, i32>::PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
             EXPECT_TRUE(false);
         }
     }
@@ -137,11 +82,11 @@ TEST_F(LinScanAlgTest, approximate_scan) {
 
     u32 gt_size = std::min(nrow, topk);
 
-    const SparseMatrix dataset = SparseTestUtil::GenerateDataset(nrow, ncol, sparsity);
-    const SparseMatrix query = SparseTestUtil::GenerateDataset(query_n, ncol, sparsity);
-    const auto [gt_indices_list, gt_scores_list] = SparseTestUtil::GenerateGroundtruth(dataset, query, topk, false);
+    const SparseMatrix dataset = SparseTestUtil<f32, i32>::GenerateDataset(nrow, ncol, sparsity);
+    const SparseMatrix query = SparseTestUtil<f32, i32>::GenerateDataset(query_n, ncol, sparsity);
+    const auto [gt_indices_list, gt_scores_list] = SparseTestUtil<f32, i32>::GenerateGroundtruth(dataset, query, topk, false);
 
-    LinScan<f32, i32> index;
+    LinScan<f32, i32> index(dataset.ncol_);
     for (auto iter = SparseMatrixIter(dataset); iter.HasNext(); iter.Next()) {
         SparseVecRef vec = iter.val();
         u32 row_id = iter.row_id();
@@ -165,11 +110,11 @@ TEST_F(LinScanAlgTest, approximate_scan) {
         const i32 *gt_indices = gt_indices_list.get() + query_id * topk;
         const f32 *gt_scores = gt_scores_list.get() + query_id * topk;
 
-        auto [hit, total] = CheckApproximateKnn(gt_indices, gt_scores, gt_size, indices, scores);
+        auto [hit, total] = SparseTestUtil<f32, i32>::CheckApproximateKnn(gt_indices, gt_scores, gt_size, indices, scores);
         hit_all += hit;
         total_all += total;
 
-        // PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
+        // SparseTestUtil<f32, i32>::PrintQuery(query_id, gt_indices, gt_scores, gt_size, indices, scores);
         std::cout << fmt::format("accuracy: {}\n", (f32)hit / total);
     }
     if (hit_all < total_all * accuracy_all) {

@@ -14,6 +14,8 @@
 
 #include "unit_test/base_test.h"
 #include <fstream>
+#include <gtest/gtest.h>
+#include <iostream>
 #include <thread>
 
 import stl;
@@ -30,6 +32,7 @@ import data_store;
 
 import dist_func_l2;
 import dist_func_ip;
+import dist_func_cos;
 import vec_store_type;
 import hnsw_common;
 import infinity_exception;
@@ -67,7 +70,7 @@ public:
 
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
             hnsw_index.InsertVecs(std::move(iter));
-            // std::ofstream os("tmp/dump.txt");
+            // std::ofstream os("/home/xwg/dev/infinity/tmp/dump.txt");
             // hnsw_index.Dump(os);
             // os.flush();
             hnsw_index.Check();
@@ -104,7 +107,7 @@ public:
             auto hnsw_index = Hnsw::Load(*file_handler);
             hnsw_index.SetEf(10);
 
-            // std::ofstream os("tmp/dump2.txt");
+            // std::ofstream os("/home/xwg/dev/infinity/tmp/dump2.txt");
             // hnsw_index.Dump(os);
             // os.flush();
             hnsw_index.Check();
@@ -255,4 +258,9 @@ TEST_F(HnswAlgTest, test3) {
 TEST_F(HnswAlgTest, test4) {
     using Hnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
     TestParallel<Hnsw>();
+}
+
+TEST_F(HnswAlgTest, test5) {
+    using Hnsw = KnnHnsw<PlainCosVecStoreType<float>, LabelT>;
+    TestSimple<Hnsw>();
 }

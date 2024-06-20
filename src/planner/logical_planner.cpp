@@ -71,6 +71,7 @@ import index_ivfflat;
 import index_hnsw;
 import index_secondary;
 import index_emvb;
+import index_bmp;
 import index_full_text;
 import base_table_ref;
 import table_ref;
@@ -677,48 +678,42 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     }
     IndexInfo *index_info = create_index_info->index_info_list_->at(0);
     SharedPtr<IndexBase> base_index_ptr{nullptr};
+    String index_filename = fmt::format("{}_{}", create_index_info->table_name_, *index_name);
     switch (index_info->index_type_) {
         case IndexType::kFullText: {
             assert(index_info->index_param_list_ != nullptr);
             IndexFullText::ValidateColumnDataType(base_table_ref, index_info->column_name_);
-            base_index_ptr = IndexFullText::Make(index_name,
-                                                 fmt::format("{}_{}", create_index_info->table_name_, *index_name),
-                                                 {index_info->column_name_},
-                                                 *(index_info->index_param_list_));
+            base_index_ptr = IndexFullText::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kHnsw: {
             assert(index_info->index_param_list_ != nullptr);
             // The following check might affect performance
             IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr = IndexHnsw::Make(index_name,
-                                             fmt::format("{}_{}", create_index_info->table_name_, *index_name),
-                                             {index_info->column_name_},
-                                             *(index_info->index_param_list_));
+            base_index_ptr = IndexHnsw::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kIVFFlat: {
             assert(index_info->index_param_list_ != nullptr);
             IndexIVFFlat::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr = IndexIVFFlat::Make(index_name,
-                                                fmt::format("{}_{}", create_index_info->table_name_, *index_name),
-                                                {index_info->column_name_},
-                                                *(index_info->index_param_list_));
+            base_index_ptr = IndexIVFFlat::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kSecondary: {
             IndexSecondary::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr =
-                IndexSecondary::Make(index_name, fmt::format("{}_{}", create_index_info->table_name_, *index_name), {index_info->column_name_});
+            base_index_ptr = IndexSecondary::Make(index_name, index_filename, {index_info->column_name_});
             break;
         }
         case IndexType::kEMVB: {
             assert(index_info->index_param_list_ != nullptr);
             IndexEMVB::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
-            base_index_ptr = IndexEMVB::Make(index_name,
-                                             fmt::format("{}_{}", create_index_info->table_name_, *index_name),
-                                             {index_info->column_name_},
-                                             *(index_info->index_param_list_));
+            base_index_ptr = IndexEMVB::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            break;
+        }
+        case IndexType::kBMP: {
+            assert(index_info->index_param_list_ != nullptr);
+            IndexBMP::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr = IndexBMP::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kInvalid: {
@@ -898,14 +893,15 @@ Status LogicalPlanner::BuildCopy(CopyStatement *statement, SharedPtr<BindContext
 
 Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     // Currently export only support jsonl and CSV
-    switch(statement->copy_file_type_) {
+    switch (statement->copy_file_type_) {
         case CopyFileType::kJSONL:
         case CopyFileType::kFVECS:
         case CopyFileType::kCSV: {
             break;
         }
         default: {
-            Status status = Status::NotSupport(fmt::format("Exporting file type: {} isn't supported.", *CopyFileTypeToStr(statement->copy_file_type_)));
+            Status status =
+                Status::NotSupport(fmt::format("Exporting file type: {} isn't supported.", *CopyFileTypeToStr(statement->copy_file_type_)));
             LOG_ERROR(status.message());
             RecoverableError(status);
         }
@@ -929,35 +925,35 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     }
 
     Vector<u64> column_idx_array;
-    if(statement->expr_array_ != nullptr) {
+    if (statement->expr_array_ != nullptr) {
         // Export columns
-        Vector<ParsedExpr*>& expr_array = *statement->expr_array_;
+        Vector<ParsedExpr *> &expr_array = *statement->expr_array_;
         column_idx_array.reserve(expr_array.size());
 
-        for(ParsedExpr* expr: expr_array) {
-            switch(expr->type_) {
+        for (ParsedExpr *expr : expr_array) {
+            switch (expr->type_) {
                 case ParsedExprType::kColumn: {
-                    ColumnExpr* column_expr = static_cast<ColumnExpr*>(expr);
-                    if(column_expr->star_) {
+                    ColumnExpr *column_expr = static_cast<ColumnExpr *>(expr);
+                    if (column_expr->star_) {
                         Status status = Status::NotSupport("Not support to export STAR expression");
                         LOG_ERROR(status.message());
                         RecoverableError(status);
                     }
-                    if(column_expr->generated_) {
+                    if (column_expr->generated_) {
                         String error_message = "Column expression shouldn't be generated here";
                         LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                     }
 
                     SizeT name_count = column_expr->names_.size();
-                    switch(name_count) {
+                    switch (name_count) {
                         case 1: {
                             u64 column_idx = table_entry->GetColumnIdByName(column_expr->names_[0]);
                             column_idx_array.emplace_back(column_idx);
                             break;
                         }
                         case 2: {
-                            if(statement->table_name_ != column_expr->names_[0]) {
+                            if (statement->table_name_ != column_expr->names_[0]) {
                                 Status status = Status::InvalidTableName(column_expr->names_[0]);
                                 LOG_ERROR(status.message());
                                 RecoverableError(status);
@@ -967,12 +963,12 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                             break;
                         }
                         case 3: {
-                            if(statement->schema_name_ != column_expr->names_[0]) {
+                            if (statement->schema_name_ != column_expr->names_[0]) {
                                 Status status = Status::InvalidTableName(column_expr->names_[0]);
                                 LOG_ERROR(status.message());
                                 RecoverableError(status);
                             }
-                            if(statement->table_name_ != column_expr->names_[1]) {
+                            if (statement->table_name_ != column_expr->names_[1]) {
                                 Status status = Status::InvalidTableName(column_expr->names_[1]);
                                 LOG_ERROR(status.message());
                                 RecoverableError(status);
@@ -988,7 +984,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                         }
                         default: {
                             std::stringstream ss;
-                            for(SizeT i = 0; i < name_count - 1; ++ i) {
+                            for (SizeT i = 0; i < name_count - 1; ++i) {
                                 ss << column_expr->names_[i] << ".";
                             }
                             ss << column_expr->names_[name_count - 1];
@@ -1001,8 +997,9 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                     break;
                 }
                 case ParsedExprType::kFunction: {
-                    FunctionExpr* function_expr = static_cast<FunctionExpr*>(expr);
-                    auto [special_function_ptr, status] = Catalog::GetSpecialFunctionByNameNoExcept(query_context_ptr_->storage()->catalog(), function_expr->func_name_);
+                    FunctionExpr *function_expr = static_cast<FunctionExpr *>(expr);
+                    auto [special_function_ptr, status] =
+                        Catalog::GetSpecialFunctionByNameNoExcept(query_context_ptr_->storage()->catalog(), function_expr->func_name_);
                     if (status.ok()) {
                         switch (special_function_ptr->special_type()) {
                             case SpecialType::kRowID: {
@@ -1035,18 +1032,17 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
             }
         }
 
-        if(statement->copy_file_type_ == CopyFileType::kFVECS)  {
-            if(column_idx_array.size() != 1) {
+        if (statement->copy_file_type_ == CopyFileType::kFVECS) {
+            if (column_idx_array.size() != 1) {
                 Status status = Status::ColumnCountMismatch(fmt::format("Attempt to export {} columns as FVECS file", column_idx_array.size()));
                 LOG_ERROR(status.message());
                 RecoverableError(status);
             }
 
-            const ColumnDef* column_def = table_entry->GetColumnDefByID(column_idx_array[0]);
-            if(column_def->type()->type() != LogicalType::kEmbedding) {
-                Status status = Status::NotSupport(fmt::format("Attempt to export column: {} with type: {} as FVECS file",
-                                                               column_def->name(),
-                                                               column_def->type()->ToString()));
+            const ColumnDef *column_def = table_entry->GetColumnDefByID(column_idx_array[0]);
+            if (column_def->type()->type() != LogicalType::kEmbedding) {
+                Status status = Status::NotSupport(
+                    fmt::format("Attempt to export column: {} with type: {} as FVECS file", column_def->name(), column_def->type()->ToString()));
                 LOG_ERROR(status.message());
                 RecoverableError(status);
             }
@@ -1212,6 +1208,12 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kQuery: {
             return BuildShowQuery(statement, bind_context_ptr);
         }
+        case ShowStmtType::kTransactions: {
+            return BuildShowTransactions(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kTransaction: {
+            return BuildShowTransaction(statement, bind_context_ptr);
+        }
         case ShowStmtType::kSegments: {
             return BuildShowSegments(statement, bind_context_ptr);
         }
@@ -1296,6 +1298,33 @@ Status LogicalPlanner::BuildShowQuery(const ShowStatement *statement, SharedPtr<
                                                                   None,
                                                                   None,
                                                                   statement->session_id_);
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowTransactions(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowTransactions,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowTransaction(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowTransaction,
+                                                                  statement->schema_name_,
+                                                                  statement->table_name_,
+                                                                  bind_context_ptr->GenerateTableIndex(),
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  None,
+                                                                  statement->txn_id_);
     this->logical_plan_ = logical_show;
     return Status::OK();
 }

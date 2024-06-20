@@ -15,7 +15,9 @@
 module;
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <iostream>
 #include <random>
 module emvb_index;
 import stl;
@@ -38,6 +40,7 @@ import column_vector;
 import column_def;
 import buffer_manager;
 import default_values;
+import block_index;
 
 namespace infinity {
 
@@ -76,6 +79,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                                const SegmentEntry *segment_entry,
                                const SharedPtr<ColumnDef> &column_def,
                                BufferManager *buffer_mgr) {
+    const auto time_0 = std::chrono::high_resolution_clock::now();
     {
         const SegmentID expected_segment_id = base_rowid.segment_id_;
         if (const SegmentID segment_id = segment_entry->segment_id(); segment_id != expected_segment_id) {
@@ -115,6 +119,13 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                 all_embedding_pos.emplace_back(i, j);
             }
         }
+    }
+    const auto time_1 = std::chrono::high_resolution_clock::now();
+    {
+        std::ostringstream oss;
+        oss << "EMVBIndex::BuildEMVBIndex: Read segment data, total row count: " << row_count << ", total embedding count: " << embedding_count
+            << ", total time cost: " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_1 - time_0);
+        LOG_INFO(std::move(oss).str());
     }
     // prepare centroid count
     const u32 sqrt_embedding_num = std::sqrt(embedding_count);
@@ -159,11 +170,26 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                             training_data.get() + i * embedding_dimension_);
             }
         }
+        const auto time_2 = std::chrono::high_resolution_clock::now();
+        {
+            std::ostringstream oss;
+            oss << "EMVBIndex::BuildEMVBIndex: Prepare training data, training embedding num: " << training_embedding_num
+                << ", time cost: " << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_2 - time_1);
+            LOG_INFO(std::move(oss).str());
+        }
         // call train
         Train(centroid_count, training_data.get(), training_embedding_num, 20);
+        const auto time_3 = std::chrono::high_resolution_clock::now();
+        {
+            std::ostringstream oss;
+            oss << "EMVBIndex::BuildEMVBIndex: Train index, time cost: "
+                << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_3 - time_2);
+            LOG_INFO(std::move(oss).str());
+        }
     }
     // add data
     {
+        const auto time_4 = std::chrono::high_resolution_clock::now();
         BlockID block_id = start_segment_offset / DEFAULT_BLOCK_CAPACITY;
         BlockOffset block_offset = start_segment_offset % DEFAULT_BLOCK_CAPACITY;
         auto column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr));
@@ -181,6 +207,15 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
             const auto [embedding_num, chunk_id, chunk_offset] = tensor_ptr[block_offset];
             const auto embedding_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
             AddOneDocEmbeddings(reinterpret_cast<const f32 *>(embedding_ptr), embedding_num);
+        }
+        {
+            const auto time_5 = std::chrono::high_resolution_clock::now();
+            const auto total_add_time = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_5 - time_4);
+            const auto avg_add_time = total_add_time / row_count;
+            std::ostringstream oss;
+            oss << "EMVBIndex::BuildEMVBIndex: Add data, total row count: " << row_count << ", total time cost: " << total_add_time
+                << ", avg time cost: " << avg_add_time;
+            LOG_INFO(std::move(oss).str());
         }
     }
 }
@@ -211,6 +246,7 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
     }
     // train both centroids and residual product quantizer
     // step 1. train centroids
+    const auto time_0 = std::chrono::high_resolution_clock::now();
     {
         const auto result_centroid_num = GetKMeansCentroids<f32>(MetricType::kMetricL2,
                                                                  embedding_dimension_,
@@ -233,6 +269,13 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
             centroid_norms_neg_half_[i] = -0.5f * L2NormSquare<f32, f32, u32>(centroid_data, embedding_dimension_);
             centroid_data += embedding_dimension_;
         }
+    }
+    const auto time_1 = std::chrono::high_resolution_clock::now();
+    {
+        std::ostringstream oss;
+        oss << "EMVBIndex::Train: Finish train centroids, time cost: "
+            << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_1 - time_0);
+        LOG_INFO(std::move(oss).str());
     }
     // step 2. get residuals
     const auto residuals = MakeUniqueForOverwrite<f32[]>(embedding_num * embedding_dimension_);
@@ -263,9 +306,23 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
             }
         }
     }
+    const auto time_2 = std::chrono::high_resolution_clock::now();
+    {
+        std::ostringstream oss;
+        oss << "EMVBIndex::Train: Finish calculate residuals, time cost: "
+            << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_2 - time_1);
+        LOG_INFO(std::move(oss).str());
+    }
     LOG_TRACE("EMVBIndex::Train: Finish calculate residuals.");
     // step 3. train residuals
     product_quantizer_->Train(residuals.get(), embedding_num, iter_cnt);
+    const auto time_3 = std::chrono::high_resolution_clock::now();
+    {
+        std::ostringstream oss;
+        oss << "EMVBIndex::Train: Finish train pq for residuals, time cost: "
+            << std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(time_3 - time_2);
+        LOG_INFO(std::move(oss).str());
+    }
     LOG_TRACE("EMVBIndex::Train: Finish train pq for residuals.");
 }
 
@@ -325,6 +382,36 @@ void EMVBIndex::AddOneDocEmbeddings(const f32 *embedding_data, const u32 embeddi
     ++n_docs_;
 }
 
+// return id: offset in the segment
+EMVBQueryResultType EMVBIndex::SearchWithBitmask(const f32 *query_ptr,
+                                                 const u32 query_embedding_num,
+                                                 const u32 top_n,
+                                                 Bitmask &bitmask,
+                                                 const SegmentEntry *segment_entry,
+                                                 const BlockIndex *block_index,
+                                                 const TxnTimeStamp begin_ts,
+                                                 const u32 centroid_nprobe,
+                                                 const f32 threshold_first,
+                                                 const u32 n_doc_to_score,
+                                                 const u32 out_second_stage,
+                                                 const f32 threshold_final) const {
+    // template argument should be in ascending order
+    // keep consistent with emvb_search.cpp
+    return query_token_num_helper<32, 64, 96, 128, 160, 192, 224, 256>(query_ptr,
+                                                                       query_embedding_num,
+                                                                       centroid_nprobe,
+                                                                       threshold_first,
+                                                                       n_doc_to_score,
+                                                                       out_second_stage,
+                                                                       top_n,
+                                                                       threshold_final,
+                                                                       bitmask,
+                                                                       start_segment_offset_,
+                                                                       segment_entry,
+                                                                       block_index,
+                                                                       begin_ts);
+}
+
 // the two thresholds are for every (query embedding, candidate embedding) pair
 // candidate embeddings are centroids
 // unqualified pairs will not be scored
@@ -332,6 +419,7 @@ void EMVBIndex::AddOneDocEmbeddings(const f32 *embedding_data, const u32 embeddi
 
 constexpr u32 current_max_query_token_num = 256;
 
+// return id: offset from start_segment_offset_
 EMVBQueryResultType EMVBIndex::GetQueryResult(const f32 *query_ptr,
                                               const u32 query_embedding_num,
                                               const u32 centroid_nprobe,  // step 1, centroid candidates for every query embedding
@@ -354,26 +442,26 @@ EMVBQueryResultType EMVBIndex::GetQueryResult(const f32 *query_ptr,
 }
 
 template <u32 I, u32... J>
-EMVBQueryResultType EMVBIndex::query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto... query_args) const {
+EMVBQueryResultType EMVBIndex::query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto &&...query_args) const {
     if (query_embedding_num <= I) {
-        return GetQueryResultT<I>(query_ptr, query_embedding_num, query_args...);
+        return GetQueryResultT<I>(query_ptr, query_embedding_num, std::forward<decltype(query_args)>(query_args)...);
     }
-    return query_token_num_helper<J...>(query_ptr, query_embedding_num, query_args...);
+    return query_token_num_helper<J...>(query_ptr, query_embedding_num, std::forward<decltype(query_args)>(query_args)...);
 }
 
 template <>
-EMVBQueryResultType EMVBIndex::query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto... query_args) const {
+EMVBQueryResultType EMVBIndex::query_token_num_helper(const f32 *query_ptr, u32 query_embedding_num, auto &&...query_args) const {
     auto error_msg = fmt::format("EMVBIndex::GetQueryResult: query_embedding_num max value: {}, got {} instead.",
                                  current_max_query_token_num,
                                  query_embedding_num);
     error_msg += fmt::format(" Embeddings after {} will not be used for search.", current_max_query_token_num);
     error_msg += " Please Add instantiation of EMVBSearch with a bigger FIXED_QUERY_TOKEN_NUM value.";
     LOG_ERROR(error_msg);
-    return GetQueryResultT<current_max_query_token_num>(query_ptr, query_embedding_num, query_args...);
+    return GetQueryResultT<current_max_query_token_num>(query_ptr, query_embedding_num, std::forward<decltype(query_args)>(query_args)...);
 }
 
 template <u32 FIXED_QUERY_TOKEN_NUM>
-EMVBQueryResultType EMVBIndex::GetQueryResultT(const f32 *query_ptr, const u32 query_embedding_num, auto... query_args) const {
+EMVBQueryResultType EMVBIndex::GetQueryResultT(const f32 *query_ptr, const u32 query_embedding_num, auto &&...query_args) const {
     UniquePtr<f32[]> extended_query_ptr;
     const f32 *query_ptr_to_use = query_ptr;
     // extend query to FIXED_QUERY_TOKEN_NUM
@@ -400,7 +488,7 @@ EMVBQueryResultType EMVBIndex::GetQueryResultT(const f32 *query_ptr, const u32 q
                                                     centroids_data_.data(),
                                                     centroids_to_docid_.get(),
                                                     product_quantizer_.get());
-    return search_helper.GetQueryResult(query_ptr_to_use, query_args...);
+    return search_helper.GetQueryResult(query_ptr_to_use, std::forward<decltype(query_args)>(query_args)...);
 }
 
 template <typename T>

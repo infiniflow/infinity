@@ -20,6 +20,7 @@ import stl;
 import plain_vec_store;
 import sparse_vec_store;
 import lvq_vec_store;
+import dist_func_cos;
 import dist_func_l2;
 import dist_func_ip;
 import dist_func_sparse_ip;
@@ -28,9 +29,25 @@ import sparse_util;
 namespace infinity {
 
 export template <typename DataT>
+class PlainCosVecStoreType {
+public:
+    using DataType = DataT;
+    using CompressType = void;
+    using Meta = PlainVecStoreMeta<DataType>;
+    using Inner = PlainVecStoreInner<DataType>;
+    using QueryVecType = const DataType *;
+    using StoreType = typename Meta::StoreType;
+    using QueryType = typename Meta::QueryType;
+    using Distance = PlainCosDist<DataType>;
+
+    static constexpr bool HasOptimize = false;
+};
+
+export template <typename DataT>
 class PlainL2VecStoreType {
 public:
     using DataType = DataT;
+    using CompressType = void;
     using Meta = PlainVecStoreMeta<DataType>;
     using Inner = PlainVecStoreInner<DataType>;
     using QueryVecType = const DataType *;
@@ -45,6 +62,7 @@ export template <typename DataT>
 class PlainIPVecStoreType {
 public:
     using DataType = DataT;
+    using CompressType = void;
     using Meta = PlainVecStoreMeta<DataType>;
     using Inner = PlainVecStoreInner<DataType>;
     using QueryVecType = const DataType *;
@@ -59,6 +77,7 @@ export template <typename DataT, typename IndexT>
 class SparseIPVecStoreType {
 public:
     using DataType = DataT;
+    using CompressType = void;
     using Meta = SparseVecStoreMeta<DataT, IndexT>;
     using Inner = SparseVecStoreInner<DataT, IndexT>;
     using QueryVecType = SparseVecRef<DataT, IndexT>;
@@ -67,6 +86,21 @@ public:
     using Distance = SparseIPDist<DataT, IndexT>;
 
     static constexpr bool HasOptimize = false;
+};
+
+export template <typename DataT, typename CompressT>
+class LVQCosVecStoreType {
+public:
+    using DataType = DataT;
+    using CompressType = CompressT;
+    using Meta = LVQVecStoreMeta<DataType, CompressType, LVQCosCache<DataType, CompressType>>;
+    using Inner = LVQVecStoreInner<DataType, CompressType, LVQCosCache<DataType, CompressType>>;
+    using QueryVecType = const DataType *;
+    using StoreType = typename Meta::StoreType;
+    using QueryType = typename Meta::QueryType;
+    using Distance = LVQCosDist<DataType, CompressType>;
+
+    static constexpr bool HasOptimize = true;
 };
 
 export template <typename DataT, typename CompressT>

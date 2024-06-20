@@ -102,11 +102,32 @@ target_link_libraries(
     jma
 )
 
+add_executable(bmp_benchmark
+    ./sparse/bmp_benchmark.cpp
+)
+
+target_include_directories(bmp_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(
+    bmp_benchmark
+    infinity_core
+    benchmark_profiler
+    sql_parser
+    onnxruntime_mlas
+    zsv_parser
+    newpfor
+    fastpfor
+    lz4.a
+    atomic.a
+    jma
+)
+
 if(ENABLE_JEMALLOC)
     target_link_libraries(infinity_benchmark jemalloc.a)
     target_link_libraries(knn_import_benchmark jemalloc.a)
     target_link_libraries(knn_query_benchmark jemalloc.a)
     target_link_libraries(fulltext_benchmark jemalloc.a)
+    target_link_libraries(sparse_benchmark jemalloc.a)
+    target_link_libraries(bmp_benchmark jemalloc.a)
 endif()
 
 # add_definitions(-march=native)

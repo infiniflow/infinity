@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "../../../../storage/knn_index/knn_hnsw/header.h"
+#include "../../../../storage/knn_index/header.h"
 #include "unit_test/base_test.h"
 #include <cstdint>
 #include <random>

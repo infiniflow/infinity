@@ -233,7 +233,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/xor_singleheader/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/base64/include")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/oatpp/src")
-target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/CControl")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/eigen-3.4.0")
 
 if (NOT SUPPORT_FMA EQUAL 0)
     message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
@@ -337,6 +337,10 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         oatpp.a
         jma
 )
+
+#if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+#    target_link_libraries(embedded_infinity_ext PRIVATE libasan.a)
+#endif ()
 
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")

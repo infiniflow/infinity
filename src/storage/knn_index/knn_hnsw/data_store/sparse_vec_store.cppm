@@ -43,6 +43,7 @@ private:
 
 public:
     static This Make(SizeT max_dim) { return This(max_dim); }
+    static This Make(SizeT max_dim, bool) { return This(max_dim); }
 
     void Save(FileHandler &file_handler) const { file_handler.Write(&max_dim_, sizeof(max_dim_)); }
 
@@ -61,13 +62,6 @@ private:
 
 public:
     void Dump(std::ostream &os) const { os << "[CONST] max dim: " << max_dim_ << std::endl; }
-};
-
-template <typename DataType, typename IdxType>
-struct SparseVecEle {
-    i32 nnz_{};
-    UniquePtr<IdxType[]> indices_;
-    UniquePtr<DataType[]> data_;
 };
 
 export template <typename DataType, typename IdxType>

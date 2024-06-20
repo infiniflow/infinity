@@ -26,6 +26,7 @@ namespace infinity {
 
 export enum class KnnDistanceAlgoType {
     kInvalid,
+    kKnnFlatCosine,
     kKnnFlatIp,
     kKnnFlatIpReservoir,
     kKnnFlatIpBlas,

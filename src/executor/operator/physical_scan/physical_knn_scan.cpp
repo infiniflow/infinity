@@ -362,6 +362,10 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 IVFFlatScanTemplate.template operator()<AnnIVFFlatIP<DataType>>(std::forward<OptionalFilter>(filter)...);
                                 break;
                             }
+                            case KnnDistanceType::kCosine: {
+                                IVFFlatScanTemplate.template operator()<AnnIVFFlatCOS<DataType>>(std::forward<OptionalFilter>(filter)...);
+                                break;
+                            }
                             default: {
                                 Status status = Status::NotSupport("Not implemented KNN distance");
                                 LOG_ERROR(status.message());
@@ -453,6 +457,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 case KnnDistanceType::kHamming: {
                                     break;
                                 }
+                                // FIXME:
                                 case KnnDistanceType::kCosine:
                                 case KnnDistanceType::kInnerProduct: {
                                     for (i64 i = 0; i < result_n; ++i) {

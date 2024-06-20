@@ -15,6 +15,7 @@
 module;
 
 #include <cassert>
+#include <vector>
 
 export module sparse_util;
 
@@ -37,6 +38,25 @@ struct SparseVecRef {
     i32 nnz_;
     const IdxType *indices_;
     const DataType *data_;
+};
+
+export template <typename DataType, typename IdxType>
+struct SparseVecEle {
+    SparseVecEle() = default;
+
+    void Init(const Vector<SizeT> &keep_idxes, const DataType *data, const IdxType *indices) {
+        nnz_ = keep_idxes.size();
+        indices_ = MakeUniqueForOverwrite<IdxType[]>(nnz_);
+        data_ = MakeUniqueForOverwrite<DataType[]>(nnz_);
+        for (i32 i = 0; i < nnz_; ++i) {
+            indices_[i] = indices[keep_idxes[i]];
+            data_[i] = data[keep_idxes[i]];
+        }
+    }
+
+    i32 nnz_{};
+    UniquePtr<IdxType[]> indices_;
+    UniquePtr<DataType[]> data_;
 };
 
 export template <typename DataT, typename IdxT>
@@ -88,6 +108,15 @@ public:
         file_handler.Write(data_.get(), sizeof(DataT) * nnz_);
     }
 
+    void Clear() {
+        data_.reset();
+        indices_.reset();
+        indptr_.reset();
+        nrow_ = 0;
+        ncol_ = 0;
+        nnz_ = 0;
+    }
+
 public:
     UniquePtr<DataT[]> data_{};
     UniquePtr<IdxT[]> indices_{};
@@ -112,7 +141,7 @@ public:
     SparseVecRef<DataT, IdxT> val() const {
         i32 nnz = mat_.indptr_[row_i_ + 1] - offset_;
         const auto *indices = reinterpret_cast<const IdxT *>(mat_.indices_.get() + offset_);
-        const float *data = mat_.data_.get() + offset_;
+        const auto *data = mat_.data_.get() + offset_;
         return SparseVecRef<DataT, IdxT>(nnz, indices, data);
     }
 
@@ -131,12 +160,12 @@ export struct SparseVecUtil {
     }
 
     template <typename DataT, typename IdxT>
-    static Pair<Vector<IdxT>, Vector<DataT>>
-    Rerank(const SparseMatrix<DataT, IdxT> &mat, const SparseVecRef<DataT, IdxT> &query, Vector<IdxT> candidates, u32 topk) {
-        Vector<IdxT> result(topk);
+    static Pair<Vector<u32>, Vector<DataT>>
+    Rerank(const SparseMatrix<DataT, IdxT> &mat, const SparseVecRef<DataT, IdxT> &query, Vector<u32> candidates, u32 topk) {
+        Vector<u32> result(topk);
         Vector<DataT> result_score(topk);
 
-        HeapResultHandler<CompareMin<DataT, IdxT>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
+        HeapResultHandler<CompareMin<DataT, u32>> result_handler(1 /*query_n*/, topk, result_score.data(), result.data());
         for (u32 row_id : candidates) {
             SparseVecRef<DataT, IdxT> vec = mat.at(row_id);
             DataT score = SparseVecUtil::DistanceIP(query, vec);

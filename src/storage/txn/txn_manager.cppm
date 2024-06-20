@@ -29,6 +29,11 @@ struct Catalog;
 class WalManager;
 class CatalogDeltaEntry;
 
+export struct TxnInfo {
+    TransactionID txn_id_;
+    SharedPtr<String> txn_text_;
+};
+
 export class TxnManager {
 public:
     explicit TxnManager(Catalog *catalog,
@@ -51,9 +56,9 @@ public:
 
     bool CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    inline void Lock() { rw_locker_.lock(); }
+    inline void Lock() { locker_.lock(); }
 
-    inline void UnLock() { rw_locker_.unlock(); }
+    inline void UnLock() { locker_.unlock(); }
 
     BufferManager *GetBufferMgr() const { return buffer_mgr_; }
 
@@ -85,6 +90,10 @@ public:
 
     SizeT ActiveTxnCount();
 
+    Vector<TxnInfo> GetTxnInfoArray() const;
+
+    UniquePtr<TxnInfo> GetTxnInfoByID(TransactionID txn_id) const;
+
     TxnTimeStamp CurrentTS() const;
 
     TxnTimeStamp GetCleanupScanTS();
@@ -108,7 +117,7 @@ public:
 
 private:
     Catalog *catalog_{};
-    std::shared_mutex rw_locker_{};
+    mutable std::mutex locker_{};
     BufferManager *buffer_mgr_{};
     BGTaskProcessor *bg_task_processor_{};
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};

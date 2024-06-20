@@ -26,6 +26,7 @@ import block_column_iter;
 import buffer_manager;
 import infinity_exception;
 import logger;
+import column_vector;
 
 namespace infinity {
 
@@ -65,6 +66,8 @@ public:
         }
         return std::make_pair(std::move(rets), offset);
     }
+
+    const SharedPtr<ColumnVector> &column_vector(SizeT col_id) const { return column_iters_[col_id].column_vector(); }
 
 private:
     Vector<BlockColumnIter<CheckTS>> column_iters_;

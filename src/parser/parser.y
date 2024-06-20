@@ -385,7 +385,7 @@ struct SQL_LTYPE {
 %token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
-%token DATA LOG BUFFER
+%token DATA LOG BUFFER TRANSACTIONS TRANSACTION
 %token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION
 
@@ -1650,6 +1650,15 @@ show_statement: SHOW DATABASES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kQuery;
     $$->session_id_ = $4;
+}
+| SHOW TRANSACTIONS {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kTransactions;
+}
+| SHOW TRANSACTION LONG_VALUE {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kTransaction;
+    $$->txn_id_ = $3;
 }
 | SHOW SESSION VARIABLES {
     $$ = new infinity::ShowStatement();
@@ -2999,6 +3008,8 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
         index_type = infinity::IndexType::kFullText;
     } else if (strcmp($5, "hnsw") == 0) {
         index_type = infinity::IndexType::kHnsw;
+    } else if (strcmp($5, "bmp") == 0) {
+        index_type = infinity::IndexType::kBMP;
     } else if (strcmp($5, "ivfflat") == 0) {
         index_type = infinity::IndexType::kIVFFlat;
     } else if (strcmp($5, "emvb") == 0) {
