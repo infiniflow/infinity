@@ -65,7 +65,7 @@ protected:
 
     void CreateDBAndTable(const String& db_name, const String& table_name);
 
-    void CreateIndex(const String& db_name, const String& table_name, const String& index_name);
+    void CreateIndex(const String &db_name, const String &table_name, const String &index_name, const String &analyzer);
 
     void InsertData(const String& db_name, const String& table_name);
 
@@ -110,25 +110,28 @@ void QueryMatchTest::InitData() {
 
 TEST_F(QueryMatchTest, basic_phrase) {
     CreateDBAndTable(db_name_, table_name_);
-    CreateIndex(db_name_, table_name_, index_name_);
-    InsertData(db_name_, table_name_);
-    String fields = "text";
-    Vector<String> phrases = {"\"Animalia is an\"", "\"one of\"", "\"are book\"", "\"add test\"", "\"harmful chemical\"", "\"high-tech\""};
-    Vector<u32> expected_doc_freq = {1, 2, 0, 2, 2, 1};
-    Vector<u64> expected_phrase_freq = {1, 2, 0, 3, 3, 1};
-    EXPECT_EQ(phrases.size(), expected_doc_freq.size());
-    EXPECT_EQ(phrases.size(), expected_phrase_freq.size());
-    for (SizeT i = 0; i < phrases.size(); ++i) {
-        auto phrase = phrases[i];
-        auto doc_freq = expected_doc_freq[i];
-        auto phrase_freq = expected_phrase_freq[i];
-        QueryMatch(db_name_, table_name_, index_name_, fields, phrase, doc_freq, phrase_freq, DocIteratorType::kPhraseIterator);
+    Vector<String> analyzers = {String("standard")};
+    for (auto &analyzer : analyzers) {
+        CreateIndex(db_name_, table_name_, index_name_, analyzer);
+        InsertData(db_name_, table_name_);
+        String fields = "text";
+        Vector<String> phrases = {"\"Animalia is an\"", "\"one of\"", "\"are book\"", "\"add test\"", "\"harmful chemical\""};
+        Vector<u32> expected_doc_freq = {1, 2, 0, 2, 2};
+        Vector<u64> expected_phrase_freq = {1, 2, 0, 3, 3};
+        EXPECT_EQ(phrases.size(), expected_doc_freq.size());
+        EXPECT_EQ(phrases.size(), expected_phrase_freq.size());
+        for (SizeT i = 0; i < phrases.size(); ++i) {
+            auto phrase = phrases[i];
+            auto doc_freq = expected_doc_freq[i];
+            auto phrase_freq = expected_phrase_freq[i];
+            QueryMatch(db_name_, table_name_, index_name_, fields, phrase, doc_freq, phrase_freq, DocIteratorType::kPhraseIterator);
+        }
     }
 }
 
 TEST_F(QueryMatchTest, basic_term) {
     CreateDBAndTable(db_name_, table_name_);
-    CreateIndex(db_name_, table_name_, index_name_);
+    CreateIndex(db_name_, table_name_, index_name_, "standard");
     InsertData(db_name_, table_name_);
     String fields = "text";
     Vector<String> terms = {"the", "harmful", "chemical", "anarchism"};
@@ -168,6 +171,11 @@ void QueryMatchTest::CreateDBAndTable(const String& db_name, const String& table
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
     {
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        txn->DropTableCollectionByName(db_name, table_name, ConflictType::kIgnore);
+        last_commit_ts_ = txn_mgr->CommitTxn(txn);
+    }
+    {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         txn->CreateTable(db_name, table_def, ConflictType::kError);
 
@@ -176,19 +184,20 @@ void QueryMatchTest::CreateDBAndTable(const String& db_name, const String& table
 
         last_commit_ts_ = txn_mgr->CommitTxn(txn);
     }
-
 }
 
-void QueryMatchTest::CreateIndex(const String& db_name, const String& table_name, const String& index_name) {
+void QueryMatchTest::CreateIndex(const String &db_name, const String &table_name, const String &index_name, const String &analyzer) {
     Storage *storage = InfinityContext::instance().storage();
 
     TxnManager *txn_mgr = storage->txn_manager();
 
-    String analyzer{"standard"};
     Vector<String> col_name_list{"text"};
     String index_file_name = index_name + ".json";
     {
         auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto status0 = txn_idx->DropIndexByName(db_name, table_name, index_name, ConflictType::kIgnore);
+        // EXPECT_TRUE(status0.ok());
+
         auto [table_entry, status1] = txn_idx->GetTableByName(db_name, table_name);
         EXPECT_TRUE(status1.ok());
 
