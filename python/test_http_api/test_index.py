@@ -373,6 +373,7 @@ class TestIndex(HttpTest):
                                   "error_code": 3060,
                               }
                               )
+            self.drop_table(db_name, table_name)
         else:
             self.create_index(db_name, table_name, idxname,
                               ["c1"],
@@ -382,7 +383,7 @@ class TestIndex(HttpTest):
                                   "metric": "l2",
                               },
                               )
-            return
+        self.drop_table(db_name, table_name)
         return
 
     @pytest.mark.parametrize("index_type", [

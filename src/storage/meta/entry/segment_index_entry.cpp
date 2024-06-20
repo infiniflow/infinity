@@ -818,7 +818,7 @@ void SegmentIndexEntry::ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
 }
 
 ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_table_store, SegmentEntry *segment_entry) {
-    Txn *txn = txn_table_store->txn_;
+    Txn *txn = txn_table_store->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
     const IndexBase *index_base = table_index_entry_->index_base();
     SharedPtr<ColumnDef> column_def = table_index_entry_->column_def();

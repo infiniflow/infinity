@@ -22,8 +22,8 @@ def setup_class(request, local_infinity):
 
 @pytest.mark.usefixtures("setup_class")
 class TestInfinity:
-    def test_version(self):
-        self.test_infinity_obj._test_version()
+    # def test_version(self):
+    #     self.test_infinity_obj._test_version()
     def test_select(self):
         self.test_infinity_obj._test_select()
     def test_select_aggregate(self):

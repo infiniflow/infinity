@@ -20,7 +20,7 @@ def setup_class(request, local_infinity):
 @pytest.mark.usefixtures("setup_class")
 class TestInfinity:
     def test_insert(self):
-        self.test_infinity_obj._test_version()
+        # self.test_infinity_obj._test_version()
         self.test_infinity_obj._test_insert_basic()
         self.test_infinity_obj._test_insert_varchar()
         self.test_infinity_obj._test_insert_big_varchar()

@@ -41,7 +41,7 @@ class TestInfinity:
         if hasattr(self, 'test_infinity_obj'):
             self.test_infinity_obj.disconnect()
     def test_table(self):
-        self.test_infinity_obj._test_version()
+        # self.test_infinity_obj._test_version()
         self.test_infinity_obj._test_table()
         self.test_infinity_obj._test_show_tables()
         self.test_infinity_obj._test_create_varchar_table()

@@ -326,7 +326,7 @@ Status Status::InvalidConstraintType() { return Status(ErrorCode::kInvalidConstr
 
 Status Status::InvalidKnnDistanceType() { return Status(ErrorCode::kInvalidKnnDistanceType, MakeUnique<String>("Invalid knn distance type.")); }
 
-Status Status::InvalidEmbeddingDataType() { return Status(ErrorCode::kInvalidEmbeddingDataType, MakeUnique<String>("Invalid embedding data type.")); }
+Status Status::InvalidEmbeddingDataType(const String& type_str) { return Status(ErrorCode::kInvalidEmbeddingDataType, MakeUnique<String>(fmt::format("Invalid embedding data type: {}.", type_str))); }
 
 Status Status::InvalidConstantType() { return Status(ErrorCode::kInvalidConstantType, MakeUnique<String>("Invalid constant type.")); }
 

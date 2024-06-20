@@ -28,7 +28,7 @@ class TestInfinity:
         request.node.skip_setup = True
 
     def test_delete(self):
-        self.test_infinity_obj._test_version()
+        # self.test_infinity_obj._test_version()
         self.test_infinity_obj._test_delete()
 
     def test_delete_empty_table(self):

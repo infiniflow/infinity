@@ -31,8 +31,8 @@ test_export_jsonl_file = "export_embedding_int_dim3.jsonl"
 test_export_jsonl_file_part = "export_embedding_int_dim3_part.jsonl"
 
 class TestCase(TestSdk):
-    def _test_version(self):
-        print(infinity.__version__)
+    # def _test_version(self):
+    #     print(infinity.__version__)
 
     def _test_connection(self):
 

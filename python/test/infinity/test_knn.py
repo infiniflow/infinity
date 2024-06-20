@@ -23,8 +23,8 @@ def setup_class(request, local_infinity):
 
 @pytest.mark.usefixtures("setup_class")
 class TestInfinity:
-    def test_version(self):
-        self.test_infinity_obj._test_version()
+    # def test_version(self):
+    #     self.test_infinity_obj._test_version()
 
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)

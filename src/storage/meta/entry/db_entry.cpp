@@ -197,7 +197,7 @@ Vector<TableEntry *> DBEntry::TableCollections(TransactionID txn_id, TxnTimeStam
             TableMeta *table_meta = table_collection_meta_pair.second.get();
             auto [table_entry, status] = table_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
-                LOG_TRACE(fmt::format("error when get table/collection entry: {}", status.message()));
+                LOG_TRACE(fmt::format("error when get table entry: {} table name: {}", status.message(), *table_meta->table_name_));
             } else {
                 results.emplace_back((TableEntry *)table_entry);
             }
