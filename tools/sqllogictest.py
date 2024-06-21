@@ -162,7 +162,7 @@ if __name__ == "__main__":
     generate15(args.generate_if_exists, args.copy)
     generate16(args.generate_if_exists, args.copy)
     generate17(args.generate_if_exists, args.copy)
-    #generate18(args.generate_if_exists, args.copy)
+    generate18(args.generate_if_exists, args.copy)
     #generate19(args.generate_if_exists, args.copy)
     print("Generate file finshed.")
 
