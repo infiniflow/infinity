@@ -20,7 +20,7 @@ import numpy as np
 from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.embedded_infinity_ext import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions
-from infinity.common import ConflictType
+from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.common import INSERT_DATA, VEC, InfinityException
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo

@@ -28,7 +28,7 @@ from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuild
 from infinity.remote_thrift.types import build_result
 from infinity.remote_thrift.utils import traverse_conditions, name_validity_check, select_res_to_polars
 from infinity.table import Table, ExplainType
-from infinity.common import ConflictType
+from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
 
 
 class RemoteTable(Table, ABC):

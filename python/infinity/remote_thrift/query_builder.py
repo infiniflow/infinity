@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, InfinityException
+from infinity.common import VEC, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import logic_type_to_dtype, make_match_tensor_expr
