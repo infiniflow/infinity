@@ -47,9 +47,9 @@ namespace infinity {
         os << "PhraseDocIterator";
         os << " (weight: " << weight_ << ")";
         os << " (column: " << *column_name_ptr_ << ")";
-        os << " (phrase: ";
+        os << " (phrase:";
         for (auto term : *terms_ptr_) {
-            os << term << " ";
+            os << " " << term;
         }
         os << ")";
         os << " (doc_freq: " << GetDF() << ")";

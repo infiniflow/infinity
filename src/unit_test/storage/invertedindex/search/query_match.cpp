@@ -65,7 +65,7 @@ protected:
 
     void CreateDBAndTable(const String& db_name, const String& table_name);
 
-    void CreateIndex(const String& db_name, const String& table_name, const String& index_name);
+    void CreateIndex(const String &db_name, const String &table_name, const String &index_name, const String &analyzer);
 
     void InsertData(const String& db_name, const String& table_name);
 
@@ -93,33 +93,45 @@ public:
 
 void QueryMatchTest::InitData() {
     datas_ = {
-        {"1", "Animalia (book)", "Animalia is an illustrated children's book by anarchism Graeme Base. It was originally published in 1986, followed by a tenth anniversary edition in 1996, and a 25th anniversary edition in 2012. Over three million copies have been sold.   A special numbered and signed anniversary edition was also published in 1996, with an embossed gold jacket."},
-        {"2", "Academy Award for Best Production Design", "harmful chemical The Academy Awards are the oldest awards ceremony for achievements in motion pictures. one of The add test Academy Award for Best Production Design recognizes achievement in art direction on a film. The category's original name was Best Art Direction, but was changed to its current name in 2012 for the 85th Academy Awards.  This change resulted from the Art Director's branch of the Academy being renamed the Designer's branch."},
-        {"3", "Animation", "The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots."},
+        {"1",
+         "Animalia (book)",
+         R"#(Animalia is an illustrated children's book by anarchism Graeme Base. It was originally published in 1986, followed by a tenth anniversary edition in 1996, and a 25th anniversary edition in 2012. Over three million copies have been sold. A special numbered and signed anniversary edition was also published in 1996, with an embossed gold jacket.)#"},
+        {"2",
+         "Academy Award for Best Production Design",
+         R"#(harmful chemical The Academy Awards are the oldest awards ceremony for achievements in motion pictures. one of The add test Academy Award for Best Production Design recognizes achievement in art direction on a film. The category's original name was Best Art Direction, but was changed to its current name in 2012 for the 85th Academy Awards.  This change resulted from the Art Director's branch of the Academy being renamed the Designer's branch.)#"},
+        {"3",
+         "Animation",
+         R"#(The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots.)#"},
+        {"4",
+         "Foobar",
+         R"#(周末我和朋友一起去“电子城”，想挑选一些新的“电脑配件”。那里有各种各样的“hardware”，如“motherboard”、“graphics card”等。我们还看到了一些很“awesome”的“peripheral devices”，像“keyboard”和“mouse”。我朋友说他需要一个新的“power supply”，而我则对那些“high-tech”的“storage devices”比较感兴趣。逛了一会儿后，我们都买到了自己心仪的东西，然后就“happily”回家了。)#"},
     };
 }
 
-TEST_F(QueryMatchTest, DISABLED_basic_phrase) {
+TEST_F(QueryMatchTest, basic_phrase) {
     CreateDBAndTable(db_name_, table_name_);
-    CreateIndex(db_name_, table_name_, index_name_);
-    InsertData(db_name_, table_name_);
-    String fields = "text";
-    Vector<String> phrases = {"\"Animalia is an\"", "\"one of\"", "\"are book\"", "\"add test\"", "\"harmful chemical\""};
-    Vector<u32> expected_doc_freq = {1, 2, 0, 2, 2};
-    Vector<u64> expected_phrase_freq = {1, 2, 0, 3, 3};
-    EXPECT_EQ(phrases.size(), expected_doc_freq.size());
-    EXPECT_EQ(phrases.size(), expected_phrase_freq.size());
-    for (SizeT i = 0; i < phrases.size(); ++i) {
-        auto phrase = phrases[i];
-        auto doc_freq = expected_doc_freq[i];
-        auto phrase_freq = expected_phrase_freq[i];
-        QueryMatch(db_name_, table_name_, index_name_, fields, phrase, doc_freq, phrase_freq, DocIteratorType::kPhraseIterator);
+    Vector<String> analyzers = {String("standard")};
+    for (auto &analyzer : analyzers) {
+        CreateIndex(db_name_, table_name_, index_name_, analyzer);
+        InsertData(db_name_, table_name_);
+        String fields = "text";
+        Vector<String> phrases = {"\"Animalia is an\"", "\"one of\"", "\"are book\"", "\"add test\"", "\"harmful chemical\""};
+        Vector<u32> expected_doc_freq = {1, 2, 0, 2, 2};
+        Vector<u64> expected_phrase_freq = {1, 2, 0, 3, 3};
+        EXPECT_EQ(phrases.size(), expected_doc_freq.size());
+        EXPECT_EQ(phrases.size(), expected_phrase_freq.size());
+        for (SizeT i = 0; i < phrases.size(); ++i) {
+            auto phrase = phrases[i];
+            auto doc_freq = expected_doc_freq[i];
+            auto phrase_freq = expected_phrase_freq[i];
+            QueryMatch(db_name_, table_name_, index_name_, fields, phrase, doc_freq, phrase_freq, DocIteratorType::kPhraseIterator);
+        }
     }
 }
 
 TEST_F(QueryMatchTest, basic_term) {
     CreateDBAndTable(db_name_, table_name_);
-    CreateIndex(db_name_, table_name_, index_name_);
+    CreateIndex(db_name_, table_name_, index_name_, "standard");
     InsertData(db_name_, table_name_);
     String fields = "text";
     Vector<String> terms = {"the", "harmful", "chemical", "anarchism"};
@@ -159,6 +171,11 @@ void QueryMatchTest::CreateDBAndTable(const String& db_name, const String& table
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
     {
+        auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("drop table"));
+        txn->DropTableCollectionByName(db_name, table_name, ConflictType::kIgnore);
+        last_commit_ts_ = txn_mgr->CommitTxn(txn);
+    }
+    {
         auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
         txn->CreateTable(db_name, table_def, ConflictType::kError);
 
@@ -167,19 +184,20 @@ void QueryMatchTest::CreateDBAndTable(const String& db_name, const String& table
 
         last_commit_ts_ = txn_mgr->CommitTxn(txn);
     }
-
 }
 
-void QueryMatchTest::CreateIndex(const String& db_name, const String& table_name, const String& index_name) {
+void QueryMatchTest::CreateIndex(const String &db_name, const String &table_name, const String &index_name, const String &analyzer) {
     Storage *storage = InfinityContext::instance().storage();
 
     TxnManager *txn_mgr = storage->txn_manager();
 
-    String analyzer{"standard"};
     Vector<String> col_name_list{"text"};
     String index_file_name = index_name + ".json";
     {
         auto *txn_idx = txn_mgr->BeginTxn(MakeUnique<String>("create index"));
+        auto status0 = txn_idx->DropIndexByName(db_name, table_name, index_name, ConflictType::kIgnore);
+        // EXPECT_TRUE(status0.ok());
+
         auto [table_entry, status1] = txn_idx->GetTableByName(db_name, table_name);
         EXPECT_TRUE(status1.ok());
 

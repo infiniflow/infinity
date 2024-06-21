@@ -50,6 +50,9 @@ public:
     void SeekPosition(pos_t pos, pos_t &result);
 
     docpayload_t GetCurrentDocPayload() {
+        if (current_row_id_ == INVALID_ROWID) [[unlikely]] {
+            return 0;
+        }
         if (posting_option_.HasDocPayload()) {
             DecodeTFBuffer();
             DecodeDocPayloadBuffer();
@@ -59,6 +62,9 @@ public:
     }
 
     tf_t GetCurrentTF() {
+        if (current_row_id_ == INVALID_ROWID) [[unlikely]] {
+            return 0;
+        }
         if (posting_option_.HasTfList()) {
             DecodeTFBuffer();
             return tf_buffer_[GetDocOffsetInBuffer()];
@@ -67,6 +73,9 @@ public:
     }
 
     ttf_t GetCurrentTTF() {
+        if (current_row_id_ == INVALID_ROWID) [[unlikely]] {
+            return 0;
+        }
         if (posting_option_.HasTfList()) {
             DecodeTFBuffer();
             i32 offset = GetDocOffsetInBuffer();
