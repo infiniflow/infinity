@@ -118,7 +118,14 @@ class ElasticsearchClient(BaseClient):
                 }
             }
         else:
-            ret = {"query": {"match": {"body": query}}}
+            is_phrase = False
+            query = query.lstrip()
+            if query.startswith('"'):
+                is_phrase = True
+            if is_phrase:
+                ret = {"query": {"match_phrase": {"body": query}}}
+            else:
+                ret = {"query": {"match": {"body": query}}}
         return ret
 
     def setup_clients(self, num_threads=1):
