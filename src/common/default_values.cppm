@@ -139,6 +139,13 @@ export {
     constexpr std::string_view SYSTEM_CONFIG_TABLE_NAME = "config";
     constexpr SizeT DEFAULT_PROFILER_HISTORY_SIZE = 128;
 
+    // default emvb parameter
+    constexpr u32 EMVB_CENTROID_NPROBE = 3;
+    constexpr f32 EMVB_THRESHOLD_FIRST = 0.0f;
+    constexpr u32 EMVB_N_DOC_TO_SCORE_FACTOR = 100;
+    constexpr u32 EMVB_N_DOC_OUT_SECOND_STAGE_FACTOR = 20;
+    constexpr f32 EMVB_THRESHOLD_FINAL = 0.0f;
+
     // default hnsw parameter
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
