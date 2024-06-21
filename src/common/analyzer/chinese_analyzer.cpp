@@ -111,7 +111,7 @@ void ChineseAnalyzer::Parse(const String &input) {
     if (cut_grain_ == CutGrain::kCoarse)
         jieba_->Cut(input, cut_words_, true);
     else
-        jieba_->CutHMM(input, cut_words_);
+        jieba_->CutForSearch(input, cut_words_);
     local_offset_ = -1;
     cursor_ = -1;
     cut_size_ = cut_words_.size();
