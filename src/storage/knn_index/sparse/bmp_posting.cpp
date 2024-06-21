@@ -24,8 +24,8 @@ namespace infinity {
 
 template <typename DataType>
 void BlockData<DataType, BMPCompressType::kCompressed>::Calculate(Vector<DataType> &upper_bounds, DataType query_score) const {
-    // MultiF32StoreI32(block_ids_.data(), max_scores_.data(), upper_bounds.data(), query_score, block_ids_.size());
-    for (SizeT i = 0; i < block_ids_.size(); ++i) {
+    SizeT block_size = block_ids_.size();
+    for (SizeT i = 0; i < block_size; ++i) {
         BMPBlockID block_id = block_ids_[i];
         DataType score = max_scores_[i];
         upper_bounds[block_id] += score * query_score;

@@ -16,6 +16,7 @@ module;
 
 #include <vector>
 #include <xmmintrin.h>
+#include <algorithm>
 
 module bmp_alg;
 
@@ -49,7 +50,7 @@ void BMPIvt<DataType, CompressType>::Optimize(i32 topk, Vector<Vector<DataType>>
         if ((i32)term_scores.size() < topk) {
             continue;
         }
-        std::partial_sort(term_scores.begin(), term_scores.begin() + topk - 1, term_scores.end(), std::greater<>());
+        std::nth_element(term_scores.begin(), term_scores.begin() + topk - 1, term_scores.end(), std::greater<>());
         posting.kth_score_ = term_scores[topk - 1];
     }
 }
