@@ -195,7 +195,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             break;
         }
 
-            // DML
+        // DML
         case LogicalNodeType::kInsert: {
             result = BuildInsert(logical_operator);
             break;
@@ -217,7 +217,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             break;
         }
 
-            // Scan
+        // Scan
         case LogicalNodeType::kShow: {
             result = BuildShow(logical_operator);
             break;
@@ -254,7 +254,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             break;
         }
 
-            // SELECT
+        // SELECT
         case LogicalNodeType::kAggregate: {
             result = BuildAggregate(logical_operator);
             break;
@@ -1011,7 +1011,6 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<Logical
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNode> &logical_operator) const {
     auto *logical_knn_scan = (LogicalKnnScan *)(logical_operator.get());
-    //    logical_knn_scan->
     UniquePtr<PhysicalKnnScan> knn_scan_op = MakeUnique<PhysicalKnnScan>(logical_knn_scan->node_id(),
                                                                          logical_knn_scan->base_table_ref_,
                                                                          logical_knn_scan->knn_expression(),
