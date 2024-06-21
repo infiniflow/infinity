@@ -108,7 +108,7 @@ class ElasticsearchClient(BaseClient):
         self.client.indices.forcemerge(index=self.table_name, wait_for_completion=True)
 
     # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query.html
-    def get_fulltext_query_content(self, query: str, is_and: bool = False, is_phrase: bool = False) -> Any:
+    def get_fulltext_query_content(self, query: str, is_and: bool = False) -> Any:
         ret = None
         if is_and:
             terms = query.split()
@@ -118,6 +118,10 @@ class ElasticsearchClient(BaseClient):
                 }
             }
         else:
+            is_phrase = False
+            query = query.lstrip()
+            if query.startswith('"'):
+                is_phrase = True
             if is_phrase:
                 ret = {"query": {"match_phrase": {"body": query}}}
             else:
@@ -152,7 +156,7 @@ class ElasticsearchClient(BaseClient):
             ]
             return result
         elif self.data["mode"] == "fulltext":
-            body = self.get_fulltext_query_content(query, is_phrase=self.data["is_phrase_query"])
+            body = self.get_fulltext_query_content(query)
             result = self.client.search(
                 index=self.table_name,
                 body=body,

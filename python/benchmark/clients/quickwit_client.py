@@ -176,7 +176,7 @@ class QuickwitClient(BaseClient):
         else:
             raise TypeError("Unsupported file type")
 
-    def get_fulltext_query_content(self, query: str, is_and: bool = False, is_phrase=False) -> Any:
+    def get_fulltext_query_content(self, query: str, is_and: bool = False) -> Any:
         ret = None
         if is_and:
             terms = query.split()
@@ -186,6 +186,11 @@ class QuickwitClient(BaseClient):
                 }
             }
         else:
+            is_phrase = False
+            query = query.lstrip()
+            if query.startswith('"'):
+                is_phrase = True
+
             if is_phrase:
                 ret = {
                     "query": {
@@ -214,7 +219,7 @@ class QuickwitClient(BaseClient):
         query = self.queries[query_id]
         client = self.clients[client_id]
         if self.data["mode"] == "fulltext":
-            body = self.get_fulltext_query_content(query=query, is_phrase=self.data["is_phrase_query"])
+            body = self.get_fulltext_query_content(query=query)
             body["size"] = self.data["topK"]
 
             result = client.search(
