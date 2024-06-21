@@ -717,7 +717,20 @@ Build a fusion expression.
 ### Parameters
 
 - **method : str**
-- **method : options_text**
+    The supported methods are: rrf, weighted_sum, match_tensor
+- **options_text : str**
+
+    Common options:
+
+    - 'topn=10': Retrieve the 10 most relevant records. The defualt value is `100`.
+
+    Dedicated options of rrf:
+
+    - 'rank_constant=30': The default value is `60`.
+
+    Dedicated options of weighted_sum:
+
+    - 'weights=1,2,0.5': The weights of children scorers. The default weight of each weight is `1.0`.
 
 ### Returns
 
@@ -728,6 +741,8 @@ Build a fusion expression.
 
 ```python
 table_obj.fusion('rrf')
+table_obj.fusion('rrf', 'topn=10')
+table_obj.fusion('weighted_sum', 'weights=1,2,0.5')
 ```
 
 ### Details
