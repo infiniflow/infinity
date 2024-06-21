@@ -155,8 +155,9 @@ export {
     constexpr SizeT DBT_COMPACTION_S = DEFAULT_BLOCK_CAPACITY;
 
     // default query option parameter
-    constexpr u32 DEFAULT_FULL_TEXT_OPTION_TOP_N = 10;
+    constexpr u32 DEFAULT_MATCH_TEXT_OPTION_TOP_N = 10;
     constexpr u32 DEFAULT_MATCH_TENSOR_OPTION_TOP_N = 10;
+    constexpr u32 DEFAULT_FUSION_OPTION_TOP_N = 100;
 
     constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
     constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "4GB"; // 4Gib
