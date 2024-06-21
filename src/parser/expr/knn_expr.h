@@ -52,7 +52,7 @@ public:
     int64_t dimension_{};
     EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
     KnnDistanceType distance_type_{KnnDistanceType::kInvalid};
-    int64_t topn_{};
+    int64_t topn_{DEFAULT_MATCH_VECTOR_TOP_N};
     std::vector<InitParameter *> *opt_params_{};
 };
 

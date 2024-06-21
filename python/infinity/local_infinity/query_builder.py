@@ -10,7 +10,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, InfinityException
+from infinity.common import VEC, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.embedded_infinity_ext import *
 from infinity.local_infinity.types import logic_type_to_dtype
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
@@ -50,7 +50,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._offset = None
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int, knn_params: {} = None) -> InfinityLocalQueryBuilder:
+            topn: int = DEFAULT_MATCH_VECTOR_TOPN, knn_params: {} = None) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
         if self._search.knn_exprs is None or len(self._search.knn_exprs) == 0:

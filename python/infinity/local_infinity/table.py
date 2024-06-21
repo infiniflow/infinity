@@ -20,7 +20,7 @@ import numpy as np
 from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.embedded_infinity_ext import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions
-from infinity.common import ConflictType
+from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.common import INSERT_DATA, VEC, InfinityException
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
@@ -339,7 +339,7 @@ class LocalTable(Table, ABC):
             raise InfinityException(res.error_code, res.error_msg)
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int, knn_params: {} = None):
+            topn: int = DEFAULT_MATCH_VECTOR_TOPN, knn_params: {} = None):
         self.query_builder.knn(
             vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
         return self
