@@ -10,7 +10,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, InfinityException
+from infinity.common import VEC, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.embedded_infinity_ext import *
 from infinity.local_infinity.types import logic_type_to_dtype
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
