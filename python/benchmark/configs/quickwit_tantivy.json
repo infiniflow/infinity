@@ -6,6 +6,7 @@
   "data_path": "datasets/tantivy/wiki-articles.json",
   "insert_batch_size": 8192,
   "query_path": "datasets/tantivy/operations.txt",
+  "is_phrase_query": false,
   "result_path": "datasets/tantivy/quickwit_result.jsonl",
   "mode": "fulltext",
   "topK": 10,
