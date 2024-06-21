@@ -50,7 +50,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._offset = None
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int, knn_params: {} = None) -> InfinityLocalQueryBuilder:
+            topn: int = DEFAULT_MATCH_VECTOR_TOPN, knn_params: {} = None) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
         if self._search.knn_exprs is None or len(self._search.knn_exprs) == 0:
