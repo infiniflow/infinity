@@ -220,7 +220,7 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
         results.append(f"Recall@10: {recall_10}")
         results.append(f"Recall@100: {recall_100}")
 
-        conn.disconnect()
+    conn.disconnect()
 
     for result in results:
         print(result)
