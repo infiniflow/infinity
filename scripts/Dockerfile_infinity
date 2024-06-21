@@ -2,4 +2,10 @@ FROM debian:stable-slim
 
 COPY cmake-build-release/src/infinity /usr/bin
 
-ENTRYPOINT [ "/usr/bin/infinity" ]
+# https://docs.docker.com/reference/dockerfile/#copy
+# If <src> is a directory, the entire contents of the directory are copied, including filesystem metadata.
+# The directory itself isn't copied, only its contents.
+COPY resource/jieba  /resource/jieba
+COPY resource/mecab  /resource/mecab
+
+ENTRYPOINT ["bash", "-c", "cp -rf /resource /var/infinity/; exec /usr/bin/infinity"]
