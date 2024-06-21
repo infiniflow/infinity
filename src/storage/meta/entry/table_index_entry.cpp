@@ -393,4 +393,17 @@ void TableIndexEntry::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin
     txn_id_ = txn_id;
 }
 
+void TableIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params) {
+    Vector<SegmentIndexEntry *> segment_indexes;
+    {
+        SegmentIndexesGuard segment_indexes_guard = this->GetSegmentIndexesGuard();
+        for (const auto &[segment_id, segment_index_entry] : segment_indexes_guard.index_by_segment_) {
+            segment_indexes.push_back(segment_index_entry.get());
+        }
+    }
+    for (auto *segment_index_entry : segment_indexes) {
+        segment_index_entry->OptimizeIndex(txn, opt_params);
+    }
+}
+
 } // namespace infinity

@@ -25,6 +25,7 @@ import third_party;
 import infinity_exception;
 import sparse_util;
 import compilation_config;
+import bmp_util;
 
 using namespace infinity;
 
@@ -248,17 +249,26 @@ public:
 struct BMPOption : public BenchmarkOption {
 public:
     void ParseInner(CLI::App &app_) override {
+        Map<String, BMPCompressType> bmp_compress_type_map = {
+            {"compress", BMPCompressType::kCompressed},
+            {"raw", BMPCompressType::kRaw},
+        };
+
+        app_.add_option("--type", type_, "BMP compress type")
+            ->required(false)
+            ->transform(CLI::CheckedTransformer(bmp_compress_type_map, CLI::ignore_case));
         app_.add_option("--topk", topk_, "Topk")->required(false)->transform(CLI::Range(1, 1024));
         app_.add_option("--block_size", block_size_, "Block size")->required(false)->transform(CLI::Range(1, 1024));
         app_.add_option("--alpha", alpha_, "Alpha")->required(false)->transform(CLI::Range(0.0, 100.0));
         app_.add_option("--beta", beta_, "Beta")->required(false)->transform(CLI::Range(0.0, 100.0));
     }
 
-    String IndexName() const override { return fmt::format("bmp_block{}", block_size_); }
+    String IndexName() const override { return fmt::format("bmp_block{}_type{}", block_size_, static_cast<i8>(type_)); }
 
 public:
+    BMPCompressType type_ = BMPCompressType::kCompressed;
     i32 topk_ = 10;
-    i8 block_size_ = 8;
+    u8 block_size_ = 8;
     f32 alpha_ = 1.0;
     f32 beta_ = 1.0;
 };

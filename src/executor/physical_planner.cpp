@@ -920,6 +920,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildOptimize(const SharedPtr<Logic
     return MakeUnique<PhysicalOptimize>(logical_optimize->node_id(),
                                         logical_optimize->schema_name(),
                                         logical_optimize->object_name(),
+                                        logical_optimize->index_name_,
+                                        std::move(logical_optimize->opt_params_),
                                         logical_operator->load_metas());
 }
 
@@ -973,7 +975,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const SharedPt
                                             std::static_pointer_cast<MatchSparseExpression>(logical_match_sparse->query_expression_),
                                             logical_match_sparse->common_query_filter_,
                                             logical_operator->load_metas());
-    if (match_sparse_scan_op->TaskletCount() == 1) {
+    if (match_sparse_scan_op->GetTaskletCount(query_context_ptr_) == 1) {
         return match_sparse_scan_op;
     }
     auto merge_match_sparse_op =
