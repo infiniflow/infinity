@@ -59,7 +59,9 @@ float calc_256_sum_8(__m256 x) {
 
 #if defined(__AVX2__)
 
-export f32 L2Distance_simd(const f32 *vector1, const f32 *vector2, u32 dimension) {
+export f32 L2Distance_simd(const f32 *vector1, const f32 *vector2, u32 dimension);
+
+export f32 L2Distance_simd_old(const f32 *vector1, const f32 *vector2, u32 dimension) {
     u32 i = 0;
     __m256 sum_1 = _mm256_setzero_ps();
     __m256 sum_2 = _mm256_setzero_ps();

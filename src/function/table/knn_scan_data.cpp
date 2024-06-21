@@ -69,8 +69,8 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
 
 // --------------------------------------------
 
-KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 current_parallel_idx)
-    : knn_scan_shared_data_(shared_data), task_id_(current_parallel_idx) {
+KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 current_parallel_idx, bool execute_block_scan_job)
+    : knn_scan_shared_data_(shared_data), task_id_(current_parallel_idx), execute_block_scan_job_(execute_block_scan_job) {
     switch (knn_scan_shared_data_->elem_type_) {
         case EmbeddingDataType::kElemFloat: {
             Init<f32>();

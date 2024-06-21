@@ -73,7 +73,9 @@ public:
 
     void PlanWithIndex(QueryContext *query_context);
 
-    SizeT TaskletCount() override { return block_column_entries_->size() + index_entries_->size(); }
+    SizeT BlockScanTaskCount() const;
+
+    SizeT TaskletCount() override;
 
     void FillingTableRefs(HashMap<SizeT, SharedPtr<BaseTableRef>> &table_refs) override {
         table_refs.insert({base_table_ref_->table_index_, base_table_ref_});
@@ -88,10 +90,15 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
     u64 knn_table_index_{};
 
+    Vector<Pair<u32, u32>> block_parallel_options_;
+    u32 block_column_entries_size_ = 0; // need this value because block_column_entries_ will be moved into KnnScanSharedData
+    u32 index_entries_size_ = 0;
     UniquePtr<Vector<BlockColumnEntry *>> block_column_entries_{};
     UniquePtr<Vector<SegmentIndexEntry *>> index_entries_{};
 
 private:
+    void InitBlockParallelOption();
+
     template <typename DataType, template <typename, typename> typename C>
     void ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state);
 };

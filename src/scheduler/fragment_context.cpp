@@ -158,18 +158,20 @@ UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, Fr
 
     UniquePtr<OperatorState> operator_state = MakeUnique<KnnScanOperatorState>();
     KnnScanOperatorState *knn_scan_op_state_ptr = (KnnScanOperatorState *)(operator_state.get());
-
+    const bool execute_block_scan_job = task->TaskID() < static_cast<i64>(physical_knn_scan->BlockScanTaskCount());
     switch (fragment_ctx->ContextType()) {
         case FragmentType::kSerialMaterialize: {
             SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_ctx);
             knn_scan_op_state_ptr->knn_scan_function_data_ =
-                MakeUnique<KnnScanFunctionData>(serial_materialize_fragment_ctx->knn_scan_shared_data_.get(), task->TaskID());
+                MakeUnique<KnnScanFunctionData>(serial_materialize_fragment_ctx->knn_scan_shared_data_.get(), task->TaskID(), execute_block_scan_job);
             break;
         }
         case FragmentType::kParallelMaterialize: {
             ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
             knn_scan_op_state_ptr->knn_scan_function_data_ =
-                MakeUnique<KnnScanFunctionData>(parallel_materialize_fragment_ctx->knn_scan_shared_data_.get(), task->TaskID());
+                MakeUnique<KnnScanFunctionData>(parallel_materialize_fragment_ctx->knn_scan_shared_data_.get(),
+                                                task->TaskID(),
+                                                execute_block_scan_job);
             break;
         }
         default: {
