@@ -65,6 +65,9 @@ jobs:
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat unittest_debug.log 2>/dev/null || true
 
+      - name: Download resources
+        run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git
+
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && pip uninstall -y infinity-sdk && pip install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug'"
@@ -162,6 +165,9 @@ jobs:
       - name: Collect infinity unit test release output
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat unittest_release.log 2>/dev/null || true
+
+      - name: Download resources
+        run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
