@@ -498,7 +498,7 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const TableEntry *tab
         }
         posting_iterators.emplace_back(std::move(posting_iterator));
     }
-    auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), GetWeight());
+    auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), GetWeight(), slop_);
 
     search->terms_ptr_ = &terms_;
     search->column_name_ptr_ = &column_;
@@ -533,7 +533,7 @@ std::unique_ptr<EarlyTerminateIterator> PhraseQueryNode::CreateEarlyTerminateSea
         }
         posting_iterators.emplace_back(std::move(posting_iterator));
     }
-    auto search = MakeUnique<BlockMaxPhraseDocIterator>(std::move(posting_iterators), GetWeight());
+    auto search = MakeUnique<BlockMaxPhraseDocIterator>(std::move(posting_iterators), GetWeight(), slop_);
     if (!search) {
         return nullptr;
     }
@@ -743,11 +743,12 @@ void PhraseQueryNode::PrintTree(std::ostream &os, const std::string &prefix, boo
     os << QueryNodeTypeToString(type_);
     os << " (weight: " << weight_ << ")";
     os << " (column: " << column_ << ")";
-    os << " (phrase: ";
+    os << " (phrase:";
     for (auto term : terms_) {
-        os << term << " ";
+        os << " " << term;
     }
     os << ")";
+    os << " (slop: " << slop_ << ")";
     os << '\n';
 }
 

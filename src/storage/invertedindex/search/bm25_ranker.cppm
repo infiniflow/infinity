@@ -27,7 +27,7 @@ public:
 
     void AddTermParam(u64 tf, u64 df, float avg_column_len, u32 column_len, float weight);
 
-    void AddPhraseParam(tf_t tf, u64 df, float avg_colum_len, u32 column_len, float weight);
+    void AddPhraseParam(float tf, u64 df, float avg_colum_len, u32 column_len, float weight);
 
     float GetScore() { return score_; }
 

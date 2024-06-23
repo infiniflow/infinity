@@ -31,7 +31,7 @@ export struct TermColumnMatchData {
 
 export struct PhraseColumnMatchData {
     RowID doc_id_;
-    tf_t tf_;
+    float tf_;
     docpayload_t doc_payload_;
     Vector<RowID> begin_positions_;
     Vector<tf_t> all_tf_;

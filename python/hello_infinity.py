@@ -61,6 +61,11 @@ def test_search():
                     "body": r"A Bloom filter is a space-efficient probabilistic data structure, conceived by Burton Howard Bloom in 1970, that is used to test whether an element is a member of a set.",
                     "vec": [4.0, 4.2, 4.3, 4.5],
                 },
+                {
+                    "num": 4,
+                    "body": r"The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots.",
+                    "vec": [4.0, 4.2, 4.3, 4.5],
+                },
             ]
         )
 
@@ -103,6 +108,7 @@ def test_search():
             # r"space-efficient",      # Error 3013: Invalid query statement: OrQueryNode should not have both not child and non-not child
             r"space\-efficient",  # Escape reserved character '-', equivalent to: `space efficient`
             r'"space\-efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
+            r'"harmful chemical"~10',  # sloppy phrase, refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query-phrase.html
         ]
         for question in questions:
             qb_result = (
@@ -125,6 +131,7 @@ def test_search():
 
     except Exception as e:
         print(str(e))
+
 
 if __name__ == "__main__":
     test_search()

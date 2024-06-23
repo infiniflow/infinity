@@ -17,8 +17,8 @@ namespace infinity {
 
 export class BlockMaxPhraseDocIterator final : public EarlyTerminateIterator {
 public:
-    BlockMaxPhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight)
-        : pos_iters_(std::move(iters)), weight_(weight) {
+    BlockMaxPhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight, u32 slop = 0)
+        : pos_iters_(std::move(iters)), weight_(weight), slop_(slop) {
         auto iter_size = pos_iters_.size();
         term_column_length_reader_.resize(iter_size, nullptr);
         term_block_max_bm25_score_cache_.resize(iter_size, 0.0f);
@@ -101,12 +101,13 @@ private:
 private:
     float avg_column_len_ = 0;
     Vector<UniquePtr<PostingIterator>> pos_iters_{};
-    u64 phrase_freq_{0};
-    u64 current_phrase_freq_{0};
+    float phrase_freq_{0};
+    float current_phrase_freq_{0};
     Set<RowID> all_doc_ids_{};
     FullTextColumnLengthReader* column_length_reader_{nullptr};
     u32 estimate_doc_freq_{0};
     float weight_ = 1.0f;
+    u32 slop_ = 0;
     float bm25_common_score_ = 0.0f;
     float block_max_bm25_score_cache_ = 0.0f;
     RowID block_max_bm25_score_cache_end_id_{INVALID_ROWID};
