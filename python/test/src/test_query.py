@@ -26,7 +26,7 @@ from src.test_sdkbase import TestSdk
 
 class TestQuery(TestSdk):
     def _test_query(self):
-        conn = ThriftInfinityClient(common_values.TEST_REMOTE_HOST)
+        conn = ThriftInfinityClient(common_values.TEST_LOCAL_HOST)
         db = RemoteDatabase(conn, "default_db")
         db.drop_table("my_table", conflict_type=ConflictType.Ignore)
         db.create_table(

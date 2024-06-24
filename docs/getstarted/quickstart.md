@@ -46,7 +46,7 @@ See [Build from Source](./build_from_source.md).
 `infinity-sdk` requires Python 3.10+.
 
 ```bash
-pip3 install infinity-sdk==0.2.0.dev7
+pip3 install infinity-sdk==0.2.0
 ```
 
 ## Import necessary modules
@@ -54,14 +54,14 @@ pip3 install infinity-sdk==0.2.0.dev7
 ```python
 import infinity
 import infinity.index as index
-from infinity.common import REMOTE_HOST
+from infinity.common import LOCAL_HOST
 from infinity.common import ConflictType
 ```
 
 ## Connect to the remote server
 
 ```python
-        infinity_obj = infinity.connect(REMOTE_HOST)
+        infinity_obj = infinity.connect(LOCAL_HOST)
 ```
 
 ## Get a database
