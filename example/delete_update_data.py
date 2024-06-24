@@ -13,7 +13,7 @@
 # limitations under the License.
 
 '''
-This example is to connect local infinity instance, create table, insert data, search the data
+This example is to connect local infinity instance, create table, insert data, delete and update data.
 '''
 
 import infinity
