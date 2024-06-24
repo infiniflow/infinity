@@ -3,8 +3,8 @@ python generate_embeddings.py \
 --languages ar de en es fr hi it ja ko pt ru th zh \
 --embedding_save_dir ./corpus-embeddings \
 --max_passage_length 8192 \
---batch_size 4 \
---fp16 False \
+--batch_size 1 \
+--fp16 True \
 """
 import os
 import struct
@@ -19,7 +19,7 @@ from transformers import HfArgumentParser
 @dataclass
 class ModelArgs:
     fp16: bool = field(
-        default=False,
+        default=True,
         metadata={'help': 'Use fp16 in inference?'}
     )
 
@@ -41,7 +41,7 @@ class EvalArgs:
         metadata={'help': 'Max passage length.'}
     )
     batch_size: int = field(
-        default=4,
+        default=1,
         metadata={'help': 'Inference batch size.'}
     )
     overwrite: bool = field(

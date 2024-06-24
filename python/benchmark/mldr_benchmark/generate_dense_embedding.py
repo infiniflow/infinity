@@ -4,8 +4,8 @@ python generate_dense_embedding.py \
 --languages ar de en es fr hi it ja ko pt ru th zh \
 --embedding_save_dir ./corpus-embedding \
 --max_passage_length 8192 \
---batch_size 4 \
---fp16 \
+--batch_size 1 \
+--fp16 True \
 --pooling_method cls \
 --normalize_embeddings True
 """
@@ -26,7 +26,7 @@ class ModelArgs:
         metadata={'help': 'Name or path of encoder'}
     )
     fp16: bool = field(
-        default=False,
+        default=True,
         metadata={'help': 'Use fp16 in inference?'}
     )
     pooling_method: str = field(
@@ -56,7 +56,7 @@ class EvalArgs:
         metadata={'help': 'Max passage length.'}
     )
     batch_size: int = field(
-        default=4,
+        default=1,
         metadata={'help': 'Inference batch size.'}
     )
     overwrite: bool = field(
