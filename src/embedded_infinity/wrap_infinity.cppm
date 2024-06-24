@@ -31,6 +31,7 @@ import logical_type;
 import constant_expr;
 import knn_expr;
 import embedding_info;
+import sparse_info;
 import statement_common;
 import search_options;
 import match_expr;
@@ -66,9 +67,16 @@ export struct WrapEmbeddingType {
     size_t dimension;
 };
 
+export struct WrapSparseType {
+    EmbeddingDataType element_type;
+    EmbeddingDataType index_type;
+    size_t dimension;
+};
+
 export struct WrapDataType {
     LogicalType logical_type;
     WrapEmbeddingType embedding_type;
+    WrapSparseType sparse_type;
 };
 
 export struct WrapConstantExpr {
@@ -79,6 +87,7 @@ export struct WrapConstantExpr {
     String str_value;
     Vector<i64> i64_array_value;
     Vector<f64> f64_array_value;
+    Vector<i64> i64_array_idx;
 
     ParsedExpr *GetParsedExpr(Status &status);
 };

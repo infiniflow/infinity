@@ -66,7 +66,8 @@ NB_MODULE(embedded_infinity_ext, m) {
     nb::class_<WrapDataType>(m, "WrapDataType")
         .def(nb::init<>())
         .def_rw("logical_type", &WrapDataType::logical_type)
-        .def_rw("embedding_type", &WrapDataType::embedding_type);
+        .def_rw("embedding_type", &WrapDataType::embedding_type)
+        .def_rw("sparse_type", &WrapDataType::sparse_type);
 
     nb::class_<WrapConstantExpr>(m, "WrapConstantExpr")
         .def(nb::init<>())
@@ -76,7 +77,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("f64_value", &WrapConstantExpr::f64_value)
         .def_rw("str_value", &WrapConstantExpr::str_value)
         .def_rw("i64_array_value", &WrapConstantExpr::i64_array_value)
-        .def_rw("f64_array_value", &WrapConstantExpr::f64_array_value);
+        .def_rw("f64_array_value", &WrapConstantExpr::f64_array_value)
+        .def_rw("i64_array_idx", &WrapConstantExpr::i64_array_idx);
 
     nb::class_<WrapColumnDef>(m, "WrapColumnDef")
         .def(nb::init<>())
@@ -90,6 +92,13 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def(nb::init<>())
         .def_rw("element_type", &WrapEmbeddingType::element_type)
         .def_rw("dimension", &WrapEmbeddingType::dimension);
+
+    nb::class_<WrapSparseType>(m, "WrapSparseType")
+        .def(nb::init<>())
+        .def_rw("element_type", &WrapSparseType::element_type)
+        .def_rw("index_type", &WrapSparseType::index_type)
+        .def_rw("dimension", &WrapSparseType::dimension);
+        
 
     nb::class_<WrapIndexInfo>(m, "WrapIndexInfo")
         .def(nb::init<>())
@@ -597,6 +606,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kMissing", LogicalType::kMissing)
         .value("kTensor", LogicalType::kTensor)
         .value("kTensorArray", LogicalType::kTensorArray)
+        .value("kSparse", LogicalType::kSparse)
         .value("kInvalid", LogicalType::kInvalid)
         .export_values();
 
@@ -615,6 +625,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kDoubleArray", LiteralType::kDoubleArray)
         .value("kSubArrayArray", LiteralType::kSubArrayArray)
         .value("kInterval", LiteralType::kInterval)
+        .value("kLongSparseArray", LiteralType::kLongSparseArray)
+        .value("kDoubleSparseArray", LiteralType::kDoubleSparseArray)
         .export_values();
 
     // embedding_info

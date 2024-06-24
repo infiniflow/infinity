@@ -55,6 +55,8 @@ def logic_type_to_dtype(ttype: WrapDataType):
                         return object
                     case _:
                         raise NotImplementedError(f"Unsupported type {ttype}")
+        case LogicalType.kSparse:
+            return object
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
 
@@ -115,6 +117,61 @@ def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
             else:
                 raise NotImplementedError(
                     f"Unsupported type {element_type}")
+        case LogicalType.kSparse:
+            dimension = column_data_type.sparse_type.dimension
+            element_type = column_data_type.sparse_type.element_type
+            index_type = column_data_type.sparse_type.index_type
+            res = []
+            offset = 0
+            # print(len(column_vector))
+            while offset < len(column_vector):
+                nnz = struct.unpack('I', column_vector[offset:offset + 4])[0]
+                offset += 4
+                # print(nnz)
+                indices = []
+                values = []
+                match index_type:
+                    case EmbeddingDataType.kElemInt8:
+                        indices = struct.unpack('<{}b'.format(nnz), column_vector[offset:offset + nnz])
+                        offset += nnz
+                    case EmbeddingDataType.kElemInt16:
+                        indices = struct.unpack('<{}h'.format(nnz), column_vector[offset:offset + nnz * 2])
+                        offset += nnz * 2
+                    case EmbeddingDataType.kElemInt32:
+                        indices = struct.unpack('<{}i'.format(nnz), column_vector[offset:offset + nnz * 4])
+                        offset += nnz * 4
+                    case EmbeddingDataType.kElemInt64:
+                        indices = struct.unpack('<{}q'.format(nnz), column_vector[offset:offset + nnz * 8])
+                        offset += nnz * 8
+                    case _:
+                        raise NotImplementedError(f"Unsupported type {index_type}")
+                match element_type:
+                    case EmbeddingDataType.kElemInt8:
+                        values = struct.unpack('<{}b'.format(nnz), column_vector[offset:offset + nnz])
+                        offset += nnz
+                    case EmbeddingDataType.kElemInt16:
+                        values = struct.unpack('<{}h'.format(nnz), column_vector[offset:offset + nnz * 2])
+                        offset += nnz * 2
+                    case EmbeddingDataType.kElemInt32:
+                        values = struct.unpack('<{}i'.format(nnz), column_vector[offset:offset + nnz * 4])
+                        offset += nnz * 4
+                    case EmbeddingDataType.kElemInt64:
+                        values = struct.unpack('<{}q'.format(nnz), column_vector[offset:offset + nnz * 8])
+                        offset += nnz * 8
+                    case EmbeddingDataType.kElemFloat:
+                        values = struct.unpack('<{}f'.format(nnz), column_vector[offset:offset + nnz * 4])
+                        offset += nnz * 4
+                    case EmbeddingDataType.kElemDouble:
+                        values = struct.unpack('<{}d'.format(nnz), column_vector[offset:offset + nnz * 8])
+                        offset += nnz * 8
+                    case EmbeddingDataType.kElemBit:
+                        pass
+                    case _:
+                        raise NotImplementedError(f"Unsupported type {element_type}")
+                # print("indices: {}, values: {}".format(indices, values))
+                res.append({"indices": indices, "values": values})
+            return res
+
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
 

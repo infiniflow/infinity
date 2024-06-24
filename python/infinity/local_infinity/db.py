@@ -10,8 +10,41 @@ from infinity.common import ConflictType, InfinityException
 from infinity.local_infinity.utils import select_res_to_polars
 from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.embedded_infinity_ext import WrapColumnDef, WrapDataType, LogicalType, ConstraintType, LiteralType, WrapConstantExpr, \
-    EmbeddingDataType, WrapEmbeddingType, WrapIndexInfo
+    EmbeddingDataType, WrapEmbeddingType, WrapSparseType, WrapIndexInfo
 
+def get_constant_expr(column_info):
+    # process constant expression
+    default = None
+    if "default" in column_info:
+        default = column_info["default"]
+
+    constant_expression = WrapConstantExpr()
+    if default is None:
+        constant_expression.literal_type = LiteralType.kNull
+        return constant_expression
+    else:
+        if isinstance(default, str):
+            constant_expression.literal_type = LiteralType.kString
+            constant_expression.str_value = default
+
+        elif isinstance(default, int):
+            constant_expression.literal_type = LiteralType.kInteger
+            constant_expression.i64_value = default
+
+        elif isinstance(default, float) or isinstance(default, np.float32):
+            constant_expression.literal_type = LiteralType.kDouble
+            constant_expression.f64_value = default
+
+        elif isinstance(default, list):
+            if isinstance(default[0], int):
+                constant_expression.literal_type = LiteralType.kIntegerArray
+                constant_expression.i64_array_value = default
+            elif isinstance(default[0], float):
+                constant_expression.literal_type = LiteralType.kDoubleArray
+                constant_expression.f64_array_value = default
+        else:
+            raise InfinityException(3069, "Invalid constant expression")
+        return constant_expression
 
 def get_ordinary_info(column_info, column_defs, column_name, index):
     # "c1": {"type": "int", "constraints":["primary key", ...], "default": 1/"asdf"/[1,2]/...}
@@ -61,38 +94,8 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
             else:
                 raise InfinityException(3055, f"Unknown constraint: {constraint}")
 
-    # process constant expression
-    default = None
-    if "default" in column_info:
-        default = column_info["default"]
+    proto_column_def.constant_expr = get_constant_expr(column_info)
 
-    constant_expression = WrapConstantExpr()
-    if default is None:
-        constant_expression.literal_type = LiteralType.kNull
-        proto_column_def.constant_expr = constant_expression
-    else:
-        if isinstance(default, str):
-            constant_expression.literal_type = LiteralType.kString
-            constant_expression.str_value = default
-
-        elif isinstance(default, int):
-            constant_expression.literal_type = LiteralType.kInteger
-            constant_expression.i64_value = default
-
-        elif isinstance(default, float) or isinstance(default, np.float32):
-            constant_expression.literal_type = LiteralType.kDouble
-            constant_expression.f64_value = default
-
-        elif isinstance(default, list):
-            if isinstance(default[0], int):
-                constant_expression.literal_type = LiteralType.kIntegerArray
-                constant_expression.i64_array_value = default
-            elif isinstance(default[0], float):
-                constant_expression.literal_type = LiteralType.kDoubleArray
-                constant_expression.f64_array_value = default
-        else:
-            raise InfinityException(3069, "Invalid constant expression")
-        proto_column_def.constant_expr = constant_expression
     column_defs.append(proto_column_def)
 
 
@@ -113,6 +116,10 @@ def get_embedding_info(column_info, column_defs, column_name, index):
         column_type.logical_type = LogicalType.kTensor
     elif column_big_info[0] == "tensorarray":
         column_type.logical_type = LogicalType.kTensorArray
+    elif column_big_info[0] == "sparse":
+        column_type.logical_type = LogicalType.kSparse
+    else:
+        raise InfinityException(3053, f"Unknown column type: {column_big_info[0]}")
 
     embedding_type = WrapEmbeddingType()
     if element_type == "bit":
@@ -140,41 +147,64 @@ def get_embedding_info(column_info, column_defs, column_name, index):
     column_type.embedding_type = embedding_type
     proto_column_def.column_type = column_type
 
-    # process constant expression
-    default = None
-    if "default" in column_info:
-        default = column_info["default"]
-
-    constant_expression = WrapConstantExpr()
-    if default is None:
-        constant_expression.literal_type = LiteralType.kNull
-        proto_column_def.constant_expr = constant_expression
-    else:
-        if isinstance(default, str):
-            constant_expression.literal_type = LiteralType.kString
-            constant_expression.str_value = default
-
-        elif isinstance(default, int):
-            constant_expression.literal_type = LiteralType.kInteger
-            constant_expression.i64_value = default
-
-        elif isinstance(default, float) or isinstance(default, np.float32):
-            constant_expression.literal_type = LiteralType.kDouble
-            constant_expression.f64_value = default
-
-        elif isinstance(default, list):
-            if isinstance(default[0], int):
-                constant_expression.literal_type = LiteralType.kIntegerArray
-                constant_expression.i64_array_value = default
-            elif isinstance(default[0], float):
-                constant_expression.literal_type = LiteralType.kDoubleArray
-                constant_expression.f64_array_value = default
-        else:
-            raise InfinityException(3069, "Invalid constant expression")
-        proto_column_def.constant_expr = constant_expression
+    proto_column_def.constant_expr = get_constant_expr(column_info)
 
     column_defs.append(proto_column_def)
 
+def get_sparse_info(column_info, column_defs, column_name, index):
+    # "sparse,30000,float32,int16"
+    column_big_info = [item.strip() for item in column_info["type"].split(",")]
+    length = column_big_info[1]
+    element_type = column_big_info[2]
+    index_type = column_big_info[3]
+
+    proto_column_def = WrapColumnDef()
+    proto_column_def.id = index
+    proto_column_def.column_name = column_name
+    column_type = WrapDataType()
+
+    if column_big_info[0] == "sparse":
+        column_type.logical_type = LogicalType.kSparse
+    else:
+        raise InfinityException(3053, f"Unknown column type: {column_big_info[0]}")
+
+    sparse_type = WrapSparseType()
+    # embedding_type = WrapEmbeddingType()
+    if element_type == "bit":
+        sparse_type.element_type = EmbeddingDataType.kElemBit
+    elif element_type == "float32" or element_type == "float":
+        sparse_type.element_type = EmbeddingDataType.kElemFloat
+    elif element_type == "float64" or element_type == "double":
+        sparse_type.element_type = EmbeddingDataType.kElemDouble
+    elif element_type == "int8":
+        sparse_type.element_type = EmbeddingDataType.kElemInt8
+    elif element_type == "int16":
+        sparse_type.element_type = EmbeddingDataType.kElemInt16
+    elif element_type == "int32" or element_type == "int":
+        sparse_type.element_type = EmbeddingDataType.kElemInt32
+    elif element_type == "int64":
+        sparse_type.element_type = EmbeddingDataType.kElemInt64
+    else:
+        raise InfinityException(3057, f"Unknown element type: {element_type}")
+    
+    if index_type == "int8":
+        sparse_type.index_type = EmbeddingDataType.kElemInt8
+    elif index_type == "int16":
+        sparse_type.index_type = EmbeddingDataType.kElemInt16
+    elif index_type == "int32" or index_type == "int":
+        sparse_type.index_type = EmbeddingDataType.kElemInt32
+    elif index_type == "int64":
+        sparse_type.index_type = EmbeddingDataType.kElemInt64
+    else:
+        raise InfinityException(3057, f"Unknown index type: {index_type}")
+    sparse_type.dimension = int(length)
+
+    column_type.sparse_type = sparse_type
+    proto_column_def.column_type = column_type
+
+    proto_column_def.constant_expr = get_constant_expr(column_info)
+
+    column_defs.append(proto_column_def)
 
 class LocalDatabase(Database, ABC):
     def __init__(self, conn, name: str):
@@ -204,6 +234,8 @@ class LocalDatabase(Database, ABC):
             column_big_info = [item.strip() for item in column_info["type"].split(",")]
             if column_big_info[0] == "vector" or column_big_info[0] == "tensor" or column_big_info[0] == "tensorarray":
                 get_embedding_info(column_info, column_defs, column_name, index)
+            elif column_big_info[0] == "sparse":
+                get_sparse_info(column_info, column_defs, column_name, index)
             else:  # numeric or varchar
                 get_ordinary_info(column_info, column_defs, column_name, index)
 

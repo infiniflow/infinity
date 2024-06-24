@@ -28,7 +28,7 @@ class NetworkAddress:
 
 URI = Union[NetworkAddress, Path]
 VEC = Union[list, np.ndarray]
-INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]]]
+INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], dict[str, Union[list[int], list[float]]]]
 
 LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
 

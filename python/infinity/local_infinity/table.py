@@ -179,6 +179,24 @@ class LocalTable(Table, ABC):
                     elif isinstance(value[0], float):
                         constant_expression.literal_type = LiteralType.kDoubleArray
                         constant_expression.f64_array_value = value
+                elif isinstance(value, dict):
+                    if isinstance(value["values"][0], int):
+                        constant_expression.literal_type = LiteralType.kLongSparseArray
+                        if isinstance(value["indices"][0], int):
+                            constant_expression.i64_array_idx = value["indices"]
+                            constant_expression.i64_array_value = value["values"]
+                        else:
+                            raise InfinityException(3069, "Invalid constant expression")
+                    elif isinstance(value["values"][0], float):
+                        constant_expression.literal_type = LiteralType.kDoubleSparseArray
+                        if isinstance(value["indices"][0], int):
+                            constant_expression.i64_array_idx = value["indices"]
+                            constant_expression.f64_array_value = value["values"]
+                        else:
+                            raise InfinityException(3069, "Invalid constant expression")
+                    else:
+                        raise InfinityException(3069, "Invalid constant expression")
+                    
                 else:
                     raise InfinityException(3069, "Invalid constant expression")
                 parse_exprs.append(constant_expression)
