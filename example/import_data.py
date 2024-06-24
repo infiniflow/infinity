@@ -19,11 +19,7 @@ This example is to connect local infinity instance, create table, insert data, i
 import infinity
 import os
 
-import os
-
 current_path = os.path.abspath(__file__)
-
-current_directory = os.path.dirname(current_path)
 project_directory = os.path.dirname(current_path)
 
 print(f"project dir: {project_directory}")
@@ -45,7 +41,7 @@ try:
         "doc": {"type": "varchar"},
     })
 
-    table_instance.import_data(current_directory + "/../test/data/csv/fulltext_delete.csv", {"file_type": "csv", "delimiter": "\t"})
+    table_instance.import_data(project_directory + "/../test/data/csv/fulltext_delete.csv", {"file_type": "csv", "delimiter": "\t"})
 
     result = table_instance.output(["num", "doc"]).to_pl()
     print(result)
