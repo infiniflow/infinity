@@ -52,7 +52,7 @@ pip3 install infinity-sdk==0.2.0
 import infinity
 
 # connect to infinity
-infinity_obj = infinity.connect(infinity.NetworkAddress("ip_address", 23817)) # for local address, can use infinity.LOCAL_HOST
+infinity_obj = infinity.connect(infinity.NetworkAddress("<server_ip_address>", 23817)) # for local address, can use infinity.LOCAL_HOST
 db = infinity_obj.get_database("default_db")
 table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
 table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
@@ -60,7 +60,6 @@ table.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 
 res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
 print(res)
 ```
-
 
 > 💡 For more information about the Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
 > 💡 For a complete example, see the [hello_infinity.py](../../python/hello_infinity.py).

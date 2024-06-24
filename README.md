@@ -48,7 +48,7 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 - Intuitive Python API. See the [Python API](https://infiniflow.org/docs/dev/python_api_reference)
 - A single-binary architecture with no dependencies, making deployment a breeze.
-- Embedded 
+- Embedded as a python library.  
 
 ## 🎮 Get Started
 
@@ -71,29 +71,10 @@ print(res)
 
 ### Deploy Infinity server
 
-#### Deploy Infinity using Docker on Linux x86_64 and MacOS x86_64
+If you wish to start Infinity server and access it remotely.
 
-```bash
-sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-docker pull infiniflow/infinity:nightly
-docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
-```
+See [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server).
 
-#### Deploy Infinity using binary package on Linux x86_64
-
-You can download the binary package (deb, rpm, or tgz) for your respective host operating system from https://github.com/infiniflow/infinity/releases. The prebuilt packages are compatible with Linux distributions based on glibc 2.17 or later, for example, RHEL 7, Debian 8, Ubuntu 14.04.
-
-Fedora/RHEL/CentOS/OpenSUSE
-```bash
-sudo rpm -i infinity-0.2.0-dev-x86_64.rpm
-sudo systemctl start infinity
-```
-
-Ubuntu/Debian
-```bash
-sudo dpkg -i infinity-0.2.0-dev-x86_64.deb
-sudo systemctl start infinity
-```
 #### 🛠️ Build from Source
 
 See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
