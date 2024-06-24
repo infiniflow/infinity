@@ -16,6 +16,7 @@ target_link_libraries(
     lz4.a
     atomic.a
     jma
+    opencc
 )
 
 # ########################################
@@ -38,6 +39,7 @@ target_link_libraries(
     lz4.a
     atomic.a
     jma
+    opencc
 )
 
 # query benchmark
@@ -58,6 +60,7 @@ target_link_libraries(
     lz4.a
     atomic.a
     jma
+    opencc
 )
 
 # ########################################
@@ -80,6 +83,7 @@ target_link_libraries(
     lz4.a
     atomic.a
     jma
+    opencc
 )
 
 # ########################################
@@ -100,6 +104,7 @@ target_link_libraries(
     lz4.a
     atomic.a
     jma
+    opencc
 )
 
 add_executable(bmp_benchmark
@@ -119,6 +124,7 @@ target_link_libraries(
     lz4.a
     atomic.a
     jma
+    opencc
 )
 
 if(ENABLE_JEMALLOC)
