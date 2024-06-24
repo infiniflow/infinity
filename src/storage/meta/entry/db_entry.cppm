@@ -54,6 +54,14 @@ public:
                      TransactionID txn_id,
                      TxnTimeStamp begin_ts);
 
+    explicit DBEntry(DBMeta *db_meta,
+                     bool is_delete,
+                     const SharedPtr<String> &base_dir,
+                     const SharedPtr<String> &db_entry_dir,
+                     const SharedPtr<String> &db_name,
+                     TransactionID txn_id,
+                     TxnTimeStamp begin_ts);
+
     static SharedPtr<DBEntry> NewDBEntry(DBMeta *db_meta,
                                          bool is_delete,
                                          const SharedPtr<String> &data_dir,
@@ -63,6 +71,7 @@ public:
 
     static SharedPtr<DBEntry> ReplayDBEntry(DBMeta *db_meta,
                                             bool is_delete,
+                                            const SharedPtr<String> &base_dir,
                                             const SharedPtr<String> &db_entry_dir,
                                             const SharedPtr<String> &db_name,
                                             TransactionID txn_id,

@@ -96,7 +96,7 @@ WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT co
     return segment_info;
 }
 
-void MockWalFile(const String &wal_file_path, const String &ckp_file_path) {
+void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const String &ckp_file_name) {
     for (int commit_ts = 0; commit_ts < 3; ++commit_ts) {
         SizeT row_count = DEFAULT_VECTOR_SIZE;
 
@@ -161,7 +161,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path) {
     }
     {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, ckp_file_path));
+        entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, ckp_file_path, ckp_file_name));
         entry->commit_ts_ = 3;
         i32 expect_size = entry->GetSizeInBytes();
         Vector<char> buf(expect_size);
@@ -243,7 +243,7 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<RowID> row_ids = {RowID(1, 3)};
         entry->cmds_.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, String(GetDataDir()) + "/catalog/META_123.full.json"));
+    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, String(GetDataDir()) + "/catalog", String("META_123.full.json")));
     {
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
@@ -270,8 +270,9 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     RemoveDbDirs();
     std::filesystem::create_directories(GetWalDir());
     String wal_file_path = String(GetWalDir()) + "/wal.log";
-    String ckp_file_path = String(GetDataDir()) + "/catalog/META_123.full.json";
-    MockWalFile(wal_file_path, ckp_file_path);
+    String ckp_file_path = String(GetDataDir()) + "/catalog";
+    String ckp_file_name = String("META_123.full.json");
+    MockWalFile(wal_file_path, ckp_file_path, ckp_file_name);
     {
         auto iterator1 = WalEntryIterator::Make(wal_file_path, true);
 
@@ -333,7 +334,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
         }
     }
     EXPECT_EQ(max_commit_ts, 123ul);
-    EXPECT_EQ(catalog_path, String(GetDataDir()) + "/catalog/META_123.full.json");
+    EXPECT_EQ(catalog_path, String(GetDataDir()) + "/catalog");
     EXPECT_EQ(replay_entries.size(), 1u);
 }
 
@@ -343,9 +344,10 @@ TEST_F(WalEntryTest, WalListIterator) {
     std::filesystem::create_directories(GetWalDir());
     String wal_file_path1 = String(GetWalDir()) + "/wal.log";
     String wal_file_path2 = String(GetWalDir()) + "/wal2.log";
-    String ckp_file_path = String(GetDataDir()) + "/catalog/META_123.full.json";
-    MockWalFile(wal_file_path1, ckp_file_path);
-    MockWalFile(wal_file_path2, ckp_file_path);
+    String ckp_file_path = String(GetDataDir()) + "/catalog";
+    String ckp_file_name = String("META_123.full.json");
+    MockWalFile(wal_file_path1, ckp_file_path, ckp_file_name);
+    MockWalFile(wal_file_path2, ckp_file_path, ckp_file_name);
 
     WalListIterator iterator1({wal_file_path1, wal_file_path2});
 

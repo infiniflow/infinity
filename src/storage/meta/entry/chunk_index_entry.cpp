@@ -63,8 +63,11 @@ String ChunkIndexEntry::EncodeIndex(const ChunkID chunk_id, const SegmentIndexEn
 }
 
 ChunkIndexEntry::ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count)
-    : BaseEntry(EntryType::kChunkIndex, false, ChunkIndexEntry::EncodeIndex(chunk_id, segment_index_entry)), chunk_id_(chunk_id),
-      segment_index_entry_(segment_index_entry), base_name_(base_name), base_rowid_(base_rowid), row_count_(row_count){};
+    : BaseEntry(EntryType::kChunkIndex,
+                false,
+                segment_index_entry->base_dir_,
+                ChunkIndexEntry::EncodeIndex(chunk_id, segment_index_entry)),
+      chunk_id_(chunk_id), segment_index_entry_(segment_index_entry), base_name_(base_name), base_rowid_(base_rowid), row_count_(row_count){};
 
 UniquePtr<IndexFileWorker> ChunkIndexEntry::CreateFileWorker(const SharedPtr<IndexBase> index_base,
                                                              const SharedPtr<ColumnDef> column_def,

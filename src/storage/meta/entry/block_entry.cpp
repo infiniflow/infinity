@@ -59,8 +59,8 @@ String BlockEntry::EncodeIndex(const BlockID block_id, const SegmentEntry *segme
 
 /// class BlockEntry
 BlockEntry::BlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts)
-    : BaseEntry(EntryType::kBlock, false, BlockEntry::EncodeIndex(block_id, segment_entry)), segment_entry_(segment_entry), block_id_(block_id),
-      row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE), checkpoint_ts_(checkpoint_ts) {}
+    : BaseEntry(EntryType::kBlock, false, segment_entry->base_dir_, BlockEntry::EncodeIndex(block_id, segment_entry)), segment_entry_(segment_entry),
+      block_id_(block_id), row_count_(0), row_capacity_(DEFAULT_VECTOR_SIZE), checkpoint_ts_(checkpoint_ts) {}
 
 UniquePtr<BlockEntry>
 BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, TxnTimeStamp checkpoint_ts, u64 column_count, Txn *txn) {
@@ -69,14 +69,15 @@ BlockEntry::NewBlockEntry(const SegmentEntry *segment_entry, BlockID block_id, T
     block_entry->begin_ts_ = txn->BeginTS();
     block_entry->txn_id_ = txn->TxnID();
 
-    block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
+    block_entry->block_dir_ = BlockEntry::DetermineDir(*block_entry->base_dir_, *segment_entry->segment_dir(), block_id);
     block_entry->columns_.reserve(column_count);
     for (SizeT column_id = 0; column_id < column_count; ++column_id) {
         auto column_entry = BlockColumnEntry::NewBlockColumnEntry(block_entry.get(), column_id, txn);
         block_entry->columns_.emplace_back(std::move(column_entry));
     }
 
-    auto version_file_worker = MakeUnique<VersionFileWorker>(block_entry->block_dir_, BlockVersion::FileName(), block_entry->row_capacity_);
+    SharedPtr<String> file_dir = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->block_dir_));
+    auto version_file_worker = MakeUnique<VersionFileWorker>(file_dir, BlockVersion::FileName(), block_entry->row_capacity_);
     auto *buffer_mgr = txn->buffer_mgr();
     block_entry->block_version_ = buffer_mgr->AllocateBufferObject(std::move(version_file_worker));
     return block_entry;
@@ -102,9 +103,10 @@ UniquePtr<BlockEntry> BlockEntry::NewReplayBlockEntry(const SegmentEntry *segmen
     block_entry->min_row_ts_ = min_row_ts;
     block_entry->max_row_ts_ = max_row_ts;
     block_entry->commit_ts_ = commit_ts;
-    block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->segment_dir(), block_id);
+    block_entry->block_dir_ = BlockEntry::DetermineDir(*segment_entry->base_dir_, *segment_entry->segment_dir(), block_id);
 
-    auto version_file_worker = MakeUnique<VersionFileWorker>(block_entry->block_dir_, BlockVersion::FileName(), row_capacity);
+    SharedPtr<String> file_dir = MakeShared<String>(fmt::format("{}/{}", *segment_entry->base_dir_, *block_entry->block_dir_));
+    auto version_file_worker = MakeUnique<VersionFileWorker>(file_dir, BlockVersion::FileName(), row_capacity);
     block_entry->block_version_ = buffer_mgr->GetBufferObject(std::move(version_file_worker));
 
     block_entry->checkpoint_ts_ = check_point_ts;
@@ -464,12 +466,12 @@ i32 BlockEntry::GetAvailableCapacity() {
     return this->row_capacity_ - this->row_count_;
 }
 
-SharedPtr<String> BlockEntry::DetermineDir(const String &parent_dir, BlockID block_id) {
+SharedPtr<String> BlockEntry::DetermineDir(const String &base_dir, const String &parent_dir, BlockID block_id) {
     LocalFileSystem fs;
-    SharedPtr<String> base_dir;
-    base_dir = MakeShared<String>(fmt::format("{}/blk_{}", parent_dir, block_id));
-    fs.CreateDirectoryNoExp(*base_dir);
-    return base_dir;
+    SharedPtr<String> relative_dir = MakeShared<String>(fmt::format("{}/blk_{}", parent_dir, block_id));
+    SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", base_dir, *relative_dir));
+    fs.CreateDirectoryNoExp(*full_dir);
+    return relative_dir;
 }
 
 void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, ColumnID column_id) {

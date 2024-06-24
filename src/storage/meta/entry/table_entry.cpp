@@ -87,9 +87,12 @@ TableEntry::TableEntry(bool is_delete,
                        TxnTimeStamp begin_ts,
                        SegmentID unsealed_id,
                        SegmentID next_segment_id)
-    : BaseEntry(EntryType::kTable, is_delete, TableEntry::EncodeIndex(*table_name, table_meta)), table_meta_(table_meta),
-      table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns), table_entry_type_(table_entry_type),
-      unsealed_id_(unsealed_id), next_segment_id_(next_segment_id) {
+    : BaseEntry(EntryType::kTable,
+                is_delete,
+                table_meta ? table_meta->data_dir_ptr() : MakeShared<String>(),
+                TableEntry::EncodeIndex(*table_name, table_meta)),
+      table_meta_(table_meta), table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns),
+      table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id) {
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
 
@@ -106,6 +109,7 @@ TableEntry::TableEntry(bool is_delete,
 }
 
 SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
+                                                const SharedPtr<String> &base_dir,
                                                 const SharedPtr<String> &db_entry_dir,
                                                 SharedPtr<String> table_name,
                                                 const Vector<SharedPtr<ColumnDef>> &columns,
@@ -113,7 +117,8 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                                 TableMeta *table_meta,
                                                 TransactionID txn_id,
                                                 TxnTimeStamp begin_ts) {
-    SharedPtr<String> table_entry_dir = is_delete ? MakeShared<String>("deleted") : TableEntry::DetermineTableDir(*db_entry_dir, *table_name);
+    SharedPtr<String> temp_dir = TableEntry::DetermineTableDir(*base_dir, *db_entry_dir, *table_name);
+    SharedPtr<String> table_entry_dir = is_delete ? MakeShared<String>("deleted") : temp_dir;
     return MakeShared<TableEntry>(is_delete,
                                   std::move(table_entry_dir),
                                   std::move(table_name),

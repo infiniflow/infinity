@@ -320,8 +320,8 @@ export struct WalCmdUpdateSegmentBloomFilterData : public WalCmd {
 };
 
 export struct WalCmdCheckpoint : public WalCmd {
-    WalCmdCheckpoint(i64 max_commit_ts, bool is_full_checkpoint, String catalog_path)
-        : max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path) {}
+    WalCmdCheckpoint(i64 max_commit_ts, bool is_full_checkpoint, String catalog_path, String catalog_name)
+        : max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path), catalog_name_(catalog_name) {}
     virtual WalCommandType GetType() override { return WalCommandType::CHECKPOINT; }
 
     virtual bool operator==(const WalCmd &other) const override;
@@ -333,6 +333,7 @@ export struct WalCmdCheckpoint : public WalCmd {
     i64 max_commit_ts_{};
     bool is_full_checkpoint_;
     String catalog_path_{};
+    String catalog_name_{};
 };
 
 export struct WalCmdCompact : public WalCmd {

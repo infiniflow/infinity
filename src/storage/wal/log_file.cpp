@@ -58,7 +58,7 @@ Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> CatalogFile::P
     return res;
 }
 
-String CatalogFile::FullCheckpoingFilename(TxnTimeStamp max_commit_ts) { return fmt::format("FULL.{}.json", max_commit_ts); }
+String CatalogFile::FullCheckpointFilename(TxnTimeStamp max_commit_ts) { return fmt::format("FULL.{}.json", max_commit_ts); }
 
 String CatalogFile::TempFullCheckpointFilename(TxnTimeStamp max_commit_ts) { return fmt::format("_FULL.{}.json", max_commit_ts); }
 

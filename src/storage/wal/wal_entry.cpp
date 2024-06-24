@@ -279,7 +279,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             i64 max_commit_ts = ReadBufAdv<i64>(ptr);
             bool is_full_checkpoint = ReadBufAdv<i8>(ptr);
             String catalog_path = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, is_full_checkpoint, catalog_path);
+            String catalog_name = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, is_full_checkpoint, catalog_path, catalog_name);
             break;
         }
         case WalCommandType::CREATE_INDEX: {
@@ -479,7 +480,7 @@ i32 WalCmdUpdateSegmentBloomFilterData::GetSizeInBytes() const {
     return sz;
 }
 
-i32 WalCmdCheckpoint::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i64) + sizeof(i8) + sizeof(i32) + this->catalog_path_.size(); }
+i32 WalCmdCheckpoint::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i64) + sizeof(i8) + sizeof(i32) + sizeof(i32) + this->catalog_path_.size() + this->catalog_name_.size(); }
 
 i32 WalCmdCompact::GetSizeInBytes() const {
     i32 size = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32);
@@ -587,6 +588,7 @@ void WalCmdCheckpoint::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->max_commit_ts_);
     WriteBufAdv(buf, i8(this->is_full_checkpoint_));
     WriteBufAdv(buf, this->catalog_path_);
+    WriteBufAdv(buf, this->catalog_name_);
 }
 
 void WalCmdCompact::WriteAdv(char *&buf) const {
@@ -752,7 +754,7 @@ String WalEntry::ToString() const {
         ss << "[" << WalCmd::WalCommandTypeToString(cmd->GetType()) << "]" << std::endl;
         if (cmd->GetType() == WalCommandType::CHECKPOINT) {
             auto checkpoint_cmd = dynamic_cast<const WalCmdCheckpoint *>(cmd.get());
-            ss << "catalog path: " << checkpoint_cmd->catalog_path_ << std::endl;
+            ss << "catalog path: " << fmt::format("{}/{}", checkpoint_cmd->catalog_path_, checkpoint_cmd->catalog_name_) << std::endl;
             ss << "max commit ts: " << checkpoint_cmd->max_commit_ts_ << std::endl;
             ss << "is full checkpoint: " << checkpoint_cmd->is_full_checkpoint_ << std::endl;
         } else if (cmd->GetType() == WalCommandType::IMPORT) {

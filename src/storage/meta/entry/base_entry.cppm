@@ -46,7 +46,11 @@ export enum class EntryType : i8 {
 
 export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type, bool is_delete, String encode)
-        : deleted_(is_delete), entry_type_(entry_type), encode_(MakeUnique<String>(std::move(encode))) {}
+        : deleted_(is_delete), entry_type_(entry_type), base_dir_(nullptr), encode_(MakeUnique<String>(std::move(encode))) {}
+
+    explicit BaseEntry(EntryType entry_type, bool is_delete, SharedPtr<String> base_dir, String encode)
+        : deleted_(is_delete), entry_type_(entry_type), base_dir_(base_dir),
+          encode_(MakeUnique<String>(std::move(encode))) {}
 
     virtual ~BaseEntry() = default;
 
@@ -66,6 +70,10 @@ public:
 
     bool Deleted() const { return deleted_; }
 
+    const String &base_dir() const { return *base_dir_; }
+
+    SharedPtr<String> base_dir_ptr() const { return base_dir_; }
+
     const String &encode() const { return *encode_; }
 
     SharedPtr<String> encode_ptr() const { return encode_; }
@@ -73,16 +81,16 @@ public:
     // return if this entry is visible to the `txn`
     virtual bool CheckVisible(Txn *txn) const {
         TxnTimeStamp begin_ts = txn->BeginTS();
-        if (begin_ts >= commit_ts_ || txn_id_ == txn->TxnID()) { 
+        if (begin_ts >= commit_ts_ || txn_id_ == txn->TxnID()) {
             return true;
         }
         TxnManager *txn_mgr = txn->txn_mgr();
         if (txn_mgr == nullptr) { // when replay
             String error_message = fmt::format("Replay should not reach here. begin_ts: {}, commit_ts_: {} txn_id: {}, txn_id_: {}",
-                                                                              begin_ts,
-                                                                              commit_ts_,
-                                                                              txn->TxnID(),
-                                                                              txn_id_);
+                                               begin_ts,
+                                               commit_ts_,
+                                               txn->TxnID(),
+                                               txn_id_);
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
@@ -97,6 +105,8 @@ public:
     const bool deleted_;
 
     const EntryType entry_type_;
+
+    SharedPtr<String> base_dir_;
 
 private:
     SharedPtr<String> encode_;
