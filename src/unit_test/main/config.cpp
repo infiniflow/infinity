@@ -32,7 +32,7 @@ TEST_F(ConfigTest, test1) {
     using namespace infinity;
     SharedPtr<String> path = nullptr;
     Config config;
-    config.Init(path);
+    config.Init(path, LogLevel::kInfo);
 
     EXPECT_EQ(config.Version(), "0.2.0");
     EXPECT_EQ(config.TimeZone(), "UTC");
@@ -65,7 +65,7 @@ TEST_F(ConfigTest, test2) {
     using namespace infinity;
     SharedPtr<String> path = MakeShared<String>(String(test_data_path()) + "/config/infinity_conf.toml");
     Config config;
-    config.Init(path);
+    config.Init(path, LogLevel::kInfo);
 
     EXPECT_EQ(config.Version(), "0.2.0");
     EXPECT_EQ(config.TimeZone(), "UTC");

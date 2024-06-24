@@ -154,7 +154,7 @@ void Storage::Init() {
 }
 
 void Storage::UnInit() {
-    fmt::print("Shutdown storage ...\n");
+    fmt::print("Close storage ...\n");
     periodic_trigger_thread_->Stop();
     if (compact_processor_.get() != nullptr) {
         compact_processor_->Stop();
@@ -171,7 +171,7 @@ void Storage::UnInit() {
     new_catalog_.reset();
     buffer_mgr_.reset();
     config_ptr_ = nullptr;
-    fmt::print("Shutdown storage successfully\n");
+    fmt::print("Close storage successfully\n");
 }
 
 void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {

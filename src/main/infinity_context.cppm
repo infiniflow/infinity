@@ -42,7 +42,7 @@ public:
     [[nodiscard]] inline ThreadPool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
 
-    void Init(const SharedPtr<String> &config_path);
+    void Init(const SharedPtr<String> &config_path, LogLevel log_level = LogLevel::kInfo);
 
     void UnInit();
 

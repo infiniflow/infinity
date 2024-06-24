@@ -30,7 +30,7 @@ import variables;
 
 namespace infinity {
 
-void InfinityContext::Init(const SharedPtr<String> &config_path) {
+void InfinityContext::Init(const SharedPtr<String> &config_path, LogLevel log_level) {
     if (initialized_) {
         return;
     } else {
@@ -39,7 +39,7 @@ void InfinityContext::Init(const SharedPtr<String> &config_path) {
 
         // Config
         config_ = MakeUnique<Config>();
-        auto status = config_->Init(config_path);
+        auto status = config_->Init(config_path, log_level);
         if (!status.ok()) {
             fmt::print("Error: {}", *status.msg_);
             std::exit(static_cast<int>(status.code()));

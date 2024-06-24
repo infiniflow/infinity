@@ -30,7 +30,7 @@ export constexpr std::string_view log_level = "log_level";
 
 export struct Config {
 public:
-    Status Init(const SharedPtr<String> &config_path);
+    Status Init(const SharedPtr<String> &config_path, LogLevel log_level);
 
     void PrintAll();
 

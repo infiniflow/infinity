@@ -117,7 +117,7 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
 
 // extern SharedPtr<spdlogger> infinity_logger;
 
-Status Config::Init(const SharedPtr<String> &config_path) {
+Status Config::Init(const SharedPtr<String> &config_path, LogLevel default_log_level) {
 
     LocalFileSystem fs;
 
@@ -270,7 +270,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
         }
 
         // Log Level
-        LogLevel log_level = LogLevel::kInfo;
+        LogLevel log_level = default_log_level;
         UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>(LOG_LEVEL_OPTION_NAME, log_level);
         status = global_options_.AddOption(std::move(log_level_option));
         if(!status.ok()) {
@@ -956,7 +956,7 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
                 if(global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel) == nullptr) {
                     // Log Level
-                    LogLevel log_level = LogLevel::kInfo;
+                    LogLevel log_level = default_log_level;
                     UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>(LOG_LEVEL_OPTION_NAME, log_level);
                     Status status = global_options_.AddOption(std::move(log_level_option));
                     if(!status.ok()) {

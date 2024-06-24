@@ -58,7 +58,7 @@ protected:
 
     void SetUp() override {
         Config config;
-        config.Init(nullptr);
+        config.Init(nullptr, LogLevel::kInfo);
         Logger::Initialize(&config);
 
         data_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/data");
