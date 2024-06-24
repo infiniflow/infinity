@@ -34,11 +34,9 @@ import block_index;
 
 import default_values;
 import infinity_exception;
-import infinity_exception;
 import third_party;
 import logger;
 import column_vector;
-import infinity_exception;
 import logical_type;
 
 import block_entry;
