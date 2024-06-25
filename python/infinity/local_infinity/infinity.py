@@ -32,7 +32,7 @@ class LocalInfinityConnection(InfinityConnection, ABC):
         elif conflict_type == ConflictType.Replace:
             create_database_conflict = LocalConflictType.kReplace
         else:
-            raise InfinityException(ErrorCode.kInvalidConflictType, "Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
         res = self._client.create_database(db_name, create_database_conflict)
 
         if res.error_code == ErrorCode.OK:
