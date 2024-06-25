@@ -156,7 +156,10 @@ class InfinityLocalQueryBuilder(ABC):
         sparse_opt_params = []
         if opt_params != None:
             for k, v in opt_params.items():
-                sparse_opt_params.append(InitParameter(k, v))
+                params = InitParameter()
+                params.param_name = k
+                params.param_value = v
+                sparse_opt_params.append(params)
         match_sparse_expr = WrapMatchSparseExpr()
         match_sparse_expr.column_expr = column_expr
 

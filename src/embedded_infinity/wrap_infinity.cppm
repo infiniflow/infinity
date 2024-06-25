@@ -361,6 +361,6 @@ export WrapQueryResult WrapSearch(Infinity &instance,
                                   WrapParsedExpr *limit_expr = nullptr,
                                   WrapParsedExpr *offset_expr = nullptr);
 
-export WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name);
+export WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, OptimizeOptions optimize_options);
 
 } // namespace infinity

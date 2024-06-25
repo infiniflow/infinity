@@ -283,7 +283,11 @@ NB_MODULE(embedded_infinity_ext, m) {
              nb::arg("where_expr") = nullptr,
              nb::arg("limit_expr") = nullptr,
              nb::arg("offset_expr") = nullptr)
-        .def("Optimize", &WrapOptimize);
+        .def("Optimize",
+             &WrapOptimize,
+             nb::arg("db_name"),
+             nb::arg("table_name"),
+             nb::arg("optimize_options"));
 
     // extra_ddl_info
     nb::enum_<ConflictType>(m, "ConflictType")
@@ -351,6 +355,11 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("delimiter", &ExportOptions::delimiter_)
         .def_rw("header", &ExportOptions::header_)
         .def_rw("copy_file_type", &ExportOptions::copy_file_type_);
+
+    nb::class_<OptimizeOptions>(m, "OptimizeOptions")
+        .def(nb::init<>())
+        .def_rw("index_name", &OptimizeOptions::index_name_)
+        .def_rw("opt_params", &OptimizeOptions::opt_params_);
 
     // parsed_expr
     nb::enum_<ParsedExprType>(m, "ParsedExprType")

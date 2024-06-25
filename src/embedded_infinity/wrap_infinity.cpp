@@ -1251,8 +1251,8 @@ WrapQueryResult WrapShowTables(Infinity &instance, const String &db_name) {
     return wrap_query_result;
 }
 
-WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name) {
-    auto query_result = instance.Optimize(db_name, table_name);
+WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, OptimizeOptions optimize_options) {
+    auto query_result = instance.Optimize(db_name, table_name, std::move(optimize_options));
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 

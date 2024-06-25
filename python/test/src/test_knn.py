@@ -750,10 +750,13 @@ class TestKnn(TestSdk):
                                                           index.InitParameter(
                                                               "compress_type", "compress")
                                                       ])], ConflictType.Error)
+
+        table_obj.optimize("idx1", {"topk": "3"})
         
         res = (table_obj
                 .output(["*", "_row_id", "_similarity"])
-                .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
+                .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3,
+                              {"alpha": "1.0", "beta": "1.0"})
                 .to_pl())
         print(res)
 
