@@ -32,6 +32,8 @@ class SparseInfo : public TypeInfo {
 public:
     static SparseStoreType ParseStoreType(const std::vector<std::unique_ptr<InitParameter>> &options);
 
+    static EmbeddingDataType GetIndexType(size_t dimension);
+
     static std::shared_ptr<SparseInfo>
     Make(EmbeddingDataType data_type, size_t dimension, SparseStoreType store_type);
 

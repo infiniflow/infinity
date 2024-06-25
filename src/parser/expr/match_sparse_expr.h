@@ -35,11 +35,16 @@ public:
 
     void SetMetricType(char *&raw_metric_type);
 
+    void SetMetricType(const std::string &metric_type);
+
     void SetOptParams(size_t topn, std::vector<InitParameter *> *&opt_params);
 
     static std::string MetricTypeToString(SparseMetricType metric);
 
     [[nodiscard]] std::string ToString() const override;
+
+private:
+    void SetMetricTypeInner(std::string_view metric_type);
 
 public:
     const bool own_memory_;

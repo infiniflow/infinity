@@ -32,10 +32,7 @@ SparseStoreType SparseInfo::ParseStoreType(const std::vector<std::unique_ptr<Ini
     return store_type;
 }
 
-std::shared_ptr<SparseInfo> SparseInfo::Make(EmbeddingDataType data_type, size_t dimension, SparseStoreType store_type) {
-    if (dimension == 0 || store_type == SparseStoreType::kInvalid) {
-        return nullptr;
-    }
+EmbeddingDataType SparseInfo::GetIndexType(size_t dimension) {
     EmbeddingDataType index_type = EmbeddingDataType::kElemInvalid;
     if (dimension <= std::numeric_limits<int8_t>::max() + 1) {
         index_type = EmbeddingDataType::kElemInt8;
@@ -48,6 +45,14 @@ std::shared_ptr<SparseInfo> SparseInfo::Make(EmbeddingDataType data_type, size_t
     } else {
         ParserAssert(false, "Sparse embedding dimension is too large");
     }
+    return index_type;
+}
+
+std::shared_ptr<SparseInfo> SparseInfo::Make(EmbeddingDataType data_type, size_t dimension, SparseStoreType store_type) {
+    if (dimension == 0 || store_type == SparseStoreType::kInvalid) {
+        return nullptr;
+    }
+    EmbeddingDataType index_type = SparseInfo::GetIndexType(dimension);
     return std::make_shared<SparseInfo>(data_type, index_type, dimension, store_type);
 }
 

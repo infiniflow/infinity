@@ -66,6 +66,11 @@ def get_infinity_db(request):
 def skip_if_local_infinity(request):
     if request.config.getoption("--local-infinity"):
         pytest.skip("Skipping local-infinity test")
+    
+@pytest.fixture(scope="function")
+def skip_if_remote_infinity(request):
+    if not request.config.getoption("--local-infinity"):
+        pytest.skip("Skipping remote-infinity test")
 
 @pytest.fixture(scope="function", autouse=False)
 def get_infinity_connection_pool():

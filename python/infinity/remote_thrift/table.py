@@ -233,6 +233,23 @@ class RemoteTable(Table, ABC):
                                 f64_tensor_array_value=float_list)
                     else:
                         raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid list type: {type(value)}")
+                elif isinstance(value, dict):
+                    if isinstance(value["values"][0], int):
+                        if isinstance(value["indices"][0], int):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.SparseIntegerArray,
+                                i64_array_value = value["values"],
+                                i64_array_idx = value["indices"])
+                        else:
+                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
+                    elif isinstance(value["values"][0], float):
+                        if isinstance(value["indices"][0], int):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.SparseDoubleArray,
+                                f64_array_value = value["values"],
+                                i64_array_idx = value["indices"])
+                        else:
+                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
                 else:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
 
@@ -414,6 +431,10 @@ class RemoteTable(Table, ABC):
                                         extra_option)
         return self
 
+    def match_sparse(self, vector_column_name: str, sparse_data, distance_type: str, topn: int, opt_params: {} = None):
+        self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
+        return self
+
     @params_type_check
     def fusion(self, method: str, options_text: str = '', match_tensor_expr: ttypes.MatchTensorExpr = None):
         self.query_builder.fusion(method, options_text, match_tensor_expr)
@@ -449,6 +470,12 @@ class RemoteTable(Table, ABC):
 
     def explain(self, explain_type: ExplainType = ExplainType.Physical):
         return self.query_builder.explain(explain_type)
+
+    def optimize(self, index_name: str, opt_params: dict[str, str]):
+        opt_options = ttypes.OptimizeOptions()
+        opt_options.index_name_ = index_name
+        opt_options.opt_params_ = [ttypes.InitParameter(k, v) for k, v in opt_params.items()]
+        return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
 
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
 

@@ -28,38 +28,45 @@ class IndexType(Enum):
     FullText = 4
     Secondary = 5
     EMVB = 6
+    BMP = 7
 
     def to_ttype(self):
-        if self == IndexType.IVFFlat:
-            return ttypes.IndexType.IVFFlat
-        elif self == IndexType.HnswLVQ:
-            return ttypes.IndexType.HnswLVQ
-        elif self == IndexType.Hnsw:
-            return ttypes.IndexType.Hnsw
-        elif self == IndexType.FullText:
-            return ttypes.IndexType.FullText
-        elif self == IndexType.Secondary:
-            return ttypes.IndexType.Secondary
-        elif self == IndexType.EMVB:
-            return ttypes.IndexType.EMVB
-        else:
-            raise InfinityException(3060, "Unknown index type")
+        match self:
+            case IndexType.IVFFlat:
+                return ttypes.IndexType.IVFFlat
+            case IndexType.HnswLVQ:
+                return ttypes.IndexType.HnswLVQ
+            case IndexType.Hnsw:
+                return ttypes.IndexType.Hnsw
+            case IndexType.FullText:
+                return ttypes.IndexType.FullText
+            case IndexType.Secondary:
+                return ttypes.IndexType.Secondary
+            case IndexType.EMVB:
+                return ttypes.IndexType.EMVB
+            case IndexType.BMP:
+                return ttypes.IndexType.BMP
+            case _:
+                raise InfinityException(3060, "Unknown index type")
 
     def to_local_type(self):
-        if self == IndexType.IVFFlat:
-            return LocalIndexType.kIVFFlat
-        elif self == IndexType.HnswLVQ:
-            return LocalIndexType.kHnswLVQ
-        elif self == IndexType.Hnsw:
-            return LocalIndexType.kHnsw
-        elif self == IndexType.FullText:
-            return LocalIndexType.kFullText
-        elif self == IndexType.Secondary:
-            return LocalIndexType.kSecondary
-        elif self == IndexType.EMVB:
-            return LocalIndexType.kEMVB
-        else:
-            raise Exception("Unknown index type")
+        match self:
+            case IndexType.IVFFlat:
+                return LocalIndexType.kIVFFlat
+            case IndexType.HnswLVQ:
+                return LocalIndexType.kHnswLVQ
+            case IndexType.Hnsw:
+                return LocalIndexType.kHnsw
+            case IndexType.FullText:
+                return LocalIndexType.kFullText
+            case IndexType.Secondary:
+                return LocalIndexType.kSecondary
+            case IndexType.EMVB:
+                return LocalIndexType.kEMVB
+            case IndexType.BMP:
+                return LocalIndexType.kBMP
+            case _:
+                raise InfinityException(3060, "Unknown index type")
 
 class InitParameter:
     def __init__(self, param_name: str, param_value: str):

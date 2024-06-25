@@ -220,3 +220,6 @@ class LocalInfinityClient:
         if self.client == None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowBlockColumn(db_name, table_name, segment_id, block_id, column_id))
+    
+    def optimize(self, db_name: str, table_name: str, optimize_opt: OptimizeOptions):
+        return self.convert_res(self.client.Optimize(db_name, table_name, optimize_opt))

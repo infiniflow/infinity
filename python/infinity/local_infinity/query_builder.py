@@ -10,7 +10,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
+from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.embedded_infinity_ext import *
 from infinity.local_infinity.types import logic_type_to_dtype
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
@@ -137,6 +137,52 @@ class InfinityLocalQueryBuilder(ABC):
         self._search.knn_exprs = self._search.knn_exprs + knn_exprs
 
         assert(len(self._search.knn_exprs) > 0)
+        return self
+
+    def match_sparse(self, vector_column_name: str, sparse_data: SPARSE, metric_type: str, topn: int, opt_params: {} = None) \
+        -> InfinityLocalQueryBuilder:
+        if self._search is None:
+            self._search = WrapSearchExpr()
+        if self._search.match_sparse_exprs is None:
+            self._search.match_sparse_exprs = list()
+
+        column_expr = WrapColumnExpr()
+        column_expr.names = [vector_column_name]
+        column_expr.star = False
+
+        if not isinstance(topn, int):
+            raise InfinityException(3073, f"Invalid topn, type should be embedded, but get {type(topn)}")
+
+        sparse_opt_params = []
+        if opt_params != None:
+            for k, v in opt_params.items():
+                params = InitParameter()
+                params.param_name = k
+                params.param_value = v
+                sparse_opt_params.append(params)
+        match_sparse_expr = WrapMatchSparseExpr()
+        match_sparse_expr.column_expr = column_expr
+
+        sparse_expr = WrapConstantExpr()
+        if isinstance(sparse_data["values"][0], int):
+            sparse_expr.literal_type = LiteralType.kLongSparseArray
+            sparse_expr.i64_array_idx = sparse_data["indices"]
+            sparse_expr.i64_array_value = sparse_data["values"]
+        elif isinstance(sparse_data["values"][0], float):
+            sparse_expr.literal_type = LiteralType.kDoubleSparseArray
+            sparse_expr.i64_array_idx = sparse_data["indices"]
+            sparse_expr.f64_array_value = sparse_data["values"]
+        else:
+            raise InfinityException(3058, f"Invalid sparse data {sparse_data['values'][0]} type")
+        match_sparse_expr.sparse_expr = sparse_expr
+
+        match_sparse_expr.metric_type = metric_type
+        match_sparse_expr.topn = topn
+        match_sparse_expr.opt_params = sparse_opt_params
+        
+        match_sparse_exprs = [match_sparse_expr]
+        self._search.match_sparse_exprs = self._search.match_sparse_exprs + match_sparse_exprs
+        assert(len(self._search.match_sparse_exprs) > 0)
         return self
 
     def match(self, fields: str, matching_text: str, options_text: str = '') -> InfinityLocalQueryBuilder:

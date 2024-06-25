@@ -33,7 +33,7 @@ import session_manager;
 import query_context;
 import parsed_expr;
 import search_expr;
-
+import statement_common;
 import status;
 import create_statement;
 import show_statement;
@@ -966,7 +966,7 @@ Infinity::Search(const String &db_name, const String &table_name, SearchExpr *se
     return result;
 }
 
-QueryResult Infinity::Optimize(const String &db_name, const String &table_name) {
+QueryResult Infinity::Optimize(const String &db_name, const String &table_name, OptimizeOptions optimize_option) {
     UniquePtr<QueryContext> optimize_context_ptr = MakeUnique<QueryContext>(session_.get());
     optimize_context_ptr->Init(InfinityContext::instance().config(),
                                InfinityContext::instance().task_scheduler(),
@@ -980,6 +980,15 @@ QueryResult Infinity::Optimize(const String &db_name, const String &table_name) 
 
     optimize_statement->table_name_ = table_name;
     ToLower(optimize_statement->table_name_);
+
+    if (!optimize_option.index_name_.empty()) {
+        optimize_statement->index_name_ = std::move(optimize_option.index_name_);
+        ToLower(optimize_statement->index_name_);
+        for (auto *param_ptr : optimize_option.opt_params_) {
+            auto param = MakeUnique<InitParameter>(std::move(param_ptr->param_name_), std::move(param_ptr->param_value_));
+            optimize_statement->opt_params_.push_back(std::move(param));
+        }
+    }
 
     QueryResult result = optimize_context_ptr->QueryStatement(optimize_statement.get());
     return result;
