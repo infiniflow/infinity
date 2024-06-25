@@ -56,7 +56,10 @@ try:
         ]
     )
 
-    result = table_instance.output(["num", "body"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).match("body", "blooms", "topn=1").fusion("rrf").to_pl()
+    result = table_instance.output(["num", "body"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).match("body",
+                                                                                                             "blooms",
+                                                                                                             "topn=1").fusion(
+        "rrf").to_pl()
     print(result)
     infinity_instance.disconnect()
 

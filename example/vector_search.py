@@ -56,7 +56,8 @@ try:
         ]
     )
 
-    result = table_instance.output(["num", "vec", "_similarity"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).to_pl()
+    result = table_instance.output(["num", "vec", "_similarity"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip",
+                                                                      3).to_pl()
     print(result)
     infinity_instance.disconnect()
 

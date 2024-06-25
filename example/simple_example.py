@@ -31,9 +31,9 @@ try:
 
     # Create a table named "my_table"
     table_instance = db_instance.create_table("my_table", {
-            "num": {"type": "integer"},
-            "body": {"type": "varchar"},
-            "vec": {"type": "vector, 4, float"},
+        "num": {"type": "integer"},
+        "body": {"type": "varchar"},
+        "vec": {"type": "vector, 4, float"},
     })
 
     # Insert 3 rows of data into the 'my_table'
@@ -61,61 +61,6 @@ try:
     print(res)
 
     infinity_instance.disconnect()
-    #
-    # # `create_index()` is required before match() or fusion()
-    # # Create index on varchar column for full-text search and multiple way fusion.
-    # res = table_instance.create_index(
-    #     "my_index",
-    #     [
-    #         infinity.index.IndexInfo("body", infinity.index.IndexType.FullText, []),
-    #     ],
-    #     infinity.ConflictType.Error,
-    # )
-    #
-    #
-    #
-    # pds_df = pds.DataFrame(res)
-    # json_data = pds_df.to_json()
-    # print(json_data)
-    #
-    # print("------tabular -------")
-    # print("------vector-------")
-    # table_obj = db.get_table("my_table")
-    # qb_result = (
-    #     table_obj.output(["num", "body"])
-    #         .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3)
-    #         .to_pl()
-    # )
-    # print(qb_result)
-    #
-    # print("------fulltext-------")
-    # questions = [
-    #     r"blooms",  # single term
-    #     r"Bloom filter",  # OR multiple terms
-    #     r'"Bloom filter"',  # phrase: adjacent multiple terms
-    #     r"space efficient",  # OR multiple terms
-    #     # r"space-efficient",      # Error 3013: Invalid query statement: OrQueryNode should not have both not child and non-not child
-    #     r"space\-efficient",  # Escape reserved character '-', equivalent to: `space efficient`
-    #     r'"space\-efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
-    # ]
-    # for question in questions:
-    #     qb_result = (
-    #         table_obj.output(["num", "body", "_score"])
-    #             .match("body", question, "topn=10")
-    #             .to_pl()
-    #     )
-    #     print(f"question: {question}")
-    #     print(qb_result)
-    #
-    # print("------vector+fulltext-------")
-    # qb_result2 = (
-    #     table_obj.output(["num", "body"])
-    #         .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3)
-    #         .match("body", "blooms", "topn=1")
-    #         .fusion("rrf")
-    #         .to_pl()
-    # )
-    # print(qb_result2)
 
 except Exception as e:
     print(str(e))

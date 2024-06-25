@@ -64,30 +64,12 @@ try:
         ],
         infinity.common.ConflictType.Error,
     )
-    #
-    #
-    #
-    # pds_df = pds.DataFrame(res)
-    # json_data = pds_df.to_json()
-    # print(json_data)
-    #
-    # print("------tabular -------")
-    # print("------vector-------")
-    # table_obj = db.get_table("my_table")
-    # qb_result = (
-    #     table_obj.output(["num", "body"])
-    #         .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3)
-    #         .to_pl()
-    # )
-    # print(qb_result)
-    #
-    # print("------fulltext-------")
+
     questions = [
         r"blooms",  # single term
         r"Bloom filter",  # OR multiple terms
         r'"Bloom filter"',  # phrase: adjacent multiple terms
         r"space efficient",  # OR multiple terms
-        # r"space-efficient",      # Error 3013: Invalid query statement: OrQueryNode should not have both not child and non-not child
         r"space\-efficient",  # Escape reserved character '-', equivalent to: `space efficient`
         r'"space\-efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
     ]
@@ -99,16 +81,7 @@ try:
         )
         print(f"question: {question}")
         print(qb_result)
-    #
-    # print("------vector+fulltext-------")
-    # qb_result2 = (
-    #     table_obj.output(["num", "body"])
-    #         .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3)
-    #         .match("body", "blooms", "topn=1")
-    #         .fusion("rrf")
-    #         .to_pl()
-    # )
-    # print(qb_result2)
+
     infinity_instance.disconnect()
 
 except Exception as e:

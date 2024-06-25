@@ -22,9 +22,6 @@ import os
 current_path = os.path.abspath(__file__)
 project_directory = os.path.dirname(current_path)
 
-print(f"project dir: {project_directory}")
-print(os.getcwd())
-
 try:
     # open a local directory to store the data
     infinity_instance = infinity.connect("/var/infinity")
@@ -41,7 +38,8 @@ try:
         "doc": {"type": "varchar"},
     })
 
-    table_instance.import_data(project_directory + "/../test/data/csv/fulltext_delete.csv", {"file_type": "csv", "delimiter": "\t"})
+    table_instance.import_data(project_directory + "/../test/data/csv/fulltext_delete.csv",
+                               {"file_type": "csv", "delimiter": "\t"})
 
     result = table_instance.output(["num", "doc"]).to_pl()
     print(result)
