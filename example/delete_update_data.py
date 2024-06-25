@@ -66,6 +66,11 @@ try:
             "num": 2,
             "body": r"Office for Harmful Blooms",
             "vec": [4.0, 4.2, 4.3, 4.5],
+        },
+        {
+            "num": 2,
+            "body": r"Office for Harmful Blooms",
+            "vec": [4.0, 4.2, 4.3, 4.5],
         }
     ])
     result = table_instance.output(["num", "body"]).to_pl()
