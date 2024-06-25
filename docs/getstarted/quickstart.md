@@ -7,10 +7,11 @@ slug: /
 
 ## Prerequisites
 
-- CPU: >= 4 cores, x86_64 with AVX2, or aarch64
-- RAM: >= 16 GB
-- Disk: >= 50 GB
-- OS: Linux with glibc >=2.17
+- CPU: &ge; 4 cores, x86_64 with AVX2, or aarch64
+- RAM: &ge; 16 GB
+- Disk: &ge; 50 GB
+- OS: Linux with glibc &ge; 2.17
+- Python: Python 3.10+
 
 ## Deploy Infinity database
 
@@ -58,7 +59,7 @@ from infinity.common import LOCAL_HOST
 from infinity.common import ConflictType
 ```
 
-## Connect to the remote server
+## Connect to the local host
 
 ```python
         infinity_obj = infinity.connect(LOCAL_HOST)
@@ -121,7 +122,7 @@ from infinity.common import ConflictType
         print(res)
 ```
 
-## Execute some fulltext search
+## Execute a full-text search
 
 ```python
         questions = [
@@ -154,5 +155,6 @@ from infinity.common import ConflictType
         print(qb_result2)
 ```
 
-> 💡 For more information about the Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
-> 💡 For a complete example, see the [hello_infinity.py](../../python/hello_infinity.py).
+:::note
+For detailed information about the Python API, see the [Python API Reference](../references/pysdk_api_reference.md).
+:::
