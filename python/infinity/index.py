@@ -28,6 +28,7 @@ class IndexType(Enum):
     FullText = 4
     Secondary = 5
     EMVB = 6
+    BMP = 7
 
     def to_ttype(self):
         if self == IndexType.IVFFlat:
@@ -54,6 +55,8 @@ class IndexType(Enum):
             return LocalIndexType.kHnsw
         elif self == IndexType.FullText:
             return LocalIndexType.kFullText
+        elif self == IndexType.BMP:
+            return LocalIndexType.kBMP
         elif self == IndexType.Secondary:
             return LocalIndexType.kSecondary
         elif self == IndexType.EMVB:

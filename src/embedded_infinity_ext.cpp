@@ -448,6 +448,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kHnsw", IndexType::kHnsw)
         .value("kFullText", IndexType::kFullText)
         .value("kSecondary", IndexType::kSecondary)
+        .value("kBMP", IndexType::kBMP)
         .value("kEMVB", IndexType::kEMVB)
         .value("kInvalid", IndexType::kInvalid)
         .export_values();
