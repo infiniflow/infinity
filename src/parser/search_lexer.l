@@ -77,6 +77,8 @@ NOT |
 "^"[0-9]+("."[0-9]*)? |
 "^."[0-9]+         { yylval->build(std::strtof(yytext+1, NULL)); return token::CARAT; }
 
+"~"[0-9]+          { yylval->build(std::strtoul(yytext+1, NULL, 10)); return token::TILDE; }
+
 -?[0-9]+("."[0-9]*)? |
 -?"."[0-9]+ |
 ([a-zA-Z0-9_]|{UONLY}|{ESCAPED})+        { yylval->build<InfString>(InfString(yytext, false)); return token::STRING; }  // https://stackoverflow.com/questions/9611682/flexlexer-support-for-unicode

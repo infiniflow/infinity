@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-'''
+"""
 This example is to connect local infinity instance, create table, insert data, search the data
-'''
+"""
 
 import infinity
 
@@ -29,11 +29,14 @@ try:
     db_instance.drop_table("my_table", infinity.common.ConflictType.Ignore)
 
     # Create a table named "my_table"
-    table_instance = db_instance.create_table("my_table", {
-        "num": {"type": "integer"},
-        "body": {"type": "varchar"},
-        "vec": {"type": "vector, 4, float"},
-    })
+    table_instance = db_instance.create_table(
+        "my_table",
+        {
+            "num": {"type": "integer"},
+            "body": {"type": "varchar"},
+            "vec": {"type": "vector, 4, float"},
+        },
+    )
 
     # Insert 3 rows of data into the 'my_table'
     table_instance.insert(
@@ -51,6 +54,11 @@ try:
             {
                 "num": 3,
                 "body": r"A Bloom filter is a space-efficient probabilistic data structure, conceived by Burton Howard Bloom in 1970, that is used to test whether an element is a member of a set.",
+                "vec": [4.0, 4.2, 4.3, 4.5],
+            },
+            {
+                "num": 4,
+                "body": r"The American Football Conference (AFC) harm chemical anarchism add test is one of harm chemical the two conferences of the National Football League (NFL). This add test conference and its counterpart, the National Football Conference (NFC), currently contain 16 teams each, making up the 32 teams of the NFL. The current AFC title holder is the New England Patriots.",
                 "vec": [4.0, 4.2, 4.3, 4.5],
             },
         ]
@@ -72,12 +80,13 @@ try:
         r"space efficient",  # OR multiple terms
         r"space\-efficient",  # Escape reserved character '-', equivalent to: `space efficient`
         r'"space\-efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
+        r'"harmful chemical"~10',  # sloppy phrase, refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query-phrase.html
     ]
     for question in questions:
         qb_result = (
             table_instance.output(["num", "body", "_score"])
-                .match("body", question, "topn=10")
-                .to_pl()
+            .match("body", question, "topn=10")
+            .to_pl()
         )
         print(f"question: {question}")
         print(qb_result)

@@ -128,6 +128,13 @@ DS\-K3AJ303\/Dm140
 "first name":Alice
 "book*":quick
 "DS-K3AJ303/Dm140"
+
+#sloppy phrase
+"a b"
+"a b"~0
+"a b"~1
+"a b"~2
+"a b c"~4
     )##";
 
     Map<String, String> column2analyzer;

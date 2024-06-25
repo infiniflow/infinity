@@ -696,7 +696,7 @@ Create a full-text search expression.
     The column where text is searched, and has create full-text index on it before. 
 - **matching_text : str**
 - **options_text : str**
-    'topn=2': Retrieve the two most relevant records.
+    'topn=2': Retrieve the two most relevant records. The `topn` is `10` by default.
 
 ### Returns
 
@@ -705,7 +705,17 @@ Create a full-text search expression.
 
 ### Examples
 ```python
-table_obj.match('body', 'harmful', 'topn=2')
+questions = [
+    r"blooms",  # single term
+    r"Bloom filter",  # OR multiple terms
+    r'"Bloom filter"',  # phrase: adjacent multiple terms
+    r"space efficient",  # OR multiple terms
+    r"space\-efficient",  # Escape reserved character '-', equivalent to: `space efficient`
+    r'"space\-efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
+    r'"harmful chemical"~10',  # sloppy phrase, refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query-phrase.html
+]
+for question in questions:
+    table_obj.match('body', question, 'topn=2')
 ```
 
 ## match tensor

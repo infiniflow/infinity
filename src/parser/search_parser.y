@@ -66,6 +66,7 @@
 %token                 LPAREN
 %token                 RPAREN
 %token                 OP_COLON
+%token <unsigned long> TILDE
 %token <float>         CARAT
 %token <InfString>     STRING
 
@@ -145,6 +146,20 @@ basic_filter
     std::string field = SearchDriver::Unescape($1.text_);
     std::string text = SearchDriver::Unescape($3.text_);
     $$ = driver.AnalyzeAndBuildQueryNode(std::move(field), std::move(text), $3.from_quoted_);
+};
+| STRING TILDE {
+    const std::string &field = default_field;
+    if(field.empty()){
+        error(@1, "default_field is empty");
+        YYERROR;
+    }
+    std::string text = SearchDriver::Unescape($1.text_);
+    $$ = driver.AnalyzeAndBuildQueryNode(field, std::move(text), $1.from_quoted_, $2);
+}
+| STRING OP_COLON STRING TILDE {
+    std::string field = SearchDriver::Unescape($1.text_);
+    std::string text = SearchDriver::Unescape($3.text_);
+    $$ = driver.AnalyzeAndBuildQueryNode(std::move(field), std::move(text), $3.from_quoted_, $4);
 };
 
 %%
