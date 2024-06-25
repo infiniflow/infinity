@@ -26,6 +26,8 @@ class IndexType(Enum):
     HnswLVQ = 2
     Hnsw = 3
     FullText = 4
+    Secondary = 5
+    EMVB = 6
 
     def to_ttype(self):
         if self == IndexType.IVFFlat:
@@ -36,6 +38,10 @@ class IndexType(Enum):
             return ttypes.IndexType.Hnsw
         elif self == IndexType.FullText:
             return ttypes.IndexType.FullText
+        elif self == IndexType.Secondary:
+            return ttypes.IndexType.Secondary
+        elif self == IndexType.EMVB:
+            return ttypes.IndexType.EMVB
         else:
             raise InfinityException(3060, "Unknown index type")
 
@@ -48,6 +54,10 @@ class IndexType(Enum):
             return LocalIndexType.kHnsw
         elif self == IndexType.FullText:
             return LocalIndexType.kFullText
+        elif self == IndexType.Secondary:
+            return LocalIndexType.kSecondary
+        elif self == IndexType.EMVB:
+            return LocalIndexType.kEMVB
         else:
             raise Exception("Unknown index type")
 

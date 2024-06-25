@@ -366,15 +366,19 @@ int _kIndexTypeValues[] = {
   IndexType::IVFFlat,
   IndexType::HnswLVQ,
   IndexType::Hnsw,
-  IndexType::FullText
+  IndexType::FullText,
+  IndexType::Secondary,
+  IndexType::EMVB
 };
 const char* _kIndexTypeNames[] = {
   "IVFFlat",
   "HnswLVQ",
   "Hnsw",
-  "FullText"
+  "FullText",
+  "Secondary",
+  "EMVB"
 };
-const std::map<int, const char*> _IndexType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(4, _kIndexTypeValues, _kIndexTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _IndexType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(6, _kIndexTypeValues, _kIndexTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const IndexType::type& val) {
   std::map<int, const char*>::const_iterator it = _IndexType_VALUES_TO_NAMES.find(val);

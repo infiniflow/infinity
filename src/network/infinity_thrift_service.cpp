@@ -1605,6 +1605,10 @@ IndexType InfinityThriftService::GetIndexTypeFromProto(const infinity_thrift_rpc
             return IndexType::kHnsw;
         case infinity_thrift_rpc::IndexType::FullText:
             return IndexType::kFullText;
+        case infinity_thrift_rpc::IndexType::Secondary:
+            return IndexType::kSecondary;
+        case infinity_thrift_rpc::IndexType::EMVB:
+            return IndexType::kEMVB;
         default:
             return IndexType::kInvalid;
     }
