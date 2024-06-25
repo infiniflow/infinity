@@ -73,7 +73,7 @@ print(res)
 
 ### Deploy Infinity server
 
-If you wish to deploy a remote Infinity server and access it remotely: 
+If you wish to deploy a standalone Infinity server and access it remotely: 
 
 See [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server).
 
