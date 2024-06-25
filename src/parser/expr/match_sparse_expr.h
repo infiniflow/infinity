@@ -50,7 +50,7 @@ public:
 
     SparseMetricType metric_type_;
     size_t query_n_ = 1; // TODO: support multiple queries
-    size_t topn_;
+    size_t topn_{DEFAULT_MATCH_SPARSE_TOP_N};
 
     std::vector<std::unique_ptr<InitParameter>> opt_params_{};
 };

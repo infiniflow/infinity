@@ -128,7 +128,7 @@ UniquePtr<OperatorState> MakeMatchSparseScanState(const PhysicalMatchSparseScan 
     auto operator_state = MakeUnique<MatchSparseScanOperatorState>();
     auto *match_sparse_scan_source_state = static_cast<MatchSparseScanSourceState *>(source_state);
     operator_state->match_sparse_scan_function_data_ =
-        MatchSparseScanFunctionData(physical_match_sparse_scan->GetBlockIndex(), match_sparse_scan_source_state->global_ids_);
+        MatchSparseScanFunctionData(match_sparse_scan_source_state->global_ids_, match_sparse_scan_source_state->segment_ids_);
     return operator_state;
 }
 
@@ -158,18 +158,20 @@ UniquePtr<OperatorState> MakeKnnScanState(PhysicalKnnScan *physical_knn_scan, Fr
 
     UniquePtr<OperatorState> operator_state = MakeUnique<KnnScanOperatorState>();
     KnnScanOperatorState *knn_scan_op_state_ptr = (KnnScanOperatorState *)(operator_state.get());
-
+    const bool execute_block_scan_job = task->TaskID() < static_cast<i64>(physical_knn_scan->BlockScanTaskCount());
     switch (fragment_ctx->ContextType()) {
         case FragmentType::kSerialMaterialize: {
             SerialMaterializedFragmentCtx *serial_materialize_fragment_ctx = static_cast<SerialMaterializedFragmentCtx *>(fragment_ctx);
             knn_scan_op_state_ptr->knn_scan_function_data_ =
-                MakeUnique<KnnScanFunctionData>(serial_materialize_fragment_ctx->knn_scan_shared_data_.get(), task->TaskID());
+                MakeUnique<KnnScanFunctionData>(serial_materialize_fragment_ctx->knn_scan_shared_data_.get(), task->TaskID(), execute_block_scan_job);
             break;
         }
         case FragmentType::kParallelMaterialize: {
             ParallelMaterializedFragmentCtx *parallel_materialize_fragment_ctx = static_cast<ParallelMaterializedFragmentCtx *>(fragment_ctx);
             knn_scan_op_state_ptr->knn_scan_function_data_ =
-                MakeUnique<KnnScanFunctionData>(parallel_materialize_fragment_ctx->knn_scan_shared_data_.get(), task->TaskID());
+                MakeUnique<KnnScanFunctionData>(parallel_materialize_fragment_ctx->knn_scan_shared_data_.get(),
+                                                task->TaskID(),
+                                                execute_block_scan_job);
             break;
         }
         default: {
@@ -976,8 +978,9 @@ void FragmentContext::MakeSourceState(i64 parallel_count) {
             }
             auto *match_sparse_scan_operator = static_cast<PhysicalMatchSparseScan *>(first_operator);
             Vector<SharedPtr<Vector<GlobalBlockID>>> blocks_group = match_sparse_scan_operator->PlanBlockEntries(parallel_count);
+            Vector<SharedPtr<Vector<SegmentID>>> segment_group = match_sparse_scan_operator->PlanWithIndex(blocks_group, parallel_count);
             for (i64 task_id = 0; task_id < parallel_count; ++task_id) {
-                tasks_[task_id]->source_state_ = MakeUnique<MatchSparseScanSourceState>(std::move(blocks_group[task_id]));
+                tasks_[task_id]->source_state_ = MakeUnique<MatchSparseScanSourceState>(std::move(blocks_group[task_id]), segment_group[task_id]);
             }
             break;
         }

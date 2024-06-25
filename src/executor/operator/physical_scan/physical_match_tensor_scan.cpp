@@ -68,6 +68,7 @@ import match_tensor_scan_function_data;
 import mlas_matrix_multiply;
 import physical_fusion;
 import filter_value_type_classification;
+import logical_match_tensor_scan;
 
 namespace infinity {
 
@@ -77,9 +78,10 @@ PhysicalMatchTensorScan::PhysicalMatchTensorScan(u64 id,
                                                  SharedPtr<MatchTensorExpression> match_tensor_expression,
                                                  const SharedPtr<CommonQueryFilter> &common_query_filter,
                                                  u32 topn,
+                                                 const MatchTensorScanIndexOptions &index_options,
                                                  SharedPtr<Vector<LoadMeta>> load_metas)
     : PhysicalFilterScanBase(id, PhysicalOperatorType::kMatchTensorScan, nullptr, nullptr, base_table_ref, common_query_filter, load_metas),
-      table_index_(table_index), match_tensor_expr_(std::move(match_tensor_expression)), topn_(topn) {
+      table_index_(table_index), match_tensor_expr_(std::move(match_tensor_expression)), topn_(topn), index_options_(index_options) {
     search_column_id_ = std::numeric_limits<ColumnID>::max();
 }
 
@@ -191,6 +193,7 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalMatchTensorScan::PlanBlockEntri
     return {};
 }
 
+// TODO: how many threads for brute force scan?
 SizeT PhysicalMatchTensorScan::TaskletCount() { return block_column_entries_.size() + index_entries_.size(); }
 
 bool PhysicalMatchTensorScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
@@ -268,11 +271,11 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                                          segment_entry,
                                                                          block_index,
                                                                          begin_ts,
-                                                                         3,
-                                                                         0.4f,
-                                                                         topn_ * 100,
-                                                                         topn_ * 20,
-                                                                         0.5f);
+                                                                         index_options_.emvb_centroid_nprobe_,
+                                                                         index_options_.emvb_threshold_first_,
+                                                                         index_options_.emvb_n_doc_to_score_,
+                                                                         index_options_.emvb_n_doc_out_second_stage_,
+                                                                         index_options_.emvb_threshold_final_);
                 std::visit(Overload{[segment_id, &function_data](const Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> &index_result) {
                                         const auto &[result_num, score_ptr, row_id_ptr] = index_result;
                                         for (u32 i = 0; i < result_num; ++i) {
@@ -325,11 +328,11 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                       segment_entry,
                                                       block_index,
                                                       begin_ts,
-                                                      3,
-                                                      0.4f,
-                                                      topn_ * 100,
-                                                      topn_ * 20,
-                                                      0.5f);
+                                                      index_options_.emvb_centroid_nprobe_,
+                                                      index_options_.emvb_threshold_first_,
+                                                      index_options_.emvb_n_doc_to_score_,
+                                                      index_options_.emvb_n_doc_out_second_stage_,
+                                                      index_options_.emvb_threshold_final_);
                     for (u32 i = 0; i < result_num; ++i) {
                         function_data.result_handler_->AddResult(0, score_ptr[i], RowID(segment_id, row_id_ptr[i]));
                     }

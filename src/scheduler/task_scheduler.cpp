@@ -46,27 +46,32 @@ namespace infinity {
 TaskScheduler::TaskScheduler(Config *config_ptr) { Init(config_ptr); }
 
 void TaskScheduler::Init(Config *config_ptr) {
-    worker_count_ = config_ptr->CPULimit();
+    const u64 cpu_count = Thread::hardware_concurrency();
+    const u64 config_cpu_limit = config_ptr->CPULimit();
+    worker_count_ = std::min(cpu_count, config_cpu_limit);
     worker_array_.reserve(worker_count_);
     worker_workloads_.resize(worker_count_);
-    u64 cpu_count = Thread::hardware_concurrency();
 
-    u64 cpu_select_step = cpu_count / worker_count_;
-    if (cpu_select_step >= 2) {
-        cpu_select_step = 2;
-    } else {
-        cpu_select_step = 1;
+    Vector<u64> cpu_id_vec;
+    cpu_id_vec.reserve(cpu_count);
+    // even cpus first
+    for (u64 cpu_id = 0; cpu_id < cpu_count; cpu_id += 2) {
+        cpu_id_vec.push_back(cpu_id);
+    }
+    // then add odd cpus
+    for (u64 cpu_id = 1; cpu_id < cpu_count; cpu_id += 2) {
+        cpu_id_vec.push_back(cpu_id);
     }
 
-    for (u64 cpu_id = 0, worker_id = 0; worker_id < worker_count_; ++worker_id) {
+    for (u64 worker_id = 0; worker_id < worker_count_; ++worker_id) {
+        const u64 cpu_id = cpu_id_vec[worker_id];
         UniquePtr<FragmentTaskBlockQueue> worker_queue = MakeUnique<FragmentTaskBlockQueue>();
         UniquePtr<Thread> worker_thread = MakeUnique<Thread>(&TaskScheduler::WorkerLoop, this, worker_queue.get(), worker_id);
         // Pin the thread to specific cpu
-        ThreadUtil::pin(*worker_thread, cpu_id % cpu_count);
+        ThreadUtil::pin(*worker_thread, cpu_id);
 
         worker_array_.emplace_back(cpu_id, std::move(worker_queue), std::move(worker_thread));
         worker_workloads_[worker_id] = 0;
-        cpu_id += cpu_select_step;
     }
 
     if (worker_array_.empty()) {

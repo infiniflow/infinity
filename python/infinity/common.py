@@ -46,3 +46,6 @@ class InfinityException(Exception):
     def __init__(self, error_code=0, error_message=None):
         self.error_code = error_code
         self.error_message = error_message
+
+DEFAULT_MATCH_VECTOR_TOPN = 10
+DEFAULT_MATCH_SPARSE_TOPN = 10

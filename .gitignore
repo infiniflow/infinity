@@ -129,3 +129,5 @@ callgrind.out.*
 python/benchmark/datasets/
 
 .venv/
+
+dist/

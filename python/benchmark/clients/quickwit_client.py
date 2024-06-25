@@ -186,10 +186,27 @@ class QuickwitClient(BaseClient):
                 }
             }
         else:
-            ret = {
-                "query": {"query_string": {"query": query, "fields": ["body"]}},
-                "sort": ["_score"],
-            }
+            is_phrase = False
+            query = query.lstrip()
+            if query.startswith('"'):
+                is_phrase = True
+
+            if is_phrase:
+                ret = {
+                    "query": {
+                        "match_phrase": {"body": query}
+                    },
+                    "sort": ["_score"],
+                    "size": self.data["topK"]
+                }
+            else:
+                ret = {
+                    "query": {
+                        "query_string": {"query": query, "fields": ["body"]}
+                    },
+                    "sort": ["_score"],
+                    "size": self.data["topK"]
+                }
         return ret
 
     def setup_clients(self, num_threads=1):
@@ -202,7 +219,7 @@ class QuickwitClient(BaseClient):
         query = self.queries[query_id]
         client = self.clients[client_id]
         if self.data["mode"] == "fulltext":
-            body = self.get_fulltext_query_content(query)
+            body = self.get_fulltext_query_content(query=query)
             body["size"] = self.data["topK"]
 
             result = client.search(

@@ -386,7 +386,7 @@ struct SQL_LTYPE {
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION
-%token KNN USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE
+%token USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION
 
 %token NUMBER
@@ -1857,6 +1857,26 @@ optimize_statement: OPTIMIZE table_name {
     $$->table_name_ = $2->table_name_ptr_;
     free($2->table_name_ptr_);
     delete $2;
+}
+//   1         2      3        4            5
+| OPTIMIZE IDENTIFIER ON table_name with_index_param_list{
+    $$ = new infinity::OptimizeStatement();
+    if($4->schema_name_ptr_ != nullptr) {
+        $$->schema_name_ = $4->schema_name_ptr_;
+        free($4->schema_name_ptr_);
+    }
+    $$->table_name_ = $4->table_name_ptr_;
+    free($4->table_name_ptr_);
+    delete $4;
+
+    $$->index_name_ = $2;
+    free($2);
+
+    for (auto *&index_param : *$5) {
+        $$->opt_params_.emplace_back(std::unique_ptr<infinity::InitParameter>(index_param));
+        index_param = nullptr;
+    }
+    delete $5;
 };
 
 /*
@@ -2098,21 +2118,21 @@ match_vector_expr : MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING '
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     $$ = match_vector_expr;
 
-    // KNN search column
+    // vector search column
     match_vector_expr->column_expr_ = $4;
 
-    // KNN distance type
+    // vector distance type
     ParserHelper::ToLower($10);
     bool check = match_vector_expr->InitDistanceType($10);
     if (!check) {
-        goto Error;
+        goto Error1;
     }
 
-    // KNN data type
+    // vector data type
     ParserHelper::ToLower($8);
     check = match_vector_expr->InitEmbedding($8, $6);
     if (!check) {
-        goto Error;
+        goto Error1;
     }
     free($8);
     free($10);
@@ -2120,8 +2140,8 @@ match_vector_expr : MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING '
 
     match_vector_expr->topn_ = $12;
     match_vector_expr->opt_params_ = $14;
-    goto Return;
-Error:
+    goto Return1;
+Error1:
     for (auto* param_ptr: *$14) {
         delete param_ptr;
     }
@@ -2130,11 +2150,55 @@ Error:
     free($10);
     delete $6;
     delete $$;
-    yyerror(&yyloc, scanner, result, "Invalid knn distance type");
+    yyerror(&yyloc, scanner, result, "Invalid vector search distance type");
     YYERROR;
-Return:
+Return1:
     ;
 }
+|
+MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ')' with_index_param_list {
+    infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
+    $$ = match_vector_expr;
+
+    // vector search search column
+    match_vector_expr->column_expr_ = $4;
+
+    // vector search distance type
+    ParserHelper::ToLower($10);
+    bool check = match_vector_expr->InitDistanceType($10);
+    if (!check) {
+        goto Error2;
+    }
+
+    // vector search data type
+    ParserHelper::ToLower($8);
+    check = match_vector_expr->InitEmbedding($8, $6);
+    if (!check) {
+        goto Error2;
+    }
+    free($8);
+    free($10);
+    delete $6;
+
+    match_vector_expr->topn_ = infinity::DEFAULT_MATCH_VECTOR_TOP_N;
+    match_vector_expr->opt_params_ = $12;
+    goto Return2;
+
+Error2:
+    for (auto* param_ptr: *$12) {
+        delete param_ptr;
+    }
+    delete $12;
+    free($8);
+    free($10);
+    delete $6;
+    delete $$;
+    yyerror(&yyloc, scanner, result, "Invalid vector search distance type");
+    YYERROR;
+Return2:
+    ;
+}
+
 
 //                 MATCH SPARSE (column_name,       query_sparse,      metric_type,     topn)         extra options
 //                   1      2         4                  6                   8           10                12
@@ -2154,6 +2218,24 @@ match_sparse_expr: MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING
 
     // topn and options
     match_sparse_expr->SetOptParams($10, $12);
+}
+|
+MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ')' with_index_param_list {
+    auto match_sparse_expr = new infinity::MatchSparseExpr();
+    $$ = match_sparse_expr;
+
+    // search column
+    match_sparse_expr->SetSearchColumn($4);
+
+    // search sparse and data type
+    match_sparse_expr->SetQuerySparse($6);
+
+    // metric type
+    ParserHelper::ToLower($8);
+    match_sparse_expr->SetMetricType($8);
+
+    // topn and options
+    match_sparse_expr->SetOptParams(infinity::DEFAULT_MATCH_SPARSE_TOP_N, $10);
 }
 
 match_text_expr : MATCH TEXT '(' STRING ',' STRING ')' {

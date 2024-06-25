@@ -201,6 +201,8 @@ BMPAlg<DataType, IdxType, CompressType> BMPAlg<DataType, IdxType, CompressType>:
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
 SizeT BMPAlg<DataType, IdxType, CompressType>::GetSizeInBytes() const {
+    std::shared_lock lock(mtx_);
+
     SizeT size = 0;
     size += bm_ivt_.GetSizeInBytes();
     size += block_fwd_.GetSizeInBytes();
@@ -211,6 +213,8 @@ SizeT BMPAlg<DataType, IdxType, CompressType>::GetSizeInBytes() const {
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
 void BMPAlg<DataType, IdxType, CompressType>::WriteAdv(char *&p) const {
+    std::shared_lock lock(mtx_);
+
     bm_ivt_.WriteAdv(p);
     block_fwd_.WriteAdv(p);
     SizeT doc_num = doc_ids_.size();

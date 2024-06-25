@@ -114,7 +114,7 @@ Following are commands to issue a single query so that you can compare results a
 ```base
 curl -X GET "http://localhost:9200/elasticsearch_enwiki/_search" -H 'Content-Type: application/json' -d'{"size":10,"_source":"doctitle","query": {"match": { "body": "wraysbury istorijos" }}}'
 
-curl -X GET "http://localhost:7280/api/v1/_elastic/qucikwit_enwiki/_search" -H 'Content-Type: application/json' -d'{"query": {"query_string": {"query": "wraysbury istorijos", "fields": [ "body" ] } },"sort": ["_score"]}'
+curl -X GET "http://localhost:7280/api/v1/_elastic/qucikwit_enwiki/_search" -H 'Content-Type: application/json' -d'{"query": {"query_string": {"query": "wraysbury istorijos", "fields": [ "body" ] } },"sort": ["_score"],"size":10}'
 
 psql -h 0.0.0.0 -p 5432 -c "SELECT doctitle, ROW_ID(), SCORE() FROM infinity_enwiki SEARCH MATCH TEXT ('body', 'wraysbury istorijos', 'topn=10');"
 ```

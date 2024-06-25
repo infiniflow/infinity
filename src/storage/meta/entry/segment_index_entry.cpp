@@ -62,6 +62,7 @@ import txn_store;
 import secondary_index_in_mem;
 import emvb_index;
 import emvb_index_in_mem;
+import bmp_util;
 
 namespace infinity {
 
@@ -798,6 +799,46 @@ void SegmentIndexEntry::CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<
     //     ss << old_chunk->chunk_id_ << ", ";
     // }
     // LOG_INFO(ss.str());
+}
+
+void SegmentIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params) {
+    switch (table_index_entry_->index_base()->index_type_) {
+        case IndexType::kBMP: {
+            Optional<BMPOptimizeOptions> ret = BMPUtil::ParseBMPOptimizeOptions(opt_params);
+            if (!ret) {
+                return;
+            }
+            const auto &options = ret.value();
+            const auto [chunk_index_entries, memory_index_entry] = this->GetBMPIndexSnapshot();
+
+            auto optimize_index = [&](AbstractBMP index) {
+                std::visit(
+                    [&](auto &index) {
+                        using T = std::decay_t<decltype(index)>;
+                        if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                            UnrecoverableError("Invalid index type.");
+                        } else {
+                            index->Optimize(options);
+                        }
+                    },
+                    index);
+            };
+            for (const auto &chunk_index_entry : chunk_index_entries) {
+                BufferHandle buffer_handle = chunk_index_entry->GetIndex();
+                auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
+                optimize_index(abstract_bmp);
+            }
+            if (memory_index_entry.get() != nullptr) {
+                BufferHandle buffer_handle = memory_index_entry->GetIndex();
+                auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
+                optimize_index(abstract_bmp);
+            }
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented");
+        }
+    }
 }
 
 bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {

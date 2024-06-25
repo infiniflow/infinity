@@ -54,7 +54,7 @@ private:
 
     bool DoNext();
 
-private:
+protected:
     cppjieba::Jieba *jieba_{nullptr};
     String dict_path_;
     bool own_jieba_{};

@@ -141,6 +141,29 @@ void ReadDataBlock(DataBlock *output,
 
 void PhysicalKnnScan::Init() {}
 
+void PhysicalKnnScan::InitBlockParallelOption() {
+    // TODO: Set brute force block parallel option
+    // 0. [0, 50), 1 thread
+    // 1. [50, 100), 2 thread
+    block_parallel_options_.emplace_back(50, 2);
+    // 2. [100, +Inf), 3 threads
+    block_parallel_options_.emplace_back(100, 3);
+}
+
+SizeT PhysicalKnnScan::BlockScanTaskCount() const {
+    const u32 block_cnt = block_column_entries_size_;
+    SizeT brute_task_n = 1;
+    for (const auto &[block_n, job_n] : block_parallel_options_) {
+        if (block_cnt < block_n) {
+            break;
+        }
+        brute_task_n = job_n;
+    }
+    return brute_task_n;
+}
+
+SizeT PhysicalKnnScan::TaskletCount() { return BlockScanTaskCount() + index_entries_size_; }
+
 bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto *knn_scan_operator_state = static_cast<KnnScanOperatorState *>(operator_state);
     auto elem_type = knn_scan_operator_state->knn_scan_function_data_->knn_scan_shared_data_->elem_type_;
@@ -182,6 +205,7 @@ String PhysicalKnnScan::TableAlias() const { return base_table_ref_->alias_; }
 Vector<SizeT> &PhysicalKnnScan::ColumnIDs() const { return base_table_ref_->column_ids_; }
 
 void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return base entry vector
+    InitBlockParallelOption(); // PlanWithIndex() will be called in physical planner
     Txn *txn = query_context->GetTxn();
     TransactionID txn_id = txn->TxnID();
     TxnTimeStamp begin_ts = txn->BeginTS();
@@ -237,7 +261,9 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             }
         }
     }
-    LOG_TRACE(fmt::format("KnnScan: brute force task: {}, index task: {}", block_column_entries_->size(), index_entries_->size()));
+    block_column_entries_size_ = block_column_entries_->size();
+    index_entries_size_ = index_entries_->size();
+    LOG_TRACE(fmt::format("KnnScan: brute force task: {}, index task: {}", block_column_entries_size_, index_entries_size_));
 }
 
 SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
@@ -259,39 +285,43 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     auto merge_heap = static_cast<MergeKnn<DataType, C> *>(knn_scan_function_data->merge_knn_base_.get());
     auto query = static_cast<const DataType *>(knn_scan_shared_data->query_embedding_);
 
-    SizeT index_task_n = knn_scan_shared_data->index_entries_->size();
-    SizeT brute_task_n = knn_scan_shared_data->block_column_entries_->size();
+    const SizeT index_task_n = knn_scan_shared_data->index_entries_->size();
+    const SizeT brute_task_n = knn_scan_shared_data->block_column_entries_->size();
     BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
 
-    if (u64 block_column_idx = knn_scan_shared_data->current_block_idx_++; block_column_idx < brute_task_n) {
+    if (u64 block_column_idx =
+            knn_scan_function_data->execute_block_scan_job_ ? knn_scan_shared_data->current_block_idx_++ : std::numeric_limits<u64>::max();
+        block_column_idx < brute_task_n) {
         LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{}", knn_scan_function_data->task_id_, block_column_idx + 1, brute_task_n));
         // brute force
-        BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_->at(block_column_idx);
-        const BlockEntry *block_entry = block_column_entry->block_entry();
-        const auto block_id = block_entry->block_id();
-        const SegmentID segment_id = block_entry->GetSegmentEntry()->segment_id();
-        const auto row_count = block_entry->row_count();
-
-        Bitmask bitmask;
-        if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
-            LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} not skipped after common_query_filter",
-                                  knn_scan_function_data->task_id_,
-                                  block_column_idx + 1,
-                                  brute_task_n));
-            block_entry->SetDeleteBitmask(begin_ts, bitmask);
-            BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
-            ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
-
-            auto data = reinterpret_cast<const DataType *>(column_vector.data());
-            merge_heap->Search(query,
-                               data,
-                               knn_scan_shared_data->dimension_,
-                               dist_func->dist_func_,
-                               row_count,
-                               block_entry->segment_id(),
-                               block_entry->block_id(),
-                               bitmask);
-        }
+        // TODO: now will try to finish all block scan job in the task
+        do {
+            BlockColumnEntry *block_column_entry = knn_scan_shared_data->block_column_entries_->at(block_column_idx);
+            const BlockEntry *block_entry = block_column_entry->block_entry();
+            const auto block_id = block_entry->block_id();
+            const SegmentID segment_id = block_entry->GetSegmentEntry()->segment_id();
+            const auto row_count = block_entry->row_count();
+            Bitmask bitmask;
+            if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
+                // LOG_TRACE(fmt::format("KnnScan: {} brute force {}/{} not skipped after common_query_filter",
+                //                       knn_scan_function_data->task_id_,
+                //                       block_column_idx + 1,
+                //                       brute_task_n));
+                block_entry->SetDeleteBitmask(begin_ts, bitmask);
+                BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
+                ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                auto data = reinterpret_cast<const DataType *>(column_vector.data());
+                merge_heap->Search(query,
+                                   data,
+                                   knn_scan_shared_data->dimension_,
+                                   dist_func->dist_func_,
+                                   row_count,
+                                   segment_id,
+                                   block_id,
+                                   bitmask);
+            }
+            block_column_idx = knn_scan_shared_data->current_block_idx_++;
+        } while (block_column_idx < brute_task_n);
     } else if (u64 index_idx = knn_scan_shared_data->current_index_idx_++; index_idx < index_task_n) {
         LOG_TRACE(fmt::format("KnnScan: {} index {}/{}", knn_scan_function_data->task_id_, index_idx + 1, index_task_n));
         // with index

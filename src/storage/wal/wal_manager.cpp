@@ -530,7 +530,9 @@ i64 WalManager::ReplayWalFile() {
 
     for (SizeT replay_count = 0; replay_count < replay_entries.size(); ++replay_count) {
         if (replay_entries[replay_count]->commit_ts_ < max_commit_ts) {
-            String error_message = "Wal Replay: Commit ts should be greater than max commit ts";
+            String error_message = fmt::format("Wal Replay: Commit ts should be greater than max commit ts, commit_ts: {}, max_commit: {}",
+                                               replay_entries[replay_count]->commit_ts_,
+                                               max_commit_ts);
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }

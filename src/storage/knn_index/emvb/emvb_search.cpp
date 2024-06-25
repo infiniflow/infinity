@@ -325,7 +325,6 @@ std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> EMVBSearch<FIXED
                                                                                                                   const u32 k,
                                                                                                                   const f32 thresh_query) const {
     assert(n_centroids_ % 8 == 0);
-    assert(nprobe > 0);
     auto query_token_centroids_scores = Get256AlignedF32Array(FIXED_QUERY_TOKEN_NUM * n_centroids_);
     matrixA_multiply_transpose_matrixB_output_to_C(query_ptr,
                                                    centroids_data_,
@@ -333,7 +332,9 @@ std::tuple<u32, std::unique_ptr<f32[]>, std::unique_ptr<u32[]>> EMVBSearch<FIXED
                                                    n_centroids_,
                                                    embedding_dimension_,
                                                    query_token_centroids_scores.get());
-    auto [candidate_docs, centroid_q_token_sim] = find_candidate_docs(query_token_centroids_scores.get(), nprobe, thresh);
+    const u32 real_nprobe = std::min(n_centroids_, nprobe);
+    assert(real_nprobe > 0);
+    auto [candidate_docs, centroid_q_token_sim] = find_candidate_docs(query_token_centroids_scores.get(), real_nprobe, thresh);
     auto selected_cnt_and_docs = compute_hit_frequency(std::move(candidate_docs), n_doc_to_score, std::move(centroid_q_token_sim));
     auto selected_docs_centroid_scores =
         second_stage_filtering(std::move(selected_cnt_and_docs), out_second_stage, std::move(query_token_centroids_scores));
@@ -357,7 +358,6 @@ Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>
                                                                                                  const BlockIndex *block_index,
                                                                                                  const TxnTimeStamp begin_ts) const {
     assert(n_centroids_ % 8 == 0);
-    assert(nprobe > 0);
     auto query_token_centroids_scores = Get256AlignedF32Array(FIXED_QUERY_TOKEN_NUM * n_centroids_);
     matrixA_multiply_transpose_matrixB_output_to_C(query_ptr,
                                                    centroids_data_,
@@ -365,7 +365,9 @@ Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>
                                                    n_centroids_,
                                                    embedding_dimension_,
                                                    query_token_centroids_scores.get());
-    auto [candidate_docs, centroid_q_token_sim] = find_candidate_docs(query_token_centroids_scores.get(), nprobe, thresh);
+    const u32 real_nprobe = std::min(n_centroids_, nprobe);
+    assert(real_nprobe > 0);
+    auto [candidate_docs, centroid_q_token_sim] = find_candidate_docs(query_token_centroids_scores.get(), real_nprobe, thresh);
     std::vector<u32> candidate_docs_filtered;
     auto filter_doc = [&candidate_docs_filtered, &candidate_docs, start_segment_offset](auto &&filter) {
         candidate_docs_filtered.reserve(candidate_docs.size());

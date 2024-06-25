@@ -118,7 +118,7 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                                         Vector<UniquePtr<DataBlock>> &output_data_block_array) const {
     SizeT num_children = 2 + other_children_.size();
     SizeT rank_constant = 60;
-    SizeT topn = 100;
+    SizeT topn = DEFAULT_FUSION_OPTION_TOP_N;
     Vector<float> weights;
     if (fusion_expr_->options_.get() != nullptr) {
         if (auto it = fusion_expr_->options_->options_.find("window_size"); it != fusion_expr_->options_->options_.end()) {

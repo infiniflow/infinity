@@ -153,17 +153,15 @@ TEST_F(MemoryIndexerTest, test2) {
 TEST_F(MemoryIndexerTest, SpillLoadTest) {
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
     auto indexer1 = MakeUnique<MemoryIndexer>(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
-    bool offline = false;
-    bool spill = true;
-    indexer1->Insert(column_, 0, 2, offline);
-    indexer1->Insert(column_, 2, 2, offline);
-    indexer1->Insert(column_, 4, 1, offline);
+    indexer1->Insert(column_, 0, 2);
+    indexer1->Insert(column_, 2, 2);
+    indexer1->Insert(column_, 4, 1);
     while (indexer1->GetInflightTasks() > 0) {
         sleep(1);
         indexer1->CommitSync();
     }
 
-    indexer1->Dump(offline, spill);
+    indexer1->Dump(false, true);
     UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
 
     loaded_indexer->Load();
@@ -189,5 +187,55 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
             u32 tf = posting_iter->GetCurrentTF();
             ASSERT_EQ(tf, expected.tfs[j]);
         }
+    }
+}
+
+TEST_F(MemoryIndexerTest, SeekPosition) {
+    // "A B C" repeats 7 times
+    String paragraph(R"#(A B C A B C A B C A B C A B C A B C A B C)#");
+    auto column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
+    column->Initialize();
+    Value v = Value::MakeVarchar(paragraph);
+    for (SizeT i = 0; i < 8192; i++) {
+        column->AppendValue(v);
+    }
+
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
+    MemoryIndexer indexer1(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    indexer1.Insert(column, 0, 8192);
+    while (indexer1.GetInflightTasks() > 0) {
+        sleep(1);
+        indexer1.CommitSync();
+    }
+
+    SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(&indexer1);
+    const String term("a");
+    SegmentPosting seg_posting;
+    SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
+    auto ret = segment_reader->GetSegmentPosting(term, seg_posting);
+    if (ret) {
+        seg_postings->push_back(seg_posting);
+    }
+
+    auto posting_iter = MakeUnique<PostingIterator>(flag_);
+    u32 state_pool_size = 0;
+    posting_iter->Init(seg_postings, state_pool_size);
+    RowID doc_id = INVALID_ROWID;
+    Vector<SizeT> doc_ids = {0, 1, 2, 5, 127, 128, 512, 1024, 2048, 4096, 8191};
+    for (SizeT i = 0; i < doc_ids.size(); ++i) {
+        doc_id = RowID::FromUint64(doc_ids[i]);
+        doc_id = posting_iter->SeekDoc(doc_id);
+        ASSERT_EQ(doc_id, doc_ids[i]);
+        u32 tf = posting_iter->GetCurrentTF();
+        ASSERT_EQ(tf, 7);
+        pos_t target_pos = 0;
+        pos_t act_pos = 0;
+        for (SizeT j = 0; j < 7; ++j) {
+            posting_iter->SeekPosition(target_pos, act_pos);
+            ASSERT_EQ(act_pos, 3 * j);
+            target_pos = act_pos + 1;
+        }
+        posting_iter->SeekPosition(act_pos + 1, act_pos);
+        ASSERT_EQ(act_pos, INVALID_POSITION);
     }
 }

@@ -27,7 +27,7 @@ import block_index;
 import third_party;
 import status;
 import random;
-
+import statement_common;
 import cleanup_scanner;
 import meta_entry_interface;
 import index_file_worker;
@@ -138,6 +138,8 @@ public:
 
     // replay
     void UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
+
+    void OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &base_dir, const String &parent_dir, const String &index_name) {

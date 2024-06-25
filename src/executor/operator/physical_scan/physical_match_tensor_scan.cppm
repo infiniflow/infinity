@@ -27,6 +27,7 @@ import data_type;
 import common_query_filter;
 import physical_filter_scan_base;
 import global_block_id;
+import logical_match_tensor_scan;
 
 namespace infinity {
 struct LoadMeta;
@@ -42,6 +43,7 @@ public:
                                      SharedPtr<MatchTensorExpression> match_tensor_expression,
                                      const SharedPtr<CommonQueryFilter> &common_query_filter,
                                      u32 topn,
+                                     const MatchTensorScanIndexOptions &index_options,
                                      SharedPtr<Vector<LoadMeta>> load_metas);
 
     void Init() override;
@@ -84,6 +86,7 @@ private:
 
     // extra options from match_tensor_expr_
     u32 topn_ = 0;
+    MatchTensorScanIndexOptions index_options_;
 
     // column to search
     ColumnID search_column_id_ = 0;

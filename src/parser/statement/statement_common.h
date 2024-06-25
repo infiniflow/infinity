@@ -20,6 +20,9 @@
 
 namespace infinity {
 
+constexpr size_t DEFAULT_MATCH_VECTOR_TOP_N = 10;
+constexpr size_t DEFAULT_MATCH_SPARSE_TOP_N = 10;
+
 enum class CopyFileType {
     kCSV,
     kJSON,

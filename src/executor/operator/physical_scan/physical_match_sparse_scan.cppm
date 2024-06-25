@@ -29,6 +29,7 @@ import physical_scan_base;
 import sparse_info;
 import match_sparse_expr;
 import physical_filter_scan_base;
+import global_block_id;
 
 namespace infinity {
 struct LoadMeta;
@@ -51,6 +52,12 @@ public:
     SharedPtr<Vector<String>> GetOutputNames() const override;
 
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const override;
+
+    SizeT TaskletCount() override;
+
+    SizeT GetTaskletCount(QueryContext *query_context);
+
+    Vector<SharedPtr<Vector<SegmentID>>> PlanWithIndex(Vector<SharedPtr<Vector<GlobalBlockID>>> &block_groups, i64 parallel_count);
 
 private:
     template <typename DataType>

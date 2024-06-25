@@ -1615,8 +1615,11 @@ Status LogicalPlanner::BuildFlushBuffer(const FlushStatement *, SharedPtr<BindCo
 
 Status LogicalPlanner::BuildOptimize(OptimizeStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     BindSchemaName(statement->schema_name_);
-    SharedPtr<LogicalNode> logical_optimize =
-        MakeShared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(), query_context_ptr_->schema_name(), statement->table_name_);
+    SharedPtr<LogicalNode> logical_optimize = MakeShared<LogicalOptimize>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                          query_context_ptr_->schema_name(),
+                                                                          statement->table_name_,
+                                                                          std::move(statement->index_name_),
+                                                                          std::move(statement->opt_params_));
     this->logical_plan_ = logical_optimize;
     return Status::OK();
 }

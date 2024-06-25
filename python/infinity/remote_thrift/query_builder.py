@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, InfinityException
+from infinity.common import VEC, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import logic_type_to_dtype, make_match_tensor_expr
@@ -67,7 +67,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._offset = None
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int, knn_params: {} = None) -> InfinityThriftQueryBuilder:
+            topn: int = DEFAULT_MATCH_VECTOR_TOPN, knn_params: {} = None) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
         if self._search.knn_exprs is None:

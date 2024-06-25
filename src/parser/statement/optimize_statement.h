@@ -33,6 +33,9 @@ public:
 
     std::string schema_name_{};
     std::string table_name_{};
+
+    std::string index_name_{};
+    std::vector<std::unique_ptr<InitParameter>> opt_params_{};
 };
 
 } // namespace infinity

@@ -195,7 +195,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             break;
         }
 
-            // DML
+        // DML
         case LogicalNodeType::kInsert: {
             result = BuildInsert(logical_operator);
             break;
@@ -217,7 +217,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             break;
         }
 
-            // Scan
+        // Scan
         case LogicalNodeType::kShow: {
             result = BuildShow(logical_operator);
             break;
@@ -254,7 +254,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildPhysicalOperator(const SharedP
             break;
         }
 
-            // SELECT
+        // SELECT
         case LogicalNodeType::kAggregate: {
             result = BuildAggregate(logical_operator);
             break;
@@ -920,6 +920,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildOptimize(const SharedPtr<Logic
     return MakeUnique<PhysicalOptimize>(logical_optimize->node_id(),
                                         logical_optimize->schema_name(),
                                         logical_optimize->object_name(),
+                                        logical_optimize->index_name_,
+                                        std::move(logical_optimize->opt_params_),
                                         logical_operator->load_metas());
 }
 
@@ -947,6 +949,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchTensorScan(const SharedPt
                                             std::static_pointer_cast<MatchTensorExpression>(logical_match_tensor->query_expression_),
                                             logical_match_tensor->common_query_filter_,
                                             logical_match_tensor->topn_,
+                                            *logical_match_tensor->index_options_,
                                             logical_operator->load_metas());
     match_tensor_scan_op->CheckColumn();
     match_tensor_scan_op->PlanWithIndex(query_context_ptr_);
@@ -972,7 +975,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildMatchSparseScan(const SharedPt
                                             std::static_pointer_cast<MatchSparseExpression>(logical_match_sparse->query_expression_),
                                             logical_match_sparse->common_query_filter_,
                                             logical_operator->load_metas());
-    if (match_sparse_scan_op->TaskletCount() == 1) {
+    if (match_sparse_scan_op->GetTaskletCount(query_context_ptr_) == 1) {
         return match_sparse_scan_op;
     }
     auto merge_match_sparse_op =
@@ -1011,7 +1014,6 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildFusion(const SharedPtr<Logical
 
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildKnn(const SharedPtr<LogicalNode> &logical_operator) const {
     auto *logical_knn_scan = (LogicalKnnScan *)(logical_operator.get());
-    //    logical_knn_scan->
     UniquePtr<PhysicalKnnScan> knn_scan_op = MakeUnique<PhysicalKnnScan>(logical_knn_scan->node_id(),
                                                                          logical_knn_scan->base_table_ref_,
                                                                          logical_knn_scan->knn_expression(),

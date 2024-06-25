@@ -222,7 +222,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                 }
                 match_node->top_n_ = top_n_option;
             } else {
-                match_node->top_n_ = DEFAULT_FULL_TEXT_OPTION_TOP_N;
+                match_node->top_n_ = DEFAULT_MATCH_TEXT_OPTION_TOP_N;
             }
 
             SearchDriver search_driver(column2analyzer, default_field);

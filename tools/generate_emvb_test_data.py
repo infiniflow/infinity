@@ -7,7 +7,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
     fix_embedding_num_in_tensor = 32
     fix_dim = 128
     row_n = 1024
-    pq_subspace_num = 16
+    pq_subspace_num = 32
     pq_subspace_bits = 8
     csv_dir = "./test/data/csv"
     slt_dir = "./test/sql/dql/knn/tensor"
@@ -42,9 +42,33 @@ def generate(generate_if_exists: bool, copy_dir: str):
         top_slt_file.write("statement ok\n")
         top_slt_file.write("COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, copy_path))
         top_slt_file.write("\nstatement ok\n")
-        top_slt_file.write(
-            "CREATE INDEX idx1 ON {} (c2) USING EMVB WITH (pq_subspace_num = {}, pq_subspace_bits = {});\n".format(
-                table_name, pq_subspace_num, pq_subspace_bits))
+        top_slt_file.write("CREATE INDEX idx1 ON {} (c2) USING EMVB WITH ".format(table_name))
+        top_slt_file.write("(pq_subspace_num = {}, pq_subspace_bits = {});\n".format(pq_subspace_num, pq_subspace_bits))
+        query_vec = [0] * fix_dim
+        query_vec[0] = 1
+        query_vec[1] = 1
+        query_vec[2] = 1
+        query_vec[3] = 1
+        top_slt_file.write("\n# test index search")
+        top_slt_file.write("\nstatement ok\n")
+        top_slt_file.write("SELECT c1 FROM {} SEARCH MATCH TENSOR".format(table_name))
+        top_slt_file.write(" (c2, {}, 'float', 'maxsim', 'topn=10');\n".format(query_vec))
+        top_slt_file.write("\nstatement ok\n")
+        top_slt_file.write("SELECT c1 FROM {} SEARCH MATCH TENSOR (c2, {}".format(table_name, query_vec))
+        top_slt_file.write(", 'float', 'maxsim', 'topn=10;emvb_threshold_first=0.4;emvb_threshold_final=0.5');\n")
+        top_slt_file.write("\n# test small mem index of exhaustive scan")
+        insert_vec = [0] * fix_dim
+        insert_vec[0] = 2 * row_n
+        insert_vec[1] = 2 * row_n
+        insert_vec[2] = 2 * row_n
+        insert_vec[3] = 2 * row_n
+        top_slt_file.write("\nstatement ok\n")
+        top_slt_file.write("INSERT INTO {} VALUES ({}, {});\n".format(table_name, row_n, insert_vec))
+        top_slt_file.write("\nquery I\n")
+        top_slt_file.write("SELECT c1 FROM {} SEARCH MATCH TENSOR".format(table_name))
+        top_slt_file.write(" (c2, {}, 'float', 'maxsim', 'topn=1');\n".format(query_vec))
+        top_slt_file.write("----\n")
+        top_slt_file.write("{}\n".format(row_n))
         top_slt_file.write("\nstatement ok\n")
         top_slt_file.write("DROP TABLE {};\n".format(table_name))
 

@@ -21,19 +21,16 @@ PROJECT (5)
      - filter for secondary index: None
      - filter except secondary index: 10 > CAST(num (#1) AS BigInt)
      - output columns: [title, num, __score, __rowid]
-  -> MERGE KNN (7)
+  -> KNN SCAN (3)
+     - table name: explain_fusion(default_db.explain_fusion)
      - table index: #5
+     - embedding info: vec
+       - element type: FLOAT32
+       - dimension: 4
+       - distance type: L2
+       - query embedding: [0,-10,0,0.7]
+     - filter: 10 > CAST(num (#1) AS BigInt)
      - output columns: [title, num, __score, __rowid]
-    -> KNN SCAN (3)
-       - table name: explain_fusion(default_db.explain_fusion)
-       - table index: #5
-       - embedding info: vec
-         - element type: FLOAT32
-         - dimension: 4
-         - distance type: L2
-         - query embedding: [0,-10,0,0.7]
-       - filter: 10 > CAST(num (#1) AS BigInt)
-       - output columns: [title, num, __score, __rowid]
 
 query I
 EXPLAIN SELECT title FROM explain_fusion SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim') WHERE 10 > num;
