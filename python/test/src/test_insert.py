@@ -252,6 +252,32 @@ class TestInsert(TestSdk):
             {'c1': ([[[1, 2], [3, 4]], [[5, 6]]], [[[7, 8]], [[9, 10], [11, 12]]], [[[13, 14], [15, 16], [17, 18]]])}))
         res = db_obj.drop_table("test_insert_tensor_array", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+    
+    def _test_insert_sparse(self):
+        """
+        target: test insert sparse column
+        method: create table with sparse column
+        expected: ok
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_insert_sparse", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_sparse", {"c1": {"type": "sparse,100,float,int"}}, ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]}}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}}, {"c1": {"indices": [70, 80, 90], "values": [-7.7, -8.8, -9.9]}}])
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["*"]).to_df()
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': ({"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}, {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]},
+                    {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}, {"indices": [70, 80, 90], "values": [-7.7, -8.8, -9.9]})}))
+
+        res = db_obj.drop_table("test_insert_sparse", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        pass
 
     def _test_insert_big_embedding(self):
         """

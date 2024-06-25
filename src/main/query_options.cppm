@@ -65,4 +65,10 @@ public:
     CopyFileType copy_file_type_{CopyFileType::kCSV};
 };
 
+export class OptimizeOptions {
+public:
+    String index_name_{};
+    Vector<InitParameter *> opt_params_{};
+};
+
 } // namespace infinity

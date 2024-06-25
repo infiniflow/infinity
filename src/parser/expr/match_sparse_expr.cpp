@@ -32,11 +32,11 @@ void MatchSparseExpr::SetMetricType(char *&raw_metric_type) {
     std::string_view metric_type(raw_metric_type);
     std::unique_ptr<char[], decltype([](char *p) { std::free(p); })> raw_metric_type_ptr(raw_metric_type);
     raw_metric_type = nullptr;
-    if (metric_type == "ip") {
-        metric_type_ = SparseMetricType::kInnerProduct;
-    } else {
-        ParserError(fmt::format("Unrecognized search method: {}", metric_type));
-    }
+    SetMetricTypeInner(metric_type);
+}
+
+void MatchSparseExpr::SetMetricType(const std::string &metric_type) {
+    SetMetricTypeInner(metric_type);
 }
 
 void MatchSparseExpr::SetOptParams(size_t topn, std::vector<InitParameter *> *&opt_params) {
@@ -69,6 +69,15 @@ std::string MatchSparseExpr::ToString() const {
     std::string opt_str = ss.str();
 
     return fmt::format("MATCH SPARSE ({}, [{}], {}, {}) WITH ({})", column_str, query_str, method_str, topn_, opt_str);
+}
+
+void MatchSparseExpr::SetMetricTypeInner(std::string_view metric_type) {
+    if (metric_type == "ip") {
+        metric_type_ = SparseMetricType::kInnerProduct;
+    } else {
+        ParserError(fmt::format("Unrecognized search method: {}", metric_type));
+        metric_type_ = SparseMetricType::kInvalid;
+    }
 }
 
 std::string MatchSparseExpr::MetricTypeToString(SparseMetricType metric) {

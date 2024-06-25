@@ -83,6 +83,27 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
             }
             return constant_expr;
         }
+        case LiteralType::kLongSparseArray: {
+            constant_expr->long_sparse_array_.first.reserve(i64_array_idx.size());
+            constant_expr->long_sparse_array_.second.reserve(i64_array_value.size());
+            for (SizeT i = 0; i < i64_array_idx.size(); ++i) {
+                constant_expr->long_sparse_array_.first.emplace_back(i64_array_idx[i]);
+                constant_expr->long_sparse_array_.second.emplace_back(i64_array_value[i]);
+            }
+            return constant_expr;
+        }
+        case LiteralType::kDoubleSparseArray: {
+            constant_expr->double_sparse_array_.first.reserve(i64_array_idx.size());
+            constant_expr->double_sparse_array_.second.reserve(f64_array_value.size());
+            for (SizeT i = 0; i < i64_array_idx.size(); ++i) {
+                constant_expr->double_sparse_array_.first.emplace_back(i64_array_idx[i]);
+                constant_expr->double_sparse_array_.second.emplace_back(f64_array_value[i]);
+            }
+            return constant_expr;
+        }
+        case LiteralType::kEmptyArray: {
+            return constant_expr;
+        }
         default: {
             status = Status::InvalidConstantType();
             delete constant_expr;
@@ -256,6 +277,39 @@ ParsedExpr *WrapMatchTensorExpr::GetParsedExpr(Status &status) {
     return match_tensor_expr;
 }
 
+ParsedExpr *WrapMatchSparseExpr::GetParsedExpr(Status &status) {
+    status.code_ = ErrorCode::kOk;
+
+    auto match_sparse_expr = new MatchSparseExpr(own_memory);
+
+    auto *column_expr_ptr = column_expr.GetParsedExpr(status);
+    if (status.code_ != ErrorCode::kOk) {
+        delete match_sparse_expr;
+        return nullptr;
+    }
+    match_sparse_expr->SetSearchColumn(column_expr_ptr);
+
+    auto *query_sparse_ptr = static_cast<ConstantExpr *>(sparse_expr.GetParsedExpr(status));
+    if (status.code_ != ErrorCode::kOk) {
+        delete match_sparse_expr;
+        return nullptr;
+    }
+    match_sparse_expr->SetQuerySparse(query_sparse_ptr);
+
+    match_sparse_expr->SetMetricType(metric_type);
+
+    auto *opt_params_ptr = new Vector<InitParameter *>();
+    for (auto &param : opt_params) {
+        auto *init_parameter = new InitParameter();
+        init_parameter->param_name_ = param.param_name_;
+        init_parameter->param_value_ = param.param_value_;
+        opt_params_ptr->emplace_back(init_parameter);
+    }
+    match_sparse_expr->SetOptParams(topn, opt_params_ptr);
+
+    return match_sparse_expr;
+}
+
 ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
@@ -281,6 +335,15 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
     search_expr->match_tensor_exprs_.reserve(match_tensor_exprs.size());
     for (SizeT i = 0; i < match_tensor_exprs.size(); ++i) {
         search_expr->match_tensor_exprs_.emplace_back(dynamic_cast<MatchTensorExpr *>(match_tensor_exprs[i].GetParsedExpr(status)));
+        if (status.code_ != ErrorCode::kOk) {
+            delete search_expr;
+            search_expr = nullptr;
+            return nullptr;
+        }
+    }
+    search_expr->match_sparse_exprs_.reserve(match_sparse_exprs.size());
+    for (SizeT i = 0; i < match_sparse_exprs.size(); ++i) {
+        search_expr->match_sparse_exprs_.emplace_back(dynamic_cast<MatchSparseExpr *>(match_sparse_exprs[i].GetParsedExpr(status)));
         if (status.code_ != ErrorCode::kOk) {
             delete search_expr;
             search_expr = nullptr;
@@ -457,6 +520,9 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
         if (logical_type == LogicalType::kEmbedding || logical_type == LogicalType::kTensor || logical_type == LogicalType::kTensorArray) {
             auto &embedding_type = wrap_column_def.column_type.embedding_type;
             type_info_ptr = MakeShared<EmbeddingInfo>(embedding_type.element_type, embedding_type.dimension);
+        } else if (logical_type == LogicalType::kSparse) {
+            auto &sparse_type = wrap_column_def.column_type.sparse_type;
+            type_info_ptr = SparseInfo::Make(sparse_type.element_type, sparse_type.index_type, sparse_type.dimension, SparseStoreType::kSort);
         }
         auto column_type = MakeShared<DataType>(wrap_column_def.column_type.logical_type, type_info_ptr);
         Status status;
@@ -833,6 +899,32 @@ void HandleTensorArrayType(ColumnField &output_column_field, SizeT row_count, co
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
+void HandleSparseType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
+    const auto sparse_info = static_cast<const SparseInfo *>(column_vector->data_type()->type_info().get());
+    SizeT total_length = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        SparseT &sparse = reinterpret_cast<SparseT *>(column_vector->data())[index];
+        total_length += sparse_info->SparseSize(sparse.nnz_) + sizeof(i32);
+    }
+    String dst;
+    dst.resize(total_length);
+
+    i32 current_offset = 0;
+    for (SizeT index = 0; index < row_count; ++index) {
+        SparseT &sparse = reinterpret_cast<SparseT *>(column_vector->data())[index];
+        i32 nnz = sparse.nnz_;
+        i32 length = sparse_info->SparseSize(nnz);
+        std::memcpy(dst.data() + current_offset, &nnz, sizeof(i32));
+        current_offset += sizeof(i32);
+        const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(sparse.chunk_id_, sparse.chunk_offset_);
+        std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
+        current_offset += length;
+    }
+
+    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+    output_column_field.column_type = column_vector->data_type()->type();
+}
+
 void HandleRowIDType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
     String dst;
@@ -872,6 +964,10 @@ void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, c
         }
         case LogicalType::kTensorArray: {
             HandleTensorArrayType(output_column_field, row_count, column_vector);
+            break;
+        }
+        case LogicalType::kSparse: {
+            HandleSparseType(output_column_field, row_count, column_vector);
             break;
         }
         case LogicalType::kRowID: {
@@ -919,6 +1015,16 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
             embedding_type.dimension = embedding_info->Dimension();
             embedding_type.element_type = embedding_info->Type();
+            break;
+        }
+        case LogicalType::kSparse: {
+            proto_data_type.logical_type = data_type->type();
+            WrapSparseType &sparse_type = proto_data_type.sparse_type;
+
+            auto sparse_info = static_cast<SparseInfo *>(data_type->type_info().get());
+            sparse_type.dimension = sparse_info->Dimension();
+            sparse_type.element_type = sparse_info->DataType();
+            sparse_type.index_type = sparse_info->IndexType();
             break;
         }
         default: {
@@ -1144,8 +1250,8 @@ WrapQueryResult WrapShowTables(Infinity &instance, const String &db_name) {
     return wrap_query_result;
 }
 
-WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name) {
-    auto query_result = instance.Optimize(db_name, table_name);
+WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, OptimizeOptions optimize_options) {
+    auto query_result = instance.Optimize(db_name, table_name, std::move(optimize_options));
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 

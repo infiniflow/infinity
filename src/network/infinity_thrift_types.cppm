@@ -54,6 +54,7 @@ export using infinity_thrift_rpc::CreateIndexRequest;
 export using infinity_thrift_rpc::DropIndexRequest;
 export using infinity_thrift_rpc::ListIndexRequest;
 export using infinity_thrift_rpc::ShowIndexRequest;
+export using infinity_thrift_rpc::OptimizeRequest;
 export using infinity_thrift_rpc::ListDatabaseResponse;
 export using infinity_thrift_rpc::ListTableResponse;
 export using infinity_thrift_rpc::ShowDatabaseResponse;
@@ -72,6 +73,7 @@ export using infinity_thrift_rpc::ConstantExpr;
 export using infinity_thrift_rpc::ColumnExpr;
 export using infinity_thrift_rpc::FunctionExpr;
 export using infinity_thrift_rpc::KnnExpr;
+export using infinity_thrift_rpc::MatchSparseExpr;
 export using infinity_thrift_rpc::MatchTensorExpr;
 export using infinity_thrift_rpc::MatchExpr;
 export using infinity_thrift_rpc::FusionExpr;
@@ -89,10 +91,12 @@ export using infinity_thrift_rpc::LogicType;
 export using infinity_thrift_rpc::VarcharType;
 export using infinity_thrift_rpc::PhysicalType;
 export using infinity_thrift_rpc::EmbeddingType;
+export using infinity_thrift_rpc::SparseType;
 export using infinity_thrift_rpc::InfinityServiceIfFactory;
 export using infinity_thrift_rpc::InfinityServiceProcessorFactory;
 export using infinity_thrift_rpc::InfinityServiceProcessor;
-
+export using infinity_thrift_rpc::OptimizeOptions;
+export using infinity_thrift_rpc::InitParameter;
 }
 
 
