@@ -63,7 +63,7 @@ Infinity, also available as a Python library, eliminates the need for a separate
    ```
 2. Write a Python script to conduct a KNN search:
 
-  ```python
+   ```python
    import infinity
 
    # Connect to infinity
