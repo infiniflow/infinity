@@ -300,16 +300,18 @@ class IndexType(object):
     HnswLVQ = 1
     Hnsw = 2
     FullText = 3
-    Secondary = 4
-    EMVB = 5
+    BMP = 4
+    Secondary = 5
+    EMVB = 6
 
     _VALUES_TO_NAMES = {
         0: "IVFFlat",
         1: "HnswLVQ",
         2: "Hnsw",
         3: "FullText",
-        4: "Secondary",
-        5: "EMVB",
+        4: "BMP",
+        5: "Secondary",
+        6: "EMVB",
     }
 
     _NAMES_TO_VALUES = {
@@ -317,8 +319,9 @@ class IndexType(object):
         "HnswLVQ": 1,
         "Hnsw": 2,
         "FullText": 3,
-        "Secondary": 4,
-        "EMVB": 5,
+        "BMP": 4,
+        "Secondary": 5,
+        "EMVB": 6,
     }
 
 

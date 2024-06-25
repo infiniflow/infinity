@@ -28,7 +28,6 @@ class TestInfinity:
     def test_create_index_HNSW(self):
         self.test_infinity_obj._test_create_index_HNSW()
 
-    @pytest.mark.usefixtures("skip_if_remote_infinity")
     @pytest.mark.parametrize("block_size", [8, 128])
     @pytest.mark.parametrize("compress_type", ["compress", "raww"])
     def test_create_index_BMP(self, block_size, compress_type):

@@ -192,8 +192,9 @@ struct IndexType {
     HnswLVQ = 1,
     Hnsw = 2,
     FullText = 3,
-    Secondary = 4,
-    EMVB = 5
+    BMP = 4,
+    Secondary = 5,
+    EMVB = 6
   };
 };
 

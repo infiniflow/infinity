@@ -369,6 +369,7 @@ IVFFlat,
 HnswLVQ,
 Hnsw,
 FullText,
+BMP,
 Secondary,
 EMVB,
 }
