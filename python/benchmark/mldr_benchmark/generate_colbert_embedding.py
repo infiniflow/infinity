@@ -117,7 +117,7 @@ def main():
         embedding_save_dir = os.path.join(eval_args.embedding_save_dir, 'bge-m3', lang)
         if not os.path.exists(embedding_save_dir):
             os.makedirs(embedding_save_dir)
-        colbert_save_file = os.path.join(embedding_save_dir, f'colbert-{eval_args.begin_pos}-{eval_args.end_pos}.json')
+        colbert_save_file = os.path.join(embedding_save_dir, f'colbert-{eval_args.begin_pos}-{eval_args.end_pos}.data')
         if os.path.exists(colbert_save_file) and not eval_args.overwrite:
             print(f'Embedding of {lang} already exists. Skip...')
             continue
