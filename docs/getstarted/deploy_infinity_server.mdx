@@ -50,7 +50,6 @@ This section provides instructions on deploying Infinity using Docker on Linux x
   ]}>
    <TabItem value="linux_mac">
 
-
 ```bash
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
 docker pull infiniflow/infinity:nightly
@@ -59,6 +58,9 @@ docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=50
   </TabItem>
   <TabItem value="windows">
 
+If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using Docker. Suppose you've installed Ubuntu in WSL or WSL2:
+
+1. 
 
 ```bash
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
