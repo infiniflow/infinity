@@ -22,6 +22,9 @@ try:
     # open a local directory to store the data
     infinity_instance = infinity.connect("/var/infinity")
 
+    # connect to server with 127.0.0.1
+    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
 
@@ -62,6 +65,11 @@ try:
     result = table_instance.output(["num", "body"]).to_pl()
     print(result)
     table_instance.insert([
+        {
+            "num": 2,
+            "body": r"Office for Harmful Blooms",
+            "vec": [4.0, 4.2, 4.3, 4.5],
+        },
         {
             "num": 2,
             "body": r"Office for Harmful Blooms",
