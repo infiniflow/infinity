@@ -1,5 +1,7 @@
 """
 python generate_sparse_embedding.py \
+--begin_pos 0 \
+--end_pos 200000 \
 --encoder BAAI/bge-m3 \
 --languages ar de en es fr hi it ja ko pt ru th zh \
 --embedding_save_dir ./corpus-embedding \
@@ -85,7 +87,14 @@ def generate_sparse(model: BGEM3FlagModel, corpus: datasets.Dataset, max_passage
                     begin_pos: int, end_pos: int):
     result_dict = model.encode(corpus["text"][begin_pos: end_pos], batch_size=batch_size, max_length=max_passage_length,
                                return_dense=False, return_sparse=True, return_colbert_vecs=False)
-    return result_dict['lexical_weights']
+    sparse_dict = result_dict['lexical_weights']
+    result = []
+    for one_dict in sparse_dict:
+        one_result = {}
+        for p, v in one_dict.items():
+            one_result[p] = float(v)
+        result.append(one_result)
+    return result
 
 
 def save_result(sparse_embeddings, sparse_save_file: str):
@@ -118,7 +127,7 @@ def main():
         print(f"Start generating embedding of {lang} ...")
         corpus = load_corpus(lang)
 
-        dense_embeddings = generate_sparse(
+        sparse_embeddings = generate_sparse(
             model=model,
             corpus=corpus,
             max_passage_length=eval_args.max_passage_length,
@@ -126,7 +135,7 @@ def main():
             begin_pos=eval_args.begin_pos,
             end_pos=eval_args.end_pos
         )
-        save_result(dense_embeddings, sparse_save_file)
+        save_result(sparse_embeddings, sparse_save_file)
 
     print("==================================================")
     print("Finish generating sparse embeddings with model: BAAI/bge-m3")
