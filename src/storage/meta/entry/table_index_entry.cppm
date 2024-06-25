@@ -142,8 +142,8 @@ public:
     void OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params);
 
 private:
-    static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name) {
-        return DetermineRandomString(parent_dir, fmt::format("index_{}", index_name));
+    static SharedPtr<String> DetermineIndexDir(const String &base_dir, const String &parent_dir, const String &index_name) {
+        return DetermineRandomString(base_dir, parent_dir, fmt::format("index_{}", index_name));
     }
 
 private:

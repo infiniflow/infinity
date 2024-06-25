@@ -42,7 +42,7 @@ String RandomString(SizeT len) {
 
 SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &name) {
     LocalFileSystem fs;
-    String result;
+    String rand, temp, result;
     int cnt = 0;
     static bool initialized = false;
     if (!initialized) {
@@ -50,10 +50,31 @@ SharedPtr<String> DetermineRandomString(const String &parent_dir, const String &
         srand(std::time(nullptr));
     }
     do {
-        result = fmt::format("{}/{}_{}", parent_dir, RandomString(DEFAULT_RANDOM_NAME_LEN), name);
+        rand = RandomString(DEFAULT_RANDOM_NAME_LEN);
+        temp = fmt::format("{}/{}_{}", parent_dir, rand, name);
+        result = fmt::format("{}_{}", rand, name);
         ++cnt;
-    } while (!fs.CreateDirectoryNoExp(result));
-    LOG_DEBUG(fmt::format("Created directory {} in {} times", result, cnt));
+    } while (!fs.CreateDirectoryNoExp(temp));
+    LOG_DEBUG(fmt::format("Created directory {} in {} times", temp, cnt));
+    return MakeShared<String>(std::move(temp));
+}
+
+SharedPtr<String> DetermineRandomString(const String &base_dir, const String &parent_dir, const String &name) {
+    LocalFileSystem fs;
+    String rand, temp, result;
+    int cnt = 0;
+    static bool initialized = false;
+    if (!initialized) {
+        initialized = true;
+        srand(std::time(nullptr));
+    }
+    do {
+        rand = RandomString(DEFAULT_RANDOM_NAME_LEN);
+        temp = fmt::format("{}/{}/{}_{}", base_dir, parent_dir, rand, name);
+        result = fmt::format("{}/{}_{}", parent_dir, rand, name);
+        ++cnt;
+    } while (!fs.CreateDirectoryNoExp(temp));
+    LOG_DEBUG(fmt::format("Created directory {} in {} times", temp, cnt));
     return MakeShared<String>(std::move(result));
 }
 

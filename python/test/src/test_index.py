@@ -309,10 +309,10 @@ class TestIndex(TestSdk):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table(
-            "test_create_index_show_index", ConflictType.Ignore)
+            "test_drop_index_show_index", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
-        table_obj = db_obj.create_table("test_create_index_show_index", {
+        table_obj = db_obj.create_table("test_drop_index_show_index", {
             "c1": {"type": "vector,3,float"}}, ConflictType.Error)
         # create created index
         res = table_obj.create_index("my_index",
@@ -332,7 +332,7 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(
-            "test_create_index_show_index", ConflictType.Error)
+            "test_drop_index_show_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     # create index on different type of column and show index

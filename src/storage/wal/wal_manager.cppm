@@ -34,6 +34,7 @@ class SegmentEntry;
 export class WalManager {
 public:
     WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
+    WalManager(Storage *storage, String wal_dir, String data_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
 
     ~WalManager();
 
@@ -106,6 +107,7 @@ private:
     // and do serial writing.
     String wal_dir_{};
     String wal_path_{};
+    String data_path_{};
 
     Storage *storage_{};
 
