@@ -20,7 +20,7 @@ import struct
 import time
 import traceback
 
-from infinity.common import REMOTE_HOST
+from infinity.common import LOCAL_HOST
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.table import RemoteTable
@@ -113,7 +113,7 @@ def trace_unhandled_exceptions(func):
 
 @trace_unhandled_exceptions
 def work(queries, topk, metric_type, column_name, data_type, table_name="sift_benchmark"):
-    conn = ThriftInfinityClient(REMOTE_HOST)
+    conn = ThriftInfinityClient(LOCAL_HOST)
     for query in queries:
         # print(len(query))
         table = RemoteTable(conn, "default_db", table_name)
@@ -177,7 +177,7 @@ def one_thread(rounds, query_path, ground_truth_path, table_name):
     results = []
     queries = fvecs_read_all(query_path)
 
-    conn = ThriftInfinityClient(REMOTE_HOST)
+    conn = ThriftInfinityClient(LOCAL_HOST)
     table = RemoteTable(conn, "default_db", table_name)
     query_builder = InfinityThriftQueryBuilder(table)
     query_builder.output(["_row_id"])

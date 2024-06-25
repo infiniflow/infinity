@@ -26,18 +26,18 @@ from common import common_values
 
 @pytest.fixture(scope="function")
 def connect_infinity():
-    return infinity.connect(common_values.TEST_REMOTE_HOST)
+    return infinity.connect(common_values.TEST_LOCAL_HOST)
 
 
 @pytest.fixture(scope="function")
 def disconnect_infinity():
-    res = ThriftInfinityClient(common_values.TEST_REMOTE_HOST).disconnect()
+    res = ThriftInfinityClient(common_values.TEST_LOCAL_HOST).disconnect()
     assert res.error_code == ErrorCode.OK
 
 
 @pytest.fixture(scope="function")
 def get_infinity_db_param(request):
-    uri = request.param if hasattr(request, 'param') else common_values.TEST_REMOTE_HOST
+    uri = request.param if hasattr(request, 'param') else common_values.TEST_LOCAL_HOST
     # connect
     infinity_obj = infinity.connect(uri)
 
@@ -52,7 +52,7 @@ def get_infinity_db(request):
     if request.config.getoption("--local-infinity"):
         uri = common_values.TEST_LOCAL_PATH
     else:
-        uri = common_values.TEST_REMOTE_HOST
+        uri = common_values.TEST_LOCAL_HOST
 
     # connect
     infinity_obj = infinity.connect(uri)
@@ -69,7 +69,7 @@ def skip_if_local_infinity(request):
 
 @pytest.fixture(scope="function", autouse=False)
 def get_infinity_connection_pool():
-    connection_pool = ConnectionPool(common_values.TEST_REMOTE_HOST)
+    connection_pool = ConnectionPool(common_values.TEST_LOCAL_HOST)
     yield connection_pool
     connection_pool.destroy()
 

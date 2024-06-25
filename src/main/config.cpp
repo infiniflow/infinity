@@ -117,7 +117,7 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
 
 // extern SharedPtr<spdlogger> infinity_logger;
 
-Status Config::Init(const SharedPtr<String> &config_path) {
+Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default_config) {
 
     LocalFileSystem fs;
 
@@ -243,6 +243,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
         // Log To Stdout
         bool log_to_stdout = false;
+        if(default_config != nullptr) {
+            log_to_stdout = default_config->default_log_to_stdout_;
+        }
         UniquePtr<BooleanOption> log_to_stdout_option = MakeUnique<BooleanOption>(LOG_TO_STDOUT_OPTION_NAME, log_to_stdout);
         status = global_options_.AddOption(std::move(log_to_stdout_option));
         if(!status.ok()) {
@@ -271,6 +274,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
 
         // Log Level
         LogLevel log_level = LogLevel::kInfo;
+        if(default_config != nullptr) {
+            log_level = default_config->default_log_level_;
+        }
         UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>(LOG_LEVEL_OPTION_NAME, log_level);
         status = global_options_.AddOption(std::move(log_level_option));
         if(!status.ok()) {
@@ -926,6 +932,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 if(global_options_.GetOptionByIndex(GlobalOptionIndex::kLogToStdout) == nullptr) {
                     // Log To Stdout
                     bool log_to_stdout = false;
+                    if(default_config != nullptr) {
+                        log_to_stdout = default_config->default_log_to_stdout_;
+                    }
                     UniquePtr<BooleanOption> log_to_stdout_option = MakeUnique<BooleanOption>(LOG_TO_STDOUT_OPTION_NAME, log_to_stdout);
                     Status status = global_options_.AddOption(std::move(log_to_stdout_option));
                     if(!status.ok()) {
@@ -957,6 +966,9 @@ Status Config::Init(const SharedPtr<String> &config_path) {
                 if(global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel) == nullptr) {
                     // Log Level
                     LogLevel log_level = LogLevel::kInfo;
+                    if(default_config != nullptr) {
+                        log_level = default_config->default_log_level_;
+                    }
                     UniquePtr<LogLevelOption> log_level_option = MakeUnique<LogLevelOption>(LOG_LEVEL_OPTION_NAME, log_level);
                     Status status = global_options_.AddOption(std::move(log_level_option));
                     if(!status.ok()) {

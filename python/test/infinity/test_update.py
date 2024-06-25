@@ -16,7 +16,7 @@ def setup_class(request, local_infinity):
     if local_infinity:
         uri = common_values.TEST_LOCAL_PATH
     else:
-        uri = common_values.TEST_REMOTE_HOST
+        uri = common_values.TEST_LOCAL_HOST
     request.cls.uri = uri
     request.cls.test_infinity_obj = TestUpdate(uri)
     yield

@@ -3,7 +3,7 @@ import sys
 import inspect
 import time
 import infinity
-from infinity.common import REMOTE_HOST, ConflictType
+from infinity.common import LOCAL_HOST, ConflictType
 from infinity.errors import ErrorCode
 
 current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
@@ -15,7 +15,7 @@ import faiss
 
 
 def infinity_import_sift_1m_no_index(path):
-    infinity_obj = infinity.connect(REMOTE_HOST)
+    infinity_obj = infinity.connect(LOCAL_HOST)
     assert infinity_obj
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
@@ -33,7 +33,7 @@ def infinity_import_sift_1m_no_index(path):
 
 
 def infinity_import_gist_1m_no_index(path):
-    infinity_obj = infinity.connect(REMOTE_HOST)
+    infinity_obj = infinity.connect(LOCAL_HOST)
     assert infinity_obj
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj
