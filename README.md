@@ -52,16 +52,11 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ## 🎮 Get Started
 
-### ✈️ Deploy Infinity locally using pip
-
 Infinity, also available as a Python library, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
-
-1. Install the Infinity SDK:
 
    ```bash
    pip install infinity-sdk==0.2.0
    ```
-2. Write a Python script to conduct a KNN search:
 
    ```python
    import infinity
