@@ -7,7 +7,7 @@ slug: /
 
 ## Prerequisites
 
-- CPU: x86_64 with AVX2, or aarch64
+- CPU: x86_64 with AVX2
 - OS: Linux with glibc &ge; 2.17
 - Python: Python 3.10+
 
