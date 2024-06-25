@@ -86,6 +86,8 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
             return object
         case ttypes.LogicType.TensorArray:
             return object
+        case ttypes.LogicType.Sparse:
+            return object
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
 
@@ -189,6 +191,8 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
             return parse_tensor_bytes(column_data_type, column_vector)
         case ttypes.ColumnType.ColumnTensorArray:
             return parse_tensorarray_bytes(column_data_type, column_vector)
+        case ttypes.ColumnType.ColumnSparse:
+            return parse_sparse_bytes(column_data_type, column_vector)
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
 
@@ -270,6 +274,61 @@ def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[
     else:
         raise NotImplementedError(
             f"Unsupported type {column_data_type.physical_type.embedding_type.element_type}")
+
+def parse_sparse_bytes(column_data_type: ttypes.DataType, column_vector):
+    dimension = column_data_type.physical_type.sparse_type.dimension
+    element_type = column_data_type.physical_type.sparse_type.element_type
+    index_type = column_data_type.physical_type.sparse_type.index_type
+    res = []
+    offset = 0
+    # print(len(column_vector))
+    while offset < len(column_vector):
+        nnz = struct.unpack('I', column_vector[offset:offset + 4])[0]
+        offset += 4
+        # print(nnz)
+        indices = []
+        values = []
+        match index_type:
+            case ttypes.ElementType.ElementInt8:
+                indices = struct.unpack('<{}b'.format(nnz), column_vector[offset:offset + nnz])
+                offset += nnz
+            case ttypes.ElementType.ElementInt16:
+                indices = struct.unpack('<{}h'.format(nnz), column_vector[offset:offset + nnz * 2])
+                offset += nnz * 2
+            case ttypes.ElementType.ElementInt32:
+                indices = struct.unpack('<{}i'.format(nnz), column_vector[offset:offset + nnz * 4])
+                offset += nnz * 4
+            case ttypes.ElementType.ElementInt64:
+                indices = struct.unpack('<{}q'.format(nnz), column_vector[offset:offset + nnz * 8])
+                offset += nnz * 8
+            case _:
+                raise NotImplementedError(f"Unsupported type {index_type}")
+        match element_type:
+            case ttypes.ElementType.ElementInt8:
+                values = struct.unpack('<{}b'.format(nnz), column_vector[offset:offset + nnz])
+                offset += nnz
+            case ttypes.ElementType.ElementInt16:
+                values = struct.unpack('<{}h'.format(nnz), column_vector[offset:offset + nnz * 2])
+                offset += nnz * 2
+            case ttypes.ElementType.ElementInt32:
+                values = struct.unpack('<{}i'.format(nnz), column_vector[offset:offset + nnz * 4])
+                offset += nnz * 4
+            case ttypes.ElementType.ElementInt64:
+                values = struct.unpack('<{}q'.format(nnz), column_vector[offset:offset + nnz * 8])
+                offset += nnz * 8
+            case ttypes.ElementType.ElementFloat32:
+                values = struct.unpack('<{}f'.format(nnz), column_vector[offset:offset + nnz * 4])
+                offset += nnz * 4
+            case ttypes.ElementType.ElementFloat64:
+                values = struct.unpack('<{}d'.format(nnz), column_vector[offset:offset + nnz * 8])
+                offset += nnz * 8
+            case ttypes.ElementType.ElementBit:
+                raise NotImplementedError(f"Unsupported type {element_type}")
+            case _:
+                raise NotImplementedError(f"Unsupported type {element_type}")
+        # print("indices: {}, values: {}".format(indices, values))
+        res.append({"indices": indices, "values": values})
+    return res
 
 
 def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> ttypes.DataType:

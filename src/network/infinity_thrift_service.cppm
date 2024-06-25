@@ -180,7 +180,7 @@ private:
 
     UniquePtr<infinity_thrift_rpc::DataType> DataTypeToProtoDataType(const SharedPtr<DataType> &data_type);
 
-    infinity_thrift_rpc::ElementType::type EmbeddingDataTypeToProtoElementType(const EmbeddingInfo &embedding_info);
+    infinity_thrift_rpc::ElementType::type EmbeddingDataTypeToProtoElementType(const EmbeddingDataType &embedding_data_type);
 
     void
     ProcessDataBlocks(const QueryResult &result, infinity_thrift_rpc::SelectResponse &response, Vector<infinity_thrift_rpc::ColumnField> &columns);
@@ -210,6 +210,9 @@ private:
 
     static void
     HandleTensorArrayType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
+
+    static void
+    HandleSparseType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 
     static void HandleRowIDType(infinity_thrift_rpc::ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector);
 

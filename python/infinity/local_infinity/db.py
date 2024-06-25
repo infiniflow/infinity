@@ -116,8 +116,6 @@ def get_embedding_info(column_info, column_defs, column_name, index):
         column_type.logical_type = LogicalType.kTensor
     elif column_big_info[0] == "tensorarray":
         column_type.logical_type = LogicalType.kTensorArray
-    elif column_big_info[0] == "sparse":
-        column_type.logical_type = LogicalType.kSparse
     else:
         raise InfinityException(3053, f"Unknown column type: {column_big_info[0]}")
 

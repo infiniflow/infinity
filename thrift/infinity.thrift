@@ -17,6 +17,7 @@ Varchar,
 Embedding,
 Tensor,
 TensorArray,
+Sparse,
 Invalid
 }
 
@@ -64,10 +65,17 @@ struct EmbeddingType {
 2:  ElementType element_type,
 }
 
+struct SparseType {
+1:  i64 dimension,
+2:  ElementType element_type,
+3:  ElementType index_type,
+}
+
 union PhysicalType {
 1:  NumberType number_type,
 2:  VarcharType varchar_type,
 3:  EmbeddingType embedding_type,
+4:  SparseType sparse_type,
 }
 
 struct DataType {
@@ -92,6 +100,8 @@ IntegerArray,
 DoubleArray,
 IntegerTensorArray,
 DoubleTensorArray,
+SparseIntegerArray,
+SparseDoubleArray,
 }
 
 union ParsedExprType {
@@ -147,6 +157,7 @@ struct ConstantExpr {
 7: optional list<double> f64_array_value,
 8: optional list<list<list<i64>>> i64_tensor_array_value,
 9: optional list<list<list<double>>> f64_tensor_array_value,
+10: optional list<i64> i64_array_idx,
 }
 
 struct KnnExpr {
@@ -241,6 +252,7 @@ ColumnVarchar,
 ColumnEmbedding,
 ColumnTensor,
 ColumnTensorArray,
+ColumnSparse,
 ColumnRowID,
 ColumnInvalid,
 }

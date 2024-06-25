@@ -233,6 +233,23 @@ class RemoteTable(Table, ABC):
                                 f64_tensor_array_value=float_list)
                     else:
                         raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid list type: {type(value)}")
+                elif isinstance(value, dict):
+                    if isinstance(value["values"][0], int):
+                        if isinstance(value["indices"][0], int):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.SparseIntegerArray,
+                                i64_array_value = value["values"],
+                                i64_array_idx = value["indices"])
+                        else:
+                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
+                    elif isinstance(value["values"][0], float):
+                        if isinstance(value["indices"][0], int):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.SparseDoubleArray,
+                                f64_array_value = value["values"],
+                                i64_array_idx = value["indices"])
+                        else:
+                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
                 else:
                     raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
 
