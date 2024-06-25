@@ -11,21 +11,21 @@ This document provides guidance on deploying the Infinity database.
 
 ## Prerequisites
 
-- CPU: &ge; 4 cores, x86_64 with AVX2, or aarch64
+- CPU: &ge; 4 cores, x86_64 with AVX2
 - RAM: &ge; 16 GB
 - Disk: &ge; 50 GB
-- OS: Linux with glibc &ge; 2.17
+- OS: Linux with glibc &ge; 2.17, Windows, MacOS
 - Python: Python 3.10+
 
 ## Deploy Infinity database
 
 You can deploy Infinity in the following three ways: 
 
-- [Deploy Infinity using pip](#deploy-infinity-using-pip): Mainly for local deployment or quick testing.
+- [Install Infinity using pip](#install-infinity-using-pip): Mainly for local deployment or quick testing.
 - [Deploy Infinity using Docker](#deploy-infinity-using-docker): Mainly for deploying a separate server for remote access.
 - [Deploy Infinity using binary](#deploy-infinity-using-binary): Mainly for deploying a separate server for remote access.
 
-### Deploy Infinity using pip
+### Install Infinity using pip
 
 Infinity, also available as a Python library, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
 
@@ -35,12 +35,18 @@ pip install infinity-sdk==0.2.0
 
 :::caution IMPORTANT
 - More detailed information is covered in the [Quickstart Guide](./quickstart.md).
-- This 'embedded' approach is for local deployment or quick testing. If you wish to deploy a separate server for remote access, follow the instructions in [Deploy Infinity using Docker](#deploy-infinity-using-docker) or [Deploy Infinity using binary](#deploy-infinity-using-binary).
+- This 'embedded' approach is for local installation or quick testing. If you wish to deploy a separate server for remote access, follow the instructions in [Deploy Infinity using Docker](#deploy-infinity-using-docker) or [Deploy Infinity using binary](#deploy-infinity-using-binary).
 :::
 
 ### Deploy Infinity using Docker 
 
-This section provides instructions on deploying Infinity using Docker on Linux x86_64, MacOS x86_64, and Windows WSL. 
+:::caution OPERATING SYSTEM
+- Linux with glibc &ge; 2.17
+- Windows 10+ with WSL/WSL2
+- MacOS
+:::
+
+This section provides instructions on deploying Infinity using Docker on Linux x86_64, MacOS x86_64, and Windows WSL/WSL2. 
 
 <Tabs
   defaultValue="linux_mac"
@@ -76,6 +82,10 @@ If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using 
 </Tabs>
 
 ### Deploy Infinity using binary
+
+:::caution OPERATING SYSTEM
+Linux with glibc &ge; 2.17
+:::
 
 This section provides instructions on deploying Infinity using binary package on Linux x86_64. You can download the binary package (deb, rpm, or tgz) for your Linux system from https://github.com/infiniflow/infinity/releases. The prebuilt packages are compatible with Linux distributions based on glibc 2.17 or later, for example, RHEL 7, Debian 8, Ubuntu 14.04.
 
