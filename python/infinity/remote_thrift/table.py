@@ -431,7 +431,6 @@ class RemoteTable(Table, ABC):
                                         extra_option)
         return self
 
-    @params_type_check
     def match_sparse(self, vector_column_name: str, sparse_data, distance_type: str, topn: int, opt_params: {} = None):
         self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
         return self
@@ -471,6 +470,12 @@ class RemoteTable(Table, ABC):
 
     def explain(self, explain_type: ExplainType = ExplainType.Physical):
         return self.query_builder.explain(explain_type)
+
+    def optimize(self, index_name: str, opt_params: dict[str, str]):
+        opt_options = ttypes.OptimizeOptions()
+        opt_options.index_name_ = index_name
+        opt_options.opt_params_ = [ttypes.InitParameter(k, v) for k, v in opt_params.items()]
+        return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
 
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
 

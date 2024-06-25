@@ -256,3 +256,7 @@ class ThriftInfinityClient:
         return self.client.ShowBlockColumn(
             ShowBlockColumnRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
                                    segment_id=segment_id, block_id=block_id, column_id=column_id))
+
+    def optimize(self, db_name: str, table_name: str, optimize_opt: ttypes.OptimizeOptions):
+        return self.client.Optimize(OptimizeRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                                                    optimize_options=optimize_opt))

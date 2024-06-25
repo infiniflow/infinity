@@ -282,6 +282,8 @@ class ImportOption;
 
 class ExportOption;
 
+class OptimizeOptions;
+
 class ConnectRequest;
 
 class CommonRequest;
@@ -321,6 +323,8 @@ class DropIndexRequest;
 class ShowIndexRequest;
 
 class ShowIndexResponse;
+
+class OptimizeRequest;
 
 class GetDatabaseRequest;
 
@@ -2206,6 +2210,56 @@ void swap(ExportOption &a, ExportOption &b);
 
 std::ostream& operator<<(std::ostream& out, const ExportOption& obj);
 
+typedef struct _OptimizeOptions__isset {
+  _OptimizeOptions__isset() : index_name(false), opt_params(true) {}
+  bool index_name :1;
+  bool opt_params :1;
+} _OptimizeOptions__isset;
+
+class OptimizeOptions : public virtual ::apache::thrift::TBase {
+ public:
+
+  OptimizeOptions(const OptimizeOptions&);
+  OptimizeOptions& operator=(const OptimizeOptions&);
+  OptimizeOptions() noexcept
+                  : index_name() {
+
+  }
+
+  virtual ~OptimizeOptions() noexcept;
+  std::string index_name;
+  std::vector<InitParameter>  opt_params;
+
+  _OptimizeOptions__isset __isset;
+
+  void __set_index_name(const std::string& val);
+
+  void __set_opt_params(const std::vector<InitParameter> & val);
+
+  bool operator == (const OptimizeOptions & rhs) const
+  {
+    if (!(index_name == rhs.index_name))
+      return false;
+    if (!(opt_params == rhs.opt_params))
+      return false;
+    return true;
+  }
+  bool operator != (const OptimizeOptions &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const OptimizeOptions & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(OptimizeOptions &a, OptimizeOptions &b);
+
+std::ostream& operator<<(std::ostream& out, const OptimizeOptions& obj);
+
 typedef struct _ConnectRequest__isset {
   _ConnectRequest__isset() : client_version(false) {}
   bool client_version :1;
@@ -3445,6 +3499,69 @@ class ShowIndexResponse : public virtual ::apache::thrift::TBase {
 void swap(ShowIndexResponse &a, ShowIndexResponse &b);
 
 std::ostream& operator<<(std::ostream& out, const ShowIndexResponse& obj);
+
+typedef struct _OptimizeRequest__isset {
+  _OptimizeRequest__isset() : db_name(false), table_name(false), optimize_options(false), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool optimize_options :1;
+  bool session_id :1;
+} _OptimizeRequest__isset;
+
+class OptimizeRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  OptimizeRequest(const OptimizeRequest&);
+  OptimizeRequest& operator=(const OptimizeRequest&);
+  OptimizeRequest() noexcept
+                  : db_name(),
+                    table_name(),
+                    session_id(0) {
+  }
+
+  virtual ~OptimizeRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  OptimizeOptions optimize_options;
+  int64_t session_id;
+
+  _OptimizeRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_optimize_options(const OptimizeOptions& val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const OptimizeRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(optimize_options == rhs.optimize_options))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const OptimizeRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const OptimizeRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(OptimizeRequest &a, OptimizeRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const OptimizeRequest& obj);
 
 typedef struct _GetDatabaseRequest__isset {
   _GetDatabaseRequest__isset() : db_name(false), session_id(false) {}

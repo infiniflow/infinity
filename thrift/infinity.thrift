@@ -284,6 +284,11 @@ struct ExportOption {
 3:  CopyFileType copy_file_type,
 }
 
+struct OptimizeOptions {
+1:  string index_name,
+2:  list<InitParameter> opt_params = []
+}
+
 struct ConnectRequest {
 1: i64 client_version,
 }
@@ -426,6 +431,13 @@ struct ShowIndexResponse {
 10: string store_dir,
 11: string store_size,
 12: string segment_index_count,
+}
+
+struct OptimizeRequest {
+1: string db_name,
+2: string table_name,
+3: OptimizeOptions optimize_options,
+4: i64 session_id,
 }
 
 struct GetDatabaseRequest {
@@ -671,5 +683,7 @@ CommonResponse GetTable(1:GetTableRequest request),
 CommonResponse CreateIndex(1:CreateIndexRequest request),
 CommonResponse DropIndex(1:DropIndexRequest request),
 ShowIndexResponse ShowIndex(1:ShowIndexRequest request),
+
+CommonResponse Optimize(1:OptimizeRequest request),
 
 }

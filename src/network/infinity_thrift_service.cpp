@@ -894,6 +894,19 @@ void InfinityThriftService::Update(infinity_thrift_rpc::CommonResponse &response
     ProcessQueryResult(response, result);
 }
 
+void InfinityThriftService::Optimize(infinity_thrift_rpc::CommonResponse& response, const infinity_thrift_rpc::OptimizeRequest& request) {
+    auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
+    if (!infinity_status.ok()) {
+        ProcessStatus(response, infinity_status);
+        return;
+    }
+
+    auto optimize_options = GetParsedOptimizeOptionFromProto(request.optimize_options);
+
+    const QueryResult result = infinity->Optimize(request.db_name, request.table_name, std::move(optimize_options));
+    ProcessQueryResult(response, result);
+}
+
 void InfinityThriftService::ListDatabase(infinity_thrift_rpc::ListDatabaseResponse &response,
                                          const infinity_thrift_rpc::ListDatabaseRequest &request) {
     auto [infinity, infinity_status] = GetInfinityBySessionID(request.session_id);
@@ -2019,6 +2032,19 @@ Tuple<UpdateExpr *, Status> InfinityThriftService::GetUpdateExprFromProto(const 
     up_expr->value = GetParsedExprFromProto(status, update_expr.value);
     return {up_expr, status};
 }
+
+OptimizeOptions InfinityThriftService::GetParsedOptimizeOptionFromProto(const infinity_thrift_rpc::OptimizeOptions &options) {
+    OptimizeOptions opt;
+    opt.index_name_ = options.index_name;
+    for (const auto &param : options.opt_params) {
+        auto *init_param = new InitParameter();
+        init_param->param_name_ = param.param_name;
+        init_param->param_value_ = param.param_value;
+        opt.opt_params_.emplace_back(init_param);
+    }
+    return opt;
+}
+
 
 infinity_thrift_rpc::ColumnType::type InfinityThriftService::DataTypeToProtoColumnType(const SharedPtr<DataType> &data_type) {
     switch (data_type->type()) {
