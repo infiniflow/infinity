@@ -127,9 +127,10 @@ TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, 
         return {nullptr, status};
     }
 
+    SharedPtr<String> full_index_dir = MakeShared<String>(fmt::format("{}/{}", *table_index_entry->base_dir_, *table_index_entry->index_dir()));
     SharedPtr<TableIndexInfo> table_index_info = MakeShared<TableIndexInfo>();
     table_index_info->index_name_ = index_name_;
-    table_index_info->index_entry_dir_ = table_index_entry->index_dir();
+    table_index_info->index_entry_dir_ = full_index_dir;
     table_index_info->segment_index_count_ = table_index_entry->index_by_segment().size();
 
     auto index_base = table_index_entry->index_base();

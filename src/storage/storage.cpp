@@ -60,6 +60,7 @@ void Storage::Init() {
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
                                       config_ptr_->WALDir(),
+                                      config_ptr_->DataDir(),
                                       config_ptr_->WALCompactThreshold(),
                                       config_ptr_->DeltaCheckpointThreshold(),
                                       config_ptr_->FlushMethodAtCommit());
@@ -174,8 +175,8 @@ void Storage::UnInit() {
     fmt::print("Close storage successfully\n");
 }
 
-void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
-    new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
+void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, const String &data_dir) {
+    new_catalog_ = Catalog::LoadFromFiles(data_dir, full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 
 void Storage::InitNewCatalog() {

@@ -136,10 +136,10 @@ nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts) {
     return json_res;
 }
 
-UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, BufferManager *buffer_mgr) {
-    SharedPtr<String> data_dir = MakeShared<String>(db_meta_json["data_dir"]);
+UniquePtr<DBMeta> DBMeta::Deserialize(const String &data_dir, const nlohmann::json &db_meta_json, BufferManager *buffer_mgr) {
+    SharedPtr<String> data_dir_ptr = MakeShared<String>(data_dir);
     SharedPtr<String> db_name = MakeShared<String>(db_meta_json["db_name"]);
-    UniquePtr<DBMeta> res = MakeUnique<DBMeta>(data_dir, db_name);
+    UniquePtr<DBMeta> res = MakeUnique<DBMeta>(data_dir_ptr, db_name);
 
     if (db_meta_json.contains("db_entries")) {
         for (const auto &db_entry_json : db_meta_json["db_entries"]) {

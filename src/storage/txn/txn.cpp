@@ -515,22 +515,22 @@ bool Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) 
 
 // Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
 bool Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
-    String delta_path;
+    String delta_path, delta_name;
     // only save the catalog delta entry
-    bool skip = catalog_->SaveDeltaCatalog(max_commit_ts, delta_path);
+    bool skip = catalog_->SaveDeltaCatalog(max_commit_ts, delta_path, delta_name);
     if (skip) {
         LOG_INFO("No delta catalog file is written");
         return false;
     }
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path));
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path, delta_name));
     return true;
 }
 
 void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
-    String full_path;
+    String full_path, full_name;
 
-    catalog_->SaveFullCatalog(max_commit_ts, full_path);
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, full_path));
+    catalog_->SaveFullCatalog(max_commit_ts, full_path, full_name);
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, full_path, full_name));
 }
 
 } // namespace infinity

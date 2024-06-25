@@ -119,7 +119,7 @@ Catalog::~Catalog() {
         return;
     }
 
-    if(mem_index_commit_thread_.get() != nullptr) {
+    if (mem_index_commit_thread_.get() != nullptr) {
         mem_index_commit_thread_->join();
         mem_index_commit_thread_.reset();
     }
@@ -508,13 +508,15 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, bool create_d
     return catalog;
 }
 
-UniquePtr<Catalog>
-Catalog::LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, BufferManager *buffer_mgr) {
+UniquePtr<Catalog> Catalog::LoadFromFiles(const String &data_dir,
+                                          const FullCatalogFileInfo &full_ckp_info,
+                                          const Vector<DeltaCatalogFileInfo> &delta_ckp_infos,
+                                          BufferManager *buffer_mgr) {
 
     // 1. load json
     // 2. load entries
     LOG_INFO(fmt::format("Load base FULL catalog json from: {}", full_ckp_info.path_));
-    auto catalog = Catalog::LoadFromFile(full_ckp_info, buffer_mgr);
+    auto catalog = Catalog::LoadFromFile(data_dir, full_ckp_info, buffer_mgr);
 
     // Load catalogs delta checkpoints and merge.
     TxnTimeStamp max_commit_ts = 0;
@@ -592,7 +594,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     this->DropDatabaseReplay(
                         *db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return DBEntry::ReplayDBEntry(db_meta, true, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
+                            return DBEntry::ReplayDBEntry(db_meta, true, data_dir_, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
                         },
                         txn_id,
                         begin_ts);
@@ -601,7 +603,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     this->CreateDatabaseReplay(
                         db_name,
                         [&](DBMeta *db_meta, const SharedPtr<String> &db_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
-                            return DBEntry::ReplayDBEntry(db_meta, false, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
+                            return DBEntry::ReplayDBEntry(db_meta, false, data_dir_, db_entry_dir, db_name, txn_id, begin_ts, commit_ts);
                         },
                         txn_id,
                         begin_ts);
@@ -921,7 +923,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
     }
 }
 
-UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr) {
+UniquePtr<Catalog> Catalog::LoadFromFile(const String &data_dir, const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr) {
     const auto &catalog_path = full_ckp_info.path_;
 
     LocalFileSystem fs;
@@ -940,27 +942,29 @@ UniquePtr<Catalog> Catalog::LoadFromFile(const FullCatalogFileInfo &full_ckp_inf
     }
 
     nlohmann::json catalog_json = nlohmann::json::parse(json_str);
-    return Deserialize(catalog_json, buffer_mgr);
+    return Deserialize(data_dir, catalog_json, buffer_mgr);
 }
 
-UniquePtr<Catalog> Catalog::Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr) {
-    SharedPtr<String> data_dir = MakeShared<String>(catalog_json["data_dir"]);
+UniquePtr<Catalog> Catalog::Deserialize(const String &data_dir, const nlohmann::json &catalog_json, BufferManager *buffer_mgr) {
+    SharedPtr<String> data_dir_ptr = MakeShared<String>(data_dir);
 
     // FIXME: new catalog need a scheduler, current we use nullptr to represent it.
-    auto catalog = MakeUnique<Catalog>(std::move(data_dir));
+    auto catalog = MakeUnique<Catalog>(std::move(data_dir_ptr));
     catalog->next_txn_id_ = catalog_json["next_txn_id"];
     catalog->full_ckp_commit_ts_ = catalog_json["full_ckp_commit_ts"];
     if (catalog_json.contains("databases")) {
         for (const auto &db_json : catalog_json["databases"]) {
-            UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(db_json, buffer_mgr);
+            UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(*catalog->data_dir_, db_json, buffer_mgr);
             catalog->db_meta_map().emplace(*db_meta->db_name(), std::move(db_meta));
         }
     }
     return catalog;
 }
 
-void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_path) {
-    full_catalog_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::FullCheckpoingFilename(max_commit_ts));
+void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_path, String &full_catalog_name) {
+    full_catalog_path = *catalog_dir_;
+    full_catalog_name = CatalogFile::FullCheckpointFilename(max_commit_ts);
+    String full_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::FullCheckpointFilename(max_commit_ts));
     String catalog_tmp_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::TempFullCheckpointFilename(max_commit_ts));
 
     // Serialize catalog to string
@@ -990,16 +994,18 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
     catalog_file_handler->Close();
 
     // Rename temp file to regular catalog file
-    catalog_file_handler->Rename(catalog_tmp_path, full_catalog_path);
+    catalog_file_handler->Rename(catalog_tmp_path, full_path);
 
     global_catalog_delta_entry_->InitFullCheckpointTs(max_commit_ts);
 
-    LOG_DEBUG(fmt::format("Saved catalog to: {}", full_catalog_path));
+    LOG_DEBUG(fmt::format("Saved catalog to: {}", full_path));
 }
 
 // called by bg_task
-bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog_path) {
-    delta_catalog_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
+bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog_path, String &delta_catalog_name) {
+    delta_catalog_path = *catalog_dir_;
+    delta_catalog_name = CatalogFile::DeltaCheckpointFilename(max_commit_ts);
+    String full_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
 
     // Check the SegmentEntry's for flush the data to disk.
     UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
@@ -1044,7 +1050,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     }
 
     std::ofstream outfile;
-    outfile.open(delta_catalog_path, std::ios::binary);
+    outfile.open(full_path, std::ios::binary);
     outfile.write((reinterpret_cast<const char *>(buf.data())), act_size);
     outfile.close();
 
@@ -1057,7 +1063,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     //     }
     //     LOG_INFO(ss.str());
     // }
-    LOG_DEBUG(fmt::format("Save delta catalog to: {}, size: {}.", delta_catalog_path, act_size));
+    LOG_DEBUG(fmt::format("Save delta catalog to: {}, size: {}.", full_path, act_size));
 
     return false;
 }

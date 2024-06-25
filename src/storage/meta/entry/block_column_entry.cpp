@@ -56,11 +56,12 @@ String BlockColumnEntry::EncodeIndex(const ColumnID column_id, const BlockEntry 
 }
 
 BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref)
-    : BaseEntry(EntryType::kBlockColumn, false, BlockColumnEntry::EncodeIndex(column_id, block_entry)), block_entry_(block_entry),
-      column_id_(column_id), base_dir_(base_dir_ref) {}
+    : BaseEntry(EntryType::kBlockColumn, false, block_entry->base_dir_, BlockColumnEntry::EncodeIndex(column_id, block_entry)),
+      block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
 
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
-    UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
+    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->base_dir()));
+    UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, full_path);
 
     auto begin_ts = txn->BeginTS();
     block_column_entry->begin_ts_ = begin_ts;
@@ -75,6 +76,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
         // TODO
         total_data_size = (row_capacity + 7) / 8;
     }
+
     auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
 
     auto *buffer_mgr = txn->buffer_mgr();
@@ -91,7 +93,8 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                                         const u64 last_chunk_offset_0,
                                                                         const u64 last_chunk_offset_1,
                                                                         const TxnTimeStamp commit_ts) {
-    UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
+    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->base_dir()));
+    UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, full_path);
     column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
     column_entry->column_type_ = block_entry->GetColumnType(column_id);
     column_entry->commit_ts_ = commit_ts;

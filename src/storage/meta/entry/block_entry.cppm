@@ -103,7 +103,7 @@ protected:
 
     void CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    static SharedPtr<String> DetermineDir(const String &parent_dir, BlockID block_id);
+    static SharedPtr<String> DetermineDir(const String &base_dir, const String &parent_dir, BlockID block_id);
 
 public:
     // Getter
