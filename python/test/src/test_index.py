@@ -77,6 +77,27 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_index_hnsw", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def _test_create_index_BMP(self, block_size: int, compress_type: str):
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_bmp", ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table(
+            "test_bmp", {"col1": {"type": "int"}, "col2": {"type": "sparse,30000,float,int16"}}, ConflictType.Error)
+        assert table_obj is not None
+
+        # CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = compress);
+        res = table_obj.create_index("idx1",
+                                    [index.IndexInfo("col2",
+                                                    index.IndexType.BMP,
+                                                    [index.InitParameter("block_size", str(block_size)),
+                                                    index.InitParameter("compress_type", compress_type)])], ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.drop_index("idx1")
+        assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_bmp", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def _test_create_index_fulltext(self):
         # CREATE INDEX ft_index ON enwiki(body) USING FULLTEXT;
         db_obj = self.infinity_obj.get_database("default_db")

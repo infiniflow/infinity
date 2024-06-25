@@ -14,7 +14,7 @@
 
 import struct
 import numpy as np
-from infinity.common import VEC, InfinityException
+from infinity.common import VEC, SPARSE, InfinityException
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from collections import defaultdict
 from typing import Any, Tuple, Dict, List
@@ -85,6 +85,8 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
         case ttypes.LogicType.Tensor:
             return object
         case ttypes.LogicType.TensorArray:
+            return object
+        case ttypes.LogicType.Sparse:
             return object
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
@@ -189,6 +191,8 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
             return parse_tensor_bytes(column_data_type, column_vector)
         case ttypes.ColumnType.ColumnTensorArray:
             return parse_tensorarray_bytes(column_data_type, column_vector)
+        case ttypes.ColumnType.ColumnSparse:
+            return parse_sparse_bytes(column_data_type, column_vector)
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
 
@@ -271,6 +275,61 @@ def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[
         raise NotImplementedError(
             f"Unsupported type {column_data_type.physical_type.embedding_type.element_type}")
 
+def parse_sparse_bytes(column_data_type: ttypes.DataType, column_vector):
+    dimension = column_data_type.physical_type.sparse_type.dimension
+    element_type = column_data_type.physical_type.sparse_type.element_type
+    index_type = column_data_type.physical_type.sparse_type.index_type
+    res = []
+    offset = 0
+    # print(len(column_vector))
+    while offset < len(column_vector):
+        nnz = struct.unpack('I', column_vector[offset:offset + 4])[0]
+        offset += 4
+        # print(nnz)
+        indices = []
+        values = []
+        match index_type:
+            case ttypes.ElementType.ElementInt8:
+                indices = struct.unpack('<{}b'.format(nnz), column_vector[offset:offset + nnz])
+                offset += nnz
+            case ttypes.ElementType.ElementInt16:
+                indices = struct.unpack('<{}h'.format(nnz), column_vector[offset:offset + nnz * 2])
+                offset += nnz * 2
+            case ttypes.ElementType.ElementInt32:
+                indices = struct.unpack('<{}i'.format(nnz), column_vector[offset:offset + nnz * 4])
+                offset += nnz * 4
+            case ttypes.ElementType.ElementInt64:
+                indices = struct.unpack('<{}q'.format(nnz), column_vector[offset:offset + nnz * 8])
+                offset += nnz * 8
+            case _:
+                raise NotImplementedError(f"Unsupported type {index_type}")
+        match element_type:
+            case ttypes.ElementType.ElementInt8:
+                values = struct.unpack('<{}b'.format(nnz), column_vector[offset:offset + nnz])
+                offset += nnz
+            case ttypes.ElementType.ElementInt16:
+                values = struct.unpack('<{}h'.format(nnz), column_vector[offset:offset + nnz * 2])
+                offset += nnz * 2
+            case ttypes.ElementType.ElementInt32:
+                values = struct.unpack('<{}i'.format(nnz), column_vector[offset:offset + nnz * 4])
+                offset += nnz * 4
+            case ttypes.ElementType.ElementInt64:
+                values = struct.unpack('<{}q'.format(nnz), column_vector[offset:offset + nnz * 8])
+                offset += nnz * 8
+            case ttypes.ElementType.ElementFloat32:
+                values = struct.unpack('<{}f'.format(nnz), column_vector[offset:offset + nnz * 4])
+                offset += nnz * 4
+            case ttypes.ElementType.ElementFloat64:
+                values = struct.unpack('<{}d'.format(nnz), column_vector[offset:offset + nnz * 8])
+                offset += nnz * 8
+            case ttypes.ElementType.ElementBit:
+                raise NotImplementedError(f"Unsupported type {element_type}")
+            case _:
+                raise NotImplementedError(f"Unsupported type {element_type}")
+        # print("indices: {}, values: {}".format(indices, values))
+        res.append({"indices": indices, "values": values})
+    return res
+
 
 def find_data_type(column_name: str, column_defs: list[ttypes.ColumnDef]) -> ttypes.DataType:
     for column_def in column_defs:
@@ -335,3 +394,27 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
     match_tensor_expr.embedding_data_type = elem_type
     match_tensor_expr.embedding_data = data
     return match_tensor_expr
+
+def make_match_sparse_expr(vector_column_name: str, sparse_data: SPARSE, metric_type: str, topn: int, opt_params: {} = None):
+    column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
+
+    query_sparse_expr = ConstantExpr()
+    if isinstance(sparse_data["values"][0], int):
+        query_sparse_expr.literal_type = LiteralType.SparseIntegerArray
+        query_sparse_expr.i64_array_idx = sparse_data["indices"]
+        query_sparse_expr.i64_array_value = sparse_data["values"]
+    elif isinstance(sparse_data["values"][0], float):
+        query_sparse_expr.literal_type = LiteralType.SparseDoubleArray
+        query_sparse_expr.i64_array_idx = sparse_data["indices"]
+        query_sparse_expr.f64_array_value = sparse_data["values"]
+    else:
+        raise InfinityException(3058, f"Invalid sparse data {sparse_data['values'][0]} type")
+
+    match_sparse_options = []
+    if opt_params is not None:
+        for k, v in opt_params.items():
+            match_sparse_options.append(InitParameter(param_name=k, param_value=v))
+
+    match_sparse_expr = MatchSparseExpr(column_expr=column_expr, query_sparse_expr=query_sparse_expr, metric_type=metric_type,
+                                        topn=topn, opt_params=match_sparse_options)
+    return match_sparse_expr

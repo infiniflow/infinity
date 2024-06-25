@@ -19,9 +19,9 @@ from typing import Optional, Union, List, Any
 import numpy as np
 from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.embedded_infinity_ext import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, \
-    ParsedExprType, WrapUpdateExpr, ExportOptions
+    ParsedExprType, WrapUpdateExpr, ExportOptions, OptimizeOptions
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
-from infinity.common import INSERT_DATA, VEC, InfinityException
+from infinity.common import INSERT_DATA, VEC, SPARSE, InfinityException
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
@@ -29,6 +29,8 @@ from infinity.local_infinity.types import build_result
 from infinity.local_infinity.utils import traverse_conditions, select_res_to_polars
 from infinity.remote_thrift.utils import name_validity_check
 from infinity.table import Table, ExplainType
+import infinity.index as index
+from infinity.index import InitParameter
 from sqlglot import condition
 
 
@@ -179,6 +181,24 @@ class LocalTable(Table, ABC):
                     elif isinstance(value[0], float):
                         constant_expression.literal_type = LiteralType.kDoubleArray
                         constant_expression.f64_array_value = value
+                elif isinstance(value, dict):
+                    if isinstance(value["values"][0], int):
+                        constant_expression.literal_type = LiteralType.kLongSparseArray
+                        if isinstance(value["indices"][0], int):
+                            constant_expression.i64_array_idx = value["indices"]
+                            constant_expression.i64_array_value = value["values"]
+                        else:
+                            raise InfinityException(3069, "Invalid constant expression")
+                    elif isinstance(value["values"][0], float):
+                        constant_expression.literal_type = LiteralType.kDoubleSparseArray
+                        if isinstance(value["indices"][0], int):
+                            constant_expression.i64_array_idx = value["indices"]
+                            constant_expression.f64_array_value = value["values"]
+                        else:
+                            raise InfinityException(3069, "Invalid constant expression")
+                    else:
+                        raise InfinityException(3069, "Invalid constant expression")
+                    
                 else:
                     raise InfinityException(3069, "Invalid constant expression")
                 parse_exprs.append(constant_expression)
@@ -344,6 +364,10 @@ class LocalTable(Table, ABC):
             vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
         return self
 
+    def match_sparse(self, vector_column_name: str, sparse_data: SPARSE, distance_type: str, topn: int, opt_params: {} = None):
+        self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
+        return self
+
     @params_type_check
     def match(self, fields: str, matching_text: str, options_text: str = ''):
         self.query_builder.match(fields, matching_text, options_text)
@@ -384,6 +408,12 @@ class LocalTable(Table, ABC):
 
     def explain(self, explain_type: ExplainType = ExplainType.Physical):
         return self.query_builder.explain(explain_type)
+    
+    def optimize(self, index_name: str, opt_params: dict[str, str]):
+        opt_options = OptimizeOptions()
+        opt_options.index_name = index_name
+        opt_options.opt_params = [InitParameter(k, v).to_local_type() for k, v in opt_params.items()]
+        return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
 
     def _execute_query(self, query: Query):
         # execute the query

@@ -17,6 +17,7 @@ Varchar,
 Embedding,
 Tensor,
 TensorArray,
+Sparse,
 Invalid
 }
 
@@ -64,10 +65,17 @@ struct EmbeddingType {
 2:  ElementType element_type,
 }
 
+struct SparseType {
+1:  i64 dimension,
+2:  ElementType element_type,
+3:  ElementType index_type,
+}
+
 union PhysicalType {
 1:  NumberType number_type,
 2:  VarcharType varchar_type,
 3:  EmbeddingType embedding_type,
+4:  SparseType sparse_type,
 }
 
 struct DataType {
@@ -92,6 +100,8 @@ IntegerArray,
 DoubleArray,
 IntegerTensorArray,
 DoubleTensorArray,
+SparseIntegerArray,
+SparseDoubleArray,
 }
 
 union ParsedExprType {
@@ -147,6 +157,7 @@ struct ConstantExpr {
 7: optional list<double> f64_array_value,
 8: optional list<list<list<i64>>> i64_tensor_array_value,
 9: optional list<list<list<double>>> f64_tensor_array_value,
+10: optional list<i64> i64_array_idx,
 }
 
 struct KnnExpr {
@@ -156,6 +167,14 @@ struct KnnExpr {
 4: KnnDistanceType distance_type,
 5: i64 topn,
 6: list<InitParameter> opt_params = [],
+}
+
+struct MatchSparseExpr {
+1: ColumnExpr  column_expr,
+2: ConstantExpr  query_sparse_expr,
+3: string  metric_type,
+4: i64  topn,
+5: list<InitParameter> opt_params = [],
 }
 
 struct MatchTensorExpr {
@@ -181,8 +200,9 @@ struct FusionExpr {
 struct SearchExpr {
 	1: optional list<MatchExpr> match_exprs,
 	2: optional list<KnnExpr> knn_exprs,
-	3: optional list<MatchTensorExpr> match_tensor_exprs,
-	4: optional list<FusionExpr> fusion_exprs,
+    3: optional list<MatchSparseExpr> match_sparse_exprs
+	4: optional list<MatchTensorExpr> match_tensor_exprs,
+	5: optional list<FusionExpr> fusion_exprs,
 }
 
 struct FunctionExpr {
@@ -241,6 +261,7 @@ ColumnVarchar,
 ColumnEmbedding,
 ColumnTensor,
 ColumnTensorArray,
+ColumnSparse,
 ColumnRowID,
 ColumnInvalid,
 }
@@ -261,6 +282,11 @@ struct ExportOption {
 1:  string delimiter,
 2:  bool has_header,
 3:  CopyFileType copy_file_type,
+}
+
+struct OptimizeOptions {
+1:  string index_name,
+2:  list<InitParameter> opt_params = []
 }
 
 struct ConnectRequest {
@@ -357,6 +383,7 @@ IVFFlat,
 HnswLVQ,
 Hnsw,
 FullText,
+BMP,
 Secondary,
 EMVB,
 }
@@ -404,6 +431,13 @@ struct ShowIndexResponse {
 10: string store_dir,
 11: string store_size,
 12: string segment_index_count,
+}
+
+struct OptimizeRequest {
+1: string db_name,
+2: string table_name,
+3: OptimizeOptions optimize_options,
+4: i64 session_id,
 }
 
 struct GetDatabaseRequest {
@@ -649,5 +683,7 @@ CommonResponse GetTable(1:GetTableRequest request),
 CommonResponse CreateIndex(1:CreateIndexRequest request),
 CommonResponse DropIndex(1:DropIndexRequest request),
 ShowIndexResponse ShowIndex(1:ShowIndexRequest request),
+
+CommonResponse Optimize(1:OptimizeRequest request),
 
 }

@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -73,16 +74,34 @@ protected:
 
 private:
     // Validate if given path satisfy all of following:
-    // - Current user is root, or the owner of the path.
-    // - The path is a directory.
-    // - Owner has read, write, and execute permission of the path.
-    bool ValidateDirPermission(const char *path) {
-        uid_t current_uid = geteuid();
-        struct stat sb;
-        if (stat(path, &sb) != 0) {
+    // - The path is a directory or symlink to a directory.
+    // - Current user has read, write, and execute permission of the path.
+    bool ValidateDirPermission(const char *path_str) {
+        fs::path path(path_str);
+        std::error_code ec;
+
+        // Check if the path exists and is a directory or symlink to a directory
+        if (!fs::exists(path, ec) || ec)
             return false;
-        }
-        return ((sb.st_uid == current_uid || current_uid == 0) && (sb.st_mode & S_IFMT) == S_IFDIR && (sb.st_mode & S_IRWXU) == S_IRWXU);
+        if (!fs::is_directory(path, ec) && !(fs::is_symlink(path, ec) && fs::is_directory(fs::read_symlink(path), ec)))
+            return false;
+
+        // Check read and execute permission
+        fs::directory_iterator it(path, fs::directory_options::skip_permission_denied, ec);
+        if (ec)
+            return false;
+
+        // Check write permission
+        fs::path temp_file = path / "temp_file.txt";
+        std::ofstream ofs(temp_file, std::ios::out | std::ios::app);
+        if (!ofs)
+            return false;
+        ofs.close();
+        fs::remove(temp_file, ec);
+        if (ec)
+            return false;
+
+        return true;
     }
 
     void CleanupDirectory(const char *dir) {

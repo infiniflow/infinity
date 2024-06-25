@@ -38,7 +38,8 @@ public:
     [[nodiscard]] std::unique_ptr<QueryNode> ParseSingle(const std::string &query, const std::string *default_field_ptr = nullptr) const;
 
     // used in SearchParser in ParseSingle. Assumes field and text are both unescaped.
-    [[nodiscard]] std::unique_ptr<QueryNode> AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text, bool from_quoted) const;
+    [[nodiscard]] std::unique_ptr<QueryNode>
+    AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text, bool from_quoted, unsigned long slop = 0) const;
 
     [[nodiscard]] static std::string Unescape(const std::string &text);
 

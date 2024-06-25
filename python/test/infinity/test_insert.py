@@ -34,6 +34,7 @@ class TestInfinity:
         self.test_infinity_obj._test_read_after_shutdown()
         self.test_infinity_obj._test_batch_insert()
         self.test_infinity_obj._test_insert_zero_column()
+        self.test_infinity_obj._test_insert_sparse()
 
         # todo support tensor
         # self.test_infinity_obj._test_insert_tensor()

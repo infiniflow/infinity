@@ -31,11 +31,13 @@ import logical_type;
 import constant_expr;
 import knn_expr;
 import embedding_info;
+import sparse_info;
 import statement_common;
 import search_options;
 import match_expr;
 import fusion_expr;
 import match_tensor_expr;
+import match_sparse_expr;
 import column_expr;
 import function_expr;
 import between_expr;
@@ -66,9 +68,16 @@ export struct WrapEmbeddingType {
     size_t dimension;
 };
 
+export struct WrapSparseType {
+    EmbeddingDataType element_type;
+    EmbeddingDataType index_type;
+    size_t dimension;
+};
+
 export struct WrapDataType {
     LogicalType logical_type;
     WrapEmbeddingType embedding_type;
+    WrapSparseType sparse_type;
 };
 
 export struct WrapConstantExpr {
@@ -79,6 +88,7 @@ export struct WrapConstantExpr {
     String str_value;
     Vector<i64> i64_array_value;
     Vector<f64> f64_array_value;
+    Vector<i64> i64_array_idx;
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -191,10 +201,21 @@ export struct WrapMatchTensorExpr {
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
+export struct WrapMatchSparseExpr {
+    bool own_memory;
+    WrapColumnExpr column_expr;
+    WrapConstantExpr sparse_expr;
+    String metric_type;
+    i64 topn;
+    Vector<InitParameter> opt_params{};
+    ParsedExpr *GetParsedExpr(Status &status);
+};
+
 export struct WrapSearchExpr {
     Vector<WrapMatchExpr> match_exprs{};
     Vector<WrapKnnExpr> knn_exprs{};
     Vector<WrapMatchTensorExpr> match_tensor_exprs{};
+    Vector<WrapMatchSparseExpr> match_sparse_exprs{};
     Vector<WrapFusionExpr> fusion_exprs{};
 
     ParsedExpr *GetParsedExpr(Status &status);
@@ -340,6 +361,6 @@ export WrapQueryResult WrapSearch(Infinity &instance,
                                   WrapParsedExpr *limit_expr = nullptr,
                                   WrapParsedExpr *offset_expr = nullptr);
 
-export WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name);
+export WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, OptimizeOptions optimize_options);
 
 } // namespace infinity

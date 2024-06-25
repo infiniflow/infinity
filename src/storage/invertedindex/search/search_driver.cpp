@@ -133,7 +133,8 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
     return result;
 }
 
-std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text, bool from_quoted) const {
+std::unique_ptr<QueryNode>
+SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text, bool from_quoted, unsigned long slop) const {
     if (text.empty()) {
         Status status = Status::SyntaxError("Empty query text");
         LOG_ERROR(status.message());
@@ -205,6 +206,7 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
                 result->AddTerm(term.Text());
             }
             result->column_ = field;
+            result->slop_ = slop;
             return result;
         } else {
             auto result = std::make_unique<OrQueryNode>();

@@ -29,6 +29,7 @@ import statement_common;
 import explain_statement;
 import search_options;
 import knn_expr;
+import match_sparse_expr;
 
 namespace nb = nanobind;
 
@@ -66,7 +67,8 @@ NB_MODULE(embedded_infinity_ext, m) {
     nb::class_<WrapDataType>(m, "WrapDataType")
         .def(nb::init<>())
         .def_rw("logical_type", &WrapDataType::logical_type)
-        .def_rw("embedding_type", &WrapDataType::embedding_type);
+        .def_rw("embedding_type", &WrapDataType::embedding_type)
+        .def_rw("sparse_type", &WrapDataType::sparse_type);
 
     nb::class_<WrapConstantExpr>(m, "WrapConstantExpr")
         .def(nb::init<>())
@@ -76,7 +78,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("f64_value", &WrapConstantExpr::f64_value)
         .def_rw("str_value", &WrapConstantExpr::str_value)
         .def_rw("i64_array_value", &WrapConstantExpr::i64_array_value)
-        .def_rw("f64_array_value", &WrapConstantExpr::f64_array_value);
+        .def_rw("f64_array_value", &WrapConstantExpr::f64_array_value)
+        .def_rw("i64_array_idx", &WrapConstantExpr::i64_array_idx);
 
     nb::class_<WrapColumnDef>(m, "WrapColumnDef")
         .def(nb::init<>())
@@ -90,6 +93,13 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def(nb::init<>())
         .def_rw("element_type", &WrapEmbeddingType::element_type)
         .def_rw("dimension", &WrapEmbeddingType::dimension);
+
+    nb::class_<WrapSparseType>(m, "WrapSparseType")
+        .def(nb::init<>())
+        .def_rw("element_type", &WrapSparseType::element_type)
+        .def_rw("index_type", &WrapSparseType::index_type)
+        .def_rw("dimension", &WrapSparseType::dimension);
+        
 
     nb::class_<WrapIndexInfo>(m, "WrapIndexInfo")
         .def(nb::init<>())
@@ -161,12 +171,23 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("embedding_data_type", &WrapMatchTensorExpr::embedding_data_type)
         .def_rw("options_text", &WrapMatchTensorExpr::options_text);
 
+    // Bind WrapMatchSparseExpr
+    nb::class_<WrapMatchSparseExpr>(m, "WrapMatchSparseExpr")
+        .def(nb::init<>())
+        .def_rw("own_memory", &WrapMatchSparseExpr::own_memory)
+        .def_rw("column_expr", &WrapMatchSparseExpr::column_expr)
+        .def_rw("sparse_expr", &WrapMatchSparseExpr::sparse_expr)
+        .def_rw("metric_type", &WrapMatchSparseExpr::metric_type)
+        .def_rw("topn", &WrapMatchSparseExpr::topn)
+        .def_rw("opt_params", &WrapMatchSparseExpr::opt_params);
+
     // Bind WrapSearchExpr
     nb::class_<WrapSearchExpr>(m, "WrapSearchExpr")
         .def(nb::init<>())
         .def_rw("match_exprs", &WrapSearchExpr::match_exprs)
         .def_rw("knn_exprs", &WrapSearchExpr::knn_exprs)
         .def_rw("match_tensor_exprs", &WrapSearchExpr::match_tensor_exprs)
+        .def_rw("match_sparse_exprs", &WrapSearchExpr::match_sparse_exprs)
         .def_rw("fusion_exprs", &WrapSearchExpr::fusion_exprs);
 
     // Bind WrapParsedExpr
@@ -262,7 +283,11 @@ NB_MODULE(embedded_infinity_ext, m) {
              nb::arg("where_expr") = nullptr,
              nb::arg("limit_expr") = nullptr,
              nb::arg("offset_expr") = nullptr)
-        .def("Optimize", &WrapOptimize);
+        .def("Optimize",
+             &WrapOptimize,
+             nb::arg("db_name"),
+             nb::arg("table_name"),
+             nb::arg("optimize_options"));
 
     // extra_ddl_info
     nb::enum_<ConflictType>(m, "ConflictType")
@@ -299,6 +324,10 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kInnerProduct", KnnDistanceType::kInnerProduct)
         .value("kHamming", KnnDistanceType::kHamming);
 
+    nb::enum_<SparseMetricType>(m, "SparseMetricType")
+        .value("kInnerProduct", SparseMetricType::kInnerProduct)
+        .value("kInvalid", SparseMetricType::kInvalid);
+
     // query_options
     nb::class_<CreateDatabaseOptions>(m, "CreateDatabaseOptions").def(nb::init<>()).def_rw("conflict_type", &CreateDatabaseOptions::conflict_type_);
 
@@ -326,6 +355,11 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("delimiter", &ExportOptions::delimiter_)
         .def_rw("header", &ExportOptions::header_)
         .def_rw("copy_file_type", &ExportOptions::copy_file_type_);
+
+    nb::class_<OptimizeOptions>(m, "OptimizeOptions")
+        .def(nb::init<>())
+        .def_rw("index_name", &OptimizeOptions::index_name_)
+        .def_rw("opt_params", &OptimizeOptions::opt_params_);
 
     // parsed_expr
     nb::enum_<ParsedExprType>(m, "ParsedExprType")
@@ -423,6 +457,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kHnsw", IndexType::kHnsw)
         .value("kFullText", IndexType::kFullText)
         .value("kSecondary", IndexType::kSecondary)
+        .value("kBMP", IndexType::kBMP)
         .value("kEMVB", IndexType::kEMVB)
         .value("kInvalid", IndexType::kInvalid)
         .export_values();
@@ -597,6 +632,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kMissing", LogicalType::kMissing)
         .value("kTensor", LogicalType::kTensor)
         .value("kTensorArray", LogicalType::kTensorArray)
+        .value("kSparse", LogicalType::kSparse)
         .value("kInvalid", LogicalType::kInvalid)
         .export_values();
 
@@ -615,6 +651,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kDoubleArray", LiteralType::kDoubleArray)
         .value("kSubArrayArray", LiteralType::kSubArrayArray)
         .value("kInterval", LiteralType::kInterval)
+        .value("kLongSparseArray", LiteralType::kLongSparseArray)
+        .value("kDoubleSparseArray", LiteralType::kDoubleSparseArray)
         .export_values();
 
     // embedding_info

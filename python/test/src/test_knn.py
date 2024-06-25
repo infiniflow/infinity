@@ -717,6 +717,55 @@ class TestKnn(TestSdk):
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def _test_sparse_scan(self, check_data):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_sparse_scan", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_sparse_scan", {"c1": {"type": "int"}, "c2": {"type": "sparse,100,float,int8"}}, ConflictType.Error)
+        if not check_data:
+            copy_data("sparse_knn.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        res = (table_obj.output(["*", "_row_id", "_similarity"])
+                        .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
+                        .to_pl())
+        print(res)
+
+        res = db_obj.drop_table("test_sparse_scan", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+    
+    def _test_sparse_knn_with_index(self, check_data):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_sparse_knn_with_index", {"c1": {"type": "int"}, "c2": {"type": "sparse,100,float,int8"}}, ConflictType.Error)
+        if not check_data:
+            copy_data("sparse_knn.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        table_obj.create_index("idx1",
+                                     [index.IndexInfo("c2",
+                                                      index.IndexType.BMP,
+                                                      [
+                                                          index.InitParameter(
+                                                              "block_size", "8"),
+                                                          index.InitParameter(
+                                                              "compress_type", "compress")
+                                                      ])], ConflictType.Error)
+
+        table_obj.optimize("idx1", {"topk": "3"})
+        
+        res = (table_obj
+                .output(["*", "_row_id", "_similarity"])
+                .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3,
+                              {"alpha": "1.0", "beta": "1.0"})
+                .to_pl())
+        print(res)
+
+        res = table_obj.drop_index("idx1", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def _test_with_multiple_fusion(self, check_data):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_with_multiple_fusion", ConflictType.Ignore)
