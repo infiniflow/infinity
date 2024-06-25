@@ -187,7 +187,9 @@ struct IndexType {
     IVFFlat = 0,
     HnswLVQ = 1,
     Hnsw = 2,
-    FullText = 3
+    FullText = 3,
+    Secondary = 4,
+    EMVB = 5
   };
 };
 

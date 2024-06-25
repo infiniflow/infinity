@@ -31,6 +31,12 @@ class TestInfinity:
     def test_create_index_fulltext(self):
         self.test_infinity_obj._test_create_index_fulltext()
 
+    def test_create_index_secondary(self):
+        self.test_infinity_obj._test_create_index_secondary()
+
+    def test_create_index_emvb(self):
+        self.test_infinity_obj._test_create_index_emvb()
+
     def test_drop_non_existent_index(self):
         self.test_infinity_obj._test_drop_non_existent_index()
 
