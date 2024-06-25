@@ -590,8 +590,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto decodes = DBEntry::DecodeIndex(encode);
                 auto db_name = MakeShared<String>(decodes[0]);
                 const auto &db_entry_dir = add_db_entry_op->db_entry_dir_;
-                // const auto &db_entry_path = add_db_entry_op->db_entry_dir_;
-                // SharedPtr<String> db_entry_dir = MakeShared<String>(fmt::format("{}/{}", *data_dir_, *db_entry_path));
                 if (merge_flag == MergeFlag::kDelete || merge_flag == MergeFlag::kDeleteAndNew) {
                     this->DropDatabaseReplay(
                         *db_name,
@@ -622,8 +620,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto db_name = String(decodes[0]);
                 auto table_name = MakeShared<String>(decodes[1]);
                 const auto &table_entry_dir = add_table_entry_op->table_entry_dir_;
-                // const auto &table_entry_path = add_table_entry_op->table_entry_dir_;
-                // SharedPtr<String> table_entry_dir = MakeShared<String>(fmt::format("{}/{}", *data_dir_, *table_entry_path));
                 auto column_defs = add_table_entry_op->column_defs_;
                 auto entry_type = add_table_entry_op->table_entry_type_;
                 auto row_count = add_table_entry_op->row_count_;
@@ -809,8 +805,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 auto table_name = String(decodes[1]);
                 auto index_name = MakeShared<String>(decodes[2]);
                 const auto &index_dir = add_table_index_entry_op->index_dir_;
-                // const auto &index_path = add_table_index_entry_op->index_dir_;
-                // SharedPtr<String> index_dir = MakeShared<String>(fmt::format("{}/{}", *data_dir_, *index_path));
                 auto index_base = add_table_index_entry_op->index_base_;
 
                 auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);

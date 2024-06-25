@@ -57,10 +57,7 @@ String BlockColumnEntry::EncodeIndex(const ColumnID column_id, const BlockEntry 
 
 BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref)
     : BaseEntry(EntryType::kBlockColumn, false, block_entry->base_dir_, BlockColumnEntry::EncodeIndex(column_id, block_entry)),
-      block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {
-    // SharedPtr<String> file_dir = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *base_dir_ref));
-    // base_dir_ = std::move(file_dir);
-}
+      block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
 
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
     SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->base_dir()));
