@@ -56,7 +56,7 @@ struct ClientVersions {
 export class InfinityThriftService final : public infinity_thrift_rpc::InfinityServiceIf {
 private:
     static constexpr std::string_view ErrorMsgHeader = "[THRIFT ERROR]";
-    static constexpr i64 current_version_index_{7}; // 0.2.0
+    static constexpr i64 current_version_index_{7}; // 0.2.0.dev8
 
     static std::mutex infinity_session_map_mutex_;
     static HashMap<u64, SharedPtr<Infinity>> infinity_session_map_;
@@ -127,15 +127,6 @@ public:
     void ListIndex(infinity_thrift_rpc::ListIndexResponse &response, const infinity_thrift_rpc::ListIndexRequest &request) final;
 
     void ShowIndex(infinity_thrift_rpc::ShowIndexResponse &response, const infinity_thrift_rpc::ShowIndexRequest &request) final;
-
-private:
-
-
-    // SizeT count_ = 0;
-    // std::chrono::duration<double> phase_1_duration_{};
-    // std::chrono::duration<double> phase_2_duration_{};
-    // std::chrono::duration<double> phase_3_duration_{};
-    // std::chrono::duration<double> phase_4_duration_{};
 
 private:
     Tuple<Infinity *, Status> GetInfinityBySessionID(i64 session_id);
