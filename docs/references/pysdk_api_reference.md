@@ -352,7 +352,7 @@ Create an index by `IndexInfo` list.
   A IndexInfo struct contains three fields,`column_name`, `index_type`, and `index_param_list`.
     - **column_name : str** Name of the column to build index on.
     - **index_type : IndexType**
-      enum type which could be `IVFFlat` , `Hnsw`, `HnswLVQ` or `FullText`, defined in *infinity.index*
+      enum type which could be `IVFFlat` , `Hnsw`, `HnswLVQ`, `FullText` or `BMP`, defined in *infinity.index*
       `Note: The difference between Hnsw and HnswLVQ is only adopting different clustering method. The former uses K-Means while the later uses LVQ(Learning Vector Quantization)`
     - **index_param_list**
       A list of InitParameter. The InitParameter struct is like a key-value pair, with two string fields named param_name and param_value. The optional parameters of each type of index are listed below:
@@ -366,6 +366,9 @@ Create an index by `IndexInfo` list.
              - `ip`: Inner product
              - `l2`: Euclidean distance
         - `FullText`: `'ANALYZER'`(default:`'standard'`)
+        - `BMP`: 
+          - `block_size=1~256`(default: 16): The size of the block in BMP index
+          - `compress_type=[compress|raww]`(default: 'compress'): If set "compress", the block max will be stored as sparse format. So suitable for small "block size".
 - `conflict_type`: `Enum`. See `ConflictType`, which is defined in the **infinity.common** package. 
           - `Error`
           - `Ignore`
@@ -380,7 +383,7 @@ Create an index by `IndexInfo` list.
 ```python
 db_obj.create_table("test_index_ivfflat", {
             "c1": {"type": "vector,1024,float"}}, None)
-db_obj.get_table("test_index_ivfflat")
+table_obj = db_obj.get_table("test_index_ivfflat")
 table_obj.create_index("my_index",
                         [index.IndexInfo("c1",index.IndexType.IVFFlat,
 	                    [
@@ -392,7 +395,7 @@ table_obj.create_index("my_index",
 db_obj.create_table(
             "test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 
-db_obj.get_table("test_index_hnsw")
+table_obj = db_obj.get_table("test_index_hnsw")
 table_obj.create_index("my_index",
                        [index.IndexInfo("c1",index.IndexType.Hnsw,
                        [
@@ -411,12 +414,26 @@ db_obj.create_table(
                 "body": {"type": "varchar"}
             }, None)
 
-db_obj.get_table("test_index_fulltext")
+table_obj = db_obj.get_table("test_index_fulltext")
 table_obj.create_index("my_index",
                              [index.IndexInfo("body", index.IndexType.FullText, []),
                               index.IndexInfo("doctitle", index.IndexType.FullText, []),
                               index.IndexInfo("docdate", index.IndexType.FullText, []),
                               ], None)
+```
+
+```python
+db_obj.create_table(
+            "test_index_bmp", {
+                "c1": {"type": "sparse,30000,float,int16"}
+            }, None)
+table_obj = db_obj.get_table("test_index_bmp")
+table_obj.create_index("my_index",
+                             [index.IndexInfo("c1", index.IndexType.BMP,
+                              [
+                                  index.InitParameter("block_size", "16"),
+                                  index.InitParameter("compress_type", "compress")
+                              ])], None)
 ```
 
 ## drop_index
@@ -686,6 +703,33 @@ table_obj.knn('col1', [0.1,0.2,0.3], 'float', 'l2', 100)
 table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 ```
 
+## match sparse
+
+**RemoteTable.match_sparse(*vector_column_name, sparse_data, distance_type, topn, opt_params = None*)**
+
+### Parameters
+
+- **vector_column_name : str**
+- **sparse_data : {"indices": list[int], "values": Union(list[int], list[float])}**
+- **distance_type : str**
+  -  `'ip'`
+- **topn : int**
+- **opt_params : dict[str, str]**
+    common options:
+      - 'alpha=0.0~1.0'(default: 1.0): paramter for "Termination Conditions", the smaller the value, the more aggressive the pruning.
+      - 'beta=0.0~1.0'(default: 1.0): parameter for "Query Term Pruning", the smaller the value, the more aggressive the pruning.
+
+### Returns
+- Success: Self `RemoteTable`
+- Failure: `Exception`
+
+### Examples
+
+```python
+table_obj.match_sparse('col1', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100)
+table_obj.match_sparse('col1_with_bmp_index', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
+```
+
 ## match
 
 Create a full-text search expression.
@@ -798,6 +842,28 @@ table_obj.fusion('match_tensor', 'topn=2', make_match_tensor_expr('t', [[0.0, -1
 `rrf`:  Reciprocal rank fusion method.
 
 [Reciprocal rank fusion (RRF)](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) is a method that combines multiple result sets with different relevance indicators into one result set. RRF does not requires tuning, and the different relevance indicators do not have to be related to each other to achieve high-quality results.
+
+## optimize
+
+**RemoteTable.optimize(*index_name, opt_params*)**
+
+### Parameters
+
+- **index_name : str**
+- **opt_params : dict[str, str]**
+    Common options:
+  - 'topk=10': Optimize the BMP index for top 10. Only used when the index is BMP.
+
+### Returns
+
+- Success: `True`
+- Failure: `Exception`
+
+### Examples
+
+```python
+table_obj.optimize('bmp_index_name', {'topk': '10'})
+```
 
 ## get result
 
