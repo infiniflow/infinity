@@ -21,7 +21,7 @@ from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.embedded_infinity_ext import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
-from infinity.common import INSERT_DATA, VEC, InfinityException
+from infinity.common import INSERT_DATA, VEC, SPARSE, InfinityException
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
@@ -360,6 +360,10 @@ class LocalTable(Table, ABC):
             topn: int = DEFAULT_MATCH_VECTOR_TOPN, knn_params: {} = None):
         self.query_builder.knn(
             vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
+        return self
+
+    def match_sparse(self, vector_column_name: str, sparse_data: SPARSE, distance_type: str, topn: int, knn_params: {} = None):
+        self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, knn_params)
         return self
 
     @params_type_check

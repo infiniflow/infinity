@@ -253,6 +253,7 @@ class TestInsert(TestSdk):
         res = db_obj.drop_table("test_insert_tensor_array", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
     
+    @pytest.mark.usefixtures("skip_if_remote_infinity")
     def _test_insert_sparse(self):
         """
         target: test insert sparse column

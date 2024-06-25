@@ -37,6 +37,7 @@ import search_options;
 import match_expr;
 import fusion_expr;
 import match_tensor_expr;
+import match_sparse_expr;
 import column_expr;
 import function_expr;
 import between_expr;
@@ -200,10 +201,21 @@ export struct WrapMatchTensorExpr {
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
+export struct WrapMatchSparseExpr {
+    bool own_memory;
+    WrapColumnExpr column_expr;
+    WrapConstantExpr sparse_expr;
+    String metric_type;
+    i64 topn;
+    Vector<InitParameter> opt_params{};
+    ParsedExpr *GetParsedExpr(Status &status);
+};
+
 export struct WrapSearchExpr {
     Vector<WrapMatchExpr> match_exprs{};
     Vector<WrapKnnExpr> knn_exprs{};
     Vector<WrapMatchTensorExpr> match_tensor_exprs{};
+    Vector<WrapMatchSparseExpr> match_sparse_exprs{};
     Vector<WrapFusionExpr> fusion_exprs{};
 
     ParsedExpr *GetParsedExpr(Status &status);

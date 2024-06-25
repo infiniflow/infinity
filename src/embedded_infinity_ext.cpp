@@ -29,6 +29,7 @@ import statement_common;
 import explain_statement;
 import search_options;
 import knn_expr;
+import match_sparse_expr;
 
 namespace nb = nanobind;
 
@@ -170,12 +171,23 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("embedding_data_type", &WrapMatchTensorExpr::embedding_data_type)
         .def_rw("options_text", &WrapMatchTensorExpr::options_text);
 
+    // Bind WrapMatchSparseExpr
+    nb::class_<WrapMatchSparseExpr>(m, "WrapMatchSparseExpr")
+        .def(nb::init<>())
+        .def_rw("own_memory", &WrapMatchSparseExpr::own_memory)
+        .def_rw("column_expr", &WrapMatchSparseExpr::column_expr)
+        .def_rw("sparse_expr", &WrapMatchSparseExpr::sparse_expr)
+        .def_rw("metric_type", &WrapMatchSparseExpr::metric_type)
+        .def_rw("topn", &WrapMatchSparseExpr::topn)
+        .def_rw("opt_params", &WrapMatchSparseExpr::opt_params);
+
     // Bind WrapSearchExpr
     nb::class_<WrapSearchExpr>(m, "WrapSearchExpr")
         .def(nb::init<>())
         .def_rw("match_exprs", &WrapSearchExpr::match_exprs)
         .def_rw("knn_exprs", &WrapSearchExpr::knn_exprs)
         .def_rw("match_tensor_exprs", &WrapSearchExpr::match_tensor_exprs)
+        .def_rw("match_sparse_exprs", &WrapSearchExpr::match_sparse_exprs)
         .def_rw("fusion_exprs", &WrapSearchExpr::fusion_exprs);
 
     // Bind WrapParsedExpr
@@ -307,6 +319,10 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kCosine", KnnDistanceType::kCosine)
         .value("kInnerProduct", KnnDistanceType::kInnerProduct)
         .value("kHamming", KnnDistanceType::kHamming);
+
+    nb::enum_<SparseMetricType>(m, "SparseMetricType")
+        .value("kInnerProduct", SparseMetricType::kInnerProduct)
+        .value("kInvalid", SparseMetricType::kInvalid);
 
     // query_options
     nb::class_<CreateDatabaseOptions>(m, "CreateDatabaseOptions").def(nb::init<>()).def_rw("conflict_type", &CreateDatabaseOptions::conflict_type_);

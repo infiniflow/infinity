@@ -277,6 +277,40 @@ ParsedExpr *WrapMatchTensorExpr::GetParsedExpr(Status &status) {
     return match_tensor_expr;
 }
 
+ParsedExpr *WrapMatchSparseExpr::GetParsedExpr(Status &status) {
+    status.code_ = ErrorCode::kOk;
+
+    auto match_sparse_expr = new MatchSparseExpr(own_memory);
+
+    auto *column_expr_ptr = column_expr.GetParsedExpr(status);
+    if (status.code_ != ErrorCode::kOk) {
+        delete match_sparse_expr;
+        return nullptr;
+    }
+    match_sparse_expr->SetSearchColumn(column_expr_ptr);
+
+    auto *query_sparse_ptr = static_cast<ConstantExpr *>(sparse_expr.GetParsedExpr(status));
+    if (status.code_ != ErrorCode::kOk) {
+        delete match_sparse_expr;
+        return nullptr;
+    }
+    match_sparse_expr->SetQuerySparse(query_sparse_ptr);
+
+    match_sparse_expr->SetMetricType(metric_type);
+
+    auto *opt_params_ptr = new Vector<InitParameter *>();
+    for (auto &param : opt_params) {
+        auto init_parameter = new InitParameter();
+        init_parameter->param_name_ = param.param_name_;
+        init_parameter->param_value_ = param.param_value_;
+        opt_params_ptr->emplace_back(init_parameter);
+    }
+    match_sparse_expr->SetOptParams(topn, opt_params_ptr);
+
+    match_sparse_expr->topn_ = topn;
+    return match_sparse_expr;
+}
+
 ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
@@ -302,6 +336,15 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
     search_expr->match_tensor_exprs_.reserve(match_tensor_exprs.size());
     for (SizeT i = 0; i < match_tensor_exprs.size(); ++i) {
         search_expr->match_tensor_exprs_.emplace_back(dynamic_cast<MatchTensorExpr *>(match_tensor_exprs[i].GetParsedExpr(status)));
+        if (status.code_ != ErrorCode::kOk) {
+            delete search_expr;
+            search_expr = nullptr;
+            return nullptr;
+        }
+    }
+    search_expr->match_sparse_exprs_.reserve(match_sparse_exprs.size());
+    for (SizeT i = 0; i < match_sparse_exprs.size(); ++i) {
+        search_expr->match_sparse_exprs_.emplace_back(dynamic_cast<MatchSparseExpr *>(match_sparse_exprs[i].GetParsedExpr(status)));
         if (status.code_ != ErrorCode::kOk) {
             delete search_expr;
             search_expr = nullptr;
