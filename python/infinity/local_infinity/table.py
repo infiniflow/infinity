@@ -364,8 +364,8 @@ class LocalTable(Table, ABC):
             vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
         return self
 
-    def match_sparse(self, vector_column_name: str, sparse_data: SPARSE, distance_type: str, topn: int, knn_params: {} = None):
-        self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, knn_params)
+    def match_sparse(self, vector_column_name: str, sparse_data: SPARSE, distance_type: str, topn: int, opt_params: {} = None):
+        self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
         return self
 
     @params_type_check

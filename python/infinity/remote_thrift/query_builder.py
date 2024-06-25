@@ -24,10 +24,10 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
+from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
-from infinity.remote_thrift.types import logic_type_to_dtype, make_match_tensor_expr
+from infinity.remote_thrift.types import logic_type_to_dtype, make_match_tensor_expr, make_match_sparse_expr
 from infinity.remote_thrift.utils import traverse_conditions, parse_expr
 
 '''FIXME: How to disable validation of only the search field?'''
@@ -140,6 +140,18 @@ class InfinityThriftQueryBuilder(ABC):
         knn_expr = KnnExpr(column_expr=column_expr, embedding_data=data, embedding_data_type=elem_type,
                            distance_type=dist_type, topn=topn, opt_params=knn_opt_params)
         self._search.knn_exprs.append(knn_expr)
+        return self
+
+    def match_sparse(self, vector_column_name: str, sparse_data: SPARSE, metric_type: str, topn: int, opt_params: {} = None) \
+        -> InfinityThriftQueryBuilder:
+        if self._search is None:
+            self._search = SearchExpr()
+        if self._search.match_sparse_exprs is None:
+            self._search.match_sparse_exprs = list()
+
+        match_sparse_expr = make_match_sparse_expr(vector_column_name, sparse_data, metric_type, topn, opt_params)
+    
+        self._search.match_sparse_exprs.append(match_sparse_expr)
         return self
 
     def match(self, fields: str, matching_text: str, options_text: str = '') -> InfinityThriftQueryBuilder:

@@ -169,6 +169,14 @@ struct KnnExpr {
 6: list<InitParameter> opt_params = [],
 }
 
+struct MatchSparseExpr {
+1: ColumnExpr  column_expr,
+2: ConstantExpr  query_sparse_expr,
+3: string  metric_type,
+4: i64  topn,
+5: list<InitParameter> opt_params = [],
+}
+
 struct MatchTensorExpr {
 1: string search_method,
 2: ColumnExpr column_expr,
@@ -192,8 +200,9 @@ struct FusionExpr {
 struct SearchExpr {
 	1: optional list<MatchExpr> match_exprs,
 	2: optional list<KnnExpr> knn_exprs,
-	3: optional list<MatchTensorExpr> match_tensor_exprs,
-	4: optional list<FusionExpr> fusion_exprs,
+    3: optional list<MatchSparseExpr> match_sparse_exprs
+	4: optional list<MatchTensorExpr> match_tensor_exprs,
+	5: optional list<FusionExpr> fusion_exprs,
 }
 
 struct FunctionExpr {

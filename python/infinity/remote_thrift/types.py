@@ -14,7 +14,7 @@
 
 import struct
 import numpy as np
-from infinity.common import VEC, InfinityException
+from infinity.common import VEC, SPARSE, InfinityException
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from collections import defaultdict
 from typing import Any, Tuple, Dict, List
@@ -394,3 +394,27 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
     match_tensor_expr.embedding_data_type = elem_type
     match_tensor_expr.embedding_data = data
     return match_tensor_expr
+
+def make_match_sparse_expr(vector_column_name: str, sparse_data: SPARSE, metric_type: str, topn: int, opt_params: {} = None):
+    column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
+
+    query_sparse_expr = ConstantExpr()
+    if isinstance(sparse_data["values"][0], int):
+        query_sparse_expr.literal_type = LiteralType.SparseIntegerArray
+        query_sparse_expr.i64_array_idx = sparse_data["indices"]
+        query_sparse_expr.i64_array_value = sparse_data["values"]
+    elif isinstance(sparse_data["values"][0], float):
+        query_sparse_expr.literal_type = LiteralType.SparseDoubleArray
+        query_sparse_expr.i64_array_idx = sparse_data["indices"]
+        query_sparse_expr.f64_array_value = sparse_data["values"]
+    else:
+        raise InfinityException(3058, f"Invalid sparse data {sparse_data['values'][0]} type")
+
+    match_sparse_options = []
+    if opt_params is not None:
+        for k, v in opt_params.items():
+            match_sparse_options.append(InitParameter(param_name=k, param_value=v))
+
+    match_sparse_expr = MatchSparseExpr(column_expr=column_expr, query_sparse_expr=query_sparse_expr, metric_type=metric_type,
+                                        topn=topn, opt_params=match_sparse_options)
+    return match_sparse_expr

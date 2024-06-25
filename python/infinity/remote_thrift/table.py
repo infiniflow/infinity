@@ -432,6 +432,11 @@ class RemoteTable(Table, ABC):
         return self
 
     @params_type_check
+    def match_sparse(self, vector_column_name: str, sparse_data, distance_type: str, topn: int, opt_params: {} = None):
+        self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
+        return self
+
+    @params_type_check
     def fusion(self, method: str, options_text: str = '', match_tensor_expr: ttypes.MatchTensorExpr = None):
         self.query_builder.fusion(method, options_text, match_tensor_expr)
         return self

@@ -254,6 +254,8 @@ class ConstantExpr;
 
 class KnnExpr;
 
+class MatchSparseExpr;
+
 class MatchTensorExpr;
 
 class MatchExpr;
@@ -1375,6 +1377,75 @@ void swap(KnnExpr &a, KnnExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const KnnExpr& obj);
 
+typedef struct _MatchSparseExpr__isset {
+  _MatchSparseExpr__isset() : column_expr(false), query_sparse_expr(false), metric_type(false), topn(false), opt_params(true) {}
+  bool column_expr :1;
+  bool query_sparse_expr :1;
+  bool metric_type :1;
+  bool topn :1;
+  bool opt_params :1;
+} _MatchSparseExpr__isset;
+
+class MatchSparseExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  MatchSparseExpr(const MatchSparseExpr&);
+  MatchSparseExpr& operator=(const MatchSparseExpr&);
+  MatchSparseExpr() noexcept
+                  : metric_type(),
+                    topn(0) {
+
+  }
+
+  virtual ~MatchSparseExpr() noexcept;
+  ColumnExpr column_expr;
+  ConstantExpr query_sparse_expr;
+  std::string metric_type;
+  int64_t topn;
+  std::vector<InitParameter>  opt_params;
+
+  _MatchSparseExpr__isset __isset;
+
+  void __set_column_expr(const ColumnExpr& val);
+
+  void __set_query_sparse_expr(const ConstantExpr& val);
+
+  void __set_metric_type(const std::string& val);
+
+  void __set_topn(const int64_t val);
+
+  void __set_opt_params(const std::vector<InitParameter> & val);
+
+  bool operator == (const MatchSparseExpr & rhs) const
+  {
+    if (!(column_expr == rhs.column_expr))
+      return false;
+    if (!(query_sparse_expr == rhs.query_sparse_expr))
+      return false;
+    if (!(metric_type == rhs.metric_type))
+      return false;
+    if (!(topn == rhs.topn))
+      return false;
+    if (!(opt_params == rhs.opt_params))
+      return false;
+    return true;
+  }
+  bool operator != (const MatchSparseExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const MatchSparseExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(MatchSparseExpr &a, MatchSparseExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const MatchSparseExpr& obj);
+
 typedef struct _MatchTensorExpr__isset {
   _MatchTensorExpr__isset() : search_method(false), column_expr(false), embedding_data_type(false), embedding_data(false), extra_options(false) {}
   bool search_method :1;
@@ -1564,9 +1635,10 @@ void swap(FusionExpr &a, FusionExpr &b);
 std::ostream& operator<<(std::ostream& out, const FusionExpr& obj);
 
 typedef struct _SearchExpr__isset {
-  _SearchExpr__isset() : match_exprs(false), knn_exprs(false), match_tensor_exprs(false), fusion_exprs(false) {}
+  _SearchExpr__isset() : match_exprs(false), knn_exprs(false), match_sparse_exprs(false), match_tensor_exprs(false), fusion_exprs(false) {}
   bool match_exprs :1;
   bool knn_exprs :1;
+  bool match_sparse_exprs :1;
   bool match_tensor_exprs :1;
   bool fusion_exprs :1;
 } _SearchExpr__isset;
@@ -1582,6 +1654,7 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
   virtual ~SearchExpr() noexcept;
   std::vector<MatchExpr>  match_exprs;
   std::vector<KnnExpr>  knn_exprs;
+  std::vector<MatchSparseExpr>  match_sparse_exprs;
   std::vector<MatchTensorExpr>  match_tensor_exprs;
   std::vector<FusionExpr>  fusion_exprs;
 
@@ -1590,6 +1663,8 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
   void __set_match_exprs(const std::vector<MatchExpr> & val);
 
   void __set_knn_exprs(const std::vector<KnnExpr> & val);
+
+  void __set_match_sparse_exprs(const std::vector<MatchSparseExpr> & val);
 
   void __set_match_tensor_exprs(const std::vector<MatchTensorExpr> & val);
 
@@ -1604,6 +1679,10 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
     if (__isset.knn_exprs != rhs.__isset.knn_exprs)
       return false;
     else if (__isset.knn_exprs && !(knn_exprs == rhs.knn_exprs))
+      return false;
+    if (__isset.match_sparse_exprs != rhs.__isset.match_sparse_exprs)
+      return false;
+    else if (__isset.match_sparse_exprs && !(match_sparse_exprs == rhs.match_sparse_exprs))
       return false;
     if (__isset.match_tensor_exprs != rhs.__isset.match_tensor_exprs)
       return false;

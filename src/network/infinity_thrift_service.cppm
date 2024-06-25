@@ -29,6 +29,7 @@ import constant_expr;
 import column_expr;
 import function_expr;
 import knn_expr;
+import match_sparse_expr;
 import match_tensor_expr;
 import match_expr;
 import fusion_expr;
@@ -159,6 +160,8 @@ private:
     static FunctionExpr *GetFunctionExprFromProto(Status &status, const infinity_thrift_rpc::FunctionExpr &function_expr);
 
     static Tuple<KnnExpr *, Status> GetKnnExprFromProto(const infinity_thrift_rpc::KnnExpr &expr);
+
+    static Tuple<MatchSparseExpr *, Status> GetMatchSparseExprFromProto(const infinity_thrift_rpc::MatchSparseExpr &expr);
 
     static Pair<MatchTensorExpr *, Status> GetMatchTensorExprFromProto(const infinity_thrift_rpc::MatchTensorExpr &expr);
 

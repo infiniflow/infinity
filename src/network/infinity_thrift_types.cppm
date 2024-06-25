@@ -72,6 +72,7 @@ export using infinity_thrift_rpc::ConstantExpr;
 export using infinity_thrift_rpc::ColumnExpr;
 export using infinity_thrift_rpc::FunctionExpr;
 export using infinity_thrift_rpc::KnnExpr;
+export using infinity_thrift_rpc::MatchSparseExpr;
 export using infinity_thrift_rpc::MatchTensorExpr;
 export using infinity_thrift_rpc::MatchExpr;
 export using infinity_thrift_rpc::FusionExpr;

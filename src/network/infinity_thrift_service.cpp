@@ -46,6 +46,7 @@ import constant_expr;
 import column_expr;
 import function_expr;
 import knn_expr;
+import match_sparse_expr;
 import match_tensor_expr;
 import match_expr;
 import fusion_expr;
@@ -476,6 +477,7 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
         search_expr = new SearchExpr();
         auto search_expr_list = new Vector<ParsedExpr *>();
         SizeT knn_expr_count = request.search_expr.knn_exprs.size();
+        SizeT match_sparse_expr_count = request.search_expr.match_sparse_exprs.size();
         SizeT match_tensor_expr_count = request.search_expr.match_tensor_exprs.size();
         SizeT match_expr_count = request.search_expr.match_exprs.size();
         SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
@@ -515,6 +517,37 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
                 return;
             }
             search_expr_list->emplace_back(knn_expr);
+        }
+
+        for (SizeT idx = 0; idx < match_sparse_expr_count; ++idx) {
+            auto [match_sparse_expr, match_sparse_status] = GetMatchSparseExprFromProto(request.search_expr.match_sparse_exprs[idx]);
+            if (!match_sparse_status.ok()) {
+                if (output_columns != nullptr) {
+                    for (auto &expr_ptr : *output_columns) {
+                        delete expr_ptr;
+                    }
+                    delete output_columns;
+                    output_columns = nullptr;
+                }
+                if (search_expr_list != nullptr) {
+                    for (auto &expr_ptr : *search_expr_list) {
+                        delete expr_ptr;
+                    }
+                    delete search_expr_list;
+                    search_expr_list = nullptr;
+                }
+                if (match_sparse_expr != nullptr) {
+                    delete match_sparse_expr;
+                    match_sparse_expr = nullptr;
+                }
+                if (search_expr != nullptr) {
+                    delete search_expr;
+                    search_expr = nullptr;
+                }
+                ProcessStatus(response, match_sparse_status);
+                return;
+            }
+            search_expr_list->emplace_back(match_sparse_expr);
         }
 
         for (SizeT idx = 0; idx < match_tensor_expr_count; ++idx) {
@@ -1824,6 +1857,34 @@ Tuple<KnnExpr *, Status> InfinityThriftService::GetKnnExprFromProto(const infini
         knn_expr->opt_params_->emplace_back(init_parameter);
     }
     return {knn_expr, status};
+}
+
+Tuple<MatchSparseExpr *, Status> InfinityThriftService::GetMatchSparseExprFromProto(const infinity_thrift_rpc::MatchSparseExpr &expr)  {
+    auto match_sparse_expr = new MatchSparseExpr(true);
+    auto *column_expr = static_cast<ParsedExpr *>(GetColumnExprFromProto(expr.column_expr));
+    match_sparse_expr->SetSearchColumn(column_expr);
+
+    Status status;
+    auto *constant_expr = GetConstantFromProto(status, expr.query_sparse_expr);
+    if (!status.ok()) {
+        delete match_sparse_expr;
+        match_sparse_expr = nullptr;
+        return {nullptr, status};
+    }
+    match_sparse_expr->SetQuerySparse(constant_expr);
+
+    match_sparse_expr->SetMetricType(expr.metric_type);
+
+    auto *opt_params_ptr = new Vector<InitParameter *>();
+    for (auto &param : expr.opt_params) {
+        auto *init_parameter = new InitParameter();
+        init_parameter->param_name_ = param.param_name;
+        init_parameter->param_value_ = param.param_value;
+        opt_params_ptr->emplace_back(init_parameter);
+    }
+    match_sparse_expr->SetOptParams(expr.topn, opt_params_ptr);
+
+    return {match_sparse_expr, status};
 }
 
 Pair<MatchTensorExpr *, Status> InfinityThriftService::GetMatchTensorExprFromProto(const infinity_thrift_rpc::MatchTensorExpr &expr) {

@@ -300,14 +300,13 @@ ParsedExpr *WrapMatchSparseExpr::GetParsedExpr(Status &status) {
 
     auto *opt_params_ptr = new Vector<InitParameter *>();
     for (auto &param : opt_params) {
-        auto init_parameter = new InitParameter();
+        auto *init_parameter = new InitParameter();
         init_parameter->param_name_ = param.param_name_;
         init_parameter->param_value_ = param.param_value_;
         opt_params_ptr->emplace_back(init_parameter);
     }
     match_sparse_expr->SetOptParams(topn, opt_params_ptr);
 
-    match_sparse_expr->topn_ = topn;
     return match_sparse_expr;
 }
 

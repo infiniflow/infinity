@@ -239,7 +239,6 @@ class TestInfinity:
     def test_tensor_scan(self, check_data):
         self.test_infinity_obj._test_tensor_scan(check_data)
 
-    @pytest.mark.usefixtures("skip_if_remote_infinity")
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_sparse_knn(self, check_data):
