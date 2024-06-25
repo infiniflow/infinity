@@ -70,9 +70,12 @@ void Infinity::LocalInit(const String &path) {
 
     SharedPtr<String> config_path = MakeShared<String>(path + "/infinity_conf.toml");
     if (fs.Exists(*config_path)) {
-        InfinityContext::instance().Init(config_path, LogLevel::kInfo);
+        InfinityContext::instance().Init(config_path);
     } else {
-        InfinityContext::instance().Init(nullptr, LogLevel::kCritical);
+        UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
+        default_config->default_log_level_ = LogLevel::kInfo;
+        default_config->default_log_to_stdout_ = false;
+        InfinityContext::instance().Init(nullptr, default_config.get());
     }
 }
 
