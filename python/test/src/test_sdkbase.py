@@ -2,7 +2,7 @@ from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 class TestSdk():
-    def __init__(self, uri=common_values.TEST_REMOTE_HOST, connect=True):
+    def __init__(self, uri=common_values.TEST_LOCAL_HOST, connect=True):
         self.uri = uri
         if connect:
             self.connect()

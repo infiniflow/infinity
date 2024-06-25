@@ -13,7 +13,7 @@ class TestInfinity:
         if local_infinity:
             self.uri = common_values.TEST_LOCAL_PATH
         else:
-            self.uri = common_values.TEST_REMOTE_HOST
+            self.uri = common_values.TEST_LOCAL_HOST
         self.test_infinity_obj = TestExplain(self.uri)
 
     def teardown(self):

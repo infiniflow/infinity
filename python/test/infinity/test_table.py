@@ -15,7 +15,7 @@ def setup_class(request, local_infinity):
     if local_infinity:
         uri = common_values.TEST_LOCAL_PATH
     else:
-        uri = common_values.TEST_REMOTE_HOST
+        uri = common_values.TEST_LOCAL_HOST
     request.cls.uri = uri
     request.cls.test_infinity_obj = TestTable(uri)
     yield
@@ -32,7 +32,7 @@ class TestInfinity:
             if local_infinity:
                 self.uri = common_values.TEST_LOCAL_PATH
             else:
-                self.uri = common_values.TEST_REMOTE_HOST
+                self.uri = common_values.TEST_LOCAL_HOST
             self.test_infinity_obj = TestTable(self.uri)
             yield
             self.teardown()

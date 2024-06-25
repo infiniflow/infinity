@@ -4,7 +4,7 @@ import time
 
 import infinity
 from infinity import index
-from infinity.common import REMOTE_HOST
+from infinity.common import LOCAL_HOST
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.client import ThriftInfinityClient
 from infinity.remote_thrift.table import RemoteTable
@@ -20,7 +20,7 @@ def import_data(path):
 
 
 def import_sift_1m(path):
-    infinity_obj = infinity.connect(REMOTE_HOST)
+    infinity_obj = infinity.connect(LOCAL_HOST)
     assert infinity_obj
 
     db_obj = infinity_obj.get_database("default_db")
@@ -48,7 +48,7 @@ def import_sift_1m(path):
 
 
 def import_gist_1m(path):
-    infinity_obj = infinity.connect(REMOTE_HOST)
+    infinity_obj = infinity.connect(LOCAL_HOST)
     assert infinity_obj
 
     db_obj = infinity_obj.get_database("default_db")
@@ -76,7 +76,7 @@ def import_gist_1m(path):
 
 
 def create_index(table_name):
-    conn = ThriftInfinityClient(REMOTE_HOST)
+    conn = ThriftInfinityClient(LOCAL_HOST)
     table = RemoteTable(conn, "default_db", table_name)
     res = table.create_index("hnsw_index",
                              [index.IndexInfo("col1",

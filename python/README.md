@@ -36,10 +36,10 @@ Note that pypi allow a version of a package [be uploaded only once](https://pypi
 
 ```python
 import infinity
-from infinity.common import REMOTE_HOST
+from infinity.common import LOCAL_HOST
 from infinity.common import ConflictType
 
-infinity_obj = infinity.connect(REMOTE_HOST)
+infinity_obj = infinity.connect(LOCAL_HOST)
 db = infinity_obj.get_database("default_db")
 db.drop_table("my_table", ConflictType.Ignore)
 table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector,5,float"}}, ConflictType.Error)

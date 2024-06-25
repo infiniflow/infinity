@@ -67,13 +67,16 @@ void Infinity::Hello() { std::cout << "hello infinity" << std::endl; }
 
 void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
-    if (!fs.Exists(path)) {
-        fs.CreateDirectory(path);
-    }
 
     SharedPtr<String> config_path = MakeShared<String>(path + "/infinity_conf.toml");
-
-    InfinityContext::instance().Init(config_path);
+    if (fs.Exists(*config_path)) {
+        InfinityContext::instance().Init(config_path);
+    } else {
+        UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
+        default_config->default_log_level_ = LogLevel::kInfo;
+        default_config->default_log_to_stdout_ = false;
+        InfinityContext::instance().Init(nullptr, default_config.get());
+    }
 }
 
 void Infinity::LocalUnInit() { InfinityContext::instance().UnInit(); }
