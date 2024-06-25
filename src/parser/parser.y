@@ -461,7 +461,7 @@ struct SQL_LTYPE {
 %type <index_param_list_t> index_param_list
 %type <with_index_param_list_t> with_index_param_list optional_table_properties_list
 
-%type <index_info_list_t> index_info_list
+%type <index_info_list_t> index_info_list index_info_list_one_pack
 
 /* %type <if_exists_info_t> if_exists_info */
 %type <if_not_exists_info_t> if_not_exists_info 
@@ -3083,7 +3083,19 @@ index_param : IDENTIFIER {
 /* CREATE INDEX [[IF NOT EXISTS] index_name] ON table_name
 (column1[, ...column2]) USING method [WITH (param[, ...param])] (column1[, ...column2]) USING method [WITH (param[, ...param])]; */
 
-index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_list {
+index_info_list : index_info_list_one_pack {
+    $$ = $1;
+    $1 = nullptr;
+}
+| index_info_list index_info_list_one_pack {
+    $$ = $1;
+    $1 = nullptr;
+    $$->insert($$->end(), $2->begin(), $2->end());
+    delete $2;
+    $2 = nullptr;
+};
+
+index_info_list_one_pack : '(' identifier_array ')' USING IDENTIFIER with_index_param_list {
     ParserHelper::ToLower($5);
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
     if(strcmp($5, "fulltext") == 0) {
@@ -3134,55 +3146,6 @@ index_info_list : '(' identifier_array ')' USING IDENTIFIER with_index_param_lis
         $$->emplace_back(index_info);
     }
     delete $2;
-}
-| index_info_list '(' identifier_array ')' USING IDENTIFIER with_index_param_list {
-    ParserHelper::ToLower($6);
-    infinity::IndexType index_type = infinity::IndexType::kInvalid;
-    if(strcmp($6, "fulltext") == 0) {
-        index_type = infinity::IndexType::kFullText;
-    } else if (strcmp($6, "hnsw") == 0) {
-        index_type = infinity::IndexType::kHnsw;
-    } else if (strcmp($6, "ivfflat") == 0) {
-        index_type = infinity::IndexType::kIVFFlat;
-    } else {
-        free($6);
-        delete $3;
-        delete $7;
-        yyerror(&yyloc, scanner, result, "Unknown index type");
-        YYERROR;
-    }
-    free($6);
-
-    size_t index_count = $3->size();
-    if(index_count == 0) {
-        delete $1;
-        delete $3;
-        delete $7;
-    }
-    $$ = $1;
-    $$->reserve($$->size() + index_count);
-
-    infinity::IndexInfo* index_info = new infinity::IndexInfo();
-    index_info->index_type_ = index_type;
-    index_info->column_name_ = (*$3)[0];
-    index_info->index_param_list_ = $7;
-    $$->emplace_back(index_info);
-
-    for(size_t idx = 1; idx < index_count; ++ idx) {
-        infinity::IndexInfo* index_info = new infinity::IndexInfo();
-        index_info->index_type_ = index_type;
-        index_info->column_name_ = (*$3)[idx];
-
-        size_t param_count = $7->size();
-        index_info->index_param_list_ = new std::vector<infinity::InitParameter*>();
-        index_info->index_param_list_->resize(param_count);
-        for(size_t param_idx = 0; param_idx < param_count; ++ param_idx) {
-            (*(index_info->index_param_list_))[param_idx] = new infinity::InitParameter();
-            *(*(index_info->index_param_list_))[param_idx] = *(*$7)[param_idx];
-        }
-        $$->emplace_back(index_info);
-    }
-    delete $3;
 }
 | '(' identifier_array ')' {
     infinity::IndexType index_type = infinity::IndexType::kSecondary;

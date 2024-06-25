@@ -357,6 +357,8 @@ IVFFlat,
 HnswLVQ,
 Hnsw,
 FullText,
+Secondary,
+EMVB,
 }
 
 struct IndexInfo {

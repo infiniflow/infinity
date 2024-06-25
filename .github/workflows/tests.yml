@@ -119,6 +119,7 @@ jobs:
           fi
 
       - name: Collect infinity debug output
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: cat debug.log 2>/dev/null || true
 
@@ -223,6 +224,7 @@ jobs:
           fi
 
       - name: Collect infinity release output
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
         run: cat release.log 2>/dev/null || true
 

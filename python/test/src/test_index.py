@@ -101,6 +101,57 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_index_fulltext", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def _test_create_index_emvb(self):
+        # CREATE INDEX idx_emvb ON t(c2) USING EMVB;
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_index_emvb", ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table(
+            "test_index_emvb", {
+                "c1": {"type": "int"}, "c2": {"type": "tensor, 128, float"}
+            }, ConflictType.Error)
+        assert table_obj is not None
+        res = table_obj.create_index("my_index_1",
+                                     [index.IndexInfo("c2",
+                                                      index.IndexType.EMVB,
+                                                      [index.InitParameter("pq_subspace_num", "32"),
+                                                       index.InitParameter("pq_subspace_bits", "8")]),
+                                      ], ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.drop_index("my_index_1")
+        assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_index_emvb", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_create_index_secondary(self):
+        # CREATE INDEX idx_secondary ON t(c1);
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_index_secondary", ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table(
+            "test_index_secondary", {
+                "c1": {"type": "int"}, "body": {"type": "varchar"}
+            }, ConflictType.Error)
+        assert table_obj is not None
+        res = table_obj.create_index("my_index_1",
+                                     [index.IndexInfo("c1",
+                                                      index.IndexType.Secondary,
+                                                      []),
+                                      ], ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.create_index("my_index_2",
+                                     [index.IndexInfo("body",
+                                                      index.IndexType.Secondary,
+                                                      []),
+                                      ], ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.drop_index("my_index_1")
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.drop_index("my_index_2")
+        assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_index_secondary", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
         # drop non-existent index
 
     def _test_drop_non_existent_index(self):
