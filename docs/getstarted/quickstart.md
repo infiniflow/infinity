@@ -7,22 +7,20 @@ slug: /
 
 ## Prerequisites
 
-- CPU: &ge; 4 cores, x86_64 with AVX2, or aarch64
-- RAM: &ge; 16 GB
-- Disk: &ge; 50 GB
+- CPU: x86_64 with AVX2
 - OS: Linux with glibc &ge; 2.17
 - Python: Python 3.10+
 
-## Deploy Infinity locally using pip
+## Install Infinity locally using pip
 
 Infinity, also available as a Python library, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
 
-1. Install the Infinity SDK:
+- Install the Infinity SDK:
 
    ```bash
    pip install infinity-sdk==0.2.0
    ```
-2. Write a Python script to conduct a KNN search:
+- Use Infinity to conduct a KNN search:
 
   ```python
    import infinity
@@ -47,13 +45,6 @@ See [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_ser
 
 See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
 
-## Install a Python client
-
-
-```bash
-pip3 install infinity-sdk==0.2.0
-```
-
 ### Try our Python examples
 
 - [Create table, insert data, and search](../../example/simple_example.py)
@@ -63,7 +54,6 @@ pip3 install infinity-sdk==0.2.0
 - [Conduct a full-text search](../../example/fulltext_search.py)
 - [Conduct a fused search](../../example/fusion_search.py)
 - [ColBERT reranker examples](../../example)
-
 
 ## Python API reference
 
