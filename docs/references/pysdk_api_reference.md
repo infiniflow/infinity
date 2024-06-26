@@ -710,7 +710,7 @@ table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 ### Parameters
 
 - **vector_column_name : str**
-- **sparse_data : {"indices": list[int], "values": Union(list[int], list[float])}**
+- **sparse_data** : `{"indices": list[int], "values": Union(list[int], list[float])}`
 - **distance_type : str**
   -  `'ip'`
 - **topn : int**
