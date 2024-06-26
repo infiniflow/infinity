@@ -507,8 +507,8 @@ TEST_F(BufferObjTest, test1) {
 TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // GTEST_SKIP(); // FIXME
 
-#ifdef INFINITY_DEBUG
     infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
     infinity::GlobalResourceUsage::UnInit();
