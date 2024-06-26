@@ -107,6 +107,10 @@ int main(int argc, char *argv[]) {
     }
     sift = strcmp(argv[1], "sift") == 0;
     size_t ef = std::stoull(argv[2]);
+    bool rerank = false;
+    if (argc >= 4) {
+        rerank = std::string(argv[3]) == "true";
+    }
 
     size_t thread_num = 1;
     size_t total_times = 1;
@@ -116,8 +120,8 @@ int main(int argc, char *argv[]) {
     std::cin >> total_times;
 
     std::string path = "/var/infinity";
-    if (argc >= 5) {
-        path = std::string(argv[4]);
+    if (argc >= 6) {
+        path = std::string(argv[5]);
     }
     LocalFileSystem fs;
 
@@ -129,8 +133,8 @@ int main(int argc, char *argv[]) {
     std::vector<std::string> results;
 
     std::string base_path = std::string(test_data_path());
-    if (argc >= 4) {
-        base_path = std::string(argv[3]);
+    if (argc >= 5) {
+        base_path = std::string(argv[4]);
     }
     std::string query_path = base_path;
     std::string groundtruth_path = base_path;
@@ -209,7 +213,12 @@ int main(int argc, char *argv[]) {
             knn_expr->distance_type_ = KnnDistanceType::kL2;
             knn_expr->topn_ = topk;
             knn_expr->opt_params_ = new std::vector<InitParameter *>();
-            knn_expr->opt_params_->push_back(new InitParameter("ef", std::to_string(ef)));
+            {
+                knn_expr->opt_params_->push_back(new InitParameter("ef", std::to_string(ef)));
+                if (rerank) {
+                    knn_expr->opt_params_->push_back(new InitParameter("rerank"));
+                }
+            }
             knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
             auto embedding_data_ptr = new float[dimension];
             knn_expr->embedding_data_ptr_ = embedding_data_ptr;
