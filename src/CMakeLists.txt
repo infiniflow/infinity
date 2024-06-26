@@ -303,6 +303,7 @@ target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 
+if (SKBUILD)
 add_library(embedded_infinity_ext MODULE
         embedded_infinity_ext.cpp
         embedded_infinity/wrap_infinity.cpp
@@ -352,6 +353,7 @@ nanobind_opt_size(embedded_infinity_ext)
 nanobind_strip(embedded_infinity_ext)
 
 install(TARGETS embedded_infinity_ext LIBRARY DESTINATION infinity)
+endif ()
 
 ### unit test
 
