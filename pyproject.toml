@@ -1,5 +1,12 @@
+# Refers to:
+# - https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
+# - https://packaging.python.org/en/latest/specifications/platform-compatibility-tags/
+# - https://docs.python.org/3/c-api/stable.html
+# - https://github.com/scikit-build/scikit-build-core
+# - https://github.com/wjakob/nanobind/blob/master/docs/api_cmake.rst
+
 [build-system]
-requires = ["scikit-build-core", "setuptools", "wheel", "nanobind"]
+requires = ["scikit-build-core", "nanobind"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -15,7 +22,7 @@ dependencies = [
     "pandas~=2.2.2",
     "numpy~=1.26.4",
     "pyarrow~=16.0.0",
-    "polars~=0.20.23",
+    "polars~=0.20.31",
     "openpyxl~=3.1.2"
 ]
 description = "infinity"
@@ -29,13 +36,6 @@ build-dir = "build/{wheel_tag}"
 
 wheel.py-api = "cp310"
 wheel.packages = ["python/infinity"]
-
-[tool.cibuildwheel]
-build-verbosity = 1
-
-# Needed for full C++17 support
-[tool.cibuildwheel.macos.environment]
-MACOSX_DEPLOYMENT_TARGET = "10.14"
 
 [tool.pytest.ini_options]
 addopts = "--strict-markers"
