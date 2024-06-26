@@ -4,7 +4,7 @@ import argparse
 import argparse
 import os
 from generate_util.generate_sparse_data import generate_sparse_data
-from generate_util.format_data import format_float
+from generate_util.format_data import sparse_format_float
 
 
 def generate(generate_if_exists: bool, copy_dir: str):
@@ -59,7 +59,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
             start, end = indptr[row_id], indptr[row_id + 1]
             for j in range(start, end):
                 slt_file.write(
-                    "{}: {}".format(indices[j], format_float(data[j])),
+                    "{}: {}".format(indices[j], sparse_format_float(data[j])),
                 )
                 if j != end - 1:
                     slt_file.write(", ")
