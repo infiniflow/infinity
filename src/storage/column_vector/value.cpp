@@ -982,10 +982,10 @@ String Value::ToString() const {
             return value_.huge_int.ToString();
         }
         case LogicalType::kFloat: {
-            return std::to_string(value_.float32);
+            return fmt::format("{}", value_.float32);
         }
         case LogicalType::kDouble: {
-            return std::to_string(value_.float64);
+            return fmt::format("{}", value_.float64);
         }
         case LogicalType::kDate: {
             return value_.date.ToString();

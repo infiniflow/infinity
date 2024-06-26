@@ -179,12 +179,29 @@ private:
         ss << "[";
         for (size_t i = 0; i < dimension - 1; ++i) {
             char buffer[20];
-            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[i], std::chars_format::general, 6);
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[i], std::chars_format::general, 7);
             ss.write((const char *)buffer, ptr - buffer);
             ss.put(',');
         }
         char buffer[20];
-        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[dimension - 1], std::chars_format::general, 6);
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[dimension - 1], std::chars_format::general, 7);
+        ss.write((const char *)buffer, ptr - buffer);
+        ss << "]";
+        return ss.str();
+    }
+
+    template <>
+    inline std::string Embedding2StringInternal<double>(const EmbeddingType &embedding, size_t dimension) {
+        std::stringstream ss;
+        ss << "[";
+        for (size_t i = 0; i < dimension - 1; ++i) {
+            char buffer[20];
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((double *)(embedding.ptr))[i], std::chars_format::general, 16);
+            ss.write((const char *)buffer, ptr - buffer);
+            ss.put(',');
+        }
+        char buffer[20];
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((double *)(embedding.ptr))[dimension - 1], std::chars_format::general, 16);
         ss.write((const char *)buffer, ptr - buffer);
         ss << "]";
         return ss.str();
