@@ -97,10 +97,7 @@ void BufferManager::RemoveClean() {
     {
         std::unique_lock lock(gc_locker_);
         for (auto *buffer_obj : clean_list) {
-            if (auto iter = gc_map_.find(buffer_obj); iter != gc_map_.end()) {
-                gc_list_.erase(iter->second);
-                gc_map_.erase(iter);
-            }
+            gc_set_.erase(buffer_obj);
         }
     }
     {
@@ -117,6 +114,11 @@ void BufferManager::RemoveClean() {
     }
 }
 
+SizeT BufferManager::WaitingGCObjectCount() {
+    std::unique_lock lock(gc_locker_);
+    return gc_set_.size();
+}
+
 SizeT BufferManager::BufferedObjectCount() {
     std::unique_lock lock(w_locker_);
     return buffer_map_.size();
@@ -124,18 +126,20 @@ SizeT BufferManager::BufferedObjectCount() {
 
 void BufferManager::RequestSpace(SizeT need_size) {
     std::unique_lock lock(gc_locker_);
-    auto iter = gc_list_.begin();
-    while (current_memory_size_ + need_size > memory_limit_ && iter != gc_list_.end()) {
+    auto iter = gc_set_.begin();
+    while (current_memory_size_ + need_size > memory_limit_ && iter != gc_set_.end()) {
         auto *buffer_obj = *iter;
 
         // Free return false when the buffer is freed by cleanup
-        // will not dead lock because caller is in kNew or kFree state, and `buffer_obj` is in kUnloaded or state
-        if (buffer_obj->Free()) {
-            current_memory_size_ -= buffer_obj->GetBufferSize();
-            iter = gc_list_.erase(iter);
-            gc_map_.erase(buffer_obj);
-        } else {
+        // will not dead lock because caller is in kNew or kFree state, and `buffer_obj` is in kUnloaded or kLoaded state
+        auto status = buffer_obj->Free();
+        if (status == BufferFreeStatus::kCleaned) {
             ++iter;
+        } else {
+            if (status == BufferFreeStatus::kSuccess) {
+                current_memory_size_ -= buffer_obj->GetBufferSize();
+            }
+            iter = gc_set_.erase(iter);
         }
     }
     if (current_memory_size_ + need_size > memory_limit_) {
@@ -148,17 +152,7 @@ void BufferManager::RequestSpace(SizeT need_size) {
 
 void BufferManager::PushGCQueue(BufferObj *buffer_obj) {
     std::unique_lock lock(gc_locker_);
-    auto iter = gc_map_.find(buffer_obj);
-    if (iter != gc_map_.end()) {
-        gc_list_.erase(iter->second);
-    }
-    gc_list_.push_back(buffer_obj);
-    gc_map_[buffer_obj] = --gc_list_.end();
-}
-
-bool BufferManager::RemoveFromGCQueue(BufferObj *buffer_obj) {
-    std::unique_lock lock(gc_locker_);
-    return RemoveFromGCQueueInner(buffer_obj);
+    gc_set_.insert(buffer_obj);
 }
 
 void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
@@ -215,9 +209,8 @@ void BufferManager::MoveTemp(BufferObj *buffer_obj) {
 }
 
 bool BufferManager::RemoveFromGCQueueInner(BufferObj *buffer_obj) {
-    if (auto iter = gc_map_.find(buffer_obj); iter != gc_map_.end()) {
-        gc_list_.erase(iter->second);
-        gc_map_.erase(iter);
+    if (auto iter = gc_set_.find(buffer_obj); iter != gc_set_.end()) {
+        gc_set_.erase(iter);
         return true;
     }
     return false;

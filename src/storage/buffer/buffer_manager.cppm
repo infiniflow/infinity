@@ -49,10 +49,7 @@ public:
 
     u64 memory_usage() { return current_memory_size_; }
 
-    SizeT WaitingGCObjectCount() {
-        std::unique_lock lock(gc_locker_);
-        return gc_map_.size();
-    }
+    SizeT WaitingGCObjectCount();
 
     SizeT BufferedObjectCount();
 
@@ -68,8 +65,6 @@ private:
 
     // BufferHandle calls it, after unload.
     void PushGCQueue(BufferObj *buffer_obj);
-
-    bool RemoveFromGCQueue(BufferObj *buffer_obj);
 
     void AddToCleanList(BufferObj *buffer_obj, bool do_free);
 
@@ -94,8 +89,7 @@ private:
 
     std::mutex gc_locker_{};
     using GCListIter = List<BufferObj *>::iterator;
-    HashMap<BufferObj *, GCListIter> gc_map_{};
-    List<BufferObj *> gc_list_{};
+    HashSet<BufferObj *> gc_set_{};
 
     std::mutex clean_locker_{};
     Vector<BufferObj *> clean_list_{};
