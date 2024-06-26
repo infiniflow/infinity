@@ -341,6 +341,7 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         jma
         opencc
 )
+target_link_options(embedded_infinity_ext PRIVATE -static-libstdc++ -static-libgcc)
 
 #if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 #    target_link_libraries(embedded_infinity_ext PRIVATE libasan.a)
