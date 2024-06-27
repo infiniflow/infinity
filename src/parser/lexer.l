@@ -157,7 +157,7 @@ SELECT          { return SELECT; }
 SESSION         { return SESSION; }
 SET             { return SET; }
 SEGMENT         { return SEGMENT; }
-SEGMENTS         { return SEGMENTS; }
+SEGMENTS        { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
 SPARSE          { return SPARSE; }
