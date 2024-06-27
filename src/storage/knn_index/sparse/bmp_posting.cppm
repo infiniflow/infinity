@@ -31,9 +31,11 @@ public:
 
     void AddBlock(BMPBlockID block_id, DataType max_score);
 
+    void Prefetch() const;
+
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BlockData<DataType, BMPCompressType::kCompressed> ReadAdv(char *&p);
+    static BlockData<DataType, BMPCompressType::kCompressed> ReadAdv(const char *&p);
 
 private:
     Vector<BMPBlockID> block_ids_;
@@ -48,9 +50,11 @@ public:
 
     void AddBlock(BMPBlockID block_id, DataType max_score);
 
+    void Prefetch() const;
+
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BlockData<DataType, BMPCompressType::kRaw> ReadAdv(char *&p);
+    static BlockData<DataType, BMPCompressType::kRaw> ReadAdv(const char *&p);
 
 public:
     Vector<DataType> max_scores_;
@@ -61,9 +65,11 @@ struct BlockPostings {
 public:
     DataType kth(i32 topk) const { return topk == kth_ ? kth_score_ : 0.0; }
 
+    void Prefetch() const { data_.Prefetch(); }
+
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BlockPostings ReadAdv(char *&p);
+    static BlockPostings ReadAdv(const char *&p);
 
 public:
     i32 kth_{-1};

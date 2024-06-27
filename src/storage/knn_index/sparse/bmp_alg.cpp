@@ -14,9 +14,9 @@
 
 module;
 
+#include <algorithm>
 #include <vector>
 #include <xmmintrin.h>
-#include <algorithm>
 
 module bmp_alg;
 
@@ -142,16 +142,17 @@ Optional<TailFwd<DataType, IdxType>> BlockFwd<DataType, IdxType>::AddDoc(const S
     std::swap(tail_fwd1, tail_fwd_);
 
     Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> block_terms = tail_fwd1.ToBlockFwd();
-    block_terms_.emplace_back(std::move(block_terms));
+    block_terms_list_.emplace_back(block_terms);
     return tail_fwd1;
 }
 
 template <typename DataType, typename IdxType>
 Vector<Vector<DataType>> BlockFwd<DataType, IdxType>::GetIvtScores(SizeT term_num) const {
     Vector<Vector<DataType>> res(term_num);
-    for (const auto &block_terms : block_terms_) {
-        for (const auto &[term_id, block_offsets, scores] : block_terms) {
-            for (SizeT i = 0; i < scores.size(); ++i) {
+    for (const auto &block_terms : block_terms_list_) {
+        for (auto iter = block_terms.Iter(); iter.HasNext(); iter.Next()) {
+            const auto [term_id, block_size, block_offsets, scores] = iter.Value();
+            for (SizeT i = 0; i < block_size; ++i) {
                 res[term_id].push_back(scores[i]);
             }
         }
@@ -161,21 +162,20 @@ Vector<Vector<DataType>> BlockFwd<DataType, IdxType>::GetIvtScores(SizeT term_nu
 
 template <typename DataType, typename IdxType>
 Vector<DataType> BlockFwd<DataType, IdxType>::GetScores(BMPBlockID block_id, const SparseVecRef<DataType, IdxType> &query) const {
-    const auto &block_terms = block_terms_[block_id];
+    const auto &block_terms = block_terms_list_[block_id];
     Vector<DataType> res(block_size_, 0.0);
-    SizeT j = 0;
-    for (i32 i = 0; i < query.nnz_; ++i) {
-        IdxType query_term = query.indices_[i];
-        DataType query_score = query.data_[i];
-        while (j < block_terms.size() && std::get<0>(block_terms[j]) < query_term) {
-            ++j;
+
+    i32 i = 0;
+    for (auto iter = block_terms.Iter(); iter.HasNext(); iter.Next()) {
+        const auto [term_id, block_size, block_offsets, scores] = iter.Value();
+        while (i < query.nnz_ && query.indices_[i] < term_id) {
+            ++i;
         }
-        if (j == block_terms.size()) {
+        if (i == query.nnz_) {
             break;
         }
-        if (std::get<0>(block_terms[j]) == query_term) {
-            const auto &[_, block_offsets, scores] = block_terms[j];
-            BlockFwd::Calculate(block_offsets, scores, res, query_score);
+        if (query.indices_[i] == term_id) {
+            Calculate(block_size, block_offsets, scores, res, query.data_[i]);
         }
     }
     return res;
@@ -183,16 +183,16 @@ Vector<DataType> BlockFwd<DataType, IdxType>::GetScores(BMPBlockID block_id, con
 
 template <typename DataType, typename IdxType>
 void BlockFwd<DataType, IdxType>::Prefetch(BMPBlockID block_id) const {
-    const auto *ptr = reinterpret_cast<const char *>(block_terms_[block_id].data());
-    _mm_prefetch(ptr, _MM_HINT_T0);
+    block_terms_list_[block_id].Prefetch();
 }
 
 template <typename DataType, typename IdxType>
-void BlockFwd<DataType, IdxType>::Calculate(const Vector<BMPBlockOffset> &block_offsets,
-                                            const Vector<DataType> scores,
+void BlockFwd<DataType, IdxType>::Calculate(SizeT block_size,
+                                            const BMPBlockOffset *block_offsets,
+                                            const DataType *scores,
                                             Vector<DataType> &res,
                                             DataType query_score) {
-    for (SizeT i = 0; i < block_offsets.size(); ++i) {
+    for (SizeT i = 0; i < block_size; ++i) {
         BMPBlockOffset block_offset = block_offsets[i];
         res[block_offset] += query_score * scores[i];
     }
