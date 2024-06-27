@@ -14,6 +14,8 @@
 
 module;
 
+#include <xmmintrin.h>
+
 module bm_posting;
 
 import stl;
@@ -38,6 +40,12 @@ void BlockData<DataType, BMPCompressType::kCompressed>::AddBlock(BMPBlockID bloc
     max_scores_.push_back(max_score);
 }
 
+template <typename DataType>
+void BlockData<DataType, BMPCompressType::kCompressed>::Prefetch() const {
+    _mm_prefetch(block_ids_.data(), _MM_HINT_T0);
+    _mm_prefetch(max_scores_.data(), _MM_HINT_T0);
+}
+
 template struct BlockData<f32, BMPCompressType::kCompressed>;
 template struct BlockData<f64, BMPCompressType::kCompressed>;
 
@@ -56,6 +64,11 @@ void BlockData<DataType, BMPCompressType::kRaw>::AddBlock(BMPBlockID block_id, D
         max_scores_.resize(block_id + 1, 0.0);
     }
     max_scores_[block_id] = max_score;
+}
+
+template <typename DataType>
+void BlockData<DataType, BMPCompressType::kRaw>::Prefetch() const {
+    _mm_prefetch(max_scores_.data(), _MM_HINT_T0);
 }
 
 template struct BlockData<f32, BMPCompressType::kRaw>;

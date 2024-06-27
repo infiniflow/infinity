@@ -42,6 +42,8 @@ public:
 
     const BlockPostings<DataType, CompressType> &GetPostings(SizeT term_id) const { return postings_[term_id]; }
 
+    void Prefetch(SizeT term_id) const { postings_[term_id].Prefetch(); }
+
     SizeT term_num() const { return postings_.size(); }
 
     SizeT GetSizeInBytes() const;
@@ -205,6 +207,10 @@ Pair<Vector<BMPDocID>, Vector<DataType>> BMPAlg<DataType, IdxType, CompressType>
     SizeT block_num = block_fwd_.block_num();
     Vector<DataType> upper_bounds(block_num, 0.0);
     for (i32 i = 0; i < query_ref.nnz_; ++i) {
+        // if (i + 1 < query_ref.nnz_) {
+        //     IdxType next_query_term = query_ref.indices_[i + 1];
+        //     bm_ivt_.Prefetch(next_query_term);
+        // }
         IdxType query_term = query_ref.indices_[i];
         DataType query_score = query_ref.data_[i];
         const auto &posting = bm_ivt_.GetPostings(query_term);
