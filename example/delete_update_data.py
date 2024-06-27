@@ -79,8 +79,8 @@ try:
     result = table_instance.output(["num", "body"]).to_pl()
     print(result)
 
-    table_instance.update("num = 2", [{"body": "unnecessary and harmful"}])
-    result = table_instance.output(["num", "body"]).to_pl()
+    table_instance.update("num = 2", [{"body": "unnecessary and harmful", "vec": [14.0, 7.2, 0.8, 10.9]}])
+    result = table_instance.output(["*"]).to_pl()
     print(result)
 
     infinity_instance.disconnect()
