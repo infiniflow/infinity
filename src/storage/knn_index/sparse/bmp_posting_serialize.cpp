@@ -32,12 +32,12 @@ template <typename DataType>
 void BlockData<DataType, BMPCompressType::kCompressed>::WriteAdv(char *&p) const {
     SizeT max_score_size = max_scores_.size();
     WriteBufAdv<SizeT>(p, max_score_size);
-    WriteBufCharsAdv(p, reinterpret_cast<const char *>(block_ids_.data()), sizeof(BMPBlockID) * block_ids_.size());
-    WriteBufCharsAdv(p, reinterpret_cast<const char *>(max_scores_.data()), sizeof(DataType) * max_scores_.size());
+    WriteBufVecAdv(p, block_ids_.data(), block_ids_.size());
+    WriteBufVecAdv(p, max_scores_.data(), max_scores_.size());
 }
 
 template <typename DataType>
-BlockData<DataType, BMPCompressType::kCompressed> BlockData<DataType, BMPCompressType::kCompressed>::ReadAdv(char *&p) {
+BlockData<DataType, BMPCompressType::kCompressed> BlockData<DataType, BMPCompressType::kCompressed>::ReadAdv(const char *&p) {
     BlockData<DataType, BMPCompressType::kCompressed> res;
     SizeT max_score_size = ReadBufAdv<SizeT>(p);
     res.block_ids_.resize(max_score_size);
@@ -65,11 +65,11 @@ template <typename DataType>
 void BlockData<DataType, BMPCompressType::kRaw>::WriteAdv(char *&p) const {
     SizeT max_score_size = max_scores_.size();
     WriteBufAdv<SizeT>(p, max_score_size);
-    WriteBufCharsAdv(p, reinterpret_cast<const char *>(max_scores_.data()), sizeof(DataType) * max_scores_.size());
+    WriteBufVecAdv(p, max_scores_.data(), max_scores_.size());
 }
 
 template <typename DataType>
-BlockData<DataType, BMPCompressType::kRaw> BlockData<DataType, BMPCompressType::kRaw>::ReadAdv(char *&p) {
+BlockData<DataType, BMPCompressType::kRaw> BlockData<DataType, BMPCompressType::kRaw>::ReadAdv(const char *&p) {
     BlockData<DataType, BMPCompressType::kRaw> res;
     SizeT max_score_size = ReadBufAdv<SizeT>(p);
     res.max_scores_.resize(max_score_size);
@@ -97,7 +97,7 @@ void BlockPostings<DataType, CompressType>::WriteAdv(char *&p) const {
 }
 
 template <typename DataType, BMPCompressType CompressType>
-BlockPostings<DataType, CompressType> BlockPostings<DataType, CompressType>::ReadAdv(char *&p) {
+BlockPostings<DataType, CompressType> BlockPostings<DataType, CompressType>::ReadAdv(const char *&p) {
     BlockPostings res;
     res.kth_ = ReadBufAdv<i32>(p);
     res.kth_score_ = ReadBufAdv<DataType>(p);

@@ -46,7 +46,9 @@ private:
     String message_;
 };
 
-#ifdef INFINITY_DEBUG
+#define ADD_LOG_INFO
+
+#if defined(INFINITY_DEBUG) || defined(ADD_LOG_INFO)
 
 export void RecoverableError(Status status,
                              const char *file_name = std::source_location::current().file_name(),
