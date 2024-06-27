@@ -748,7 +748,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         if (cell.len) {
             str_view = std::string_view((char *)cell.str, cell.len);
             auto &column_vector = parser_context->column_vectors_[column_idx];
-            column_vector.AppendByStringView(str_view, parser_context->delimiter_);
+            column_vector.AppendByStringView(str_view);
         } else {
             if (column_def->has_default_value()) {
                 auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
@@ -1015,7 +1015,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                 }
                 case kVarchar: {
                     std::string_view str_view = line_json[column_def->name_].get<std::string_view>();
-                    column_vector.AppendByStringView(str_view, ',');
+                    column_vector.AppendByStringView(str_view);
                     break;
                 }
                 case kEmbedding: {
