@@ -23,6 +23,7 @@ import bm_posting;
 import bmp_util;
 import hnsw_common;
 import knn_result_handler;
+import bmp_blockterms;
 
 namespace infinity {
 
@@ -39,7 +40,7 @@ public:
 
     void Optimize(i32 topk, Vector<Vector<DataType>> ivt_scores);
 
-    const Vector<BlockPostings<DataType, CompressType>> &GetPostings() const { return postings_; }
+    const BlockPostings<DataType, CompressType> &GetPostings(SizeT term_id) const { return postings_[term_id]; }
 
     SizeT term_num() const { return postings_.size(); }
 
@@ -78,10 +79,8 @@ private:
 template <typename DataType, typename IdxType>
 class BlockFwd {
 private:
-    BlockFwd(SizeT block_size,
-             Vector<Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>>> block_terms,
-             TailFwd<DataType, IdxType> tail_fwd)
-        : block_size_(block_size), block_terms_(std::move(block_terms)), tail_fwd_(std::move(tail_fwd)) {}
+    BlockFwd(SizeT block_size, Vector<BlockTerms<DataType, IdxType>> block_terms_list, TailFwd<DataType, IdxType> tail_fwd)
+        : block_size_(block_size), block_terms_list_(std::move(block_terms_list)), tail_fwd_(std::move(tail_fwd)) {}
 
 public:
     BlockFwd(SizeT block_size) : block_size_(block_size) {}
@@ -98,18 +97,18 @@ public:
 
     SizeT block_size() const { return block_size_; }
 
-    SizeT block_num() const { return block_terms_.size(); }
+    SizeT block_num() const { return block_terms_list_.size(); }
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
     static BlockFwd ReadAdv(const char *&p);
 
 private:
-    static void Calculate(const Vector<BMPBlockOffset> &block_offsets, const Vector<DataType> scores, Vector<DataType> &res, DataType query_score);
+    static void Calculate(SizeT block_size, const BMPBlockOffset *block_offsets, const DataType *scores, Vector<DataType> &res, DataType query_score);
 
 private:
     SizeT block_size_;
-    Vector<Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>>> block_terms_;
+    Vector<BlockTerms<DataType, IdxType>> block_terms_list_;
     TailFwd<DataType, IdxType> tail_fwd_;
 };
 
@@ -202,14 +201,13 @@ Pair<Vector<BMPDocID>, Vector<DataType>> BMPAlg<DataType, IdxType, CompressType>
     const SparseVecRef<DataType, IdxType> &query_ref =
         options.beta_ < 1.0 ? SparseVecRef<DataType, IdxType>(keeped_query.nnz_, keeped_query.indices_.get(), keeped_query.data_.get()) : query;
 
-    const auto &postings = bm_ivt_.GetPostings();
     DataType threshold = 0.0;
     SizeT block_num = block_fwd_.block_num();
     Vector<DataType> upper_bounds(block_num, 0.0);
     for (i32 i = 0; i < query_ref.nnz_; ++i) {
         IdxType query_term = query_ref.indices_[i];
         DataType query_score = query_ref.data_[i];
-        const auto &posting = postings[query_term];
+        const auto &posting = bm_ivt_.GetPostings(query_term);
         threshold = std::max(threshold, query_score * posting.kth(topk));
         posting.data_.Calculate(upper_bounds, query_score);
     }

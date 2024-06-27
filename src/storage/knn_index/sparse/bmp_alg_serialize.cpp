@@ -112,11 +112,8 @@ template class TailFwd<f64, i8>;
 template <typename DataType, typename IdxType>
 SizeT BlockFwd<DataType, IdxType>::GetSizeInBytes() const {
     SizeT size = sizeof(block_size_) + sizeof(SizeT);
-    for (const auto &block_terms : block_terms_) {
-        size += sizeof(SizeT);
-        for (const auto &[term_id, block_offsets, scores] : block_terms) {
-            size += sizeof(IdxType) + sizeof(SizeT) + block_offsets.size() * sizeof(BMPBlockOffset) + scores.size() * sizeof(DataType);
-        }
+    for (const auto &block_terms : block_terms_list_) {
+        size += block_terms.GetSizeInBytes();
     }
     size += tail_fwd_.GetSizeInBytes();
     return size;
@@ -125,18 +122,10 @@ SizeT BlockFwd<DataType, IdxType>::GetSizeInBytes() const {
 template <typename DataType, typename IdxType>
 void BlockFwd<DataType, IdxType>::WriteAdv(char *&p) const {
     WriteBufAdv<SizeT>(p, block_size_);
-    SizeT block_num = block_terms_.size();
+    SizeT block_num = block_terms_list_.size();
     WriteBufAdv<SizeT>(p, block_num);
-    for (const auto &block_terms : block_terms_) {
-        SizeT term_num = block_terms.size();
-        WriteBufAdv<SizeT>(p, term_num);
-        for (const auto &[term_id, block_offsets, scores] : block_terms) {
-            WriteBufAdv<IdxType>(p, term_id);
-            SizeT inner_num = block_offsets.size();
-            WriteBufAdv<SizeT>(p, inner_num);
-            WriteBufVecAdv(p, block_offsets.data(), block_offsets.size());
-            WriteBufVecAdv(p, scores.data(), scores.size());
-        }
+    for (const auto &block_terms : block_terms_list_) {
+        block_terms.WriteAdv(p);
     }
     tail_fwd_.WriteAdv(p);
 }
@@ -145,26 +134,14 @@ template <typename DataType, typename IdxType>
 BlockFwd<DataType, IdxType> BlockFwd<DataType, IdxType>::ReadAdv(const char *&p) {
     SizeT block_size = ReadBufAdv<SizeT>(p);
     SizeT block_num = ReadBufAdv<SizeT>(p);
-    Vector<Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>>> block_terms(block_num);
+    Vector<BlockTerms<DataType, IdxType>> block_terms_list;
+    block_terms_list.reserve(block_num);
     for (SizeT i = 0; i < block_num; ++i) {
-        SizeT term_num = ReadBufAdv<SizeT>(p);
-        block_terms[i].resize(term_num);
-        for (SizeT j = 0; j < term_num; ++j) {
-            IdxType term_id = ReadBufAdv<IdxType>(p);
-            SizeT inner_num = ReadBufAdv<SizeT>(p);
-            Vector<BMPBlockOffset> block_offsets(inner_num);
-            Vector<DataType> scores(inner_num);
-            for (SizeT k = 0; k < inner_num; ++k) {
-                block_offsets[k] = ReadBufAdv<BMPBlockOffset>(p);
-            }
-            for (SizeT k = 0; k < inner_num; ++k) {
-                scores[k] = ReadBufAdv<DataType>(p);
-            }
-            block_terms[i][j] = {term_id, std::move(block_offsets), std::move(scores)};
-        }
+        auto block_terms = BlockTerms<DataType, IdxType>::ReadAdv(p);
+        block_terms_list.push_back(std::move(block_terms));
     }
     auto tail_fwd = TailFwd<DataType, IdxType>::ReadAdv(p);
-    return BlockFwd(block_size, std::move(block_terms), std::move(tail_fwd));
+    return BlockFwd(block_size, std::move(block_terms_list), std::move(tail_fwd));
 }
 
 template class BlockFwd<f32, i32>;

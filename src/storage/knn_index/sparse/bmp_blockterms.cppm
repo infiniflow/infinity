@@ -35,19 +35,19 @@ public:
 
     bool HasNext() const { return ptr_ < ptr_end_; }
 
-    Tuple<IdxType, SizeT, BlockOffset *, DataType *> Value() {
+    Tuple<IdxType, SizeT, const BMPBlockOffset *, const DataType *> Value() {
         const char *p = ptr_;
         auto block_size = ReadBufAdv<SizeT>(p);
         auto term_id = ReadBufAdv<IdxType>(p);
 
-        auto *block_offsets = ReadBuf<BlockOffset *>(p);
-        auto *values = ReadBuf<DataType *>(p + block_size * sizeof(BlockOffset));
+        auto *block_offsets = reinterpret_cast<const BMPBlockOffset *>(p);
+        auto *values = reinterpret_cast<const DataType *>(block_offsets + block_size);
         return {term_id, block_size, block_offsets, values};
     }
 
     void Next() {
         auto block_size = ReadBuf<SizeT>(ptr_);
-        ptr_ += sizeof(block_size) + sizeof(IdxType) + block_size * sizeof(BlockOffset) + block_size * sizeof(DataType);
+        ptr_ += sizeof(block_size) + sizeof(IdxType) + block_size * sizeof(BMPBlockOffset) + block_size * sizeof(DataType);
     }
 
 private:
@@ -60,7 +60,7 @@ class BlockTerms {
     using IterT = BlockTermsIter<DataType, IdxType>;
 
 public:
-    BlockTerms(Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> block_terms)
+    BlockTerms(const Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> &block_terms)
         : data_len_(GetBufferSize(block_terms)), data_(MakeUniqueForOverwrite<char[]>(data_len_)) {
         char *ptr = data_.get();
         for (const auto &[term_id, block_offsets, values] : block_terms) {
@@ -75,7 +75,6 @@ public:
 private:
     static SizeT GetBufferSize(const Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> &block_terms) {
         SizeT size = 0;
-        size += sizeof(SizeT);
         for (const auto &[term_id, block_offsets, values] : block_terms) {
             SizeT block_size = block_offsets.size();
             if (block_size != values.size()) {
@@ -101,7 +100,7 @@ public:
         WriteBufVecAdv(p, data_.get(), data_len_);
     }
 
-    static BlockTerms<DataType, IdxType> ReadAdv(char *&p) {
+    static BlockTerms<DataType, IdxType> ReadAdv(const char *&p) {
         SizeT data_len = ReadBufAdv<SizeT>(p);
         UniquePtr<char[]> data = MakeUniqueForOverwrite<char[]>(data_len);
         std::memcpy(data.get(), p, data_len);
