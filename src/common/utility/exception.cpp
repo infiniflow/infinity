@@ -46,6 +46,11 @@ void RecoverableError(Status status, const char *file_name, u32 line) {
     throw RecoverableException(status);
 }
 
+std::string_view GetErrorMsg(const String &message) {
+    auto pos = message.find_first_of('@', 0);
+    return {message.data(), pos};
+}
+
 void UnrecoverableError(const String &message, const char *file_name, u32 line) {
     throw UnrecoverableException(fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line));
 }
@@ -58,6 +63,10 @@ void RecoverableError(Status status) {
 
 void UnrecoverableError(const String &message) {
     throw UnrecoverableException(message);
+}
+
+std::string_view GetErrorMsg(const String &message) {
+    return message;
 }
 
 #endif

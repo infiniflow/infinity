@@ -619,6 +619,9 @@ void ExecuteFTSearch(UniquePtr<EarlyTerminateIterator> &et_iter,
     }
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable" 
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
 bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, OperatorState *operator_state) {
     using TimeDurationType = std::chrono::duration<float, std::milli>;
     auto execute_start_time = std::chrono::high_resolution_clock::now();
@@ -897,6 +900,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
     LOG_DEBUG(fmt::format("PhysicalMatch Part 5: Output data time: {} ms", output_duration.count()));
     return true;
 }
+#pragma clang diagnostic pop
 
 PhysicalMatch::PhysicalMatch(u64 id,
                              SharedPtr<BaseTableRef> base_table_ref,

@@ -181,6 +181,19 @@ public:
             knn_hnsw_ptr_);
     }
 
+    bool RerankDist() const {
+        return std::visit(
+            [](auto &&arg) {
+                using T = std::decay_t<decltype(*arg)>;
+                if constexpr (std::is_same_v<T, Hnsw4> || std::is_same_v<T, Hnsw5> || std::is_same_v<T, Hnsw6>) {
+                    return true;
+                } else {
+                    return false;
+                }
+            },
+            knn_hnsw_ptr_);
+    }
+
 private:
     std::variant<Hnsw1 *, Hnsw2 *, Hnsw3 *, Hnsw4 *, Hnsw5 *, Hnsw6 *> knn_hnsw_ptr_;
 };

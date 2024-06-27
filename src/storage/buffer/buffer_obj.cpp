@@ -47,15 +47,8 @@ BufferObj::~BufferObj() = default;
 BufferHandle BufferObj::Load() {
     std::unique_lock<std::mutex> locker(w_locker_);
     switch (status_) {
-        case BufferStatus::kLoaded: {
-            break;
-        }
+        case BufferStatus::kLoaded:
         case BufferStatus::kUnloaded: {
-            if (!buffer_mgr_->RemoveFromGCQueue(this)) {
-                String error_message = fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", GetFilename());
-                LOG_CRITICAL(error_message);
-                UnrecoverableError(error_message);
-            }
             break;
         }
         case BufferStatus::kFreed: {
@@ -88,10 +81,13 @@ BufferHandle BufferObj::Load() {
     return BufferHandle(this, data);
 }
 
-bool BufferObj::Free() {
+BufferFreeStatus BufferObj::Free() {
     std::unique_lock<std::mutex> locker(w_locker_, std::defer_lock);
     if (!locker.try_lock()) {
-        return false;
+        return BufferFreeStatus::kCleaned;
+    }
+    if (status_ == BufferStatus::kLoaded) {
+        return BufferFreeStatus::kLoaded;
     }
     if (status_ != BufferStatus::kUnloaded) {
         String error_message = fmt::format("attempt to free {} buffer object", BufferStatusToString(status_));
@@ -113,7 +109,7 @@ bool BufferObj::Free() {
     }
     file_worker_->FreeInMemory();
     status_ = BufferStatus::kFreed;
-    return true;
+    return BufferFreeStatus::kSuccess;
 }
 
 bool BufferObj::Save() {

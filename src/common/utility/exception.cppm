@@ -56,11 +56,15 @@ export void UnrecoverableError(const String &message,
                                const char *file_name = std::source_location::current().file_name(),
                                u32 line = std::source_location::current().line());
 
+export std::string_view GetErrorMsg(const String &message);
+
 #else
 
 export void RecoverableError(Status status);
 
 export void UnrecoverableError(const String &message);
+
+export std::string_view GetErrorMsg(const String &message);
 
 #endif
 

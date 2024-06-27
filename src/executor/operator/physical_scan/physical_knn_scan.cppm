@@ -83,6 +83,9 @@ public:
 
     inline bool IsKnnMinHeap() const { return knn_expression_->IsKnnMinHeap(); }
 
+private:
+    SizeT GetColumnID() const;
+
 public:
     SharedPtr<KnnExpression> knn_expression_{};
 

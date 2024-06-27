@@ -204,15 +204,19 @@ String PhysicalKnnScan::TableAlias() const { return base_table_ref_->alias_; }
 
 Vector<SizeT> &PhysicalKnnScan::ColumnIDs() const { return base_table_ref_->column_ids_; }
 
+SizeT PhysicalKnnScan::GetColumnID() const {
+    KnnExpression *knn_expr = knn_expression_.get();
+    ColumnExpression *column_expr = static_cast<ColumnExpression *>(knn_expr->arguments()[0].get());
+    return column_expr->binding().column_idx;
+}
+
 void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: return base entry vector
-    InitBlockParallelOption(); // PlanWithIndex() will be called in physical planner
+    InitBlockParallelOption();                                     // PlanWithIndex() will be called in physical planner
     Txn *txn = query_context->GetTxn();
     TransactionID txn_id = txn->TxnID();
     TxnTimeStamp begin_ts = txn->BeginTS();
 
-    KnnExpression *knn_expr = knn_expression_.get();
-    ColumnExpression *column_expr = static_cast<ColumnExpression *>(knn_expr->arguments()[0].get());
-    SizeT knn_column_id = column_expr->binding().column_idx;
+    SizeT knn_column_id = GetColumnID();
 
     block_column_entries_ = MakeUnique<Vector<BlockColumnEntry *>>();
     index_entries_ = MakeUnique<Vector<SegmentIndexEntry *>>();
@@ -288,6 +292,8 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     const SizeT index_task_n = knn_scan_shared_data->index_entries_->size();
     const SizeT brute_task_n = knn_scan_shared_data->block_column_entries_->size();
     BlockIndex *block_index = knn_scan_shared_data->table_ref_->block_index_.get();
+    BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
+    SizeT knn_column_id = GetColumnID();
 
     if (u64 block_column_idx =
             knn_scan_function_data->execute_block_scan_job_ ? knn_scan_shared_data->current_block_idx_++ : std::numeric_limits<u64>::max();
@@ -308,17 +314,9 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 //                       block_column_idx + 1,
                 //                       brute_task_n));
                 block_entry->SetDeleteBitmask(begin_ts, bitmask);
-                BufferManager *buffer_mgr = query_context->storage()->buffer_manager();
                 ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
                 auto data = reinterpret_cast<const DataType *>(column_vector.data());
-                merge_heap->Search(query,
-                                   data,
-                                   knn_scan_shared_data->dimension_,
-                                   dist_func->dist_func_,
-                                   row_count,
-                                   segment_id,
-                                   block_id,
-                                   bitmask);
+                merge_heap->Search(query, data, knn_scan_shared_data->dimension_, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
             }
             block_column_idx = knn_scan_shared_data->current_block_idx_++;
         } while (block_column_idx < brute_task_n);
@@ -428,10 +426,17 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                     auto hnsw_search = [&](BufferHandle index_handle, bool with_lock, int chunk_id = -1) {
                         AbstractHnsw<f32, SegmentOffset> abstract_hnsw(index_handle.GetDataMut(), index_hnsw);
 
+                        bool rerank = false;
                         for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
                             if (opt_param.param_name_ == "ef") {
                                 u64 ef = std::stoull(opt_param.param_value_);
                                 abstract_hnsw.SetEf(ef);
+                            } else if (opt_param.param_name_ == "rerank") {
+                                if (abstract_hnsw.RerankDist()) {
+                                    rerank = true;
+                                } else {
+                                    LOG_WARN("rerank for this hnsw type is not valid");
+                                }
                             }
                         }
 
@@ -477,40 +482,54 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 UnrecoverableError(error_message);
                             }
 
-                            switch (knn_scan_shared_data->knn_distance_type_) {
-                                case KnnDistanceType::kInvalid: {
-                                    String error_message = "Invalid distance type";
-                                    LOG_CRITICAL(error_message);
-                                    UnrecoverableError(error_message);
-                                }
-                                case KnnDistanceType::kL2:
-                                case KnnDistanceType::kHamming: {
-                                    break;
-                                }
-                                // FIXME:
-                                case KnnDistanceType::kCosine:
-                                case KnnDistanceType::kInnerProduct: {
-                                    for (i64 i = 0; i < result_n; ++i) {
-                                        d_ptr[i] = -d_ptr[i];
+                            if (abstract_hnsw.RerankDist() && rerank) {
+                                Vector<SizeT> idxes(result_n);
+                                std::iota(idxes.begin(), idxes.end(), 0);
+                                std::sort(idxes.begin(), idxes.end(), [&](SizeT i, SizeT j) { return l_ptr[i] < l_ptr[j]; }); // sort by segment offset
+                                BlockID prev_block_id = -1;
+                                ColumnVector column_vector;
+                                for (SizeT idx : idxes) {
+                                    SegmentOffset segment_offset = l_ptr[idx];
+                                    BlockID block_id = segment_offset / DEFAULT_BLOCK_CAPACITY;
+                                    BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
+                                    if (block_id != prev_block_id) {
+                                        prev_block_id = block_id;
+                                        BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
+                                        BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(knn_column_id);
+                                        column_vector = block_column_entry->GetColumnVector(buffer_mgr);
                                     }
-                                    break;
+                                    const auto *data = reinterpret_cast<const DataType *>(column_vector.data());
+                                    data += block_offset * knn_scan_shared_data->dimension_;
+                                    merge_heap->Search(query, data, knn_scan_shared_data->dimension_, dist_func->dist_func_, segment_id, segment_offset);
                                 }
-                            }
+                            } else {
+                                switch (knn_scan_shared_data->knn_distance_type_) {
+                                    case KnnDistanceType::kInvalid: {
+                                        String error_message = "Invalid distance type";
+                                        LOG_CRITICAL(error_message);
+                                        UnrecoverableError(error_message);
+                                    }
+                                    case KnnDistanceType::kL2:
+                                    case KnnDistanceType::kHamming: {
+                                        break;
+                                    }
+                                    // FIXME:
+                                    case KnnDistanceType::kCosine:
+                                    case KnnDistanceType::kInnerProduct: {
+                                        for (i64 i = 0; i < result_n; ++i) {
+                                            d_ptr[i] = -d_ptr[i];
+                                        }
+                                        break;
+                                    }
+                                }
 
-                            auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
-                            for (i64 i = 0; i < result_n; ++i) {
-                                row_ids[i] = RowID{segment_id, l_ptr[i]};
+                                auto row_ids = MakeUniqueForOverwrite<RowID[]>(result_n);
+                                for (i64 i = 0; i < result_n; ++i) {
+                                    row_ids[i] = RowID{segment_id, l_ptr[i]};
+                                }
 
-                                BlockID block_id = l_ptr[i] / DEFAULT_BLOCK_CAPACITY;
-                                auto *block_entry = block_index->GetBlockEntry(segment_id, block_id);
-                                if (block_entry == nullptr) {
-                                    String error_message =
-                                        fmt::format("Cannot find segment id: {}, block id: {}, index chunk is {}", segment_id, block_id, chunk_id);
-                                    LOG_CRITICAL(error_message);
-                                    UnrecoverableError(error_message);
-                                } // this is for debug
+                                merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                             }
-                            merge_heap->Search(0, d_ptr.get(), row_ids.get(), result_n);
                         }
                     };
 
