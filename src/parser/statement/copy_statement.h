@@ -24,6 +24,8 @@ enum class CopyOptionType {
     kFormat,
     kDelimiter,
     kHeader,
+    kOffset,
+    kLimit,
 };
 
 struct CopyOption {
@@ -31,6 +33,8 @@ struct CopyOption {
     bool header_{false};
     CopyFileType file_type_{CopyFileType::kCSV};
     char delimiter_{','};
+    size_t offset_{0};
+    size_t limit_{0};
 };
 
 class CopyStatement final : public BaseStatement {
@@ -48,6 +52,8 @@ public:
     bool header_{false};
     CopyFileType copy_file_type_{CopyFileType::kCSV};
     char delimiter_{','};
+    size_t offset_{0};
+    size_t limit_{0};
 
     // EXPORT columns
     std::vector<ParsedExpr *> *expr_array_{nullptr};

@@ -567,6 +567,8 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExport(const SharedPtr<Logical
                                       logical_export->header(),
                                       logical_export->delimiter(),
                                       logical_export->FileType(),
+                                      logical_export->offset(),
+                                      logical_export->limit(),
                                       logical_export->column_idx_array(),
                                       logical_export->block_index(),
                                       logical_operator->load_metas());

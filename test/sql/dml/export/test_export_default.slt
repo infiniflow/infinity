@@ -1,0 +1,104 @@
+# name: test/sql/dml/export/test_export_default.slt
+# description: Test export default
+# group: [dml, export]
+
+statement ok
+DROP TABLE IF EXISTS products;
+
+statement ok
+CREATE TABLE products (product_no integer, price integer, description varchar);
+
+# insert data
+query I
+INSERT INTO products VALUES (1, 2, 'a');
+----
+
+# insert data
+query I
+INSERT INTO products VALUES (3, 4, 'abcdef'), (5, 6, 'abcdefghijklmnopqrstuvwxyz');
+----
+
+query II rowsort
+SELECT * FROM products;
+----
+1 2 a
+3 4 abcdef
+5 6 abcdefghijklmnopqrstuvwxyz
+
+query II
+SELECT count(*) FROM products;
+----
+3
+
+query I
+COPY products TO '/var/infinity/test_data/test_export_default_full.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+
+query I
+COPY products TO '/var/infinity/test_data/test_export_default_full.csv' WITH (FORMAT CSV, DELIMITER ',');
+
+query I
+COPY products TO '/var/infinity/test_data/test_export_default_part.jsonl' WITH (FORMAT JSONL, DELIMITER ',', OFFSET 1, LIMIT 1);
+
+query I
+COPY products TO '/var/infinity/test_data/test_export_default_part.csv' WITH (FORMAT CSV, DELIMITER ',', OFFSET 0, LIMIT 2);
+
+statement ok
+DROP TABLE IF EXISTS products_jsonl;
+
+statement ok
+CREATE TABLE products_jsonl (product_no integer, price integer, description varchar);
+
+query I
+COPY products_jsonl FROM '/var/infinity/test_data/test_export_default_part.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+
+query II rowsort
+SELECT * FROM products_jsonl;
+----
+3 4 abcdef
+
+query I
+COPY products_jsonl FROM '/var/infinity/test_data/test_export_default_full.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+
+query III
+SELECT * FROM products_jsonl;
+----
+3 4 abcdef
+1 2 a
+3 4 abcdef
+5 6 abcdefghijklmnopqrstuvwxyz
+
+statement ok
+DROP TABLE IF EXISTS products_csv;
+
+statement ok
+CREATE TABLE products_csv (product_no integer, price integer, description varchar);
+
+query I
+COPY products_csv FROM '/var/infinity/test_data/test_export_default_part.csv' WITH (FORMAT CSV, DELIMITER ',');
+
+query III
+SELECT * FROM products_csv;
+----
+1 2 a
+3 4 abcdef
+
+query I
+COPY products_csv FROM '/var/infinity/test_data/test_export_default_full.csv' WITH (FORMAT CSV, DELIMITER ',');
+
+query III
+SELECT * FROM products_csv;
+----
+1 2 a
+3 4 abcdef
+1 2 a
+3 4 abcdef
+5 6 abcdefghijklmnopqrstuvwxyz
+
+statement ok
+DROP TABLE products;
+
+statement ok
+DROP TABLE products_jsonl;
+
+statement ok
+DROP TABLE products_csv;

@@ -128,6 +128,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
         fs.Write(*file_handler, header.c_str(), header.size());
     }
 
+    SizeT offset = offset_;
     SizeT row_count{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager* buffer_manager = query_context->storage()->buffer_manager();
@@ -176,9 +177,13 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
             }
 
             for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
+                // TODO: Check the visibility
+                if(offset > 0) {
+                    -- offset;
+                    continue;
+                }
                 String line;
                 for(SizeT select_column_idx = 0; select_column_idx < select_column_count; ++ select_column_idx) {
-                    // TODO: Check the visibility
                     Value v = column_vectors[select_column_idx].GetValue(row_idx);
                     switch(v.type().type()) {
                         case LogicalType::kEmbedding: {
@@ -197,6 +202,9 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 }
                 fs.Write(*file_handler, line.c_str(), line.size());
                 ++ row_count;
+                if(limit_ != 0 && row_count == limit_) {
+                    return row_count;
+                }
             }
         }
     }
@@ -229,6 +237,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
     }
     DeferFn file_defer([&]() { fs.Close(*file_handler); });
 
+    SizeT offset = offset_;
     SizeT row_count{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager* buffer_manager = query_context->storage()->buffer_manager();
@@ -278,10 +287,12 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
             }
 
             for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
-                nlohmann::json line_json;
-
                 // TODO: Need to check visibility
-
+                if(offset > 0) {
+                    -- offset;
+                    continue;
+                }
+                nlohmann::json line_json;
                 for(ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++ block_column_idx) {
                     ColumnID select_column_idx = select_columns[block_column_idx];
                     switch(select_column_idx) {
@@ -311,6 +322,9 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 String to_write = line_json.dump() + "\n";
                 fs.Write(*file_handler, to_write.c_str(), to_write.size());
                 ++ row_count;
+                if(limit_ != 0 && row_count == limit_) {
+                    return row_count;
+                }
             }
         }
     }
@@ -351,6 +365,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     }
     DeferFn file_defer([&]() { fs.Close(*file_handler); });
 
+    SizeT offset = offset_;
     SizeT row_count{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager* buffer_manager = query_context->storage()->buffer_manager();
@@ -372,11 +387,19 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
             }
 
             for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
+                if(offset > 0) {
+                    -- offset;
+                    continue;
+                }
+
                 Value v = exported_column_vector.GetValue(row_idx);
                 Span<char> embedding = v.GetEmbedding();
                 fs.Write(*file_handler, &dimension, sizeof(dimension));
                 fs.Write(*file_handler, embedding.data(), embedding.size_bytes());
                 ++ row_count;
+                if(limit_ != 0 && row_count == limit_) {
+                    return row_count;
+                }
             }
         }
     }
