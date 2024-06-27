@@ -140,6 +140,7 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
         case LogicalType::kEmbedding: {
             switch (target.type()) {
                 case LogicalType::kVarchar:
+                case LogicalType::kEmbedding:
                     return true;
                 default:
                     return false;
