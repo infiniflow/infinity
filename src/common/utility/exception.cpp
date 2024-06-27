@@ -39,7 +39,9 @@ void PrintStacktrace(const String &err_msg) {
     free(stacktrace);
 }
 
-#ifdef INFINITY_DEBUG
+#define ADD_LOG_INFO
+
+#if defined(INFINITY_DEBUG) || defined(ADD_LOG_INFO)
 
 void RecoverableError(Status status, const char *file_name, u32 line) {
     status.AppendMessage(fmt::format("@{}:{}", infinity::TrimPath(file_name), line));
