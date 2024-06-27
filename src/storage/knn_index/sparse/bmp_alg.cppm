@@ -45,7 +45,7 @@ public:
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BMPIvt ReadAdv(char *&p);
+    static BMPIvt ReadAdv(const char *&p);
 
 private:
     Vector<BlockPostings<DataType, CompressType>> postings_;
@@ -69,7 +69,7 @@ public:
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static TailFwd<DataType, IdxType> ReadAdv(char *&p);
+    static TailFwd<DataType, IdxType> ReadAdv(const char *&p);
 
 private:
     Vector<Vector<Pair<IdxType, DataType>>> tail_terms_;
@@ -102,7 +102,7 @@ public:
 
     SizeT GetSizeInBytes() const;
     void WriteAdv(char *&p) const;
-    static BlockFwd ReadAdv(char *&p);
+    static BlockFwd ReadAdv(const char *&p);
 
 private:
     static void Calculate(const Vector<BMPBlockOffset> &block_offsets, const Vector<DataType> scores, Vector<DataType> &res, DataType query_score);
@@ -148,7 +148,7 @@ private:
 
     void WriteAdv(char *&p) const;
 
-    static BMPAlg<DataType, IdxType, CompressType> ReadAdv(char *&p);
+    static BMPAlg<DataType, IdxType, CompressType> ReadAdv(const char *&p);
 
 private:
     BMPIvt<DataType, CompressType> bm_ivt_;

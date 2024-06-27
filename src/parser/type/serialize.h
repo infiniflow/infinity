@@ -33,6 +33,7 @@ inline int32_t GetSizeInBytes(const T &) {
     return sizeof(T);
 }
 
+// >>>>>>>>>>>>>>> deprecated
 template <>
 inline int32_t GetSizeInBytes(const std::string &value) {
     return sizeof(int32_t) + value.length();
@@ -69,6 +70,39 @@ inline std::string ReadBufAdv<std::string>(char *&buf) {
     buf += size;
     return str;
 }
+// <<<<<<<<<<<<<< deprecated
+
+template <typename T>
+inline T ReadBuf(const char * buf) {
+    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    T *ptr = (T *)buf;
+    T value = *ptr;
+    return value;
+}
+
+template <typename T>
+inline T ReadBufAdv(const char *&buf) {
+    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    T *ptr = (T *)buf;
+    T value = *ptr;
+    buf += sizeof(T);
+    return value;
+}
+
+template <>
+inline std::string ReadBuf<std::string>(const char *buf) {
+    int32_t size = ReadBuf<int32_t>(buf);
+    std::string str(buf + sizeof(int32_t), size);
+    return str;
+}
+
+template <>
+inline std::string ReadBufAdv<std::string>(const char *&buf) {
+    int32_t size = ReadBufAdv<int32_t>(buf);
+    std::string str(buf, size);
+    buf += size;
+    return str;
+}
 
 template <typename T>
 inline void WriteBuf(char *const buf, const T &value) {
@@ -100,9 +134,11 @@ inline void WriteBufAdv<std::string>(char *&buf, const std::string &value) {
     buf += len;
 }
 
-inline void WriteBufCharsAdv(char *&buf, const char *data, size_t bytes) {
-    memcpy(buf, data, bytes);
-    buf += bytes;
+template<typename T>
+inline void WriteBufVecAdv(char *&buf, const T *data, size_t size) {
+    static_assert(std::is_standard_layout_v<T>, "T must be POD");
+    memcpy(buf, data, sizeof(T) * size);
+    buf += sizeof(T) * size;
 }
 
 } // namespace infinity
