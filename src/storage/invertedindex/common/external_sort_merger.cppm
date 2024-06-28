@@ -431,19 +431,14 @@ protected:
     typedef SortMergerTermTuple<KeyType, LenType> self_t;
     using Super = SortMerger<KeyType, LenType>;
     using typename Super::KeyAddr;
-    u64 term_list_count_{0};
     FILE *run_file_{nullptr};
 
     void PredictImpl(DirectIO &io_stream);
-
-    void OutputImpl(FILE *f);
 
     void MergeImpl();
 public:
     SortMergerTermTuple(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2)
         : Super(filenm, group_size, bs, output_num) {}
-
-    void Run() override;
 
     void Run(Vector<UniquePtr<Thread>>& threads);
 

@@ -555,50 +555,6 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
 
 template <typename KeyType, typename LenType>
 requires std::same_as<KeyType, TermTuple>
-void SortMergerTermTuple<KeyType, LenType>::OutputImpl(FILE *f) {
-    DirectIO io_stream(f, "w");
-    while (this->count_ > 0) {
-        UniquePtr<TermTupleList> temp_term_tuple;
-        {
-            std::unique_lock out_lock(this->out_queue_mtx_);
-            this->out_queue_con_.wait(out_lock, [this]() { return !this->term_tuple_list_queue_.empty(); });
-
-            if (this->count_ == 0) {
-                break;
-            }
-
-            temp_term_tuple = std::move(this->term_tuple_list_queue_.front());
-            ++term_list_count_;
-            this->term_tuple_list_queue_.pop();
-        }
-        this->count_ -= temp_term_tuple->Size();
-
-        // output format
-        // |   u32    |    u32   |     u32       |  char [term_len]  | pair<u32, u32> [doc_list_size]
-        // | data_len | term_len | doc_list_size |       term        |      [doc_id, term_pos]...
-        u32 term_len = temp_term_tuple->term_.size();
-        u32 doc_list_size = temp_term_tuple->Size();
-        u32 data_len = sizeof(u32) + sizeof(u32) + term_len + 2 * sizeof(u32) * doc_list_size;
-
-        char buf[20];
-        auto SIZE_U32 = sizeof(u32);
-        memcpy(buf, &data_len, SIZE_U32);
-        memcpy(buf + SIZE_U32, &term_len, SIZE_U32);
-        memcpy(buf + SIZE_U32 + SIZE_U32, &doc_list_size, SIZE_U32);
-        io_stream.Write(buf, SIZE_U32 * 3);
-        io_stream.Write(temp_term_tuple->term_.data(), term_len);
-        io_stream.Write((char*)temp_term_tuple->doc_pos_list_.data(), SIZE_U32 * 2 * doc_list_size);
-        if (this->count_ == 0) {
-            io_stream.Seek(0, SEEK_SET);
-            io_stream.Write((char*)(&term_list_count_), sizeof(u64));
-            term_list_count_ = 0;
-            break;
-        }
-    }
-}
-
-template <typename KeyType, typename LenType>
-requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::PredictImpl(DirectIO &io_stream) {
     this->Predict(io_stream);
 }
@@ -644,50 +600,6 @@ void SortMergerTermTuple<KeyType, LenType>::Run(Vector<UniquePtr<Thread>>& threa
     threads.push_back(std::move(predict_thread));
     threads.push_back(std::move(merge_thread));
 }
-
-template <typename KeyType, typename LenType>
-requires std::same_as<KeyType, TermTuple>
-void SortMergerTermTuple<KeyType, LenType>::Run() {
-    FILE *f = fopen(this->filenm_.c_str(), "r");
-
-    DirectIO io_stream(f);
-    this->FILE_LEN_ = io_stream.Length();
-
-    term_list_count_ = 0;
-    io_stream.Read((char *)(&this->count_), sizeof(u64));
-
-    Super::Init(io_stream);
-
-    UniquePtr<Thread> predict_thread = MakeUnique<Thread>(std::bind(&self_t::PredictImpl, this, io_stream));
-    UniquePtr<Thread> merge_thread = MakeUnique<Thread>(std::bind(&self_t::MergeImpl, this));
-    FILE *out_f = fopen((this->filenm_ + ".out").c_str(), "w+");
-    IASSERT(out_f);
-    IASSERT(fwrite(&this->count_, sizeof(u64), 1, out_f) == 1);
-
-    UniquePtr<Thread> out_thread = MakeUnique<Thread>(std::bind(&self_t::OutputImpl, this, out_f));
-
-    Vector<UniquePtr<Thread>> threads;
-    threads.push_back(std::move(predict_thread));
-    threads.push_back(std::move(merge_thread));
-    threads.push_back(std::move(out_thread));
-
-    this->Unpin(threads);
-
-    for (auto& thread : threads) {
-        thread->join();
-    }
-
-    fclose(f);
-    fclose(out_f);
-
-    if (std::filesystem::exists(this->filenm_)) {
-        std::filesystem::remove(this->filenm_);
-    }
-    if (std::filesystem::exists(this->filenm_ + ".out")) {
-        std::filesystem::rename(this->filenm_ + ".out", this->filenm_);
-    }
-}
-
 
 template class SortMerger<u32, u8>;
 template class SortMerger<TermTuple, u32>;
