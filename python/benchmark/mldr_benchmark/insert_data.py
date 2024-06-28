@@ -60,7 +60,7 @@ class InfinityClientForInsert:
         docid_list = corpus["docid"]
         corpus_text_list = corpus["text"]
         del corpus
-        print("Expect total number of rows: {}", total_num)
+        print(f"Expect total number of rows: {total_num}")
         dense_embedding_dir = input("Input dense embedding data files dir: ")
         print("Input begin and end position pairs of dense embedding data to insert:")
         dense_part_begin_ends = get_all_part_begin_ends(total_num)
