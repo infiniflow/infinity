@@ -65,8 +65,8 @@ SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32
     out_buf_full_ = new bool[OUT_BUF_NUM_];
 
 
-    CYCLE_BUF_SIZE_ = MAX_GROUP_SIZE_ * 4;
-    CYCLE_BUF_THRESHOLD_ = MAX_GROUP_SIZE_ * 3;
+    CYCLE_BUF_SIZE_ = MAX_GROUP_SIZE_ + MAX_GROUP_SIZE_ / 2;
+    CYCLE_BUF_THRESHOLD_ = MAX_GROUP_SIZE_;
     OUT_BATCH_SIZE_ = 10240;
     assert(CYCLE_BUF_THRESHOLD_ <= CYCLE_BUF_SIZE_);
     cycle_buffer_ = MakeUnique<CycleBuffer>(CYCLE_BUF_SIZE_, PRE_BUF_SIZE_);
