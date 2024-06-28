@@ -317,11 +317,9 @@ target_sources(embedded_infinity_ext
 nanobind_compile_options(embedded_infinity_ext)
 nanobind_link_options(embedded_infinity_ext)
 set_target_properties(embedded_infinity_ext PROPERTIES LINKER_LANGUAGE CXX)
-set(ARG_NB_STATIC TRUE)
-set(ARG_STABLE_ABI FALSE)
-set(libname "nanobind-static")
+set(libname "nanobind-static-abi3")
 nanobind_build_library(${libname})
-nanobind_extension(embedded_infinity_ext)
+nanobind_extension_abi3(embedded_infinity_ext)
 add_dependencies(embedded_infinity_ext oatpp)
 
 target_link_libraries(embedded_infinity_ext PRIVATE

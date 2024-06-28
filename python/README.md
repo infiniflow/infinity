@@ -7,30 +7,7 @@
 - upload to pypi.org
 - install new python SDK
 
-# build python SDK
-Execute the following command under the root path of infinity project, but not python SDK project root path.
-
-```shell
-rm -f dist/* && pip wheel . -w dist
-```
-
-Note: This command will compile C++ code, which may take a long time. You can use `-v` to display the compilation details, i.e. `rm -f dist/* && pip wheel . -v -w dist`
-
-# install python SDK
-```shell
-pip uninstall -y infinity-sdk && pip install dist/*.whl
-```
-
-This will install infinity-sdk and its dependencies.
-
-# upload to pypi.org
-```shell
-twine upload dist/*.whl
-```
-
-Enter your pypi API token according to the prompt.
-
-Note that pypi allow a version of a package [be uploaded only once](https://pypi.org/help/#file-name-reuse). You need to change the `version` inside the `pyproject.toml` before build and upload.
+Please see [releases.yml](https://github.com/infiniflow/infinity/blob/main/.github/workflows/release.yml) for details.
 
 # using
 

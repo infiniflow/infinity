@@ -55,7 +55,7 @@ jobs:
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug"
+        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity test_main"
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -70,7 +70,7 @@ jobs:
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && pip uninstall -y infinity-sdk && pip install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug'"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug'"
 
       - name: Start infinity pysdk & http_api debug version
         if: ${{ !cancelled() && !failure() }}
@@ -157,7 +157,7 @@ jobs:
 
       - name: Build release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity test_main knn_import_benchmark knn_query_benchmark"
 
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
@@ -170,19 +170,21 @@ jobs:
       - name: Download resources
         run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git
 
-      - name: Install pysdk
+      - name: Install pysdk for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && pip uninstall -y infinity-sdk && pip install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release'"
+        run: |
+          sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && pip3 wheel . -v -w dist --config-settings=wheel.py-api=cp310 && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*cp310*.whl && pip3 install wheelhouse/infinity*cp310*.whl"
 
-      - name: pysdk local infinity test release version
+      - name: Test embeded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity/* && python3 tools/run_pysdk_local_infinity_test.py" && sleep 1s
+        run: |
+          sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
-      - name: Start infinity pysdk & http_api release version
+      - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
 
       - name: pysdk remote infinity test release version
         if: ${{ !cancelled() && !failure() }}
@@ -196,7 +198,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
 
-      - name: Stop infinity pysdk & http_api release
+      - name: Stop infinity release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
           sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 20
@@ -205,7 +207,7 @@ jobs:
             exit 1
           fi
 
-      - name: Start infinity sqllogictest release version
+      - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
@@ -214,7 +216,7 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
-      - name: Stop infinity sqllogictest release
+      - name: Stop infinity release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
           sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 20
