@@ -65,8 +65,8 @@ SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32
     out_buf_full_ = new bool[OUT_BUF_NUM_];
 
 
-    CYCLE_BUF_SIZE_ = MAX_GROUP_SIZE_ * 4;
-    CYCLE_BUF_THRESHOLD_ = MAX_GROUP_SIZE_ * 3;
+    CYCLE_BUF_SIZE_ = MAX_GROUP_SIZE_ + MAX_GROUP_SIZE_ / 2;
+    CYCLE_BUF_THRESHOLD_ = MAX_GROUP_SIZE_;
     OUT_BATCH_SIZE_ = 10240;
     assert(CYCLE_BUF_THRESHOLD_ <= CYCLE_BUF_SIZE_);
     cycle_buffer_ = MakeUnique<CycleBuffer>(CYCLE_BUF_SIZE_, PRE_BUF_SIZE_);
@@ -487,6 +487,7 @@ requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
     UniquePtr<TermTupleList> tuple_list = nullptr;
     u32 last_idx = -1;
+    SizeT term_tuple_list_queue_size = 0;
     while (this->merge_loser_tree_->TopSource() != LoserTree<KeyAddr>::invalid_) {
         auto top = this->merge_loser_tree_->TopKey();
         u32 idx = top.IDX();
@@ -500,6 +501,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
                 {
                     std::unique_lock lock(this->out_queue_mtx_);
                     this->term_tuple_list_queue_.push(std::move(tuple_list));
+                    term_tuple_list_queue_size = std::max(this->term_tuple_list_queue_.size(), term_tuple_list_queue_size);
                     this->out_queue_con_.notify_one();
                 }
                 tuple_list = MakeUnique<TermTupleList>(out_key.term_);
@@ -548,9 +550,11 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
         std::unique_lock lock(this->out_queue_mtx_);
         if (tuple_list != nullptr) {
             this->term_tuple_list_queue_.push(std::move(tuple_list));
+            term_tuple_list_queue_size = std::max(this->term_tuple_list_queue_.size(), term_tuple_list_queue_size);
         }
         this->out_queue_con_.notify_one();
     }
+//    fmt::print("max term tuple list queue = {}\n", term_tuple_list_queue_size);
 }
 
 template <typename KeyType, typename LenType>
