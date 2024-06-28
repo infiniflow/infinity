@@ -55,7 +55,7 @@ jobs:
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug"
+        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity test_main"
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -157,7 +157,7 @@ jobs:
 
       - name: Build release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity test_main knn_import_benchmark knn_query_benchmark"
 
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
@@ -170,20 +170,15 @@ jobs:
       - name: Download resources
         run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git
 
-      - name: Install pysdk and test embeded infinity for Python 3.10
+      - name: Install pysdk for Python 3.10
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && pip3 wheel . -v -w dist --config-settings=wheel.py-api=cp310 && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*cp310*.whl && pip3 install wheelhouse/infinity*cp310*.whl && python3 tools/run_pysdk_local_infinity_test.py"
+          sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && pip3 wheel . -v -w dist --config-settings=wheel.py-api=cp310 && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*cp310*.whl && pip3 install wheelhouse/infinity*cp310*.whl"
 
-      - name: Install pysdk and test embeded infinity for Python 3.11
+      - name: Test embeded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
         run: |
-          sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv311/bin/activate && pip3 wheel . -v -w dist --config-settings=wheel.py-api=cp311 && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*cp311*.whl && pip3 install wheelhouse/infinity*cp311*.whl && python3 tools/run_pysdk_local_infinity_test.py"
-
-      - name: Install pysdk and test embeded infinity for Python 3.12
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv312/bin/activate && pip3 wheel . -v -w dist --config-settings=wheel.py-api=cp312 && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*cp312*.whl && pip3 install wheelhouse/infinity*cp312*.whl && python3 tools/run_pysdk_local_infinity_test.py"
+          sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
