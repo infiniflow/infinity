@@ -421,7 +421,7 @@ public:
 
     virtual ~SortMerger();
 
-    virtual void Run();
+    void Run();
 };
 
 export template <typename KeyType, typename LenType>
