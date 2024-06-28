@@ -206,8 +206,6 @@ set(CMAKE_INSTALL_PREFIX /usr)
 install(TARGETS infinity DESTINATION bin)
 install(FILES conf/infinity.service DESTINATION lib/systemd/system)
 install(FILES conf/infinity_conf.toml DESTINATION etc)
-install(DIRECTORY resource/jieba DESTINATION ../var/infinity/resource)
-install(DIRECTORY resource/mecab DESTINATION ../var/infinity/resource)
 
 # https://cmake.org/cmake/help/latest/cpack_gen/rpm.html
 # Specify the post-install script for RPM
