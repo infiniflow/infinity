@@ -294,7 +294,7 @@ void QueryMatchTest::InsertData(const String& db_name, const String& table_name)
                 auto& row = datas_[block_id];
                 for (SizeT i = 0; i < column_vectors.size(); ++i) {
                     auto &column = row[i];
-                    column_vectors[i].AppendByStringView(column, ',');
+                    column_vectors[i].AppendByStringView(column);
                 }
                 block_entry->IncreaseRowCount(1);
             }
