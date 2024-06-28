@@ -2226,7 +2226,13 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         ptr += tail_index * data_type_size;
     }
     // read variable part
-    if (const auto data_t = data_type->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
+    if (const auto data_t = data_type->type(); data_t == kVarchar or data_t == kTensorArray) {
+        i32 heap_len = ReadBufAdv<i32>(ptr);
+        if (heap_len > 0) {
+            column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, heap_len);
+            ptr += heap_len;
+        }
+    } else if (data_t == kTensor or data_t == kSparse) {
         i32 heap_len = ReadBufAdv<i32>(ptr);
         const i32 one_chunk_size = column_vector->buffer_->fix_heap_mgr_->current_chunk_size();
         while (heap_len > 0) {
