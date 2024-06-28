@@ -3,6 +3,7 @@ import struct
 import numpy as np
 import datasets
 from dataclasses import dataclass, field
+from pyserini.output_writer import get_output_writer, OutputFormat
 
 
 @dataclass
@@ -18,6 +19,15 @@ class EvalArgs:
     overwrite: bool = field(default=False, metadata={'help': 'Whether to overwrite embedding'})
 
 
+@dataclass
+class QueryArgs:
+    languages: str = field(default="en", metadata={
+        'help': 'Languages to evaluate. Available languages: ar de en es fr hi it ja ko pt ru th zh', "nargs": "+"})
+    query_result_dave_dir: str = field(default='./query-results', metadata={'help': 'Dir to save query result.'})
+    query_types: str = field(default="bm25",
+                             metadata={'help': 'Query method. Available methods: bm25, dense, sparse', "nargs": "+"})
+
+
 def check_languages(languages):
     if isinstance(languages, str):
         languages = [languages]
@@ -28,10 +38,54 @@ def check_languages(languages):
     return languages
 
 
+def check_query_types(query_types):
+    if isinstance(query_types, str):
+        query_types = [query_types]
+    available_query_types = ['bm25', 'dense', 'sparse']
+    for query_type in query_types:
+        if query_type not in available_query_types:
+            raise ValueError(
+                f"Query type `{query_type}` is not supported. Available query types: {available_query_types}")
+    return query_types
+
+
 def load_corpus(lang: str):
     corpus = datasets.load_dataset('Shitao/MLDR', f'corpus-{lang}', split='corpus',
                                    download_config=datasets.DownloadConfig(resume_download=True))
     return corpus
+
+
+def get_queries_and_qids(lang: str, streaming: bool = True):
+    if streaming:
+        dataset = datasets.load_dataset('Shitao/MLDR', lang, split='test', streaming=streaming)
+    else:
+        dataset = datasets.load_dataset('Shitao/MLDR', lang, split='test',
+                                        download_config=datasets.DownloadConfig(resume_download=True))
+    queries = []
+    qids = []
+    for data in dataset:
+        qids.append(data['query_id'])
+        queries.append(data['query'])
+    return queries, qids
+
+
+class FakeJScoredDoc:
+    def __init__(self, docid: str, score: float):
+        self.docid = docid
+        self.score = score
+
+
+# search_results: List[Tuple[str, List[JScoredDoc]]]
+# here, JScoredDoc needs .docid, .score
+def save_result(search_results, result_save_path: str, qids: list, max_hits: int):
+    output_writer = get_output_writer(result_save_path, OutputFormat(OutputFormat.TREC.value), 'w',
+                                      max_hits=max_hits, tag='Faiss', topics=qids,
+                                      use_max_passage=False,
+                                      max_passage_delimiter='#',
+                                      max_passage_hits=1000)
+    with output_writer:
+        for topic, hits in search_results:
+            output_writer.write(topic, hits)
 
 
 def ivecs_read(fname: str):

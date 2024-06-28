@@ -119,7 +119,7 @@ class InfinityClientForInsert:
                                                                                index.InitParameter("ef_construction",
                                                                                                    "200"),
                                                                                index.InitParameter("ef", "200"),
-                                                                               index.InitParameter("metric", "l2"),
+                                                                               index.InitParameter("metric", "ip"),
                                                                                index.InitParameter("encode", "lvq")])],
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK

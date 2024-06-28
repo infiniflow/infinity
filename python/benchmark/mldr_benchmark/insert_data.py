@@ -34,7 +34,6 @@ def get_all_part_begin_ends(total_row_count: int):
     return result
 
 
-# fulltext column, dense embedding column, sparse embedding column
 class InfinityClientForInsert:
     def __init__(self):
         self.test_db_name = "default_db"
@@ -115,7 +114,7 @@ class InfinityClientForInsert:
                                                                                index.InitParameter("ef_construction",
                                                                                                    "200"),
                                                                                index.InitParameter("ef", "200"),
-                                                                               index.InitParameter("metric", "l2"),
+                                                                               index.InitParameter("metric", "ip"),
                                                                                index.InitParameter("encode", "lvq")])],
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
