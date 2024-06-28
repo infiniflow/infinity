@@ -60,7 +60,7 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
     auto iter =
         std::upper_bound(created_.begin(), created_.end(), begin_ts, [](TxnTimeStamp ts, const CreateField &field) { return ts < field.create_ts_; });
     if (iter == created_.begin()) {
-        return false;
+        return 0;
     }
     --iter;
     return iter->row_count_;
@@ -121,8 +121,9 @@ UniquePtr<BlockVersion> BlockVersion::LoadFromFile(FileHandler &file_handler) {
 
 void BlockVersion::GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) const {
     // find the first create_field that has row_count_ >= offset
-    auto iter =
-        std::lower_bound(created_.begin(), created_.end(), offset, [](const CreateField &field, i64 offset) { return field.row_count_ < offset; });
+    auto iter = std::lower_bound(created_.begin(), created_.end(), static_cast<i64>(offset), [](const CreateField &field, const i64 offset_cp) {
+        return field.row_count_ < offset_cp;
+    });
     SizeT i = 0;
     for (; i < size; ++i) {
         if (iter == created_.end()) {
