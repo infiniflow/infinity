@@ -14,16 +14,17 @@ name = "infinity_sdk"
 version = "0.2.0"
 requires-python = ">=3.10"
 dependencies = [
-    "sqlglot~=11.7.1",
-    "pydantic~=2.7.1",
+    "sqlglot~=11.7.0",
+    "pydantic~=2.7.0",
     "thrift~=0.20.0",
-    "setuptools~=69.5.1",
+    "setuptools~=69.5.0",
     "pytest~=8.2.0",
-    "pandas~=2.2.2",
-    "numpy~=1.26.4",
+    "pandas~=2.2.0",
+    "numpy~=1.26.0",
     "pyarrow~=16.0.0",
-    "polars~=0.20.31",
-    "openpyxl~=3.1.2"
+    "polars~=0.20.0",
+    "openpyxl~=3.1.0",
+    "requests~=2.32.0"
 ]
 description = "infinity"
 readme = "README.md"
