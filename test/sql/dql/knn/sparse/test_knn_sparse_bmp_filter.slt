@@ -51,3 +51,6 @@ SELECT col1 FROM test_knn_sparse_bmp_filter SEARCH MATCH SPARSE (col2, [0:1.0,20
 2
 1
 
+statement ok
+DROP TABLE test_knn_sparse_bmp_filter;
+

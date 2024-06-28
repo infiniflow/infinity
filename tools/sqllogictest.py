@@ -169,20 +169,20 @@ if __name__ == "__main__":
     if os.path.exists("/var/infinity/test_data/test_export_embedding.jsonl"):
         os.remove("/var/infinity/test_data/test_export_embedding.jsonl")
 
-    if os.path.exists("/var/infinity/test_data/test_export_embedding.csv'"):
-        os.remove("/var/infinity/test_data/test_export_embedding.csv'")
+    if os.path.exists("/var/infinity/test_data/test_export_embedding.csv"):
+        os.remove("/var/infinity/test_data/test_export_embedding.csv")
 
     if os.path.exists("/var/infinity/test_data/test_export_default_full.jsonl"):
         os.remove("/var/infinity/test_data/test_export_default_full.jsonl")
 
-    if os.path.exists("/var/infinity/test_data/test_export_default_full.csv'"):
-        os.remove("/var/infinity/test_data/test_export_default_full.csv'")
+    if os.path.exists("/var/infinity/test_data/test_export_default_full.csv"):
+        os.remove("/var/infinity/test_data/test_export_default_full.csv")
 
     if os.path.exists("/var/infinity/test_data/test_export_default_part.jsonl"):
         os.remove("/var/infinity/test_data/test_export_default_part.jsonl")
 
-    if os.path.exists("/var/infinity/test_data/test_export_default_part.csv'"):
-        os.remove("/var/infinity/test_data/test_export_default_part.csv'")
+    if os.path.exists("/var/infinity/test_data/test_export_default_part.csv"):
+        os.remove("/var/infinity/test_data/test_export_default_part.csv")
 
     print("Start copying data...")
     if args.just_copy_all_data is True:

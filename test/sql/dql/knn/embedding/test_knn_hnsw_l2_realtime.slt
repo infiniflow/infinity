@@ -32,3 +32,6 @@ SELECT c1 FROM test_knn_hnsw_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], '
 8
 8
 6
+
+statement ok
+DROP TABLE test_knn_hnsw_l2;
