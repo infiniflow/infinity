@@ -139,8 +139,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
         data_ptr_ = buffer_->GetDataMut();
     } else {
         // Initialize after reset will come to this branch
-        if (const auto t = vector_buffer_types.first;
-            t == VectorBufferType::kHeap or t == VectorBufferType::kTensorHeap or t == VectorBufferType::kSparseHeap) {
+        if (vector_buffer_types.first == VectorBufferType::kHeap or vector_buffer_types.first == VectorBufferType::kTensorHeap) {
             if (buffer_->fix_heap_mgr_.get() != nullptr or buffer_->fix_heap_mgr_1_.get() != nullptr) {
                 String error_message = "Vector heap should be null.";
                 LOG_CRITICAL(error_message);
@@ -2226,30 +2225,18 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         ptr += tail_index * data_type_size;
     }
     // read variable part
-    if (const auto data_t = data_type->type(); data_t == kVarchar or data_t == kTensorArray) {
+    if (const auto data_t = data_type->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
         i32 heap_len = ReadBufAdv<i32>(ptr);
         if (heap_len > 0) {
             column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, heap_len);
             ptr += heap_len;
         }
-    } else if (data_t == kTensor or data_t == kSparse) {
-        i32 heap_len = ReadBufAdv<i32>(ptr);
-        const i32 one_chunk_size = column_vector->buffer_->fix_heap_mgr_->current_chunk_size();
-        while (heap_len > 0) {
-            const i32 real_append_size = std::min(heap_len, one_chunk_size);
-            column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, real_append_size);
-            ptr += real_append_size;
-            heap_len -= real_append_size;
-        }
     }
     if (const auto data_t = data_type->type(); data_t == kTensorArray) {
         i32 heap_len_1 = ReadBufAdv<i32>(ptr);
-        const i32 one_chunk_size = column_vector->buffer_->fix_heap_mgr_1_->current_chunk_size();
-        while (heap_len_1 > 0) {
-            const i32 real_append_size = std::min(heap_len_1, one_chunk_size);
-            column_vector->buffer_->fix_heap_mgr_1_->AppendToHeap(ptr, real_append_size);
-            ptr += real_append_size;
-            heap_len_1 -= real_append_size;
+        if (heap_len_1 > 0) {
+            column_vector->buffer_->fix_heap_mgr_1_->AppendToHeap(ptr, heap_len_1);
+            ptr += heap_len_1;
         }
     }
 
