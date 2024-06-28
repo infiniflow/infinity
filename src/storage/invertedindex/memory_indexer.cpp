@@ -378,9 +378,9 @@ void MemoryIndexer::OfflineDump() {
     merger->Run();
     delete merger;
 
-    MmapReader reader(spill_full_path_);
+    FILE *f = fopen(spill_full_path_.c_str(), "r");
     u64 term_list_count;
-    reader.ReadU64(term_list_count);
+    fread((char *)&term_list_count, sizeof(u64), 1, f);
 
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
@@ -406,18 +406,18 @@ void MemoryIndexer::OfflineDump() {
     u32 last_doc_id = INVALID_DOCID;
     UniquePtr<PostingWriter> posting;
 
-    assert(record_length < MAX_TUPLE_LIST_LENGTH);
-
     for (u64 i = 0; i < term_list_count; ++i) {
-        reader.ReadU32(record_length);
-        reader.ReadU32(term_length);
+        fread(&record_length, sizeof(u32), 1, f);
+        fread(&term_length, sizeof(u32), 1, f);
+
+        assert(record_length < MAX_TUPLE_LIST_LENGTH);
 
         if (term_length >= MAX_TUPLE_LENGTH) {
-            reader.Seek(record_length - sizeof(u32));
+            fread(buf.get(), record_length - sizeof(u32), 1, f);
             continue;
         }
 
-        reader.ReadBuf(buf.get(), record_length - sizeof(u32));
+        fread(buf.get(), record_length - sizeof(u32), 1, f);
         u32 buf_idx = 0;
 
         doc_pos_list_size = *(u32 *)(buf.get() + buf_idx);
