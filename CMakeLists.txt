@@ -188,7 +188,9 @@ endif ()
 
 # CPack settings
 set(CPACK_PACKAGE_NAME "infinity")
-set(CPACK_PACKAGE_VERSION "0.2.0")
+if(NOT DEFINED CPACK_PACKAGE_VERSION)
+    set(CPACK_PACKAGE_VERSION "0.2.0")
+endif()
 set(CPACK_PACKAGE_RELEASE 1)
 set(CPACK_PACKAGE_CONTACT "Zhichang Yu <yuzhichang@gmail.com>")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The AI-native database built for LLM applications, offering incredibly fast vector and full-text search.")

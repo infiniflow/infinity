@@ -75,7 +75,7 @@ jobs:
       run: sed -i '/install.*TARGETS embedded_infinity_ext.*/d' src/CMakeLists.txt
 
     - name: Build release version
-      run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=1 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+      run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${{ env.RELEASE_TAG }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=1 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
 
     - name: Download resources
       run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git
@@ -118,3 +118,12 @@ jobs:
         push: true
         tags: infiniflow/infinity:${{ env.RELEASE_TAG }}
         file: scripts/Dockerfile_infinity
+
+    - name: Build and upload infinity_sdk
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        sed -i "s/^version = \".*\"/version = \"$(echo $RELEASE_TAG | cut -c2-)\"/" pyproject.toml
+        sudo docker exec infinity_build bash -c "cd /infinity/ && rm -f dist/* && /usr/local/bin/pip3.10 wheel . -v -w dist --config-settings=wheel.py-api=cp310 && /usr/local/bin/pip3.11 wheel . -v -w dist --config-settings=wheel.py-api=cp311 && /usr/local/bin/pip3.12 wheel . -v -w dist --config-settings=wheel.py-api=cp312 && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*.whl && twine upload --repository pypi wheelhouse/infinity*.whl"
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
