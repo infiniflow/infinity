@@ -335,7 +335,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 if(row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
                     ++ file_no_;
                     fs.Close(*file_handler);
-                    String new_file_path = fmt::format("{}/part{}", file_path_, file_no_);
+                    String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
                     if(!result.second.ok()) {
                         RecoverableError(result.second);
@@ -424,7 +424,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
                 if(row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
                     ++ file_no_;
                     fs.Close(*file_handler);
-                    String new_file_path = fmt::format("{}/part{}", file_path_, file_no_);
+                    String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
                     if(!result.second.ok()) {
                         RecoverableError(result.second);

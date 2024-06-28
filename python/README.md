@@ -74,11 +74,11 @@ LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python
 ```
 
 # run pysdk test
-Run a local infinity test
+Run a local infinity test in project root directory
 ```shell
-pytest --local-infinity test/infinity/test_basic.py::TestInfinity::test_basic
+pytest --local-infinity python/test/infinity/test_basic.py::TestInfinity::test_basic
 ```
-Run a remote infinity test
+Run a remote infinity test in project root directory
 ```shell
-pytest test/infinity/test_basic.py::TestInfinity::test_basic
+pytest python/test/infinity/test_basic.py::TestInfinity::test_basic
 ```

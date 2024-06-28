@@ -329,6 +329,8 @@ class RemoteTable(Table, ABC):
                         options.copy_file_type = ttypes.CopyFileType.CSV
                     elif file_type == 'jsonl':
                         options.copy_file_type = ttypes.CopyFileType.JSONL
+                    elif file_type == 'fvecs':
+                        options.copy_file_type = ttypes.CopyFileType.FVECS
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
@@ -342,17 +344,17 @@ class RemoteTable(Table, ABC):
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
                 elif key == 'offset':
-                    if isinstance(v, integer):
+                    if isinstance(v, int):
                         options.offset = v
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'offset' field")
                 elif key == 'limit':
-                    if isinstance(v, integer):
+                    if isinstance(v, int):
                         options.limit = v
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'limit' field")
                 elif key == 'row_limit':
-                    if isinstance(v, integer):
+                    if isinstance(v, int):
                         options.row_limit = v
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'row_limit' field")
