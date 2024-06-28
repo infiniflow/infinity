@@ -280,6 +280,21 @@ class LocalTable(Table, ABC):
                         options.header = v
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
+                elif key == 'offset':
+                    if isinstance(v, integer):
+                        options.offset = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'offset' field")
+                elif key == 'limit':
+                    if isinstance(v, integer):
+                        options.limit = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'limit' field")
+                elif key == 'row_limit':
+                    if isinstance(v, integer):
+                        options.row_limit = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'row_limit' field")
                 else:
                     raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
         if not columns:

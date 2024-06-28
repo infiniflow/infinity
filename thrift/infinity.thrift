@@ -282,6 +282,9 @@ struct ExportOption {
 1:  string delimiter,
 2:  bool has_header,
 3:  CopyFileType copy_file_type,
+4:  i64 offset,
+5:  i64 limit,
+6:  i64 row_limit,
 }
 
 struct OptimizeOptions {

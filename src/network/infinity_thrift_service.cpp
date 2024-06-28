@@ -418,6 +418,9 @@ void InfinityThriftService::Export(infinity_thrift_rpc::CommonResponse &response
         ProcessStatus(response, Status::SyntaxError("CSV file delimiter isn't a char."));
     }
     export_options.delimiter_ = delimiter_string[0];
+    export_options.offset_ = request.export_option.offset;
+    export_options.limit_ = request.export_option.limit;
+    export_options.row_limit_ = request.export_option.row_limit;
 
     const QueryResult result = infinity->Export(request.db_name, request.table_name, export_columns, request.file_name.c_str(), export_options);
     ProcessQueryResult(response, result);
