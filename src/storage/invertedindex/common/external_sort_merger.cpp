@@ -605,6 +605,48 @@ void SortMergerTermTuple<KeyType, LenType>::PredictImpl(DirectIO &io_stream) {
 
 template <typename KeyType, typename LenType>
 requires std::same_as<KeyType, TermTuple>
+void SortMergerTermTuple<KeyType, LenType>::InitRunFile() {
+    run_file_ = fopen(this->filenm_.c_str(), "r");
+}
+
+template <typename KeyType, typename LenType>
+requires std::same_as<KeyType, TermTuple>
+void SortMergerTermTuple<KeyType, LenType>::UnInitRunFile() {
+    fclose(run_file_);
+    if (std::filesystem::exists(this->filenm_)) {
+        std::filesystem::remove(this->filenm_);
+    }
+}
+
+template <typename KeyType, typename LenType>
+requires std::same_as<KeyType, TermTuple>
+void SortMergerTermTuple<KeyType, LenType>::JoinThreads(Vector<UniquePtr<Thread>> &threads) {
+    this->Unpin(threads);
+    for (auto& thread : threads) {
+        thread->join();
+    }
+}
+
+template <typename KeyType, typename LenType>
+requires std::same_as<KeyType, TermTuple>
+void SortMergerTermTuple<KeyType, LenType>::Run(Vector<UniquePtr<Thread>>& threads) {
+    InitRunFile();
+    DirectIO io_stream(run_file_);
+    this->FILE_LEN_ = io_stream.Length();
+
+    io_stream.Read((char *)(&this->count_), sizeof(u64));
+
+    Super::Init(io_stream);
+
+    UniquePtr<Thread> predict_thread = MakeUnique<Thread>(std::bind(&self_t::PredictImpl, this, io_stream));
+    UniquePtr<Thread> merge_thread = MakeUnique<Thread>(std::bind(&self_t::MergeImpl, this));
+
+    threads.push_back(std::move(predict_thread));
+    threads.push_back(std::move(merge_thread));
+}
+
+template <typename KeyType, typename LenType>
+requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::Run() {
     FILE *f = fopen(this->filenm_.c_str(), "r");
 

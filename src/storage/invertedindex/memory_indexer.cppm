@@ -32,6 +32,7 @@ import map_with_lock;
 import vector_with_lock;
 import buf_writer;
 import posting_list_format;
+import external_sort_merger;
 
 namespace infinity {
 
@@ -113,6 +114,8 @@ private:
     u32 ReadU32LE(const u8 *ptr) { return *(u32 *)ptr; }
 
     u64 ReadU64LE(const u8 *ptr) { return *(u64 *)ptr; }
+
+    void TupleListToIndexFile(SortMergerTermTuple<TermTuple, u32> *merger);
 
 private:
     String index_dir_;

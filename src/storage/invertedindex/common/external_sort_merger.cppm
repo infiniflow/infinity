@@ -432,6 +432,7 @@ protected:
     using Super = SortMerger<KeyType, LenType>;
     using typename Super::KeyAddr;
     u64 term_list_count_{0};
+    FILE *run_file_{nullptr};
 
     void PredictImpl(DirectIO &io_stream);
 
@@ -443,6 +444,22 @@ public:
         : Super(filenm, group_size, bs, output_num) {}
 
     void Run() override;
+
+    void Run(Vector<UniquePtr<Thread>>& threads);
+
+    u64& Count() { return this->count_; }
+
+    Queue<UniquePtr<TermTupleList>>& TermTupleListQueue() { return this->term_tuple_list_queue_; }
+
+    std::mutex& OutQueueMtx() { return this->out_queue_mtx_; }
+
+    std::condition_variable& OutQueueCon() { return this->out_queue_con_; }
+
+    void InitRunFile();
+
+    void JoinThreads(Vector<UniquePtr<Thread>>& threads);
+
+    void UnInitRunFile();
 };
 
 } // namespace infinity
