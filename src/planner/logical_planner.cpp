@@ -1061,6 +1061,7 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
                                                                       statement->copy_file_type_,
                                                                       statement->offset_,
                                                                       statement->limit_,
+                                                                      statement->row_limit_,
                                                                       column_idx_array,
                                                                       block_index);
 

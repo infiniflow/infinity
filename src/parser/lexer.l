@@ -150,6 +150,7 @@ QUERY           { return QUERY; }
 RAW             { return RAW; }
 REAL            { return REAL; }
 RIGHT           { return RIGHT; }
+ROWLIMIT        { return ROWLIMIT; }
 SEARCH          { return SEARCH; }
 SECOND          { return SECOND; }
 SECONDS         { return SECONDS; }

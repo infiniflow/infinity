@@ -354,6 +354,9 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def(nb::init<>())
         .def_rw("delimiter", &ExportOptions::delimiter_)
         .def_rw("header", &ExportOptions::header_)
+        .def_rw("offset", &ExportOptions::offset_)
+        .def_rw("limit", &ExportOptions::limit_)
+        .def_rw("row_limit_", &ExportOptions::row_limit_)
         .def_rw("copy_file_type", &ExportOptions::copy_file_type_);
 
     nb::class_<OptimizeOptions>(m, "OptimizeOptions")

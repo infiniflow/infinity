@@ -30,9 +30,9 @@ namespace infinity {
 
 export class LogicalExport : public LogicalNode {
 public:
-    explicit LogicalExport(u64 node_id, TableEntry *table_entry, String schema_name, String table_name, String file_path, bool header, char delimiter, CopyFileType type, SizeT offset, SizeT limit, Vector<u64> column_idx_array, SharedPtr<BlockIndex> block_index)
+    explicit LogicalExport(u64 node_id, TableEntry *table_entry, String schema_name, String table_name, String file_path, bool header, char delimiter, CopyFileType type, SizeT offset, SizeT limit, SizeT row_limit, Vector<u64> column_idx_array, SharedPtr<BlockIndex> block_index)
         : LogicalNode(node_id, LogicalNodeType::kExport), table_entry_(table_entry), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)),
-          file_path_(std::move(file_path)), header_(header), delimiter_(delimiter), file_type_(type), offset_(offset), limit_(limit), column_idx_array_(std::move(column_idx_array)), block_index_(std::move(block_index)) {}
+          file_path_(std::move(file_path)), header_(header), delimiter_(delimiter), file_type_(type), offset_(offset), limit_(limit), row_limit_(row_limit), column_idx_array_(std::move(column_idx_array)), block_index_(std::move(block_index)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -64,6 +64,8 @@ public:
 
     [[nodiscard]] SizeT limit() const { return limit_; }
 
+    [[nodiscard]] SizeT row_limit() const { return row_limit_; }
+
     [[nodiscard]] const Vector<u64>& column_idx_array() const { return column_idx_array_; }
 
     [[nodiscard]] SharedPtr<BlockIndex> block_index() const { return block_index_; }
@@ -79,6 +81,7 @@ private:
     CopyFileType file_type_{CopyFileType::kCSV};
     SizeT offset_{};
     SizeT limit_{};
+    SizeT row_limit_{};
     Vector<u64> column_idx_array_;
     SharedPtr<BlockIndex> block_index_{};
 };

@@ -26,6 +26,7 @@ enum class CopyOptionType {
     kHeader,
     kOffset,
     kLimit,
+    kRowLimit,
 };
 
 struct CopyOption {
@@ -35,6 +36,7 @@ struct CopyOption {
     char delimiter_{','};
     size_t offset_{0};
     size_t limit_{0};
+    size_t row_limit_{0};
 };
 
 class CopyStatement final : public BaseStatement {
@@ -54,6 +56,7 @@ public:
     char delimiter_{','};
     size_t offset_{0};
     size_t limit_{0};
+    size_t row_limit_{0};
 
     // EXPORT columns
     std::vector<ParsedExpr *> *expr_array_{nullptr};

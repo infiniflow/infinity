@@ -37,6 +37,8 @@ class TestInsertDeleteUpdate:
         table_obj = db_obj.get_table("insert_delete_update_test")
         res = table_obj.output(['*']).to_df()
         print(res)
+        res = db_obj.drop_table("insert_delete_update_test", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
 
 def insert(table_obj: Table):
