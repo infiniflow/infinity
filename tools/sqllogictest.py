@@ -27,6 +27,7 @@ from generate_csr import generate as generate16
 from generate_bvecs import generate as generate17
 from generate_emvb_test_data import generate as generate18
 from generate_emvb_test_data_2 import generate as generate19
+import generate_wiki_embedding
 
 class SpinnerThread(threading.Thread):
     def __init__(self):
@@ -164,6 +165,8 @@ if __name__ == "__main__":
     generate17(args.generate_if_exists, args.copy)
     generate18(args.generate_if_exists, args.copy)
     #generate19(args.generate_if_exists, args.copy)
+    # generate_wiki_embedding.generate()
+
     print("Generate file finshed.")
 
     if os.path.exists("/var/infinity/test_data/test_export_embedding.jsonl"):
