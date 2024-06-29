@@ -130,6 +130,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
     SizeT offset = offset_;
     SizeT row_count{0};
+    SizeT file_no_{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager* buffer_manager = query_context->storage()->buffer_manager();
     for(auto& [segment_id, segment_snapshot]: segment_block_index_ref) {
@@ -200,6 +201,18 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                         line += delimiter_;
                     }
                 }
+
+                if(row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
+                    ++ file_no_;
+                    fs.Close(*file_handler);
+                    String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
+                    auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+                    if(!result.second.ok()) {
+                        RecoverableError(result.second);
+                    }
+                    file_handler = std::move(result.first);
+                }
+
                 fs.Write(*file_handler, line.c_str(), line.size());
                 ++ row_count;
                 if(limit_ != 0 && row_count == limit_) {
@@ -239,6 +252,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
 
     SizeT offset = offset_;
     SizeT row_count{0};
+    SizeT file_no_{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager* buffer_manager = query_context->storage()->buffer_manager();
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
@@ -318,6 +332,17 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                         }
                     }
                 }
+                if(row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
+                    ++ file_no_;
+                    fs.Close(*file_handler);
+                    String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
+                    auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+                    if(!result.second.ok()) {
+                        RecoverableError(result.second);
+                    }
+                    file_handler = std::move(result.first);
+                }
+
                 LOG_DEBUG(line_json.dump());
                 String to_write = line_json.dump() + "\n";
                 fs.Write(*file_handler, to_write.c_str(), to_write.size());
@@ -367,6 +392,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
     SizeT offset = offset_;
     SizeT row_count{0};
+    SizeT file_no_{0};
     Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
     BufferManager* buffer_manager = query_context->storage()->buffer_manager();
     // Write header
@@ -394,6 +420,18 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
                 Value v = exported_column_vector.GetValue(row_idx);
                 Span<char> embedding = v.GetEmbedding();
+
+                if(row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
+                    ++ file_no_;
+                    fs.Close(*file_handler);
+                    String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
+                    auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
+                    if(!result.second.ok()) {
+                        RecoverableError(result.second);
+                    }
+                    file_handler = std::move(result.first);
+                }
+
                 fs.Write(*file_handler, &dimension, sizeof(dimension));
                 fs.Write(*file_handler, embedding.data(), embedding.size_bytes());
                 ++ row_count;

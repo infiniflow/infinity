@@ -41,6 +41,8 @@ class TestInsertDeleteParallelSimple:
         res = table_obj.output(["*"]).to_df()
         print(res)
         assert len(res) == 0
+        res = db_obj.drop_table("insert_delete_test", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
 
 def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):

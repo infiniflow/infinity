@@ -19,7 +19,7 @@ module;
 module explain_ast;
 
 import stl;
-
+import third_party;
 import status;
 import infinity_exception;
 import base_statement;
@@ -731,21 +731,57 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
 
             SharedPtr<String> delimiter = MakeShared<String>(String(intent_size, ' ') + "delimiter: " + copy_statement->delimiter_);
             result->emplace_back(delimiter);
+            if(!copy_statement->copy_from_) {
+                // export
+                SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                result->emplace_back(offset);
+                SharedPtr<String> limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                result->emplace_back(limit);
+                SharedPtr<String> row_limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                result->emplace_back(row_limit);
+            }
             break;
         }
         case CopyFileType::kJSON: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSON");
             result->emplace_back(file_type);
+            if(!copy_statement->copy_from_) {
+                // export
+                SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                result->emplace_back(offset);
+                SharedPtr<String> limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                result->emplace_back(limit);
+                SharedPtr<String> row_limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                result->emplace_back(row_limit);
+            }
             break;
         }
         case CopyFileType::kFVECS: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: FVECS");
             result->emplace_back(file_type);
+            if(!copy_statement->copy_from_) {
+                // export
+                SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                result->emplace_back(offset);
+                SharedPtr<String> limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                result->emplace_back(limit);
+                SharedPtr<String> row_limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                result->emplace_back(row_limit);
+            }
             break;
         }
         case CopyFileType::kJSONL: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSONL");
             result->emplace_back(file_type);
+            if(!copy_statement->copy_from_) {
+                // export
+                SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                result->emplace_back(offset);
+                SharedPtr<String> limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                result->emplace_back(limit);
+                SharedPtr<String> row_limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                result->emplace_back(row_limit);
+            }
             break;
         }
         case CopyFileType::kCSR: {

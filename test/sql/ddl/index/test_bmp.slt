@@ -36,3 +36,6 @@ CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_t
 
 statement ok
 CREATE INDEX idx2 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = raww);
+
+statement ok
+DROP TABLE test_bmp;
