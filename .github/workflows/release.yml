@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: [ "self-hosted", "benchmark" ]
+    runs-on: [ "ubuntu-latest" ]
     steps:
     - name: Ensure workspace ownership
       run: echo "chown -R $USER $GITHUB_WORKSPACE" && sudo chown -R $USER $GITHUB_WORKSPACE
@@ -116,11 +116,17 @@ jobs:
         tags: infiniflow/infinity:${{ env.RELEASE_TAG }}
         file: scripts/Dockerfile_infinity
 
-    - name: Build and upload infinity_sdk
+    - name: Build infinity-sdk
       if: startsWith(github.ref, 'refs/tags/v')
       run: |
+        sudo rm -f cmake-build-release/*.deb cmake-build-release/*.rpm cmake-build-release/*.gz
         sed -i "s/^version = \".*\"/version = \"$(echo $RELEASE_TAG | cut -c2-)\"/" pyproject.toml
-        sudo docker exec infinity_build bash -c "cd /infinity/ && rm -f dist/* && /usr/local/bin/pip3.10 wheel . -v -w dist --config-settings=wheel.py-api=cp310 && /usr/local/bin/pip3.11 wheel . -v -w dist --config-settings=wheel.py-api=cp311 && /usr/local/bin/pip3.12 wheel . -v -w dist --config-settings=wheel.py-api=cp312 && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*.whl && twine upload --repository pypi wheelhouse/infinity*.whl"
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        sudo docker exec infinity_build bash -c "cd /infinity/ && rm -f dist/* && /usr/local/bin/pip3.10 wheel . -v -w dist --config-settings=wheel.py-api=cp310 --config-settings=build-dir='cmake-build-release' && /usr/local/bin/pip3.11 wheel . -v -w dist --config-settings=wheel.py-api=cp311 --config-settings=build-dir='cmake-build-release' && /usr/local/bin/pip3.12 wheel . -v -w dist --config-settings=wheel.py-api=cp312 --config-settings=build-dir='cmake-build-release' && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*.whl"
+
+    - name: Publish package distributions to PyPI
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: wheelhouse/
+        password: ${{ secrets.PYPI_API_TOKEN }}
+        verbose: true
