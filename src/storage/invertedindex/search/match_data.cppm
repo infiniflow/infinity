@@ -33,7 +33,7 @@ export struct PhraseColumnMatchData {
     RowID doc_id_;
     float tf_;
     docpayload_t doc_payload_;
-    Vector<RowID> begin_positions_;
+    Vector<pos_t> begin_positions_;
     Vector<tf_t> all_tf_;
     Vector<docpayload_t> all_doc_payload_;
 };
