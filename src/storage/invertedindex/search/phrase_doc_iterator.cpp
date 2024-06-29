@@ -57,24 +57,40 @@ namespace infinity {
         os << '\n';
     }
 
-    bool PhraseDocIterator::CheckBeginPosition(pos_t position) {
-        pos_t now_position = position;
-        for (SizeT i = 1; i < pos_iters_.size(); ++i) {
-            auto &iter = pos_iters_[i];
-            pos_t next_position = 0;
-            iter->SeekPosition(now_position, next_position);
-            if (next_position != now_position + 1) {
-                return false;
+    bool PhraseDocIterator::GetExactPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id) {
+        pos_t beg_position0 = 0;
+        pos_t now_position0 = 0;
+        while (true) {
+            pos_iters_[0]->SeekPosition(beg_position0, now_position0);
+            if (now_position0 == INVALID_POSITION) {
+                break;
             }
-            now_position = next_position;
+            beg_position0 = now_position0 + 1;
+            bool found = true;
+            for (SizeT i = 1; i < pos_iters_.size(); ++i) {
+                auto &iter = pos_iters_[i];
+                pos_t beg_position = now_position0 + i;
+                pos_t now_position = beg_position;
+                iter->SeekPosition(beg_position, now_position);
+                if (now_position != beg_position) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+                match_data.begin_positions_.push_back(now_position0);
+            }
         }
+        if (match_data.begin_positions_.empty()) {
+            return false;
+        }
+        doc_freq_++;
+        match_data.tf_ = match_data.begin_positions_.size();
+        phrase_freq_ += match_data.tf_;
         return true;
     }
 
-    bool PhraseDocIterator::GetPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id) {
-        if (doc_id != doc_id_) {
-            return false;
-        }
+    bool PhraseDocIterator::GetSloppyPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id) {
         Vector<Vector<int>> positions;
         for (auto &pos_iter : pos_iters_) {
             Vector<int> pos_vec;

@@ -72,7 +72,7 @@ jobs:
         sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7
 
     - name: Build release version
-      run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${{ env.RELEASE_TAG }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=1 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+      run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${{ env.RELEASE_TAG }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=1 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity"
 
     - name: Download resources
       run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git

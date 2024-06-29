@@ -39,9 +39,19 @@ public:
 
     float GetWeight() const { return weight_; }
 
-    bool GetPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id);
-
-    bool CheckBeginPosition(pos_t position);
+    bool GetPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id) {
+        if (doc_id != doc_id_) {
+            return false;
+        }
+        match_data.doc_id_ = doc_id;
+        match_data.tf_ = 0.0F;
+        match_data.begin_positions_.clear();
+        if (slop_ == 0) {
+            return GetExactPhraseMatchData(match_data, doc_id);
+        } else {
+            return GetSloppyPhraseMatchData(match_data, doc_id);
+        }
+    }
 
     DocIteratorType GetType() const override { return DocIteratorType::kPhraseIterator; }
 
@@ -54,6 +64,8 @@ public:
     const String *column_name_ptr_ = nullptr;
 
 private:
+    bool GetExactPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id);
+    bool GetSloppyPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id);
     Vector<UniquePtr<PostingIterator>> pos_iters_;
     Vector<RowID> doc_ids_;
     u32 doc_freq_{0};

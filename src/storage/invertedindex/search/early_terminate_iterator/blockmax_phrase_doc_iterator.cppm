@@ -70,15 +70,27 @@ public:
 
     float BM25Score() override;
 
-    bool CheckBeginPosition(pos_t position);
-
-    bool GetPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id);
+    bool GetPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id) {
+        if (doc_id != doc_id_) {
+            return false;
+        }
+        match_data.doc_id_ = doc_id;
+        match_data.tf_ = 0.0F;
+        match_data.begin_positions_.clear();
+        if (slop_ == 0) {
+            return GetExactPhraseMatchData(match_data, doc_id);
+        } else {
+            return GetSloppyPhraseMatchData(match_data, doc_id);
+        }
+    }
 
     // debug info
     const Vector<String> *terms_ptr_ = nullptr;
     const String *column_name_ptr_ = nullptr;
 
 private:
+    bool GetExactPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id);
+    bool GetSloppyPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id);
     float TermBlockMaxBM25Score(u32 term_id);
 
     Pair<u32, u16> TermGetBlockMaxInfo(u32 term_id) const { return pos_iters_[term_id]->GetBlockMaxInfo(); }
