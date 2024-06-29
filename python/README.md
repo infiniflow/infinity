@@ -43,19 +43,19 @@ pip install . -v --config-settings=cmake.build-type="Debug"  --config-settings=b
 ```
 Note: If you run with the debug version, you must set the **libasan** environment variable, for example
 ```shell
-LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 python3 hello_infinity.py
+LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 python3 example/simple_example.py
 ```
 Note: When running with the debug version infinity-sdk, you may find some memory leaks caused by arrow. You can use `ASAN_OPTIONS=detect_leaks=0` to disable memory leak detection, for example
 ```shell
-LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 hello_infinity.py
+LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 example/simple_example.py
 ```
 
 # run pysdk test
 Run a local infinity test in project root directory
 ```shell
-pytest --local-infinity python/test/infinity/test_basic.py::TestInfinity::test_basic
+pytest --local-infinity python/test/cases/test_basic.py::TestInfinity::test_basic
 ```
 Run a remote infinity test in project root directory
 ```shell
-pytest python/test/infinity/test_basic.py::TestInfinity::test_basic
+pytest python/test/test_basic/test_basic.py::TestInfinity::test_basic
 ```
