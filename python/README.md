@@ -57,5 +57,5 @@ pytest --local-infinity python/test/cases/test_basic.py::TestInfinity::test_basi
 ```
 Run a remote infinity test in project root directory
 ```shell
-pytest python/test/test_basic/test_basic.py::TestInfinity::test_basic
+pytest python/test/cases/test_basic.py::TestInfinity::test_basic
 ```

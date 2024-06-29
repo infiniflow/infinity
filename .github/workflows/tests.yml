@@ -172,13 +172,11 @@ jobs:
 
       - name: Install pysdk for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: |
-          sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && pip3 wheel . -v -w dist --config-settings=wheel.py-api=cp310 && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*cp310*.whl && pip3 install wheelhouse/infinity*cp310*.whl"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && pip3 install . -v --config-settings=cmake.build-type="Release"  --config-settings=build-dir="cmake-build-release"
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: |
-          sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
