@@ -48,11 +48,11 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 - Intuitive Python API. See the [Python API](https://infiniflow.org/docs/dev/python_api_reference)
 - A single-binary architecture with no dependencies, making deployment a breeze.
-- Embedded in Python as a library and friendly to AI developers.  
+- Embedded in Python as a module and friendly to AI developers.  
 
 ## 🎮 Get Started
 
-Infinity, also available as a Python library, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
+Infinity, also available as a Python module, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
 
    ```bash
    pip install infinity-sdk==0.2.1

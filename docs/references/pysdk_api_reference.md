@@ -28,7 +28,7 @@ Connect to the Infinity server and return an Infinity object.
    infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
    ```
 
-- If Infinity is deployed as a Python library: 
+- If Infinity is deployed as a Python module: 
    ```python
    infinity_obj = infinity.connect("/path/to/save/to")
    ```
