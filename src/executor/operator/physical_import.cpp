@@ -748,7 +748,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         if (cell.len) {
             str_view = std::string_view((char *)cell.str, cell.len);
             auto &column_vector = parser_context->column_vectors_[column_idx];
-            column_vector.AppendByStringView(str_view);
+            column_vector.AppendByStringView(str_view, column_def);
         } else {
             if (column_def->has_default_value()) {
                 auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
@@ -1110,6 +1110,7 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                 case kSparse: {
                     const auto *sparse_info = static_cast<SparseInfo *>(column_vector.data_type()->type_info().get());
                     SharedPtr<ConstantExpr> const_expr = BuildConstantSparseExprFromJson(line_json[column_def->name_], sparse_info);
+                    const_expr->TrySortSparseVec(column_def);
                     if (const_expr.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid json object."));
                     }

@@ -22,8 +22,8 @@ SparseStoreType SparseInfo::ParseStoreType(const std::vector<std::unique_ptr<Ini
     for (auto &option : options) {
         if (option->param_name_ == "sort") {
             store_type = SparseStoreType::kSort;
-        } else if (option->param_name_ == "notsort") {
-            store_type = SparseStoreType::kNotSort;
+        } else if (option->param_name_ == "sorted") {
+            store_type = SparseStoreType::kSorted;
         } else {
             store_type = SparseStoreType::kInvalid;
         }
