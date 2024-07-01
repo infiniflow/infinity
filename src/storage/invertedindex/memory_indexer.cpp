@@ -28,6 +28,8 @@ module;
 #include <filesystem>
 #include <iostream>
 #include <string.h>
+#include "concurrentqueue.h"
+
 module memory_indexer;
 
 import stl;
@@ -363,25 +365,9 @@ void MemoryIndexer::Reset() {
     column_lengths_.Clear();
 }
 
-void MemoryIndexer::OfflineDump() {
-    // Steps of offline dump:
-    // 1. External sort merge
-    // 2. Generate posting
-    // 3. Dump disk segment data
-    // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump begin, num_runs_ {}\n", num_runs_));
-    if (tuple_count_ == 0) {
-        return;
-    }
-    FinalSpillFile();
-    constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
-    SortMergerTermTuple<TermTuple, u32> *merger = new SortMergerTermTuple<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
-    merger->Run();
-    delete merger;
-
-    FILE *f = fopen(spill_full_path_.c_str(), "r");
-    u64 term_list_count;
-    fread((char *)&term_list_count, sizeof(u64), 1, f);
-
+void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple, u32>>& merger) {
+    auto& count = merger->Count();
+    auto& term_tuple_list_queue = merger->TermTupleListQueue();
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
     LocalFileSystem fs;
@@ -395,36 +381,31 @@ void MemoryIndexer::OfflineDump() {
     OstreamWriter wtr(ofs);
     FstBuilder fst_builder(wtr);
 
-    u32 record_length = 0;
     u32 term_length = 0;
     u32 doc_pos_list_size = 0;
-    const u32 MAX_TUPLE_LIST_LENGTH = MAX_TUPLE_LENGTH + 2 * 1024 * 1024;
-    auto buf = MakeUnique<char[]>(MAX_TUPLE_LIST_LENGTH);
 
     String last_term_str;
     std::string_view last_term;
     u32 last_doc_id = INVALID_DOCID;
     UniquePtr<PostingWriter> posting;
 
-    for (u64 i = 0; i < term_list_count; ++i) {
-        fread(&record_length, sizeof(u32), 1, f);
-        fread(&term_length, sizeof(u32), 1, f);
-
-        assert(record_length < MAX_TUPLE_LIST_LENGTH);
+    while (count > 0) {
+        UniquePtr<TermTupleList> temp_term_tuple;
+        {
+            term_tuple_list_queue.wait_dequeue(temp_term_tuple);
+            if (count == 0) {
+                break;
+            }
+        }
+        doc_pos_list_size = temp_term_tuple->Size();
+        term_length = temp_term_tuple->term_.size();
 
         if (term_length >= MAX_TUPLE_LENGTH) {
-            fread(buf.get(), record_length - sizeof(u32), 1, f);
             continue;
         }
 
-        fread(buf.get(), record_length - sizeof(u32), 1, f);
-        u32 buf_idx = 0;
-
-        doc_pos_list_size = *(u32 *)(buf.get() + buf_idx);
-        buf_idx += sizeof(u32);
-
-        std::string_view term = std::string_view(buf.get() + buf_idx, term_length);
-        buf_idx += term_length;
+        count -= temp_term_tuple->Size();
+        std::string_view term = std::string_view(temp_term_tuple->term_);
 
         if (term != last_term) {
             assert(last_term < term);
@@ -444,10 +425,8 @@ void MemoryIndexer::OfflineDump() {
             last_doc_id = INVALID_DOCID;
         }
         for (SizeT i = 0; i < doc_pos_list_size; ++i) {
-            u32& doc_id = *(u32 *)(buf.get() + buf_idx);
-            buf_idx += sizeof(u32);
-            u32& term_pos = *(u32 *)(buf.get() + buf_idx);
-            buf_idx += sizeof(u32);
+            u32& doc_id = temp_term_tuple->doc_pos_list_[i].first;
+            u32& term_pos = temp_term_tuple->doc_pos_list_[i].second;
 
             if (last_doc_id != INVALID_DOCID && last_doc_id != doc_id) {
                 assert(last_doc_id < doc_id);
@@ -483,6 +462,27 @@ void MemoryIndexer::OfflineDump() {
     Vector<u32> &unsafe_column_lengths = column_lengths_.UnsafeVec();
     fs.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
     fs.Close(*file_handler);
+}
+
+void MemoryIndexer::OfflineDump() {
+    // Steps of offline dump:
+    // 1. External sort merge
+    // 2. Generate posting
+    // 3. Dump disk segment data
+    // LOG_INFO(fmt::format("MemoryIndexer::OfflineDump begin, num_runs_ {}\n", num_runs_));
+    if (tuple_count_ == 0) {
+        return;
+    }
+    FinalSpillFile();
+    constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
+    UniquePtr<SortMergerTermTuple<TermTuple, u32>> merger = MakeUnique<SortMergerTermTuple<TermTuple, u32>>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
+    Vector<UniquePtr<Thread>> threads;
+    merger->Run(threads);
+    UniquePtr<Thread> output_thread = MakeUnique<Thread>(std::bind(&MemoryIndexer::TupleListToIndexFile, this, std::ref(merger)));
+    threads.emplace_back(std::move(output_thread));
+
+    merger->JoinThreads(threads);
+    merger->UnInitRunFile();
 
     std::filesystem::remove(spill_full_path_);
     num_runs_ = 0;
