@@ -62,7 +62,7 @@ Infinity, also available as a Python library, eliminates the need for a separate
    import infinity
 
    # Connect to infinity
-   infinity_obj = infinity.connect("/path/to/save/your/files/to")
+   infinity_obj = infinity.connect("/path/to/save/to")
    db = infinity_obj.get_database("default_db")
    table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
    table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])

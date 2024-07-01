@@ -30,7 +30,7 @@ Connect to the Infinity server and return an Infinity object.
 
 - If Infinity is deployed as a Python library: 
    ```python
-   infinity_obj = infinity.connect("/path/to/save/your/files/to")
+   infinity_obj = infinity.connect("/path/to/save/to")
    ```
 
 ## disconnect

@@ -13,9 +13,9 @@ slug: /
 
 ## Install Infinity locally using pip
 
-Infinity, also available as a Python library, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
+Infinity, also available as a Python module, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
 
-1. Install Infinity as a whole:
+1. Install Infinity as a module:
    ```bash
    pip install infinity-sdk==0.2.1
    ```
@@ -24,7 +24,7 @@ Infinity, also available as a Python library, eliminates the need for a separate
    import infinity
 
    # Connect to infinity
-   infinity_obj = infinity.connect("/path/to/save/your/files/to")
+   infinity_obj = infinity.connect("/path/to/save/to")
    db = infinity_obj.get_database("default_db")
    table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
    table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
