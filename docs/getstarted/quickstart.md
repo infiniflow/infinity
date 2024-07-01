@@ -15,14 +15,12 @@ slug: /
 
 Infinity, also available as a Python library, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
 
-- Install the Infinity SDK:
-
+1. Install Infinity as a whole:
    ```bash
    pip install infinity-sdk==0.2.0
    ```
-- Use Infinity to conduct a KNN search:
-
-  ```python
+2. Use Infinity to conduct a KNN search:
+   ```python
    import infinity
 
    # Connect to infinity
@@ -37,7 +35,7 @@ Infinity, also available as a Python library, eliminates the need for a separate
 
 ## Deploy Infinity as a separate server
 
-If you wish to deploy a standalone Infinity server and access it remotely: 
+If you wish to deploy Infinity with the server and client as separate processes: 
 
 See [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server).
 

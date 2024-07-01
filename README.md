@@ -83,7 +83,7 @@ See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
 
 > 💡 For more information about Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/python_api_reference).
 
-## Document
+## 📚 Document
 
 - [Quickstart](https://infiniflow.org/docs/dev/)
 - [Python API](https://infiniflow.org/docs/dev/python_api_reference)
