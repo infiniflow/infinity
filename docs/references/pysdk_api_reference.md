@@ -14,9 +14,8 @@ Connect to the Infinity server and return an Infinity object.
 
 - `uri`: `NetworkAddress` A NetworkAddress object is a struct with two fields, one for the IP address (`str`) and the other for the port number (`int`). To access the local Infinity service:
   ```python
-  LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
+  infinity_obj = infinity.connect("/path/to/save/your/files/to")
   ```
-  > `LOCAL_HOST` is defined in the **infinity.common** package, and the above is its default value.
 
 ### Returns
 
@@ -27,7 +26,7 @@ Connect to the Infinity server and return an Infinity object.
 
 ```python
 infinity_obj = infinity.connect()
-infinity_obj = infinity.connect(NetworkAddress("127.0.0.1", 23817))
+infinity_obj = infinity.connect("/path/to/save/your/files/to")
 ```
 
 ## disconnect
