@@ -268,8 +268,11 @@ Pair<Vector<BMPDocID>, Vector<DataType>> BMPAlg<DataType, IdxType, CompressType>
         }
     }
 
+    SizeT res_n = result_handler.GetSize(0 /*query_id*/);
     result_handler.End(0 /*query_id*/);
-    Vector<BMPDocID> result_docid(topk);
+    result.erase(result.begin() + res_n, result.end());
+    result_score.erase(result_score.begin() + res_n, result_score.end());
+    Vector<BMPDocID> result_docid(res_n);
     std::transform(result.begin(), result.end(), result_docid.begin(), [&](BMPDocID doc_id) { return doc_ids_[doc_id]; });
     return {result_docid, result_score};
 }
