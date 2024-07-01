@@ -368,8 +368,6 @@ void MemoryIndexer::Reset() {
 void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple, u32>>& merger) {
     auto& count = merger->Count();
     auto& term_tuple_list_queue = merger->TermTupleListQueue();
-    auto& out_queue_mtx = merger->OutQueueMtx();
-    auto& out_queue_con = merger->OutQueueCon();
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
     LocalFileSystem fs;
@@ -394,8 +392,7 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     while (count > 0) {
         UniquePtr<TermTupleList> temp_term_tuple;
         {
-            std::unique_lock out_lock(out_queue_mtx);
-            out_queue_con.wait(out_lock, [&term_tuple_list_queue, &temp_term_tuple]() { return term_tuple_list_queue.try_dequeue(temp_term_tuple); });
+            term_tuple_list_queue.wait_dequeue(temp_term_tuple);
             if (count == 0) {
                 break;
             }

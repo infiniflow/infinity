@@ -45,7 +45,8 @@ namespace infinity {
 template <typename KeyType, typename LenType>
 SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32 bs, u32 output_num)
     : filenm_(filenm), MAX_GROUP_SIZE_(group_size), BS_SIZE_(bs), PRE_BUF_SIZE_((u32)(1. * bs * 0.8 / (group_size + 1))),
-      RUN_BUF_SIZE_(PRE_BUF_SIZE_ * group_size), OUT_BUF_SIZE_(bs - RUN_BUF_SIZE_ - PRE_BUF_SIZE_), OUT_BUF_NUM_(output_num) {
+      RUN_BUF_SIZE_(PRE_BUF_SIZE_ * group_size), OUT_BUF_SIZE_(bs - RUN_BUF_SIZE_ - PRE_BUF_SIZE_), OUT_BUF_NUM_(output_num),
+      term_tuple_list_queue_(20480) {
     run_buf_ = out_buf_ = nullptr;
     count_ = 0;
 
@@ -462,9 +463,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
             if (tuple_list->IsFull() || out_key.term_ != tuple_list->term_) {
                 // output
                 {
-                    std::unique_lock lock(this->out_queue_mtx_);
                     this->term_tuple_list_queue_.enqueue(std::move(tuple_list));
-                    this->out_queue_con_.notify_one();
                 }
                 tuple_list = MakeUnique<TermTupleList>(out_key.term_);
             }
@@ -509,11 +508,9 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
         this->micro_run_pos_[idx] += KeyAddr(this->micro_buf_[idx] + this->micro_run_pos_[idx], -1, idx).LEN() + sizeof(LenType);
     }
     {
-        std::unique_lock lock(this->out_queue_mtx_);
         if (tuple_list != nullptr) {
             this->term_tuple_list_queue_.enqueue(std::move(tuple_list));
         }
-        this->out_queue_con_.notify_one();
     }
 }
 
