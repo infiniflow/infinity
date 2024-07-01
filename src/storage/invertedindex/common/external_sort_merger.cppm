@@ -14,24 +14,25 @@
 
 module;
 
-#include <filesystem>
-#include <queue>
-#include <cstring>
 #include <cstdio>
 #include <unistd.h>
-
+#include <concepts>
+#include <vector>
+#include <stdexcept>
+#include "concurrentqueue.h"
 export module external_sort_merger;
 
 import stl;
 import loser_tree;
 import infinity_exception;
-import file_writer;
+import third_party;
 
 namespace infinity {
 
 export struct DirectIO {
     DirectIO(FILE *fd, const String &mode = "r") : fd_(fd), length_(0) {
         if (mode.compare("r") == 0) {
+            fseek(fd_, 0, SEEK_END);
             fseek(fd_, 0, SEEK_END);
             length_ = ftell(fd_);
             fseek(fd_, 0, SEEK_SET);
@@ -354,7 +355,7 @@ protected:
     const u32 OUT_BUF_NUM_;    //!< output threads number
 
     // both pre_heap_ and merge_losser_tree are defined as small root heaps
-    std::priority_queue<KeyAddr, std::vector<KeyAddr>, std::greater<KeyAddr>> pre_heap_;
+    Heap<KeyAddr, std::greater<KeyAddr>> pre_heap_;
     SharedPtr<LoserTree<KeyAddr, std::less<KeyAddr>>> merge_loser_tree_;
 
     u32 *micro_run_idx_{nullptr};   //!< the access index of each microruns
@@ -388,12 +389,8 @@ protected:
     std::mutex cycle_buf_mtx_;
     std::condition_variable cycle_buf_con_;
 
-    std::mutex out_queue_mtx_;
-    std::condition_variable out_queue_con_;
-    Queue<UniquePtr<char_t[]>> out_queue_;
-    Queue<u32> out_size_queue_;
     SizeT OUT_BATCH_SIZE_;
-    Queue<UniquePtr<TermTupleList>> term_tuple_list_queue_;
+    moodycamel::BlockingConcurrentQueue<UniquePtr<TermTupleList>> term_tuple_list_queue_;
 
     bool read_finish_{false};
     u32 CYCLE_BUF_SIZE_;
@@ -413,15 +410,13 @@ protected:
 
     void Output(FILE *f, u32 idx);
 
-    void OutputByQueue(FILE* f);
-
     void Unpin(Vector<UniquePtr<Thread>> &threads);
 public:
     SortMerger(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2);
 
     virtual ~SortMerger();
 
-    virtual void Run();
+    void Run();
 };
 
 export template <typename KeyType, typename LenType>
@@ -431,18 +426,26 @@ protected:
     typedef SortMergerTermTuple<KeyType, LenType> self_t;
     using Super = SortMerger<KeyType, LenType>;
     using typename Super::KeyAddr;
-    u64 term_list_count_{0};
+    FILE *run_file_{nullptr};
 
     void PredictImpl(DirectIO &io_stream);
-
-    void OutputImpl(FILE *f);
 
     void MergeImpl();
 public:
     SortMergerTermTuple(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2)
         : Super(filenm, group_size, bs, output_num) {}
 
-    void Run() override;
+    void Run(Vector<UniquePtr<Thread>>& threads);
+
+    u64& Count() { return this->count_; }
+
+    moodycamel::BlockingConcurrentQueue<UniquePtr<TermTupleList>>& TermTupleListQueue() { return this->term_tuple_list_queue_; }
+
+    void InitRunFile();
+
+    void JoinThreads(Vector<UniquePtr<Thread>>& threads);
+
+    void UnInitRunFile();
 };
 
 } // namespace infinity

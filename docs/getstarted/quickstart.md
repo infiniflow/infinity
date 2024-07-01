@@ -17,7 +17,7 @@ Infinity, also available as a Python library, eliminates the need for a separate
 
 1. Install Infinity as a whole:
    ```bash
-   pip install infinity-sdk==0.2.0
+   pip install infinity-sdk==0.2.1
    ```
 2. Use Infinity to conduct a KNN search:
    ```python
