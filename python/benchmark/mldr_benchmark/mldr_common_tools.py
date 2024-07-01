@@ -55,7 +55,7 @@ def load_corpus(lang: str):
     return corpus
 
 
-def get_queries_and_qids(lang: str, streaming: bool = True):
+def get_queries_and_qids(lang: str, streaming: bool = False):
     if streaming:
         dataset = datasets.load_dataset('Shitao/MLDR', lang, split='test', streaming=streaming)
     else:
@@ -105,7 +105,7 @@ def fvecs_read_yield(filename):
                 dims = struct.unpack('i', f.read(4))[0]
                 vec = struct.unpack('{}f'.format(dims), f.read(4 * dims))
                 assert dims == len(vec)
-                yield list(vec)
+                yield vec
             except struct.error:
                 break
 

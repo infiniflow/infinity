@@ -13,11 +13,15 @@
 # limitations under the License.
 
 import os
+import time
 from dataclasses import dataclass, field
 from FlagEmbedding import BGEM3FlagModel
 from tqdm import tqdm
+import numpy as np
+import struct
 import infinity
 from infinity.common import LOCAL_HOST
+from mldr_common_tools import fvecs_read_yield, read_mldr_sparse_embedding_yield
 from mldr_common_tools import QueryArgs, check_languages, check_query_types
 from mldr_common_tools import FakeJScoredDoc, get_queries_and_qids, save_result
 from transformers import HfArgumentParser
@@ -37,6 +41,50 @@ text_to_replace_with = " " * len(text_to_replace)
 query_translation_table = str.maketrans(text_to_replace, text_to_replace_with)
 
 
+def prepare_dense_embedding(embedding_file: str, model: BGEM3FlagModel, queries: list[str], qids: list[int]):
+    query_embedding = model.encode(queries, return_dense=True, return_sparse=False, return_colbert_vecs=False)
+    query_embedding = query_embedding['dense_vecs'].astype(np.float32)
+    assert len(query_embedding.shape) == 2
+    assert query_embedding.shape[0] == len(qids)
+    assert query_embedding.shape[1] == 1024
+    with open(embedding_file, 'wb') as f:
+        for single_embedding in query_embedding:
+            assert len(single_embedding) == 1024
+            f.write(struct.pack('i', 1024))
+            single_embedding.tofile(f)
+    return
+
+
+def prepare_sparse_embedding(embedding_file: str, model: BGEM3FlagModel, queries: list[str], qids: list[int]):
+    query_embedding = model.encode(queries, return_dense=False, return_sparse=True, return_colbert_vecs=False)
+    query_embedding = query_embedding['lexical_weights']
+    assert len(query_embedding) == len(qids)
+    with open(embedding_file, 'wb') as f:
+        f.write(struct.pack('i', len(query_embedding)))
+        for one_dict in query_embedding:
+            tmp_list = []
+            for p, v in one_dict.items():
+                tmp_list.append((int(p), float(v)))
+            tmp_list.sort()
+            f.write(struct.pack('i', len(tmp_list)))
+            for p, v in tmp_list:
+                f.write(struct.pack('if', p, v))
+    return
+
+
+def bm25_query_yield(queries: list[str], embedding_file: str):
+    for query in queries:
+        yield query.translate(query_translation_table)
+
+
+def dense_query_yield(queries: list[str], embedding_file: str):
+    return fvecs_read_yield(embedding_file)
+
+
+def sparse_query_yield(queries: list[str], embedding_file: str):
+    return read_mldr_sparse_embedding_yield(embedding_file)
+
+
 class InfinityClientForSearch:
     def __init__(self):
         self.test_db_name = "default_db"
@@ -47,6 +95,8 @@ class InfinityClientForSearch:
         self.infinity_obj = infinity.connect(LOCAL_HOST)
         self.infinity_db = self.infinity_obj.get_database(self.test_db_name)
         self.infinity_table = None
+        self.prepare_embedding_funcs = {'dense': prepare_dense_embedding, 'sparse': prepare_sparse_embedding}
+        self.query_yields = {'bm25': bm25_query_yield, 'dense': dense_query_yield, 'sparse': sparse_query_yield}
         self.query_funcs = {'bm25': self.bm25_query, 'dense': self.dense_query, 'sparse': self.sparse_query}
 
     def get_test_table(self, language_suffix: str):
@@ -54,31 +104,19 @@ class InfinityClientForSearch:
         self.infinity_table = self.infinity_db.get_table(table_name)
         print(f"Get table {table_name} successfully.")
 
-    def bm25_query(self, query: str, model: BGEM3FlagModel, max_hits: int):
-        query_str = query.translate(query_translation_table)
+    def bm25_query(self, query_str: str, max_hits: int):
+        # query_str = query.translate(query_translation_table)
         result = self.infinity_table.output(["docid_col", "_score"]).match('fulltext_col', query_str,
                                                                            f'topn={max_hits}').to_pl()
         return result['docid_col'], result['SCORE']
 
-    def dense_query(self, query: str, model: BGEM3FlagModel, max_hits: int):
-        query_embedding = model.encode(query, return_dense=True, return_sparse=False, return_colbert_vecs=False)
-        query_embedding = query_embedding['dense_vecs']
+    def dense_query(self, query_embedding, max_hits: int):
         result = self.infinity_table.output(["docid_col", "_similarity"]).knn("dense_col", query_embedding, "float",
                                                                               "ip", max_hits).to_pl()
         return result['docid_col'], result['SIMILARITY']
 
-    def sparse_query(self, query: str, model: BGEM3FlagModel, max_hits: int):
-        query_embedding = model.encode(query, return_dense=False, return_sparse=True, return_colbert_vecs=False)
-        query_embedding = query_embedding['lexical_weights']
-        tmp_list = []
-        for p, v in query_embedding.items():
-            tmp_list.append((int(p), float(v)))
-        tmp_list.sort()
-        query_sparse_data = {"indices": [], "values": []}
-        for p, v in tmp_list:
-            query_sparse_data["indices"].append(p)
-            query_sparse_data["values"].append(v)
-        result = self.infinity_table.output(["docid_col", "_similarity"]).match_sparse("sparse_col", query_sparse_data,
+    def sparse_query(self, query_embedding: dict, max_hits: int):
+        result = self.infinity_table.output(["docid_col", "_similarity"]).match_sparse("sparse_col", query_embedding,
                                                                                        "ip", max_hits,
                                                                                        {"alpha": "1.0",
                                                                                         "beta": "1.0"}).to_pl()
@@ -89,19 +127,34 @@ class InfinityClientForSearch:
             print(f"Start to search for language: {lang}")
             self.get_test_table(lang)
             queries, qids = get_queries_and_qids(lang, False)
+            # If you would like to use streaming, please modify the following code and generate embeddings on-the-fly.
             print(f"Total number of queries: {len(qids)}")
             for query_type in query_types:
+                embedding_file = None
+                if query_type in self.prepare_embedding_funcs:
+                    embedding_file = os.path.join(save_dir, f"query_embedding_{lang}_{query_type}.data")
+                    if not os.path.exists(embedding_file):
+                        print(f"Start to prepare embedding for query method: {query_type}")
+                        self.prepare_embedding_funcs[query_type](embedding_file, model, queries, qids)
+                query_yield = self.query_yields[query_type](queries, embedding_file)
+                query_func = self.query_funcs[query_type]
                 print(f"Start to search for query method: {query_type}")
                 save_path = os.path.join(save_dir, f"{lang}_{query_type}.txt")
                 print(f"Save search result to: {save_path}")
+                total_query_time: float = 0.0
+                total_query_num: int = len(qids)
                 result_list = []
-                query_func = self.query_funcs[query_type]
-                for query, qid in tqdm(zip(queries, qids), total=len(qids)):
-                    docid_list, score_list = query_func(query, model=model, max_hits=1000)
+                for query, qid in tqdm(zip(queries, qids), total=total_query_num):
+                    query_target = next(query_yield)
+                    time_start = time.time()
+                    docid_list, score_list = query_func(query_target, max_hits=1000)
+                    time_end = time.time()
+                    total_query_time += time_end - time_start
                     result = []
                     for docid, score in zip(docid_list, score_list):
                         result.append(FakeJScoredDoc(docid, score))
                     result_list.append((qid, result))
+                print(f"Average query time: {1000.0 * total_query_time / float(total_query_num)} ms.")
                 save_result(result_list, save_path, qids, max_hits=1000)
 
 
