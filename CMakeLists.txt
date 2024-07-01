@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28.1)
 
-project(infinity VERSION 0.2.0)
+project(infinity VERSION 0.2.1)
 
 if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
     message(FATAL_ERROR "This project requires the Ninja generator. Refers to https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html#generator-support")
@@ -189,7 +189,7 @@ endif ()
 # CPack settings
 set(CPACK_PACKAGE_NAME "infinity")
 if(NOT DEFINED CPACK_PACKAGE_VERSION)
-    set(CPACK_PACKAGE_VERSION "0.2.0")
+    set(CPACK_PACKAGE_VERSION "0.2.1")
 endif()
 set(CPACK_PACKAGE_RELEASE 1)
 set(CPACK_PACKAGE_CONTACT "Zhichang Yu <yuzhichang@gmail.com>")
