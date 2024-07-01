@@ -172,7 +172,7 @@ jobs:
 
       - name: Install pysdk for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install . -v --config-settings=cmake.build-type='Release' --config-settings=build-dir='cmake-build-release'"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release'"
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
