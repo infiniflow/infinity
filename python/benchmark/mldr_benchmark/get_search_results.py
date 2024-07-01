@@ -32,6 +32,11 @@ def get_model(model_args: ModelArgs):
     return BGEM3FlagModel("BAAI/bge-m3", use_fp16=model_args.fp16)
 
 
+text_to_replace = "&|!+-():\'\"?~^"
+text_to_replace_with = " " * len(text_to_replace)
+query_translation_table = str.maketrans(text_to_replace, text_to_replace_with)
+
+
 class InfinityClientForSearch:
     def __init__(self):
         self.test_db_name = "default_db"
@@ -50,7 +55,8 @@ class InfinityClientForSearch:
         print(f"Get table {table_name} successfully.")
 
     def bm25_query(self, query: str, model: BGEM3FlagModel, max_hits: int):
-        result = self.infinity_table.output(["docid_col", "_score"]).match('fulltext_col', query,
+        query_str = query.translate(query_translation_table)
+        result = self.infinity_table.output(["docid_col", "_score"]).match('fulltext_col', query_str,
                                                                            f'topn={max_hits}').to_pl()
         return result['docid_col'], result['SCORE']
 
