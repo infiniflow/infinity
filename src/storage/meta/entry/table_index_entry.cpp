@@ -32,7 +32,7 @@ import base_table_ref;
 import create_index_info;
 import base_entry;
 import logger;
-
+import index_hnsw;
 import index_file_worker;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
@@ -398,17 +398,49 @@ void TableIndexEntry::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin
     txn_id_ = txn_id;
 }
 
-void TableIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params) {
-    Vector<SegmentIndexEntry *> segment_indexes;
-    {
-        SegmentIndexesGuard segment_indexes_guard = this->GetSegmentIndexesGuard();
-        for (const auto &[segment_id, segment_index_entry] : segment_indexes_guard.index_by_segment_) {
-            segment_indexes.push_back(segment_index_entry.get());
+Vector<SegmentIndexEntry *> TableIndexEntry::OptimizeIndex(Txn *txn, Vector<UniquePtr<InitParameter>> opt_params, bool replay) {
+    switch (index_base_->index_type_) {
+        case IndexType::kBMP: {
+            Vector<SegmentIndexEntry *> segment_indexes;
+            {
+                SegmentIndexesGuard segment_indexes_guard = this->GetSegmentIndexesGuard();
+                for (const auto &[segment_id, segment_index_entry] : segment_indexes_guard.index_by_segment_) {
+                    segment_indexes.push_back(segment_index_entry.get());
+                }
+            }
+            for (auto *segment_index_entry : segment_indexes) {
+                segment_index_entry->OptimizeIndex(txn, opt_params);
+            }
+            return {};
+        }
+        case IndexType::kHnsw: {
+            std::unique_lock w_lock(rw_locker_);
+            Vector<SegmentIndexEntry *> segment_indexes;
+            for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+                segment_indexes.push_back(segment_index_entry.get());
+            }
+            auto *hnsw_index = static_cast<IndexHnsw *>(index_base_.get());
+            if (hnsw_index->encode_type_ != HnswEncodeType::kPlain) {
+                LOG_WARN("Not implemented");
+                break;
+            }
+            if (!replay) {
+                for (auto *segment_index_entry : segment_indexes) {
+                    segment_index_entry->OptimizeIndex(txn, opt_params);
+                }
+            }
+
+            hnsw_index->encode_type_ = HnswEncodeType::kLVQ;
+            for (auto *segment_index_entry : segment_indexes) {
+                segment_index_entry->SaveHnsw();
+            }
+            return segment_indexes;
+        }
+        default: {
+            LOG_WARN("Not implemented");
         }
     }
-    for (auto *segment_index_entry : segment_indexes) {
-        segment_index_entry->OptimizeIndex(txn, opt_params);
-    }
+    return {};
 }
 
 } // namespace infinity

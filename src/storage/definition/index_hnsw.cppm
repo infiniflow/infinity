@@ -75,7 +75,7 @@ public:
 
 public:
     const MetricType metric_type_{MetricType::kInvalid};
-    const HnswEncodeType encode_type_{HnswEncodeType::kInvalid};
+    HnswEncodeType encode_type_{HnswEncodeType::kInvalid};
     const SizeT M_{};
     const SizeT ef_construction_{};
     const SizeT ef_{};

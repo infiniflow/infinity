@@ -49,6 +49,7 @@ import segment_entry;
 import block_entry;
 import table_index_meta;
 import table_index_entry;
+import segment_index_entry;
 import log_file;
 import default_values;
 import defer_op;
@@ -615,6 +616,11 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
                 WalCmdCompactReplay(*static_cast<const WalCmdCompact *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
                 break;
             }
+            case WalCommandType::OPTIMIZE: {
+                auto *optimize_cmd = const_cast<WalCmdOptimize *>(static_cast<const WalCmdOptimize *>(cmd.get()));
+                WalCmdOptimizeReplay(*optimize_cmd, entry.txn_id_, entry.commit_ts_);
+                break;
+            }
             default: {
                 String error_message = "WalManager::ReplayWalEntry unknown wal command type";
                 LOG_CRITICAL(error_message);
@@ -840,6 +846,20 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
         }
         segment_entry->SetDeprecated(commit_ts);
     }
+}
+
+void WalManager::WalCmdOptimizeReplay(WalCmdOptimize &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    auto [table_index_entry, status] = storage_->catalog()->GetIndexByName(cmd.db_name_, cmd.table_name_, cmd.index_name_, txn_id, commit_ts);
+    if (!status.ok()) {
+        String error_message = fmt::format("Wal Replay: Get index failed {}", status.message());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    Vector<SegmentIndexEntry *> segment_index_entries = table_index_entry->OptimizeIndex(fake_txn.get(), std::move(cmd.params_), true /*replay*/);
+    TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
+    auto *txn_table_store = fake_txn->GetTxnTableStore(table_entry);
+    txn_table_store->AddSegmentIndexesStore(table_index_entry, std::move(segment_index_entries));
 }
 
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

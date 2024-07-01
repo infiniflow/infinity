@@ -316,6 +316,18 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
                 MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(new_segment_infos), std::move(deprecated_segment_ids));
             break;
         }
+        case WalCommandType::OPTIMIZE: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String index_name = ReadBufAdv<String>(ptr);
+            auto param_n = ReadBufAdv<i32>(ptr);
+            Vector<UniquePtr<InitParameter>> params;
+            for (i32 i = 0; i < param_n; i++) {
+                params.push_back(InitParameter::ReadAdv(ptr));
+            }
+            cmd = MakeShared<WalCmdOptimize>(std::move(db_name), std::move(table_name), std::move(index_name), std::move(params));
+            break;
+        }
         default: {
             String error_message = fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type));
             LOG_CRITICAL(error_message);
@@ -422,6 +434,12 @@ bool WalCmdCompact::operator==(const WalCmd &other) const {
     return true;
 }
 
+bool WalCmdOptimize::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdOptimize *>(&other);
+    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_) &&
+           IsEqual(index_name_, other_cmd->index_name_);
+}
+
 i32 WalCmdCreateDatabase::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_dir_tail_.size();
 }
@@ -488,6 +506,16 @@ i32 WalCmdCompact::GetSizeInBytes() const {
         size += segment_info.GetSizeInBytes();
     }
     return size + sizeof(i32) + this->deprecated_segment_ids_.size() * sizeof(SegmentID);
+}
+
+i32 WalCmdOptimize::GetSizeInBytes() const {
+    i32 size = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+               this->index_name_.size();
+    size += sizeof(i32);
+    for (const auto &param : this->params_) {
+        size += param->GetSizeInBytes();
+    }
+    return size;
 }
 
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
@@ -604,6 +632,17 @@ void WalCmdCompact::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, deprecated_n);
     for (i32 i = 0; i < deprecated_n; ++i) {
         WriteBufAdv(buf, this->deprecated_segment_ids_[i]);
+    }
+}
+
+void WalCmdOptimize::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::OPTIMIZE);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->index_name_);
+    WriteBufAdv(buf, static_cast<i32>(this->params_.size()));
+    for (const auto &param : this->params_) {
+        param->WriteAdv(buf);
     }
 }
 
@@ -845,6 +884,9 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
             break;
         case WalCommandType::COMPACT:
             command = "COMPACT";
+            break;
+        case WalCommandType::OPTIMIZE:
+            command = "OPTIMIZE";
             break;
         default: {
             String error_message = "Unknown command type";

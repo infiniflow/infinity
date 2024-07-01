@@ -140,6 +140,8 @@ public:
         return ts >= deprecate_ts;
     }
 
+    void Save();
+
 public:
     ChunkID chunk_id_;
 

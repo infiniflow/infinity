@@ -29,6 +29,9 @@ export module dist_func_cos;
 
 namespace infinity {
 
+export template <typename DataType, typename CompressType>
+class LVQCosDist;
+
 export template <typename DataType>
 class PlainCosDist {
 public:
@@ -80,6 +83,8 @@ public:
     DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
         return -SIMDFunc(v1, v2, vec_store_meta.dim());
     }
+
+    LVQCosDist<DataType, i8> ToLVQDistance(SizeT dim) &&;
 };
 
 export template <typename DataType, typename CompressType>
@@ -181,5 +186,10 @@ public:
         return -dist;
     }
 };
+
+template<typename DataType>
+LVQCosDist<DataType, i8> PlainCosDist<DataType>::ToLVQDistance(SizeT dim) && {
+    return LVQCosDist<DataType, i8>(dim);
+}
 
 } // namespace infinity
