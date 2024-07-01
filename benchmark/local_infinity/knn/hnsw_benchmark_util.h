@@ -25,7 +25,7 @@ using namespace infinity;
 namespace benchmark {
 
 template <typename T>
-Tuple<SizeT, i32, UniquePtr<T[]>> DecodeFVecsDataset(const Path &path) {
+Tuple<SizeT, i32, UniquePtr<T[]>> DecodeFvecsDataset(const Path &path) {
     LocalFileSystem fs;
     auto [file_handler, status] = fs.OpenFile(path.string(), FileFlags::READ_FLAG, FileLockType::kReadLock);
     if (!status.ok()) {

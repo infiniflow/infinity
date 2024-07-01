@@ -159,7 +159,7 @@ void Build(const BenchmarkOption &option) {
     LocalFileSystem fs;
     BaseProfiler profiler;
 
-    auto [vec_num, dim, data] = benchmark::DecodeFVecsDataset<float>(option.data_path_);
+    auto [vec_num, dim, data] = benchmark::DecodeFvecsDataset<float>(option.data_path_);
 
     profiler.Begin();
     auto hnsw = HnswT::Make(option.chunk_size_, option.max_chunk_num_, dim, option.M_, option.ef_construction_);
@@ -213,8 +213,8 @@ void Query(const BenchmarkOption &option) {
 
     auto hnsw = HnswT::Load(*index_file);
 
-    auto [query_num, query_dim, query_data] = benchmark::DecodeFVecsDataset<float>(option.query_path_);
-    auto [gt_num, topk, gt_data] = benchmark::DecodeFVecsDataset<i32>(option.groundtruth_path_);
+    auto [query_num, query_dim, query_data] = benchmark::DecodeFvecsDataset<float>(option.query_path_);
+    auto [gt_num, topk, gt_data] = benchmark::DecodeFvecsDataset<i32>(option.groundtruth_path_);
     if (gt_num != query_num) {
         UnrecoverableError("gt_num != query_num");
     }

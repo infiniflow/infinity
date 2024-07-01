@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
     size_t query_count;
     {
         int dim = -1;
-        std::tie(query_count, dim, queries_ptr) = benchmark::DecodeFVecsDataset<float>(query_path);
+        std::tie(query_count, dim, queries_ptr) = benchmark::DecodeFvecsDataset<float>(query_path);
         assert((int)dimension == dim || !"query vector dim isn't 128");
     }
     auto queries = queries_ptr.get();
