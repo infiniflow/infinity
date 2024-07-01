@@ -19,61 +19,53 @@ export module or_iterator;
 import stl;
 import index_defines;
 import doc_iterator;
-import multi_query_iterator;
-import priority_queue;
+import multi_doc_iterator;
 import internal_types;
 
 namespace infinity {
 
-export class OrIterator : public MultiQueryDocIterator {
+export struct DocIteratorEntry {
+    RowID doc_id_{INVALID_ROWID};
+    u32 entry_id_{0};
+};
+
+export struct DocIteratorHeap {
 public:
-    class DocIteratorHeap : public PriorityQueue<DocIterator *> {
-    public:
-        DocIteratorHeap(u32 size) { Initialize(size); }
+    DocIteratorHeap() { iterator_heap_.resize(1); }
 
-    protected:
-        bool LessThan(DocIterator *iter1, DocIterator *iter2) override { return iter1->Doc() < iter2->Doc(); }
-    };
+    void AddEntry(const DocIteratorEntry &entry) { iterator_heap_.push_back(entry); }
 
-    struct DocIteratorEntry {
-        RowID doc_id_{INVALID_ROWID};
-        u32 entry_id_{0};
-    };
+    void BuildHeap();
 
+    void AdjustDown(SizeT idx);
+
+    DocIteratorEntry &TopEntry() { return iterator_heap_[1]; }
+
+public:
+    Vector<DocIteratorEntry> iterator_heap_; // children begin with 1
+};
+
+export class OrIterator : public MultiDocIterator {
+public:
     OrIterator(Vector<UniquePtr<DocIterator>> iterators);
 
-    bool IsOr() const override { return true; }
+    String Name() const override { return "OrIterator"; }
 
-    void DoSeek(RowID doc_id) override;
+    /* pure virtual methods implementation */
+    bool Next(RowID doc_id) override;
 
-    u32 GetDF() const override { return or_iterator_df_; }
+    float BM25Score() override;
+
+    void UpdateScoreThreshold(float threshold) override;
 
 private:
     DocIterator *GetDocIterator(u32 i) { return children_[i].get(); }
 
     const DocIterator *GetDocIterator(u32 i) const { return children_[i].get(); }
 
-    void AdjustDown(u32 idx) {
-        DocIteratorEntry *heap = iterator_heap_.data();
-        u32 min = idx;
-        do {
-            idx = min;
-            u32 left = idx << 1;
-            u32 right = left + 1;
-            if (left <= count_ && heap[left].doc_id_ < heap[min].doc_id_) {
-                min = left;
-            }
-            if (right <= count_ && heap[right].doc_id_ < heap[min].doc_id_) {
-                min = right;
-            }
-            if (min != idx) {
-                std::swap(heap[idx], heap[min]);
-            }
-        } while (min != idx);
-    }
-
-    Vector<DocIteratorEntry> iterator_heap_;
-    u32 count_{};
-    u32 or_iterator_df_{};
+    DocIteratorHeap heap_;
+    // bm25 score cache
+    RowID bm25_score_cache_docid_ = INVALID_ROWID;
+    float bm25_score_cache_ = 0.0f;
 };
 } // namespace infinity

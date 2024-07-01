@@ -247,4 +247,56 @@ void CommonQueryFilter::TryApplySecondaryIndexFilterOptimizer(QueryContext *quer
     filter_execute_command_ = std::move(filter_execute_command);
 }
 
+bool CommonQueryFilter::PassFilter(RowID doc_id) {
+    bool finish_build = finish_build_.test_and_set(std::memory_order_acquire);
+    assert(finish_build);
+    if (!finish_build)
+        return false;
+    if (doc_id.segment_id_ != current_segment_id_) [[unlikely]] {
+        const auto it = filter_result_.find(doc_id.segment_id_);
+        if (it == filter_result_.end()) [[unlikely]] {
+            current_segment_id_ = INVALID_SEGMENT_ID;
+            return false;
+        }
+        current_segment_id_ = doc_id.segment_id_;
+        const std::variant<Vector<u32>, Bitmask> &doc_id_list_or_bitmask = it->second;
+        decode_status_ = doc_id_list_or_bitmask.index();
+        doc_id_list_ = nullptr;
+        doc_id_bitmask_ = nullptr;
+        switch (decode_status_) {
+            case 0: {
+                doc_id_list_ = &std::get<0>(doc_id_list_or_bitmask);
+                doc_id_bitmask_ = nullptr;
+                doc_id_list_size_ = doc_id_list_->size();
+                pos_ = 0;
+                break;
+            }
+            case 1: {
+                doc_id_list_ = nullptr;
+                doc_id_bitmask_ = &std::get<1>(doc_id_list_or_bitmask);
+                break;
+            }
+            default: {
+                String error_message = "Error variant status!";
+                UnrecoverableError(error_message);
+                break;
+            }
+        }
+    }
+    switch (decode_status_) {
+        case 0: {
+            while (pos_ < doc_id_list_size_ && (*doc_id_list_)[pos_] < doc_id.segment_offset_)
+                pos_++;
+            bool found = pos_ < doc_id_list_size_ && (*doc_id_list_)[pos_] == doc_id.segment_offset_;
+            return found;
+        }
+        case 1: {
+            bool found = doc_id_bitmask_->IsTrue(doc_id.segment_offset_);
+            return found;
+        }
+        default:
+            return false;
+    }
+}
+
 } // namespace infinity

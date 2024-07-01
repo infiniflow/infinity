@@ -17,6 +17,8 @@ export module common_query_filter;
 import stl;
 import bitmask;
 import secondary_index_scan_execute_expression;
+import internal_types;
+import default_values;
 
 namespace infinity {
 class FastRoughFilterEvaluator;
@@ -89,8 +91,19 @@ export struct CommonQueryFilter {
     void TryApplyFastRoughFilterOptimizer();
     void TryApplySecondaryIndexFilterOptimizer(QueryContext *query_context);
 
+    // Check if given doc pass filter. Requires doc_id be in ascending order.
+    bool PassFilter(RowID doc_id);
+
 private:
     void BuildFilter(u32 task_id, Txn *txn);
+
+    // for PassFilter
+    SegmentID current_segment_id_ = INVALID_SEGMENT_ID;
+    i8 decode_status_ = 0;
+    const Vector<u32> *doc_id_list_ = nullptr;
+    const Bitmask *doc_id_bitmask_ = nullptr;
+    u32 doc_id_list_size_ = 0;
+    u32 pos_ = 0; // index to doc_id_list_
 };
 
 } // namespace infinity

@@ -29,8 +29,8 @@ import internal_types;
 import data_type;
 import common_query_filter;
 import column_index_reader;
+import doc_iterator;
 import query_node;
-import early_terminate_iterator;
 
 namespace infinity {
 

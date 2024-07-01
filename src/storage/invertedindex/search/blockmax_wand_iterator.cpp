@@ -20,7 +20,8 @@ module blockmax_wand_iterator;
 import stl;
 import third_party;
 import index_defines;
-import early_terminate_iterator;
+import term_doc_iterator;
+import multi_doc_iterator;
 import internal_types;
 import logger;
 import infinity_exception;
@@ -42,62 +43,31 @@ BlockMaxWandIterator::~BlockMaxWandIterator() {
     LOG_TRACE(msg);
 }
 
-BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators) : sorted_iterators_(std::move(iterators)), pivot_(sorted_iterators_.size()) {
-    backup_iterators_.reserve(sorted_iterators_.size());
+BlockMaxWandIterator::BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iterators)
+    : MultiDocIterator(std::move(iterators)), pivot_(sorted_iterators_.size()) {
     bm25_score_upper_bound_ = 0.0f;
-    SizeT num_iterators = sorted_iterators_.size();
+    SizeT num_iterators = children_.size();
     for (SizeT i = 0; i < num_iterators; i++){
-        bm25_score_upper_bound_ += sorted_iterators_[i]->BM25ScoreUpperBound();
+        TermDocIterator *tdi = dynamic_cast<TermDocIterator *>(children_[i].get());
+        if (tdi == nullptr)
+            continue;
+        bm25_score_upper_bound_ += tdi->BM25ScoreUpperBound();
+        sorted_iterators_.push_back(tdi);
     }
     next_sum_score_bm_low_cnt_dist_.resize(100, 0);
+    backup_iterators_.reserve(sorted_iterators_.size());
 }
 
 void BlockMaxWandIterator::UpdateScoreThreshold(const float threshold) {
-    EarlyTerminateIterator::UpdateScoreThreshold(threshold);
-    const float base_threshold = threshold - BM25ScoreUpperBound();
-    SizeT num_iterators = sorted_iterators_.size();
-    for (SizeT i = 0; i < num_iterators; i++){
-        auto &it = sorted_iterators_[i];
-        float new_threshold = base_threshold + it->BM25ScoreUpperBound();
-        it->UpdateScoreThreshold(new_threshold);
-    }
-}
-
-bool BlockMaxWandIterator::NextShallow(RowID doc_id){
-    assert(doc_id != INVALID_ROWID);
-    assert(backup_iterators_.empty());
-    RowID common_block_last_doc_id = INVALID_ROWID;
-    SizeT num_iterators = sorted_iterators_.size();
-    SizeT gap = num_iterators;
-    for (SizeT i = 0; i < num_iterators; i++){
-        auto &it = sorted_iterators_[i];
-        bool ok = it->NextShallow(doc_id);
-        if (ok)[[likely]] {
-            if (common_block_last_doc_id > it->BlockLastDocID())
-                common_block_last_doc_id = it->BlockLastDocID();
-            if(gap < num_iterators)[[unlikely]] {
-                sorted_iterators_[gap] = std::move(it);
-                gap++;
-            }
-        } else{
-            it.reset();
-            if(gap == num_iterators){
-                gap = i;
-            }
+    if (threshold > threshold_) {
+        threshold_ = threshold;
+        const float base_threshold = threshold - BM25ScoreUpperBound();
+        SizeT num_iterators = sorted_iterators_.size();
+        for (SizeT i = 0; i < num_iterators; i++) {
+            auto &it = sorted_iterators_[i];
+            float new_threshold = base_threshold + it->BM25ScoreUpperBound();
+            it->UpdateScoreThreshold(new_threshold);
         }
-    }
-    if(gap != num_iterators)[[unlikely]] {
-        sorted_iterators_.resize(gap);
-    }
-    if (sorted_iterators_.empty())[[unlikely]] {
-        common_block_min_possible_doc_id_ = INVALID_ROWID;
-        common_block_last_doc_id_ = INVALID_ROWID;
-        doc_id_ = INVALID_ROWID;
-        return false;
-    } else {
-        common_block_min_possible_doc_id_ = doc_id;
-        common_block_last_doc_id_ = common_block_last_doc_id;
-        return true;
     }
 }
 
@@ -110,6 +80,8 @@ bool BlockMaxWandIterator::Next(RowID doc_id){
         for (SizeT i = 0; i < num_iterators; i++) {
             sorted_iterators_[i]->Next(0);
         }
+    } else if (doc_id_ >= doc_id) {
+        return true;
     } else {
         assert(pivot_ < num_iterators);
         assert(doc_id_ < doc_id);
@@ -267,11 +239,6 @@ bool BlockMaxWandIterator::Next(RowID doc_id){
     return false;
 }
 
-// inherited from EarlyTerminateIterator
-bool BlockMaxWandIterator::BlockSkipTo(RowID doc_id, float threshold) {
-    return false;
-}
-
 float BlockMaxWandIterator::BM25Score() {
     if (bm25_score_cached_) [[unlikely]] {
         return bm25_score_cache_;
@@ -288,22 +255,6 @@ float BlockMaxWandIterator::BM25Score() {
     bm25_score_cache_ = sum_score;
     bm25_score_cached_ = true;
     return sum_score;
-}
-
-Pair<bool, RowID> BlockMaxWandIterator::SeekInBlockRange(RowID doc_id, const RowID doc_id_no_beyond) {
-    return {false, INVALID_ROWID};
-}
-
-Tuple<bool, float, RowID> BlockMaxWandIterator::SeekInBlockRange(RowID doc_id, const RowID doc_id_no_beyond, const float threshold) {
-    return {false, 0.0F, INVALID_ROWID};
-}
-
-Pair<bool, RowID> BlockMaxWandIterator::PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) {
-    return {false, INVALID_ROWID};
-}
-
-bool BlockMaxWandIterator::NotPartCheckExist(RowID doc_id) {
-    return false;
 }
 
 } // namespace infinity

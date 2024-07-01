@@ -81,8 +81,8 @@ import logger;
 import search_options;
 import search_driver;
 import query_node;
+import doc_iterator;
 import status;
-import early_terminate_iterator;
 import default_values;
 
 namespace infinity {
