@@ -12,10 +12,7 @@ Connect to the Infinity server and return an Infinity object.
 
 ### Parameters
 
-- `uri`: `NetworkAddress` A NetworkAddress object is a struct with two fields, one for the IP address (`str`) and the other for the port number (`int`). To access the local Infinity service:
-  ```python
-  infinity_obj = infinity.connect("/path/to/save/your/files/to")
-  ```
+- `uri`: `NetworkAddress` A NetworkAddress object is a struct with two fields, one for the IP address (`str`) and the other for the port number (`int`).
 
 ### Returns
 
@@ -24,10 +21,17 @@ Connect to the Infinity server and return an Infinity object.
 
 ### Examples
 
-```python
-infinity_obj = infinity.connect()
-infinity_obj = infinity.connect("/path/to/save/your/files/to")
-```
+- If Infinity is deployed as a separate server: 
+
+   ```python
+   # If Infinity is deployed locally, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
+   infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+   ```
+
+- If Infinity is deployed as a Python library: 
+   ```python
+   infinity_obj = infinity.connect("/path/to/save/your/files/to")
+   ```
 
 ## disconnect
 
@@ -35,7 +39,7 @@ infinity_obj = infinity.connect("/path/to/save/your/files/to")
 
 Disconnect the current Infinity object from the server.
 
->This method is automatically called when an Infinity object is destructed.
+> This method is automatically called when an Infinity object is destructed.
 
 ### Returns
 
