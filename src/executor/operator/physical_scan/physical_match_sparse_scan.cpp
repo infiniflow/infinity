@@ -476,7 +476,8 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
                             BmpSearchOptions options = BMPUtil::ParseBmpSearchOptions(match_sparse_expr_->opt_params_);
                             options.use_lock_ = with_lock;
                             auto [doc_ids, scores] = index->SearchKnn(query, topn, options, filter);
-                            for (SizeT i = 0; i < topn; ++i) {
+                            SizeT res_n = doc_ids.size();
+                            for (SizeT i = 0; i < res_n; ++i) {
                                 RowID row_id(segment_id, doc_ids[i]);
                                 ResultType d = scores[i];
                                 merge_heap->Search(query_id, &d, &row_id, 1);
