@@ -36,7 +36,7 @@ def get_model(model_args: ModelArgs):
     return BGEM3FlagModel("BAAI/bge-m3", use_fp16=model_args.fp16)
 
 
-text_to_replace = "&|!+-():\'\"?~^"
+text_to_replace = "&|!+-–():\'\"?~^"
 text_to_replace_with = " " * len(text_to_replace)
 query_translation_table = str.maketrans(text_to_replace, text_to_replace_with)
 
@@ -129,6 +129,7 @@ class InfinityClientForSearch:
             queries, qids = get_queries_and_qids(lang, False)
             # If you would like to use streaming, please modify the following code and generate embeddings on-the-fly.
             print(f"Total number of queries: {len(qids)}")
+            print(f"Average query chars: {sum([len(q) for q in queries]) / len(queries)}")
             for query_type in query_types:
                 embedding_file = None
                 if query_type in self.prepare_embedding_funcs:
@@ -139,8 +140,6 @@ class InfinityClientForSearch:
                 query_yield = self.query_yields[query_type](queries, embedding_file)
                 query_func = self.query_funcs[query_type]
                 print(f"Start to search for query method: {query_type}")
-                save_path = os.path.join(save_dir, f"{lang}_{query_type}.txt")
-                print(f"Save search result to: {save_path}")
                 total_query_time: float = 0.0
                 total_query_num: int = len(qids)
                 result_list = []
@@ -155,6 +154,8 @@ class InfinityClientForSearch:
                         result.append(FakeJScoredDoc(docid, score))
                     result_list.append((qid, result))
                 print(f"Average query time: {1000.0 * total_query_time / float(total_query_num)} ms.")
+                save_path = os.path.join(save_dir, f"{lang}_{query_type}.txt")
+                print(f"Save search result to: {save_path}")
                 save_result(result_list, save_path, qids, max_hits=1000)
 
 
