@@ -11,9 +11,9 @@ This document provides guidance on deploying the Infinity database.
 
 You can deploy Infinity in the following three ways: 
 
-- [Deploy embedded Infinity using pip](#deploy-embedded-infinity-using-pip): Mainly for local deployment or quick testing.
-- [Deploy Infinity using Docker](#deploy-infinity-using-docker): Mainly for deploying a separate server for remote access.
-- [Deploy Infinity using binary](#deploy-infinity-using-binary): Mainly for deploying a separate server for remote access.
+- [Deploy Infinity as a library](#deploy-embedded-infinity-using-pip): For all-in-one deployment or quick testing.
+- [Deploy Infinity using Docker](#deploy-infinity-using-docker): If you wish to deploy a separate server.
+- [Deploy Infinity using binary](#deploy-infinity-using-binary): If you wish to deploy a separate server.
 
 ### Deploy embedded Infinity using pip
 
@@ -31,7 +31,7 @@ pip install infinity-sdk==0.2.0
 
 :::caution IMPORTANT
 - More detailed information is covered in the [Quickstart Guide](./quickstart.md).
-- This 'embedded' approach is for local installation or quick testing. If you wish to deploy a separate server for remote access, follow the instructions in [Deploy Infinity using Docker](#deploy-infinity-using-docker) or [Deploy Infinity using binary](#deploy-infinity-using-binary).
+- This 'all-in-one' approach is for local deployment or quick testing. If you wish to deploy a separate server for remote access, follow the instructions in [Deploy Infinity using Docker](#deploy-infinity-using-docker) or [Deploy Infinity using binary](#deploy-infinity-using-binary).
 :::
 
 ### Deploy Infinity using Docker 
@@ -122,7 +122,7 @@ Before running the following Python scripts, please ensure that you have already
 import infinity
 
 # Connect to Infinity. 
-# If Infinity is deployed using pip as an embedded package, use `infinity_obj = infinity.connect("/path/to/save/your/files/to")` instead
+# If Infinity is deployed as a library, use `infinity_obj = infinity.connect("/path/to/save/your/files/to")` instead
 infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
 db = infinity_obj.get_database("default_db")
 table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
