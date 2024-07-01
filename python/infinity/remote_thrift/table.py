@@ -316,6 +316,10 @@ class RemoteTable(Table, ABC):
         options.has_header = False
         options.delimiter = ','
         options.copy_file_type = ttypes.CopyFileType.CSV
+        options.offset = 0
+        options.limit = 0
+        options.row_limit = 0
+
         if export_options != None:
             for k, v in export_options.items():
                 key = k.lower()
@@ -325,6 +329,8 @@ class RemoteTable(Table, ABC):
                         options.copy_file_type = ttypes.CopyFileType.CSV
                     elif file_type == 'jsonl':
                         options.copy_file_type = ttypes.CopyFileType.JSONL
+                    elif file_type == 'fvecs':
+                        options.copy_file_type = ttypes.CopyFileType.FVECS
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
@@ -337,6 +343,21 @@ class RemoteTable(Table, ABC):
                         options.has_header = v
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
+                elif key == 'offset':
+                    if isinstance(v, int):
+                        options.offset = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'offset' field")
+                elif key == 'limit':
+                    if isinstance(v, int):
+                        options.limit = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'limit' field")
+                elif key == 'row_limit':
+                    if isinstance(v, int):
+                        options.row_limit = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'row_limit' field")
                 else:
                     raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
 

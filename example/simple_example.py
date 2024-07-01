@@ -17,7 +17,6 @@ This example is about connecting to the local infinity instance, creating table,
 '''
 
 import infinity
-import pandas
 
 try:
     # open a local directory to store the data

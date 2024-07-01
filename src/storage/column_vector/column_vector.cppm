@@ -226,7 +226,7 @@ public:
 
     void AppendByPtr(const_ptr_t value_ptr);
 
-    void AppendByStringView(std::string_view sv, char delimiter);
+    void AppendByStringView(std::string_view sv);
 
     void AppendByConstantExpr(const ConstantExpr *const_expr);
 

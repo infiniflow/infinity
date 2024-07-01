@@ -387,7 +387,7 @@ struct SQL_LTYPE {
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION
 %token USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE
-%token SEARCH MATCH MAXSIM QUERY QUERIES FUSION
+%token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
 
 %token NUMBER
 
@@ -1186,6 +1186,10 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
                 $$->limit_ = option_ptr->limit_;
                 break;
             }
+            case infinity::CopyOptionType::kRowLimit: {
+                $$->row_limit_ = option_ptr->row_limit_;
+                break;
+            }
         }
         delete option_ptr;
     }
@@ -1235,6 +1239,10 @@ copy_statement: COPY table_name TO file_path WITH '(' copy_option_list ')' {
             }
             case infinity::CopyOptionType::kLimit: {
                 $$->limit_ = option_ptr->limit_;
+                break;
+            }
+            case infinity::CopyOptionType::kRowLimit: {
+                $$->row_limit_ = option_ptr->row_limit_;
                 break;
             }
         }
@@ -3021,6 +3029,11 @@ copy_option : FORMAT IDENTIFIER {
     $$ = new infinity::CopyOption();
     $$->option_type_ = infinity::CopyOptionType::kLimit;
     $$->limit_ = $2;
+}
+| ROWLIMIT LONG_VALUE {
+    $$ = new infinity::CopyOption();
+    $$->option_type_ = infinity::CopyOptionType::kRowLimit;
+    $$->row_limit_ = $2;
 }
 
 file_path : STRING {

@@ -29,6 +29,11 @@ class TestInsertDeleteUpdate:
         for i in range(len(threads)):
             threads[i].join()
 
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        res = db_obj.drop_table(table_name, ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+
 
 def create_table(db_obj: Database):
     try:

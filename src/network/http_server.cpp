@@ -575,6 +575,15 @@ public:
                 if (http_body_json.contains("header")) {
                     export_options.header_ = http_body_json["header"];
                 }
+                if (http_body_json.contains("offset")) {
+                    export_options.offset_ = http_body_json["offset"];
+                }
+                if (http_body_json.contains("limit")) {
+                    export_options.limit_ = http_body_json["limit"];
+                }
+                if (http_body_json.contains("row_limit")) {
+                    export_options.row_limit_ = http_body_json["row_limit"];
+                }
                 if (http_body_json.contains("delimiter")) {
                     String delimiter = http_body_json["delimiter"];
                     if (delimiter.size() != 1) {
