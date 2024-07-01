@@ -12,7 +12,9 @@ Connect to the Infinity server and return an Infinity object.
 
 ### Parameters
 
-- `uri`: `NetworkAddress` A NetworkAddress object is a struct with two fields, one for the IP address (`str`) and the other for the port number (`int`).
+- `uri`: 
+  - `NetworkAddress` A NetworkAddress object is a struct with two fields, one for the IP address (`str`) and the other for the port number (`int`). Used when Infinity is deployed as a separate server.
+  - a path ('str') to store the Infinity data. Used when Infinity is deployed as a Python module. 
 
 ### Returns
 
