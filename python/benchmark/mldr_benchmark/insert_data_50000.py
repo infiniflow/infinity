@@ -34,6 +34,7 @@ def get_all_part_begin_ends(total_row_count: int):
     return result
 
 
+# fulltext column, dense embedding column, sparse embedding column
 class InfinityClientForInsert:
     def __init__(self):
         self.test_db_name = "default_db"
@@ -66,8 +67,8 @@ class InfinityClientForInsert:
         sparse_embedding_dir = input("Input sparse embedding data files dir: ")
         print("Input begin and end position pairs of sparse embedding data to insert:")
         sparse_part_begin_ends = get_all_part_begin_ends(total_num)
-        insert_num = int(input("Input insert row count: "))
-        batch_size = int(input("Input batch size: "))
+        insert_num = total_num
+        batch_size = 1024
         print("Start inserting data...")
         dense_data = None
         dense_pos_part_end = 0
@@ -89,11 +90,15 @@ class InfinityClientForInsert:
                     sparse_pair_id_next += 1
                     sparse_base_name = f"sparse-{sparse_pos_part_begin}-{sparse_pos_part_end}.data"
                     sparse_data = read_mldr_sparse_embedding_yield(os.path.join(sparse_embedding_dir, sparse_base_name))
-                insert_dict = {"docid_col": docid_list[row_pos], "fulltext_col": corpus_text_list[row_pos],
+                docid_str = docid_list[row_pos]
+                if int(docid_str.split('-')[-1]) >= 189796:
+                    continue
+                insert_dict = {"docid_col": docid_str, "fulltext_col": corpus_text_list[row_pos],
                                "dense_col": next(dense_data), "sparse_col": next(sparse_data)}
                 buffer.append(insert_dict)
-            self.infinity_table.insert(buffer)
-            buffer.clear()
+            if len(buffer) > 0:
+                self.infinity_table.insert(buffer)
+                del buffer
         print("Finish inserting data.")
         del dense_data
         del sparse_data
