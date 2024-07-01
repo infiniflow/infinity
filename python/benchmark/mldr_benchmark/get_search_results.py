@@ -70,10 +70,14 @@ class InfinityClientForSearch:
     def sparse_query(self, query: str, model: BGEM3FlagModel, max_hits: int):
         query_embedding = model.encode(query, return_dense=False, return_sparse=True, return_colbert_vecs=False)
         query_embedding = query_embedding['lexical_weights']
+        tmp_list = []
+        for p, v in query_embedding.items():
+            tmp_list.append((int(p), float(v)))
+        tmp_list.sort()
         query_sparse_data = {"indices": [], "values": []}
-        for p, v in sorted(query_embedding.items()):
-            query_sparse_data["indices"].append(int(p))
-            query_sparse_data["values"].append(float(v))
+        for p, v in tmp_list:
+            query_sparse_data["indices"].append(p)
+            query_sparse_data["values"].append(v)
         result = self.infinity_table.output(["docid_col", "_similarity"]).match_sparse("sparse_col", query_sparse_data,
                                                                                        "ip", max_hits,
                                                                                        {"alpha": "1.0",
