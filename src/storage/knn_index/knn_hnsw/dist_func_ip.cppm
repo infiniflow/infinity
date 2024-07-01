@@ -27,6 +27,9 @@ export module dist_func_ip;
 
 namespace infinity {
 
+export template <typename DataType, typename CompressType>
+class LVQIPDist;
+
 export template <typename DataType>
 class PlainIPDist {
 public:
@@ -77,6 +80,8 @@ public:
     DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
         return -SIMDFunc(v1, v2, vec_store_meta.dim());
     }
+
+    LVQIPDist<DataType, i8> ToLVQDistance(SizeT dim) &&;
 };
 
 export template <typename DataType, typename CompressType>
@@ -179,5 +184,10 @@ public:
         return -dist;
     }
 };
+
+template <typename DataType>
+LVQIPDist<DataType, i8> PlainIPDist<DataType>::ToLVQDistance(SizeT dim) && {
+    return LVQIPDist<DataType, i8>(dim);
+}
 
 } // namespace infinity

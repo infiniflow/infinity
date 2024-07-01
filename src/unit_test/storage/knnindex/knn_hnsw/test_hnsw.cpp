@@ -15,7 +15,6 @@
 #include "unit_test/base_test.h"
 #include <fstream>
 #include <gtest/gtest.h>
-#include <iostream>
 #include <thread>
 
 import stl;
@@ -64,13 +63,8 @@ public:
             data[i] = distrib_real(rng);
         }
 
-        LocalFileSystem fs;
-        {
-            Hnsw hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
-
-            auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-            hnsw_index.InsertVecs(std::move(iter));
-            // std::ofstream os("/home/xwg/dev/infinity/tmp/dump.txt");
+        auto test_func = [&](auto &hnsw_index) {
+            // std::fstream os("./tmp/dump.txt");
             // hnsw_index.Dump(os);
             // os.flush();
             hnsw_index.Check();
@@ -87,6 +81,15 @@ public:
             float correct_rate = float(correct) / element_size;
             // std::printf("correct rage: %f\n", correct_rate);
             EXPECT_GE(correct_rate, 0.95);
+        };
+
+        LocalFileSystem fs;
+        {
+            Hnsw hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
+            auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
+            hnsw_index.InsertVecs(std::move(iter));
+
+            test_func(hnsw_index);
 
             u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
             auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
@@ -94,7 +97,6 @@ public:
                 UnrecoverableError(status.message());
             }
             hnsw_index.Save(*file_handler);
-            file_handler->Close();
         }
 
         {
@@ -105,12 +107,33 @@ public:
             }
 
             auto hnsw_index = Hnsw::Load(*file_handler);
-            hnsw_index.SetEf(10);
 
-            // std::ofstream os("/home/xwg/dev/infinity/tmp/dump2.txt");
-            // hnsw_index.Dump(os);
-            // os.flush();
+            test_func(hnsw_index);
+        }
+    }
+
+    template <typename Hnsw, typename CompressedHnsw>
+    void TestCompress() {
+        int dim = 16;
+        int M = 8;
+        int ef_construction = 200;
+        int chunk_size = 128;
+        int max_chunk_n = 10;
+        int element_size = max_chunk_n * chunk_size;
+
+        std::mt19937 rng;
+        rng.seed(0);
+        std::uniform_real_distribution<float> distrib_real;
+
+        auto data = MakeUnique<float[]>(dim * element_size);
+        for (int i = 0; i < dim * element_size; ++i) {
+            data[i] = distrib_real(rng);
+        }
+
+        auto test_func = [&](auto &hnsw_index) {
             hnsw_index.Check();
+
+            hnsw_index.SetEf(10);
             int correct = 0;
             for (int i = 0; i < element_size; ++i) {
                 const float *query = data.get() + i * dim;
@@ -122,8 +145,42 @@ public:
             float correct_rate = float(correct) / element_size;
             // std::printf("correct rage: %f\n", correct_rate);
             EXPECT_GE(correct_rate, 0.95);
+        };
 
-            file_handler->Close();
+        LocalFileSystem fs;
+        {
+            auto hnsw = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
+
+            auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
+            hnsw.InsertVecs(std::move(iter));
+            {
+                // std::fstream os("./tmp/dump_1.txt", std::fstream::out);
+                // hnsw.Dump(os);
+            }
+            auto compress_hnsw = std::move(hnsw).CompressToLVQ();
+            {
+                // std::fstream os("./tmp/dump_2.txt", std::fstream::out);
+                // compress_hnsw.Dump(os);
+            }
+            test_func(compress_hnsw);
+
+            u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
+            auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+            compress_hnsw.Save(*file_handler);
+        }
+        {
+            u8 file_flags = FileFlags::READ_FLAG;
+            auto [file_handler, status] = fs.OpenFile(save_dir_ + "/test_hnsw.bin", file_flags, FileLockType::kNoLock);
+            if (!status.ok()) {
+                UnrecoverableError(status.message());
+            }
+
+            auto compress_hnsw = CompressedHnsw::Load(*file_handler);
+
+            test_func(compress_hnsw);
         }
     }
 
@@ -263,4 +320,10 @@ TEST_F(HnswAlgTest, test4) {
 TEST_F(HnswAlgTest, test5) {
     using Hnsw = KnnHnsw<PlainCosVecStoreType<float>, LabelT>;
     TestSimple<Hnsw>();
+}
+
+TEST_F(HnswAlgTest, test6) {
+    using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
+    using CompressedHnsw = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
+    TestCompress<Hnsw, CompressedHnsw>();
 }

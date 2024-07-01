@@ -28,6 +28,15 @@ import sparse_util;
 
 namespace infinity {
 
+export template <typename DataT, typename CompressT>
+class LVQCosVecStoreType;
+
+export template <typename DataT, typename CompressT>
+class LVQL2VecStoreType;
+
+export template <typename DataT, typename CompressT>
+class LVQIPVecStoreType;
+
 export template <typename DataT>
 class PlainCosVecStoreType {
 public:
@@ -41,6 +50,11 @@ public:
     using Distance = PlainCosDist<DataType>;
 
     static constexpr bool HasOptimize = false;
+
+    template <typename CompressType>
+    static constexpr LVQCosVecStoreType<DataType, CompressType> ToLVQ() {
+        return {};
+    }
 };
 
 export template <typename DataT>
@@ -56,6 +70,11 @@ public:
     using Distance = PlainL2Dist<DataType>;
 
     static constexpr bool HasOptimize = false;
+
+    template <typename CompressType>
+    static constexpr LVQL2VecStoreType<DataType, CompressType> ToLVQ() {
+        return {};
+    }
 };
 
 export template <typename DataT>
@@ -71,6 +90,11 @@ public:
     using Distance = PlainIPDist<DataType>;
 
     static constexpr bool HasOptimize = false;
+
+    template <typename CompressType>
+    static constexpr LVQIPVecStoreType<DataType, CompressType> ToLVQ() {
+        return {};
+    }
 };
 
 export template <typename DataT, typename IndexT>
@@ -86,6 +110,11 @@ public:
     using Distance = SparseIPDist<DataT, IndexT>;
 
     static constexpr bool HasOptimize = false;
+
+    template <typename CompressType>
+    static constexpr SparseIPVecStoreType<DataType, IndexT> ToLVQ() {
+        return {};
+    }
 };
 
 export template <typename DataT, typename CompressT>
@@ -101,6 +130,11 @@ public:
     using Distance = LVQCosDist<DataType, CompressType>;
 
     static constexpr bool HasOptimize = true;
+
+    template <typename CompressType>
+    static constexpr LVQCosVecStoreType<DataType, CompressType> ToLVQ() {
+        return {};
+    }
 };
 
 export template <typename DataT, typename CompressT>
@@ -116,6 +150,11 @@ public:
     using Distance = LVQL2Dist<DataType, CompressType>;
 
     static constexpr bool HasOptimize = true;
+
+    template <typename CompressType>
+    static constexpr LVQL2VecStoreType<DataType, CompressType> ToLVQ() {
+        return {};
+    }
 };
 
 export template <typename DataT, typename CompressT>
@@ -131,6 +170,11 @@ public:
     using Distance = LVQIPDist<DataType, CompressType>;
 
     static constexpr bool HasOptimize = true;
+
+    template <typename CompressType>
+    static constexpr LVQIPVecStoreType<DataType, CompressType> ToLVQ() {
+        return {};
+    }
 };
 
 } // namespace infinity

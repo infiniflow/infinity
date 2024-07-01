@@ -835,8 +835,22 @@ void SegmentIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParam
             }
             break;
         }
+        case IndexType::kHnsw: {
+            const auto [chunk_index_entries, memory_index_entry] = this->GetHnswIndexSnapshot();
+            for (const auto &chunk_index_entry : chunk_index_entries) {
+                BufferHandle buffer_handle = chunk_index_entry->GetIndex();
+                auto *file_worker = static_cast<HnswFileWorker *>(buffer_handle.GetFileWorkerMut());
+                file_worker->CompressToLVQ();
+            }
+            if (memory_index_entry.get() != nullptr) {
+                BufferHandle buffer_handle = memory_index_entry->GetIndex();
+                auto *file_worker = static_cast<HnswFileWorker *>(buffer_handle.GetFileWorkerMut());
+                file_worker->CompressToLVQ();
+            }
+            break;
+        }
         default: {
-            UnrecoverableError("Not implemented");
+            LOG_WARN("Not implemented");
         }
     }
 }
@@ -1050,6 +1064,15 @@ void SegmentIndexEntry::SaveIndexFile() {
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->SaveIndexFile();
+    }
+}
+
+void SegmentIndexEntry::SaveHnsw() {
+    for (auto &chunk_index_entry : chunk_index_entries_) {
+        chunk_index_entry->Save();
+    }
+    if (memory_hnsw_indexer_.get() != nullptr) {
+        memory_hnsw_indexer_->Save();
     }
 }
 

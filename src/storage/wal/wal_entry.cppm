@@ -22,7 +22,7 @@ import table_def;
 import index_base;
 import data_block;
 import stl;
-
+import statement_common;
 import infinity_exception;
 import internal_types;
 
@@ -63,6 +63,11 @@ export enum class WalCommandType : i8 {
     // -----------------------------
     CHECKPOINT = 99,
     COMPACT = 100,
+
+    // -----------------------------
+    // Optimize
+    // -----------------------------
+    OPTIMIZE = 101,
 };
 
 export struct WalBlockInfo {
@@ -355,6 +360,26 @@ export struct WalCmdCompact : public WalCmd {
     const String table_name_{};
     const Vector<WalSegmentInfo> new_segment_infos_{};
     const Vector<SegmentID> deprecated_segment_ids_{};
+};
+
+export struct WalCmdOptimize : public WalCmd {
+    WalCmdOptimize(String db_name, String table_name, String index_name, Vector<UniquePtr<InitParameter>> params)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), params_(std::move(params)) {}
+
+    WalCommandType GetType() override { return WalCommandType::OPTIMIZE; }
+
+    bool operator==(const WalCmd &other) const override;
+
+    i32 GetSizeInBytes() const override;
+
+    void WriteAdv(char *&buf) const override;
+
+    static WalCmdOptimize ReadBufferAdv(char *&ptr);
+
+    String db_name_{};
+    String table_name_{};
+    String index_name_{};
+    Vector<UniquePtr<InitParameter>> params_{};
 };
 
 export struct WalEntryHeader {

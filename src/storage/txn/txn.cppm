@@ -16,7 +16,7 @@ module;
 export module txn;
 
 import stl;
-
+import statement_common;
 import meta_info;
 import table_def;
 import index_base;
@@ -166,6 +166,8 @@ public:
     Status Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool check_conflict = true);
 
     Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
+
+    Status OptimizeIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
 
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
