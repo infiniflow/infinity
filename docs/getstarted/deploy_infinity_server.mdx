@@ -11,11 +11,11 @@ This document provides guidance on deploying the Infinity database.
 
 You can deploy Infinity in the following three ways: 
 
-- [Install Infinity using pip](#install-infinity-using-pip): Mainly for local deployment or quick testing.
+- [Deploy embedded Infinity using pip](#deploy-embedded-infinity-using-pip): Mainly for local deployment or quick testing.
 - [Deploy Infinity using Docker](#deploy-infinity-using-docker): Mainly for deploying a separate server for remote access.
 - [Deploy Infinity using binary](#deploy-infinity-using-binary): Mainly for deploying a separate server for remote access.
 
-### Install Infinity using pip
+### Deploy embedded Infinity using pip
 
 #### Prerequisites
 
@@ -121,7 +121,8 @@ Before running the following Python scripts, please ensure that you have already
 ```python
 import infinity
 
-# Connect to Infinity. If it is deployed locally use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
+# Connect to Infinity. 
+# If Infinity is deployed using pip as an embedded package, use `infinity_obj = infinity.connect("/path/to/save/your/files/to")` instead
 infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
 db = infinity_obj.get_database("default_db")
 table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
