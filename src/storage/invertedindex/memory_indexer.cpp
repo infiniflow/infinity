@@ -28,6 +28,8 @@ module;
 #include <filesystem>
 #include <iostream>
 #include <string.h>
+#include "concurrentqueue.h"
+
 module memory_indexer;
 
 import stl;
@@ -363,7 +365,7 @@ void MemoryIndexer::Reset() {
     column_lengths_.Clear();
 }
 
-void MemoryIndexer::TupleListToIndexFile(SortMergerTermTuple<TermTuple, u32> *merger) {
+void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple, u32>>& merger) {
     auto& count = merger->Count();
     auto& term_tuple_list_queue = merger->TermTupleListQueue();
     auto& out_queue_mtx = merger->OutQueueMtx();
@@ -393,12 +395,10 @@ void MemoryIndexer::TupleListToIndexFile(SortMergerTermTuple<TermTuple, u32> *me
         UniquePtr<TermTupleList> temp_term_tuple;
         {
             std::unique_lock out_lock(out_queue_mtx);
-            out_queue_con.wait(out_lock, [&term_tuple_list_queue]() { return !term_tuple_list_queue.empty(); });
+            out_queue_con.wait(out_lock, [&term_tuple_list_queue, &temp_term_tuple]() { return term_tuple_list_queue.try_dequeue(temp_term_tuple); });
             if (count == 0) {
                 break;
             }
-            temp_term_tuple = std::move(term_tuple_list_queue.front());
-            term_tuple_list_queue.pop();
         }
         doc_pos_list_size = temp_term_tuple->Size();
         term_length = temp_term_tuple->term_.size();
@@ -478,15 +478,14 @@ void MemoryIndexer::OfflineDump() {
     }
     FinalSpillFile();
     constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
-    SortMergerTermTuple<TermTuple, u32> *merger = new SortMergerTermTuple<TermTuple, u32>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
+    UniquePtr<SortMergerTermTuple<TermTuple, u32>> merger = MakeUnique<SortMergerTermTuple<TermTuple, u32>>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
     Vector<UniquePtr<Thread>> threads;
     merger->Run(threads);
-    UniquePtr<Thread> output_thread = MakeUnique<Thread>(std::bind(&MemoryIndexer::TupleListToIndexFile, this, merger));
+    UniquePtr<Thread> output_thread = MakeUnique<Thread>(std::bind(&MemoryIndexer::TupleListToIndexFile, this, std::ref(merger)));
     threads.emplace_back(std::move(output_thread));
 
     merger->JoinThreads(threads);
     merger->UnInitRunFile();
-    delete merger;
 
     std::filesystem::remove(spill_full_path_);
     num_runs_ = 0;

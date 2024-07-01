@@ -22,6 +22,7 @@ module;
 #include <cstdio>
 #include <unistd.h>
 #include <fcntl.h>
+#include "concurrentqueue.h"
 
 module external_sort_merger;
 
@@ -352,43 +353,6 @@ void SortMerger<KeyType, LenType>::Merge() {
 }
 
 template <typename KeyType, typename LenType>
-void SortMerger<KeyType, LenType>::OutputByQueue(FILE *f) {
-    DirectIO io_stream(f, "w");
-    while (count_ > 0) {
-        Queue<UniquePtr<char_t[]>> temp_out_queue;
-        Queue<u32> temp_out_size_queue;
-        {
-            std::unique_lock out_lock(out_queue_mtx_);
-            out_queue_con_.wait(out_lock, [this]() { return !this->out_queue_.empty(); });
-
-            if (count_ == 0) {
-                break;
-            }
-
-            auto write_cnt = OUT_BATCH_SIZE_;
-
-            while (count_ > 0 && write_cnt > 0 && !out_queue_.empty()) {
-                temp_out_queue.push(std::move(out_queue_.front()));
-                temp_out_size_queue.push(out_size_queue_.front());
-                out_queue_.pop();
-                out_size_queue_.pop();
-
-                --count_;
-                --write_cnt;
-            }
-        }
-        assert(temp_out_queue.size() == temp_out_size_queue.size());
-        while(temp_out_queue.size()) {
-            auto top_data = std::move(temp_out_queue.front());
-            auto data_len = temp_out_size_queue.front();
-            temp_out_queue.pop();
-            temp_out_size_queue.pop();
-            io_stream.Write(top_data.get(), data_len);
-        }
-    }
-}
-
-template <typename KeyType, typename LenType>
 void SortMerger<KeyType, LenType>::Unpin(Vector<UniquePtr<Thread>> &threads) {
     int num_cores = std::thread::hardware_concurrency();
     cpu_set_t cpuset;
@@ -499,7 +463,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
                 // output
                 {
                     std::unique_lock lock(this->out_queue_mtx_);
-                    this->term_tuple_list_queue_.push(std::move(tuple_list));
+                    this->term_tuple_list_queue_.enqueue(std::move(tuple_list));
                     this->out_queue_con_.notify_one();
                 }
                 tuple_list = MakeUnique<TermTupleList>(out_key.term_);
@@ -547,7 +511,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
     {
         std::unique_lock lock(this->out_queue_mtx_);
         if (tuple_list != nullptr) {
-            this->term_tuple_list_queue_.push(std::move(tuple_list));
+            this->term_tuple_list_queue_.enqueue(std::move(tuple_list));
         }
         this->out_queue_con_.notify_one();
     }

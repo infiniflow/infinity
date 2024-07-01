@@ -115,7 +115,7 @@ private:
 
     u64 ReadU64LE(const u8 *ptr) { return *(u64 *)ptr; }
 
-    void TupleListToIndexFile(SortMergerTermTuple<TermTuple, u32> *merger);
+    void TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple, u32>>& merger);
 
 private:
     String index_dir_;
