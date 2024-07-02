@@ -24,6 +24,7 @@ import infinity_exception;
 import third_party;
 import serialize;
 import segment_iter;
+import bp_reordering;
 
 namespace infinity {
 
@@ -157,6 +158,25 @@ Optional<TailFwd<DataType, IdxType>> BlockFwd<DataType, IdxType>::AddDoc(const S
 }
 
 template <typename DataType, typename IdxType>
+Vector<Pair<Vector<IdxType>, Vector<DataType>>> BlockFwd<DataType, IdxType>::GetFwd(SizeT doc_num, SizeT term_num) const {
+    SizeT doc_n = doc_num / block_size_ * block_size_;
+    Vector<Pair<Vector<IdxType>, Vector<DataType>>> fwd(doc_n);
+    for (SizeT block_id = 0; block_id < block_terms_list_.size(); ++block_id) {
+        const auto &block_terms = block_terms_list_[block_id];
+        for (auto iter = block_terms.Iter(); iter.HasNext(); iter.Next()) {
+            const auto &[term_id, block_size, block_offsets, scores] = iter.Value();
+            for (SizeT i = 0; i < block_size; ++i) {
+                BMPDocID doc_id = block_offsets[i] + block_id * block_size_;
+                DataType score = scores[i];
+                fwd[doc_id].first.push_back(term_id);
+                fwd[doc_id].second.push_back(score);
+            }
+        }
+    }
+    return fwd;
+}
+
+template <typename DataType, typename IdxType>
 Vector<Vector<DataType>> BlockFwd<DataType, IdxType>::GetIvtScores(SizeT term_num) const {
     Vector<Vector<DataType>> res(term_num);
     for (const auto &block_terms : block_terms_list_) {
@@ -236,9 +256,40 @@ template <typename DataType, typename IdxType, BMPCompressType CompressType>
 void BMPAlg<DataType, IdxType, CompressType>::Optimize(const BMPOptimizeOptions &options) {
     std::unique_lock lock(mtx_);
 
-    SizeT term_num = bm_ivt_.term_num();
-    Vector<Vector<DataType>> ivt_scores = block_fwd_.GetIvtScores(term_num);
-    bm_ivt_.Optimize(options.topk_, std::move(ivt_scores));
+    if (options.bp_reorder_) {
+        SizeT block_size = block_fwd_.block_size();
+        SizeT term_num = bm_ivt_.term_num();
+        SizeT doc_num = doc_ids_.size() - doc_ids_.size() % block_size;
+
+        bm_ivt_ = BMPIvt<DataType, CompressType>(term_num);
+        Vector<Pair<Vector<IdxType>, Vector<DataType>>> fwd = block_fwd_.GetFwd(doc_num, term_num);
+        TailFwd<DataType, IdxType> tail_fwd = block_fwd_.GetTailFwd();
+        block_fwd_ = BlockFwd<DataType, IdxType>(block_size);
+
+        BPReordering<IdxType, BMPDocID> bp;
+        for (BMPDocID i = 0; i < doc_num; ++i) {
+            bp.AddDoc(&fwd[i].first);
+        }
+        Vector<BMPDocID> remap = bp(term_num);
+
+        Vector<BMPDocID> doc_ids;
+        std::swap(doc_ids, doc_ids_);
+        for (BMPDocID new_id = 0; new_id < doc_num; ++new_id) {
+            BMPDocID old_id = remap[new_id];
+            SparseVecRef<DataType, IdxType> doc((i32)fwd[old_id].first.size(), fwd[old_id].first.data(), fwd[old_id].second.data());
+            this->AddDoc(doc, doc_ids[old_id], false);
+        }
+        for (BMPDocID i = doc_num; i < doc_ids.size(); ++i) {
+            const auto &[indices, data] = tail_fwd.GetTailTerms()[i - doc_num];
+            SparseVecRef<DataType, IdxType> doc((i32)indices.size(), indices.data(), data.data());
+            this->AddDoc(doc, doc_ids[i], false);
+        }
+    }
+    if (options.topk_ != 0) {
+        SizeT term_num = bm_ivt_.term_num();
+        Vector<Vector<DataType>> ivt_scores = block_fwd_.GetIvtScores(term_num);
+        bm_ivt_.Optimize(options.topk_, std::move(ivt_scores));
+    }
 }
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>

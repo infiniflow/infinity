@@ -70,9 +70,11 @@ Optional<BMPOptimizeOptions> BMPUtil::ParseBMPOptimizeOptions(const Vector<Uniqu
                 LOG_WARN(fmt::format("topk value is large {}", topk));
             }
             options.topk_ = topk;
+        } else if (opt_param->param_name_ == "bp_reorder") {
+            options.bp_reorder_ = true;
         }
     }
-    if (options.topk_ == 0) {
+    if (options.topk_ == 0 && !options.bp_reorder_) {
         return None;
     }
     return options;

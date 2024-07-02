@@ -88,6 +88,10 @@ public:
 
     Optional<TailFwd<DataType, IdxType>> AddDoc(const SparseVecRef<DataType, IdxType> &doc);
 
+    Vector<Pair<Vector<IdxType>, Vector<DataType>>> GetFwd(SizeT doc_num, SizeT term_num) const;
+
+    TailFwd<DataType, IdxType> GetTailFwd() { return std::move(tail_fwd_); }
+
     Vector<Vector<DataType>> GetIvtScores(SizeT term_num) const;
 
     Vector<DataType> GetScores(BMPBlockID block_id, const SparseVecRef<DataType, IdxType> &query) const;

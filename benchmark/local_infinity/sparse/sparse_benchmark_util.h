@@ -322,18 +322,26 @@ public:
         app_.add_option("--type", type_, "BMP compress type")
             ->required(false)
             ->transform(CLI::CheckedTransformer(bmp_compress_type_map, CLI::ignore_case));
+        app_.add_option("--bp_reorder", bp_reorder_, "BP reorder")->required(false)->transform(CLI::TypeValidator<bool>());
         app_.add_option("--topk", topk_, "Topk")->required(false)->transform(CLI::Range(1, 1024));
-        app_.add_option("--block_size", block_size_, "Block size")->required(false)->transform(CLI::Range(1, 1024));
+        app_.add_option("--block_size", block_size_, "Block size")->required(false)->transform(CLI::Range(1, 256));
         app_.add_option("--alpha", alpha_, "Alpha")->required(false)->transform(CLI::Range(0.0, 100.0));
         app_.add_option("--beta", beta_, "Beta")->required(false)->transform(CLI::Range(0.0, 100.0));
     }
 
-    String IndexName() const override { return fmt::format("bmp_block{}_type{}", block_size_, static_cast<i8>(type_)); }
+    String IndexName() const override {
+        String name = fmt::format("bmp_block{}_type{}", block_size_, static_cast<i8>(type_));
+        if (bp_reorder_) {
+            name += "_bp";
+        }
+        return name;
+    }
 
 public:
     BMPCompressType type_ = BMPCompressType::kCompressed;
+    bool bp_reorder_ = false;
     i32 topk_ = 10;
-    u8 block_size_ = 8;
+    SizeT block_size_ = 8;
     f32 alpha_ = 1.0;
     f32 beta_ = 1.0;
 };

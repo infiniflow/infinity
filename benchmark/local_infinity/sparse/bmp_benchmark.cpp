@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
                 }
                 data_mat.Clear();
 
-                BMPOptimizeOptions optimize_options{.topk_ = opt.topk_};
+                BMPOptimizeOptions optimize_options{.topk_ = opt.topk_, .bp_reorder_ = opt.bp_reorder_};
                 std::cout << "Optimizing index...\n";
                 index.Optimize(optimize_options);
                 std::cout << "Index built\n";
