@@ -3,10 +3,10 @@
 # NOTICE: You can use the download_deps_infinity_builder_centos7.sh script to download them
 # bison-3.8.2.tar.xz
 # binutils-2.41.tar.xz
-# gcc-13.2.0.tar.xz
+# gcc-12.2.0.tar.xz
 # cmake-3.29.3-linux-x86_64.tar.gz
 # ninja-linux.zip
-# llvm-project-17.0.6.src.tar.xz
+# llvm-project-18.1.8.src.tar.xz
 # boost_1_81_0.tar.bz2
 # flex-2.6.4.tar.gz
 # liburing-2.5.tar.gz
@@ -39,15 +39,15 @@ RUN --mount=type=bind,source=binutils-2.41.tar.xz,target=/root/binutils-2.41.tar
     && make -j && make install-strip \
     && ldconfig && cd /root && rm -rf binutils-2.41
 
-# Install gcc-13.2.0
-RUN --mount=type=bind,source=gcc-13.2.0.tar.xz,target=/root/gcc-13.2.0.tar.xz \
-    cd /root && tar xf gcc-13.2.0.tar.xz \
-    && cd gcc-13.2.0 && ./contrib/download_prerequisites \
+# Install gcc-12.2.0
+RUN --mount=type=bind,source=gcc-12.2.0.tar.xz,target=/root/gcc-12.2.0.tar.xz \
+    cd /root && tar xf gcc-12.2.0.tar.xz \
+    && cd gcc-12.2.0 && ./contrib/download_prerequisites \
     && cd /root && mkdir build-gcc && cd build-gcc \
-    && ../gcc-13.2.0/configure --enable-languages=c,c++ \
+    && ../gcc-12.2.0/configure --enable-languages=c,c++ \
         --disable-multilib --with-pic \
     && make -j12 && make install-strip \
-    && cd /root && rm -rf build-gcc && rm -rf gcc-13.2.0 \
+    && cd /root && rm -rf build-gcc && rm -rf gcc-12.2.0 \
     && ln -s gcc /usr/local/bin/cc && ldconfig
 
 ENV LIBRARY_PATH=/usr/local/lib:/usr/local/lib64
@@ -64,12 +64,12 @@ RUN --mount=type=bind,source=ninja-linux.zip,target=/root/ninja-linux.zip \
     cd /root && unzip ninja-linux.zip \
     && cp ninja /usr/local/bin && rm ninja
 
-# Install clang-17.0.6
+# Install clang-18.1.8
 # Add -DCLANG_DEFAULT_LINKER=lld to use lld by default
 # infinity seems to be incompatible with the lld linker
-RUN --mount=type=bind,source=llvm-project-17.0.6.src.tar.xz,target=/root/llvm-project-17.0.6.src.tar.xz \
-    cd /root && tar xf llvm-project-17.0.6.src.tar.xz \
-    && cd llvm-project-17.0.6.src && mkdir build && cd build \
+RUN --mount=type=bind,source=llvm-project-18.1.8.src.tar.xz,target=/root/llvm-project-18.1.8.src.tar.xz \
+    cd /root && tar xf llvm-project-18.1.8.src.tar.xz \
+    && cd llvm-project-18.1.8.src && mkdir build && cd build \
     && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_JOB_POOLS:STRING=link_pool=1 \
         -DCMAKE_JOB_POOL_LINK:STRING=link_pool \
@@ -78,8 +78,8 @@ RUN --mount=type=bind,source=llvm-project-17.0.6.src.tar.xz,target=/root/llvm-pr
         -DLLVM_ENABLE_RUNTIMES="compiler-rt" \
         -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
         -DLLVM_TARGETS_TO_BUILD=X86 ../llvm \
-    && ninja -j12 install/strip \
-    && ldconfig && cd /root && rm -rf llvm-project-17.0.6.src
+    && ninja install/strip \
+    && ldconfig && cd /root && rm -rf llvm-project-18.1.8.src
 
 # Install boost-1.81.0
 RUN --mount=type=bind,source=boost_1_81_0.tar.bz2,target=/root/boost_1_81_0.tar.bz2 \
@@ -107,7 +107,7 @@ RUN --mount=type=bind,source=libevent-2.1.12-stable.tar.gz,target=/root/libevent
     && cd libevent-2.1.12-stable && mkdir build && cd build \
     && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_C_FLAGS="-fPIC" .. \
-    && ninja -j0 install \
+    && ninja install \
     && ldconfig && cd /root && rm -rf libevent-2.1.12-stable
 
 # Install lz4-1.9.4

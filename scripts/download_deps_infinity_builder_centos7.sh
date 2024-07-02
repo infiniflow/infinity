@@ -13,10 +13,10 @@ download()
 # https://stackoverflow.com/questions/24628076/convert-multiline-string-to-array
 names="https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz
 https://ftp.gnu.org/gnu/binutils/binutils-2.41.tar.xz
-https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz
+https://ftp.gnu.org/gnu/gcc/gcc-12.2.0/gcc-12.2.0.tar.xz
 https://github.com/Kitware/CMake/releases/download/v3.29.3/cmake-3.29.3-linux-x86_64.tar.gz
 https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
-https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/llvm-project-17.0.6.src.tar.xz
+https://github.com/llvm/llvm-project/releases/download/llvmorg-18.1.8/llvm-project-18.1.8.src.tar.xz
 https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.bz2
 https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz
 https://github.com/axboe/liburing/archive/refs/tags/liburing-2.5.tar.gz
