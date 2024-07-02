@@ -74,7 +74,7 @@ class TestInsert(HttpTest):
 
     def test_http_insert_embedding(self):
         db_name = "default_db"
-        table_name = "test_http_test_insert_big_embedding"
+        table_name = "test_http_test_insert_embedding"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
