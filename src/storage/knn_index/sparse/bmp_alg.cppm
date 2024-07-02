@@ -36,7 +36,7 @@ public:
     BMPIvt(SizeT term_num) : postings_(term_num) {}
 
     template <typename IdxType>
-    void AddBlock(BMPBlockID block_id, const Vector<Vector<Pair<IdxType, DataType>>> &tail_terms);
+    void AddBlock(BMPBlockID block_id, const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &tail_terms);
 
     void Optimize(i32 topk, Vector<Vector<DataType>> ivt_scores);
 
@@ -57,14 +57,14 @@ private:
 template <typename DataType, typename IdxType>
 class TailFwd {
 private:
-    TailFwd(Vector<Vector<Pair<IdxType, DataType>>> tail_terms) : tail_terms_(std::move(tail_terms)) {}
+    TailFwd(Vector<Pair<Vector<IdxType>, Vector<DataType>>> tail_terms) : tail_terms_(std::move(tail_terms)) {}
 
 public:
-    TailFwd() = default;
+    TailFwd(SizeT block_size) { tail_terms_.reserve(block_size); }
 
     SizeT AddDoc(const SparseVecRef<DataType, IdxType> &doc);
 
-    const Vector<Vector<Pair<IdxType, DataType>>> &GetTailTerms() const { return tail_terms_; }
+    const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &GetTailTerms() const { return tail_terms_; }
 
     Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> ToBlockFwd() const;
 
@@ -75,17 +75,16 @@ public:
     static TailFwd<DataType, IdxType> ReadAdv(const char *&p);
 
 private:
-    Vector<Vector<Pair<IdxType, DataType>>> tail_terms_;
+    Vector<Pair<Vector<IdxType>, Vector<DataType>>> tail_terms_;
 };
 
 template <typename DataType, typename IdxType>
 class BlockFwd {
-private:
+public:
     BlockFwd(SizeT block_size, Vector<BlockTerms<DataType, IdxType>> block_terms_list, TailFwd<DataType, IdxType> tail_fwd)
         : block_size_(block_size), block_terms_list_(std::move(block_terms_list)), tail_fwd_(std::move(tail_fwd)) {}
 
-public:
-    BlockFwd(SizeT block_size) : block_size_(block_size) {}
+    BlockFwd(SizeT block_size) : block_size_(block_size), tail_fwd_(block_size) {}
 
     Optional<TailFwd<DataType, IdxType>> AddDoc(const SparseVecRef<DataType, IdxType> &doc);
 
@@ -127,7 +126,7 @@ private:
 public:
     BMPAlg(SizeT term_num, SizeT block_size) : bm_ivt_(term_num), block_fwd_(block_size) {}
 
-    void AddDoc(const SparseVecRef<DataType, IdxType> &doc, BMPDocID doc_id);
+    void AddDoc(const SparseVecRef<DataType, IdxType> &doc, BMPDocID doc_id, bool lock = true);
 
     template <DataIteratorConcept<SparseVecRef<DataType, IdxType>, BMPDocID> Iterator>
     SizeT AddDocs(Iterator iter);

@@ -29,10 +29,13 @@ namespace infinity {
 
 template <typename DataType, BMPCompressType CompressType>
 template <typename IdxType>
-void BMPIvt<DataType, CompressType>::AddBlock(BMPBlockID block_id, const Vector<Vector<Pair<IdxType, DataType>>> &tail_terms) {
+void BMPIvt<DataType, CompressType>::AddBlock(BMPBlockID block_id, const Vector<Pair<Vector<IdxType>, Vector<DataType>>> &tail_terms) {
     HashMap<IdxType, DataType> max_scores;
-    for (const auto &terms : tail_terms) {
-        for (const auto &[term_id, score] : terms) {
+    for (const auto &[indices, data] : tail_terms) {
+        SizeT block_size = indices.size();
+        for (SizeT i = 0; i < block_size; ++i) {
+            IdxType term_id = indices[i];
+            DataType score = data[i];
             max_scores[term_id] = std::max(max_scores[term_id], score);
         }
     }
@@ -62,11 +65,15 @@ template class BMPIvt<f64, BMPCompressType::kRaw>;
 
 template <typename DataType, typename IdxType>
 SizeT TailFwd<DataType, IdxType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc) {
-    Vector<Pair<IdxType, DataType>> doc_terms;
+    Vector<IdxType> indices;
+    Vector<DataType> data;
+    indices.reserve(doc.nnz_);
+    data.reserve(doc.nnz_);
     for (i32 i = 0; i < doc.nnz_; ++i) {
-        doc_terms.emplace_back(doc.indices_[i], doc.data_[i]);
+        indices.push_back(doc.indices_[i]);
+        data.push_back(doc.data_[i]);
     }
-    tail_terms_.emplace_back(std::move(doc_terms));
+    tail_terms_.emplace_back(std::move(indices), std::move(data));
     return tail_terms_.size();
 }
 
@@ -75,7 +82,10 @@ Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> TailFwd<DataTyp
     Vector<Tuple<IdxType, BMPBlockOffset, DataType>> term_pairs;
     SizeT block_size = tail_terms_.size();
     for (SizeT block_offset = 0; block_offset < block_size; ++block_offset) {
-        for (const auto &[term_id, score] : tail_terms_[block_offset]) {
+        SizeT block_size = tail_terms_[block_offset].first.size();
+        for (SizeT i = 0; i < block_size; ++i) {
+            IdxType term_id = tail_terms_[block_offset].first[i];
+            DataType score = tail_terms_[block_offset].second[i];
             term_pairs.emplace_back(term_id, block_offset, score);
         }
     }
@@ -106,19 +116,19 @@ Vector<DataType> TailFwd<DataType, IdxType>::GetScores(const SparseVecRef<DataTy
     SizeT tail_size = tail_terms_.size();
     Vector<DataType> res(tail_size, 0.0);
     for (SizeT offset = 0; offset < tail_size; ++offset) {
-        const auto &tail_terms = tail_terms_[offset];
+        const auto &[indices, data] = tail_terms_[offset];
         SizeT j = 0;
         for (i32 i = 0; i < query.nnz_; ++i) {
             IdxType query_term = query.indices_[i];
             DataType query_score = query.data_[i];
-            while (j < tail_terms.size() && tail_terms[j].first < query_term) {
+            while (j < indices.size() && indices[j] < query_term) {
                 ++j;
             }
-            if (j == tail_terms.size()) {
+            if (j == indices.size()) {
                 break;
             }
-            if (tail_terms[j].first == query_term) {
-                res[offset] += query_score * tail_terms[j].second;
+            if (indices[j] == query_term) {
+                res[offset] += query_score * data[j];
             }
         }
     }
@@ -138,7 +148,7 @@ Optional<TailFwd<DataType, IdxType>> BlockFwd<DataType, IdxType>::AddDoc(const S
     if (tail_size < block_size_) {
         return None;
     }
-    TailFwd<DataType, IdxType> tail_fwd1;
+    TailFwd<DataType, IdxType> tail_fwd1(block_size_);
     std::swap(tail_fwd1, tail_fwd_);
 
     Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>> block_terms = tail_fwd1.ToBlockFwd();
@@ -206,8 +216,11 @@ template class BlockFwd<f64, i16>;
 template class BlockFwd<f64, i8>;
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
-void BMPAlg<DataType, IdxType, CompressType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc, BMPDocID doc_id) {
-    std::unique_lock lock(mtx_);
+void BMPAlg<DataType, IdxType, CompressType>::AddDoc(const SparseVecRef<DataType, IdxType> &doc, BMPDocID doc_id, bool lck) {
+    std::unique_lock<std::shared_mutex> lock;
+    if (lck) {
+        lock = std::unique_lock(mtx_);
+    }
 
     doc_ids_.push_back(doc_id);
     Optional<TailFwd<DataType, IdxType>> tail_fwd = block_fwd_.AddDoc(doc);
