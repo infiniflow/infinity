@@ -1,0 +1,22 @@
+import subprocess
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
+
+commands = [
+    "python3 tools/run_pysdk_remote_infinity_test.py",
+    "python3 tools/run_parallel_test.py",
+    "python3 tools/run_http_api.py"
+]
+
+def run_command(command):
+    start_time = time.time()
+    subprocess.run(command, shell=True)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    return command, elapsed_time
+
+with ProcessPoolExecutor() as executor:
+    futures = [executor.submit(run_command, cmd) for cmd in commands]
+    for future in as_completed(futures):
+        command, elapsed_time = future.result()
+        print(f"Command '{command}' executed in {elapsed_time:.2f} seconds")
