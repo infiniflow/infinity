@@ -13,10 +13,12 @@
 // limitations under the License.
 
 #include "constant_expr.h"
+#include "definition/column_def.h"
 #include "expr/parsed_expr.h"
 #include "parser_assert.h"
 #include "spdlog/fmt/fmt.h"
 #include "type/datetime/interval_type.h"
+#include "type/info/sparse_info.h"
 #include "type/serialize.h"
 #include <cstdint>
 #include <cstring>
@@ -512,6 +514,40 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(const nlohmann::json &cons
         }
     }
     return std::shared_ptr<ParsedExpr>(const_expr);
+}
+
+void ConstantExpr::TrySortSparseVec(const ColumnDef *col_def) {
+    if (literal_type_ != LiteralType::kLongSparseArray && literal_type_ != LiteralType::kDoubleSparseArray) {
+        return;
+    }
+    if (col_def != nullptr) {
+        auto data_type = col_def->type()->type();
+        if (data_type != LogicalType::kSparse) {
+            return;
+        }
+        const auto *sparse_info = static_cast<const SparseInfo *>(col_def->type()->type_info().get());
+        if (sparse_info->StoreType() == SparseStoreType::kSorted) {
+            return;
+        }
+    }
+    if (literal_type_ == LiteralType::kLongSparseArray) {
+        if (long_sparse_array_.second.empty()) {
+            // bit sparse vec
+            std::sort(long_sparse_array_.first.begin(), long_sparse_array_.first.end());
+        } else {
+            std::vector<std::pair<int64_t, int64_t>> pairs;
+            for (size_t i = 0; i < long_sparse_array_.first.size(); ++i) {
+                pairs.emplace_back(long_sparse_array_.first[i], long_sparse_array_.second[i]);
+            }
+            std::sort(pairs.begin(), pairs.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+        }
+    } else {
+        std::vector<std::pair<int64_t, double>> pairs;
+        for (size_t i = 0; i < double_sparse_array_.first.size(); ++i) {
+            pairs.emplace_back(double_sparse_array_.first[i], double_sparse_array_.second[i]);
+        }
+        std::sort(pairs.begin(), pairs.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+    }
 }
 
 } // namespace infinity

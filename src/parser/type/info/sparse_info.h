@@ -24,7 +24,7 @@ namespace infinity {
 
 enum class SparseStoreType : int8_t {
     kSort,
-    kNotSort,
+    kSorted,
     kInvalid,
 };
 
