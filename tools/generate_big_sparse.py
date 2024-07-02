@@ -1,8 +1,9 @@
-# generate 'test/sql/dml/import/test_import_big_sparse.slt' & 'test/sql/dml/import/test_insert_big_sparse.slt' & 'test/data/csv/test_sparse/big_sparse.csv'
+# generate 'test/sql/dml/import/test_import_big_sparse.slt' & 'test/sql/dml/import/test_insert_big_sparse.slt' & 'test/sql/dql/knn/sparse/test_knn_sparse_bmp_big.slt'
+# genrate 'test/data/csv/test_sparse/big_sparse.csv'
 
 import argparse
 import os
-from generate_util.generate_sparse_data import generate_sparse_data
+from generate_util.generate_sparse_data import *
 from generate_util.format_data import sparse_format_float
 
 
@@ -14,12 +15,14 @@ def generate(generate_if_exists: bool, copy_dir: str):
     csv_dir = "./test/data/csv/test_sparse"
     import_slt_dir = "./test/sql/dml/import"
     insert_slt_dir = "./test/sql/dml/insert"
+    knn_slt_dir = "./test/sql/dql/knn/sparse"
 
     table_name = "big_sparse_table"
     csv_filename = "big_sparse.csv"
     csv_path = csv_dir + "/" + csv_filename
     import_slt_path = import_slt_dir + "/test_import_big_sparse.slt"
     insert_slt_path = insert_slt_dir + "/test_insert_big_sparse.slt"
+    bmp_knn_slt_path = knn_slt_dir + "/test_knn_sparse_bmp_big.slt"
     copy_path = copy_dir + "/" + csv_filename
 
     os.makedirs(csv_dir, exist_ok=True)
@@ -29,11 +32,12 @@ def generate(generate_if_exists: bool, copy_dir: str):
         os.path.exists(csv_path)
         and os.path.exists(import_slt_path)
         and os.path.exists(insert_slt_path)
+        and os.path.exists(bmp_knn_slt_path)
         and not generate_if_exists
     ):
         print(
-            "File {} and {} and {} already existed. Skip Generating.".format(
-                csv_path, import_slt_path, insert_slt_path
+            "File {} and {} and {} and {} already existed. Skip Generating.".format(
+                csv_path, import_slt_path, insert_slt_path, bmp_knn_slt_path
             )
         )
         return
@@ -133,6 +137,75 @@ def generate(generate_if_exists: bool, copy_dir: str):
                 if j != end - 1:
                     insert_slt_file.write(", ")
             insert_slt_file.write("\n")
+
+    index_name = "bmp_index"
+    topk = 3
+    query_n = 1
+    qsparsity = 0.05
+    qindptr, qindices, qdata = generate_sparse_data(query_n, max_dim, qsparsity)
+
+    with open(bmp_knn_slt_path, "w") as bmp_knn_slt_file:
+        bmp_knn_slt_file.write("statement ok\n")
+        bmp_knn_slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name))
+        bmp_knn_slt_file.write("\n")
+
+        bmp_knn_slt_file.write("statement ok\n")
+        bmp_knn_slt_file.write(
+            "CREATE TABLE {} ( c1 INT, c2 SPARSE(FLOAT, {}));\n".format(
+                table_name, max_dim
+            )
+        )
+        bmp_knn_slt_file.write("\n")
+
+        bmp_knn_slt_file.write("statement ok\n")
+        bmp_knn_slt_file.write(
+            "COPY {} FROM '{}' WITH ( DELIMITER ',');\n".format(table_name, copy_path)
+        )
+        bmp_knn_slt_file.write("\n")
+
+        bmp_knn_slt_file.write("statement ok\n")
+        bmp_knn_slt_file.write(
+            "CREATE INDEX {} ON {} (c2) USING Bmp WITH (block_size = 8, compress_type = compress);\n".format(
+                index_name, table_name
+            )
+        )
+        bmp_knn_slt_file.write("\n")
+
+        bmp_knn_slt_file.write("statement ok\n")
+        bmp_knn_slt_file.write(
+            "OPTIMIZE {} ON {} WITH (bp_reorder, topk = {});\n".format(
+                index_name, table_name, topk
+            )
+        )
+        bmp_knn_slt_file.write("\n")
+
+        for i in range(0, query_n):
+            bmp_knn_slt_file.write("query I\n")
+
+            start, end = qindptr[i], qindptr[i + 1]
+            bmp_knn_slt_file.write(
+                "SELECT c1 FROM {} SEARCH MATCH SPARSE (c2, [{}], 'ip', {}) WITH (alpha = 1.0, beta = 1.0);\n".format(
+                    table_name,
+                    ",".join(
+                        [
+                            "{}:{}".format(i, d)
+                            for (i, d) in zip(qindices[start:end], qdata[start:end])
+                        ]
+                    ),
+                    topk,
+                )
+            )
+            res = find_topk(
+                indptr, indices, data, topk, qindices[start:end], qdata[start:end]
+            )
+            bmp_knn_slt_file.write("----\n")
+            for r in res:
+                bmp_knn_slt_file.write("{}\n".format(r))
+            bmp_knn_slt_file.write("\n")
+
+        bmp_knn_slt_file.write("statement ok\n")
+        bmp_knn_slt_file.write("DROP TABLE {};\n".format(table_name))
+        bmp_knn_slt_file.write("\n")
 
 
 if __name__ == "__main__":

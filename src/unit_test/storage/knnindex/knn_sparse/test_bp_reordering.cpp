@@ -30,6 +30,21 @@ using namespace infinity;
 
 class BPReorderingTest : public BaseTest {
 protected:
+    f32 cost_func(i32 data_n, i32 query_n, const Vector<Vector<i32>> &fwd) {
+        Vector<Vector<i32>> ivt = Fwd2Ivt(fwd, query_n);
+        f32 cost = 0;
+        for (auto &posting : ivt) {
+            if (posting.empty()) {
+                continue;
+            }
+            for (SizeT i = 0; i < posting.size() - 1; ++i) {
+                float r = std::log2(posting[i + 1] - posting[i]);
+                cost += r;
+            }
+        }
+        return cost;
+    }
+
     f32 cost_func(i32 data_n, i32 query_n, const Vector<Vector<i32>> &fwd, const Vector<i32> &reorder) {
         Vector<i32> permutation(reorder.size());
         for (i32 i = 0; i < (i32)reorder.size(); ++i) {
@@ -95,7 +110,7 @@ protected:
             std::sort(data_indices.begin(), data_indices.end());
             bool check = true;
             for (i32 i = 0; i < data_n; ++i) {
-                auto diff = data_indices[i + 1] - data_indices[i] ;
+                auto diff = data_indices[i + 1] - data_indices[i];
                 if (diff > query_n) {
                     check = false;
                     break;
@@ -142,12 +157,13 @@ TEST_F(BPReorderingTest, test1) {
         // auto rng = std::default_random_engine{};
         // std::shuffle(fwd.begin(), fwd.end(), rng);
 
-        Vector<i32> old_order(data_n);
-        std::iota(old_order.begin(), old_order.end(), 0);
-        f32 old_cost = cost_func(data_n, query_n, fwd, old_order);
+        f32 old_cost = cost_func(data_n, query_n, fwd);
 
-        BPReordering bp(query_n, fwd, 10, 10);
-        Vector<i32> reorder = bp();
+        BPReordering<i32, i32> bp;
+        for (i32 i = 0; i < data_n; ++i) {
+            bp.AddDoc(&fwd[i]);
+        }
+        Vector<i32> reorder = bp(query_n, std::log2(data_n));
         f32 new_cost = cost_func(data_n, query_n, fwd, reorder);
 
         // Vector<i32> gt_reorder = {0, 1, 4, 2, 5, 6, 3, 7, 8};
@@ -164,12 +180,13 @@ TEST_F(BPReorderingTest, test2) {
     // assert(data_n % m == 0);
     Vector<Vector<i32>> fwd = GenerateFwd(data_n, query_n, edge_n);
 
-    BPReordering bp(query_n, fwd, 20, 10);
-    Vector<i32> reorder = bp();
+    BPReordering<i32, i32> bp;
+    for (i32 i = 0; i < data_n; ++i) {
+        bp.AddDoc(&fwd[i]);
+    }
+    Vector<i32> reorder = bp(query_n);
 
-    Vector<i32> old_order(data_n);
-    std::iota(old_order.begin(), old_order.end(), 0);
-    f32 old_cost = cost_func(data_n, query_n, fwd, old_order);
+    f32 old_cost = cost_func(data_n, query_n, fwd);
     f32 new_cost = cost_func(data_n, query_n, fwd, reorder);
 
     std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
@@ -180,7 +197,7 @@ TEST_F(BPReorderingTest, test3) {
     GTEST_SKIP() << "Skip this test. This program is not a test but for preprocessing data.";
 
     LocalFileSystem fs;
-    Path dataset_path = Path(test_data_path()) / "benchmark" / "splade" / "base_small.csr";
+    Path dataset_path = Path(test_data_path()) / "benchmark" / "splade" / "base_small_shuffled.csr";
     auto [file_handler, status] = fs.OpenFile(dataset_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
     if (!status.ok()) {
         std::cout << String(status.message()) << std::endl;
@@ -202,12 +219,13 @@ TEST_F(BPReorderingTest, test3) {
     // auto rng = std::default_random_engine{};
     // std::shuffle(fwd.begin(), fwd.end(), rng);
 
-    Vector<i32> old_order(data_n);
-    std::iota(old_order.begin(), old_order.end(), 0);
-    f32 old_cost = cost_func(data_n, dataset.ncol_, fwd, old_order);
+    f32 old_cost = cost_func(data_n, dataset.ncol_, fwd);
 
-    BPReordering bp(dataset.ncol_, fwd, 15, 20);
-    Vector<i32> reorder = bp();
+    BPReordering<i32, i32> bp;
+    for (i32 i = 0; i < data_n; ++i) {
+        bp.AddDoc(&fwd[i]);
+    }
+    Vector<i32> reorder = bp(dataset.ncol_);
     f32 new_cost = cost_func(data_n, dataset.ncol_, fwd, reorder);
 
     std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);

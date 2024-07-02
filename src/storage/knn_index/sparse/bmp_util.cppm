@@ -64,6 +64,7 @@ export struct BmpSearchOptions {
 
 export struct BMPOptimizeOptions {
     i32 topk_ = 0;
+    bool bp_reorder_ = false;
 };
 
 export class BMPUtil {
