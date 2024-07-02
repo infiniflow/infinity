@@ -17,6 +17,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "../type/serialize.h"
 
 namespace infinity {
 
@@ -62,6 +63,22 @@ struct InitParameter {
     std::string param_value_{};
 
     std::string ToString() { return param_name_ + ": " + param_value_; }
+
+    size_t GetSizeInBytes() const {
+        return sizeof(int) + param_name_.size() + sizeof(int) + param_value_.size();
+    }
+
+    void WriteAdv(char *&p) {
+        WriteBufAdv(p, param_name_);
+        WriteBufAdv(p, param_value_);
+    }
+
+    static std::unique_ptr<InitParameter> ReadAdv(char *&p) {
+        auto init_param = std::make_unique<InitParameter>();
+        init_param->param_name_ = ReadBufAdv<std::string>(p);
+        init_param->param_value_ = ReadBufAdv<std::string>(p);
+        return init_param;
+    }
 
     static std::vector<std::unique_ptr<InitParameter>> MakeInitParameterList(std::vector<InitParameter *> *init_params) {
         std::vector<std::unique_ptr<InitParameter>> results;

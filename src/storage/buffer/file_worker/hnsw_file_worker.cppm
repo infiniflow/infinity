@@ -50,6 +50,8 @@ public:
 
     FileWorkerType Type() const override { return FileWorkerType::kHNSWIndexFile; }
 
+    void CompressToLVQ();
+
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
 

@@ -57,7 +57,9 @@ public:
     constexpr static int prefetch_offset_ = 0;
     constexpr static int prefetch_step_ = 2;
 
-private:
+    using CompressVecStoreType = decltype(VecStoreType::template ToLVQ<i8>());
+
+// private:
     KnnHnsw(SizeT M, SizeT ef_construction, DataStore data_store, Distance distance, SizeT ef, SizeT random_seed)
         : M_(M), ef_construction_(std::max(M_, ef_construction)), mult_(1 / std::log(1.0 * M_)), data_store_(std::move(data_store)),
           distance_(std::move(distance)) {
@@ -342,6 +344,19 @@ public:
             SelectNeighborsHeuristic(std::move(search_result), M_, q_neighbors_p, q_neighbor_size_p);
             ep = q_neighbors_p[0];
             ConnectNeighbors(vertex_i, q_neighbors_p, *q_neighbor_size_p, cur_layer);
+        }
+    }
+
+    KnnHnsw<CompressVecStoreType, LabelType> CompressToLVQ() && {
+        if constexpr (std::is_same_v<VecStoreType, CompressVecStoreType>) {
+            return std::move(*this);
+        } else {
+            using CompressedDistance = typename CompressVecStoreType::Distance;
+            CompressedDistance distance = std::move(distance_).ToLVQDistance(data_store_.dim());
+            auto compressed_datastore = std::move(data_store_).template CompressToLVQ<CompressVecStoreType>();
+            auto ret = KnnHnsw<CompressVecStoreType, LabelType>(M_, ef_construction_, std::move(compressed_datastore), std::move(distance), ef_, 0);
+            *this = This();
+            return ret;
         }
     }
 

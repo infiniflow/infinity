@@ -48,6 +48,15 @@ public:
         : Mmax0_(std::exchange(other.Mmax0_, 0)), Mmax_(std::exchange(other.Mmax_, 0)), level0_size_(std::exchange(other.level0_size_, 0)),
           levelx_size_(std::exchange(other.levelx_size_, 0)), max_layer_(std::exchange(other.max_layer_, -1)),
           enterpoint_(std::exchange(other.enterpoint_, -1)) {}
+    GraphStoreMeta &operator=(GraphStoreMeta &&other) {
+        Mmax0_ = std::exchange(other.Mmax0_, 0);
+        Mmax_ = std::exchange(other.Mmax_, 0);
+        level0_size_ = std::exchange(other.level0_size_, 0);
+        levelx_size_ = std::exchange(other.levelx_size_, 0);
+        max_layer_ = std::exchange(other.max_layer_, -1);
+        enterpoint_ = std::exchange(other.enterpoint_, -1);
+        return *this;
+    }
     ~GraphStoreMeta() = default;
 
     static GraphStoreMeta Make(SizeT Mmax0, SizeT Mmax) {

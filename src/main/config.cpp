@@ -448,18 +448,31 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                                 version_str = elem.second.value_or("invalid");
                                 ToLower(version_str);
 
-                                if (IsEqual(version_str, invalid_str)) {
+                                String major_version_str;
+                                i8 point_count = 0;
+                                for(char c: version_str) {
+                                    if(c == '.') {
+                                        ++ point_count;
+                                        if(point_count > 1) {
+                                            break;
+                                        }
+                                    }
+                                    major_version_str += c;
+                                }
+
+                                if (IsEqual(major_version_str, invalid_str)) {
                                     return Status::InvalidConfig("Invalid version field");
                                 } else {
+                                    String current_major_version = fmt::format("{}.{}", version_major(), version_minor());
                                     String current_version = fmt::format("{}.{}.{}", version_major(), version_minor(), version_patch());
-                                    if (IsEqual(version_str, current_version)) {
+                                    if (IsEqual(major_version_str, current_major_version)) {
                                         UniquePtr<StringOption> version_option = MakeUnique<StringOption>(VERSION_OPTION_NAME, current_version);
                                         Status status = global_options_.AddOption(std::move(version_option));
                                         if (!status.ok()) {
                                             UnrecoverableError(status.message());
                                         }
                                     } else {
-                                        Status::MismatchVersion(version_str, current_version);
+                                        return Status::MismatchVersion(major_version_str, current_major_version);
                                     }
                                 }
                             } else {

@@ -48,21 +48,21 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 - Intuitive Python API. See the [Python API](https://infiniflow.org/docs/dev/python_api_reference)
 - A single-binary architecture with no dependencies, making deployment a breeze.
-- Embedded in Python as a library and friendly to AI developers.  
+- Embedded in Python as a module and friendly to AI developers.  
 
 ## 🎮 Get Started
 
-Infinity, also available as a Python library, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
+Infinity, also available as a Python module, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
 
    ```bash
-   pip install infinity-sdk==0.2.0
+   pip install infinity-sdk==0.2.1.dev2
    ```
 
    ```python
    import infinity
 
    # Connect to infinity
-   infinity_obj = infinity.connect("/path/to/save/your/files/to")
+   infinity_obj = infinity.connect("/path/to/save/to")
    db = infinity_obj.get_database("default_db")
    table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
    table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
@@ -83,7 +83,7 @@ See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
 
 > 💡 For more information about Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/python_api_reference).
 
-## Document
+## 📚 Document
 
 - [Quickstart](https://infiniflow.org/docs/dev/)
 - [Python API](https://infiniflow.org/docs/dev/python_api_reference)

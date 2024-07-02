@@ -71,7 +71,7 @@ void PhysicalOptimize::OptimizeAIndex(QueryContext *query_context, OperatorState
         RecoverableError(status);
         return;
     }
-    table_index_entry->OptimizeIndex(txn, opt_params_);
+    txn->OptimizeIndex(table_index_entry, std::move(opt_params_));
 }
 
 } // namespace infinity

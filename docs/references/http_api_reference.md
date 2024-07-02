@@ -1209,7 +1209,7 @@ curl --request GET \
     "server_address":"0.0.0.0",
     "temp_dir":"/var/infinity/tmp",
     "time_zone":"UTC+8",
-    "version":"0.2.0",
+    "version":"0.2.1",
     "wal_compact_threshold":"1073741824",
     "wal_dir":"/var/infinity/wal",
     "wal_flush":"FlushAtOnce"
@@ -1235,7 +1235,7 @@ curl --request GET \
 ```
 {
     "error_code": 0,
-    "version":"0.2.0"
+    "version":"0.2.1"
 }
 ```
 

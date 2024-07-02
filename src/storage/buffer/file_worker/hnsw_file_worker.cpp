@@ -103,6 +103,29 @@ void HnswFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
+void HnswFileWorker::CompressToLVQ() {
+    if (!data_) {
+        String error_message = "CompressToLVQ: Data is not allocated.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
+    EmbeddingDataType embedding_type = GetType();
+    switch (embedding_type) {
+        case kElemFloat: {
+            AbstractHnsw<f32, SegmentOffset> abstract_hnsw(data_, index_hnsw);
+            abstract_hnsw.CompressToLVQ();
+            data_ = abstract_hnsw.RawPtr();
+            break;
+        }
+        default: {
+            String error_message = "Index should be created on float embedding column now.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+    }
+}
+
 void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     if (!data_) {
         String error_message = "WriteToFileImpl: Data is not allocated.";
