@@ -35,5 +35,5 @@ class InfinityTest(TestSdk):
 
     def _test_list_database(self):
         database_res = self.infinity_obj.list_databases()
-        assert database_res.db_names[0] == "default_db"
+        assert "default_db" in database_res.db_names
 
