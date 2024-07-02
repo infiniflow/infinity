@@ -531,11 +531,16 @@ void ConstantExpr::TrySortSparseVec(const ColumnDef *col_def) {
         }
     }
     if (literal_type_ == LiteralType::kLongSparseArray) {
-        std::vector<std::pair<int64_t, int64_t>> pairs;
-        for (size_t i = 0; i < long_sparse_array_.first.size(); ++i) {
-            pairs.emplace_back(long_sparse_array_.first[i], long_sparse_array_.second[i]);
+        if (long_sparse_array_.second.empty()) {
+            // bit sparse vec
+            std::sort(long_sparse_array_.first.begin(), long_sparse_array_.first.end());
+        } else {
+            std::vector<std::pair<int64_t, int64_t>> pairs;
+            for (size_t i = 0; i < long_sparse_array_.first.size(); ++i) {
+                pairs.emplace_back(long_sparse_array_.first[i], long_sparse_array_.second[i]);
+            }
+            std::sort(pairs.begin(), pairs.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
         }
-        std::sort(pairs.begin(), pairs.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
     } else {
         std::vector<std::pair<int64_t, double>> pairs;
         for (size_t i = 0; i < double_sparse_array_.first.size(); ++i) {
