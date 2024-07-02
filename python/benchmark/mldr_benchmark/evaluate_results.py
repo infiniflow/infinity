@@ -66,10 +66,11 @@ def main():
         print("*****************************")
         print(f"Start evaluating {lang} ...")
         qrels_path = os.path.join(eval_args.qrels_dir, f"qrels.mldr-v1.0-{lang}-test.tsv")
-        for query_type in all_query_types:
-            query_result_path = os.path.join(query_result_dave_dir, f"{lang}_{query_type}.txt")
-            if not os.path.exists(query_result_path):
-                print(f"Skip {query_result_path}, not found.")
+        for filename in os.listdir(query_result_dave_dir):
+            if not filename.startswith(f'{lang}_') or not filename.endswith('.txt'):
+                continue
+            query_result_path = os.path.join(query_result_dave_dir, filename)
+            if not os.path.isfile(query_result_path):
                 continue
             print(f"Start evaluating {query_result_path} ...")
             result = evaluate(script_path, qrels_path, query_result_path, metrics)

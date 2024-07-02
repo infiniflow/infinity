@@ -105,7 +105,7 @@ def fvecs_read_yield(filename):
                 dims = struct.unpack('i', f.read(4))[0]
                 vec = struct.unpack('{}f'.format(dims), f.read(4 * dims))
                 assert dims == len(vec)
-                yield vec
+                yield list(vec)
             except struct.error:
                 break
 
