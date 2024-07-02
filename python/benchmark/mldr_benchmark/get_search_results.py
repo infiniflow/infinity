@@ -19,12 +19,12 @@ from FlagEmbedding import BGEM3FlagModel
 from tqdm import tqdm
 import numpy as np
 import struct
-import infinity
-from infinity.common import LOCAL_HOST
 from mldr_common_tools import fvecs_read_yield, read_mldr_sparse_embedding_yield
 from mldr_common_tools import QueryArgs, check_languages, check_query_types
 from mldr_common_tools import FakeJScoredDoc, get_queries_and_qids, save_result
 from transformers import HfArgumentParser
+import infinity
+from infinity.common import LOCAL_HOST
 
 
 @dataclass
@@ -157,6 +157,9 @@ class InfinityClientForSearch:
                 save_path = os.path.join(save_dir, f"{lang}_{query_type}.txt")
                 print(f"Save search result to: {save_path}")
                 save_result(result_list, save_path, qids, max_hits=1000)
+            if len(query_types) < 2:
+                return
+            # fusion ops
 
 
 if __name__ == "__main__":
