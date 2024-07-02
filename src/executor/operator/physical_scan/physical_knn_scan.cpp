@@ -14,31 +14,36 @@
 
 module;
 
+#include "type/complex/row_id.h"
 #include <string>
 
 module physical_knn_scan;
 
 import stl;
 import query_context;
+import operator_state;
+import physical_operator_type;
+import base_table_ref;
+import table_entry;
+import block_column_entry;
+import segment_index_entry;
+import load_meta;
+import knn_expression;
+import data_type;
+import common_query_filter;
+import physical_filter_scan_base;
 
 import logger;
-import operator_state;
-import global_block_id;
 import block_index;
-import base_table_ref;
 import knn_scan_data;
 import knn_filter;
-import vector_buffer;
 import knn_distance;
 import third_party;
 import txn;
 import infinity_exception;
 import default_values;
-import segment_iter;
-import knn_expression;
 import column_expression;
 
-import index_base;
 import buffer_manager;
 import merge_knn;
 import knn_result_handler;
@@ -47,23 +52,12 @@ import annivfflat_index_data;
 import buffer_handle;
 import data_block;
 import bitmask;
-import bitmask_buffer;
 import column_vector;
-import expression_evaluator;
-import expression_state;
 import index_hnsw;
 import status;
-import hnsw_alg;
-import knn_expression;
-import value;
-import status;
-import buffer_obj;
 import create_index_info;
 import knn_expr;
-import chunk_index_entry;
-import internal_types;
 import block_entry;
-import segment_index_entry;
 import segment_entry;
 import abstract_hnsw;
 
