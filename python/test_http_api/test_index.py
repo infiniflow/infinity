@@ -12,7 +12,7 @@ import httputils
 class TestIndex(HttpTest):
     def test_http_create_index_IVFFlat(self):
         db_name = "default_db"
-        table_name = "test_create_index_IVFFlat"
+        table_name = "test_http_test_create_index_IVFFlat"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
@@ -37,7 +37,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_create_index_HNSW(self):
         db_name = "default_db"
-        table_name = "test_create_index_HMSW"
+        table_name = "test_http_test_create_index_HMSW"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
@@ -61,7 +61,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_create_index_fulltext(self):
         db_name = "default_db"
-        table_name = "test_create_index_fulltext"
+        table_name = "test_http_test_create_index_fulltext"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
@@ -93,7 +93,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_drop_non_existent_index(self):
         db_name = "default_db"
-        table_name = "test_drop_non_existent_index"
+        table_name = "test_http_test_drop_non_existent_index"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
@@ -116,7 +116,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_create_created_index(self):
         db_name = "default_db"
-        table_name = "test_create_index_fulltext"
+        table_name = "test_http_test_create_index_fulltext"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
@@ -152,7 +152,7 @@ class TestIndex(HttpTest):
     ])
     def test_http_create_drop_vector_index_invalid_options(self, column_name, index_type, params):
         db_name = "default_db"
-        table_name = "test_create_drop_vector_index_invalid_options"
+        table_name = "test_http_test_create_drop_vector_index_invalid_options"
         idxname = "my_index"
 
         self.drop_table(db_name, table_name)
@@ -222,7 +222,7 @@ class TestIndex(HttpTest):
     def test_http_create_drop_different_fulltext_index_invalid_options(self, column_name, index_type, params,
                                                                        column_types):
         db_name = "default_db"
-        table_name = "test_create_drop_different_fulltext_index_invalid_options"
+        table_name = "test_http_test_create_drop_different_fulltext_index_invalid_options"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
@@ -257,7 +257,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_create_index_on_dropped_table(self):
         db_name = "default_db"
-        table_name = "test_create_index_on_dropped_table"
+        table_name = "test_http_test_create_index_on_dropped_table"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
@@ -285,7 +285,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_create_index_show_index(self):
         db_name = "default_db"
-        table_name = "test_create_index_show_index"
+        table_name = "test_http_test_create_index_show_index"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
@@ -309,7 +309,7 @@ class TestIndex(HttpTest):
 
     def test_http_drop_index_show_index(self):
         db_name = "default_db"
-        table_name = "test_drop_index_show_index"
+        table_name = "test_http_test_drop_index_show_index"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name,
@@ -352,7 +352,7 @@ class TestIndex(HttpTest):
     ])
     def test_http_create_index_on_different_type_of_column(self, column_types, index_type):
         db_name = "default_db"
-        table_name = "test_create_index_on_different_type_of_column"
+        table_name = "test_http_test_create_index_on_different_type_of_column"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(
@@ -391,7 +391,7 @@ class TestIndex(HttpTest):
     ])
     def test_http_insert_data_create_index(self, index_type):
         db_name = "default_db"
-        table_name = "test_insert_data_create_index"
+        table_name = "test_http_test_insert_data_create_index"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -413,7 +413,7 @@ class TestIndex(HttpTest):
     def test_http_import_data_create_index(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default_db"
-        table_name = "test_import_data_create_index"
+        table_name = "test_http_test_import_data_create_index"
         idxname = "my_index"
         index_type = ["IVFFlat", "FullText"]
         for t in index_type:
@@ -447,7 +447,7 @@ class TestIndex(HttpTest):
     def test_http_create_vector_index_import_data(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default_db"
-        table_name = "test_create_vector_index_import_data"
+        table_name = "test_http_test_create_vector_index_import_data"
         idxname = "my_index"
 
         self.drop_table(db_name, table_name)
@@ -480,7 +480,7 @@ class TestIndex(HttpTest):
     def test_http_create_index_import_data(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default_db"
-        table_name = "test_create_index_import_data"
+        table_name = "test_http_test_create_index_import_data"
         idxname = "my_index"
         index_type = ["IVFFlat", "FullText"]
         for t in index_type:
@@ -518,7 +518,7 @@ class TestIndex(HttpTest):
         httputils.check_data(TEST_TMP_DIR)
         httputils.copy_data("enwiki_99.csv")
         db_name = "default_db"
-        table_name = "test_insert_data_fulltext_index_search"
+        table_name = "test_http_test_insert_data_fulltext_index_search"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -548,7 +548,7 @@ class TestIndex(HttpTest):
     def test_http_fulltext_match_with_invalid_analyzer(self):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default_db"
-        table_name = "test_fulltext_match_with_invalid_analyzer"
+        table_name = "test_http_test_fulltext_match_with_invalid_analyzer"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -586,7 +586,7 @@ class TestIndex(HttpTest):
 
     def test_http_create_index_on_deleted_table(self):
         db_name = "default_db"
-        table_name = "test_create_index_on_deleted_table"
+        table_name = "test_http_test_create_index_on_deleted_table"
         idxname = "my_index"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -618,7 +618,7 @@ class TestIndex(HttpTest):
     # @pytest.mark.xfail(reason="Not support to convert Embedding to Embedding")
     def test_http_create_index_on_update_table(self):
         db_name = "default_db"
-        table_name = "test_create_index_on_update_table"
+        table_name = "test_http_test_create_index_on_update_table"
         idxname = "my_index"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -653,7 +653,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_create_index_with_valid_options(self):
         db_name = "default_db"
-        table_name = "test_create_index_with_valid_options"
+        table_name = "test_http_test_create_index_with_valid_options"
         idxname = "my_index"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -686,7 +686,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_create_index_with_invalid_options(self):
         db_name = "default_db"
-        table_name = "test_http_create_index_with_invalid_options"
+        table_name = "test_http_test_http_create_index_with_invalid_options"
         idxname = "my_index"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -726,7 +726,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_create_duplicated_index_with_valid_options(self):
         db_name = "default_db"
-        table_name = "test_create_duplicated_index_with_valid_options"
+        table_name = "test_http_test_create_duplicated_index_with_valid_options"
         idxname = "my_index"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -755,7 +755,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_create_duplicated_index_with_valid_error_options(self):
         db_name = "default_db"
-        table_name = "test_create_duplicated_index_with_valid_error_options"
+        table_name = "test_http_test_create_duplicated_index_with_valid_error_options"
         idxname = "my_index"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -797,7 +797,7 @@ class TestIndex(HttpTest):
 
     def test_http_show_index(self):
         db_name = "default_db"
-        table_name = "test_show_index"
+        table_name = "test_http_test_show_index"
         idxname = "my_index"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -828,7 +828,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_show_valid_name_index(self):
         db_name = "default_db"
-        table_name = "test_show_various_name_index"
+        table_name = "test_http_test_show_various_name_index"
         idxname = "my_index"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -858,7 +858,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_show_invalid_name_index(self):
         db_name = "default_db"
-        table_name = "test_show_various_name_index"
+        table_name = "test_http_test_show_various_name_index"
         idxname = "my_idx"
         idx_name_list = ["*Invalid name", "not_exist_name", 1, 1.1, True, [], (), {}]
 
@@ -894,7 +894,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_list_index(self):
         db_name = "default_db"
-        table_name = "test_list_index"
+        table_name = "test_http_test_list_index"
         idxname = "my_idx"
 
         self.show_database(db_name)
@@ -928,7 +928,7 @@ class TestIndex(HttpTest):
     # PASS (drop options doesn't need option: ignore ?)
     def test_http_drop_index_with_valid_options(self):
         db_name = "default_db"
-        table_name = "test_drop_index_with_valid_options"
+        table_name = "test_http_test_drop_index_with_valid_options"
         idxname = "my_idx"
 
         self.show_database(db_name)
@@ -958,7 +958,7 @@ class TestIndex(HttpTest):
 
     def test_http_drop_index_with_invalid_options(self):
         db_name = "default_db"
-        table_name = "test_http_drop_index_with_invalid_options"
+        table_name = "test_http_test_http_drop_index_with_invalid_options"
         idx_name = "my_idx"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
@@ -993,7 +993,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_supported_vector_index(self):
         db_name = "default_db"
-        table_name = "test_drop_index_with_invalid_options"
+        table_name = "test_http_test_drop_index_with_invalid_options"
         idxname = "my_idx"
 
         self.show_database(db_name)
@@ -1029,7 +1029,7 @@ class TestIndex(HttpTest):
     # PASS
     def test_http_unsupported_vector_index(self):
         db_name = "default_db"
-        table_name = "test_http_unsupported_vector_index"
+        table_name = "test_http_test_http_unsupported_vector_index"
         idxname = "my_idx"
 
         self.show_database(db_name)

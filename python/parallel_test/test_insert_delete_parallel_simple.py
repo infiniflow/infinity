@@ -18,11 +18,13 @@ class TestInsertDeleteParallelSimple:
     def test_insert_and_delete_parallel_simple(self, get_infinity_connection_pool):
         connection_pool = get_infinity_connection_pool
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default_db")
-        res = db_obj.drop_table("insert_delete_test", ConflictType.Ignore)
+        db_name = "default_db"
+        table_name = "parallel_simple_insert_delete_test"
+        db_obj = infinity_obj.get_database(db_name)
+        res = db_obj.drop_table(table_name, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
         table_obj = db_obj.create_table(
-            "insert_delete_test", {"id": {"type": "int64"}}, ConflictType.Error
+            table_name, {"id": {"type": "int64"}}, ConflictType.Error
         )
         connection_pool.release_conn(infinity_obj)
 
@@ -36,19 +38,21 @@ class TestInsertDeleteParallelSimple:
             threads[i].join()
 
         infinity_obj = connection_pool.get_conn()
-        db_obj = infinity_obj.get_database("default_db")
-        table_obj = db_obj.get_table("insert_delete_test")
+        db_obj = infinity_obj.get_database(db_name)
+        table_obj = db_obj.get_table(table_name)
         res = table_obj.output(["*"]).to_df()
         print(res)
         assert len(res) == 0
-        res = db_obj.drop_table("insert_delete_test", ConflictType.Error)
+        res = db_obj.drop_table(table_name, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
 
 def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):
     infinity_obj = connection_pool.get_conn()
-    db_obj = infinity_obj.get_database("default_db")
-    table_obj = db_obj.get_table("insert_delete_test")
+    db_name = "default_db"
+    table_name = "parallel_simple_insert_delete_test"
+    db_obj = infinity_obj.get_database(db_name)
+    table_obj = db_obj.get_table(table_name)
     while True:
         start_i = 0
         lock.acquire()

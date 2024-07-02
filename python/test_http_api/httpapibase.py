@@ -147,6 +147,11 @@ class HttpTest:
                 continue
             self.drop_database(db_name)
 
+    def clear_http_database(self):
+        dbs = self.get_database()
+        for db_name in dbs:
+            if db_name != "default_db" and db_name.startswith("test_http"):
+                self.drop_database(db_name)
     def create_table(self, db_name, table_name, fields=[], properties=[], expect={
         "error_code": 0
     }, opt="kIgnore"):

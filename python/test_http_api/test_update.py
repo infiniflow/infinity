@@ -13,7 +13,7 @@ class TestUpdate(HttpTest):
     # PASS
     def test_http_update(self):
         db_name = "default_db"
-        table_name = "test_update"
+        table_name = "test_http_test_update"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
@@ -54,7 +54,7 @@ class TestUpdate(HttpTest):
 
     def test_http_update_empty_table(self):
         db_name = "default_db"
-        table_name = "test_update_empty_table"
+        table_name = "test_http_test_update_empty_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [], {}, {
@@ -74,7 +74,7 @@ class TestUpdate(HttpTest):
 
     def test_http_update_non_existent_table(self):
         db_name = "default_db"
-        table_name = "test_update_non_existent_table"
+        table_name = "test_http_test_update_non_existent_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
 
@@ -106,7 +106,7 @@ class TestUpdate(HttpTest):
 
     def test_http_update_no_row_is_met_the_condition(self):
         db_name = "default_db"
-        table_name = "test_update_no_row_is_met_the_condition"
+        table_name = "test_http_test_update_no_row_is_met_the_condition"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         types = [
@@ -137,7 +137,7 @@ class TestUpdate(HttpTest):
 
     def test_http_update_all_row_is_met_the_condition(self):
         db_name = "default_db"
-        table_name = "test_update_all_row_is_met_the_condition"
+        table_name = "test_http_test_update_all_row_is_met_the_condition"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         types = [
@@ -167,7 +167,7 @@ class TestUpdate(HttpTest):
 
     def test_http_update_table_with_one_block(self):
         db_name = "default_db"
-        table_name = "test_update_all_row_is_met_the_condition"
+        table_name = "test_http_test_update_all_row_is_met_the_condition"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -183,7 +183,7 @@ class TestUpdate(HttpTest):
     # PASS
     def test_http_update_table_with_one_segment(self):
         db_name = "default_db"
-        table_name = "test_update_all_row_is_met_the_condition"
+        table_name = "test_http_test_update_all_row_is_met_the_condition"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -200,7 +200,7 @@ class TestUpdate(HttpTest):
     # PASS
     def test_http_update_before_delete(self):
         db_name = "default_db"
-        table_name = "test_update_before_delete"
+        table_name = "test_http_test_update_before_delete"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -219,7 +219,7 @@ class TestUpdate(HttpTest):
     # PASS
     def test_http_update_inserted_data(self):
         db_name = "default_db"
-        table_name = "test_update_before_delete"
+        table_name = "test_http_test_update_before_delete"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -237,7 +237,7 @@ class TestUpdate(HttpTest):
     @pytest.mark.skipif(condition=os.getenv("SKIPTIMECOST") != "0", reason="Taking too much time.")
     def test_http_update_inserted_long_before(self):
         db_name = "default_db"
-        table_name = "test_update_before_delete"
+        table_name = "test_http_test_update_before_delete"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -256,7 +256,7 @@ class TestUpdate(HttpTest):
 
     def test_http_update_dropped_table(self):
         db_name = "default_db"
-        table_name = "test_update_before_delete"
+        table_name = "test_http_test_update_before_delete"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -270,7 +270,7 @@ class TestUpdate(HttpTest):
 
     def test_http_update_invalid_value(self):
         db_name = "default_db"
-        table_name = "test_update_before_delete"
+        table_name = "test_http_test_update_before_delete"
         types = [
             "varchar"
         ]
@@ -300,7 +300,7 @@ class TestUpdate(HttpTest):
         types = ["integer", "float"]
         types_example = [1, 1.333, "1"]
         db_name = "default_db"
-        table_name = "test_update_before_delete"
+        table_name = "test_http_test_update_before_delete"
         self.drop_table(db_name, table_name)
         for i in range(len(types)):
             self.create_table(db_name, table_name, [
@@ -331,7 +331,7 @@ class TestUpdate(HttpTest):
         types_example = ["1", "1.333"]
 
         db_name = "default_db"
-        table_name = "test_valid_filter_expression"
+        table_name = "test_http_test_valid_filter_expression"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
             {
@@ -363,7 +363,7 @@ class TestUpdate(HttpTest):
         types_example = [1, 1.333]
 
         db_name = "default_db"
-        table_name = "test_valid_filter_expression"
+        table_name = "test_http_test_valid_filter_expression"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
             {

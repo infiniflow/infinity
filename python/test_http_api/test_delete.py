@@ -13,7 +13,7 @@ class TestDelete(HttpTest):
 
     def test_http_delete(self):
         db_name = "default_db"
-        table_name = "test_delete"
+        table_name = "test_http_test_delete"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -53,7 +53,7 @@ class TestDelete(HttpTest):
 
     def test_http_delete_empty_table(self):
         db_name = "default_db"
-        table_name = "test_delete_empty_table"
+        table_name = "test_http_test_delete_empty_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -76,7 +76,7 @@ class TestDelete(HttpTest):
 
     def test_http_delete_non_existent_table(self):
         db_name = "default_db"
-        table_name = "test_delete_non_existent_table"
+        table_name = "test_http_test_delete_non_existent_table"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.delete(db_name, table_name, "", {
@@ -88,7 +88,7 @@ class TestDelete(HttpTest):
 
     def test_http_delete_table_all_row_met_the_condition(self):
         db_name = "default_db"
-        table_name = "test_delete_table_all_row_met_the_condition"
+        table_name = "test_http_test_delete_table_all_row_met_the_condition"
         types = [
             "integer", "tinyint", "smallint", "bigint", "float", "double",  # "hugeint"
         ]
@@ -119,7 +119,7 @@ class TestDelete(HttpTest):
 
     def test_http_delete_table_no_rows_met_condition(self):
         db_name = "default_db"
-        table_name = "test_delete_table_no_rows_met_condition"
+        table_name = "test_http_test_delete_table_no_rows_met_condition"
         types = [
             "integer", "tinyint", "smallint", "bigint", "float", "double",  # "hugeint"
         ]
@@ -149,7 +149,7 @@ class TestDelete(HttpTest):
     # PASS
     def test_http_delete_table_with_one_block(self):
         db_name = "default_db"
-        table_name = "test_delete_table_with_one_block"
+        table_name = "test_http_test_delete_table_with_one_block"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
         values = [{"c1": 1} for _ in range(8192)]
@@ -161,7 +161,7 @@ class TestDelete(HttpTest):
     # PASS
     def test_http_delete_table_with_one_segment(self):
         db_name = "default_db"
-        table_name = "test_delete_table_with_one_segment"
+        table_name = "test_http_test_delete_table_with_one_segment"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
         for i in range(1024):
@@ -175,7 +175,7 @@ class TestDelete(HttpTest):
 
     def test_http_select_before_after_delete(self):
         db_name = "default_db"
-        table_name = "test_select_before_after_delete"
+        table_name = "test_http_test_select_before_after_delete"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
 
@@ -189,7 +189,7 @@ class TestDelete(HttpTest):
 
     def test_http_delete_insert_data(self):
         db_name = "default_db"
-        table_name = "test_delete_insert_data"
+        table_name = "test_http_test_delete_insert_data"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
 
@@ -203,7 +203,7 @@ class TestDelete(HttpTest):
     @pytest.mark.slow
     def test_http_delete_inserted_long_before_data(self):
         db_name = "default_db"
-        table_name = "test_delete_inserted_long_before_data"
+        table_name = "test_http_test_delete_inserted_long_before_data"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [{"name": "c1", "type": "integer"}], )
 
@@ -219,7 +219,7 @@ class TestDelete(HttpTest):
 
     def test_http_delete_dropped_table(self):
         db_name = "default_db"
-        table_name = "test_delete_dropped_table"
+        table_name = "test_http_test_delete_dropped_table"
         self.drop_table(db_name, table_name)
         self.show_table(db_name, table_name, {
             "status_code": 500,
@@ -234,7 +234,7 @@ class TestDelete(HttpTest):
 
     def test_http_various_expression_in_where_clause(self):
         db_name = "default_db"
-        table_name = "test_various_expression_in_where_clause"
+        table_name = "test_http_test_various_expression_in_where_clause"
         self.drop_table(db_name, table_name)
         types = [
             "integer", "tinyint", "smallint", "bigint", "float", "double"
@@ -260,7 +260,7 @@ class TestDelete(HttpTest):
 
     def test_http_delete_one_block_without_expression(self):
         db_name = "default_db"
-        table_name = "test_delete_one_block_without_expression"
+        table_name = "test_http_test_delete_one_block_without_expression"
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [{"name": "c1", "type": "integer", }])
         values = [{"c1": 1} for _ in range(8192)]
@@ -271,7 +271,7 @@ class TestDelete(HttpTest):
 
     def test_http_delete_one_segment_without_expression(self):
         db_name = "default_db"
-        table_name = "test_delete_one_segment_without_expression"
+        table_name = "test_http_test_delete_one_segment_without_expression"
         self.create_table(db_name, table_name, [{"name": "c1", "type": "integer", }])
         for i in range(1024):
             values = [{"c1": i} for _ in range(10)]
@@ -290,7 +290,7 @@ class TestDelete(HttpTest):
             "c1 = 0",
         ]
         db_name = "default_db"
-        table_name = "test_delete_one_segment_without_expression"
+        table_name = "test_http_test_delete_one_segment_without_expression"
         self.create_table(db_name, table_name, [
             {"name": "c1", "type": "integer", },
             {"name": "c2", "type": "float"}
@@ -312,7 +312,7 @@ class TestDelete(HttpTest):
                                          ("c1 > 0.1 %@#$sf c2 < 1.0", 3063)])
     def test_http_filter_with_invalid_expression(self, filters):
         db_name = "default_db"
-        table_name = "test_filter_with_invalid_expression"
+        table_name = "test_http_test_filter_with_invalid_expression"
         self.create_table(db_name, table_name, [
             {"name": "c1", "type": "integer", },
             {"name": "c2", "type": "float"}

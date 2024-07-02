@@ -45,26 +45,28 @@ class TestDatabase(TestSdk):
         expect: all operations successfully
         """
 
-        self.infinity_obj.drop_database("my_database", ConflictType.Ignore)
+        db_name = "test_pysdk_my_database"
+
+        self.infinity_obj.drop_database(db_name, ConflictType.Ignore)
 
         # infinity
-        db = self.infinity_obj.create_database("my_database")
+        db = self.infinity_obj.create_database(db_name)
         assert db
 
         with pytest.raises(InfinityException) as e:
-            self.infinity_obj.create_database("my_database!@#")
+            self.infinity_obj.create_database("test_pysdk_my_database!@#")
 
         assert e.type == infinity.common.InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         with pytest.raises(InfinityException) as e:
-            self.infinity_obj.create_database("my-database-dash")
+            self.infinity_obj.create_database("test_pysdk_my-database-dash")
 
         assert e.type == infinity.common.InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         with pytest.raises(InfinityException) as e:
-            self.infinity_obj.create_database("123_database")
+            self.infinity_obj.create_database("123_database_test_pysdk")
 
         assert e.type == infinity.common.InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
@@ -80,10 +82,16 @@ class TestDatabase(TestSdk):
 
         res.db_names.sort()
 
-        assert res.db_names[0] == "default_db"
-        assert res.db_names[1] == 'my_database'
+        db_names = []
+        for db in res.db_names:
+            if db == "default_db" or "test_pysdk" in db:
+                db_names.append(db)
 
-        res = self.infinity_obj.drop_database("my_database")
+        db_names.sort()
+        assert db_names[0] == "default_db"
+        assert db_names[1] == db_name
+
+        res = self.infinity_obj.drop_database(db_name)
         assert res.error_code == ErrorCode.OK
 
         # res = self.infinity_obj.drop_database("default_db")
@@ -92,7 +100,12 @@ class TestDatabase(TestSdk):
         res = self.infinity_obj.list_databases()
         assert res.error_code == ErrorCode.OK
 
+        db_names = []
         for db in res.db_names:
+            if db == "default_db" or "test_pysdk" in db:
+                db_names.append(db)
+
+        for db in db_names:
             assert db == "default_db"
 
 
@@ -136,23 +149,26 @@ class TestDatabase(TestSdk):
         # 1. connect
         db_count = 100
         for i in range(db_count):
-            print('create db_name' + str(i))
-            db = self.infinity_obj.drop_database('db_name' + str(i), ConflictType.Ignore)
+            print('create test_pysdk_db_name' + str(i))
+            db = self.infinity_obj.drop_database('test_pysdk_db_name' + str(i), ConflictType.Ignore)
         # db = self.infinity_obj.create_database('db_name')
         # res = self.infinity_obj.drop_database('db_name')
         # 2. create db with invalid name
         for i in range(db_count):
-            print('create db_name' + str(i))
-            db = self.infinity_obj.create_database('db_name' + str(i))
+            print('create test_pysdk_db_name' + str(i))
+            db = self.infinity_obj.create_database('test_pysdk_db_name' + str(i))
 
         dbs = self.infinity_obj.list_databases()
+        res_dbs = []
         for db_name in dbs.db_names:
             print('db name: ' + db_name)
-        assert len(dbs.db_names) == (db_count + 1)
+            if db_name.startswith("test_pysdk") or db_name == "default_db":
+                res_dbs.append(db_name)
+        assert len(res_dbs) == (db_count + 1)
         # 4. drop 1m database
         for i in range(db_count):
-            print('drop db_name' + str(i))
-            db = self.infinity_obj.drop_database('db_name' + str(i))
+            print('drop test_pysdk_db_name' + str(i))
+            db = self.infinity_obj.drop_database('test_pysdk_db_name' + str(i))
 
 
     @pytest.mark.slow
@@ -220,16 +236,19 @@ class TestDatabase(TestSdk):
 
         for i in range(loop_count):
             # 2.1 create database:
-            db = self.infinity_obj.create_database('test_repeatedly_create_drop_show_databases')
+            db = self.infinity_obj.create_database('test_pysdk_test_repeatedly_create_drop_show_databases')
 
             # 2.2 show database
             dbs = self.infinity_obj.list_databases()
+            res_dbs = []
             for db_name in dbs.db_names:
-                assert db_name in ['test_repeatedly_create_drop_show_databases', "default_db"]
-            assert len(dbs.db_names) == 2
+                if db_name.startswith("test_pysdk") or db_name == "default_db":
+                    assert db_name in ['test_pysdk_test_repeatedly_create_drop_show_databases', "default_db"]
+                    res_dbs.append(db_name)
+            assert len(res_dbs) == 2
 
             # 2.3 drop database
-            self.infinity_obj.drop_database('test_repeatedly_create_drop_show_databases')
+            self.infinity_obj.drop_database('test_pysdk_test_repeatedly_create_drop_show_databases')
 
     def _test_drop_database_with_invalid_name(self):
         """
@@ -266,11 +285,14 @@ class TestDatabase(TestSdk):
         assert e.type == infinity.common.InfinityException
         assert e.value.args[0] == ErrorCode.DB_NOT_EXIST
 
+        db_name = "my_database"
+        self.infinity_obj.drop_database(db_name, ConflictType.Ignore)
+
         # 1. create db
-        db = self.infinity_obj.create_database("my_database", ConflictType.Error)
+        db = self.infinity_obj.create_database(db_name, ConflictType.Error)
 
         # 2. get db(using db)
-        db = self.infinity_obj.get_database("my_database")
+        db = self.infinity_obj.get_database(db_name)
         print(db._db_name)
 
         # 3. get "default_db" db(using default), if not switch to default, my_database can't be dropped.
@@ -278,7 +300,7 @@ class TestDatabase(TestSdk):
         print(db._db_name)
 
         # 4.
-        res = self.infinity_obj.drop_database("my_database", ConflictType.Error)
+        res = self.infinity_obj.drop_database(db_name, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # 2. drop db with invalid name
