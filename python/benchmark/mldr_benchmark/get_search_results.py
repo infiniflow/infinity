@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+from itertools import chain, combinations
 import time
 from dataclasses import dataclass, field
 from FlagEmbedding import BGEM3FlagModel
@@ -85,6 +86,25 @@ def sparse_query_yield(queries: list[str], embedding_file: str):
     return read_mldr_sparse_embedding_yield(embedding_file)
 
 
+def apply_bm25(table, query_str: str, max_hits: int):
+    return table.match('fulltext_col', query_str, f'topn={max_hits}')
+
+
+def apply_dense(table, query_embedding, max_hits: int):
+    return table.knn("dense_col", query_embedding, "float", "ip", max_hits)
+
+
+def apply_sparse(table, query_embedding: dict, max_hits: int):
+    return table.match_sparse("sparse_col", query_embedding, "ip", max_hits, {"alpha": "1.0", "beta": "1.0"})
+
+
+apply_funcs = {'bm25': apply_bm25, 'dense': apply_dense, 'sparse': apply_sparse}
+
+
+def powerset_above_2(s: list):
+    return chain.from_iterable(combinations(s, r) for r in range(2, len(s) + 1))
+
+
 class InfinityClientForSearch:
     def __init__(self):
         self.test_db_name = "default_db"
@@ -122,12 +142,20 @@ class InfinityClientForSearch:
                                                                                         "beta": "1.0"}).to_pl()
         return result['docid_col'], result['SIMILARITY']
 
+    def fusion_query(self, query_targets_list: list, apply_funcs_list: list, max_hits: int):
+        result_table = self.infinity_table.output(["docid_col", "_score"])
+        for query_target, apply_func in zip(query_targets_list, apply_funcs_list):
+            result_table = apply_func(result_table, query_target, max_hits)
+        result_table = result_table.fusion('rrf', options_text=f'topn={max_hits}')
+        result = result_table.to_pl()
+        return result['docid_col'], result['SCORE']
+
     def main(self, languages: list[str], query_types: list[str], model: BGEM3FlagModel, save_dir: str):
         for lang in languages:
             print(f"Start to search for language: {lang}")
             self.get_test_table(lang)
+            # enable streaming to decrease download time
             queries, qids = get_queries_and_qids(lang, False)
-            # If you would like to use streaming, please modify the following code and generate embeddings on-the-fly.
             print(f"Total number of queries: {len(qids)}")
             print(f"Average query chars: {sum([len(q) for q in queries]) / len(queries)}")
             for query_type in query_types:
@@ -160,6 +188,32 @@ class InfinityClientForSearch:
             if len(query_types) < 2:
                 return
             # fusion ops
+            print("Start to search for fusion methods.")
+            for query_type_comb in powerset_above_2(query_types):
+                query_type_comb_str = '_'.join(query_type_comb)
+                print(f"Start to search for fusion method: {query_type_comb_str}")
+                embedding_files_list = [os.path.join(save_dir, f"query_embedding_{lang}_{query_type}.data")
+                                        for query_type in query_type_comb]
+                query_yields_list = [self.query_yields[query_type](queries, embedding_file)
+                                     for query_type, embedding_file in zip(query_type_comb, embedding_files_list)]
+                apply_funcs_list = [apply_funcs[query_type] for query_type in query_type_comb]
+                total_query_time: float = 0.0
+                total_query_num: int = len(qids)
+                result_list = []
+                for query, qid in tqdm(zip(queries, qids), total=total_query_num):
+                    query_targets_list = [next(query_yield) for query_yield in query_yields_list]
+                    time_start = time.time()
+                    docid_list, score_list = self.fusion_query(query_targets_list, apply_funcs_list, max_hits=1000)
+                    time_end = time.time()
+                    total_query_time += time_end - time_start
+                    result = []
+                    for docid, score in zip(docid_list, score_list):
+                        result.append(FakeJScoredDoc(docid, score))
+                    result_list.append((qid, result))
+                print(f"Average query time: {1000.0 * total_query_time / float(total_query_num)} ms.")
+                save_path = os.path.join(save_dir, f"{lang}_fusion_{query_type_comb_str}.txt")
+                print(f"Save search result to: {save_path}")
+                save_result(result_list, save_path, qids, max_hits=1000)
 
 
 if __name__ == "__main__":
