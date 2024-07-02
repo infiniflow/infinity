@@ -51,7 +51,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         import_slt_file.write("statement ok\n")
         import_slt_file.write(
-            "CREATE TABLE {} ( c1 INT, c2 SPARSE(FLOAT, {}) WITH (NOTSORT));\n".format(
+            "CREATE TABLE {} ( c1 INT, c2 SPARSE(FLOAT, {}) WITH (SORTED));\n".format(
                 table_name, max_dim
             )
         )
