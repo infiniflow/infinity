@@ -145,6 +145,9 @@ int main(int argc, char *argv[]) {
             }
             break;
         }
+        default: {
+            UnrecoverableError("Unknown mode type");
+        }
     }
 
     return 0;
