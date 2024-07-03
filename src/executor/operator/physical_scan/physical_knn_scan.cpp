@@ -224,6 +224,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
                 // already dropped
+                LOG_WARN(status.message());
                 continue;
             }
 
