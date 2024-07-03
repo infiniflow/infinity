@@ -243,6 +243,10 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                     min_heaps[i] = phy_merge_knn->IsKnnMinHeap();
                     break;
                 }
+                case PhysicalOperatorType::kMatchTensorScan:
+                case PhysicalOperatorType::kMergeMatchTensor:
+                case PhysicalOperatorType::kMatchSparseScan:
+                case PhysicalOperatorType::kMergeMatchSparse:
                 case PhysicalOperatorType::kMatch: {
                     min_heaps[i] = true;
                     break;
