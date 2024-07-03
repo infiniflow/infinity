@@ -31,21 +31,15 @@ namespace infinity {
 
 export class SearchExpression final : public BaseExpression {
 public:
-    SearchExpression(Vector<SharedPtr<MatchExpression>> &match_exprs,
-                     Vector<SharedPtr<KnnExpression>> &knn_exprs,
-                     Vector<SharedPtr<MatchTensorExpression>> &match_tensor_exprs,
-                     Vector<SharedPtr<MatchSparseExpression>> match_sparse_exprs,
-                     Vector<SharedPtr<FusionExpression>> &fusion_exprs);
+    SearchExpression(Vector<SharedPtr<BaseExpression>> &match_exprs, Vector<SharedPtr<FusionExpression>> &fusion_exprs);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
     String ToString() const override;
 
 public:
-    Vector<SharedPtr<MatchExpression>> match_exprs_{};
-    Vector<SharedPtr<KnnExpression>> knn_exprs_{};
-    Vector<SharedPtr<MatchTensorExpression>> match_tensor_exprs_{};
-    Vector<SharedPtr<MatchSparseExpression>> match_sparse_exprs_{};
+    // Eash match_expr shall be one of MatchExpression, KnnExpression, MatchTensorExpression, MatchSparseExpression
+    Vector<SharedPtr<BaseExpression>> match_exprs_{};
     Vector<SharedPtr<FusionExpression>> fusion_exprs_{};
 };
 

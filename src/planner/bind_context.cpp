@@ -375,59 +375,62 @@ void BindContext::BoundSearch(ParsedExpr *expr) {
         return;
     }
     auto search_expr = (SearchExpr *)expr;
+    allow_score = !search_expr->match_exprs_.empty() || !(search_expr->fusion_exprs_.empty());
+    if (!search_expr->fusion_exprs_.empty())
+        return;
 
-    if (!search_expr->knn_exprs_.empty() && search_expr->fusion_exprs_.empty()) {
-        SizeT expr_count = search_expr->knn_exprs_.size();
-        KnnExpr *first_knn = search_expr->knn_exprs_[0];
-        KnnDistanceType first_distance_type = first_knn->distance_type_;
-        for (SizeT idx = 1; idx < expr_count; ++idx) {
-            if (search_expr->knn_exprs_[idx]->distance_type_ != first_distance_type) {
-                // Mixed distance type
-                return;
-            }
-        }
-        switch (first_distance_type) {
-            case KnnDistanceType::kL2:
-            case KnnDistanceType::kHamming: {
-                allow_distance = true;
+    KnnDistanceType first_distance_type = KnnDistanceType::kInvalid;
+    SparseMetricType first_metric_type = SparseMetricType::kInvalid;
+    for (SizeT i = 0; i < search_expr->match_exprs_.size(); i++) {
+        auto &match_expr = search_expr->match_exprs_[i];
+        if (match_expr->type_ == ParsedExprType::kKnn) {
+            auto knn_expr = (KnnExpr *)match_expr;
+            if (first_distance_type == KnnDistanceType::kInvalid) {
+                first_distance_type = knn_expr->distance_type_;
+                switch (first_distance_type) {
+                    case KnnDistanceType::kL2:
+                    case KnnDistanceType::kHamming: {
+                        allow_distance = true;
+                        break;
+                    }
+                    case KnnDistanceType::kInnerProduct:
+                    case KnnDistanceType::kCosine: {
+                        allow_similarity = true;
+                        break;
+                    }
+                    default: {
+                        String error_message = "Invalid KNN metric type";
+                        LOG_ERROR(error_message);
+                        UnrecoverableError(error_message);
+                    }
+                }
+            } else if (first_distance_type != knn_expr->distance_type_) {
+                allow_distance = false;
+                allow_similarity = false;
                 break;
             }
-            case KnnDistanceType::kInnerProduct:
-            case KnnDistanceType::kCosine: {
-                allow_similarity = true;
+        } else if (match_expr->type_ == ParsedExprType::kMatchSparse) {
+            auto match_sparse_expr = (MatchSparseExpr *)match_expr;
+            if (first_metric_type == SparseMetricType::kInvalid) {
+                first_metric_type = match_sparse_expr->metric_type_;
+                switch (first_metric_type) {
+                    case SparseMetricType::kInnerProduct: {
+                        allow_similarity = true;
+                        break;
+                    }
+                    default: {
+                        String error_message = "Invalid sparse metric type";
+                        LOG_ERROR(error_message);
+                        UnrecoverableError(error_message);
+                    }
+                }
+            } else if (first_metric_type != match_sparse_expr->metric_type_) {
+                allow_distance = false;
+                allow_similarity = false;
                 break;
-            }
-            default: {
-                String error_message = "Invalid KNN metric type";
-                LOG_ERROR(error_message);
-                UnrecoverableError(error_message);
             }
         }
     }
-    if (!search_expr->match_sparse_exprs_.empty() && search_expr->fusion_exprs_.empty()) {
-        SizeT expr_count = search_expr->match_sparse_exprs_.size();
-        MatchSparseExpr *first_sparse = search_expr->match_sparse_exprs_[0];
-        SparseMetricType first_metric_type = first_sparse->metric_type_;
-        for (SizeT idx = 1; idx < expr_count; ++idx) {
-            if (search_expr->match_sparse_exprs_[idx]->metric_type_ != first_metric_type) {
-                // Mixed distance type
-                return;
-            }
-        }
-        switch (first_metric_type) {
-            case SparseMetricType::kInnerProduct: {
-                allow_similarity = true;
-                break;
-            }
-            default: {
-                String error_message = "Invalid sparse metric type";
-                LOG_ERROR(error_message);
-                UnrecoverableError(error_message);
-            }
-        }
-    }
-
-    allow_score = !search_expr->match_exprs_.empty() || !search_expr->match_tensor_exprs_.empty() || !(search_expr->fusion_exprs_.empty());
 }
 
 // void

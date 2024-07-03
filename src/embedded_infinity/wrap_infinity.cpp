@@ -316,34 +316,7 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
     auto search_expr = new SearchExpr();
     search_expr->match_exprs_.reserve(match_exprs.size());
     for (SizeT i = 0; i < match_exprs.size(); ++i) {
-        search_expr->match_exprs_.emplace_back(dynamic_cast<MatchExpr *>(match_exprs[i].GetParsedExpr(status)));
-        if (status.code_ != ErrorCode::kOk) {
-            delete search_expr;
-            search_expr = nullptr;
-            return nullptr;
-        }
-    }
-    search_expr->knn_exprs_.reserve(knn_exprs.size());
-    for (SizeT i = 0; i < knn_exprs.size(); ++i) {
-        search_expr->knn_exprs_.emplace_back(dynamic_cast<KnnExpr *>(knn_exprs[i].GetParsedExpr(status)));
-        if (status.code_ != ErrorCode::kOk) {
-            delete search_expr;
-            search_expr = nullptr;
-            return nullptr;
-        }
-    }
-    search_expr->match_tensor_exprs_.reserve(match_tensor_exprs.size());
-    for (SizeT i = 0; i < match_tensor_exprs.size(); ++i) {
-        search_expr->match_tensor_exprs_.emplace_back(dynamic_cast<MatchTensorExpr *>(match_tensor_exprs[i].GetParsedExpr(status)));
-        if (status.code_ != ErrorCode::kOk) {
-            delete search_expr;
-            search_expr = nullptr;
-            return nullptr;
-        }
-    }
-    search_expr->match_sparse_exprs_.reserve(match_sparse_exprs.size());
-    for (SizeT i = 0; i < match_sparse_exprs.size(); ++i) {
-        search_expr->match_sparse_exprs_.emplace_back(dynamic_cast<MatchSparseExpr *>(match_sparse_exprs[i].GetParsedExpr(status)));
+        search_expr->match_exprs_.emplace_back(match_exprs[i].GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
             delete search_expr;
             search_expr = nullptr;

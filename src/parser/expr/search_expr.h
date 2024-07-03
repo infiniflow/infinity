@@ -34,10 +34,7 @@ public:
     void Validate() const;
 
 public:
-    std::vector<MatchExpr *> match_exprs_{};
-    std::vector<KnnExpr *> knn_exprs_{};
-    std::vector<MatchTensorExpr *> match_tensor_exprs_{};
-    std::vector<MatchSparseExpr *> match_sparse_exprs_{};
+    std::vector<ParsedExpr *> match_exprs_{};
     std::vector<FusionExpr *> fusion_exprs_{};
 
 private:
