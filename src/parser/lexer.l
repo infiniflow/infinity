@@ -202,7 +202,7 @@ YEARS           { return YEARS; }
 
 [-+*/(){},.;<>=^%:?[\]|]    { return yytext[0]; }
 
--?[0-9]+"."[0-9]* |
+-?[0-9]+"."[0-9]*((E|e)-?[0-9]+)? |
 "."[0-9]*  {
     yylval->double_value = atof(yytext);
     return DOUBLE_VALUE;
