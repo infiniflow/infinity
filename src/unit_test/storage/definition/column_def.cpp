@@ -39,7 +39,7 @@ TEST_F(ColumnDefTest, test1) {
     EXPECT_EQ(*column_def_ptr->type(), DataType(LogicalType::kTinyInt));
     EXPECT_EQ(column_def_ptr->id(), 0);
     EXPECT_STREQ(column_def_ptr->name().c_str(), "c1");
-    EXPECT_EQ(column_def_ptr->ToString(), "c1 TinyInt Unique Not nullable default Null");
+    EXPECT_EQ(column_def_ptr->ToString(), "c1 TinyInt Not nullable Unique default Null");
 }
 
 TEST_F(ColumnDefTest, test2) {

@@ -52,6 +52,7 @@ module;
 #include <utility>
 #include <variant>
 #include <vector>
+#include <span>
 
 export module stl;
 
@@ -184,7 +185,6 @@ export namespace std {
 
         using std::chrono::steady_clock;
         using std::chrono::time_point;
-        using std::chrono::system_clock;
 
     } // namespace chrono
 
