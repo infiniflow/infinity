@@ -13,11 +13,11 @@
 # limitations under the License.
 
 import os
-import infinity
 from tqdm import tqdm
-import infinity.index as index
-from infinity.common import ConflictType, LOCAL_HOST
 from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield
+import infinity
+from infinity.common import ConflictType, LOCAL_HOST
+import infinity.index as index
 from infinity.errors import ErrorCode
 
 
