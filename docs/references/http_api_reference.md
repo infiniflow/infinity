@@ -1,6 +1,6 @@
 ---
 sidebar_position: 3
-slug: /html_api_reference
+slug: /http_api_reference
 ---
 
 # HTTP API Reference
@@ -500,6 +500,76 @@ curl --request GET \
 }
 ```
 
+## Show index segment
+
+Show detailed information of a specified index segment.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code":0,
+    "chunk_count":"1",
+    "index_segment_size":"290.41MB",
+    "segment_id":"0",
+    "storage_path":"/var/infinity/data/XScyuGgMEf_db_default_db/X7Ilrg2jG1_table_sift_benchmark/gWao7rl6u4_index_hnsw_index"
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 3018,
+    "error_message": "Index {index_name} doesn't exist in {table_name}."
+}
+```
+
+## Show index chunk
+
+Show detailed information of a index chunk of specified index chunk.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id} \
+     --header 'accept: application/json'
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code":0,
+    "deprecate_timestamp":"18446744073709551615",
+    "file_name":"",
+    "row_count":"1000000",
+    "start_row":"0"
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 3018,
+    "error_message": "Index {index_name} doesn't exist in {table_name}."
+}
+```
+
 ## List indexes
 
 Lists all indexes of a specified table.
@@ -571,6 +641,45 @@ curl --request PUT \
 {
     "error_code": 3032,
     "error_message": "Not supported file type: docx"
+}
+```
+
+## Export data
+
+Export data into a specified table.
+
+#### Request
+
+```
+curl --request GET \
+     --url localhost:23820/databases/{database_name}/table/{table_name} \
+     --header 'accept: application/json' \
+     --header 'content-type: application/json' \
+     --data ' \
+{
+    "file_path":"/var/infinity/filename.csv",
+    "file_type":"csv",
+    "header":false,
+    "delimiter":","
+} '
+```
+
+#### Response
+
+- 200 Success.
+
+```
+{
+    "error_code": 0
+}
+```
+
+- 500 Error.
+
+```
+{
+    "error_code": 7002,
+    "error_message": "File already existed: /var/infinity/filename.csv"
 }
 ```
 
@@ -1100,7 +1209,7 @@ curl --request GET \
     "server_address":"0.0.0.0",
     "temp_dir":"/var/infinity/tmp",
     "time_zone":"UTC+8",
-    "version":"0.2.0",
+    "version":"0.2.1",
     "wal_compact_threshold":"1073741824",
     "wal_dir":"/var/infinity/wal",
     "wal_flush":"FlushAtOnce"
@@ -1126,7 +1235,7 @@ curl --request GET \
 ```
 {
     "error_code": 0,
-    "version":"0.2.0"
+    "version":"0.2.1"
 }
 ```
 

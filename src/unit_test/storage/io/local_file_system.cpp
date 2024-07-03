@@ -35,8 +35,11 @@ TEST_F(LocalFileSystemTest, file_write) {
     LocalFileSystem local_file_system;
     String path = String(GetTmpDir()) + "/test_file2.abc";
 
-    UniquePtr<FileHandler> file_handler =
+    auto [file_handler, status] =
         local_file_system.OpenFile(path, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kWriteLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
 
     SizeT len = 10;
     UniquePtr<char[]> data_array = MakeUnique<char[]>(len);
@@ -58,8 +61,11 @@ TEST_F(LocalFileSystemTest, dir_ops) {
 
     local_file_system.CreateDirectory(dir);
 
-    UniquePtr<FileHandler> file_handler =
+    auto [file_handler, status] =
             local_file_system.OpenFile(path, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kWriteLock);
+    if(!status.ok()) {
+        UnrecoverableError(status.message());
+    }
 
     SizeT len = 10;
     UniquePtr<char[]> data_array = MakeUnique<char[]>(len);

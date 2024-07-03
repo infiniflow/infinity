@@ -37,7 +37,12 @@ namespace infinity {
 void PhysicalOptimize::Init() {}
 
 bool PhysicalOptimize::Execute(QueryContext *query_context, OperatorState *operator_state) {
-    OptimizeIndex(query_context, operator_state);
+    if (index_name_.empty()) {
+        OptimizeIndex(query_context, operator_state);
+    } else {
+        OptimizeAIndex(query_context, operator_state);
+    }
+
     operator_state->SetComplete();
     return true;
 }
@@ -56,6 +61,17 @@ void PhysicalOptimize::OptimizeIndex(QueryContext *query_context, OperatorState 
 
     table_entry->OptimizeIndex(txn);
     LOG_INFO(fmt::format("OptimizeIndex {}.{} end", db_name_, table_name_));
+}
+
+void PhysicalOptimize::OptimizeAIndex(QueryContext *query_context, OperatorState *operator_state) {
+    auto txn = query_context->GetTxn();
+    auto [table_index_entry, status] = txn->GetIndexByName(db_name_, table_name_, index_name_);
+    if (!status.ok()) {
+        operator_state->status_ = status;
+        RecoverableError(status);
+        return;
+    }
+    txn->OptimizeIndex(table_index_entry, std::move(opt_params_));
 }
 
 } // namespace infinity

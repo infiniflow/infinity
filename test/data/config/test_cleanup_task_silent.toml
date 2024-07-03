@@ -1,0 +1,21 @@
+[general]
+version = "0.2.1"
+time_zone = "utc-8"
+
+[network]
+[log]
+log_level = "critical"
+
+[storage]
+# close auto cleanup task
+cleanup_interval = "0s"
+# close auto compact
+compact_interval = "0s"
+
+[buffer]
+[wal]
+# close full checkpoint
+full_checkpoint_interval = "0s"
+#short checkpoint interval to allow quick cleanup
+delta_checkpoint_interval = "1s"
+[resource]

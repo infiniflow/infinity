@@ -46,6 +46,8 @@ import extra_ddl_info;
 import update_statement;
 import http_search;
 import knn_expr;
+import function_expr;
+import column_expr;
 import type_info;
 import logical_type;
 import embedding_info;
@@ -324,7 +326,12 @@ public:
                 } else if (etype == "double") {
                     e_data_type = EmbeddingDataType::kElemDouble;
                 } else {
-                    e_data_type = EmbeddingDataType::kElemInvalid;
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
                 }
                 type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
                 column_type = std::make_shared<DataType>(LogicalType::kEmbedding, type_info);
@@ -535,6 +542,125 @@ public:
     }
 };
 
+class ExportTableHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        String database_name = request->getPathVariable("database_name");
+        String table_name = request->getPathVariable("table_name");
+
+        nlohmann::json json_response;
+        HTTPStatus http_status = HTTPStatus::CODE_500;
+
+        String data_body = request->readBodyToString();
+        try {
+            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
+            ExportOptions export_options;
+
+            String file_type_str = http_body_json["file_type"];
+            ToLower(file_type_str);
+            if (file_type_str == "csv") {
+                export_options.copy_file_type_ = CopyFileType::kCSV;
+            } else if (file_type_str == "jsonl") {
+                export_options.copy_file_type_ = CopyFileType::kJSONL;
+            } else {
+                json_response["error_code"] = ErrorCode::kNotSupported;
+                json_response["error_message"] = fmt::format("Not supported file type {}", file_type_str);
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+
+            if (export_options.copy_file_type_ == CopyFileType::kCSV) {
+                if (http_body_json.contains("header")) {
+                    export_options.header_ = http_body_json["header"];
+                }
+                if (http_body_json.contains("offset")) {
+                    export_options.offset_ = http_body_json["offset"];
+                }
+                if (http_body_json.contains("limit")) {
+                    export_options.limit_ = http_body_json["limit"];
+                }
+                if (http_body_json.contains("row_limit")) {
+                    export_options.row_limit_ = http_body_json["row_limit"];
+                }
+                if (http_body_json.contains("delimiter")) {
+                    String delimiter = http_body_json["delimiter"];
+                    if (delimiter.size() != 1) {
+                        json_response["error_code"] = ErrorCode::kNotSupported;
+                        json_response["error_message"] = fmt::format("Not supported delimiter: {}", delimiter);
+                        return ResponseFactory::createResponse(http_status, json_response.dump());
+                    }
+                    export_options.delimiter_ = delimiter[0];
+                } else {
+                    export_options.delimiter_ = ',';
+                }
+            }
+            String file_path = http_body_json["file_path"];
+
+            Vector<ParsedExpr *> *export_columns{nullptr};
+            DeferFn defer_fn([&]() {
+                if (export_columns != nullptr) {
+                    for (auto &column_expr : *export_columns) {
+                        delete column_expr;
+                        column_expr = nullptr;
+                    }
+                    delete export_columns;
+                    export_columns = nullptr;
+                }
+            });
+
+            if (http_body_json.contains("columns")) {
+                export_columns = new Vector<ParsedExpr *>();
+
+                for(const auto& column: http_body_json["columns"]) {
+                    if(column.is_string()) {
+                        String column_name = column;
+                        ToLower(column_name);
+                        if(column_name == "_row_id") {
+                            FunctionExpr* expr = new FunctionExpr();
+                            expr->func_name_ = "row_id";
+                            export_columns->emplace_back(expr);
+                        } else if(column_name == "_create_timestamp") {
+                            FunctionExpr* expr = new FunctionExpr();
+                            expr->func_name_ = "create_timestamp";
+                            export_columns->emplace_back(expr);
+                        } else if(column_name == "_delete_timestamp") {
+                            FunctionExpr* expr = new FunctionExpr();
+                            expr->func_name_ = "delete_timestamp";
+                            export_columns->emplace_back(expr);
+                        } else {
+                            ColumnExpr* expr = new ColumnExpr();
+                            expr->names_.emplace_back(column_name);
+                            export_columns->emplace_back(expr);
+                        }
+                    } else {
+                        json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
+                        json_response["error_message"] = "Export data isn't a column";
+                    }
+                }
+            }
+
+            auto result = infinity->Export(database_name, table_name, export_columns, file_path, export_options);
+
+            export_columns = nullptr;
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
+        } catch (nlohmann::json::exception &e) {
+            json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
+            json_response["error_message"] = e.what();
+        }
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class ShowTableColumnsHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -589,7 +715,7 @@ public:
 
         String data_body = request->readBodyToString();
         try {
-            nlohmann::json http_body_json = nlohmann::json::parse(data_body)["data"];
+            nlohmann::json http_body_json = nlohmann::json::parse(data_body);
             ImportOptions import_options;
 
             String file_type_str = http_body_json["file_type"];
@@ -1471,6 +1597,86 @@ public:
     }
 };
 
+class ShowTableIndexSegmentHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto index_name = request->getPathVariable("index_name");
+        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+
+        auto result = infinity->ShowIndexSegment(database_name, table_name, index_name, segment_id);
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        if (result.IsOk()) {
+
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                auto row_count = data_block->row_count();
+                for (int row = 0; row < row_count; ++row) {
+                    auto field_name = data_block->GetValue(0, row).ToString();
+                    auto field_value = data_block->GetValue(1, row).ToString();
+                    json_response[field_name] = field_value;
+                }
+            }
+
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
+class ShowTableIndexChunkHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto index_name = request->getPathVariable("index_name");
+        auto segment_id = std::strtoll(request->getPathVariable("segment_id").get()->c_str(), nullptr, 0);
+        auto chunk_id = std::strtoll(request->getPathVariable("chunk_id").get()->c_str(), nullptr, 0);
+        auto result = infinity->ShowIndexChunk(database_name, table_name, index_name, segment_id, chunk_id);
+
+        HTTPStatus http_status;
+        nlohmann::json json_response;
+
+        if (result.IsOk()) {
+
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(block_id);
+                auto row_count = data_block->row_count();
+                for (int row = 0; row < row_count; ++row) {
+                    auto field_name = data_block->GetValue(0, row).ToString();
+                    auto field_value = data_block->GetValue(1, row).ToString();
+                    json_response[field_name] = field_value;
+                }
+            }
+
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class DropIndexHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -2150,6 +2356,7 @@ void HTTPServer::Start(u16 port) {
     router->route("POST", "/databases/{database_name}/tables/{table_name}", MakeShared<CreateTableHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}", MakeShared<DropTableHandler>());
     router->route("GET", "/databases/{database_name}/tables/{table_name}", MakeShared<ShowTableHandler>());
+    router->route("GET", "/databases/{database_name}/table/{table_name}", MakeShared<ExportTableHandler>()); // Export table
     router->route("GET", "/databases/{database_name}/tables/{table_name}/columns", MakeShared<ShowTableColumnsHandler>());
 
     // DML
@@ -2164,6 +2371,8 @@ void HTTPServer::Start(u16 port) {
     // index
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", MakeShared<ListTableIndexesHandler>());
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<ShowTableIndexDetailHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}", MakeShared<ShowTableIndexSegmentHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id}", MakeShared<ShowTableIndexChunkHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<DropIndexHandler>());
     router->route("POST", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<CreateIndexHandler>());
 

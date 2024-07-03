@@ -29,7 +29,7 @@ import third_party;
 namespace infinity {
 
 FusionExpression::FusionExpression(const String &method, SharedPtr<SearchOptions> options)
-    : BaseExpression(ExpressionType::kFusion, Vector<SharedPtr<BaseExpression>>()), method_(method), options_(options) {}
+    : BaseExpression(ExpressionType::kFusion, Vector<SharedPtr<BaseExpression>>()), method_(method), options_(std::move(options)) {}
 
 String FusionExpression::ToString() const {
     if (!alias_.empty()) {

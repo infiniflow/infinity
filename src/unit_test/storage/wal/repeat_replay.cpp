@@ -84,7 +84,7 @@ TEST_F(RepeatReplayTest, append) {
         }
         {
             std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
-            column_vectors[1]->AppendByStringView(v2, ',');
+            column_vectors[1]->AppendByStringView(v2);
         }
         auto data_block = DataBlock::Make();
         data_block->Init(column_vectors);
@@ -114,7 +114,7 @@ TEST_F(RepeatReplayTest, append) {
                 ASSERT_EQ(block_entry->columns().size(), 2ul);
                 {
                     auto &col2 = block_entry->columns()[1];
-                    EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
+                    EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
                 }
             }
         }

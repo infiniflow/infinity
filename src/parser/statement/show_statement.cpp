@@ -32,6 +32,18 @@ std::string ShowStatement::ToString() const {
             ss << "Show index, database: " << schema_name_;
             break;
         }
+        case ShowStmtType::kBuffer: {
+            ss << "Show buffer";
+            break;
+        }
+        case ShowStmtType::kIndexSegment: {
+            ss << "Show index segment, database: " << schema_name_ << ", table_name: " << table_name_;
+            break;
+        }
+        case ShowStmtType::kIndexChunk: {
+            ss << "Show index chunk, database: " << schema_name_ << ", table_name: " << table_name_;
+            break;
+        }
         case ShowStmtType::kTables: {
             ss << "Show tables, database: " << schema_name_;
             break;
@@ -82,6 +94,22 @@ std::string ShowStatement::ToString() const {
         }
         case ShowStmtType::kProfiles: {
             ss << "Show profiles";
+            break;
+        }
+        case ShowStmtType::kQueries: {
+            ss << "Show queries";
+            break;
+        }
+        case ShowStmtType::kQuery: {
+            ss << "Show query";
+            break;
+        }
+        case ShowStmtType::kTransactions: {
+            ss << "Show transactions";
+            break;
+        }
+        case ShowStmtType::kTransaction: {
+            ss << "Show transaction";
             break;
         }
         case ShowStmtType::kGlobalVariable: {

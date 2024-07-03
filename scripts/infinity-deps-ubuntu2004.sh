@@ -26,13 +26,13 @@ tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
 
 echo
-echo 'step [4/9] : download ninja-1.11.1'
-echo 'command: wget https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip'
+echo 'step [4/9] : download ninja-1.12.1'
+echo 'command: wget https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip'
 echo
-wget https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip
+wget https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
 
 echo
-echo 'step [5/9] : install ninja-1.11.1 into /usr/local/bin'
+echo 'step [5/9] : install ninja-1.12.1 into /usr/local/bin'
 echo 'command: unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja'
 echo
 unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja

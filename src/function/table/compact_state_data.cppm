@@ -30,6 +30,7 @@ import segment_index_entry;
 import base_table_ref;
 import block_index;
 import txn;
+import logger;
 
 namespace infinity {
 
@@ -54,7 +55,9 @@ public:
                              [](BlockOffset block_offset, const Pair<BlockOffset, RowID> &pair) { return block_offset < pair.first; } // NOLINT
             );
         if (iter == block_vec.begin()) {
-            UnrecoverableError("RowID not found");
+            String error_message = "RowID not found";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         --iter;
         RowID rtn = iter->second;
@@ -95,10 +98,13 @@ public:
 
     const HashMap<SegmentID, Vector<SegmentOffset>> &GetToDelete() const { return to_delete_; }
 
-    void AddNewSegment(SegmentEntry *new_segment, Txn *txn) {
+    void AddNewSegment(SharedPtr<SegmentEntry> new_segment, Vector<SegmentEntry *> compacted_segments, Txn *txn) {
         std::lock_guard lock(mutex2_);
         auto *block_index = new_table_ref_->block_index_.get();
-        block_index->Insert(new_segment, txn);
+        block_index->Insert(new_segment.get(), txn);
+
+        CompactSegmentData data{new_segment, std::move(compacted_segments)};
+        segment_data_list_.push_back(std::move(data));
     }
 
     void AddNewIndex(TableIndexEntry *table_index_entry, Txn *txn) {

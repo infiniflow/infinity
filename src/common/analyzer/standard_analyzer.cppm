@@ -38,7 +38,7 @@ protected:
     }
 
     inline bool NextToken() override {
-        if (tokenizer_.NextToken()) {
+        if (DoNext()) {
             token_ = tokenizer_.GetToken();
             len_ = tokenizer_.GetLength();
             offset_ = local_offset_;
@@ -51,6 +51,16 @@ protected:
         }
     }
 
+    bool DoNext() {
+        while (tokenizer_.NextToken()) {
+            if (!IsSpecialChar()) {
+                return true;
+            } else {
+                continue;
+            }
+        }
+        return false;
+    }
     inline bool IsAlpha() override { return true; }
 
     inline bool IsSpecialChar() override { return tokenizer_.IsDelimiter(); }

@@ -16,7 +16,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 10000
     limit_offset = [[10, 9000], [10, 10], [8, 9995], [9000, 1000], [100000, 0]]
     csv_dir = "./test/data/csv"
-    slt_dir = "./test/sql/dql"
+    slt_dir = "./test/sql/dql/sort_top"
     csv_name = "/test_big_top_varchar.csv"
     slt_name = "/big_top_varchar.slt"
     table_name = "test_big_top_varchar"
@@ -27,7 +27,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    if os.path.exists(csv_path) and os.path.exists(slt_path) and generate_if_exists:
+    if os.path.exists(csv_path) and os.path.exists(slt_path) and not generate_if_exists:
         print("File {} and {} already existed exists. Skip Generating.".format(
             slt_path, csv_path))
         return

@@ -37,17 +37,23 @@ DataFileWorker::~DataFileWorker() {
 
 void DataFileWorker::AllocateInMemory() {
     if (data_ != nullptr) {
-        UnrecoverableError("Data is already allocated.");
+        String error_message = "Data is already allocated.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (buffer_size_ == 0) {
-        UnrecoverableError("Buffer size is 0.");
+        String error_message = "Buffer size is 0.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     data_ = static_cast<void *>(new char[buffer_size_]{});
 }
 
 void DataFileWorker::FreeInMemory() {
     if (data_ == nullptr) {
-        UnrecoverableError("Data is already freed.");
+        String error_message = "Data is already freed.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     delete[] static_cast<char *>(data_);
     data_ = nullptr;
@@ -132,7 +138,7 @@ void DataFileWorker::ReadFromFileImpl() {
     }
 
     // file body
-    data_ = static_cast<void *>(new char[buffer_size_]{});
+    data_ = static_cast<void *>(new char[buffer_size_]);
     nbytes = fs.Read(*file_handler_, data_, buffer_size_);
     if (nbytes != buffer_size_) {
         Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));

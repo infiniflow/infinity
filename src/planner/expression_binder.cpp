@@ -19,7 +19,7 @@ module;
 module expression_binder;
 
 import stl;
-
+import default_values;
 import type_info;
 import infinity_exception;
 import bind_context;
@@ -41,6 +41,7 @@ import fusion_expression;
 import search_expression;
 import match_expression;
 import match_tensor_expression;
+import match_sparse_expression;
 import function;
 import aggregate_function;
 import aggregate_function_set;
@@ -59,6 +60,7 @@ import status;
 import query_context;
 import logger;
 import embedding_info;
+import sparse_info;
 import parsed_expr;
 import function_expr;
 import constant_expr;
@@ -72,12 +74,17 @@ import between_expr;
 import subquery_expr;
 import match_expr;
 import match_tensor_expr;
+import match_sparse_expr;
+import fusion_expr;
 import data_type;
 
 import catalog;
 import table_entry;
 
 namespace infinity {
+
+template <typename T>
+ptr_t GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension);
 
 SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
     // Call implemented BuildExpression
@@ -136,7 +143,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildExpression(const ParsedExpr &ex
             return BuildSearchExpr((const SearchExpr &)expr, bind_context_ptr, depth, root);
         }
         default: {
-            UnrecoverableError("Unexpected expression type.");
+            String error_message = "Unexpected expression type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -238,7 +247,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             // It will be bound into a ValueExpression here.
             IntervalT interval_value(expr.integer_value_);
             if (expr.interval_type_ == TimeUnit::kInvalidUnit) {
-                UnrecoverableError("Invalid time unit");
+                String error_message = "Invalid time unit";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             interval_value.unit = expr.interval_type_;
             Value value = Value::MakeInterval(interval_value);
@@ -256,13 +267,119 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             Value value = Value::MakeEmbedding(expr.double_array_);
             return MakeShared<ValueExpression>(value);
         }
+        case LiteralType::kLongSparseArray: {
+            Value value = Value::MakeSparse(expr.long_sparse_array_);
+            return MakeShared<ValueExpression>(value);
+        }
+        case LiteralType::kDoubleSparseArray: {
+            Value value = Value::MakeSparse(expr.double_sparse_array_);
+            return MakeShared<ValueExpression>(value);
+        }
+        case LiteralType::kSubArrayArray: {
+            if (expr.sub_array_array_.size() == 0) {
+                String error_message = "Empty subarray array";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+            switch (expr.sub_array_array_[0]->literal_type_) {
+                case LiteralType::kIntegerArray:
+                case LiteralType::kDoubleArray: {
+                    // expect it to be tensor of i64 or double data type
+                    const u32 basic_embedding_dim = expr.sub_array_array_[0]->long_array_.size() + expr.sub_array_array_[0]->double_array_.size();
+                    bool have_double = false;
+                    for (const auto &sub_array : expr.sub_array_array_) {
+                        if (sub_array->literal_type_ == LiteralType::kDoubleArray) {
+                            have_double = true;
+                            break;
+                        }
+                    }
+                    if (have_double) {
+                        u32 tensor_total_dim = 0;
+                        const auto embedding_data_ptr = GetConcatenatedTensorData<double>(&expr, basic_embedding_dim, tensor_total_dim);
+                        UniquePtr<double[]> embedding_data;
+                        embedding_data.reset(reinterpret_cast<double *>(embedding_data_ptr));
+                        auto type_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, basic_embedding_dim);
+                        Value value = Value::MakeTensor(embedding_data_ptr, tensor_total_dim * sizeof(double), std::move(type_info_ptr));
+                        return MakeShared<ValueExpression>(std::move(value));
+                    } else {
+                        u32 tensor_total_dim = 0;
+                        const auto embedding_data_ptr = GetConcatenatedTensorData<i64>(&expr, basic_embedding_dim, tensor_total_dim);
+                        UniquePtr<i64[]> embedding_data;
+                        embedding_data.reset(reinterpret_cast<i64 *>(embedding_data_ptr));
+                        auto type_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemInt64, basic_embedding_dim);
+                        Value value = Value::MakeTensor(embedding_data_ptr, tensor_total_dim * sizeof(i64), std::move(type_info_ptr));
+                        return MakeShared<ValueExpression>(std::move(value));
+                    }
+                }
+                case LiteralType::kSubArrayArray: {
+                    // expect it to be tensor-array type
+                    bool have_double = false;
+                    for (const auto &sub_array : expr.sub_array_array_) {
+                        if (sub_array->literal_type_ != LiteralType::kSubArrayArray) {
+                            const auto error_info = "Invalid TensorArray input format.";
+                            LOG_ERROR(error_info);
+                            RecoverableError(Status::SyntaxError(error_info));
+                        }
+                        if (have_double) {
+                            // skip the check if already have double
+                            continue;
+                        }
+                        for (const auto &sub_sub_array : sub_array->sub_array_array_) {
+                            if (sub_sub_array->literal_type_ == LiteralType::kDoubleArray) {
+                                have_double = true;
+                                break;
+                            }
+                        }
+                    }
+                    const auto &grand_child_ptr = expr.sub_array_array_[0]->sub_array_array_[0];
+                    const u32 basic_embedding_dim = grand_child_ptr->long_array_.size() + grand_child_ptr->double_array_.size();
+                    if (have_double) {
+                        auto type_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemDouble, basic_embedding_dim);
+                        Value value = Value::MakeTensorArray(std::move(type_info_ptr));
+                        for (const auto &sub_array : expr.sub_array_array_) {
+                            u32 child_tensor_total_dim = 0;
+                            const auto embedding_data_ptr =
+                                GetConcatenatedTensorData<double>(sub_array.get(), basic_embedding_dim, child_tensor_total_dim);
+                            UniquePtr<double[]> embedding_data;
+                            embedding_data.reset(reinterpret_cast<double *>(embedding_data_ptr));
+                            value.AppendToTensorArray(embedding_data_ptr, child_tensor_total_dim * sizeof(double));
+                        }
+                        return MakeShared<ValueExpression>(std::move(value));
+                    } else {
+                        auto type_info_ptr = EmbeddingInfo::Make(EmbeddingDataType::kElemInt64, basic_embedding_dim);
+                        Value value = Value::MakeTensorArray(std::move(type_info_ptr));
+                        for (const auto &sub_array : expr.sub_array_array_) {
+                            u32 child_tensor_total_dim = 0;
+                            const auto embedding_data_ptr =
+                                GetConcatenatedTensorData<i64>(sub_array.get(), basic_embedding_dim, child_tensor_total_dim);
+                            UniquePtr<i64[]> embedding_data;
+                            embedding_data.reset(reinterpret_cast<i64 *>(embedding_data_ptr));
+                            value.AppendToTensorArray(embedding_data_ptr, child_tensor_total_dim * sizeof(i64));
+                        }
+                        return MakeShared<ValueExpression>(std::move(value));
+                    }
+                }
+                default: {
+                    String error_message = "Unexpected subarray type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                    return nullptr;
+                }
+            }
+        }
         case LiteralType::kNull: {
             Value value = Value::MakeNull();
             return MakeShared<ValueExpression>(value);
         }
+        case LiteralType::kEmptyArray: {
+            Value value = Value::MakeEmptyArray();
+            return MakeShared<ValueExpression>(value);
+        }
     }
 
-    UnrecoverableError("Unreachable.");
+    String error_message = "Unreachable";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildColExpr(const ColumnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
@@ -339,10 +456,15 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
             auto aggregate_function_ptr = MakeShared<AggregateExpression>(aggregate_function, arguments);
             return aggregate_function_ptr;
         }
-        case FunctionType::kTable:
-            UnrecoverableError("Table function shouldn't be bound here.");
+        case FunctionType::kTable: {
+            String error_message = "Table function shouldn't be bound here.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
         default: {
-            UnrecoverableError(fmt::format("Unknown function type: {}", function_set_ptr->name()));
+            String error_message = fmt::format("Unknown function type: {}", function_set_ptr->name());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return nullptr;
@@ -355,10 +477,14 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, 
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     if (!expr.case_check_array_) {
-        UnrecoverableError("No when and then expression");
+        String error_message = "No when and then expression";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (expr.case_check_array_->empty()) {
-        UnrecoverableError("No when and then expression");
+        String error_message = "No when and then expression";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     SharedPtr<CaseExpression> case_expression_ptr = MakeShared<CaseExpression>();
@@ -449,7 +575,9 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
 
     // Bind query column
     if (parsed_knn_expr.column_expr_->type_ != ParsedExprType::kColumn) {
-        UnrecoverableError("Knn expression expect a column expression");
+        String error_message = "Knn expression expect a column expression";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (parsed_knn_expr.topn_ <= 0) {
         String topn = std::to_string(parsed_knn_expr.topn_);
@@ -492,80 +620,99 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTensorExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     // Bind query column
-    Vector<SharedPtr<BaseExpression>> arguments;
     if (expr.column_expr_->type_ != ParsedExprType::kColumn) {
         UnrecoverableError("MatchTensor expression expect a column expression");
     }
-    // TODO: now only support MaxSim search method
-    if (expr.search_method_ != MatchTensorMethod::kMaxSim) {
-        Status status = Status::NotSupport(fmt::format("Unsupported search method: {}, now only support MaxSim search method",
-                                                       MatchTensorExpr::MethodToString(expr.search_method_)));
-        LOG_ERROR(status.message());
-        RecoverableError(status);
-    }
-    auto expr_ptr = BuildColExpr((ColumnExpr &)*expr.column_expr_, bind_context_ptr, depth, false);
+    auto expr_ptr = BuildColExpr((ColumnExpr &)*expr.column_expr_.get(), bind_context_ptr, depth, false);
     auto column_data_type = expr_ptr->Type();
     TypeInfo *type_info = column_data_type.type_info().get();
     u32 tensor_column_basic_embedding_dim = 0;
-    if (column_data_type.type() != LogicalType::kTensor or type_info == nullptr or type_info->type() != TypeInfoType::kEmbedding) {
-        Status status = Status::SyntaxError("Expect the column search is an tensor column");
-        LOG_ERROR(status.message());
-        RecoverableError(status);
-    } else {
+    if ((column_data_type.type() == LogicalType::kTensor or column_data_type.type() == LogicalType::kTensorArray) and type_info != nullptr and
+        type_info->type() == TypeInfoType::kEmbedding) {
+        // valid search column
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
         tensor_column_basic_embedding_dim = embedding_info->Dimension();
-        if (expr.dimension_ == 0 or expr.dimension_ % tensor_column_basic_embedding_dim != 0) {
-            Status status = Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't match with tensor basic dimension {}",
-                                                            expr.dimension_, embedding_info->Dimension()));
-            LOG_ERROR(status.message());
-            RecoverableError(status);
+        if (tensor_column_basic_embedding_dim == 0) {
+            const auto error_info = "The tensor column basic embedding dimension should be greater than 0";
+            LOG_CRITICAL(error_info);
+            UnrecoverableError(error_info);
         }
-        // TODO: now only support float query tensor
-        // TODO: now only support search on tensor column with float data type
-        if (expr.embedding_data_type_ != EmbeddingDataType::kElemFloat) {
-            Status status = Status::NotSupport(fmt::format("Unsupported query tensor data type: {}, now only support float input",
-                                                           EmbeddingT::EmbeddingDataType2String(expr.embedding_data_type_)));
-            LOG_ERROR(status.message());
-            RecoverableError(status);
-        }
-        if (embedding_info->Type() != EmbeddingDataType::kElemFloat) {
-            Status status = Status::NotSupport(
-                fmt::format("Unsupported tensor column type: {}, now only support search on float tensor column", embedding_info->ToString()));
-            LOG_ERROR(status.message());
-            RecoverableError(status);
-        }
+    } else {
+        const auto error_info = fmt::format("Expect the column search is an tensor column, but got: {}", column_data_type.ToString());
+        LOG_ERROR(error_info);
+        RecoverableError(Status::SyntaxError(error_info));
     }
+    Vector<SharedPtr<BaseExpression>> arguments;
     arguments.emplace_back(std::move(expr_ptr));
     // Create query embedding
-    EmbeddingT query_embedding((ptr_t)expr.embedding_data_ptr_, false);
-    auto bound_tensor_maxsim_expr = MakeShared<MatchTensorExpression>(std::move(arguments),
-                                                                      expr.search_method_,
-                                                                      expr.embedding_data_type_,
-                                                                      expr.dimension_,
-                                                                      std::move(query_embedding),
-                                                                      tensor_column_basic_embedding_dim,
-                                                                      expr.options_text_);
-    return bound_tensor_maxsim_expr;
+    EmbeddingT query_embedding(expr.query_tensor_data_ptr_.get(), false);
+    auto bound_match_tensor_expr = MakeShared<MatchTensorExpression>(std::move(arguments),
+                                                                     expr.search_method_enum_,
+                                                                     expr.embedding_data_type_,
+                                                                     expr.dimension_,
+                                                                     std::move(query_embedding),
+                                                                     tensor_column_basic_embedding_dim,
+                                                                     expr.options_text_);
+    return bound_match_tensor_expr;
+}
+
+SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSparseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root) {
+    if (expr.column_expr_->type_ != ParsedExprType::kColumn) {
+        UnrecoverableError("MatchSparse expression expect a column expression");
+    }
+    auto expr_ptr = BuildColExpr(static_cast<ColumnExpr &>(*expr.column_expr_), bind_context_ptr, depth, false);
+    auto column_data_type = expr_ptr->Type();
+    TypeInfo *type_info = column_data_type.type_info().get();
+    if (column_data_type.type() != LogicalType::kSparse or type_info == nullptr or type_info->type() != TypeInfoType::kSparse) {
+        const auto error_info = fmt::format("Expect the column search is a sparse column, but got: {}", column_data_type.ToString());
+        LOG_ERROR(error_info);
+        RecoverableError(Status::SyntaxError(error_info));
+    }
+
+    Vector<SharedPtr<BaseExpression>> arguments;
+    arguments.emplace_back(expr_ptr);
+
+    SharedPtr<BaseExpression> query_expr = BuildExpression(*expr.query_sparse_expr_, bind_context_ptr, depth, root);
+
+    auto bound_match_sparse_expr = MakeShared<MatchSparseExpression>(std::move(arguments),
+                                                                     query_expr,
+                                                                     expr.metric_type_,
+                                                                     expr.query_n_,
+                                                                     expr.topn_,
+                                                                     std::move(expr.opt_params_));
+    return bound_match_sparse_expr;
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     Vector<SharedPtr<MatchExpression>> match_exprs;
     Vector<SharedPtr<KnnExpression>> knn_exprs;
-    Vector<SharedPtr<MatchTensorExpression>> tensor_maxsim_exprs;
-    SharedPtr<FusionExpression> fusion_expr = nullptr;
+    Vector<SharedPtr<MatchTensorExpression>> match_tensor_exprs;
+    Vector<SharedPtr<MatchSparseExpression>> match_sparse_exprs;
+    Vector<SharedPtr<FusionExpression>> fusion_exprs;
     for (MatchExpr *match_expr : expr.match_exprs_) {
         match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
     }
     for (KnnExpr *knn_expr : expr.knn_exprs_) {
         knn_exprs.push_back(static_pointer_cast<KnnExpression>(BuildKnnExpr(*knn_expr, bind_context_ptr, depth, false)));
     }
-    for (MatchTensorExpr *tensor_maxsim_expr : expr.tensor_maxsim_exprs_) {
-        tensor_maxsim_exprs.push_back(
-            static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*tensor_maxsim_expr, bind_context_ptr, depth, false)));
+    for (MatchTensorExpr *match_tensor_expr : expr.match_tensor_exprs_) {
+        match_tensor_exprs.push_back(
+            static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*match_tensor_expr, bind_context_ptr, depth, false)));
     }
-    if (expr.fusion_expr_ != nullptr)
-        fusion_expr = MakeShared<FusionExpression>(expr.fusion_expr_->method_, expr.fusion_expr_->options_);
-    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, knn_exprs, tensor_maxsim_exprs, fusion_expr);
+    for (MatchSparseExpr *match_sparse_expr : expr.match_sparse_exprs_) {
+        match_sparse_exprs.push_back(
+            static_pointer_cast<MatchSparseExpression>(BuildMatchSparseExpr(std::move(*match_sparse_expr), bind_context_ptr, depth, false)));
+    }
+    for (FusionExpr *fusion_expr : expr.fusion_exprs_) {
+        auto output_expr = MakeShared<FusionExpression>(fusion_expr->method_, fusion_expr->options_);
+        if (fusion_expr->match_tensor_expr_) {
+            output_expr->match_tensor_expr_ =
+                static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*fusion_expr->match_tensor_expr_, bind_context_ptr, depth, false));
+        }
+        fusion_exprs.push_back(std::move(output_expr));
+    }
+    SharedPtr<SearchExpression> bound_search_expr =
+        MakeShared<SearchExpression>(match_exprs, knn_exprs, match_tensor_exprs, match_sparse_exprs, fusion_exprs);
     return bound_search_expr;
 }
 
@@ -601,11 +748,15 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
             return subquery_expr;
         }
         case SubqueryType::kAny: {
-            UnrecoverableError("Not implement: Any");
+            const auto error_info = "Not implement: Any";
+            LOG_CRITICAL(error_info);
+            UnrecoverableError(error_info);
         }
     }
 
-    UnrecoverableError("Unreachable");
+    const auto error_info = "Unreachable";
+    LOG_CRITICAL(error_info);
+    UnrecoverableError(error_info);
     return nullptr;
 }
 
@@ -615,7 +766,17 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         switch (special_function_ptr->special_type()) {
             case SpecialType::kDistance: {
                 if (!bind_context_ptr->allow_distance) {
-                    Status status = Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR");
+                    Status status =
+                        Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
+                }
+                break;
+            }
+            case SpecialType::kSimilarity: {
+                if (!bind_context_ptr->allow_similarity) {
+                    Status status = Status::SyntaxError(
+                        "SIMILARITY() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product");
                     LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
@@ -638,24 +799,188 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
         String column_name = special_function_ptr->name();
 
         TableEntry *table_entry = bind_context_ptr->binding_by_name_[table_name]->table_collection_entry_ptr_;
-        SharedPtr<ColumnExpression> bound_column_expr = ColumnExpression::Make(special_function_ptr->data_type(),
-                                                                               table_name,
-                                                                               bind_context_ptr->table_name2table_index_[table_name],
-                                                                               column_name,
-                                                                               table_entry->ColumnCount() + special_function_ptr->extra_idx(),
-                                                                               depth,
-                                                                               special_function_ptr->special_type());
-        return bound_column_expr;
+        switch (special_function_ptr->special_type()) {
+            case SpecialType::kCreateTs: {
+                return ColumnExpression::Make(special_function_ptr->data_type(),
+                                              table_name,
+                                              bind_context_ptr->table_name2table_index_[table_name],
+                                              column_name,
+                                              COLUMN_IDENTIFIER_CREATE,
+                                              depth,
+                                              special_function_ptr->special_type());
+            }
+            case SpecialType::kDeleteTs: {
+                return ColumnExpression::Make(special_function_ptr->data_type(),
+                                              table_name,
+                                              bind_context_ptr->table_name2table_index_[table_name],
+                                              column_name,
+                                              COLUMN_IDENTIFIER_DELETE,
+                                              depth,
+                                              special_function_ptr->special_type());
+            }
+            default: {
+                return ColumnExpression::Make(special_function_ptr->data_type(),
+                                              table_name,
+                                              bind_context_ptr->table_name2table_index_[table_name],
+                                              column_name,
+                                              table_entry->ColumnCount() + special_function_ptr->extra_idx(),
+                                              depth,
+                                              special_function_ptr->special_type());
+            }
+        }
     } else {
         return None;
     }
 }
 
-//
-//// Bind window function.
-// SharedPtr<BaseExpression>
-// ExpressionBinder::BuildWindow(const hsql::Expr &expr, const SharedPtr<BindContext>& bind_context_ptr) {
-//     PlannerError("ExpressionBinder::BuildWindow");
-// }
+template <typename T, typename U>
+void FillConcatenatedTensorData(T *output_ptr, const Vector<U> &data_array, const u32 expect_dim) {
+    if (data_array.size() != expect_dim) {
+        const auto error_info = fmt::format("Mismatch in tensor member dimension, expect: {}, but got: {}", expect_dim, data_array.size());
+        LOG_ERROR(error_info);
+        RecoverableError(Status::SyntaxError(error_info));
+    }
+    for (u32 i = 0; i < expect_dim; ++i) {
+        output_ptr[i] = data_array[i];
+    }
+}
+
+template <typename T>
+ptr_t GetConcatenatedTensorDataFromSubArray(const Vector<SharedPtr<ConstantExpr>> &sub_array_array,
+                                            const u32 tensor_column_basic_embedding_dim,
+                                            u32 &query_total_dimension) {
+    static_assert(!std::is_same_v<T, bool>);
+    // expect children to be embedding of dimension tensor_column_basic_embedding_dim
+    query_total_dimension = sub_array_array.size() * tensor_column_basic_embedding_dim;
+    auto output_data = MakeUniqueForOverwrite<T[]>(query_total_dimension);
+    for (u32 i = 0; i < sub_array_array.size(); ++i) {
+        switch (sub_array_array[i]->literal_type_) {
+            case LiteralType::kIntegerArray: {
+                FillConcatenatedTensorData(output_data.get() + i * tensor_column_basic_embedding_dim,
+                                           sub_array_array[i]->long_array_,
+                                           tensor_column_basic_embedding_dim);
+                break;
+            }
+            case LiteralType::kDoubleArray: {
+                FillConcatenatedTensorData(output_data.get() + i * tensor_column_basic_embedding_dim,
+                                           sub_array_array[i]->double_array_,
+                                           tensor_column_basic_embedding_dim);
+                break;
+            }
+            default: {
+                const auto error_info = "Tensor subarray type should be IntegerArray or DoubleArray.";
+                LOG_ERROR(error_info);
+                RecoverableError(Status::SyntaxError(error_info));
+                break;
+            }
+        }
+    }
+    auto output_ptr = output_data.release();
+    return reinterpret_cast<ptr_t>(output_ptr);
+}
+
+template <typename T, typename U>
+void FillConcatenatedTensorDataBit(T *output_ptr, const Vector<U> &data_array, const u32 expect_dim) {
+    static_assert(std::is_same_v<T, u8>);
+    if (data_array.size() != expect_dim) {
+        const auto error_info = fmt::format("Mismatch in tensor member dimension, expect: {}, but got: {}", expect_dim, data_array.size());
+        LOG_ERROR(error_info);
+        RecoverableError(Status::SyntaxError(error_info));
+    }
+    for (u32 i = 0; i < expect_dim; ++i) {
+        if (data_array[i]) {
+            output_ptr[i / 8] |= (1u << (i % 8));
+        }
+    }
+}
+
+template <>
+ptr_t GetConcatenatedTensorDataFromSubArray<bool>(const Vector<SharedPtr<ConstantExpr>> &sub_array_array,
+                                                  const u32 tensor_column_basic_embedding_dim,
+                                                  u32 &query_total_dimension) {
+    // expect children to be embedding of dimension tensor_column_basic_embedding_dim
+    query_total_dimension = sub_array_array.size() * tensor_column_basic_embedding_dim;
+    auto output_data = MakeUnique<u8[]>(query_total_dimension / 8);
+    const u32 basic_u8_dim = tensor_column_basic_embedding_dim / 8;
+    for (u32 i = 0; i < sub_array_array.size(); ++i) {
+        switch (sub_array_array[i]->literal_type_) {
+            case LiteralType::kIntegerArray: {
+                FillConcatenatedTensorDataBit(output_data.get() + i * basic_u8_dim,
+                                              sub_array_array[i]->long_array_,
+                                              tensor_column_basic_embedding_dim);
+                break;
+            }
+            case LiteralType::kDoubleArray: {
+                FillConcatenatedTensorDataBit(output_data.get() + i * basic_u8_dim,
+                                              sub_array_array[i]->double_array_,
+                                              tensor_column_basic_embedding_dim);
+                break;
+            }
+            default: {
+                const auto error_info = "Tensor subarray type should be IntegerArray or DoubleArray.";
+                LOG_ERROR(error_info);
+                RecoverableError(Status::SyntaxError(error_info));
+                break;
+            }
+        }
+    }
+    auto output_ptr = output_data.release();
+    return reinterpret_cast<ptr_t>(output_ptr);
+}
+
+template <typename T, typename U>
+ptr_t GetConcatenatedTensorData(const Vector<U> &data_array, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension) {
+    query_total_dimension = data_array.size();
+    if (query_total_dimension == 0 or query_total_dimension % tensor_column_basic_embedding_dim != 0) {
+        const auto error_info = fmt::format("Query embedding with dimension: {} which doesn't match with tensor basic dimension {}",
+                                            query_total_dimension,
+                                            tensor_column_basic_embedding_dim);
+        LOG_ERROR(error_info);
+        RecoverableError(Status::SyntaxError(error_info));
+    }
+    if constexpr (std::is_same_v<T, bool>) {
+        auto *embedding_data_ptr = new u8[query_total_dimension / 8]();
+        for (u32 i = 0; i < query_total_dimension; ++i) {
+            if (data_array[i]) {
+                embedding_data_ptr[i / 8] |= (1u << (i % 8));
+            }
+        }
+        return reinterpret_cast<ptr_t>(embedding_data_ptr);
+    } else {
+        T *embedding_data_ptr = new T[query_total_dimension];
+        for (u32 i = 0; i < query_total_dimension; ++i) {
+            embedding_data_ptr[i] = data_array[i];
+        }
+        return reinterpret_cast<ptr_t>(embedding_data_ptr);
+    }
+}
+
+template <typename T>
+ptr_t GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tensor_column_basic_embedding_dim, u32 &query_total_dimension) {
+    if constexpr (std::is_same_v<T, bool>) {
+        if (tensor_column_basic_embedding_dim % 8 != 0) {
+            String error_message = "The tensor column basic embedding dimension should be multiple of 8";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+    }
+    switch (tensor_expr_->literal_type_) {
+        case LiteralType::kIntegerArray: {
+            return GetConcatenatedTensorData<T>(tensor_expr_->long_array_, tensor_column_basic_embedding_dim, query_total_dimension);
+        }
+        case LiteralType::kDoubleArray: {
+            return GetConcatenatedTensorData<T>(tensor_expr_->double_array_, tensor_column_basic_embedding_dim, query_total_dimension);
+        }
+        case LiteralType::kSubArrayArray: {
+            return GetConcatenatedTensorDataFromSubArray<T>(tensor_expr_->sub_array_array_, tensor_column_basic_embedding_dim, query_total_dimension);
+        }
+        default: {
+            String error_message = "Unexpected case!";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            return nullptr;
+        }
+    }
+}
 
 } // namespace infinity

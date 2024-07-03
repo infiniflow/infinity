@@ -6,7 +6,7 @@ import random
 def generate(generate_if_exists: bool, copy_dir: str):
     row_n = 20000
     csv_dir = "./test/data/csv"
-    slt_dir = "./test/sql/dql"
+    slt_dir = "./test/sql/dql/index_scan"
     csv_name = "/test_big_index_scan.csv"
     slt_name = "/big_index_scan.slt"
     table_name = "test_big_index_scan"
@@ -17,7 +17,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    if os.path.exists(csv_path) and os.path.exists(slt_path) and generate_if_exists:
+    if os.path.exists(csv_path) and os.path.exists(slt_path) and not generate_if_exists:
         print("File {} and {} already existed exists. Skip Generating.".format(
             slt_path, csv_path))
         return

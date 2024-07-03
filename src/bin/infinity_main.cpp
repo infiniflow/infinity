@@ -30,8 +30,6 @@ import http_server;
 
 namespace {
 
-infinity::PGServer pg_server;
-
 #define THRIFT_SERVER_TYPE 0
 
 #if THRIFT_SERVER_TYPE == 0
@@ -41,6 +39,7 @@ infinity::PoolThriftServer pool_thrift_server;
 
 #elif THRIFT_SERVER_TYPE == 1
 
+infinity::Thread non_block_pool_thrift_thread;
 infinity::NonBlockPoolThriftServer non_block_pool_thrift_server;
 
 #else
@@ -53,7 +52,10 @@ infinity::ThreadedThriftServer threaded_thrift_server;
 infinity::Thread http_server_thread;
 infinity::HTTPServer http_server;
 
+infinity::Thread pg_thread;
+infinity::PGServer pg_server;
 
+// Used for server shutdown
 std::mutex server_mutex;
 std::condition_variable server_cv;
 
@@ -69,13 +71,12 @@ void ShutdownServer() {
     }
 
     http_server.Shutdown();
-    http_server_thread.join();
+
     fmt::print("HTTP Server is shutdown.\n");
 
 #if THRIFT_SERVER_TYPE == 0
 
     pool_thrift_server.Shutdown();
-    pool_thrift_thread.join();
 
 #elif THRIFT_SERVER_TYPE == 1
 
@@ -84,7 +85,6 @@ void ShutdownServer() {
 #else
 
     threaded_thrift_server.Shutdown();
-    threaded_thrift_thread.join();
 
 #endif
 
@@ -98,11 +98,7 @@ void ShutdownServer() {
 
 void SignalHandler(int signal_number, siginfo_t *, void *) {
     switch (signal_number) {
-        case SIGUSR1: {
-            fmt::print("Unrecoverable error issued, stop the server");
-            exit(-1);
-            break;
-        }
+        case SIGUSR1:
         case SIGINT:
         case SIGQUIT:
         case SIGTERM: {
@@ -178,8 +174,6 @@ auto main(int argc, char **argv) -> int {
 
     InfinityContext::instance().Init(parameters.config_path);
 
-    RegisterSignal();
-
     InfinityContext::instance().config()->PrintAll();
 
     fmt::print("Release: {}.{}.{} build on {} with {} mode from branch: {}, commit-id: {}\n",
@@ -205,7 +199,7 @@ auto main(int argc, char **argv) -> int {
 
     i32 thrift_server_pool_size = InfinityContext::instance().config()->ConnectionPoolSize();
     non_block_pool_thrift_server.Init(thrift_server_port, thrift_server_pool_size);
-    non_block_pool_thrift_server.Start();
+    non_block_pool_thrift_thread = infinity::Thread([&]() { non_block_pool_thrift_server.Start(); });
 
 #else
 
@@ -214,10 +208,33 @@ auto main(int argc, char **argv) -> int {
 
 #endif
 
+    pg_thread = infinity::Thread([&]() { pg_server.Run(); });
+
     shutdown_thread = infinity::Thread([&]() { ShutdownServer(); });
-    pg_server.Run();
+
+    RegisterSignal();
 
     shutdown_thread.join();
+
+    http_server_thread.join();
+
+#if THRIFT_SERVER_TYPE == 0
+
+    pool_thrift_thread.join();
+
+#elif THRIFT_SERVER_TYPE == 1
+
+    non_block_pool_thrift_server.join();
+
+#else
+
+    threaded_thrift_thread.join();
+
+#endif
+
+    pg_thread.join();
+
+
 
     fmt::print("Server is shutdown\n");
     return 0;

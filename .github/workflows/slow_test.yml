@@ -30,7 +30,7 @@ jobs:
 
       - name: Build release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=2 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=2 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
@@ -61,7 +61,7 @@ jobs:
       - name: Stop infinity release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 10s
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh 10s $(pidof cmake-build-release/src/infinity)
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1

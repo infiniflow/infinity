@@ -22,12 +22,12 @@ DELETE FROM test_compact_with_delete WHERE c1 = 1;
 query II
 SELECT * FROM test_compact_with_delete;
 ----
-5 6,7,8
-9 10,11,12
-5 6,7,8
-9 10,11,12
-5 6,7,8
-9 10,11,12
+5 [6,7,8]
+9 [10,11,12]
+5 [6,7,8]
+9 [10,11,12]
+5 [6,7,8]
+9 [10,11,12]
 
 query I
 COMPACT TABLE test_compact_with_delete;
@@ -36,12 +36,12 @@ COMPACT TABLE test_compact_with_delete;
 query II
 SELECT * FROM test_compact_with_delete;
 ----
-5 6,7,8
-9 10,11,12
-5 6,7,8
-9 10,11,12
-5 6,7,8
-9 10,11,12
+5 [6,7,8]
+9 [10,11,12]
+5 [6,7,8]
+9 [10,11,12]
+5 [6,7,8]
+9 [10,11,12]
 
 statement ok
 DROP TABLE test_compact_with_delete;

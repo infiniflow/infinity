@@ -12,7 +12,7 @@ namespace infinity {
 
 export class PostingFormatOption {
 public:
-    inline PostingFormatOption(optionflag_t flag)
+    inline PostingFormatOption(optionflag_t flag = OPTION_FLAG_ALL)
         : has_term_payload_(flag & of_term_payload), doc_list_format_option_(flag), pos_list_format_option_(flag) {}
 
     bool HasTfList() const { return doc_list_format_option_.HasTfList(); }
@@ -45,7 +45,7 @@ private:
 
 export class PostingFormat {
 public:
-    PostingFormat(const PostingFormatOption &option) : doc_list_format_(nullptr), pos_list_format_(nullptr) {
+    explicit PostingFormat(const PostingFormatOption &option) : option_(option), doc_list_format_(nullptr), pos_list_format_(nullptr) {
         doc_list_format_ = new DocListFormat(option.GetDocListFormatOption());
         if (option.HasPositionList()) {
             pos_list_format_ = new PositionListFormat(option.GetPosListFormatOption());
@@ -64,6 +64,10 @@ public:
 
     DocListFormat *GetDocListFormat() const { return doc_list_format_; }
     PositionListFormat *GetPositionListFormat() const { return pos_list_format_; }
+    const PostingFormatOption GetOption() const { return option_; }
+
+private:
+    const PostingFormatOption option_;
 
 private:
     DocListFormat *doc_list_format_;

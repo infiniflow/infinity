@@ -28,9 +28,14 @@ export constexpr std::string_view enable_profile_name = "enable_profile";
 export constexpr std::string_view worker_cpu_limit = "cpu_count";
 export constexpr std::string_view log_level = "log_level";
 
+export struct DefaultConfig {
+    LogLevel default_log_level_{LogLevel::kInfo};
+    bool default_log_to_stdout_{false};
+};
+
 export struct Config {
 public:
-    Status Init(const SharedPtr<String> &config_path);
+    Status Init(const SharedPtr<String> &config_path, DefaultConfig* default_config);
 
     void PrintAll();
 
@@ -41,6 +46,10 @@ public:
 
     void SetCPULimit(i64 new_cpu_limit);
     i64 CPULimit();
+    inline bool RecordRunningQuery() {
+        return record_running_query_;
+    }
+    void SetRecordRunningQuery(bool flag);
 
     // Network
     String ServerAddress();
@@ -109,6 +118,9 @@ private:
 private:
     std::mutex mutex_;
     GlobalOptions global_options_;
+
+    // record running query flag
+    Atomic<bool> record_running_query_{false};
 };
 
 } // namespace infinity

@@ -23,7 +23,16 @@
 
 namespace infinity {
 
-enum EmbeddingDataType : int8_t { kElemBit, kElemInt8, kElemInt16, kElemInt32, kElemInt64, kElemFloat, kElemDouble, kElemInvalid };
+enum EmbeddingDataType : int8_t {
+    kElemBit,
+    kElemInt8,
+    kElemInt16,
+    kElemInt32,
+    kElemInt64,
+    kElemFloat,
+    kElemDouble,
+    kElemInvalid,
+};
 
 template <typename T>
 inline EmbeddingDataType ToEmbeddingDataType() {
@@ -108,6 +117,27 @@ public:
         return std::string();
     }
 
+    static EmbeddingDataType String2EmbeddingDataType(std::string_view sv) {
+        if (sv == "BIT") {
+            return kElemBit;
+        } else if (sv == "INT8") {
+            return kElemInt8;
+        } else if (sv == "INT16") {
+            return kElemInt16;
+        } else if (sv == "INT32" || sv == "INT") {
+            return kElemInt32;
+        } else if (sv == "INT64") {
+            return kElemInt64;
+        } else if (sv == "FLOAT32" || sv == "FLOAT" || sv == "F32") {
+            return kElemFloat;
+        } else if (sv == "FLOAT64" || sv == "DOUBLE" || sv == "F64") {
+            return kElemDouble;
+        } else {
+            ParserError("Unexpected embedding type");
+        }
+        return kElemInvalid;
+    }
+
     [[nodiscard]] static inline std::string Embedding2String(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension) {
         switch (type) {
             case kElemBit:
@@ -135,25 +165,45 @@ private:
     template <typename T>
     static inline std::string Embedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
         std::stringstream ss;
+        ss << "[";
         for (size_t i = 0; i < dimension - 1; ++i) {
             ss << ((T *)(embedding.ptr))[i] << ',';
         }
-        ss << ((T *)(embedding.ptr))[dimension - 1];
+        ss << ((T *)(embedding.ptr))[dimension - 1] << "]";
         return ss.str();
     }
 
     template <>
     inline std::string Embedding2StringInternal<float>(const EmbeddingType &embedding, size_t dimension) {
         std::stringstream ss;
+        ss << "[";
         for (size_t i = 0; i < dimension - 1; ++i) {
             char buffer[20];
-            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[i], std::chars_format::general, 6);
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[i], std::chars_format::general, 7);
             ss.write((const char *)buffer, ptr - buffer);
             ss.put(',');
         }
         char buffer[20];
-        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[dimension - 1], std::chars_format::general, 6);
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[dimension - 1], std::chars_format::general, 7);
         ss.write((const char *)buffer, ptr - buffer);
+        ss << "]";
+        return ss.str();
+    }
+
+    template <>
+    inline std::string Embedding2StringInternal<double>(const EmbeddingType &embedding, size_t dimension) {
+        std::stringstream ss;
+        ss << "[";
+        for (size_t i = 0; i < dimension - 1; ++i) {
+            char buffer[20];
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((double *)(embedding.ptr))[i], std::chars_format::general, 16);
+            ss.write((const char *)buffer, ptr - buffer);
+            ss.put(',');
+        }
+        char buffer[20];
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((double *)(embedding.ptr))[dimension - 1], std::chars_format::general, 16);
+        ss.write((const char *)buffer, ptr - buffer);
+        ss << "]";
         return ss.str();
     }
 
@@ -161,7 +211,8 @@ private:
         // TODO:  This is for bitmap, and high-performance implementation is needed here.
         ParserAssert(dimension % 8 == 0, "Binary embedding dimension should be the times of 8.");
         std::string str;
-        str.reserve(dimension);
+        str.reserve(2 * dimension + 2);
+        str.push_back('[');
         auto *array = reinterpret_cast<const uint8_t *>(embedding.ptr);
         for (size_t i = 0; i < dimension / 8; ++i) {
             const uint8_t byte = array[i];
@@ -169,6 +220,7 @@ private:
                 str.push_back((byte & (1 << j)) ? '1' : '0');
             }
         }
+        str.push_back(']');
         return str;
     }
 
@@ -195,18 +247,7 @@ public:
 
     EmbeddingType &operator=(const EmbeddingType &other) = delete;
 
-    EmbeddingType &operator=(EmbeddingType &&other) noexcept {
-        if (this == &other)
-            return *this;
-        if (ptr != nullptr) {
-            //            LOG_TRACE("Target embedding isn't null, need to manually SetNull or Reset");
-            Reset();
-        }
-        const_cast<bool &>(new_allocated_) = other.new_allocated_;
-        ptr = other.ptr;
-        other.ptr = nullptr;
-        return *this;
-    }
+    EmbeddingType &operator=(EmbeddingType &&other) = delete;
 
     void Init(const void *ptr, size_t size);
 

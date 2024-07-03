@@ -15,7 +15,7 @@
 module;
 
 import stl;
-import memory_pool;
+
 import third_party;
 import segment_posting;
 import index_segment_reader;
@@ -37,9 +37,9 @@ export class ColumnIndexReader {
 public:
     void Open(optionflag_t flag, String &&index_dir, Map<SegmentID, SharedPtr<SegmentIndexEntry>> &&index_by_segment);
 
-    UniquePtr<PostingIterator> Lookup(const String &term, MemoryPool *session_pool, bool fetch_position = true);
+    UniquePtr<PostingIterator> Lookup(const String &term, bool fetch_position = true);
 
-    UniquePtr<BlockMaxTermDocIterator> LookupBlockMax(const String &term, MemoryPool *session_pool, float weight, bool fetch_position = true);
+    UniquePtr<BlockMaxTermDocIterator> LookupBlockMax(const String &term, float weight, bool fetch_position = true);
 
     float GetAvgColumnLength() const;
 
@@ -69,7 +69,6 @@ export struct IndexReader {
 
     SharedPtr<FlatHashMap<u64, SharedPtr<ColumnIndexReader>, detail::Hash<u64>>> column_index_readers_;
     SharedPtr<Map<String, String>> column2analyzer_;
-    SharedPtr<MemoryPool> session_pool_;
 };
 
 export class TableIndexReaderCache {

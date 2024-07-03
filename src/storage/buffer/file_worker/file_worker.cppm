@@ -19,6 +19,7 @@ export module file_worker;
 import stl;
 import file_system;
 import third_party;
+import file_worker_type;
 
 namespace infinity {
 
@@ -43,7 +44,11 @@ public:
 
     virtual SizeT GetMemoryCost() const = 0;
 
+    virtual FileWorkerType Type() const = 0;
+
     void *GetData() { return data_; }
+
+    void SetData(void *data) { data_ = data; } // use for optimize hnsw index
 
     void SetBaseTempDir(SharedPtr<String> base_dir, SharedPtr<String> temp_dir) {
         base_dir_ = std::move(base_dir);

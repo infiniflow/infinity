@@ -27,8 +27,8 @@ download()
 names="https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz
 https://ftp.gnu.org/gnu/binutils/binutils-2.41.tar.xz
 https://ftp.gnu.org/gnu/gcc/gcc-13.2.0/gcc-13.2.0.tar.xz
-https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
-https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-linux.zip
+https://github.com/Kitware/CMake/releases/download/v3.29.3/cmake-3.29.3-linux-x86_64.tar.gz
+https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
 https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/llvm-project-17.0.6.src.tar.xz
 https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.bz2
 https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz
@@ -39,7 +39,9 @@ https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
 https://github.com/jemalloc/jemalloc/releases/download/5.3.0/jemalloc-5.3.0.tar.bz2
 https://github.com/gperftools/gperftools/releases/download/gperftools-2.15/gperftools-2.15.tar.gz
 https://github.com/openssl/openssl/releases/download/OpenSSL_1_1_1w/openssl-1.1.1w.tar.gz
-https://www.python.org/ftp/python/3.12.3/Python-3.12.3.tar.xz"
+https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tar.xz
+https://www.python.org/ftp/python/3.11.9/Python-3.11.9.tar.xz
+https://www.python.org/ftp/python/3.12.4/Python-3.12.4.tar.xz"
 
 SAVEIFS=$IFS   # Save current IFS (Internal Field Separator)
 IFS=$'\n'      # Change IFS to newline char

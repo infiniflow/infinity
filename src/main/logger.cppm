@@ -33,6 +33,12 @@ public:
     Shutdown();
 };
 
+export inline bool SHOULD_LOG_TRACE() { return infinity_logger->should_log(spdlog::level::level_enum::trace); }
+
+export inline bool SHOULD_LOG_DEBUG() { return infinity_logger->should_log(spdlog::level::level_enum::debug); }
+
+export inline bool SHOULD_LOG_INFO() { return infinity_logger->should_log(spdlog::level::level_enum::info); }
+
 export inline void
 LOG_TRACE(const String& msg) {
     infinity_logger->trace(msg);

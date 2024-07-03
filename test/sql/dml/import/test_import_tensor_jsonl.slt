@@ -1,0 +1,23 @@
+statement ok
+DROP TABLE IF EXISTS test_import_tensor_jsonl;
+
+statement ok
+CREATE TABLE test_import_tensor_jsonl (c1 INT, c2 TENSOR (FLOAT, 3), c3 TENSORARRAY (FLOAT, 2), c4 TENSOR (int, 3) DEFAULT [[1.0, 2.0, 3.0]]);
+
+statement ok
+COPY test_import_tensor_jsonl FROM '/var/infinity/test_data/test_tensor.jsonl' WITH (FORMAT JSONL);
+
+query III
+SELECT * FROM test_import_tensor_jsonl;
+----
+1 [1,3,4],[-3,-5,33] [[0,4],[22,-9]],[[-6,88]] [1,2,3]
+5 [1,3,4],[-3,-5,33] [[6,-8]] [1,2,3]
+6 [1,3,4] [[99,4]],[[20,44],[262,79],[-76,878]] [1,2,3]
+
+query III
+SELECT count(*) FROM test_import_tensor_jsonl;
+----
+3
+
+statement ok
+DROP TABLE IF EXISTS test_import_tensor_jsonl;

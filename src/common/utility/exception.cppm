@@ -46,7 +46,9 @@ private:
     String message_;
 };
 
-#ifdef INFINITY_DEBUG
+#define ADD_LOG_INFO
+
+#if defined(INFINITY_DEBUG) || defined(ADD_LOG_INFO)
 
 export void RecoverableError(Status status,
                              const char *file_name = std::source_location::current().file_name(),
@@ -56,11 +58,15 @@ export void UnrecoverableError(const String &message,
                                const char *file_name = std::source_location::current().file_name(),
                                u32 line = std::source_location::current().line());
 
+export std::string_view GetErrorMsg(const String &message);
+
 #else
 
 export void RecoverableError(Status status);
 
 export void UnrecoverableError(const String &message);
+
+export std::string_view GetErrorMsg(const String &message);
 
 #endif
 

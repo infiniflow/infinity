@@ -50,6 +50,7 @@ import bg_task;
 import physical_import;
 import chunk_index_entry;
 import wal_manager;
+import internal_types;
 
 using namespace infinity;
 
@@ -102,7 +103,9 @@ public:
                 break;
             }
             if (end - start > 5) {
-                UnrecoverableError("WaitFlushDeltaOp timeout");
+                String error_message = "WaitFlushDeltaOp timeout";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             LOG_INFO(fmt::format("Before usleep. Wait flush delta op for {} seconds", end - start));
             usleep(1000 * 1000);
@@ -504,8 +507,8 @@ TEST_F(BufferObjTest, test1) {
 TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
     // GTEST_SKIP(); // FIXME
 
-#ifdef INFINITY_DEBUG
     infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
     infinity::GlobalResourceUsage::UnInit();

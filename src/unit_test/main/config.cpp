@@ -32,9 +32,9 @@ TEST_F(ConfigTest, test1) {
     using namespace infinity;
     SharedPtr<String> path = nullptr;
     Config config;
-    config.Init(path);
+    config.Init(path, nullptr);
 
-    EXPECT_EQ(config.Version(), "0.2.0");
+    EXPECT_EQ(config.Version(), "0.2.1");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), 8);
     EXPECT_EQ(config.CPULimit(), std::thread::hardware_concurrency());
@@ -65,9 +65,9 @@ TEST_F(ConfigTest, test2) {
     using namespace infinity;
     SharedPtr<String> path = MakeShared<String>(String(test_data_path()) + "/config/infinity_conf.toml");
     Config config;
-    config.Init(path);
+    config.Init(path, nullptr);
 
-    EXPECT_EQ(config.Version(), "0.2.0");
+    EXPECT_EQ(config.Version(), "0.2.1");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), -9);
 

@@ -2,7 +2,7 @@
 #include <cassert>
 
 import stl;
-import memory_pool;
+
 import posting_byte_slice;
 import posting_byte_slice_reader;
 import term_meta;
@@ -11,13 +11,33 @@ import file_reader;
 import index_defines;
 import posting_list_format;
 import local_file_system;
+import global_resource_usage;
+import infinity_context;
 
 using namespace infinity;
 
 class TermMetaTest : public BaseTest {
 public:
-    void SetUp() override { file_name_ = String(GetTmpDir()) + "/term_meta"; }
-    void TearDown() override {}
+    void SetUp() override {
+        BaseTest::SetUp();
+        BaseTest::RemoveDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        infinity::InfinityContext::instance().Init(config_path);
+
+        file_name_ = String(GetTmpDir()) + "/term_meta";
+    }
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        BaseTest::TearDown();
+    }
 
     void DoTest1() {
         SharedPtr<FileWriter> file_writer = MakeShared<FileWriter>(fs_, file_name_, 128);

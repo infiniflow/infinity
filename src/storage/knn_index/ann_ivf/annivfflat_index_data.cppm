@@ -55,10 +55,14 @@ struct AnnIVFFlatIndexData {
                     const u32 min_points_per_centroid = 32,
                     const u32 max_points_per_centroid = 256) {
         if (loaded_) {
-            UnrecoverableError("AnnIVFFlatIndexData::BuildIndex(): Index data already exists.");
+            String error_message = "AnnIVFFlatIndexData::BuildIndex(): Index data already exists.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (dimension != dimension_) {
-            UnrecoverableError("Dimension not match");
+            String error_message = "Dimension not match";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
@@ -98,10 +102,14 @@ struct AnnIVFFlatIndexData {
                     const u32 min_points_per_centroid = 32,
                     const u32 max_points_per_centroid = 256) {
         if (loaded_) {
-            UnrecoverableError("AnnIVFFlatIndexData::BuildIndex(): Index data already exists.");
+            String error_message = "AnnIVFFlatIndexData::BuildIndex(): Index data already exists.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (dimension != dimension_) {
-            UnrecoverableError("Dimension not match");
+            String error_message = "Dimension not match";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
@@ -133,7 +141,9 @@ struct AnnIVFFlatIndexData {
                 break;
             }
             if (cnt >= full_row_count) {
-                UnrecoverableError("AnnIVFFlatIndexData::BuildIndex(): segment row count more than expected");
+                String error_message = "AnnIVFFlatIndexData::BuildIndex(): segment row count more than expected.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
             auto &[val_ptr, offset] = pair_opt.value(); // val_ptr is const VectorDataType * type, offset is SegmentOffset type
             // copy data of single embedding
@@ -227,7 +237,9 @@ struct AnnIVFFlatIndexData {
 
     void SaveIndexInner(FileHandler &file_handler) {
         if (!loaded_) {
-            UnrecoverableError("AnnIVFFlatIndexData::SaveIndexInner(): Index data not loaded.");
+            String error_message = "AnnIVFFlatIndexData::SaveIndexInner(): Index data not loaded.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         file_handler.Write(&metric_, sizeof(metric_));
         file_handler.Write(&dimension_, sizeof(dimension_));
@@ -247,7 +259,11 @@ struct AnnIVFFlatIndexData {
 
     void SaveIndex(const String &file_path, UniquePtr<FileSystem> fs) {
         u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+        auto [file_handler, status] = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
+        if(!status.ok()) {
+            LOG_CRITICAL(status.message());
+            UnrecoverableError(status.message());
+        }
         SaveIndexInner(*file_handler);
         file_handler->Close();
     }
@@ -280,7 +296,11 @@ struct AnnIVFFlatIndexData {
 
     static UniquePtr<AnnIVFFlatIndexData<CentroidsDataType, VectorDataType>> LoadIndex(const String &file_path, UniquePtr<FileSystem> fs) {
         u8 file_flags = FileFlags::READ_FLAG;
-        UniquePtr<FileHandler> file_handler = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
+        auto [file_handler, status] = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
+        if(!status.ok()) {
+            LOG_CRITICAL(status.message());
+            UnrecoverableError(status.message());
+        }
         auto index_data = LoadIndexInner(*file_handler);
         file_handler->Close();
         return index_data;

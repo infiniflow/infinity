@@ -17,6 +17,7 @@ target_link_libraries(
     atomic.a
     c++.a
     jma
+    opencc
 )
 
 # ########################################
@@ -40,6 +41,7 @@ target_link_libraries(
     atomic.a
     c++.a
     jma
+    opencc
 )
 
 # query benchmark
@@ -61,6 +63,7 @@ target_link_libraries(
     atomic.a
     c++.a
     jma
+    opencc
 )
 
 # ########################################
@@ -84,6 +87,71 @@ target_link_libraries(
     atomic.a
     c++.a
     jma
+    opencc
+)
+
+# ########################################
+add_executable(sparse_benchmark
+    ./sparse/sparse_benchmark.cpp
+)
+
+target_include_directories(sparse_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(
+    sparse_benchmark
+    infinity_core
+    benchmark_profiler
+    sql_parser
+    onnxruntime_mlas
+    zsv_parser
+    newpfor
+    fastpfor
+    lz4.a
+    atomic.a
+    jma
+    c++.a
+    opencc
+)
+
+add_executable(bmp_benchmark
+    ./sparse/bmp_benchmark.cpp
+)
+
+target_include_directories(bmp_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(
+    bmp_benchmark
+    infinity_core
+    benchmark_profiler
+    sql_parser
+    onnxruntime_mlas
+    zsv_parser
+    newpfor
+    fastpfor
+    lz4.a
+    atomic.a
+    jma
+    c++.a
+    opencc
+)
+
+add_executable(hnsw_benchmark
+    ./knn/hnsw_benchmark.cpp
+)
+
+target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(
+    hnsw_benchmark
+    infinity_core
+    benchmark_profiler
+    sql_parser
+    onnxruntime_mlas
+    zsv_parser
+    newpfor
+    fastpfor
+    lz4.a
+    atomic.a
+    jma
+    c++.a
+    opencc
 )
 
 if(ENABLE_JEMALLOC)
@@ -91,6 +159,9 @@ if(ENABLE_JEMALLOC)
     target_link_libraries(knn_import_benchmark jemalloc.a)
     target_link_libraries(knn_query_benchmark jemalloc.a)
     target_link_libraries(fulltext_benchmark jemalloc.a)
+    target_link_libraries(sparse_benchmark jemalloc.a)
+    target_link_libraries(bmp_benchmark jemalloc.a)
+    target_link_libraries(hnsw_benchmark jemalloc.a)
 endif()
 
 # add_definitions(-march=native)

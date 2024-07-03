@@ -46,24 +46,26 @@ LocalFileHandler::~LocalFileHandler() {
     if (fd_ != -1) {
         int ret = close(fd_);
         if (ret != 0) {
-            UnrecoverableError(fmt::format("Close file failed: {}", strerror(errno)));
+            String error_message = fmt::format("Close file failed: {}", strerror(errno));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         fd_ = -1;
     }
 }
 
-UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, FileLockType lock_type) {
+Pair<UniquePtr<FileHandler>, Status> LocalFileSystem::OpenFile(const String &path, u8 flags, FileLockType lock_type) {
     i32 file_flags{O_RDWR};
     bool read_flag = flags & FileFlags::READ_FLAG;
     bool write_flag = flags & FileFlags::WRITE_FLAG;
     if (read_flag && write_flag) {
         file_flags = O_RDWR;
     } else if (read_flag) {
-        file_flags = O_RDONLY;
+        file_flags = O_RDONLY | O_NOATIME;
     } else if (write_flag) {
         file_flags = O_WRONLY;
     } else {
-        UnrecoverableError("Please specify a read or write flag on file open");
+        return {nullptr, Status::InvalidFileFlag(file_flags)};
     }
 
     if (write_flag) {
@@ -86,7 +88,7 @@ UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, F
 
     i32 fd = open(path.c_str(), file_flags, 0666);
     if (fd == -1) {
-        UnrecoverableError(fmt::format("Can't open file: {}: {}", path, strerror(errno)));
+        return {nullptr, Status::IOError(fmt::format("Can't open file: {}: {}", path, strerror(errno)))};
     }
     // LOG_TRACE(fmt::format("[+] OPEN FILE: {}", path));
 
@@ -102,10 +104,10 @@ UniquePtr<FileHandler> LocalFileSystem::OpenFile(const String &path, u8 flags, F
         file_lock.l_start = 0;
         file_lock.l_len = 0;
         if (fcntl(fd, F_SETLK, &file_lock) == -1) {
-            UnrecoverableError(fmt::format("Can't lock file: {}: {}", path, strerror(errno)));
+            return {nullptr, Status::LockFileError(path, strerror(errno))};
         }
     }
-    return MakeUnique<LocalFileHandler>(*this, path, fd);
+    return {MakeUnique<LocalFileHandler>(*this, path, fd), Status::OK()};
 }
 
 void LocalFileSystem::Close(FileHandler &file_handler) {
@@ -114,24 +116,38 @@ void LocalFileSystem::Close(FileHandler &file_handler) {
     // set fd to -1 so that destructor of `LocalFileHandler` will not close the file.
     local_file_handler->fd_ = -1;
     if (close(fd) != 0) {
-        UnrecoverableError(fmt::format("Can't close file: {}: {}", file_handler.path_.string(), strerror(errno)));
+        String error_message = fmt::format("Can't close file: {}: {}", file_handler.path_.string(), strerror(errno));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     // LOG_TRACE(fmt::format("[-] CLOSE FILE: {}", file_handler.path_.string()));
 }
 
 void LocalFileSystem::Rename(const String &old_path, const String &new_path) {
     if (rename(old_path.c_str(), new_path.c_str()) != 0) {
-        UnrecoverableError(fmt::format("Can't rename file: {}, {}", old_path, strerror(errno)));
+        String error_message = fmt::format("Can't rename file: {}, {}", old_path, strerror(errno));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
 i64 LocalFileSystem::Read(FileHandler &file_handler, void *data, u64 nbytes) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
-    i64 read_count = read(fd, data, nbytes);
-    if (read_count == -1) {
-        UnrecoverableError(fmt::format("Can't read file: {}: {}", file_handler.path_.string(), strerror(errno)));
+    i64 readen = 0;
+    while (readen < (i64)nbytes) {
+        SizeT a = nbytes - readen;
+        i64 read_count = read(fd, (char *)data + readen, a);
+        if (read_count == 0) {
+            break;
+        }
+        if (read_count == -1) {
+            String error_message = fmt::format("Can't read file: {}: {}", file_handler.path_.string(), strerror(errno));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+        readen += read_count;
     }
-    return read_count;
+    return readen;
 }
 
 i64 LocalFileSystem::Write(FileHandler &file_handler, const void *data, u64 nbytes) {
@@ -140,7 +156,9 @@ i64 LocalFileSystem::Write(FileHandler &file_handler, const void *data, u64 nbyt
     while (written < (i64)nbytes) {
         i64 write_count = write(fd, (char *)data + written, nbytes - written);
         if (write_count == -1) {
-            UnrecoverableError(fmt::format("Can't write file: {}: {}. fd: {}", file_handler.path_.string(), strerror(errno), fd));
+            String error_message = fmt::format("Can't write file: {}: {}. fd: {}", file_handler.path_.string(), strerror(errno), fd);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         written += write_count;
     }
@@ -149,11 +167,20 @@ i64 LocalFileSystem::Write(FileHandler &file_handler, const void *data, u64 nbyt
 
 i64 LocalFileSystem::ReadAt(FileHandler &file_handler, i64 file_offset, void *data, u64 nbytes) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
-    i64 read_count = pread(fd, data, nbytes, file_offset);
-    if (read_count == -1) {
-        UnrecoverableError(fmt::format("Can't read file: {}: {}", file_handler.path_.string(), strerror(errno)));
+    i64 readen = 0;
+    while (readen < (i64)nbytes) {
+        i64 read_count = pread(fd, (char *)data + readen, nbytes - readen, file_offset + readen);
+        if (read_count == 0) {
+            break;
+        }
+        if (read_count == -1) {
+            String error_message = fmt::format("Can't read file: {}: {}", file_handler.path_.string(), strerror(errno));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+        readen += read_count;
     }
-    return read_count;
+    return readen;
 }
 
 i64 LocalFileSystem::WriteAt(FileHandler &file_handler, i64 file_offset, const void *data, u64 nbytes) {
@@ -162,7 +189,9 @@ i64 LocalFileSystem::WriteAt(FileHandler &file_handler, i64 file_offset, const v
     while (written < (i64)nbytes) {
         i64 write_count = pwrite(fd, (char *)data + written, nbytes - written, file_offset + written);
         if (write_count == -1) {
-            UnrecoverableError(fmt::format("Can't write file: {}: {}. fd: {}", file_handler.path_.string(), strerror(errno), fd));
+            String error_message = fmt::format("Can't write file: {}: {}. fd: {}", file_handler.path_.string(), strerror(errno), fd);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         written += write_count;
     }
@@ -172,7 +201,9 @@ i64 LocalFileSystem::WriteAt(FileHandler &file_handler, i64 file_offset, const v
 void LocalFileSystem::Seek(FileHandler &file_handler, i64 pos) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
     if ((off_t)-1 == lseek(fd, pos, SEEK_SET)) {
-        UnrecoverableError(fmt::format("Can't seek file: {}: {}", file_handler.path_.string(), strerror(errno)));
+        String error_message = fmt::format("Can't seek file: {}: {}", file_handler.path_.string(), strerror(errno));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -191,17 +222,21 @@ void LocalFileSystem::DeleteFile(const String &file_name) {
     bool is_deleted = std::filesystem::remove(p, error_code);
     if (error_code.value() == 0) {
         if (!is_deleted) {
-            UnrecoverableError(fmt::format("Can't delete file: {}: {}", file_name, strerror(errno)));
+            LOG_WARN(fmt::format("Failed to delete file: {}: {}", file_name, strerror(errno)));
         }
     } else {
-        UnrecoverableError(fmt::format("Delete file {} exception: {}", file_name, strerror(errno)));
+        String error_message = fmt::format("Delete file {} exception: {}", file_name, strerror(errno));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
 void LocalFileSystem::SyncFile(FileHandler &file_handler) {
     i32 fd = ((LocalFileHandler &)file_handler).fd_;
     if (fsync(fd) != 0) {
-        UnrecoverableError(fmt::format("fsync failed: {}, {}", file_handler.path_.string(), strerror(errno)));
+        String error_message = fmt::format("fsync failed: {}, {}", file_handler.path_.string(), strerror(errno));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -210,12 +245,16 @@ void LocalFileSystem::AppendFile(const String &dst_path, const String &src_path)
     Path src{src_path};
     std::ifstream srcFile(src, std::ios::binary);
     if (!srcFile.is_open()) {
-        UnrecoverableError(fmt::format("Failed to open source file {}", src_path));
+        String error_message = fmt::format("Failed to open source file {}", src_path);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return;
     }
     std::ofstream dstFile(dst, std::ios::binary | std::ios::app);
     if (!dstFile.is_open()) {
-        UnrecoverableError(fmt::format("Failed to open destination file {}", dst_path));
+        String error_message = fmt::format("Failed to open destination file {}", dst_path);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return;
     }
     char buffer[BUFFER_SIZE];
@@ -227,6 +266,16 @@ void LocalFileSystem::AppendFile(const String &dst_path, const String &src_path)
     dstFile.close();
 }
 
+void LocalFileSystem::Truncate(const String &file_name, SizeT length) {
+    std::error_code error_code;
+    std::filesystem::resize_file(file_name, length, error_code);
+    if (error_code.value() != 0) {
+        String error_message = fmt::format("Failed to truncate {} to size {}", file_name, strerror(errno));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+}
+
 // Directory related methods
 bool LocalFileSystem::Exists(const String &path) {
     std::error_code error_code;
@@ -235,7 +284,9 @@ bool LocalFileSystem::Exists(const String &path) {
     if (error_code.value() == 0) {
         return is_exists;
     } else {
-        UnrecoverableError(fmt::format("{} exists exception: {}", path, strerror(errno)));
+        String error_message = fmt::format("{} exists exception: {}", path, strerror(errno));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return false;
 }
@@ -251,7 +302,9 @@ void LocalFileSystem::CreateDirectory(const String &path) {
     Path p{path};
     std::filesystem::create_directories(p, error_code);
     if (error_code.value() != 0) {
-        UnrecoverableError(fmt::format("{} create exception: {}", path, strerror(errno)));
+        String error_message = fmt::format("{} create exception: {}", path, strerror(errno));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -260,7 +313,9 @@ u64 LocalFileSystem::DeleteDirectory(const String &path) {
     Path p{path};
     u64 removed_count = std::filesystem::remove_all(p, error_code);
     if (error_code.value() != 0) {
-        UnrecoverableError(fmt::format("Delete directory {} exception: {}", path, error_code.message()));
+        String error_message = fmt::format("Delete directory {} exception: {}", path, error_code.message());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return removed_count;
 }
@@ -271,21 +326,27 @@ void LocalFileSystem::CleanupDirectory(const String &path) {
     if (!fs::exists(p)) {
         std::filesystem::create_directories(p, error_code);
         if (error_code.value() != 0) {
-            UnrecoverableError(fmt::format("CleanupDirectory create {} exception: {}", path, error_code.message()));
+            String error_message = fmt::format("CleanupDirectory create {} exception: {}", path, error_code.message());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return;
     }
     try {
         std::ranges::for_each(std::filesystem::directory_iterator{path}, [&](const auto &dir_entry) { std::filesystem::remove_all(dir_entry); });
     } catch (const std::filesystem::filesystem_error &e) {
-        UnrecoverableError(fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what()));
+        String error_message = fmt::format("CleanupDirectory cleanup {} exception: {}", path, e.what());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
 Vector<SharedPtr<DirEntry>> LocalFileSystem::ListDirectory(const String &path) {
     Path dir_path(path);
     if (!is_directory(dir_path)) {
-        UnrecoverableError(fmt::format("{} isn't a directory", path));
+        String error_message = fmt::format("{} isn't a directory", path);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     Vector<SharedPtr<DirEntry>> file_array;
@@ -333,7 +394,7 @@ int LocalFileSystem::MmapFile(const String &file_path, u8 *&data_ptr, SizeT &dat
     long len_f = fs::file_size(file_path);
     if (len_f == 0)
         return -1;
-    int f = open(file_path.c_str(), O_RDONLY);
+    int f = open(file_path.c_str(), O_RDONLY | O_NOATIME);
     void *tmpd = mmap(NULL, len_f, PROT_READ, MAP_SHARED, f, 0);
     if (tmpd == MAP_FAILED)
         return -1;

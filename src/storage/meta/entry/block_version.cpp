@@ -22,7 +22,8 @@ import stl;
 import infinity_exception;
 import logger;
 import third_party;
-
+import default_values;
+import column_vector;
 import serialize;
 import local_file_system;
 
@@ -59,7 +60,7 @@ i32 BlockVersion::GetRowCount(TxnTimeStamp begin_ts) const {
     auto iter =
         std::upper_bound(created_.begin(), created_.end(), begin_ts, [](TxnTimeStamp ts, const CreateField &field) { return ts < field.create_ts_; });
     if (iter == created_.begin()) {
-        return false;
+        return 0;
     }
     --iter;
     return iter->row_count_;
@@ -116,6 +117,27 @@ UniquePtr<BlockVersion> BlockVersion::LoadFromFile(FileHandler &file_handler) {
         file_handler.Read(&block_version->deleted_[i], sizeof(TxnTimeStamp));
     }
     return block_version;
+}
+
+void BlockVersion::GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) const {
+    // find the first create_field that has row_count_ >= offset
+    auto iter = std::lower_bound(created_.begin(), created_.end(), static_cast<i64>(offset), [](const CreateField &field, const i64 offset_cp) {
+        return field.row_count_ < offset_cp;
+    });
+    SizeT i = 0;
+    for (; i < size; ++i) {
+        if (iter == created_.end()) {
+            break;
+        }
+        res.AppendByPtr(reinterpret_cast<const char *>(&iter->create_ts_));
+        if (iter->row_count_ == (i64)(i + offset)) {
+            ++iter;
+        }
+    }
+    TxnTimeStamp empty_ts = MAX_TIMESTAMP;
+    for (; i < size; ++i) {
+        res.AppendByPtr(reinterpret_cast<const char *>(&empty_ts));
+    }
 }
 
 // void BlockVersion::Cleanup(const String &version_path) {

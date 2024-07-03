@@ -14,14 +14,14 @@
 
 module;
 
+export module ternary_operator;
+
 import stl;
 import column_vector;
-
+import logger;
 import infinity_exception;
 import bitmask;
 import bitmask_buffer;
-
-export module ternary_operator;
 
 namespace infinity {
 
@@ -87,13 +87,17 @@ public:
         // 2. Flat Flat Constant
         if (first->vector_type() == ColumnVectorType::kFlat && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kConstant) {
-            UnrecoverableError("Not support Flat Flat Constant");
+            String error_message = "Not support";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         // 3. Flat Constant Flat
         if (first->vector_type() == ColumnVectorType::kFlat && second->vector_type() == ColumnVectorType::kConstant &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            UnrecoverableError("Not support Flat Constant Flat");
+            String error_message = "Not support";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         // 4. Flat Constant Constant
@@ -125,19 +129,25 @@ public:
         // 5. Constant Flat Flat
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            UnrecoverableError("Not support Constant Flat Flat");
+            String error_message = "Not support";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         // 6. Constant Flat Constant
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kConstant) {
-            UnrecoverableError("Not support Constant Flat Constant");
+            String error_message = "Not support";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         // 7. Constant Constant Flat
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kConstant &&
             third->vector_type() == ColumnVectorType::kFlat) {
-            UnrecoverableError("Not support Constant Constant Flat");
+            String error_message = "Not support";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         // 8. Constant Constant Constant

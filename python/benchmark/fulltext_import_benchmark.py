@@ -5,7 +5,7 @@ import json
 
 import infinity
 from infinity import index
-from infinity.common import REMOTE_HOST
+from infinity.common import LOCAL_HOST
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 
@@ -73,7 +73,7 @@ if __name__ == '__main__':
 
     data = import_data(path=data_dir)
 
-    infinity_obj = infinity.connect(REMOTE_HOST)
+    infinity_obj = infinity.connect(LOCAL_HOST)
     assert infinity_obj
     db_obj = infinity_obj.get_database("default_db")
     assert db_obj

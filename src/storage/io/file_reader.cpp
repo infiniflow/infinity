@@ -33,7 +33,13 @@ FileReader::FileReader(FileSystem &fs, const String &path, SizeT buffer_size)
     if (buffer_size != 0) {
         data_ = MakeUnique<char_t[]>(buffer_size);
     }
-    file_handler_ = fs_.OpenFile(path, flags, FileLockType::kReadLock);
+    auto [file_handler, status] = fs_.OpenFile(path, flags, FileLockType::kReadLock);
+    if(!status.ok()) {
+        LOG_CRITICAL(status.message());
+        UnrecoverableError(status.message());
+    }
+
+    file_handler_ = std::move(file_handler);
     file_size_ = fs_.GetFileSize(*file_handler_);
 }
 

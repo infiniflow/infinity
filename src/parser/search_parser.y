@@ -1,5 +1,6 @@
-
 // Bison variant of [Lucene syntax](https://github.com/apache/lucene/blob/main/lucene/queryparser/src/java/org/apache/lucene/queryparser/flexible/standard/parser/StandardSyntaxParser.jj)
+// ElasticSearch query string examples: https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
+// Infinity query string examples: https://github.com/infiniflow/infinity/blob/main/src/unit_test/parser/search_driver.cpp
 
 %language "c++"
 %skeleton "lalr1.cc"
@@ -23,6 +24,15 @@
     namespace infinity {
         class SearchDriver;
         class SearchScanner;
+
+        class InfString {
+        public:
+            // Bison requires default constructor for inplace new
+            InfString() = default;
+            InfString(const std::string &text, bool from_quoted) : text_{text}, from_quoted_{from_quoted} {}
+            std::string text_{};
+            bool from_quoted_{};
+        };
     }
 }
 
@@ -56,8 +66,9 @@
 %token                 LPAREN
 %token                 RPAREN
 %token                 OP_COLON
+%token <unsigned long> TILDE
 %token <float>         CARAT
-%token <std::string>   STRING
+%token <InfString>     STRING
 
 /* nonterminal symbol */
 %type <std::unique_ptr<QueryNode>>  topLevelQuery query clause term basic_filter_boost basic_filter
@@ -128,10 +139,27 @@ basic_filter
         error(@1, "default_field is empty");
         YYERROR;
     }
-    $$ = driver.AnalyzeAndBuildQueryNode(field, std::move($1));
+    std::string text = SearchDriver::Unescape($1.text_);
+    $$ = driver.AnalyzeAndBuildQueryNode(field, std::move(text), $1.from_quoted_);
 }
 | STRING OP_COLON STRING {
-    $$ = driver.AnalyzeAndBuildQueryNode($1, std::move($3));
+    std::string field = SearchDriver::Unescape($1.text_);
+    std::string text = SearchDriver::Unescape($3.text_);
+    $$ = driver.AnalyzeAndBuildQueryNode(std::move(field), std::move(text), $3.from_quoted_);
+};
+| STRING TILDE {
+    const std::string &field = default_field;
+    if(field.empty()){
+        error(@1, "default_field is empty");
+        YYERROR;
+    }
+    std::string text = SearchDriver::Unescape($1.text_);
+    $$ = driver.AnalyzeAndBuildQueryNode(field, std::move(text), $1.from_quoted_, $2);
+}
+| STRING OP_COLON STRING TILDE {
+    std::string field = SearchDriver::Unescape($1.text_);
+    std::string text = SearchDriver::Unescape($3.text_);
+    $$ = driver.AnalyzeAndBuildQueryNode(std::move(field), std::move(text), $3.from_quoted_, $4);
 };
 
 %%

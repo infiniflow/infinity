@@ -51,22 +51,26 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:ubuntu2310
+          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug"
+        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity test_main"
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-debug/src/test_main > unittest_debug.log 2>&1"
 
       - name: Collect infinity unit test debug output
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat unittest_debug.log 2>/dev/null || true
+
+      - name: Download resources
+        run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/python && python3 setup.py install"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug'"
 
       - name: Start infinity pysdk & http_api debug version
         if: ${{ !cancelled() && !failure() }}
@@ -74,22 +78,22 @@ jobs:
           # Run a command in the background
           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
 
-      - name: pysdk test debug version
+      - name: pysdk remote infinity test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py" && sleep 1s
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib64/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pysdk_remote_infinity_test.py" && sleep 1s
 
       - name: parallel test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_parallel_test.py" && sleep 1s
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib64/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 tools/run_parallel_test.py" && sleep 1s
 
       - name: http_api test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib64/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py" && sleep 1s
 
       - name: Stop infinity pysdk & http_api debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 20
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh 20 $(pidof cmake-build-debug/src/infinity)
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -103,18 +107,19 @@ jobs:
 
       - name: sqllogictest debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib64/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py"
 
       - name: Stop infinity sqllogictest debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-debug/src/infinity) 20
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh 20 $(pidof cmake-build-debug/src/infinity)
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
           fi
 
       - name: Collect infinity debug output
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected.
         run: cat debug.log 2>/dev/null || true
 
@@ -148,32 +153,40 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:ubuntu2310
+          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7
 
       - name: Build release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity test_main knn_import_benchmark knn_query_benchmark"
 
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
       
       - name: Collect infinity unit test release output
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat unittest_release.log 2>/dev/null || true
 
-      - name: Install pysdk
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/python && rm -fr dist/* && python setup.py sdist bdist_wheel && pip uninstall -y infinity-sdk && pip install dist/*.whl"
+      - name: Download resources
+        run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git
 
-      - name: Start infinity pysdk & http_api release version
+      - name: Install pysdk for Python 3.10
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release'"
+
+      - name: Test embedded infinity for Python 3.10
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+
+      - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
 
-      - name: pysdk test release version
+      - name: pysdk remote infinity test release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_test.py" && sleep 1s
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_remote_infinity_test.py" && sleep 1s
 
       - name: parallel test release version
         if: ${{ !cancelled() && !failure() }}
@@ -183,16 +196,16 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
 
-      - name: Stop infinity pysdk & http_api release
+      - name: Stop infinity release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 20
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh 20 $(pidof cmake-build-release/src/infinity)
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
           fi
 
-      - name: Start infinity sqllogictest release version
+      - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
@@ -201,16 +214,17 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
 
-      - name: Stop infinity sqllogictest release
+      - name: Stop infinity release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh $(pidof cmake-build-release/src/infinity) 20
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh 20 $(pidof cmake-build-release/src/infinity)
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
           fi
 
       - name: Collect infinity release output
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
         run: cat release.log 2>/dev/null || true
 
@@ -228,8 +242,8 @@ jobs:
 
       - name: Benchmark sift search 1 thread repeat 50 times
         if: ${{ !cancelled() && !failure() }}
-        run: truncate --size 0 $HOME/benchmark/benchmark_sift_1_thread_latest_output.log ; echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 $PWD/test/data $PWD/db_tmp | tee $HOME/benchmark/benchmark_sift_1_thread_latest_output.log ; cat $HOME/benchmark/benchmark_sift_1_thread_latest_output.log | ./tools/ci_tools/collect_benchmark_result.py $HOME/benchmark/benchmark_sift_1_thread.log ; ./tools/ci_tools/check_benchmark_result.py sift_1 $HOME/benchmark/benchmark_sift_1_thread.log
+        run: truncate --size 0 $HOME/benchmark/benchmark_sift_1_thread_latest_output.log ; echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | tee $HOME/benchmark/benchmark_sift_1_thread_latest_output.log ; cat $HOME/benchmark/benchmark_sift_1_thread_latest_output.log | ./tools/ci_tools/collect_benchmark_result.py $HOME/benchmark/benchmark_sift_1_thread.log ; ./tools/ci_tools/check_benchmark_result.py sift_1 $HOME/benchmark/benchmark_sift_1_thread.log
 
       - name: Benchmark sift search 8 threads repeat 50 times
         if: ${{ !cancelled() && !failure() }}
-        run: truncate --size 0 $HOME/benchmark/benchmark_sift_8_threads_latest_output.log ; echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 $PWD/test/data $PWD/db_tmp | tee $HOME/benchmark/benchmark_sift_8_threads_latest_output.log ; cat $HOME/benchmark/benchmark_sift_8_threads_latest_output.log | ./tools/ci_tools/collect_benchmark_result.py $HOME/benchmark/benchmark_sift_8_threads.log ; ./tools/ci_tools/check_benchmark_result.py sift_8 $HOME/benchmark/benchmark_sift_8_threads.log
+        run: truncate --size 0 $HOME/benchmark/benchmark_sift_8_threads_latest_output.log ; echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | tee $HOME/benchmark/benchmark_sift_8_threads_latest_output.log ; cat $HOME/benchmark/benchmark_sift_8_threads_latest_output.log | ./tools/ci_tools/collect_benchmark_result.py $HOME/benchmark/benchmark_sift_8_threads.log ; ./tools/ci_tools/check_benchmark_result.py sift_8 $HOME/benchmark/benchmark_sift_8_threads.log

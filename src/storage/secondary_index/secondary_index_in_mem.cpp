@@ -16,6 +16,7 @@ module;
 
 #include <bit>
 #include <vector>
+
 module secondary_index_in_mem;
 
 import stl;
@@ -32,6 +33,7 @@ import secondary_index_data;
 import chunk_index_entry;
 import segment_index_entry;
 import buffer_handle;
+import logger;
 
 namespace infinity {
 
@@ -73,8 +75,24 @@ private:
                 break;
             }
             const auto &[v_ptr, offset] = opt.value();
-            const KeyType key = ConvertToOrderedKeyValue(*v_ptr);
-            in_mem_secondary_index_.emplace(key, offset);
+            if constexpr (std::is_same_v<RawValueType, VarcharT>) {
+                auto column_vector = iter.column_vector();
+                String str;
+                if (v_ptr->IsInlined()) {
+                    str = {v_ptr->short_.data_, v_ptr->length_};
+                } else {
+                    str.resize(v_ptr->length_);
+                    column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(str.data(),
+                                                                        v_ptr->vector_.chunk_id_,
+                                                                        v_ptr->vector_.chunk_offset_,
+                                                                        v_ptr->length_);
+                }
+                const KeyType key = ConvertToOrderedKeyValue(str);
+                in_mem_secondary_index_.emplace(key, offset);
+            } else {
+                const KeyType key = ConvertToOrderedKeyValue(*v_ptr);
+                in_mem_secondary_index_.emplace(key, offset);
+            }
         }
     }
 
@@ -107,7 +125,9 @@ private:
 
 SharedPtr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, RowID begin_row_id, u32 max_size) {
     if (!column_def->type()->CanBuildSecondaryIndex()) {
-        UnrecoverableError("Column type can't build secondary index");
+        String error_message = "Column type can't build secondary index";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     switch (column_def->type()->type()) {
         case LogicalType::kTinyInt: {
@@ -139,6 +159,9 @@ SharedPtr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const
         }
         case LogicalType::kTimestamp: {
             return MakeShared<SecondaryIndexInMemT<TimestampT>>(begin_row_id, max_size);
+        }
+        case LogicalType::kVarchar: {
+            return MakeShared<SecondaryIndexInMemT<VarcharT>>(begin_row_id, max_size);
         }
         default: {
             return nullptr;

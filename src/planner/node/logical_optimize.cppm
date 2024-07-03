@@ -23,13 +23,15 @@ import logical_node;
 import data_type;
 import internal_types;
 import optimize_statement;
+import statement_common;
 
 namespace infinity {
 
 export class LogicalOptimize : public LogicalNode {
 public:
-    explicit LogicalOptimize(u64 node_id, String schema_name, String table_name)
-        : LogicalNode(node_id, LogicalNodeType::kOptimize), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)) {}
+    explicit LogicalOptimize(u64 node_id, String schema_name, String table_name, String index_name, Vector<UniquePtr<InitParameter>> opt_params)
+        : LogicalNode(node_id, LogicalNodeType::kOptimize), schema_name_(std::move(schema_name)), table_name_(std::move(table_name)),
+          index_name_(std::move(index_name)), opt_params_(std::move(opt_params)) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
 
@@ -48,6 +50,10 @@ public:
 private:
     String schema_name_;
     String table_name_;
+
+public:
+    String index_name_;
+    Vector<UniquePtr<InitParameter>> opt_params_;
 };
 
 } // namespace infinity

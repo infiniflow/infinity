@@ -3,6 +3,7 @@
 #include "knn_expr.h"
 #include "match_expr.h"
 #include "match_tensor_expr.h"
+#include "match_sparse_expr.h"
 #include "spdlog/fmt/fmt.h"
 #include <cmath>
 #include <sstream>
@@ -40,19 +41,34 @@ std::string SearchExpr::ToString() const {
         oss << expr->ToString();
         is_first = false;
     }
-    for (auto &expr : tensor_maxsim_exprs_) {
+    for (auto &expr : match_tensor_exprs_) {
         if (!is_first)
             oss << ", ";
         oss << expr->ToString();
         is_first = false;
     }
-    if (fusion_expr_ != nullptr) {
-        oss << ", " << fusion_expr_->ToString();
+    for (auto &expr : match_sparse_exprs_) {
+        if (!is_first)
+            oss << ", ";
+        oss << expr->ToString();
+        is_first = false;
+    }
+    for (auto &expr : fusion_exprs_) {
+        if (!is_first)
+            oss << ", ";
+        oss << expr->ToString();
+        is_first = false;
     }
     return oss.str();
 }
 
 void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
+    if (exprs == nullptr) {
+        ParserError("SearchExpr::SetExprs parameter is nullptr");
+    }
+    if (exprs_ != nullptr) {
+        ParserError("SearchExpr::SetExprs member exprs_ is not nullptr");
+    }
     exprs_ = exprs;
     for (ParsedExpr *expr : *exprs) {
         AddExpr(expr);
@@ -61,12 +77,13 @@ void SearchExpr::SetExprs(std::vector<infinity::ParsedExpr *> *exprs) {
 }
 
 void SearchExpr::Validate() const {
-    size_t num_sub_expr = knn_exprs_.size() + match_exprs_.size() + tensor_maxsim_exprs_.size();
+    size_t num_sub_expr = knn_exprs_.size() + match_exprs_.size() + match_tensor_exprs_.size() + match_sparse_exprs_.size();
     if (num_sub_expr <= 0) {
-        ParserError("Need at least one MATCH VECTOR / MATCH TENSOR / MATCH TEXT / QUERY expression");
+        ParserError("Need at least one MATCH VECTOR / MATCH TENSOR / MATCH TEXT / MATCH SPARSE / QUERY expression");
     } else if (num_sub_expr >= 2) {
-        if (fusion_expr_ == nullptr)
-            ParserError("Need FUSION expr since there are multiple MATCH VECTOR / MATCH TENSOR / MATCH TEXT / QUERY expressions");
+        if (fusion_exprs_.empty()) {
+            ParserError("Need FUSION expr since there are multiple MATCH VECTOR / MATCH TENSOR / MATCH TEXT / MATCH SPARSE / QUERY expressions");
+        }
     }
 }
 
@@ -78,15 +95,16 @@ void SearchExpr::AddExpr(infinity::ParsedExpr *expr) {
         case ParsedExprType::kMatch:
             match_exprs_.push_back(static_cast<MatchExpr *>(expr));
             break;
-        case ParsedExprType::kTensorMaxSim:
-            tensor_maxsim_exprs_.push_back(static_cast<MatchTensorExpr *>(expr));
+        case ParsedExprType::kMatchTensor:
+            match_tensor_exprs_.push_back(static_cast<MatchTensorExpr *>(expr));
             break;
         case ParsedExprType::kFusion:
-            if (fusion_expr_ != nullptr) {
-                ParserError("More than one FUSION expr");
-            }
-            fusion_expr_ = static_cast<FusionExpr *>(expr);
+            fusion_exprs_.push_back(static_cast<FusionExpr *>(expr));
             break;
+        case ParsedExprType::kMatchSparse: {
+            match_sparse_exprs_.push_back(static_cast<MatchSparseExpr *>(expr));
+            break;
+        }
         default:
             ParserError("Invalid expr type for SEARCH");
     }

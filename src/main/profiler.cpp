@@ -14,6 +14,8 @@
 module;
 
 #include "magic_enum.hpp"
+#include <chrono>
+module profiler;
 
 import stl;
 import third_party;
@@ -21,10 +23,8 @@ import physical_operator;
 import plan_fragment;
 import operator_state;
 import data_block;
-
+import logger;
 import infinity_exception;
-
-module profiler;
 
 namespace infinity {
 
@@ -38,6 +38,49 @@ void BaseProfiler::End() {
         return;
     end_ts_ = Now();
     finished_ = true;
+}
+
+std::string BaseProfiler::BeginTime() {
+
+    std::time_t now_time_t  = std::chrono::system_clock::to_time_t(begin_ts_);
+    std::tm* now_tm = std::localtime(&now_time_t);
+
+    char buffer[128];
+    strftime(buffer, sizeof(buffer), "%T", now_tm);
+
+    std::ostringstream ss;
+    ss.fill('0');
+
+    std::chrono::milliseconds ms;
+    std::chrono::microseconds cs;
+    std::chrono::nanoseconds ns;
+
+    ms = std::chrono::duration_cast<std::chrono::milliseconds>(begin_ts_.time_since_epoch()) % 1000;
+    cs = std::chrono::duration_cast<std::chrono::microseconds>(begin_ts_.time_since_epoch()) % 1000000;
+    ns = std::chrono::duration_cast<std::chrono::nanoseconds>(begin_ts_.time_since_epoch()) % 1000000000;
+    ss << buffer << ":" << ms.count() << ":" << cs.count() % 1000 << ":" << ns.count() % 1000;
+    return ss.str();
+}
+
+std::string BaseProfiler::EndTime() {
+    std::time_t now_time_t  = std::chrono::system_clock::to_time_t(end_ts_);
+    std::tm* now_tm = std::localtime(&now_time_t);
+
+    char buffer[128];
+    strftime(buffer, sizeof(buffer), "%F %T", now_tm);
+
+    std::ostringstream ss;
+    ss.fill('0');
+
+    std::chrono::milliseconds ms;
+    std::chrono::microseconds cs;
+    std::chrono::nanoseconds ns;
+
+    ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_ts_.time_since_epoch()) % 1000;
+    cs = std::chrono::duration_cast<std::chrono::microseconds>(end_ts_.time_since_epoch()) % 1000000;
+    ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_ts_.time_since_epoch()) % 1000000000;
+    ss << buffer << "." << ms.count() << "." << cs.count() % 1000 << "." << ns.count() % 1000;
+    return ss.str();
 }
 
 NanoSeconds BaseProfiler::ElapsedInternal() const {
@@ -88,7 +131,9 @@ void TaskProfiler::StartOperator(const PhysicalOperator *op) {
         return;
     }
     if (active_operator_ != nullptr) {
-        UnrecoverableError("Attempting to call StartOperator while another operator is active.");
+        String error_message = "Attempting to call StartOperator while another operator is active.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     active_operator_ = op;
     profiler_.Begin();
@@ -98,7 +143,9 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
         return;
     }
     if (active_operator_ == nullptr) {
-        UnrecoverableError("Attempting to call StopOperator while another operator is active.");
+        String error_message = "Attempting to call StartOperator while another operator is active.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     profiler_.End();
 
@@ -156,7 +203,9 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
             return "Rollback";
         }
         default: {
-            UnrecoverableError("Invalid query phase in query profiler");
+            String error_message = "Invalid query phase in query profiler";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return {};
@@ -172,7 +221,9 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
     if (current_phase_ == QueryPhase::kInvalid) {
         current_phase_ = phase;
     } else {
-        UnrecoverableError(fmt::format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_)));
+        String error_message = fmt::format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     BaseProfiler& phase_profiler = profilers_[phase_idx];
@@ -187,7 +238,9 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
 
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
-        UnrecoverableError("Query phase isn't started, yet");
+        String error_message = "Query phase isn't started, yet";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     current_phase_ = QueryPhase::kInvalid;

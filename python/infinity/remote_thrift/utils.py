@@ -22,6 +22,8 @@ import sqlglot.expressions as exp
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
+from infinity.common import InfinityException
+from infinity.errors import ErrorCode
 
 
 def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
@@ -40,28 +42,51 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
             arguments.append(expr)
         function_expr.arguments = arguments
 
-        paser_expr_type = ttypes.ParsedExprType()
-        paser_expr_type.function_expr = function_expr
+        parser_expr_type = ttypes.ParsedExprType()
+        parser_expr_type.function_expr = function_expr
 
-        parsed_expr.type = paser_expr_type
+        parsed_expr.type = parser_expr_type
 
         return parsed_expr
 
     elif isinstance(cons, exp.Column):
-        parsed_expr = ttypes.ParsedExpr()
-        column_expr = ttypes.ColumnExpr()
-        column_name = [cons.alias_or_name]
-        if cons.alias_or_name == "*":
-            column_expr.star = True
-        else:
-            column_expr.star = False
-        column_expr.column_name = column_name
 
-        paser_expr_type = ttypes.ParsedExprType()
-        paser_expr_type.column_expr = column_expr
+        match cons.alias_or_name:
+            case "_row_id":
+                func_expr = ttypes.FunctionExpr(function_name="row_id", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case "_score":
+                func_expr = ttypes.FunctionExpr(function_name="score", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case "_similarity":
+                func_expr = ttypes.FunctionExpr(function_name="similarity", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case "_distance":
+                func_expr = ttypes.FunctionExpr(function_name="distance", arguments=[])
+                expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+                parsed_expr = ttypes.ParsedExpr(type=expr_type)
+                return parsed_expr
+            case _:
+                parsed_expr = ttypes.ParsedExpr()
+                column_expr = ttypes.ColumnExpr()
+                column_name = [cons.alias_or_name]
+                if cons.alias_or_name == "*":
+                    column_expr.star = True
+                else:
+                    column_expr.star = False
+                column_expr.column_name = column_name
 
-        parsed_expr.type = paser_expr_type
-        return parsed_expr
+                parser_expr_type = ttypes.ParsedExprType()
+                parser_expr_type.column_expr = column_expr
+
+                parsed_expr.type = parser_expr_type
+                return parsed_expr
 
     elif isinstance(cons, exp.Literal):
         parsed_expr = ttypes.ParsedExpr()
@@ -77,12 +102,12 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
             constant_expr.literal_type = ttypes.LiteralType.String
             constant_expr.str_value = cons.output_name
         else:
-            raise Exception(f"unknown literal type: {cons}")
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Unknown literal type: {cons}")
 
-        paser_expr_type = ttypes.ParsedExprType()
-        paser_expr_type.constant_expr = constant_expr
+        parser_expr_type = ttypes.ParsedExprType()
+        parser_expr_type.constant_expr = constant_expr
 
-        parsed_expr.type = paser_expr_type
+        parsed_expr.type = parser_expr_type
         return parsed_expr
 
     elif isinstance(cons, exp.Paren):
@@ -99,15 +124,15 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
                 constant_expr.literal_type = ttypes.LiteralType.Double
                 constant_expr.f64_value = -float(cons.hashable_args[0].output_name)
             else:
-                raise Exception(f"unknown literal type: {cons}")
+                raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown literal type: {cons}")
 
-            paser_expr_type = ttypes.ParsedExprType()
-            paser_expr_type.constant_expr = constant_expr
-            parsed_expr.type = paser_expr_type
+            parser_expr_type = ttypes.ParsedExprType()
+            parser_expr_type.constant_expr = constant_expr
+            parsed_expr.type = parser_expr_type
 
             return parsed_expr
     else:
-        raise Exception(f"unknown condition type: {cons}")
+        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown condition type: {cons}")
 
 
 def parse_expr(expr) -> ttypes.ParsedExpr:
@@ -135,7 +160,7 @@ def parse_expr(expr) -> ttypes.ParsedExpr:
             parsed_expr = ttypes.ParsedExpr(type=expr_type)
             return parsed_expr
         else:
-            raise Exception(f"unknown expression type: {expr}")
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {expr}")
 
 
 # invalid_name_array = [
@@ -158,22 +183,24 @@ identifier_limit = 65536
 
 def check_valid_name(name, name_type: str = "Table"):
     if not isinstance(name, str):
-        raise ValueError(f"{name_type} name must be a string, got {type(name)}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
+                                f"{name_type} name must be a string, got {type(name)}")
     if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
-        raise ValueError(
-            f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
+                                f"{name_type} name '{name}' is not valid. It should start with a letter and can contain only letters, numbers and underscores")
     if len(name) > identifier_limit:
-        raise ValueError(f"{name_type} name '{name}' is not of appropriate length")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME,
+                                f"{name_type} name '{name}' is not of appropriate length")
     if name is None:
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name.isspace():
-        raise ValueError(f"{name_type} name cannot be composed of whitespace characters only")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"{name_type} name cannot be composed of whitespace characters only")
     if name == '':
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name == ' ':
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
     if name.isdigit():
-        raise ValueError(f"invalid name: {name}")
+        raise InfinityException(ErrorCode.INVALID_IDENTIFIER_NAME, f"invalid name: {name}")
 
 
 def name_validity_check(arg_name: str, name_type: str = "Table"):

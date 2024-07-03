@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import memory_pool;
+
 import byte_slice_reader;
 import posting_list_format;
 import term_meta;
@@ -19,7 +19,7 @@ export module posting_iterator;
 namespace infinity {
 export class PostingIterator {
 public:
-    PostingIterator(optionflag_t flag, MemoryPool *session_pool);
+    PostingIterator(optionflag_t flag);
 
     ~PostingIterator();
 
@@ -43,11 +43,16 @@ public:
 
     RowID SeekDoc(RowID docId);
 
+    inline RowID DocID() const { return current_row_id_; }
+
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond);
 
     void SeekPosition(pos_t pos, pos_t &result);
 
     docpayload_t GetCurrentDocPayload() {
+        if (current_row_id_ == INVALID_ROWID) [[unlikely]] {
+            return 0;
+        }
         if (posting_option_.HasDocPayload()) {
             DecodeTFBuffer();
             DecodeDocPayloadBuffer();
@@ -57,6 +62,9 @@ public:
     }
 
     tf_t GetCurrentTF() {
+        if (current_row_id_ == INVALID_ROWID) [[unlikely]] {
+            return 0;
+        }
         if (posting_option_.HasTfList()) {
             DecodeTFBuffer();
             return tf_buffer_[GetDocOffsetInBuffer()];
@@ -65,6 +73,9 @@ public:
     }
 
     ttf_t GetCurrentTTF() {
+        if (current_row_id_ == INVALID_ROWID) [[unlikely]] {
+            return 0;
+        }
         if (posting_option_.HasTfList()) {
             DecodeTFBuffer();
             i32 offset = GetDocOffsetInBuffer();
@@ -116,7 +127,6 @@ private:
 private:
     SharedPtr<Vector<SegmentPosting>> segment_postings_;
     PostingFormatOption posting_option_;
-    MemoryPool *session_pool_ = nullptr;
     u32 doc_freq_ = 0;
 
     // info for skiplist, block max

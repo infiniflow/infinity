@@ -25,14 +25,6 @@ import catalog;
 
 namespace infinity {
 
-export class SessionVar {
-public:
-    i64 query_count_{};
-    i64 total_commit_count_{};
-    bool enable_profile_{false};
-    i64 connected_time_{};
-};
-
 export enum class SessionType {
     kLocal,
     kRemote,
@@ -47,7 +39,6 @@ public:
 
     inline void set_current_schema(const String &current_database) { current_database_ = current_database; }
     [[nodiscard]] inline String &current_database() { return current_database_; }
-    SessionVar *SessionVariables() { return &session_variables_; }
     [[nodiscard]] inline u64 session_id() const { return session_id_; }
 
     [[nodiscard]] inline Txn *GetTxn() const { return txn_; }
@@ -69,6 +60,10 @@ public:
 
     String ConnectedTimeToStr() const { return std::asctime(std::localtime(&connected_time_)); }
 
+    void SetProfile(bool flag) { enable_profile_ = flag; }
+
+    bool GetProfile() const { return enable_profile_; }
+
 protected:
     std::time_t connected_time_;
 
@@ -80,14 +75,14 @@ protected:
 
     SessionType session_type_{SessionType::kRemote};
 
-    SessionVar session_variables_;
-
     u64 session_id_{0};
 
     u64 query_count_{0};
 
     u64 committed_txn_count_{0};
     u64 rollbacked_txn_count_{0};
+
+    bool enable_profile_{false};
 };
 
 export class LocalSession : public BaseSession {
@@ -110,6 +105,11 @@ public:
         client_port_ = port;
     }
 
+    inline void GetClientInfo(String &ip_address, u16 &port) {
+        ip_address = client_address_;
+        port = client_port_;
+    }
+
 private:
     // User / Tenant information
     String tenant_name_{};
@@ -120,38 +120,5 @@ private:
     String client_address_{};
     u16 client_port_{};
 };
-
-// export class Session {
-// public:
-//     explicit Session() : current_database_("default_db") {}
-//
-//     [[nodiscard]] inline String &current_database() { return current_database_; }
-//
-//     [[nodiscard]] inline const String &user_name() const { return user_name_; }
-//
-//     [[nodiscard]] inline u64 user_id() const { return user_id_; }
-//
-//     inline void SetClientInfo(const String &ip_address, u16 port) {
-//         client_address_ = ip_address;
-//         client_port_ = port;
-//     }
-//
-// public:
-//     // Txn is session level.
-//     Txn *txn_{};
-//
-// private:
-//     // Current schema
-//     String current_database_;
-//
-//     // User / Tenant information
-//     String tenant_name_;
-//     String user_name_;
-//
-//     u64 user_id_{0};
-//
-//     String client_address_{};
-//     u16 client_port_{};
-// };
 
 } // namespace infinity

@@ -28,6 +28,10 @@ public:
 
     void UpdateScoreThreshold(float threshold) override;
 
+    bool NextShallow(RowID doc_id) override;
+
+    bool Next(RowID doc_id) override;
+
     bool BlockSkipTo(RowID doc_id, float threshold) override;
 
     // following functions are available only after BlockSkipTo() is called

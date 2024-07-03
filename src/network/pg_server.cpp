@@ -27,6 +27,7 @@ import third_party;
 import infinity_exception;
 
 import connection;
+import logger;
 
 namespace infinity {
 
@@ -75,10 +76,18 @@ void PGServer::CreateConnection() {
 }
 
 void PGServer::StartConnection(SharedPtr<Connection> &connection) {
-    Thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_, initialized = this->initialized_]() mutable {
+    Thread connection_thread([connection = connection, &num_running_connections = this->running_connection_count_, initialized = bool(this->initialized_)]() mutable {
         if(initialized) {
             ++num_running_connections;
-            connection->Run();
+            try {
+                connection->Run();
+            } catch (...) {
+                String ip_address;
+                u16 port;
+                connection->GetClientInfo(ip_address, port);
+                String msg = fmt::format("closed connection with {}:{} due to exception", ip_address, port);
+                LOG_ERROR(msg);
+            }
 
             // User disconnected
             connection.reset();

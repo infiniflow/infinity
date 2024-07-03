@@ -58,7 +58,7 @@ Txn::Txn(TxnManager *txn_manager,
          BGTaskProcessor *bg_task_processor,
          TransactionID txn_id,
          TxnTimeStamp begin_ts,
-         UniquePtr<String> txn_text)
+         SharedPtr<String> txn_text)
     : txn_store_(this, catalog), txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog),
       txn_id_(txn_id), txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
       txn_text_(std::move(txn_text)) {}
@@ -67,8 +67,10 @@ Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, Trans
     : txn_store_(this, catalog), txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), txn_context_(begin_ts),
       wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
-UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id) {
-    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id, MAX_TIMESTAMP);
+UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts) {
+    auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id, begin_ts);
+    txn->txn_context_.commit_ts_ = begin_ts;
+    txn->txn_context_.state_ = TxnState::kCommitted;
     return txn;
 }
 
@@ -127,12 +129,28 @@ Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vecto
     return compact_status;
 }
 
+Status Txn::OptimizeIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params) {
+    Vector<SegmentIndexEntry *> segment_index_entries = table_index_entry->OptimizeIndex(this, std::move(init_params), false /*replay*/);
+    TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
+    auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
+
+    txn_table_store->AddSegmentIndexesStore(table_index_entry, std::move(segment_index_entries));
+
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdOptimize>(db_name_,
+                                                           *table_index_entry->table_index_meta()->table_entry()->GetTableName(),
+                                                           *table_index_entry->GetIndexName(),
+                                                           std::move(init_params)));
+    return Status::OK();
+}
+
 TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) { return txn_store_.GetTxnTableStore(table_entry); }
 
 void Txn::CheckTxnStatus() {
     TxnState txn_state = txn_context_.GetTxnState();
     if (txn_state != TxnState::kStarted) {
-        UnrecoverableError("Transaction isn't started.");
+        String error_message = "Transaction isn't started.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 
@@ -143,7 +161,7 @@ void Txn::CheckTxn(const String &db_name) {
     } else if (!IsEqual(db_name_, db_name)) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table from another database {}", db_name));
         LOG_ERROR(*err_msg);
-        RecoverableError(Status::InvalidDBName(db_name));
+        RecoverableError(Status::InvalidIdentifierName(db_name));
     }
 }
 
@@ -276,15 +294,19 @@ Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_
         return {segment_index_entries, status};
     }
 
-    auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
-    txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
-    for (auto &segment_index_entry : segment_index_entries) {
-        Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-        segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
-        for (auto &chunk_index_intry : chunk_index_entries) {
-            txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_intry.get());
+    {
+        std::lock_guard guard(txn_store_.mtx_);
+        auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
+        txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
+        for (auto &segment_index_entry : segment_index_entries) {
+            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+            segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+            for (auto &chunk_index_intry : chunk_index_entries) {
+                txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_intry.get());
+            }
         }
     }
+
     return {segment_index_entries, Status::OK()};
 }
 
@@ -397,9 +419,7 @@ WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 // }
 
 TxnTimeStamp Txn::Commit() {
-    txn_store_.PrepareCommit1();
-
-    if (wal_entry_->cmds_.empty() && txn_store_.Empty()) {
+    if (wal_entry_->cmds_.empty() && txn_store_.ReadOnly()) {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampR(this);
         this->SetTxnCommitting(commit_ts);
@@ -409,9 +429,11 @@ TxnTimeStamp Txn::Commit() {
 
     // register commit ts in wal manager here, define the commit sequence
     TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampW(this);
-    // LOG_INFO(fmt::format("Txn: {} is committing, committing ts: {}", txn_id_, commit_ts));
+    LOG_TRACE(fmt::format("Txn: {} is committing, committing ts: {}", txn_id_, commit_ts));
 
     this->SetTxnCommitting(commit_ts);
+
+    txn_store_.PrepareCommit1();
     // LOG_INFO(fmt::format("Txn {} commit ts: {}", txn_id_, commit_ts));
 
     if (txn_mgr_->CheckConflict(this)) {
@@ -475,13 +497,6 @@ void Txn::CancelCommitBottom() {
     cond_var_.notify_one();
 }
 
-// Dangerous! only used during replaying wal.
-void Txn::FakeCommit(TxnTimeStamp commit_ts) {
-    txn_context_.begin_ts_ = commit_ts;
-    txn_context_.commit_ts_ = commit_ts;
-    txn_context_.state_ = TxnState::kCommitted;
-}
-
 void Txn::Rollback() {
     auto state = txn_context_.GetTxnState();
     TxnTimeStamp abort_ts = 0;
@@ -490,7 +505,9 @@ void Txn::Rollback() {
     } else if (state == TxnState::kCommitting) {
         abort_ts = txn_context_.GetCommitTS();
     } else {
-        UnrecoverableError(fmt::format("Transaction {} state is {}.", txn_id_, ToString(state)));
+        String error_message = fmt::format("Transaction {} state is {}.", txn_id_, ToString(state));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     txn_context_.SetTxnRollbacking(abort_ts);
 
@@ -512,22 +529,22 @@ bool Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) 
 
 // Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
 bool Txn::DeltaCheckpoint(const TxnTimeStamp max_commit_ts) {
-    String delta_path;
+    String delta_path, delta_name;
     // only save the catalog delta entry
-    bool skip = catalog_->SaveDeltaCatalog(max_commit_ts, delta_path);
+    bool skip = catalog_->SaveDeltaCatalog(max_commit_ts, delta_path, delta_name);
     if (skip) {
         LOG_INFO("No delta catalog file is written");
         return false;
     }
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path));
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path, delta_name));
     return true;
 }
 
 void Txn::FullCheckpoint(const TxnTimeStamp max_commit_ts) {
-    String full_path;
+    String full_path, full_name;
 
-    catalog_->SaveFullCatalog(max_commit_ts, full_path);
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, full_path));
+    catalog_->SaveFullCatalog(max_commit_ts, full_path, full_name);
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, true, full_path, full_name));
 }
 
 } // namespace infinity

@@ -24,16 +24,14 @@ import block_index;
 import internal_types;
 import knn_result_handler;
 import infinity_exception;
+import logger;
 
 namespace infinity {
 
-export class MatchTensorScanFunctionData : public TableFunctionData {
+export class MatchTensorScanFunctionData final : public TableFunctionData {
 public:
     using ResultHandler = ReservoirResultHandler<CompareMin<float, RowID>>;
-    MatchTensorScanFunctionData(const BlockIndex *block_index, const SharedPtr<Vector<GlobalBlockID>> &global_block_ids, const u32 topn)
-        : block_index_(block_index), global_block_ids_(global_block_ids), topn_(topn) {
-        Init();
-    }
+    explicit MatchTensorScanFunctionData(const u32 topn) : topn_(topn) { Init(); }
 
     void Init() {
         score_result_ = MakeUniqueForOverwrite<float[]>(topn_);
@@ -44,7 +42,9 @@ public:
 
     u32 End() {
         if (finished_) {
-            UnrecoverableError("End() is called twice!");
+            String error_message = "End() is called twice!";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return 0;
         }
         finished_ = true;
@@ -53,14 +53,10 @@ public:
     }
 
     bool finished_ = false;
-    const BlockIndex *block_index_;
-    const SharedPtr<Vector<GlobalBlockID>> &global_block_ids_;
-    const u32 topn_;
+    const u32 topn_ = 0;
     UniquePtr<float[]> score_result_;
     UniquePtr<RowID[]> row_id_result_;
     UniquePtr<ResultHandler> result_handler_;
-
-    u32 current_block_ids_idx_ = 0;
 };
 
 } // namespace infinity

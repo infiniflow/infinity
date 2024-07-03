@@ -134,7 +134,9 @@ String BufferReader::read_string(const SizeT string_length, NullTerminator null_
 
     if (null_terminator == NullTerminator::kYes) {
         if (result.back() != NULL_END) {
-            UnrecoverableError("Last character isn't null.");
+            String error_message = "Last character isn't null.";
+            LOG_ERROR(error_message);
+            RecoverableError(Status::IOError(error_message));
         }
         result.pop_back();
     }
@@ -170,7 +172,9 @@ void BufferReader::receive_more(SizeT bytes) {
     }
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset) {
-        UnrecoverableError(fmt::format("Client close the connection: {}", boost_error.message()));
+        String error_message = fmt::format("Client close the connection: {}", boost_error.message());
+        LOG_ERROR(error_message);
+        RecoverableError(Status::ClientClose());
     }
 
     if(bytes_read == 0) {
@@ -179,7 +183,9 @@ void BufferReader::receive_more(SizeT bytes) {
     }
 
     if (boost_error) {
-        UnrecoverableError(boost_error.message());
+        String error_message = boost_error.message();
+        LOG_ERROR(error_message);
+        RecoverableError(Status::IOError(error_message));
     }
 
     current_pos_.increment(bytes_read);

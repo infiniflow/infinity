@@ -29,6 +29,7 @@ import third_party;
 import logical_type;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -42,7 +43,9 @@ struct AndFunction {
                              std::is_same_v<std::remove_cv_t<TC>, BooleanT>) {
             result = left and right;
         } else {
-            UnrecoverableError("AND function accepts only u8 and BooleanT.");
+            String error_message = "AND function accepts only u8 and BooleanT.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 };

@@ -25,6 +25,7 @@ import logical_index_scan;
 import logical_knn_scan;
 import logical_match;
 import logical_match_tensor_scan;
+import logical_match_scan_base;
 import query_context;
 import logical_node_visitor;
 import infinity_exception;
@@ -43,60 +44,71 @@ public:
         if (!op) {
             return;
         }
-        if (op->operator_type() == LogicalNodeType::kFilter) {
-            if (op->right_node().get() != nullptr) {
-                UnrecoverableError("BuildSecondaryIndexScan: Logical filter node shouldn't have right child.");
-            } else if (op->left_node()->operator_type() != LogicalNodeType::kTableScan) {
-                LOG_INFO("BuildSecondaryIndexScan: The left child of Logical filter is not table scan. Cannot push down filter. Need to fix.");
-            } else {
-                auto &filter = static_cast<LogicalFilter &>(*op);
-                auto &filter_expression = filter.expression();
-                auto &table_scan = static_cast<LogicalTableScan &>(*(op->left_node()));
-                auto &base_table_ref_ptr = table_scan.base_table_ref_;
-                auto &fast_rough_filter_evaluator = table_scan.fast_rough_filter_evaluator_;
-                // check if the filter can be pushed down to the table scan
-                IndexScanFilterExpressionPushDownResult index_scan_solve_result =
-                    FilterExpressionPushDown::PushDownToIndexScan(query_context_, *base_table_ref_ptr, filter_expression);
-                auto &column_index_map = index_scan_solve_result.column_index_map_;
-                auto &v_qualified = index_scan_solve_result.index_filter_qualified_;
-                auto &s_leftover = index_scan_solve_result.extra_leftover_filter_;
-                auto &filter_execute_command = index_scan_solve_result.filter_execute_command_;
-                // 1. check if the filter can be pushed down to the table scan
-                if (!v_qualified) {
-                    // no qualified index filter condition, keep the table scan
-                    LOG_TRACE("BuildSecondaryIndexScan: No qualified index scan filter. Keep the table scan.");
+        switch (op->operator_type()) {
+            case LogicalNodeType::kFilter: {
+                if (op->right_node().get() != nullptr) {
+                    String error_message = "BuildSecondaryIndexScan: Logical filter node shouldn't have right child.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                } else if (op->left_node()->operator_type() != LogicalNodeType::kTableScan) {
+                    LOG_INFO("BuildSecondaryIndexScan: The left child of Logical filter is not table scan. Cannot push down filter. Need to fix.");
                 } else {
-                    // try to push down the qualified index filter condition to the scan
-                    // replace logical table scan with logical index scan
-                    auto index_scan = MakeShared<LogicalIndexScan>(query_context_->GetNextNodeID(),
-                                                                   std::move(base_table_ref_ptr),
-                                                                   std::move(v_qualified),
-                                                                   std::move(column_index_map),
-                                                                   std::move(filter_execute_command),
-                                                                   std::move(fast_rough_filter_evaluator),
-                                                                   true);
-                    op->set_left_node(std::move(index_scan));
-                    LOG_TRACE("BuildSecondaryIndexScan: Push down the qualified index scan filter. Replace table scan with index scan.");
+                    auto &filter = static_cast<LogicalFilter &>(*op);
+                    auto &filter_expression = filter.expression();
+                    auto &table_scan = static_cast<LogicalTableScan &>(*(op->left_node()));
+                    auto &base_table_ref_ptr = table_scan.base_table_ref_;
+                    auto &fast_rough_filter_evaluator = table_scan.fast_rough_filter_evaluator_;
+                    // check if the filter can be pushed down to the table scan
+                    IndexScanFilterExpressionPushDownResult index_scan_solve_result =
+                        FilterExpressionPushDown::PushDownToIndexScan(query_context_, *base_table_ref_ptr, filter_expression);
+                    auto &column_index_map = index_scan_solve_result.column_index_map_;
+                    auto &v_qualified = index_scan_solve_result.index_filter_qualified_;
+                    auto &s_leftover = index_scan_solve_result.extra_leftover_filter_;
+                    auto &filter_execute_command = index_scan_solve_result.filter_execute_command_;
+                    // 1. check if the filter can be pushed down to the table scan
+                    if (!v_qualified) {
+                        // no qualified index filter condition, keep the table scan
+                        LOG_TRACE("BuildSecondaryIndexScan: No qualified index scan filter. Keep the table scan.");
+                    } else {
+                        // try to push down the qualified index filter condition to the scan
+                        // replace logical table scan with logical index scan
+                        auto index_scan = MakeShared<LogicalIndexScan>(query_context_->GetNextNodeID(),
+                                                                       std::move(base_table_ref_ptr),
+                                                                       std::move(v_qualified),
+                                                                       std::move(column_index_map),
+                                                                       std::move(filter_execute_command),
+                                                                       std::move(fast_rough_filter_evaluator),
+                                                                       true);
+                        op->set_left_node(std::move(index_scan));
+                        LOG_TRACE("BuildSecondaryIndexScan: Push down the qualified index scan filter. Replace table scan with index scan.");
+                    }
+                    // 2. check the remaining filter expression
+                    if (s_leftover) {
+                        // Keep the filter node.
+                        filter_expression = std::move(s_leftover);
+                    } else {
+                        // Remove the filter node. Need to get parent node
+                        SharedPtr<LogicalNode> scan = std::move(op->left_node());
+                        op = std::move(scan);
+                    }
                 }
-                // 2. check the remaining filter expression
-                if (s_leftover) {
-                    // Keep the filter node.
-                    filter_expression = std::move(s_leftover);
-                } else {
-                    // Remove the filter node. Need to get parent node
-                    SharedPtr<LogicalNode> scan = std::move(op->left_node());
-                    op = std::move(scan);
-                }
+                break;
             }
-        } else if (op->operator_type() == LogicalNodeType::kKnnScan) {
-            auto &knn_scan = static_cast<LogicalKnnScan &>(*op);
-            knn_scan.common_query_filter_->TryApplySecondaryIndexFilterOptimizer(query_context_);
-        } else if (op->operator_type() == LogicalNodeType::kMatch) {
-            auto &match = static_cast<LogicalMatch &>(*op);
-            match.common_query_filter_->TryApplySecondaryIndexFilterOptimizer(query_context_);
-        } else if (op->operator_type() == LogicalNodeType::kMatchTensorScan) {
-            auto &match_tensor = static_cast<LogicalMatchTensorScan &>(*op);
-            match_tensor.common_query_filter_->TryApplySecondaryIndexFilterOptimizer(query_context_);
+            case LogicalNodeType::kKnnScan:
+            case LogicalNodeType::kMatchSparseScan:
+            case LogicalNodeType::kMatchTensorScan: {
+                auto &match_base = static_cast<LogicalMatchScanBase &>(*op);
+                match_base.common_query_filter_->TryApplySecondaryIndexFilterOptimizer(query_context_);
+                break;
+            }
+            case LogicalNodeType::kMatch: {
+                auto &match = static_cast<LogicalMatch &>(*op);
+                match.common_query_filter_->TryApplySecondaryIndexFilterOptimizer(query_context_);
+                break;
+            }
+            default: {
+                break;
+            }
         }
         // visit children after handling current node
         VisitNode(op->left_node());

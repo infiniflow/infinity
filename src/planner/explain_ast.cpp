@@ -19,7 +19,7 @@ module;
 module explain_ast;
 
 import stl;
-
+import third_party;
 import status;
 import infinity_exception;
 import base_statement;
@@ -92,7 +92,9 @@ void ExplainAST::Explain(const BaseStatement *statement, SharedPtr<Vector<Shared
             break;
         }
         default: {
-            UnrecoverableError("Unexpected statement type");
+            String error_message = "Unexpected statement type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
     return;
@@ -102,7 +104,9 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
 
     switch (create_statement->ddl_type()) {
         case DDLType::kInvalid: {
-            UnrecoverableError("Invalid DDL type.");
+            String error_message = "Invalid DDL type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case DDLType::kDatabase: {
             String create_schema = String(intent_size, ' ') + "CREATE SCHEMA: ";
@@ -130,7 +134,9 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
 
             SizeT column_count = table_info->column_defs_.size();
             if (column_count == 0) {
-                UnrecoverableError("Table definition without any columns");
+                String error_message = "Table definition without any columns";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             for (SizeT idx = 0; idx < column_count - 1; ++idx) {
@@ -183,7 +189,9 @@ void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<
     String values = String(intent_size, ' ') + "values: ";
     SizeT value_count = insert_statement->values_->size();
     if (value_count == 0) {
-        UnrecoverableError("Insert value list is empty");
+        String error_message = "Insert value list is empty";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < value_count - 1; ++idx) {
         if (idx != 0)
@@ -206,7 +214,9 @@ void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<
 void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
     switch (drop_statement->ddl_type()) {
         case DDLType::kInvalid: {
-            UnrecoverableError("Invalid DDL type.");
+            String error_message = "Invalid DDL type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case DDLType::kDatabase: {
             String drop_schema = String(intent_size, ' ') + "DROP SCHEMA: ";
@@ -288,7 +298,9 @@ void ExplainAST::BuildSelect(const SelectStatement *select_statement,
         String projection_str = String(intent_size, ' ') + "projection: ";
         SizeT select_count = select_statement->select_list_->size();
         if (select_count == 0) {
-            UnrecoverableError("No select list");
+            String error_message = "No select list";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         for (SizeT idx = 0; idx < select_count - 1; ++idx) {
             ParsedExpr *expr = select_statement->select_list_->at(idx);
@@ -497,6 +509,35 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>(index_name));
             break;
         }
+        case ShowStmtType::kIndexSegment: {
+            result->emplace_back(MakeShared<String>("SHOW INDEX SEGMENT: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String index_name = String(intent_size, ' ') + "index: " + show_statement->index_name_.value();
+            result->emplace_back(MakeShared<String>(index_name));
+            String index_segment = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(index_segment));
+            break;
+        }
+        case ShowStmtType::kIndexChunk: {
+            result->emplace_back(MakeShared<String>("SHOW INDEX CHUNK: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String index_name = String(intent_size, ' ') + "index: " + show_statement->index_name_.value();
+            result->emplace_back(MakeShared<String>(index_name));
+            String index_segment = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(index_segment));
+            String index_chunk = String(intent_size, ' ') + "chunk: " + std::to_string(show_statement->chunk_id_.value());
+            result->emplace_back(MakeShared<String>(index_chunk));
+            break;
+        }
+
         case ShowStmtType::kColumns: {
             result->emplace_back(MakeShared<String>("SHOW COLUMNS: "));
             intent_size += 2;
@@ -514,6 +555,10 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             Status::NotSupport("Show views");
             break;
         }
+        case ShowStmtType::kBuffer: {
+            result->emplace_back(MakeShared<String>("SHOW BUFFER"));
+            break;
+        }
         case ShowStmtType::kTables: {
             result->emplace_back(MakeShared<String>("SHOW TABLES: "));
             intent_size += 2;
@@ -522,27 +567,66 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             break;
         }
         case ShowStmtType::kDatabases: {
-            result->emplace_back(MakeShared<String>("SHOW DATABASES: "));
+            result->emplace_back(MakeShared<String>("SHOW DATABASES"));
             break;
         }
         case ShowStmtType::kSegments: {
             result->emplace_back(MakeShared<String>("SHOW SEGMENTS: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
             break;
         }
         case ShowStmtType::kSegment: {
             result->emplace_back(MakeShared<String>("SHOW SEGMENT: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String segment_info = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(segment_info));
             break;
         }
         case ShowStmtType::kBlocks: {
             result->emplace_back(MakeShared<String>("SHOW BLOCKS: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String segment_info = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(segment_info));
             break;
         }
         case ShowStmtType::kBlock: {
             result->emplace_back(MakeShared<String>("SHOW BLOCK: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String segment_info = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(segment_info));
+            String block_info = String(intent_size, ' ') + "block: " + std::to_string(show_statement->block_id_.value());
+            result->emplace_back(MakeShared<String>(block_info));
             break;
         }
         case ShowStmtType::kBlockColumn: {
             result->emplace_back(MakeShared<String>("SHOW BLOCK COLUMN: "));
+            intent_size += 2;
+            String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
+            result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
+            String segment_info = String(intent_size, ' ') + "segment: " + std::to_string(show_statement->segment_id_.value());
+            result->emplace_back(MakeShared<String>(segment_info));
+            String block_info = String(intent_size, ' ') + "block: " + std::to_string(show_statement->block_id_.value());
+            result->emplace_back(MakeShared<String>(block_info));
+            String column_info = String(intent_size, ' ') + "column: " + std::to_string(show_statement->column_id_.value());
+            result->emplace_back(MakeShared<String>(column_info));
             break;
         }
         case ShowStmtType::kIndexes: {
@@ -550,14 +634,32 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             intent_size += 2;
             String schema_name = String(intent_size, ' ') + "database: " + show_statement->schema_name_;
             result->emplace_back(MakeShared<String>(schema_name));
+            String table_name = String(intent_size, ' ') + "table: " + show_statement->table_name_;
+            result->emplace_back(MakeShared<String>(table_name));
             break;
         }
         case ShowStmtType::kConfigs: {
             result->emplace_back(MakeShared<String>("SHOW CONFIGS"));
             break;
         }
+        case ShowStmtType::kQueries: {
+            result->emplace_back(MakeShared<String>("SHOW QUERIES"));
+            break;
+        }
+        case ShowStmtType::kQuery: {
+            result->emplace_back(MakeShared<String>("SHOW QUERY"));
+            break;
+        }
+        case ShowStmtType::kTransactions: {
+            result->emplace_back(MakeShared<String>("SHOW TRANSACTIONS"));
+            break;
+        }
+        case ShowStmtType::kTransaction: {
+            result->emplace_back(MakeShared<String>("SHOW TRANSACTION"));
+            break;
+        }
         case ShowStmtType::kProfiles: {
-            result->emplace_back(MakeShared<String>("SHOW PROFILES"));
+            result->emplace_back(MakeShared<String>("SHOW QUERIES"));
             break;
         }
         case ShowStmtType::kSessionVariable: {
@@ -629,25 +731,73 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
 
             SharedPtr<String> delimiter = MakeShared<String>(String(intent_size, ' ') + "delimiter: " + copy_statement->delimiter_);
             result->emplace_back(delimiter);
+            if(!copy_statement->copy_from_) {
+                // export
+                SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                result->emplace_back(offset);
+                SharedPtr<String> limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                result->emplace_back(limit);
+                SharedPtr<String> row_limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                result->emplace_back(row_limit);
+            }
             break;
         }
         case CopyFileType::kJSON: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSON");
             result->emplace_back(file_type);
+            if(!copy_statement->copy_from_) {
+                // export
+                SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                result->emplace_back(offset);
+                SharedPtr<String> limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                result->emplace_back(limit);
+                SharedPtr<String> row_limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                result->emplace_back(row_limit);
+            }
             break;
         }
         case CopyFileType::kFVECS: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: FVECS");
             result->emplace_back(file_type);
+            if(!copy_statement->copy_from_) {
+                // export
+                SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                result->emplace_back(offset);
+                SharedPtr<String> limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                result->emplace_back(limit);
+                SharedPtr<String> row_limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                result->emplace_back(row_limit);
+            }
             break;
         }
         case CopyFileType::kJSONL: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: JSONL");
             result->emplace_back(file_type);
+            if(!copy_statement->copy_from_) {
+                // export
+                SharedPtr<String> offset = MakeShared<String>(String(intent_size, ' ') + fmt::format("offset: {}", copy_statement->offset_));
+                result->emplace_back(offset);
+                SharedPtr<String> limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("limit: {}", copy_statement->limit_));
+                result->emplace_back(limit);
+                SharedPtr<String> row_limit = MakeShared<String>(String(intent_size, ' ') + fmt::format("row_limit: {}", copy_statement->row_limit_));
+                result->emplace_back(row_limit);
+            }
+            break;
+        }
+        case CopyFileType::kCSR: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: CSR");
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kBVECS: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: BVECS");
+            result->emplace_back(file_type);
             break;
         }
         case CopyFileType::kInvalid: {
-            UnrecoverableError("Invalid file type");
+            String error_message = "Invalid file type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }

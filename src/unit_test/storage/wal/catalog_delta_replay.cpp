@@ -69,7 +69,9 @@ protected:
             // wait for at most 10s
             time_t end = time(nullptr);
             if (end - start > 10) {
-                UnrecoverableError("WaitFlushDeltaOp timeout");
+                String error_message = "WaitFlushDeltaOp timeout";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }
@@ -307,7 +309,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
                     }
                     {
                         std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
-                        column_vectors[1].AppendByStringView(v2, ',');
+                        column_vectors[1].AppendByStringView(v2);
                     }
                     block_entry->IncreaseRowCount(1);
                 }
@@ -347,7 +349,7 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
                         ASSERT_EQ(block_entry->columns().size(), 2ul);
                         {
                             auto &col2 = block_entry->columns()[1];
-                            EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
+                            EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
                         }
                     }
                 }
@@ -398,7 +400,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
             }
             {
                 std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
-                column_vectors[1]->AppendByStringView(v2, ',');
+                column_vectors[1]->AppendByStringView(v2);
             }
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
@@ -434,7 +436,7 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
                     ASSERT_EQ(block_entry->columns().size(), 2ul);
                     {
                         auto &col2 = block_entry->columns()[1];
-                        EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
+                        EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
                     }
                 }
             }
@@ -490,7 +492,7 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
             int v1 = 1;
             column_vectors[0]->AppendByPtr(reinterpret_cast<const_ptr_t>(&v1));
             std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
-            column_vectors[1]->AppendByStringView(v2, ',');
+            column_vectors[1]->AppendByStringView(v2);
 
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
@@ -562,7 +564,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             }
             {
                 std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
-                column_vectors[1]->AppendByStringView(v2, ',');
+                column_vectors[1]->AppendByStringView(v2);
             }
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
@@ -589,7 +591,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             }
             {
                 std::string v2 = "askljhfasfhuiwqeriqkldfnramgeasfklhllfjas";
-                column_vectors[1]->AppendByStringView(v2, ',');
+                column_vectors[1]->AppendByStringView(v2);
             }
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
@@ -637,7 +639,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
             }
             {
                 std::string v2 = "this is a test for replay with full checkpoint";
-                column_vectors[1]->AppendByStringView(v2, ',');
+                column_vectors[1]->AppendByStringView(v2);
             }
             auto data_block = DataBlock::Make();
             data_block->Init(column_vectors);
@@ -685,7 +687,7 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
                         ASSERT_EQ(block_entry->columns().size(), 2ul);
                         {
                             auto &col2 = block_entry->columns()[1];
-                            EXPECT_EQ(col2->OutlineBufferCount(), 1ul);
+                            EXPECT_EQ(col2->OutlineBufferCount(0), 1ul);
                         }
                     }
                 }
@@ -817,7 +819,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                     }
                     {
                         std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
-                        column_vectors[1].AppendByStringView(v2, ',');
+                        column_vectors[1].AppendByStringView(v2);
                     }
                     block_entry->IncreaseRowCount(1);
                 }
@@ -898,6 +900,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                     }
                     last_commit_ts = txn_mgr->CommitTxn(txn_idx);
                 }
+                WaitFlushDeltaOp(storage, last_commit_ts);
             }
             {
                 // Drop index (by Name)
@@ -909,8 +912,8 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
                 }
                 last_commit_ts = txn_mgr->CommitTxn(txn_idx_drop);
             }
+            WaitFlushDeltaOp(storage, last_commit_ts);
         }
-        WaitFlushDeltaOp(storage, last_commit_ts);
         infinity::InfinityContext::instance().UnInit();
     }
 }
@@ -985,7 +988,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
                     }
                     {
                         std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
-                        column_vectors[1].AppendByStringView(v2, ',');
+                        column_vectors[1].AppendByStringView(v2);
                     }
                     block_entry->IncreaseRowCount(1);
                 }

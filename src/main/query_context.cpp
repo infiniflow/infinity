@@ -52,6 +52,7 @@ import parser_result;
 import parser_assert;
 import plan_fragment;
 import bg_query_state;
+import show_statement;
 
 namespace infinity {
 
@@ -94,7 +95,9 @@ QueryResult QueryContext::Query(const String &query) {
     }
 
     if (parsed_result->statements_ptr_->size() != 1) {
-        UnrecoverableError("Only support single statement.");
+        String error_message = "Only support single statement.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     StopProfile(QueryPhase::kParser);
     for (BaseStatement *statement : *parsed_result->statements_ptr_) {
@@ -102,7 +105,9 @@ QueryResult QueryContext::Query(const String &query) {
         return query_result;
     }
 
-    UnrecoverableError("Not reachable");
+    String error_message = "Not reachable";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return QueryResult::UnusedResult();
 }
 
@@ -113,11 +118,33 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     SharedPtr<PlanFragment> plan_fragment{};
     UniquePtr<Notifier> notifier{};
 
-    this->BeginTxn();
+    query_id_ = session_ptr_->query_count();
 //    ProfilerStart("Query");
 //    BaseProfiler profiler;
 //    profiler.Begin();
     try {
+
+        if(global_config_->RecordRunningQuery()) {
+            bool add_record_flag = false;
+            if(statement->type_ == StatementType::kShow) {
+                const ShowStatement* show_statement = static_cast<const ShowStatement*>(statement);
+                ShowStmtType show_type = show_statement->show_type_;
+                if(show_type != ShowStmtType::kQueries and show_type != ShowStmtType::kQuery) {
+                    add_record_flag = true;
+                }
+            } else {
+                add_record_flag = true;
+            }
+
+            if(add_record_flag) {
+                LOG_DEBUG(fmt::format("Record running query: {}", statement->ToString()));
+                session_manager_->AddQueryRecord(session_ptr_->session_id(),
+                                                 query_id_,
+                                                 StatementType2Str(statement->type_),
+                                                 statement->ToString());
+            }
+        }
+
         this->BeginTxn();
 //        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
 //                        session_ptr_->GetTxn()->TxnID(),
@@ -204,6 +231,24 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 //    ProfilerStop();
     session_ptr_->IncreaseQueryCount();
     session_manager_->IncreaseQueryCount();
+
+    if(global_config_->RecordRunningQuery()) {
+        bool remove_record_flag = false;
+        if(statement->type_ == StatementType::kShow) {
+            const ShowStatement* show_statement = static_cast<const ShowStatement*>(statement);
+            ShowStmtType show_type = show_statement->show_type_;
+            if(show_type != ShowStmtType::kQueries and show_type != ShowStmtType::kQuery) {
+                remove_record_flag = true;
+            }
+        } else {
+            remove_record_flag = true;
+        }
+
+        if(remove_record_flag) {
+            LOG_DEBUG(fmt::format("Remove the query string from running query container: {}", statement->ToString()));
+            session_manager_->RemoveQueryRecord(session_ptr_->session_id());
+        }
+    }
 //    profiler.End();
 //    LOG_WARN(fmt::format("Query cost: {}", profiler.ElapsedToString()));
     return query_result;

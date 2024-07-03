@@ -14,7 +14,7 @@
 
 #include "unit_test/base_test.h"
 import stl;
-import memory_pool;
+
 import index_defines;
 import posting_list_format;
 import data_type;
@@ -32,16 +32,15 @@ using namespace infinity;
 
 class PostingWriterTest : public BaseTest {
 public:
-    PostingWriterTest() : byte_slice_pool_(10240), buffer_pool_(10240) {}
+    PostingWriterTest() {}
 
     void SetUp() override { file_ = String(GetTmpDir()) + "/posting_writer"; }
     void TearDown() override {}
 
 protected:
     String file_;
-    MemoryPool byte_slice_pool_;
-    RecyclePool buffer_pool_;
     optionflag_t flag_{OPTION_FLAG_ALL};
+    PostingFormat posting_format_{flag_};
     LocalFileSystem fs_;
 };
 
@@ -49,8 +48,7 @@ TEST_F(PostingWriterTest, test1) {
     Vector<docid_t> expected = {1, 3, 5, 7, 9};
     VectorWithLock<u32> column_length_array(20, 10);
     {
-        SharedPtr<PostingWriter> posting =
-            MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_length_array);
+        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(posting_format_, column_length_array);
 
         for (u32 i = 0; i < expected.size(); ++i) {
             posting->AddPosition(1);
@@ -65,8 +63,7 @@ TEST_F(PostingWriterTest, test1) {
         file_writer->Sync();
     }
     {
-        SharedPtr<PostingWriter> posting =
-            MakeShared<PostingWriter>(&byte_slice_pool_, &buffer_pool_, PostingFormatOption(flag_), column_length_array);
+        SharedPtr<PostingWriter> posting = MakeShared<PostingWriter>(posting_format_, column_length_array);
         SharedPtr<FileReader> file_reader = MakeShared<FileReader>(fs_, file_, 128000);
         posting->Load(file_reader);
 
@@ -83,7 +80,7 @@ TEST_F(PostingWriterTest, test1) {
         RowID base_row_id = 0;
         seg_posting.Init(base_row_id, posting);
         seg_postings->push_back(seg_posting);
-        PostingIterator iter(flag_, &byte_slice_pool_);
+        PostingIterator iter(flag_);
         iter.Init(seg_postings, 0);
 
         RowID doc_id = INVALID_ROWID;

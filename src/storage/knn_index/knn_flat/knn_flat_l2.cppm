@@ -20,7 +20,7 @@ export module knn_flat_l2;
 
 import stl;
 import knn_distance;
-
+import logger;
 
 import knn_result_handler;
 import infinity_exception;
@@ -58,7 +58,9 @@ public:
 
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
-            UnrecoverableError("KnnFlatL2 isn't begin");
+            String error_message = "KnnFlatL2 isn't begin";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         this->total_base_count_ += base_count;
@@ -73,7 +75,7 @@ public:
             const DistType *x_i = queries_ + i * this->dimension_;
             const DistType *y_j = base;
 
-            for (u16 j = 0; j < base_count; j++, y_j += this->dimension_) {
+            for (u16 j = 0; j < base_count; ++j, y_j += this->dimension_) {
                 auto l2 = L2Distance<DistType>(x_i, y_j, this->dimension_);
                 result_handler_->AddResult(i, l2, RowID(segment_id, segment_offset_start + j));
             }
@@ -86,7 +88,9 @@ public:
             return;
         }
         if (!begin_) {
-            UnrecoverableError("KnnFlatL2 isn't begin");
+            String error_message = "KnnFlatL2 isn't begin";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
         this->total_base_count_ += base_count;
@@ -126,14 +130,18 @@ public:
 
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            UnrecoverableError("Query index exceeds the limit");
+            String error_message = "Query index exceeds the limit";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return distance_array_.get() + idx * this->top_k_;
     }
 
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
-            UnrecoverableError("Query index exceeds the limit");
+            String error_message = "Query index exceeds the limit";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return id_array_.get() + idx * this->top_k_;
     }

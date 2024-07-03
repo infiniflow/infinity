@@ -18,7 +18,7 @@ module;
 
 export module memory_indexer;
 import stl;
-import memory_pool;
+
 import index_defines;
 import posting_writer;
 import column_vector;
@@ -30,6 +30,9 @@ import skiplist;
 import internal_types;
 import map_with_lock;
 import vector_with_lock;
+import buf_writer;
+import posting_list_format;
+import external_sort_merger;
 
 namespace infinity {
 
@@ -46,19 +49,9 @@ public:
     struct PostingTable {
         PostingTable();
         PostingTableStore store_;
-        MemoryPool byte_slice_pool_;
-        RecyclePool buffer_pool_;
     };
 
-    MemoryIndexer(const String &index_dir,
-                  const String &base_name,
-                  RowID base_row_id,
-                  optionflag_t flag,
-                  const String &analyzer,
-                  MemoryPool &byte_slice_pool,
-                  RecyclePool &buffer_pool,
-                  ThreadPool &inverting_thread_pool,
-                  ThreadPool &commiting_thread_pool);
+    MemoryIndexer(const String &index_dir, const String &base_name, RowID base_row_id, optionflag_t flag, const String &analyzer);
 
     ~MemoryIndexer();
 
@@ -97,8 +90,6 @@ public:
 
     u32 GetColumnLength(u32 doc_id) { return column_lengths_.Get(doc_id); }
 
-    MemoryPool *GetPool() { return &byte_slice_pool_; }
-
     SharedPtr<PostingTable> GetPostingTable() { return posting_table_; }
 
     SharedPtr<PostingWriter> GetOrAddPosting(const String &term);
@@ -120,14 +111,19 @@ private:
 
     void PrepareSpillFile();
 
+    u32 ReadU32LE(const u8 *ptr) { return *(u32 *)ptr; }
+
+    u64 ReadU64LE(const u8 *ptr) { return *(u64 *)ptr; }
+
+    void TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple, u32>>& merger);
+
 private:
     String index_dir_;
     String base_name_;
     RowID base_row_id_{INVALID_ROWID};
     optionflag_t flag_;
+    PostingFormat posting_format_;
     String analyzer_;
-    MemoryPool &byte_slice_pool_;
-    RecyclePool &buffer_pool_;
     ThreadPool &inverting_thread_pool_;
     ThreadPool &commiting_thread_pool_;
     u32 doc_count_{0};
@@ -151,5 +147,10 @@ private:
     // for column length info
     VectorWithLock<u32> column_lengths_;
     Atomic<u32> column_length_sum_{0};
+
+    // spill file write buf
+    UniquePtr<char_t[]> spill_buffer_{};
+    SizeT spill_buffer_size_{0};
+    UniquePtr<BufWriter> buf_writer_;
 };
 } // namespace infinity

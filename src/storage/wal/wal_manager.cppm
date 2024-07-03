@@ -34,6 +34,7 @@ class SegmentEntry;
 export class WalManager {
 public:
     WalManager(Storage *storage, String wal_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
+    WalManager(Storage *storage, String wal_dir, String data_dir, u64 wal_size_threshold, u64 delta_checkpoint_interval_wal_bytes, FlushOptionType flush_option);
 
     ~WalManager();
 
@@ -96,6 +97,7 @@ private:
     // void WalCmdSetSegmentStatusSealedReplay(const WalCmdSetSegmentStatusSealed &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     // void WalCmdUpdateSegmentBloomFilterDataReplay(const WalCmdUpdateSegmentBloomFilterData &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
     void WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
+    void WalCmdOptimizeReplay(WalCmdOptimize &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
 
 public:
     u64 cfg_wal_size_threshold_{};
@@ -106,6 +108,7 @@ private:
     // and do serial writing.
     String wal_dir_{};
     String wal_path_{};
+    String data_path_{};
 
     Storage *storage_{};
 

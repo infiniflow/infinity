@@ -28,5 +28,5 @@ export using infinity::WriteBufAdv;
 
 export using infinity::WriteBufAdv;
 
-
+export using infinity::WriteBufVecAdv;
 }

@@ -3,7 +3,7 @@ module;
 export module column_index_iterator;
 
 import stl;
-import memory_pool;
+
 import byte_slice;
 import byte_slice_reader;
 import file_reader;

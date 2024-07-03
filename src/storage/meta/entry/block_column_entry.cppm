@@ -50,8 +50,10 @@ public:
     static UniquePtr<BlockColumnEntry> NewReplayBlockColumnEntry(const BlockEntry *block_entry,
                                                                  ColumnID column_id,
                                                                  BufferManager *buffer_manager,
-                                                                 i32 next_outline_idx,
-                                                                 u64 last_chunk_offset,
+                                                                 u32 next_outline_idx_0,
+                                                                 u32 next_outline_idx_1,
+                                                                 u64 last_chunk_offset_0,
+                                                                 u64 last_chunk_offset_1,
                                                                  TxnTimeStamp commit_ts);
 
     nlohmann::json Serialize();
@@ -69,31 +71,21 @@ public:
     inline const SharedPtr<String> &base_dir() const { return base_dir_; }
     inline const BlockEntry *block_entry() const { return block_entry_; }
 
-    SharedPtr<String> OutlineFilename(SizeT file_idx) const { return MakeShared<String>(fmt::format("col_{}_out_{}", column_id_, file_idx)); }
+    SharedPtr<String> OutlineFilename(u32 buffer_group_id, SizeT file_idx) const;
 
     String FilePath() { return LocalFileSystem::ConcatenateFilePath(*base_dir_, *file_name_); }
-    Vector<String> OutlinePaths() const;
 
     ColumnVector GetColumnVector(BufferManager *buffer_mgr);
 
-    void AppendOutlineBuffer(BufferObj *buffer) {
-        std::unique_lock lock(mutex_);
-        outline_buffers_.emplace_back(buffer);
-    }
+    void AppendOutlineBuffer(u32 buffer_group_id, BufferObj *buffer);
 
-    BufferObj *GetOutlineBuffer(SizeT idx) const {
-        std::shared_lock lock(mutex_);
-        return outline_buffers_[idx];
-    }
+    BufferObj *GetOutlineBuffer(u32 buffer_group_id, SizeT idx) const;
 
-    SizeT OutlineBufferCount() const {
-        std::shared_lock lock(mutex_);
-        return outline_buffers_.size();
-    }
+    SizeT OutlineBufferCount(u32 buffer_group_id) const;
 
-    u64 LastChunkOff() const { return last_chunk_offset_; }
+    u64 LastChunkOff(u32 buffer_group_id) const;
 
-    void SetLastChunkOff(u64 offset) { last_chunk_offset_ = offset; }
+    void SetLastChunkOff(u32 buffer_group_id, u64 offset);
 
 public:
     void Append(const ColumnVector *input_column_vector, u16 input_offset, SizeT append_rows, BufferManager *buffer_mgr);
@@ -112,8 +104,10 @@ private:
     SharedPtr<String> file_name_{};
 
     mutable std::shared_mutex mutex_{};
-    Vector<BufferObj *> outline_buffers_{};
-    u64 last_chunk_offset_{};
+    Vector<BufferObj *> outline_buffers_group_0_;
+    Vector<BufferObj *> outline_buffers_group_1_;
+    u64 last_chunk_offset_0_{};
+    u64 last_chunk_offset_1_{};
 };
 
 } // namespace infinity

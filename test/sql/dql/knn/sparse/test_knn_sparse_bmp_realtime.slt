@@ -1,0 +1,75 @@
+statement ok
+DROP TABLE IF EXISTS test_knn_sparse_bmp;
+
+statement ok
+CREATE TABLE test_knn_sparse_bmp (col1 INT, col2 SPARSE(FLOAT,100));
+
+statement ok
+CREATE INDEX idx1 ON test_knn_sparse_bmp (col2) USING Bmp WITH (block_size = 8, compress_type = compress);
+
+statement ok
+INSERT INTO test_knn_sparse_bmp VALUES (1,[0:1.0,10:1.0,20:1.0,30:1.0,40:1.0,50:1.0,60:1.0,70:1.0,80:1.0,90:1.0]);
+
+statement ok
+INSERT INTO test_knn_sparse_bmp VALUES (2,[0:2.0,20:2.0,40:2.0,60:2.0,80:2.0]), 
+                                       (3,[0:3.0,30:3.0,60:3.0,90:3.0]),
+                                       (4,[0:4.0,40:4.0,80:4.0]),
+                                       (5,[]);
+
+query I
+SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+2
+1
+
+statement ok
+OPTIMIZE idx1 ON test_knn_sparse_bmp WITH (topk = 3);
+
+query I
+SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+2
+1
+
+statement ok
+INSERT INTO test_knn_sparse_bmp VALUES (1,[0:1.0,10:1.0,20:1.0,30:1.0,40:1.0,50:1.0,60:1.0,70:1.0,80:1.0,90:1.0]),
+                                       (2,[0:2.0,20:2.0,40:2.0,60:2.0,80:2.0]), 
+                                       (3,[0:3.0,30:3.0,60:3.0,90:3.0]),
+                                       (4,[0:4.0,40:4.0,80:4.0]),
+                                       (5,[]);
+
+query I
+SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+4
+2
+
+statement ok
+INSERT INTO test_knn_sparse_bmp VALUES (1,[0:1.0,10:1.0,20:1.0,30:1.0,40:1.0,50:1.0,60:1.0,70:1.0,80:1.0,90:1.0]),
+                                       (2,[0:2.0,20:2.0,40:2.0,60:2.0,80:2.0]), 
+                                       (3,[0:3.0,30:3.0,60:3.0,90:3.0]),
+                                       (4,[0:4.0,40:4.0,80:4.0]),
+                                       (5,[]);
+
+query I
+SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+4
+4
+
+statement ok
+OPTIMIZE idx1 ON test_knn_sparse_bmp WITH (topk = 3);
+
+query I
+SELECT col1 FROM test_knn_sparse_bmp SEARCH MATCH SPARSE (col2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
+----
+4
+4
+4
+
+statement ok
+DROP TABLE test_knn_sparse_bmp;

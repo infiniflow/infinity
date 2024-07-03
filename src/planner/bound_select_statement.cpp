@@ -14,7 +14,8 @@
 
 module;
 
-#include <vector>
+#include <string>
+#include <cstdlib>
 
 module bound_select_statement;
 
@@ -44,6 +45,7 @@ import logical_filter;
 import logical_table_scan;
 import logical_knn_scan;
 import logical_match_tensor_scan;
+import logical_match_sparse_scan;
 import logical_aggregate;
 import logical_sort;
 import logical_limit;
@@ -71,6 +73,14 @@ import knn_expression;
 import third_party;
 import table_reference;
 import common_query_filter;
+import logger;
+
+import search_options;
+import search_driver;
+import query_node;
+import status;
+import early_terminate_iterator;
+import default_values;
 
 namespace infinity {
 
@@ -106,7 +116,9 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         if (!order_by_expressions_.empty()) {
             if (order_by_expressions_.size() != order_by_types_.size()) {
-                UnrecoverableError("Unknown error on order by expression");
+                String error_message = "Unknown error on order by expression";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
 
             if (limit_expression_.get() == nullptr) {
@@ -134,7 +146,9 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         root = project;
 
         if (!pruned_expression_.empty()) {
-            UnrecoverableError("Projection method changed!");
+            String error_message = "Projection method changed!";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), pruned_expression_, result_index_);
             pruned_project->set_left_node(root);
             root = pruned_project;
@@ -143,65 +157,130 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         return root;
     } else {
         SharedPtr<LogicalNode> root = nullptr;
-        SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size() + search_expr_->match_tensor_exprs_.size();
+        const SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size() + search_expr_->match_tensor_exprs_.size() +
+                                   search_expr_->match_sparse_exprs_.size();
         if (num_children <= 0) {
-            UnrecoverableError("SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR expression");
-        } else if (num_children >= 3) {
-            UnrecoverableError("SEARCH shall have at max two MATCH TEXT or MATCH VECTOR expression");
+            String error_message = "SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR expression or MATCH SPARSE expression";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
-
+        if (table_ref_ptr_->type() != TableRefType::kTable) {
+            String error_message = "Not base table reference";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+        auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
         // FIXME: need check if there is subquery inside the where conditions
         auto filter_expr = ComposeExpressionWithDelimiter(where_conditions_, ConjunctionType::kAnd);
-        auto common_query_filter =
-            MakeShared<CommonQueryFilter>(filter_expr, static_pointer_cast<BaseTableRef>(table_ref_ptr_), query_context->GetTxn()->BeginTS());
+        auto common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
         Vector<SharedPtr<LogicalNode>> match_knn_nodes;
-        match_knn_nodes.reserve(search_expr_->match_exprs_.size());
+        match_knn_nodes.reserve(num_children);
         for (auto &match_expr : search_expr_->match_exprs_) {
-            if (table_ref_ptr_->type() != TableRefType::kTable) {
-                UnrecoverableError("Not base table reference");
+            SharedPtr<LogicalMatch> match_node = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_expr);
+            match_node->filter_expression_ = filter_expr;
+            match_node->common_query_filter_ = common_query_filter;
+            match_node->index_reader_ = base_table_ref->table_entry_ptr_->GetFullTextIndexReader(query_context->GetTxn());
+
+            const Map<String, String> &column2analyzer = match_node->index_reader_.GetColumn2Analyzer();
+            SearchOptions search_ops(match_node->match_expr_->options_text_);
+
+            // option: threshold
+            const String &threshold = search_ops.options_["threshold"];
+            match_node->begin_threshold_ = strtof(threshold.c_str(), nullptr);
+
+            // option: default field
+            auto iter = search_ops.options_.find("default_field");
+            String default_field;
+            if(iter != search_ops.options_.end()) {
+                default_field = iter->second;
             }
-            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
-            SharedPtr<LogicalMatch> matchNode = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_expr);
-            matchNode->filter_expression_ = filter_expr;
-            matchNode->common_query_filter_ = common_query_filter;
-            match_knn_nodes.push_back(std::move(matchNode));
+
+            // option: block max
+            iter = search_ops.options_.find("block_max");
+            if(iter == search_ops.options_.end() or iter->second == "true" or iter->second == "bmw") {
+                match_node->early_term_algo_ = EarlyTermAlgo::kBMW;
+            } else if(iter->second == "bmm") {
+                match_node->early_term_algo_ = EarlyTermAlgo::kBMM;
+            } else if(iter->second == "false") {
+                match_node->early_term_algo_ = EarlyTermAlgo::kNaive;
+            } else if(iter->second == "compare") {
+                match_node->early_term_algo_ = EarlyTermAlgo::kCompare;
+            } else {
+                Status status = Status::SyntaxError("block_max option must be empty, true, false or compare");
+                LOG_ERROR(status.message());
+                RecoverableError(status);
+            }
+
+            // option: top n
+            iter = search_ops.options_.find("topn");
+            if (iter != search_ops.options_.end()) {
+                i32 top_n_option = std::strtol(iter->second.c_str(), nullptr, 0);
+                if (top_n_option <= 0) {
+                    Status status = Status::SyntaxError("top n must be a positive integer");
+                    LOG_ERROR(status.message());
+                    RecoverableError(status);
+                }
+                match_node->top_n_ = top_n_option;
+            } else {
+                match_node->top_n_ = DEFAULT_MATCH_TEXT_OPTION_TOP_N;
+            }
+
+            SearchDriver search_driver(column2analyzer, default_field);
+            UniquePtr<QueryNode> query_tree = search_driver.ParseSingleWithFields(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
+            if (query_tree.get() == nullptr) {
+                Status status = Status::ParseMatchExprFailed(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
+                LOG_ERROR(status.message());
+                RecoverableError(status);
+            }
+
+            match_node->query_tree_ = std::move(query_tree);
+            match_knn_nodes.push_back(std::move(match_node));
         }
         for (auto &match_tensor_expr : search_expr_->match_tensor_exprs_) {
-            if (table_ref_ptr_->type() != TableRefType::kTable) {
-                UnrecoverableError("Not base table reference");
-            }
-            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
             auto match_tensor_node = MakeShared<LogicalMatchTensorScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_tensor_expr);
             match_tensor_node->filter_expression_ = filter_expr;
             match_tensor_node->common_query_filter_ = common_query_filter;
             match_tensor_node->InitExtraOptions();
             match_knn_nodes.push_back(std::move(match_tensor_node));
         }
-
+        for (auto &match_sparse_expr : search_expr_->match_sparse_exprs_) {
+            auto match_sparse_node = MakeShared<LogicalMatchSparseScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_sparse_expr);
+            match_sparse_node->filter_expression_ = filter_expr;
+            match_sparse_node->common_query_filter_ = common_query_filter;
+            match_knn_nodes.push_back(std::move(match_sparse_node));
+        }
         bind_context->GenerateTableIndex();
         for (auto &knn_expr : search_expr_->knn_exprs_) {
-            if (table_ref_ptr_->type() != TableRefType::kTable) {
-                UnrecoverableError("Not base table reference");
-            }
             SharedPtr<LogicalKnnScan> knn_scan = BuildInitialKnnScan(table_ref_ptr_, knn_expr, query_context, bind_context);
             knn_scan->filter_expression_ = filter_expr;
             knn_scan->common_query_filter_ = common_query_filter;
             match_knn_nodes.push_back(std::move(knn_scan));
         }
-
-        if (search_expr_->fusion_expr_.get() != nullptr) {
-            SharedPtr<LogicalNode> fusionNode = MakeShared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), search_expr_->fusion_expr_);
-            fusionNode->set_left_node(match_knn_nodes[0]);
-            if (match_knn_nodes.size() > 1)
-                fusionNode->set_right_node(match_knn_nodes[1]);
-            root = fusionNode;
+        if (!(search_expr_->fusion_exprs_.empty())) {
+            auto firstfusionNode = MakeShared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), base_table_ref, search_expr_->fusion_exprs_[0]);
+            firstfusionNode->set_left_node(match_knn_nodes[0]);
+            if (match_knn_nodes.size() > 1) {
+                firstfusionNode->set_right_node(match_knn_nodes[1]);
+                if (match_knn_nodes.size() > 2) {
+                    for (SizeT i = 2; i < match_knn_nodes.size(); i++) {
+                        firstfusionNode->other_children_.push_back(std::move(match_knn_nodes[i]));
+                    }
+                }
+            }
+            root = std::move(firstfusionNode);
+            // extra fusion nodes
+            for (u32 i = 1; i < search_expr_->fusion_exprs_.size(); ++i) {
+                auto extrafusionNode = MakeShared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), base_table_ref, search_expr_->fusion_exprs_[i]);
+                extrafusionNode->set_left_node(root);
+                root = std::move(extrafusionNode);
+            }
         } else {
-            root = match_knn_nodes[0];
+            root = std::move(match_knn_nodes[0]);
         }
 
         auto project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), projection_expressions_, projection_index_);
         project->set_left_node(root);
-        root = project;
+        root = std::move(project);
 
         return root;
     }
@@ -212,32 +291,40 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
                                                                     QueryContext *query_context,
                                                                     const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr) {
-        UnrecoverableError("Attempt to do KNN scan without table");
+        String error_message = "Attempt to do KNN scan without table";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     switch (table_ref->type_) {
         case TableRefType::kCrossProduct: {
-            UnrecoverableError("KNN is not supported on CROSS PRODUCT relation, now.");
+            String error_message = "KNN is not supported on CROSS PRODUCT relation, now.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case TableRefType::kJoin: {
-            UnrecoverableError("KNN is not supported on JOIN relation, now.");
+            String error_message = "KNN is not supported on JOIN relation, now.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case TableRefType::kTable: {
             auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref);
 
             // Change function table to knn table scan function
-            SharedPtr<LogicalKnnScan> knn_scan_node = MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(), base_table_ref);
-
-            knn_scan_node->knn_expression_ = knn_expr;
-            knn_scan_node->knn_table_index_ = bind_context->knn_table_index_;
+            SharedPtr<LogicalKnnScan> knn_scan_node =
+                MakeShared<LogicalKnnScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, knn_expr, bind_context->knn_table_index_);
             return knn_scan_node;
         }
         case TableRefType::kSubquery: {
-            UnrecoverableError("KNN is not supported on a SUBQUERY, now.");
+            String error_message = "KNN is not supported on a SUBQUERY, now.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         default: {
-            UnrecoverableError("Unexpected table type");
+            String error_message = "Unexpected table type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 
@@ -264,7 +351,9 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *qu
                 return BuildDummyTable(table_ref, query_context, bind_context);
             }
             default: {
-                UnrecoverableError("Unknown table reference type.");
+                String error_message = "Unknown table reference type.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     } else {
@@ -365,7 +454,9 @@ void BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
     if (condition->type() == ExpressionType::kSubQuery) {
         if (building_subquery_) {
             // nested subquery
-            UnrecoverableError("Nested subquery detected");
+            String error_message = "Nested subquery detected";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);
     }

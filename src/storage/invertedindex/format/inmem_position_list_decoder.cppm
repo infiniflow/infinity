@@ -3,7 +3,7 @@ module;
 export module inmem_position_list_decoder;
 
 import stl;
-import memory_pool;
+
 import position_list_decoder;
 import posting_byte_slice_reader;
 import in_doc_pos_state;
@@ -18,7 +18,7 @@ class PostingByteSlice;
 
 export class InMemPositionListDecoder : public PositionListDecoder {
 public:
-    InMemPositionListDecoder(const PostingFormatOption &option, MemoryPool *session_pool);
+    InMemPositionListDecoder(const PostingFormatOption &option);
 
     ~InMemPositionListDecoder();
 

@@ -87,6 +87,9 @@ export {
     constexpr SizeT DEFAULT_BASE_FILE_SIZE = 8 * 1024;
     constexpr SizeT DEFAULT_OUTLINE_FILE_MAX_SIZE = 16 * 1024 * 1024;
 
+    constexpr SizeT DEFAULT_CHUNK_SIZE = 10 * 1024 * 1024;
+    constexpr SizeT DEFAULT_ALIGN_SIZE = sizeof(char *);
+
     constexpr SizeT MIN_CLEANUP_INTERVAL_SEC = 0; // 0 means disable the function
     constexpr SizeT DEFAULT_CLEANUP_INTERVAL_SEC = 10;
     constexpr std::string_view DEFAULT_CLEANUP_INTERVAL_SEC_STR = "10s"; // 10 seconds
@@ -136,10 +139,19 @@ export {
     constexpr std::string_view SYSTEM_CONFIG_TABLE_NAME = "config";
     constexpr SizeT DEFAULT_PROFILER_HISTORY_SIZE = 128;
 
+    // default emvb parameter
+    constexpr u32 EMVB_CENTROID_NPROBE = 3;
+    constexpr f32 EMVB_THRESHOLD_FIRST = 0.0f;
+    constexpr u32 EMVB_N_DOC_TO_SCORE_FACTOR = 100;
+    constexpr u32 EMVB_N_DOC_OUT_SECOND_STAGE_FACTOR = 20;
+    constexpr f32 EMVB_THRESHOLD_FINAL = 0.0f;
+
     // default hnsw parameter
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
     constexpr SizeT HNSW_EF = 200;
+
+    constexpr SizeT BMP_BLOCK_SIZE = 16;
 
     // default distance compute blas parameter
     constexpr SizeT DISTANCE_COMPUTE_BLAS_QUERY_BS = 4096;
@@ -150,8 +162,9 @@ export {
     constexpr SizeT DBT_COMPACTION_S = DEFAULT_BLOCK_CAPACITY;
 
     // default query option parameter
-    constexpr u32 DEFAULT_FULL_TEXT_OPTION_TOP_N = 10;
-    constexpr u32 DEFAULT_TENSOR_MAXSIM_OPTION_TOP_N = 10;
+    constexpr u32 DEFAULT_MATCH_TEXT_OPTION_TOP_N = 10;
+    constexpr u32 DEFAULT_MATCH_TENSOR_OPTION_TOP_N = 10;
+    constexpr u32 DEFAULT_FUSION_OPTION_TOP_N = 100;
 
     constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
     constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "4GB"; // 4Gib
@@ -195,6 +208,8 @@ export {
     constexpr std::string_view WAL_FLUSH_OPTION_NAME = "wal_flush";
     constexpr std::string_view RESOURCE_DIR_OPTION_NAME = "resource_dir";
 
+    constexpr std::string_view RECORD_RUNNING_QUERY_OPTION_NAME = "record_running_query";
+
     // Variable name
     constexpr std::string_view QUERY_COUNT_VAR_NAME = "query_count";        // global and session
     constexpr std::string_view SESSION_COUNT_VAR_NAME = "session_count";    // global
@@ -207,11 +222,18 @@ export {
     constexpr std::string_view ACTIVE_TXN_COUNT_VAR_NAME = "active_txn_count";    // global
     constexpr std::string_view CURRENT_TS_VAR_NAME = "current_timestamp";    // global
     constexpr std::string_view TOTAL_COMMIT_COUNT_VAR_NAME = "total_commit_count"; // global and session
+    constexpr std::string_view TOTAL_ROLLBACK_COUNT_VAR_NAME = "total_rollback_count"; // global and session
     constexpr std::string_view CONNECTED_TS_VAR_NAME = "connected_timestamp"; // session
     constexpr std::string_view CATALOG_VERSION_VAR_NAME = "catalog_version";   // global
     constexpr std::string_view ACTIVE_WAL_FILENAME_VAR_NAME = "active_wal_filename";   // global
     constexpr std::string_view ENABLE_PROFILE_VAR_NAME = "enable_profile";  // session
     constexpr std::string_view PROFILE_RECORD_CAPACITY_VAR_NAME = "profile_record_capacity";  // session
+    constexpr std::string_view BG_TASK_COUNT_VAR_NAME = "bg_task_count";  // global
+    constexpr std::string_view RUNNING_BG_TASK_VAR_NAME = "running_bg_task";  // global
+    constexpr std::string_view RUNNING_COMPACT_TASK_VAR_NAME = "running_compact_task";  // global
+    constexpr std::string_view SYSTEM_MEMORY_USAGE_VAR_NAME = "system_memory_usage";  // global
+    constexpr std::string_view OPEN_FILE_COUNT_VAR_NAME = "open_file_count";  // global
+    constexpr std::string_view CPU_USAGE_VAR_NAME = "cpu_usage";  // global
 
 }
 

@@ -18,6 +18,7 @@ import early_terminate_iterator;
 import blockmax_term_doc_iterator;
 import blockmax_and_iterator;
 import blockmax_and_not_iterator;
+import blockmax_wand_iterator;
 import blockmax_maxscore_iterator;
 import index_defines;
 import third_party;
@@ -34,7 +35,12 @@ namespace infinity {
 // 3. children of "or" can only be term, "and" or "and_not", because "or" will be optimized, and "not" is either optimized or not allowed
 // 4. "and_not" does not exist in parser output, it is generated during optimization
 //    "and_not": first child can be term, "and", "or", other children form a list of "not"
-void QueryNode::FilterOptimizeQueryTree() { UnrecoverableError("Should not reach here!"); }
+void QueryNode::FilterOptimizeQueryTree() {
+    String error_message = "Should not reach here!";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
+}
+
 std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<QueryNode> root) {
     if (root->GetType() == QueryNodeType::FILTER) {
         root->FilterOptimizeQueryTree();
@@ -80,11 +86,15 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
             break;
         }
         case QueryNodeType::AND_NOT: {
-            UnrecoverableError("Unexpected AndNotQueryNode from parser output");
+            String error_message = "Unexpected AndNotQueryNode from parser output";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         default: {
-            UnrecoverableError("GetOptimizedQueryTree: Unexpected case!");
+            String error_message = "GetOptimizedQueryTree: Unexpected case!";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
     }
@@ -117,7 +127,9 @@ std::unique_ptr<QueryNode> MultiQueryNode::GetNewOptimizedQueryTree() {
                 break;
             }
             case QueryNodeType::AND_NOT: {
-                UnrecoverableError("GetNewOptimizedQueryTree: Unexpected case! AndNotQueryNode should not exist in parser output");
+                String error_message = "GetNewOptimizedQueryTree: Unexpected case! AndNotQueryNode should not exist in parser output";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 break;
             }
             case QueryNodeType::NOT:
@@ -128,7 +140,9 @@ std::unique_ptr<QueryNode> MultiQueryNode::GetNewOptimizedQueryTree() {
                 break;
             }
             default: {
-                UnrecoverableError("GetNewOptimizedQueryTree: Unexpected case!");
+                String error_message = "GetNewOptimizedQueryTree: Unexpected case!";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 break;
             }
         }
@@ -152,7 +166,9 @@ std::unique_ptr<QueryNode> MultiQueryNode::GetNewOptimizedQueryTree() {
 
 std::unique_ptr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
     if (children_.empty()) {
-        UnrecoverableError("Invalid query statement: NotQueryNode should have at least 1 child");
+        String error_message = "Invalid query statement: NotQueryNode should have at least 1 children";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto new_not_node = std::make_unique<NotQueryNode>(); // new node, weight is reset to 1.0
     auto &new_not_list = new_not_node->children_;
@@ -179,7 +195,9 @@ std::unique_ptr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
                 break;
             }
             default: {
-                UnrecoverableError("OptimizeInPlaceInner: Unexpected case!");
+                String error_message = "OptimizeInPlaceInner: Unexpected case!";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 break;
             }
         }
@@ -202,7 +220,9 @@ std::unique_ptr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
 
 std::unique_ptr<QueryNode> AndQueryNode::InnerGetNewOptimizedQueryTree() {
     if (children_.size() < 2) {
-        UnrecoverableError("Invalid query statement: AndQueryNode should have at least 2 children");
+        String error_message = "Invalid query statement: AndQueryNode should have at least 2 children";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     std::vector<std::unique_ptr<QueryNode>> and_list;
     std::vector<std::unique_ptr<QueryNode>> not_list;
@@ -245,7 +265,9 @@ std::unique_ptr<QueryNode> AndQueryNode::InnerGetNewOptimizedQueryTree() {
                 break;
             }
             default: {
-                UnrecoverableError("OptimizeInPlaceInner: Unexpected case!");
+                String error_message = "OptimizeInPlaceInner: Unexpected case!";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 break;
             }
         }
@@ -293,7 +315,9 @@ std::unique_ptr<QueryNode> AndQueryNode::InnerGetNewOptimizedQueryTree() {
 
 std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
     if (children_.size() < 2) {
-        UnrecoverableError("Invalid query statement: OrQueryNode should have at least 2 children");
+        String error_message = "OptimizeInPlaceInner: Unexpected case! AndNotQueryNode should not exist in parser output";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     std::vector<std::unique_ptr<QueryNode>> or_list;
     std::vector<std::unique_ptr<QueryNode>> not_list;
@@ -317,7 +341,9 @@ std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
                 break;
             }
             default: {
-                UnrecoverableError("OptimizeInPlaceInner: Unexpected case!");
+                String error_message = "OptimizeInPlaceInner: Unexpected case!";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
                 break;
             }
         }
@@ -348,6 +374,35 @@ std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
         not_node->children_.emplace_back(std::move(optimized_node));
         return not_node;
     } else if (not_list.empty()) {
+        // merge duplicated TermQueryNode children
+        std::vector<std::unique_ptr<QueryNode>> or_list_tmp;
+        for (auto &child1 : or_list) {
+            if (child1->GetType() != QueryNodeType::TERM) {
+                or_list_tmp.emplace_back(std::move(child1));
+                continue;
+            }
+            TermQueryNode *term_query_node1 = static_cast<TermQueryNode *>(child1.get());
+            bool duplicated = false;
+            for (auto &child2 : or_list_tmp) {
+                if (child2->GetType() == QueryNodeType::TERM) {
+                    TermQueryNode *term_query_node2 = static_cast<TermQueryNode *>(child2.get());
+                    if (term_query_node1->term_ == term_query_node2->term_ && term_query_node1->column_ == term_query_node2->column_ &&
+                        term_query_node1->position_ == term_query_node2->position_) {
+                        term_query_node2->weight_ += term_query_node1->weight_;
+                        duplicated = true;
+                        break;
+                    }
+                }
+            }
+            if (!duplicated) {
+                or_list_tmp.emplace_back(std::move(child1));
+            }
+        }
+        or_list = std::move(or_list_tmp);
+
+        if (or_list.size() == 1) {
+            return std::move(or_list[0]);
+        }
         // at least 2 children
         auto or_node = std::make_unique<OrQueryNode>(); // new node, weight is reset to 1.0
         or_node->children_ = std::move(or_list);
@@ -364,7 +419,9 @@ std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
 // "and_not" does not exist in parser output, it is generated during optimization
 
 std::unique_ptr<QueryNode> AndNotQueryNode::InnerGetNewOptimizedQueryTree() {
-    UnrecoverableError("OptimizeInPlaceInner: Unexpected case! AndNotQueryNode should not exist in parser output");
+    String error_message = "OptimizeInPlaceInner: Unexpected case! AndNotQueryNode should not exist in parser output";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return nullptr;
 }
 
@@ -381,7 +438,7 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
     if (option_flag & OptionFlag::of_position_list) {
         fetch_position = true;
     }
-    auto posting_iterator = column_index_reader->Lookup(term_, index_reader.session_pool_.get(), fetch_position);
+    auto posting_iterator = column_index_reader->Lookup(term_, fetch_position);
     if (!posting_iterator) {
         return nullptr;
     }
@@ -395,8 +452,10 @@ std::unique_ptr<DocIterator> TermQueryNode::CreateSearch(const TableEntry *table
     return search;
 }
 
-std::unique_ptr<EarlyTerminateIterator>
-TermQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+std::unique_ptr<EarlyTerminateIterator> TermQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry,
+                                                                                  IndexReader &index_reader,
+                                                                                  Scorer *scorer,
+                                                                                  EarlyTermAlgo /*early_term_algo*/) const {
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader) {
@@ -407,7 +466,7 @@ TermQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexRe
     if (option_flag & OptionFlag::of_position_list) {
         fetch_position = true;
     }
-    auto search = column_index_reader->LookupBlockMax(term_, index_reader.session_pool_.get(), GetWeight(), fetch_position);
+    auto search = column_index_reader->LookupBlockMax(term_, GetWeight(), fetch_position);
     if (!search) {
         return nullptr;
     }
@@ -433,13 +492,13 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const TableEntry *tab
     }
     Vector<std::unique_ptr<PostingIterator>> posting_iterators;
     for (auto &term : terms_) {
-        auto posting_iterator = column_index_reader->Lookup(term, index_reader.session_pool_.get(), fetch_position);
+        auto posting_iterator = column_index_reader->Lookup(term, fetch_position);
         if (nullptr == posting_iterator) {
             return nullptr;
         }
         posting_iterators.emplace_back(std::move(posting_iterator));
     }
-    auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), GetWeight());
+    auto search = MakeUnique<PhraseDocIterator>(std::move(posting_iterators), GetWeight(), slop_);
 
     search->terms_ptr_ = &terms_;
     search->column_name_ptr_ = &column_;
@@ -450,8 +509,10 @@ std::unique_ptr<DocIterator> PhraseQueryNode::CreateSearch(const TableEntry *tab
     return search;
 }
 
-std::unique_ptr<EarlyTerminateIterator>
-PhraseQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+std::unique_ptr<EarlyTerminateIterator> PhraseQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry,
+                                                                                    IndexReader &index_reader,
+                                                                                    Scorer *scorer,
+                                                                                    EarlyTermAlgo /*early_term_algo*/) const {
     ColumnID column_id = table_entry->GetColumnIdByName(column_);
     ColumnIndexReader *column_index_reader = index_reader.GetColumnIndexReader(column_id);
     if (!column_index_reader) {
@@ -465,14 +526,14 @@ PhraseQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, Index
 
     Vector<std::unique_ptr<PostingIterator>> posting_iterators;
     for (auto& term : terms_) {
-        auto posting_iterator = column_index_reader->Lookup(term, index_reader.session_pool_.get(), fetch_position);
+        auto posting_iterator = column_index_reader->Lookup(term, fetch_position);
         if (nullptr == posting_iterator) {
             fmt::print("not found term = {}\n", term);
             return nullptr;
         }
         posting_iterators.emplace_back(std::move(posting_iterator));
     }
-    auto search = MakeUnique<BlockMaxPhraseDocIterator>(std::move(posting_iterators), GetWeight());
+    auto search = MakeUnique<BlockMaxPhraseDocIterator>(std::move(posting_iterators), GetWeight(), slop_);
     if (!search) {
         return nullptr;
     }
@@ -503,12 +564,14 @@ std::unique_ptr<DocIterator> AndQueryNode::CreateSearch(const TableEntry *table_
     }
 }
 
-std::unique_ptr<EarlyTerminateIterator>
-AndQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+std::unique_ptr<EarlyTerminateIterator> AndQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry,
+                                                                                 IndexReader &index_reader,
+                                                                                 Scorer *scorer,
+                                                                                 EarlyTermAlgo early_term_algo) const {
     Vector<std::unique_ptr<EarlyTerminateIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     for (auto &child : children_) {
-        auto iter = child->CreateEarlyTerminateSearch(table_entry, index_reader, scorer);
+        auto iter = child->CreateEarlyTerminateSearch(table_entry, index_reader, scorer, early_term_algo);
         if (iter) {
             sub_doc_iters.emplace_back(std::move(iter));
         }
@@ -546,12 +609,14 @@ std::unique_ptr<DocIterator> AndNotQueryNode::CreateSearch(const TableEntry *tab
     }
 }
 
-std::unique_ptr<EarlyTerminateIterator>
-AndNotQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+std::unique_ptr<EarlyTerminateIterator> AndNotQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry,
+                                                                                    IndexReader &index_reader,
+                                                                                    Scorer *scorer,
+                                                                                    EarlyTermAlgo early_term_algo) const {
     Vector<std::unique_ptr<EarlyTerminateIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     // check if the first child is a valid query
-    auto first_iter = children_.front()->CreateEarlyTerminateSearch(table_entry, index_reader, scorer);
+    auto first_iter = children_.front()->CreateEarlyTerminateSearch(table_entry, index_reader, scorer, early_term_algo);
     if (!first_iter) {
         // no need to continue if the first child is invalid
         return nullptr;
@@ -559,7 +624,7 @@ AndNotQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, Index
     sub_doc_iters.emplace_back(std::move(first_iter));
     for (u32 i = 1; i < children_.size(); ++i) {
         // set scorer to nullptr, because nodes under "not" should not be added to scorer
-        auto iter = children_[i]->CreateEarlyTerminateSearch(table_entry, index_reader, nullptr);
+        auto iter = children_[i]->CreateEarlyTerminateSearch(table_entry, index_reader, nullptr, early_term_algo);
         if (iter) {
             sub_doc_iters.emplace_back(std::move(iter));
         }
@@ -590,11 +655,11 @@ std::unique_ptr<DocIterator> OrQueryNode::CreateSearch(const TableEntry *table_e
 }
 
 std::unique_ptr<EarlyTerminateIterator>
-OrQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
+OrQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer, EarlyTermAlgo early_term_algo) const {
     Vector<std::unique_ptr<EarlyTerminateIterator>> sub_doc_iters;
     sub_doc_iters.reserve(children_.size());
     for (auto &child : children_) {
-        auto iter = child->CreateEarlyTerminateSearch(table_entry, index_reader, scorer);
+        auto iter = child->CreateEarlyTerminateSearch(table_entry, index_reader, scorer, early_term_algo);
         if (iter) {
             sub_doc_iters.emplace_back(std::move(iter));
         }
@@ -604,18 +669,30 @@ OrQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexRead
     } else if (sub_doc_iters.size() == 1) {
         return std::move(sub_doc_iters[0]);
     } else {
-        return MakeUnique<BlockMaxMaxscoreIterator>(std::move(sub_doc_iters));
+        switch (early_term_algo) {
+            case EarlyTermAlgo::kBMM:
+                return MakeUnique<BlockMaxMaxscoreIterator>(std::move(sub_doc_iters));
+            case EarlyTermAlgo::kBMW:
+            default:
+                return MakeUnique<BlockMaxWandIterator>(std::move(sub_doc_iters));
+        }
     }
 }
 
 std::unique_ptr<DocIterator> NotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
-    UnrecoverableError("NOT query node should be optimized into AND_NOT query node");
+    String error_message = "NOT query node should be optimized into AND_NOT query node";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return nullptr;
 }
 
-std::unique_ptr<EarlyTerminateIterator>
-NotQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
-    UnrecoverableError("NOT query node should be optimized into AND_NOT query node");
+std::unique_ptr<EarlyTerminateIterator> NotQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry,
+                                                                                 IndexReader &index_reader,
+                                                                                 Scorer *scorer,
+                                                                                 EarlyTermAlgo early_term_algo) const {
+    String error_message = "NOT query node should be optimized into AND_NOT query node";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return nullptr;
 }
 
@@ -666,11 +743,12 @@ void PhraseQueryNode::PrintTree(std::ostream &os, const std::string &prefix, boo
     os << QueryNodeTypeToString(type_);
     os << " (weight: " << weight_ << ")";
     os << " (column: " << column_ << ")";
-    os << " (phrase: ";
+    os << " (phrase:";
     for (auto term : terms_) {
-        os << term << " ";
+        os << " " << term;
     }
     os << ")";
+    os << " (slop: " << slop_ << ")";
     os << '\n';
 }
 

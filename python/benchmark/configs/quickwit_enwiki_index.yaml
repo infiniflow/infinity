@@ -1,0 +1,28 @@
+version: 0.8
+
+index_id: quickwit_enwiki
+
+doc_mapping:
+  field_mappings:
+    - name: doctitle
+      type: text
+      tokenizer: default
+      record: position
+      stored: true
+    - name: docdate
+      type: text
+      tokenizer: default
+      record: position
+      stored: true
+    - name: body
+      type: text
+      tokenizer: default
+      record: position
+      stored: true
+
+
+search_settings:
+  default_search_fields: [body]
+
+indexing_settings:
+  commit_timeout_secs: 10

@@ -3,7 +3,7 @@ module;
 import stl;
 import byte_slice;
 import byte_slice_writer;
-import memory_pool;
+
 import file_writer;
 import file_reader;
 import index_defines;
@@ -19,8 +19,6 @@ namespace infinity {
 export class PositionListEncoder {
 public:
     PositionListEncoder(const PostingFormatOption &format_option,
-                        MemoryPool *byte_slice_pool,
-                        MemoryPool *buffer_pool,
                         const PositionListFormat *pos_list_format = nullptr);
 
     ~PositionListEncoder();
@@ -32,7 +30,7 @@ public:
     void Load(const SharedPtr<FileReader> &file);
     u32 GetDumpLength() const;
 
-    InMemPositionListDecoder *GetInMemPositionListDecoder(MemoryPool *session_pool) const;
+    InMemPositionListDecoder *GetInMemPositionListDecoder() const;
 
     const ByteSliceList *GetPositionList() const { return pos_list_buffer_.GetByteSliceList(); }
 
@@ -53,7 +51,6 @@ private:
     bool is_own_format_;                              // 1byte
     UniquePtr<SkipListWriter> pos_skiplist_writer_;
     const PositionListFormat *pos_list_format_;
-    MemoryPool *byte_slice_pool_;
 };
 
 } // namespace infinity

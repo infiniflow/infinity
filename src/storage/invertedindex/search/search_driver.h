@@ -29,7 +29,7 @@ struct QueryNode;
 class SearchDriver {
 public:
     SearchDriver(const std::map<std::string, std::string> &field2analyzer, const std::string &default_field)
-        : field2analyzer_{field2analyzer}, default_field_{default_field} {}
+        : field2analyzer_{field2analyzer}, default_field_{SearchDriver::Unescape(default_field)} {}
 
     // used in PhysicalMatch
     [[nodiscard]] std::unique_ptr<QueryNode> ParseSingleWithFields(const std::string &fields_str, const std::string &query) const;
@@ -37,14 +37,17 @@ public:
     // used in ParseSingleWithFields and unit_test
     [[nodiscard]] std::unique_ptr<QueryNode> ParseSingle(const std::string &query, const std::string *default_field_ptr = nullptr) const;
 
-    // used in SearchParser in ParseSingle
-    [[nodiscard]] std::unique_ptr<QueryNode> AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text) const;
+    // used in SearchParser in ParseSingle. Assumes field and text are both unescaped.
+    [[nodiscard]] std::unique_ptr<QueryNode>
+    AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text, bool from_quoted, unsigned long slop = 0) const;
+
+    [[nodiscard]] static std::string Unescape(const std::string &text);
 
     /**
      * parsing options
      */
     const std::map<std::string, std::string> &field2analyzer_;
-    const std::string &default_field_;
+    const std::string default_field_;
 };
 
 } // namespace infinity

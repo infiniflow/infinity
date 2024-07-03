@@ -133,7 +133,8 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
     return result;
 }
 
-std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text) const {
+std::unique_ptr<QueryNode>
+SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text, bool from_quoted, unsigned long slop) const {
     if (text.empty()) {
         Status status = Status::SyntaxError("Empty query text");
         LOG_ERROR(status.message());
@@ -143,6 +144,7 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
     Term input_term;
     input_term.text_ = std::move(text);
     TermList terms;
+
     // 1. analyze
     std::string analyzer_name = "standard";
     if (!field.empty()) {
@@ -155,40 +157,37 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
-    if (analyzer_name == AnalyzerPool::STANDARD) {
-        TermList temp_output_terms;
-        analyzer->Analyze(input_term, temp_output_terms);
-        // remove duplicates and only keep the root words for query
-        const u32 INVALID_TERM_OFFSET = -1;
-        Term last_term;
-        last_term.word_offset_ = INVALID_TERM_OFFSET;
-        for (const Term &term : temp_output_terms) {
-            if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-                assert(term.word_offset_ >= last_term.word_offset_);
-            }
-            if (last_term.word_offset_ != term.word_offset_) {
-                if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-                    terms.emplace_back(last_term);
-                }
-                last_term.text_ = term.text_;
-                last_term.word_offset_ = term.word_offset_;
-                last_term.stats_ = term.stats_;
-            } else {
-                if (term.text_.size() < last_term.text_.size()) {
-                    last_term.text_ = term.text_;
-                    last_term.stats_ = term.stats_;
-                }
-            }
-        }
+    TermList temp_output_terms;
+    analyzer->Analyze(input_term, temp_output_terms);
+    // remove duplicates and only keep the root words for query
+    const u32 INVALID_TERM_OFFSET = -1;
+    Term last_term;
+    last_term.word_offset_ = INVALID_TERM_OFFSET;
+    for (const Term &term : temp_output_terms) {
         if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
-            terms.emplace_back(last_term);
+            assert(term.word_offset_ >= last_term.word_offset_);
         }
-    } else {
-        analyzer->Analyze(input_term, terms);
+        if (last_term.word_offset_ != term.word_offset_) {
+            if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
+                terms.emplace_back(last_term);
+            }
+            last_term.text_ = term.text_;
+            last_term.word_offset_ = term.word_offset_;
+            last_term.stats_ = term.stats_;
+        } else {
+            if (term.text_.size() < last_term.text_.size()) {
+                last_term.text_ = term.text_;
+                last_term.stats_ = term.stats_;
+            }
+        }
+    }
+    if (last_term.word_offset_ != INVALID_TERM_OFFSET) {
+        terms.emplace_back(last_term);
     }
     if (terms.empty()) {
         std::cerr << "Analyzer " << analyzer_name << " analyzes following text as empty terms: " << input_term.text_ << std::endl;
     }
+
     // 2. build query node
     if (terms.empty()) {
         auto result = std::make_unique<TermQueryNode>();
@@ -201,25 +200,69 @@ std::unique_ptr<QueryNode> SearchDriver::AnalyzeAndBuildQueryNode(const std::str
         result->column_ = field;
         return result;
     } else {
-        /*
-        fmt::print("Create Or Query Node\n");
-        auto result = std::make_unique<OrQueryNode>();
-        for (auto &term : terms) {
-            auto subquery = std::make_unique<TermQueryNode>();
-            subquery->term_ = std::move(term.text_);
-            subquery->column_ = field;
-            result->Add(std::move(subquery));
+        if (from_quoted) {
+            auto result = std::make_unique<PhraseQueryNode>();
+            for (auto term : terms) {
+                result->AddTerm(term.Text());
+            }
+            result->column_ = field;
+            result->slop_ = slop;
+            return result;
+        } else {
+            auto result = std::make_unique<OrQueryNode>();
+            for (auto &term : terms) {
+                auto subquery = std::make_unique<TermQueryNode>();
+                subquery->term_ = std::move(term.text_);
+                subquery->column_ = field;
+                result->Add(std::move(subquery));
+            }
+            return result;
         }
-        return result;
-        */
-        // create phrase query node
-        auto result = std::make_unique<PhraseQueryNode>();
-        for (auto term : terms) {
-            result->AddTerm(term.Text());
-        }
-        result->column_ = field;
-        return result;
     }
+}
+
+// Unescape reserved characters per https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
+// Shall keep sync with ESCAPEABLE in search_lexer.l
+// [\x20+\-=&|!(){}\[\]^"~*?:\\/]
+std::string SearchDriver::Unescape(const std::string &text) {
+    std::string result;
+    result.reserve(text.size());
+    for (size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == '\\' && i + 1 < text.size()) {
+            switch (text[i + 1]) {
+                case ' ':
+                case '+':
+                case '-':
+                case '=':
+                case '&':
+                case '|':
+                case '!':
+                case '(':
+                case ')':
+                case '{':
+                case '}':
+                case '[':
+                case ']':
+                case '^':
+                case '"':
+                case '~':
+                case '*':
+                case '?':
+                case ':':
+                case '\\':
+                case '/':
+                    result.push_back(text[i + 1]);
+                    ++i;
+                    break;
+                default:
+                    result.push_back(text[i]);
+                    break;
+            }
+        } else {
+            result.push_back(text[i]);
+        }
+    }
+    return result;
 }
 
 } // namespace infinity

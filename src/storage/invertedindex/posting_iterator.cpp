@@ -2,9 +2,10 @@ module;
 
 #include "common/utility/builtin.h"
 #include <cassert>
+#include <cstdlib>
 #include <vector>
 import stl;
-import memory_pool;
+
 import byte_slice_reader;
 import posting_list_format;
 import term_meta;
@@ -19,22 +20,21 @@ module posting_iterator;
 
 namespace infinity {
 
-PostingIterator::PostingIterator(optionflag_t flag, MemoryPool *session_pool) : posting_option_(flag), session_pool_(session_pool) {
-    tf_buffer_ = (tf_t *)((session_pool_)->Allocate(sizeof(tf_t) * MAX_DOC_PER_RECORD));
-    doc_payload_buffer_ = (docpayload_t *)((session_pool_)->Allocate(sizeof(docpayload_t) * MAX_DOC_PER_RECORD));
+PostingIterator::PostingIterator(optionflag_t flag) : posting_option_(flag) {
+    tf_buffer_ = (tf_t *)malloc(sizeof(tf_t) * MAX_DOC_PER_RECORD);
+    doc_payload_buffer_ = (docpayload_t *)malloc(sizeof(docpayload_t) * MAX_DOC_PER_RECORD);
     doc_buffer_base_ = doc_buffer_;
 }
 
 PostingIterator::~PostingIterator() {
     if (tf_buffer_) {
-        session_pool_->Deallocate((void *)tf_buffer_, sizeof(tf_t) * MAX_DOC_PER_RECORD);
+        free((void *)tf_buffer_);
     }
     if (doc_payload_buffer_) {
-        session_pool_->Deallocate((void *)doc_payload_buffer_, sizeof(docpayload_t) * MAX_DOC_PER_RECORD);
+        free((void *)doc_payload_buffer_);
     }
     if (posting_decoder_) {
-        posting_decoder_->~MultiPostingDecoder();
-        session_pool_->Deallocate((void *)posting_decoder_, sizeof(posting_decoder_));
+        delete posting_decoder_;
     }
 }
 
@@ -64,11 +64,12 @@ bool PostingIterator::SkipTo(RowID doc_id) {
 Pair<u32, u16> PostingIterator::GetBlockMaxInfo() const { return posting_decoder_->GetBlockMaxInfo(); }
 
 RowID PostingIterator::SeekDoc(RowID row_id) {
-    RowID current_row_id = finish_decode_docid_ ? current_row_id_ : INVALID_ROWID;
-    if (row_id == current_row_id) [[unlikely]] {
-        return current_row_id;
+    if (segment_postings_.get() == nullptr || segment_postings_->empty()) [[unlikely]] {
+        current_row_id_ = INVALID_ROWID;
+        return INVALID_ROWID;
     }
-    if (current_row_id != INVALID_ROWID and row_id < current_row_id) {
+    RowID current_row_id = finish_decode_docid_ ? current_row_id_ : INVALID_ROWID;
+    if (current_row_id != INVALID_ROWID and row_id <= current_row_id) [[unlikely]] {
         return current_row_id;
     }
     assert(row_id > current_row_id or current_row_id == INVALID_ROWID);
@@ -150,11 +151,10 @@ void PostingIterator::Reset() {
         return;
     }
     if (posting_decoder_) {
-        posting_decoder_->~MultiPostingDecoder();
-        session_pool_->Deallocate((void *)posting_decoder_, sizeof(posting_decoder_));
+        delete posting_decoder_;
     }
 
-    posting_decoder_ = new (session_pool_->Allocate(sizeof(MultiPostingDecoder))) MultiPostingDecoder(posting_option_, &state_, session_pool_);
+    posting_decoder_ = new MultiPostingDecoder(posting_option_, &state_);
     posting_decoder_->Init(segment_postings_);
 
     current_row_id_ = INVALID_ROWID;

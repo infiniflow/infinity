@@ -31,6 +31,10 @@ import infinity_exception;
 import internal_types;
 import data_type;
 import common_query_filter;
+import logger;
+import column_index_reader;
+import query_node;
+import early_terminate_iterator;
 
 namespace infinity {
 
@@ -39,6 +43,11 @@ public:
     explicit PhysicalMatch(u64 id,
                            SharedPtr<BaseTableRef> base_table_ref,
                            SharedPtr<MatchExpression> match_expr,
+                           IndexReader index_reader,
+                           UniquePtr<QueryNode>&& query_tree,
+                           float begin_threshold,
+                           EarlyTermAlgo early_term_algo,
+                           u32 top_n,
                            const SharedPtr<CommonQueryFilter> &common_query_filter,
                            u64 match_table_index,
                            SharedPtr<Vector<LoadMeta>> load_metas);
@@ -54,7 +63,9 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
     SizeT TaskletCount() override {
-        UnrecoverableError("Not implement: TaskletCount not Implement");
+        String error_message = "Not implement: TaskletCount not Implement";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return 0;
     }
 
@@ -78,6 +89,11 @@ private:
     u64 table_index_ = 0;
     SharedPtr<BaseTableRef> base_table_ref_;
     SharedPtr<MatchExpression> match_expr_;
+    IndexReader index_reader_;
+    UniquePtr<QueryNode> query_tree_;
+    float begin_threshold_;
+    EarlyTermAlgo early_term_algo_{EarlyTermAlgo::kBMW};
+    u32 top_n_{1};
 
     // for filter
     SharedPtr<CommonQueryFilter> common_query_filter_;

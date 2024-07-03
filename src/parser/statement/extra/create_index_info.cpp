@@ -33,6 +33,12 @@ std::string IndexInfo::IndexTypeToString(IndexType index_type) {
         case IndexType::kSecondary: {
             return "SECONDARY";
         }
+        case IndexType::kEMVB: {
+            return "EMVB";
+        }
+        case IndexType::kBMP: {
+            return "BMP";
+        }
         case IndexType::kInvalid: {
             ParserError("Invalid conflict type.");
         }
@@ -49,6 +55,10 @@ IndexType IndexInfo::StringToIndexType(const std::string &index_type_str) {
         return IndexType::kFullText;
     } else if (index_type_str == "SECONDARY") {
         return IndexType::kSecondary;
+    } else if (index_type_str == "EMVB") {
+        return IndexType::kEMVB;
+    } else if (index_type_str == "BMP") {
+        return IndexType::kBMP;
     } else {
         return IndexType::kInvalid;
     }

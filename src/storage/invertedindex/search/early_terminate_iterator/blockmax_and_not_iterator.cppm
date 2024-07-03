@@ -29,7 +29,14 @@ public:
         bm25_score_upper_bound_ = inner_iterators_[0]->BM25ScoreUpperBound();
     }
 
-    void UpdateScoreThreshold(float threshold) override { return inner_iterators_[0]->UpdateScoreThreshold(threshold); }
+    void UpdateScoreThreshold(float threshold) override {
+        EarlyTerminateIterator::UpdateScoreThreshold(threshold);
+        return inner_iterators_[0]->UpdateScoreThreshold(threshold);
+    }
+
+    bool NextShallow(RowID doc_id) override;
+
+    bool Next(RowID doc_id) override;
 
     bool BlockSkipTo(RowID doc_id, float threshold) override { return inner_iterators_[0]->BlockSkipTo(doc_id, threshold); }
 

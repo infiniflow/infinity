@@ -53,6 +53,8 @@ public:
 
     SegmentOffset GetSegmentOffset(SegmentID segment_id) const;
 
+    BlockOffset GetBlockOffset(SegmentID segment_id, BlockID block_id) const;
+
     bool IsEmpty() const { return segment_block_index_.empty(); }
 
 public:
@@ -67,7 +69,7 @@ export struct IndexSnapshot {
 
 export struct IndexIndex {
 public:
-    void Insert(TableIndexEntry *table_index_entry, Txn *txn);
+    SharedPtr<IndexSnapshot> Insert(TableIndexEntry *table_index_entry, Txn *txn);
 
     void Insert(String index_name, SharedPtr<IndexSnapshot> index_snapshot);
 

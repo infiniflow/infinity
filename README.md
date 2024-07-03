@@ -8,10 +8,10 @@
 </p>
 
 <h4 align="center">
-  <a href="https://github.com/infiniflow/infinity/issues/338">Roadmap 2024</a> |
+  <a href="https://infiniflow.org/docs/dev/category/get-started">Document</a> |
+  <a href="https://infiniflow.org/docs/dev/benchmark">Benchmark</a> |
   <a href="https://twitter.com/infiniflowai">Twitter</a> |
-  <a href="https://discord.gg/jEfRUwEYEV">Discord</a> |
-  <a href="https://www.youtube.com/@InfiniFlow-AI">YouTube</a> |
+  <a href="https://discord.gg/jEfRUwEYEV">Discord</a>
 </h4>
 
 
@@ -19,6 +19,7 @@ Infinity is a cutting-edge AI-native database that provides a wide range of sear
 
 - [Key Features](#-key-features)
 - [Get Started](#-get-started)
+- [Document](#-document)
 - [Roadmap](#-roadmap)
 - [Community](#-community)
 
@@ -29,10 +30,10 @@ Infinity comes with high performance, flexibility, ease-of-use, and many feature
 
 ### ⚡️ Incredibly fast
 
-- Achieves 0.1 milliseconds query latency on million-scale vector datasets.
-- Up to 15K QPS on million-scale vector datasets.
+- Achieves 0.1 milliseconds query latency and 15K+ QPS on million-scale vector datasets.
+- Achieves 1 millisecond latency and 12K+ QPS in full-text search on 33M documents.
 
-> See the [Benchmark report](./docs/references/benchmark.md) for more information.
+> See the [Benchmark report](https://infiniflow.org/docs/dev/benchmark) for more information.
 
 
 ### 🔮 Fused search
@@ -45,105 +46,50 @@ Supports a wide range of data types including strings, numerics, vectors, and mo
 
 ### 🎁 Ease-of-use
 
-- Intuitive Python API. See the [Python API](docs/references/pysdk_api_reference.md)
+- Intuitive Python API. See the [Python API](https://infiniflow.org/docs/dev/python_api_reference)
 - A single-binary architecture with no dependencies, making deployment a breeze.
+- Embedded in Python as a module and friendly to AI developers.  
 
 ## 🎮 Get Started
 
-### Deploy Infinity database
+Infinity, also available as a Python module, eliminates the need for a separate back-end server and all the complex communication settings. Using `pip install` and `import infinity`, you can quickly build a local AI application in Python, leveraging the world's fastest and the most powerful RAG database:
 
-#### Deploy Infinity using Docker on Linux x86_64 and MacOS x86_64
+   ```bash
+   pip install infinity-sdk==0.2.1.dev3
+   ```
 
-```bash
-sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
-docker pull infiniflow/infinity:nightly
-docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
-```
+   ```python
+   import infinity
 
-#### Deploy Infinity using binary package on Linux x86_64
+   # Connect to infinity
+   infinity_obj = infinity.connect("/path/to/save/to")
+   db = infinity_obj.get_database("default_db")
+   table = db.create_table("my_table", {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector, 4, float"}})
+   table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
+   table.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
+   res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
+   print(res)
+   ```
 
-You can download the binary package (deb, rpm, or tgz) for your respective host operating system from https://github.com/infiniflow/infinity/releases. The prebuilt packages are compatible with Linux distributions based on glibc 2.17 or later, for example, RHEL 7, Debian 8, Ubuntu 14.04.
+### 🛠️ Deploy Infinity as a separate server
 
-Fedora/RHEL/CentOS/OpenSUSE
-```bash
-sudo rpm -i infinity-0.2.0-dev-x86_64.rpm
-sudo systemctl start infinity
-```
+If you wish to deploy a standalone Infinity server and access it remotely: 
 
-Ubuntu/Debian
-```bash
-sudo dpkg -i infinity-0.2.0-dev-x86_64.deb
-sudo systemctl start infinity
-```
+See [Deploy infinity server](https://infiniflow.org/docs/dev/deploy_infinity_server).
+
 #### 🛠️ Build from Source
 
-See [Build from Source](docs/getstarted/build_from_source.md).
+See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
 
-### Install Infinity's Python client
+> 💡 For more information about Infinity's Python API, see the [Python API Reference](https://infiniflow.org/docs/dev/python_api_reference).
 
-`infinity-sdk` requires Python 3.10+.
+## 📚 Document
 
-```bash
-pip3 install infinity-sdk==0.2.0.dev1
-```
-
-### Import necessary modules
-
-```python
-import infinity
-import infinity.index as index
-from infinity.common import REMOTE_HOST
-from infinity.common import ConflictType
-```
-
-
-
-### Connect to the remote server
-
-```python
-infinity_obj = infinity.connect(REMOTE_HOST)
-```
-
-
-### Get a database
-
-```python
-db = infinity_obj.get_database("default_db")
-```
-
-
-### Create a table
-
-```python
-# Drop my_table if it already exists
-db.drop_table("my_table", ConflictType.Ignore)
-# Create a table named "my_table"
-table = db.create_table(
-          "my_table", {
-            "num": {"type": "integer"}, 
-            "body": {"type": "varchar"},
-            "vec": {"type": "vector, 4, float"}
-          })
-```
-
-
-### Insert two records 
-
-```python
-table.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
-table.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
-```
-
-
-### Execute a vector search
-
-```python
-res = table.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2).to_pl()
-print(res)
-```
-
-> 💡 For more information about the Python API, see the [Python API Reference](docs/references/pysdk_api_reference.md).
-
+- [Quickstart](https://infiniflow.org/docs/dev/)
+- [Python API](https://infiniflow.org/docs/dev/python_api_reference)
+- [HTTP API](https://infiniflow.org/docs/dev/http_api_reference)
+- [References](https://infiniflow.org/docs/dev/category/references)
+- [FAQ](https://infiniflow.org/docs/dev/FAQ)
 
 ## 📜 Roadmap
 
@@ -154,4 +100,4 @@ See the [Infinity Roadmap 2024](https://github.com/infiniflow/infinity/issues/33
 - [Discord](https://discord.gg/jEfRUwEYEV)
 - [Twitter](https://twitter.com/infiniflowai)
 - [GitHub Discussions](https://github.com/infiniflow/infinity/discussions)
-- [YouTube](https://www.youtube.com/@InfiniFlow-AI)
+

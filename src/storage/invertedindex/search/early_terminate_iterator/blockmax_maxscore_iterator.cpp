@@ -316,9 +316,7 @@ Pair<bool, RowID> BlockMaxMaxscoreIterator::PeekInBlockRange(RowID doc_id, RowID
 }
 
 void BlockMaxMaxscoreIterator::UpdateScoreThreshold(const float threshold) {
-    if (threshold < 0) {
-        return;
-    }
+    EarlyTerminateIterator::UpdateScoreThreshold(threshold);
     const float base_threshold = threshold - BM25ScoreUpperBound();
     for (const auto &it : sorted_iterators_) {
         it->UpdateScoreThreshold(base_threshold + it->BM25ScoreUpperBound());

@@ -21,14 +21,14 @@ from typing import Optional, Union, List, Any
 from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-from infinity.common import INSERT_DATA, VEC
+from infinity.common import INSERT_DATA, VEC, InfinityException
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
 from infinity.remote_thrift.types import build_result
 from infinity.remote_thrift.utils import traverse_conditions, name_validity_check, select_res_to_polars
 from infinity.table import Table, ExplainType
-from infinity.common import ConflictType
+from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
 
 
 class RemoteTable(Table, ABC):
@@ -78,7 +78,7 @@ class RemoteTable(Table, ABC):
         elif conflict_type == ConflictType.Replace:
             create_index_conflict = ttypes.CreateConflict.Replace
         else:
-            raise Exception(f"ERROR:3066, Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
 
         res = self._conn.create_index(db_name=self._db_name,
                                       table_name=self._table_name,
@@ -89,7 +89,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("index_name", "Index")
     def drop_index(self, index_name: str, conflict_type: ConflictType = ConflictType.Error):
@@ -99,14 +99,14 @@ class RemoteTable(Table, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_index_conflict = ttypes.DropConflict.Ignore
         else:
-            raise Exception(f"ERROR:3066, invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
 
         res = self._conn.drop_index(db_name=self._db_name, table_name=self._table_name,
                                     index_name=index_name, conflict_type=drop_index_conflict)
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     @name_validity_check("index_name", "Index")
     def show_index(self, index_name: str):
@@ -115,35 +115,35 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def list_indexes(self):
         res = self._conn.list_indexes(db_name=self._db_name, table_name=self._table_name)
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_segments(self):
         res = self._conn.show_segments(db_name=self._db_name, table_name=self._table_name)
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_segment(self, segment_id: int):
         res = self._conn.show_segment(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_blocks(self, segment_id: int):
         res = self._conn.show_blocks(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id)
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_block(self, segment_id: int, block_id: int):
         res = self._conn.show_block(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id,
@@ -151,7 +151,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def show_block_column(self, segment_id: int, block_id: int, column_id: int):
         res = self._conn.show_block_column(db_name=self._db_name, table_name=self._table_name, segment_id=segment_id,
@@ -159,7 +159,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def insert(self, data: Union[INSERT_DATA, list[INSERT_DATA]]):
         # [{"c1": 1, "c2": 1.1}, {"c1": 2, "c2": 2.2}]
@@ -194,8 +194,64 @@ class RemoteTable(Table, ABC):
                     elif isinstance(value[0], float):
                         constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
                                                                   f64_array_value=value)
+                    elif isinstance(value[0], list):
+                        if isinstance(value[0][0], int):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.IntegerArray,
+                                i64_array_value=[x for xs in value for x in xs])
+                        elif isinstance(value[0][0], float):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.DoubleArray,
+                                f64_array_value=[x for xs in value for x in xs])
+                        elif isinstance(value[0][0], list):
+                            if isinstance(value[0][0][0], int):
+                                constant_expression = ttypes.ConstantExpr(
+                                    literal_type=ttypes.LiteralType.IntegerTensorArray,
+                                    i64_tensor_array_value=value)
+                            elif isinstance(value[0][0][0], float):
+                                constant_expression = ttypes.ConstantExpr(
+                                    literal_type=ttypes.LiteralType.DoubleTensorArray,
+                                    f64_tensor_array_value=value)
+                elif isinstance(value, np.ndarray):
+                    float_list = value.tolist()
+                    if isinstance(float_list[0], int):
+                        constant_expression = ttypes.ConstantExpr(
+                            literal_type=ttypes.LiteralType.IntegerArray,
+                            i64_array_value=float_list)
+                    elif isinstance(float_list[0], float):
+                        constant_expression = ttypes.ConstantExpr(
+                            literal_type=ttypes.LiteralType.DoubleArray,
+                            f64_array_value=float_list)
+                    elif isinstance(float_list[0], list):
+                        if isinstance(float_list[0][0], int):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.IntegerTensorArray,
+                                i64_tensor_array_value=float_list)
+                        elif isinstance(float_list[0][0], float):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.DoubleTensorArray,
+                                f64_tensor_array_value=float_list)
+                    else:
+                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid list type: {type(value)}")
+                elif isinstance(value, dict):
+                    if isinstance(value["values"][0], int):
+                        if isinstance(value["indices"][0], int):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.SparseIntegerArray,
+                                i64_array_value = value["values"],
+                                i64_array_idx = value["indices"])
+                        else:
+                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
+                    elif isinstance(value["values"][0], float):
+                        if isinstance(value["indices"][0], int):
+                            constant_expression = ttypes.ConstantExpr(
+                                literal_type=ttypes.LiteralType.SparseDoubleArray,
+                                f64_array_value = value["values"],
+                                i64_array_idx = value["indices"])
+                        else:
+                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
                 else:
-                    raise Exception("Invalid constant expression")
+                    raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
 
                 expr_type = ttypes.ParsedExprType(
                     constant_expr=constant_expression)
@@ -211,7 +267,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def import_data(self, file_path: str, import_options: {} = None):
         options = ttypes.ImportOption()
@@ -232,19 +288,19 @@ class RemoteTable(Table, ABC):
                     elif file_type == 'fvecs':
                         options.copy_file_type = ttypes.CopyFileType.FVECS
                     else:
-                        raise Exception("Unrecognized import file type")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
-                        raise Exception("Unrecognized import file delimiter")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
                         options.has_header = v
                     else:
-                        raise Exception("Boolean value is expected in header field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
                 else:
-                    raise Exception("Unknown import parameter")
+                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
 
         res = self._conn.import_data(db_name=self._db_name,
                                      table_name=self._table_name,
@@ -253,7 +309,67 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
+
+    def export_data(self, file_path: str, export_options: {} = None, columns: [str] = None):
+        options = ttypes.ExportOption()
+        options.has_header = False
+        options.delimiter = ','
+        options.copy_file_type = ttypes.CopyFileType.CSV
+        options.offset = 0
+        options.limit = 0
+        options.row_limit = 0
+
+        if export_options != None:
+            for k, v in export_options.items():
+                key = k.lower()
+                if key == 'file_type':
+                    file_type = v.lower()
+                    if file_type == 'csv':
+                        options.copy_file_type = ttypes.CopyFileType.CSV
+                    elif file_type == 'jsonl':
+                        options.copy_file_type = ttypes.CopyFileType.JSONL
+                    elif file_type == 'fvecs':
+                        options.copy_file_type = ttypes.CopyFileType.FVECS
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
+                elif key == 'delimiter':
+                    delimiter = v.lower()
+                    if len(delimiter) != 1:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file delimiter: {delimiter}")
+                    options.delimiter = delimiter[0]
+                elif key == 'header':
+                    if isinstance(v, bool):
+                        options.has_header = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
+                elif key == 'offset':
+                    if isinstance(v, int):
+                        options.offset = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'offset' field")
+                elif key == 'limit':
+                    if isinstance(v, int):
+                        options.limit = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'limit' field")
+                elif key == 'row_limit':
+                    if isinstance(v, int):
+                        options.row_limit = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'row_limit' field")
+                else:
+                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
+
+        res = self._conn.export_data(db_name=self._db_name,
+                                     table_name=self._table_name,
+                                     file_name=file_path,
+                                     export_options=options,
+                                     columns=columns)
+        if res.error_code == ErrorCode.OK:
+            return res
+        else:
+            raise InfinityException(res.error_code, res.error_msg)
 
     def delete(self, cond: Optional[str] = None):
         match cond:
@@ -266,7 +382,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def update(self, cond: Optional[str],
                data: Optional[list[dict[str, Union[str, int, float, list[Union[int, float]]]]]]):
@@ -301,7 +417,7 @@ class RemoteTable(Table, ABC):
                                 constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
                                                                           f64_array_value=value)
                         else:
-                            raise Exception("Invalid constant expression")
+                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
 
                         expr_type = ttypes.ParsedExprType(
                             constant_expr=constant_expression)
@@ -316,10 +432,10 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return res
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int, knn_params: {} = None):
+            topn: int = DEFAULT_MATCH_VECTOR_TOPN, knn_params: {} = None):
         self.query_builder.knn(
             vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
         return self
@@ -330,8 +446,19 @@ class RemoteTable(Table, ABC):
         return self
 
     @params_type_check
-    def fusion(self, method: str, options_text: str = ''):
-        self.query_builder.fusion(method, options_text)
+    def match_tensor(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, method_type: str,
+                     extra_option: str):
+        self.query_builder.match_tensor(vector_column_name, embedding_data, embedding_data_type, method_type,
+                                        extra_option)
+        return self
+
+    def match_sparse(self, vector_column_name: str, sparse_data, distance_type: str, topn: int, opt_params: {} = None):
+        self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
+        return self
+
+    @params_type_check
+    def fusion(self, method: str, options_text: str = '', match_tensor_expr: ttypes.MatchTensorExpr = None):
+        self.query_builder.fusion(method, options_text, match_tensor_expr)
         return self
 
     def output(self, columns: Optional[List[str]]):
@@ -365,6 +492,12 @@ class RemoteTable(Table, ABC):
     def explain(self, explain_type: ExplainType = ExplainType.Physical):
         return self.query_builder.explain(explain_type)
 
+    def optimize(self, index_name: str, opt_params: dict[str, str]):
+        opt_options = ttypes.OptimizeOptions()
+        opt_options.index_name_ = index_name
+        opt_options.opt_params_ = [ttypes.InitParameter(k, v) for k, v in opt_params.items()]
+        return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
+
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
 
         # execute the query
@@ -381,7 +514,7 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return build_result(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)
 
     def _explain_query(self, query: ExplainQuery) -> Any:
         res = self._conn.explain(db_name=self._db_name,
@@ -396,4 +529,4 @@ class RemoteTable(Table, ABC):
         if res.error_code == ErrorCode.OK:
             return select_res_to_polars(res)
         else:
-            raise Exception(f"ERROR:{res.error_code}, {res.error_msg}")
+            raise InfinityException(res.error_code, res.error_msg)

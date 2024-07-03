@@ -29,6 +29,8 @@ import column_identifer;
 import block_index;
 import column_expr;
 import logger;
+import knn_expr;
+import match_sparse_expr;
 
 namespace infinity {
 
@@ -203,7 +205,9 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
     for (const auto &table_name2index_pair : other_ptr->table_name2table_index_) {
         const String &table_name = table_name2index_pair.first;
         if (table_name2table_index_.contains(table_name)) {
-            UnrecoverableError(fmt::format("{} was bound before", table_name));
+            String error_message = fmt::format("{} was bound before", table_name);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         table_name2table_index_[table_name] = table_name2index_pair.second;
     }
@@ -211,7 +215,9 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
     for (const auto &table_index2name_pair : other_ptr->table_table_index2table_name_) {
         u64 table_index = table_index2name_pair.first;
         if (table_table_index2table_name_.contains(table_index)) {
-            UnrecoverableError(fmt::format("Table index: {} is bound before", table_index));
+            String error_message = fmt::format("Table index: {} is bound before", table_index);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         table_table_index2table_name_[table_index] = table_index2name_pair.second;
     }
@@ -219,7 +225,9 @@ void BindContext::AddBindContext(const SharedPtr<BindContext> &other_ptr) {
     for (auto &name_binding_pair : other_ptr->binding_by_name_) {
         auto &binding_name = name_binding_pair.first;
         if (binding_by_name_.contains(binding_name)) {
-            UnrecoverableError(fmt::format("Table: {} was bound before", binding_name));
+            String error_message = fmt::format("Table: {} was bound before", binding_name);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         this->binding_by_name_.emplace(name_binding_pair);
     }
@@ -360,6 +368,66 @@ const Binding *BindContext::GetBindingFromCurrentOrParentByName(const String &bi
         return nullptr;
     }
     return binding_iter->second.get();
+}
+
+void BindContext::BoundSearch(ParsedExpr *expr) {
+    if (expr == nullptr) {
+        return;
+    }
+    auto search_expr = (SearchExpr *)expr;
+
+    if (!search_expr->knn_exprs_.empty() && search_expr->fusion_exprs_.empty()) {
+        SizeT expr_count = search_expr->knn_exprs_.size();
+        KnnExpr *first_knn = search_expr->knn_exprs_[0];
+        KnnDistanceType first_distance_type = first_knn->distance_type_;
+        for (SizeT idx = 1; idx < expr_count; ++idx) {
+            if (search_expr->knn_exprs_[idx]->distance_type_ != first_distance_type) {
+                // Mixed distance type
+                return;
+            }
+        }
+        switch (first_distance_type) {
+            case KnnDistanceType::kL2:
+            case KnnDistanceType::kHamming: {
+                allow_distance = true;
+                break;
+            }
+            case KnnDistanceType::kInnerProduct:
+            case KnnDistanceType::kCosine: {
+                allow_similarity = true;
+                break;
+            }
+            default: {
+                String error_message = "Invalid KNN metric type";
+                LOG_ERROR(error_message);
+                UnrecoverableError(error_message);
+            }
+        }
+    }
+    if (!search_expr->match_sparse_exprs_.empty() && search_expr->fusion_exprs_.empty()) {
+        SizeT expr_count = search_expr->match_sparse_exprs_.size();
+        MatchSparseExpr *first_sparse = search_expr->match_sparse_exprs_[0];
+        SparseMetricType first_metric_type = first_sparse->metric_type_;
+        for (SizeT idx = 1; idx < expr_count; ++idx) {
+            if (search_expr->match_sparse_exprs_[idx]->metric_type_ != first_metric_type) {
+                // Mixed distance type
+                return;
+            }
+        }
+        switch (first_metric_type) {
+            case SparseMetricType::kInnerProduct: {
+                allow_similarity = true;
+                break;
+            }
+            default: {
+                String error_message = "Invalid sparse metric type";
+                LOG_ERROR(error_message);
+                UnrecoverableError(error_message);
+            }
+        }
+    }
+
+    allow_score = !search_expr->match_exprs_.empty() || !search_expr->match_tensor_exprs_.empty() || !(search_expr->fusion_exprs_.empty());
 }
 
 // void

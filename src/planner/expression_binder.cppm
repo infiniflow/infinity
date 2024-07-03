@@ -31,6 +31,7 @@ import case_expr;
 import in_expr;
 import knn_expr;
 import match_tensor_expr;
+import match_sparse_expr;
 import search_expr;
 import subquery_expr;
 import cast_expr;
@@ -75,6 +76,8 @@ public:
     virtual SharedPtr<BaseExpression> BuildKnnExpr(const KnnExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
     virtual SharedPtr<BaseExpression> BuildMatchTensorExpr(const MatchTensorExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
+
+    virtual SharedPtr<BaseExpression> BuildMatchSparseExpr(const MatchSparseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 
     virtual SharedPtr<BaseExpression> BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool root);
 

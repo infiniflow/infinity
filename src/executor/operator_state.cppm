@@ -24,6 +24,7 @@ import data_block;
 import table_scan_function_data;
 import knn_scan_data;
 import match_tensor_scan_function_data;
+import match_sparse_scan_function_data;
 import compact_state_data;
 import table_def;
 
@@ -53,7 +54,7 @@ export struct OperatorState {
     // Output status
     PhysicalOperatorType operator_type_{PhysicalOperatorType::kInvalid};
     Vector<UniquePtr<DataBlock>> data_block_array_{};
-//    UniquePtr<String> error_message_{};
+    //    UniquePtr<String> error_message_{};
     Status status_{};
     bool empty_source_{false};
 
@@ -119,6 +120,22 @@ export struct MergeMatchTensorOperatorState : public OperatorState {
     u32 middle_result_count_{};
     Vector<UniquePtr<DataBlock>> input_data_blocks_;
     bool input_complete_{false};
+};
+
+// MatchSparseScan
+export struct MatchSparseScanOperatorState : public OperatorState {
+    inline explicit MatchSparseScanOperatorState() : OperatorState(PhysicalOperatorType::kMatchSparseScan) {}
+
+    MatchSparseScanFunctionData match_sparse_scan_function_data_{};
+};
+
+// MergeMatchSparse
+export struct MergeMatchSparseOperatorState : public OperatorState {
+    inline explicit MergeMatchSparseOperatorState() : OperatorState(PhysicalOperatorType::kMergeMatchSparse) {}
+
+    UniquePtr<DataBlock> input_data_block_{nullptr};
+    bool input_complete_{false};
+    MergeSparseFunctionData merge_sparse_function_data_{};
 };
 
 // KnnScan
@@ -267,6 +284,7 @@ export struct ImportOperatorState : public OperatorState {
 // Export
 export struct ExportOperatorState : public OperatorState {
     inline explicit ExportOperatorState() : OperatorState(PhysicalOperatorType::kExport) {}
+    UniquePtr<String> result_msg_{};
 };
 
 // Alter
@@ -382,11 +400,11 @@ export struct FusionOperatorState : public OperatorState {
 
 // Compact
 export struct CompactOperatorState : public OperatorState {
-    inline explicit CompactOperatorState(SizeT compact_idx, SharedPtr<CompactStateData> compact_state_data)
-        : OperatorState(PhysicalOperatorType::kCompact), compact_idx_(compact_idx), compact_state_data_(compact_state_data) {}
+    inline explicit CompactOperatorState(Vector<Vector<SegmentEntry *>> segment_groups, SharedPtr<CompactStateData> compact_state_data)
+        : OperatorState(PhysicalOperatorType::kCompact), segment_groups_(std::move(segment_groups)), compact_state_data_(compact_state_data) {}
 
     SizeT compact_idx_{};
-
+    Vector<Vector<SegmentEntry *>> segment_groups_;
     SharedPtr<CompactStateData> compact_state_data_{};
 };
 
@@ -428,6 +446,7 @@ export enum class SourceStateType {
     kIndexScan,
     kKnnScan,
     kMatchTensorScan,
+    kMatchSparseScan,
     kCompact,
     kEmpty,
 };
@@ -444,7 +463,7 @@ export struct SourceState {
     bool complete_{false};
     OperatorState *next_op_state_{};
     SourceStateType state_type_{SourceStateType::kInvalid};
-//    UniquePtr<String> error_message_{};
+    //    UniquePtr<String> error_message_{};
     Status status_{};
 };
 
@@ -472,7 +491,7 @@ export struct AggregateSourceState : public SourceState {
     i64 hash_start_{};
     i64 hash_end_{};
 
-//    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
+    //    BlockingQueue<UniquePtr<FragmentDataBase>> source_queue_{};
 };
 
 export struct TableScanSourceState : public SourceState {
@@ -483,10 +502,15 @@ export struct TableScanSourceState : public SourceState {
 };
 
 export struct MatchTensorScanSourceState : public SourceState {
-    explicit MatchTensorScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids)
-        : SourceState(SourceStateType::kMatchTensorScan), global_ids_(std::move(global_ids)) {}
+    explicit MatchTensorScanSourceState() : SourceState(SourceStateType::kMatchTensorScan) {}
+};
+
+export struct MatchSparseScanSourceState : public SourceState {
+    explicit MatchSparseScanSourceState(SharedPtr<Vector<GlobalBlockID>> global_ids, SharedPtr<Vector<SegmentID>> segment_ids)
+        : SourceState(SourceStateType::kMatchSparseScan), global_ids_(std::move(global_ids)), segment_ids_(std::move(segment_ids)) {}
 
     SharedPtr<Vector<GlobalBlockID>> global_ids_;
+    SharedPtr<Vector<SegmentID>> segment_ids_;
 };
 
 export struct IndexScanSourceState : public SourceState {
@@ -498,6 +522,13 @@ export struct IndexScanSourceState : public SourceState {
 
 export struct KnnScanSourceState : public SourceState {
     explicit KnnScanSourceState() : SourceState(SourceStateType::kKnnScan) {}
+};
+
+export struct CompactSourceState : public SourceState {
+    explicit CompactSourceState(Vector<Vector<SegmentEntry *>> segment_groups)
+        : SourceState(SourceStateType::kCompact), segment_groups_(std::move(segment_groups)) {}
+
+    Vector<Vector<SegmentEntry *>> segment_groups_;
 };
 
 export struct EmptySourceState : public SourceState {
@@ -531,7 +562,7 @@ export struct SinkState {
     u64 task_id_{};
     OperatorState *prev_op_state_{};
     SinkStateType state_type_{SinkStateType::kInvalid};
-//    UniquePtr<String> error_message_{};
+    //    UniquePtr<String> error_message_{};
     Status status_{};
 };
 

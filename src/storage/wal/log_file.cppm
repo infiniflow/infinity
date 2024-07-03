@@ -46,7 +46,7 @@ public:
     static Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> ParseValidCheckpointFilenames(const String &catalog_dir,
                                                                                                            TxnTimeStamp max_checkpoint_ts);
 
-    static String FullCheckpoingFilename(TxnTimeStamp max_commit_ts);
+    static String FullCheckpointFilename(TxnTimeStamp max_commit_ts);
 
     static String TempFullCheckpointFilename(TxnTimeStamp max_commit_ts);
 

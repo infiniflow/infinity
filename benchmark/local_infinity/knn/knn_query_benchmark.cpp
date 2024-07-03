@@ -20,6 +20,7 @@
 #include <memory>
 #include <thread>
 #include <unordered_set>
+#include "hnsw_benchmark_util.h"
 
 import compilation_config;
 
@@ -39,28 +40,6 @@ import statement_common;
 import internal_types;
 
 using namespace infinity;
-
-template <typename T>
-std::unique_ptr<T[]> load_data(const std::string &filename, size_t &num, int &dim) {
-    std::ifstream in(filename, std::ios::binary);
-    if (!in.is_open()) {
-        std::cout << "open file error" << std::endl;
-        exit(-1);
-    }
-    in.read((char *)&dim, 4);
-    in.seekg(0, std::ios::end);
-    auto ss = in.tellg();
-    num = ((size_t)ss) / (dim + 1) / 4;
-    auto data = std::make_unique_for_overwrite<T[]>(num * dim);
-
-    in.seekg(0, std::ios::beg);
-    for (size_t i = 0; i < num; i++) {
-        in.seekg(4, std::ios::cur);
-        in.read((char *)(data.get() + i * dim), dim * 4);
-    }
-    in.close();
-    return data;
-}
 
 template <typename Function>
 inline void LoopFor(size_t id_begin, size_t id_end, size_t thread_id, Function fn, const std::string &db_name, const std::string &table_name) {
@@ -107,6 +86,10 @@ int main(int argc, char *argv[]) {
     }
     sift = strcmp(argv[1], "sift") == 0;
     size_t ef = std::stoull(argv[2]);
+    bool rerank = false;
+    if (argc >= 4) {
+        rerank = std::string(argv[3]) == "true";
+    }
 
     size_t thread_num = 1;
     size_t total_times = 1;
@@ -116,8 +99,8 @@ int main(int argc, char *argv[]) {
     std::cin >> total_times;
 
     std::string path = "/var/infinity";
-    if (argc >= 5) {
-        path = std::string(argv[4]);
+    if (argc >= 6) {
+        path = std::string(argv[5]);
     }
     LocalFileSystem fs;
 
@@ -129,8 +112,8 @@ int main(int argc, char *argv[]) {
     std::vector<std::string> results;
 
     std::string base_path = std::string(test_data_path());
-    if (argc >= 4) {
-        base_path = std::string(argv[3]);
+    if (argc >= 5) {
+        base_path = std::string(argv[4]);
     }
     std::string query_path = base_path;
     std::string groundtruth_path = base_path;
@@ -165,7 +148,7 @@ int main(int argc, char *argv[]) {
     size_t query_count;
     {
         int dim = -1;
-        queries_ptr = load_data<float>(query_path, query_count, dim);
+        std::tie(query_count, dim, queries_ptr) = benchmark::DecodeFvecsDataset<float>(query_path);
         assert((int)dimension == dim || !"query vector dim isn't 128");
     }
     auto queries = queries_ptr.get();
@@ -175,7 +158,7 @@ int main(int argc, char *argv[]) {
         size_t gt_count;
         int gt_top_k;
         {
-            gt = load_data<int>(groundtruth_path, gt_count, gt_top_k);
+            std::tie(gt_count, gt_top_k, gt) = benchmark::DecodeFvecsDataset<int>(groundtruth_path);
             assert(gt_top_k == topk || !"gt_top_k != topk");
             assert(gt_count == query_count || !"gt_count != query_count");
         }
@@ -209,7 +192,12 @@ int main(int argc, char *argv[]) {
             knn_expr->distance_type_ = KnnDistanceType::kL2;
             knn_expr->topn_ = topk;
             knn_expr->opt_params_ = new std::vector<InitParameter *>();
-            knn_expr->opt_params_->push_back(new InitParameter("ef", std::to_string(ef)));
+            {
+                knn_expr->opt_params_->push_back(new InitParameter("ef", std::to_string(ef)));
+                if (rerank) {
+                    knn_expr->opt_params_->push_back(new InitParameter("rerank"));
+                }
+            }
             knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
             auto embedding_data_ptr = new float[dimension];
             knn_expr->embedding_data_ptr_ = embedding_data_ptr;

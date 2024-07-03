@@ -17,8 +17,8 @@ namespace infinity {
 
 export class BlockMaxPhraseDocIterator final : public EarlyTerminateIterator {
 public:
-    BlockMaxPhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight)
-        : pos_iters_(std::move(iters)), weight_(weight) {
+    BlockMaxPhraseDocIterator(Vector<UniquePtr<PostingIterator>> &&iters, float weight, u32 slop = 0)
+        : pos_iters_(std::move(iters)), weight_(weight), slop_(slop) {
         auto iter_size = pos_iters_.size();
         term_column_length_reader_.resize(iter_size, nullptr);
         term_block_max_bm25_score_cache_.resize(iter_size, 0.0f);
@@ -42,7 +42,9 @@ public:
         }
     }
 
-    void UpdateScoreThreshold(float threshold) override {} // do nothing
+    bool NextShallow(RowID doc_id) override;
+
+    bool Next(RowID doc_id) override;
 
     bool BlockSkipTo(RowID doc_id, float threshold) override;
 
@@ -68,15 +70,27 @@ public:
 
     float BM25Score() override;
 
-    bool CheckBeginPosition(pos_t position);
-
-    bool GetPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id);
+    bool GetPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id) {
+        if (doc_id != doc_id_) {
+            return false;
+        }
+        match_data.doc_id_ = doc_id;
+        match_data.tf_ = 0.0F;
+        match_data.begin_positions_.clear();
+        if (slop_ == 0) {
+            return GetExactPhraseMatchData(match_data, doc_id);
+        } else {
+            return GetSloppyPhraseMatchData(match_data, doc_id);
+        }
+    }
 
     // debug info
     const Vector<String> *terms_ptr_ = nullptr;
     const String *column_name_ptr_ = nullptr;
 
 private:
+    bool GetExactPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id);
+    bool GetSloppyPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id);
     float TermBlockMaxBM25Score(u32 term_id);
 
     Pair<u32, u16> TermGetBlockMaxInfo(u32 term_id) const { return pos_iters_[term_id]->GetBlockMaxInfo(); }
@@ -98,14 +112,14 @@ private:
     void SeekDoc(RowID doc_id, RowID seek_end);
 private:
     float avg_column_len_ = 0;
-    Vector<UniquePtr<BlockMaxTermDocIterator>> term_doc_iters_{};
     Vector<UniquePtr<PostingIterator>> pos_iters_{};
-    u64 phrase_freq_{0};
-    u64 current_phrase_freq_{0};
+    float phrase_freq_{0};
+    float current_phrase_freq_{0};
     Set<RowID> all_doc_ids_{};
     FullTextColumnLengthReader* column_length_reader_{nullptr};
     u32 estimate_doc_freq_{0};
     float weight_ = 1.0f;
+    u32 slop_ = 0;
     float bm25_common_score_ = 0.0f;
     float block_max_bm25_score_cache_ = 0.0f;
     RowID block_max_bm25_score_cache_end_id_{INVALID_ROWID};

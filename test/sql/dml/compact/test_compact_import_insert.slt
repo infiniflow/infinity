@@ -23,16 +23,16 @@ INSERT INTO test_compact_import_delete VALUES (13, [14,15,16]), (17, [18,19,20])
 query II rowsort
 SELECT * FROM test_compact_import_delete;
 ----
-1 2,3,4
-1 2,3,4
-13 14,15,16
-13 14,15,16
-17 18,19,20
-17 18,19,20
-5 6,7,8
-5 6,7,8
-9 10,11,12
-9 10,11,12
+1 [2,3,4]
+1 [2,3,4]
+13 [14,15,16]
+13 [14,15,16]
+17 [18,19,20]
+17 [18,19,20]
+5 [6,7,8]
+5 [6,7,8]
+9 [10,11,12]
+9 [10,11,12]
 
 query I
 COMPACT TABLE test_compact_import_delete;
@@ -41,16 +41,16 @@ COMPACT TABLE test_compact_import_delete;
 query II rowsort
 SELECT * FROM test_compact_import_delete;
 ----
-1 2,3,4
-1 2,3,4
-13 14,15,16
-13 14,15,16
-17 18,19,20
-17 18,19,20
-5 6,7,8
-5 6,7,8
-9 10,11,12
-9 10,11,12
+1 [2,3,4]
+1 [2,3,4]
+13 [14,15,16]
+13 [14,15,16]
+17 [18,19,20]
+17 [18,19,20]
+5 [6,7,8]
+5 [6,7,8]
+9 [10,11,12]
+9 [10,11,12]
 
 statement ok
 DROP TABLE test_compact_import_delete;

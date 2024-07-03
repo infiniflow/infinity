@@ -3,7 +3,7 @@ statement ok
 DROP TABLE IF EXISTS tensor_maxsim;
 
 statement ok
-CREATE TABLE tensor_maxsim (title VARCHAR, num INT, t TENSOR(FLOAT, 4));
+CREATE TABLE tensor_maxsim (title VARCHAR, num INT, t TENSOR(FLOAT, 4), body VARCHAR);
 
 statement ok
 COPY tensor_maxsim FROM '/var/infinity/test_data/tensor_maxsim.csv' WITH ( DELIMITER ',' );
@@ -11,14 +11,14 @@ COPY tensor_maxsim FROM '/var/infinity/test_data/tensor_maxsim.csv' WITH ( DELIM
 query I
 SELECT * FROM tensor_maxsim;
 ----
-test00 2 [0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]
-test11 4 [0.2,0.1,0.3,0.4]
-test22 6 [0.3,0.2,-11.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3]
-test33 8 [0.4,0.3,0.2,0.1]
-test44 12 [0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]
-test55 14 [0.2,0.1,0.3,0.4],[-0.4,0.3,0.2,0.1],[0,0.2,-0.3,-0.2],[0.3,-0.2,0.2,0.3]
-test66 16 [0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3],[0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3]
-test77 18 [0.4,-0.3,0.2,0.1],[-0.4,0.3,0.2,0.1]
+test00 2 [0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3] this
+test11 4 [0.2,0.1,0.3,0.4] tree
+test22 6 [0.3,0.2,-11.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3] tell off
+test33 8 [0.4,0.3,0.2,0.1] that
+test44 12 [0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3] time off
+test55 14 [0.2,0.1,0.3,0.4],[-0.4,0.3,0.2,0.1],[0,0.2,-0.3,-0.2],[0.3,-0.2,0.2,0.3] where
+test66 16 [0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3],[0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3] on
+test77 18 [0.4,-0.3,0.2,0.1],[-0.4,0.3,0.2,0.1] off
 
 query I
 EXPLAIN SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim') WHERE 10 > num;
@@ -48,9 +48,29 @@ test44 -5.190000
 test00 -5.190000
 test11 -9.660001
 
+# default top 10
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim');
+----
+test22 636.870056
+test55 27.369999
+test66 11.910000
+test33 3.620001
+test77 2.260000
+test44 -5.190000
+test00 -5.190000
+test11 -9.660001
+
 # option top 2
 query I
 SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', 'topn=2');
+----
+test22 636.870056
+test55 27.369999
+
+# option top 2
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', 'topn=2');
 ----
 test22 636.870056
 test55 27.369999
@@ -63,6 +83,33 @@ test22 636.870056
 test33 3.620001
 test00 -5.190000
 test11 -9.660001
+
+# filter
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim') WHERE 10 > num;
+----
+test22 636.870056
+test33 3.620001
+test00 -5.190000
+test11 -9.660001
+
+# filter
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'double', 'maxsim') WHERE 10 > num;
+----
+test22 636.870056
+test33 3.620001
+test00 -5.190000
+test11 -9.660001
+
+# filter
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0, -10, 0, 1], [9, 46, -56, 4]], 'int8', 'maxsim') WHERE 10 > num;
+----
+test22 639.399963
+test33 3.700001
+test00 -5.200001
+test11 -9.400001
 
 # two blocks
 statement ok
@@ -104,9 +151,32 @@ test33 3.620001
 test77 2.260000
 test77 2.260000
 
+# default top 10
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim');
+----
+test22 636.870056
+test22 636.870056
+test55 27.369999
+test55 27.369999
+test66 11.910000
+test66 11.910000
+test33 3.620001
+test33 3.620001
+test77 2.260000
+test77 2.260000
+
 # filter, top 3
 query I
 SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim', 'topn=3') WHERE 10 > num;
+----
+test22 636.870056
+test22 636.870056
+test33 3.620001
+
+# filter, top 3
+query I
+SELECT title, SCORE() FROM tensor_maxsim SEARCH MATCH TENSOR (t, [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', 'topn=3') WHERE 10 > num;
 ----
 test22 636.870056
 test22 636.870056

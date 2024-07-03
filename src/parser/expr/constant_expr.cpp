@@ -13,10 +13,12 @@
 // limitations under the License.
 
 #include "constant_expr.h"
+#include "definition/column_def.h"
 #include "expr/parsed_expr.h"
 #include "parser_assert.h"
 #include "spdlog/fmt/fmt.h"
 #include "type/datetime/interval_type.h"
+#include "type/info/sparse_info.h"
 #include "type/serialize.h"
 #include <cstdint>
 #include <cstring>
@@ -110,8 +112,30 @@ std::string ConstantExpr::ToString() const {
             ss << double_array_.back();
             return ss.str();
         }
+        case LiteralType::kSubArrayArray: {
+            std::stringstream ss;
+            size_t len = sub_array_array_.size();
+            if (len <= 0) {
+                ParserError("Invalid array array length");
+            }
+            for (size_t i = 0; i < len - 1; ++i) {
+                ss << '[' << sub_array_array_[i]->ToString() << "],";
+            }
+            ss << '[' << sub_array_array_.back()->ToString() << ']';
+            return ss.str();
+        }
+        case LiteralType::kLongSparseArray: {
+            size_t nnz = long_sparse_array_.first.size();
+            return SparseT::Sparse2StringT2(long_sparse_array_.first.data(), long_sparse_array_.first.data(), nnz);
+        }
+        case LiteralType::kDoubleSparseArray: {
+            size_t nnz = double_sparse_array_.first.size();
+            return SparseT::Sparse2StringT2(double_sparse_array_.first.data(), double_sparse_array_.second.data(), nnz);
+        }
+        case LiteralType::kEmptyArray: {
+            return {};
+        }
     }
-    ParserError("Unexpected branch");
 }
 
 int32_t ConstantExpr::GetSizeInBytes() const {
@@ -133,6 +157,7 @@ int32_t ConstantExpr::GetSizeInBytes() const {
             size += sizeof(int64_t);
             break;
         }
+        case LiteralType::kEmptyArray:
         case LiteralType::kNull: {
             break;
         }
@@ -151,6 +176,23 @@ int32_t ConstantExpr::GetSizeInBytes() const {
         case LiteralType::kDoubleArray: {
             size += sizeof(int64_t);
             size += sizeof(double) * double_array_.size();
+            break;
+        }
+        case LiteralType::kSubArrayArray: {
+            size += sizeof(int64_t);
+            for (const auto &val : sub_array_array_) {
+                size += val->GetSizeInBytes();
+            }
+            break;
+        }
+        case LiteralType::kLongSparseArray: {
+            size += sizeof(int64_t) + sizeof(int64_t) * long_sparse_array_.first.size();
+            size += sizeof(int64_t) + sizeof(int64_t) * long_sparse_array_.second.size();
+            break;
+        }
+        case LiteralType::kDoubleSparseArray: {
+            size += sizeof(int64_t) + sizeof(int64_t) * double_sparse_array_.first.size();
+            size += sizeof(int64_t) + sizeof(double) * double_sparse_array_.second.size();
             break;
         }
         case LiteralType::kInterval: {
@@ -181,6 +223,7 @@ void ConstantExpr::WriteAdv(char *&ptr) const {
             WriteBufAdv<int64_t>(ptr, integer_value_);
             break;
         }
+        case LiteralType::kEmptyArray:
         case LiteralType::kNull: {
             break;
         }
@@ -205,9 +248,38 @@ void ConstantExpr::WriteAdv(char *&ptr) const {
             }
             break;
         }
+        case LiteralType::kSubArrayArray: {
+            WriteBufAdv<int64_t>(ptr, sub_array_array_.size());
+            for (const auto &val : sub_array_array_) {
+                val->WriteAdv(ptr);
+            }
+            break;
+        }
         case LiteralType::kInterval: {
             WriteBufAdv<TimeUnit>(ptr, interval_type_);
             WriteBufAdv<int64_t>(ptr, integer_value_);
+            break;
+        }
+        case LiteralType::kLongSparseArray: {
+            WriteBufAdv<int64_t>(ptr, long_sparse_array_.first.size());
+            for (size_t i = 0; i < long_sparse_array_.first.size(); ++i) {
+                WriteBufAdv<int64_t>(ptr, long_sparse_array_.first[i]);
+            }
+            WriteBufAdv<int64_t>(ptr, long_sparse_array_.second.size());
+            for (size_t i = 0; i < long_sparse_array_.second.size(); ++i) {
+                WriteBufAdv<int64_t>(ptr, long_sparse_array_.second[i]);
+            }
+            break;
+        }
+        case LiteralType::kDoubleSparseArray: {
+            WriteBufAdv<int64_t>(ptr, double_sparse_array_.first.size());
+            for (size_t i = 0; i < double_sparse_array_.first.size(); ++i) {
+                WriteBufAdv<int64_t>(ptr, double_sparse_array_.first[i]);
+            }
+            WriteBufAdv<int64_t>(ptr, double_sparse_array_.second.size());
+            for (size_t i = 0; i < double_sparse_array_.second.size(); ++i) {
+                WriteBufAdv<double>(ptr, double_sparse_array_.second[i]);
+            }
             break;
         }
     }
@@ -238,6 +310,7 @@ std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(char *&ptr, int32_t maxbytes) 
             const_expr->integer_value_ = integer_value;
             break;
         }
+        case LiteralType::kEmptyArray:
         case LiteralType::kNull: {
             break;
         }
@@ -265,11 +338,45 @@ std::shared_ptr<ParsedExpr> ConstantExpr::ReadAdv(char *&ptr, int32_t maxbytes) 
             }
             break;
         }
+        case LiteralType::kSubArrayArray: {
+            size_t len = ReadBufAdv<int64_t>(ptr);
+            for (size_t i = 0; i < len; ++i) {
+                auto sub_arr = std::static_pointer_cast<ConstantExpr>(ReadAdv(ptr, ptr_end - ptr));
+                const_expr->sub_array_array_.push_back(std::move(sub_arr));
+            }
+            break;
+        }
         case LiteralType::kInterval: {
             TimeUnit interval_type = ReadBufAdv<TimeUnit>(ptr);
             int64_t integer_value = ReadBufAdv<int64_t>(ptr);
             const_expr->interval_type_ = interval_type;
             const_expr->integer_value_ = integer_value;
+            break;
+        }
+        case LiteralType::kLongSparseArray: {
+            size_t len = ReadBufAdv<int64_t>(ptr);
+            const_expr->long_sparse_array_.first.resize(len);
+            for (size_t i = 0; i < len; ++i) {
+                const_expr->long_sparse_array_.first[i] = ReadBufAdv<int64_t>(ptr);
+            }
+            len = ReadBufAdv<int64_t>(ptr);
+            const_expr->long_sparse_array_.second.resize(len);
+            for (size_t i = 0; i < len; ++i) {
+                const_expr->long_sparse_array_.second[i] = ReadBufAdv<int64_t>(ptr);
+            }
+            break;
+        }
+        case LiteralType::kDoubleSparseArray: {
+            size_t len = ReadBufAdv<int64_t>(ptr);
+            const_expr->double_sparse_array_.first.resize(len);
+            for (size_t i = 0; i < len; ++i) {
+                const_expr->double_sparse_array_.first[i] = ReadBufAdv<int64_t>(ptr);
+            }
+            len = ReadBufAdv<int64_t>(ptr);
+            const_expr->double_sparse_array_.second.resize(len);
+            for (size_t i = 0; i < len; ++i) {
+                const_expr->double_sparse_array_.second[i] = ReadBufAdv<double>(ptr);
+            }
             break;
         }
     }
@@ -298,6 +405,7 @@ nlohmann::json ConstantExpr::Serialize() const {
             j["value"] = integer_value_;
             break;
         }
+        case LiteralType::kEmptyArray:
         case LiteralType::kNull: {
             break;
         }
@@ -316,8 +424,30 @@ nlohmann::json ConstantExpr::Serialize() const {
             j["value"] = double_array_;
             break;
         }
+        case LiteralType::kSubArrayArray: {
+            nlohmann::json sub_array_j(nlohmann::detail::value_t::array);
+            for (const auto &val : sub_array_array_) {
+                sub_array_j.emplace_back(val->Serialize());
+            }
+            j["value"] = std::move(sub_array_j);
+            break;
+        }
         case LiteralType::kInterval: {
             ParserError("Interval type is not supported in JSON serialization");
+        }
+        case LiteralType::kLongSparseArray: {
+            nlohmann::json sub_array_j;
+            sub_array_j["indices"] = long_sparse_array_.first;
+            sub_array_j["data"] = long_sparse_array_.second;
+            j["value"] = std::move(sub_array_j);
+            break;
+        }
+        case LiteralType::kDoubleSparseArray: {
+            nlohmann::json sub_array_j;
+            sub_array_j["indices"] = double_sparse_array_.first;
+            sub_array_j["data"] = double_sparse_array_.second;
+            j["value"] = std::move(sub_array_j);
+            break;
         }
     }
     return j;
@@ -343,6 +473,7 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(const nlohmann::json &cons
             const_expr->integer_value_ = constant_expr["value"].get<int64_t>();
             break;
         }
+        case LiteralType::kEmptyArray:
         case LiteralType::kNull: {
             break;
         }
@@ -361,11 +492,62 @@ std::shared_ptr<ParsedExpr> ConstantExpr::Deserialize(const nlohmann::json &cons
             const_expr->double_array_ = constant_expr["value"].get<std::vector<double>>();
             break;
         }
+        case LiteralType::kSubArrayArray: {
+            for (const nlohmann::json &array = constant_expr["value"]; const auto &val : array) {
+                auto sub_arr = std::static_pointer_cast<ConstantExpr>(Deserialize(val));
+                const_expr->sub_array_array_.push_back(std::move(sub_arr));
+            }
+            break;
+        }
         case LiteralType::kInterval: {
             ParserError("Interval type is not supported in JSON serialization");
         }
+        case LiteralType::kLongSparseArray: {
+            const_expr->long_sparse_array_.first = constant_expr["value"]["indices"].get<std::vector<int64_t>>();
+            const_expr->long_sparse_array_.second = constant_expr["value"]["data"].get<std::vector<int64_t>>();
+            break;
+        }
+        case LiteralType::kDoubleSparseArray: {
+            const_expr->double_sparse_array_.first = constant_expr["value"]["indices"].get<std::vector<int64_t>>();
+            const_expr->double_sparse_array_.second = constant_expr["value"]["data"].get<std::vector<double>>();
+            break;
+        }
     }
     return std::shared_ptr<ParsedExpr>(const_expr);
+}
+
+void ConstantExpr::TrySortSparseVec(const ColumnDef *col_def) {
+    if (literal_type_ != LiteralType::kLongSparseArray && literal_type_ != LiteralType::kDoubleSparseArray) {
+        return;
+    }
+    if (col_def != nullptr) {
+        auto data_type = col_def->type()->type();
+        if (data_type != LogicalType::kSparse) {
+            return;
+        }
+        const auto *sparse_info = static_cast<const SparseInfo *>(col_def->type()->type_info().get());
+        if (sparse_info->StoreType() == SparseStoreType::kSorted) {
+            return;
+        }
+    }
+    if (literal_type_ == LiteralType::kLongSparseArray) {
+        if (long_sparse_array_.second.empty()) {
+            // bit sparse vec
+            std::sort(long_sparse_array_.first.begin(), long_sparse_array_.first.end());
+        } else {
+            std::vector<std::pair<int64_t, int64_t>> pairs;
+            for (size_t i = 0; i < long_sparse_array_.first.size(); ++i) {
+                pairs.emplace_back(long_sparse_array_.first[i], long_sparse_array_.second[i]);
+            }
+            std::sort(pairs.begin(), pairs.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+        }
+    } else {
+        std::vector<std::pair<int64_t, double>> pairs;
+        for (size_t i = 0; i < double_sparse_array_.first.size(); ++i) {
+            pairs.emplace_back(double_sparse_array_.first[i], double_sparse_array_.second[i]);
+        }
+        std::sort(pairs.begin(), pairs.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+    }
 }
 
 } // namespace infinity

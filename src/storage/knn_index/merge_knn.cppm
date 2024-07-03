@@ -49,6 +49,8 @@ public:
 public:
     void Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id);
 
+    void Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u32 segment_id, u32 segment_offset);
+
     void Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id, Bitmask &bitmask);
 
     void Search(const DataType *dist, const RowID *row_ids, u16 count);
@@ -94,6 +96,16 @@ void MergeKnn<DataType, C>::Search(const DataType *query, const DataType *data, 
             auto dist = dist_f(x_i, y_j, dim);
             result_handler_->AddResult(i, dist, RowID(segment_id, segment_offset_start + j));
         }
+    }
+}
+
+template <typename DataType, template <typename, typename> typename C>
+void MergeKnn<DataType, C>::Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u32 segment_id, u32 segment_offset) {
+    ++this->total_count_;
+    for (u64 i = 0; i < this->query_count_; ++i) {
+        const DataType *x_i = query + i * dim;
+        auto dist = dist_f(x_i, data, dim);
+        result_handler_->AddResult(i, dist, RowID(segment_id, segment_offset));
     }
 }
 

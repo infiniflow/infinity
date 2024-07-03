@@ -29,6 +29,7 @@ import infinity_exception;
 import internal_types;
 import join_reference;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -54,7 +55,9 @@ public:
     SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final;
 
     SizeT TaskletCount() override {
-        UnrecoverableError("Not implement: TaskletCount not Implement");
+        String error_message = "Not implement: TaskletCount not Implement";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return 0;
     }
 

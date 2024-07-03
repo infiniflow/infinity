@@ -21,7 +21,6 @@ export module knn_expr;
 namespace infinity {
 
 export using infinity::KnnExpr;
-export using infinity::EmbeddingDataType;
 export using infinity::KnnDistanceType;
 
 }

@@ -103,7 +103,7 @@ protected:
 
     void CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    static SharedPtr<String> DetermineDir(const String &parent_dir, BlockID block_id);
+    static SharedPtr<String> DetermineDir(const String &base_dir, const String &parent_dir, BlockID block_id);
 
 public:
     // Getter
@@ -146,8 +146,6 @@ public:
 
     bool CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts, bool check_append) const;
 
-    bool CheckDeleteVisible(Vector<BlockOffset> &block_offsets, TxnTimeStamp check_ts) const;
-
     void SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const;
 
     i32 GetAvailableCapacity();
@@ -158,14 +156,18 @@ public:
 
     Vector<UniquePtr<BlockColumnEntry>> &columns() { return columns_; }
 
+    ColumnVector GetCreateTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
+
+    ColumnVector GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
+
 public:
     // Setter
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
 
 private:
-    void FlushData(SizeT start_row_count, SizeT checkpoint_row_count);
+    void FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count);
 
-    bool FlushVersion(TxnTimeStamp checkpoint_ts);
+    bool FlushVersionNoLock(TxnTimeStamp checkpoint_ts);
 
 protected:
     mutable std::shared_mutex rw_locker_{};

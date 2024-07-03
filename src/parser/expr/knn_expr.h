@@ -14,10 +14,11 @@
 
 #pragma once
 
+#include "expr/constant_expr.h"
 #include "parsed_expr.h"
 #include "statement/statement_common.h"
 #include "type/complex/embedding_type.h"
-#include <vector>
+
 namespace infinity {
 
 enum class KnnDistanceType {
@@ -36,6 +37,10 @@ public:
 
     [[nodiscard]] std::string ToString() const override;
 
+    bool InitDistanceType(const char *distance_type);
+
+    bool InitEmbedding(const char *data_type, const ConstantExpr *query_vec);
+
 public:
     static std::string KnnDistanceType2Str(KnnDistanceType knn_distance_type);
 
@@ -47,7 +52,7 @@ public:
     int64_t dimension_{};
     EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
     KnnDistanceType distance_type_{KnnDistanceType::kInvalid};
-    int64_t topn_{};
+    int64_t topn_{DEFAULT_MATCH_VECTOR_TOP_N};
     std::vector<InitParameter *> *opt_params_{};
 };
 

@@ -70,6 +70,10 @@ export using spdlog::sinks::rotating_file_sink_mt;
 namespace details {
 export using spdlog::details::registry;
 }
+
+namespace level {
+export using spdlog::level::level_enum;
+}
 } // namespace spdlog
 
 namespace CLI {
@@ -107,6 +111,7 @@ export using magic_enum::underlying_type_t;
 
 namespace moodycamel {
 export using moodycamel::ConcurrentQueue;
+export using moodycamel::BlockingConcurrentQueue;
 }
 
 namespace infinity {

@@ -72,15 +72,15 @@ jobs:
         sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7
 
     - name: Build release version
-      run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=1 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+      run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${{ env.RELEASE_TAG }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=1 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity"
 
     - name: Download resources
-      run: sudo docker exec infinity_build bash -c "rm -rf resource && git clone https://github.com/infiniflow/resource.git"
+      run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git
 
     - name: Build RPM and DEB
       run: sudo docker exec infinity_build bash -c "cd /infinity/cmake-build-release && cpack"
 
-    - name: Create or overwrite a releae
+    - name: Create or overwrite a release
       # https://github.com/actions/upload-release-asset has been replaced by https://github.com/softprops/action-gh-release
       uses: softprops/action-gh-release@v1
       with:
@@ -115,3 +115,18 @@ jobs:
         push: true
         tags: infiniflow/infinity:${{ env.RELEASE_TAG }}
         file: scripts/Dockerfile_infinity
+
+    - name: Build infinity-sdk
+      if: startsWith(github.ref, 'refs/tags/v')
+      run: |
+        sudo rm -f cmake-build-release/*.deb cmake-build-release/*.rpm cmake-build-release/*.gz
+        sed -i "s/^version = \".*\"/version = \"$(echo $RELEASE_TAG | cut -c2-)\"/" pyproject.toml
+        sudo docker exec infinity_build bash -c "cd /infinity/ && rm -rf dist wheelhouse && /usr/local/bin/pip3.10 wheel . -v -w dist --config-settings=wheel.py-api=cp310 --config-settings=build-dir='cmake-build-release' && /usr/local/bin/pip3.11 wheel . -v -w dist --config-settings=wheel.py-api=cp311 --config-settings=build-dir='cmake-build-release' && /usr/local/bin/pip3.12 wheel . -v -w dist --config-settings=wheel.py-api=cp312 --config-settings=build-dir='cmake-build-release' && mkdir wheelhouse && cp dist/infinity*.whl wheelhouse && wheel tags --remove --platform-tag manylinux_2_17_x86_64 wheelhouse/infinity*linux_x86_64.whl"
+
+    - name: Publish package distributions to PyPI
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: wheelhouse/
+        password: ${{ secrets.PYPI_API_TOKEN }}
+        verbose: true

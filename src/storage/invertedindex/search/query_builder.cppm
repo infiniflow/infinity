@@ -35,10 +35,14 @@ export struct FullTextQueryContext {
 };
 
 class EarlyTerminateIterator;
+enum class EarlyTermAlgo;
 
 export class QueryBuilder {
 public:
-    QueryBuilder(Txn *txn, SharedPtr<BaseTableRef> &base_table_ref);
+    explicit QueryBuilder(BaseTableRef* base_table_ref)
+    : base_table_ref_(base_table_ref), table_entry_(base_table_ref->table_entry_ptr_) {};
+
+    void Init(IndexReader index_reader);
 
     ~QueryBuilder();
 
@@ -46,11 +50,12 @@ public:
 
     UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
 
-    UniquePtr<EarlyTerminateIterator> CreateEarlyTerminateSearch(FullTextQueryContext &context);
+    UniquePtr<EarlyTerminateIterator> CreateEarlyTerminateSearch(FullTextQueryContext &context, EarlyTermAlgo early_term_algo);
 
     inline float Score(RowID doc_id) { return scorer_.Score(doc_id); }
 
 private:
+    BaseTableRef* base_table_ref_{nullptr};
     TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
     Scorer scorer_;

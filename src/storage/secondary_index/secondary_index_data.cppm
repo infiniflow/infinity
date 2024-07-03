@@ -29,6 +29,7 @@ import internal_types;
 import data_type;
 import segment_entry;
 import buffer_handle;
+import logger;
 
 namespace infinity {
 class ChunkIndexEntry;
@@ -41,6 +42,9 @@ concept ConvertToOrderedI32 = IsAnyOf<T, DateT, TimeT>;
 
 template <typename T>
 concept ConvertToOrderedI64 = IsAnyOf<T, DateTimeT, TimestampT>;
+
+template <typename T>
+concept ConvertToHashU64 = IsAnyOf<T, VarcharT, String>;
 
 template <typename ValueT>
 struct ConvertToOrdered {
@@ -62,8 +66,13 @@ struct ConvertToOrdered<T> {
     using type = i64;
 };
 
+template <ConvertToHashU64 T>
+struct ConvertToOrdered<T> {
+    using type = u64;
+};
+
 export template <typename T>
-    requires KeepOrderedSelf<T> or ConvertToOrderedI32<T> or ConvertToOrderedI64<T>
+    requires KeepOrderedSelf<T> or ConvertToOrderedI32<T> or ConvertToOrderedI64<T> or ConvertToHashU64<T>
 using ConvertToOrderedType = ConvertToOrdered<T>::type;
 
 export template <typename RawValueType>
@@ -88,6 +97,12 @@ ConvertToOrderedType<RawValueType> ConvertToOrderedKeyValue(RawValueType value) 
     return value.GetEpochTime();
 }
 
+// for VarcharT
+export template <>
+ConvertToOrderedType<String> ConvertToOrderedKeyValue(String value) {
+    return std::hash<String>{}(value);
+}
+
 template <typename T>
 LogicalType GetLogicalType = LogicalType::kInvalid;
 
@@ -109,6 +124,9 @@ LogicalType GetLogicalType<IntegerT> = LogicalType::kInteger;
 template <>
 LogicalType GetLogicalType<BigIntT> = LogicalType::kBigInt;
 
+template <>
+LogicalType GetLogicalType<VarcharT> = LogicalType::kVarchar;
+
 export class SecondaryIndexData {
 protected:
     u32 chunk_row_count_ = 0;
@@ -123,7 +141,9 @@ public:
 
     [[nodiscard]] inline auto SearchPGM(const void *val_ptr) const {
         if (!pgm_index_) {
-            UnrecoverableError("Not initialized yet.");
+            String error_message = "Not initialized yet.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         return pgm_index_->SearchIndex(val_ptr);
     }

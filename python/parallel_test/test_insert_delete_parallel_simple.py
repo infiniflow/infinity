@@ -29,9 +29,7 @@ class TestInsertDeleteParallelSimple:
         count_num = [0]
         threads = []
         for i in range(kNumThread):
-            threads.append(
-                Thread(target=worker_thread, args=[connection_pool, count_num, i])
-            )
+            threads.append(Thread(target=worker_thread, args=[connection_pool, count_num, i]))
         for i in range(len(threads)):
             threads[i].start()
         for i in range(len(threads)):
@@ -43,6 +41,8 @@ class TestInsertDeleteParallelSimple:
         res = table_obj.output(["*"]).to_df()
         print(res)
         assert len(res) == 0
+        res = db_obj.drop_table("insert_delete_test", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
 
 def worker_thread(connection_pool: ConnectionPool, count_num, thread_id):

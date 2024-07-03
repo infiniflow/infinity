@@ -30,8 +30,28 @@ import infinity_context;
 import internal_types;
 import logical_type;
 import data_type;
+import compilation_config;
 
-class ColumnVectorVarcharTest : public BaseTest {};
+class ColumnVectorVarcharTest : public BaseTest {
+    void SetUp() override {
+        RemoveDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        auto config_path = std::make_shared<std::string>(std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml");
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        BaseTest::TearDown();
+    }
+};
 
 TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     using namespace infinity;
@@ -115,7 +135,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hello" + std::to_string(i);
-        column_vector.AppendByStringView(s, '\0');
+        column_vector.AppendByStringView(s);
         Value vx = column_vector.GetValue(i);
         const String &s2 = vx.GetVarchar();
         EXPECT_STREQ(s.c_str(), s2.c_str());
@@ -377,7 +397,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
 
     for (i64 i = 0; i < DEFAULT_VECTOR_SIZE; ++i) {
         String s = "hellohellohello" + std::to_string(i);
-        column_vector.AppendByStringView(s, '\0');
+        column_vector.AppendByStringView(s);
 
         Value vx = column_vector.GetValue(i);
         const String &s2 = vx.GetVarchar();

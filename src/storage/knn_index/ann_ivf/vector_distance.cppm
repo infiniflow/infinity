@@ -16,6 +16,7 @@ module;
 #include <type_traits>
 import stl;
 import some_simd_functions;
+import hnsw_simd_func;
 
 export module vector_distance;
 
@@ -31,6 +32,23 @@ DiffType L2Distance(const ElemType1 *vector1, const ElemType2 *vector2, const Di
             distance += diff * diff;
         }
         return distance;
+    }
+}
+
+export template <typename DiffType, typename ElemType1, typename ElemType2, typename DimType = u32>
+DiffType CosineDistance(const ElemType1 *vector1, const ElemType2 *vector2, const DimType dimension) {
+    if constexpr (std::is_same_v<ElemType1, f32> && std::is_same_v<ElemType2, f32>) {
+        return F32CosAVX(vector1, vector2, dimension);
+    } else {
+        DiffType dot_product{};
+        DiffType norm1{};
+        DiffType norm2{};
+        for (u32 i = 0; i < dimension; ++i) {
+            dot_product += ((DiffType)vector1[i]) * ((DiffType)vector2[i]);
+            norm1 += ((DiffType)vector1[i]) * ((DiffType)vector1[i]);
+            norm2 += ((DiffType)vector2[i]) * ((DiffType)vector2[i]);
+        }
+        return dot_product != 0 ? dot_product / sqrt(norm1 * norm2) : 0;
     }
 }
 

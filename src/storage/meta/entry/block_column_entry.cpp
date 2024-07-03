@@ -42,7 +42,9 @@ namespace infinity {
 Vector<std::string_view> BlockColumnEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
-        UnrecoverableError(fmt::format("Invalid block column entry encode: {}", encode));
+        String error_message = fmt::format("Invalid block column entry encode: {}", encode);
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
     }
     auto decodes = BlockEntry::DecodeIndex(encode.substr(0, delimiter_i));
     decodes.push_back(encode.substr(delimiter_i + 1));
@@ -54,11 +56,12 @@ String BlockColumnEntry::EncodeIndex(const ColumnID column_id, const BlockEntry 
 }
 
 BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, const SharedPtr<String> &base_dir_ref)
-    : BaseEntry(EntryType::kBlockColumn, false, BlockColumnEntry::EncodeIndex(column_id, block_entry)), block_entry_(block_entry),
-      column_id_(column_id), base_dir_(base_dir_ref) {}
+    : BaseEntry(EntryType::kBlockColumn, false, block_entry->base_dir_, BlockColumnEntry::EncodeIndex(column_id, block_entry)),
+      block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
 
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
-    UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
+    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->base_dir()));
+    UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, full_path);
 
     auto begin_ts = txn->BeginTS();
     block_column_entry->begin_ts_ = begin_ts;
@@ -73,6 +76,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
         // TODO
         total_data_size = (row_capacity + 7) / 8;
     }
+
     auto file_worker = MakeUnique<DataFileWorker>(block_column_entry->base_dir_, block_column_entry->file_name_, total_data_size);
 
     auto *buffer_mgr = txn->buffer_mgr();
@@ -84,10 +88,13 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const BlockEntry *block_entry,
                                                                         ColumnID column_id,
                                                                         BufferManager *buffer_manager,
-                                                                        i32 next_outline_idx,
-                                                                        u64 last_chunk_offset,
-                                                                        TxnTimeStamp commit_ts) {
-    UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, block_entry->base_dir());
+                                                                        const u32 next_outline_idx_0,
+                                                                        const u32 next_outline_idx_1,
+                                                                        const u64 last_chunk_offset_0,
+                                                                        const u64 last_chunk_offset_1,
+                                                                        const TxnTimeStamp commit_ts) {
+    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->base_dir()));
+    UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, full_path);
     column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
     column_entry->column_type_ = block_entry->GetColumnType(column_id);
     column_entry->commit_ts_ = commit_ts;
@@ -99,7 +106,8 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
 
     column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker));
 
-    for (i32 outline_idx = 0; outline_idx < next_outline_idx; ++outline_idx) {
+    column_entry->outline_buffers_group_0_.reserve(next_outline_idx_0);
+    for (u32 outline_idx = 0; outline_idx < next_outline_idx_0; ++outline_idx) {
         // FIXME: not use default value
         SizeT buffer_size = 0;
         if (column_type->type() == LogicalType::kTensor) {
@@ -107,11 +115,29 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
         } else {
             buffer_size = DEFAULT_FIXLEN_CHUNK_SIZE;
         }
-        auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(outline_idx), buffer_size);
-        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(file_worker));
-        column_entry->outline_buffers_.emplace_back(buffer_obj);
+        auto outline_buffer_file_worker =
+            MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(0, outline_idx), buffer_size);
+        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker));
+        column_entry->outline_buffers_group_0_.push_back(buffer_obj);
     }
-    column_entry->last_chunk_offset_ = last_chunk_offset;
+    column_entry->outline_buffers_group_1_.reserve(next_outline_idx_1);
+    for (u32 outline_idx = 0; outline_idx < next_outline_idx_1; ++outline_idx) {
+        // FIXME: not use default value
+        SizeT buffer_size = 0;
+        if (column_type->type() == LogicalType::kTensorArray) {
+            buffer_size = DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE;
+        } else {
+            String error_message = "unexpected data type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+        auto outline_buffer_file_worker =
+            MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(1, outline_idx), buffer_size);
+        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker));
+        column_entry->outline_buffers_group_1_.push_back(buffer_obj);
+    }
+    column_entry->last_chunk_offset_0_ = last_chunk_offset_0;
+    column_entry->last_chunk_offset_1_ = last_chunk_offset_1;
 
     return column_entry;
 }
@@ -128,9 +154,90 @@ ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
     return column_vector;
 }
 
+SharedPtr<String> BlockColumnEntry::OutlineFilename(const u32 buffer_group_id, const SizeT file_idx) const {
+    if (buffer_group_id == 0) {
+        return MakeShared<String>(fmt::format("col_{}_out_{}", column_id_, file_idx));
+    } else if (buffer_group_id == 1) {
+        return MakeShared<String>(fmt::format("col_{}_out1_{}", column_id_, file_idx));
+    } else {
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+        return nullptr;
+    }
+}
+
+void BlockColumnEntry::AppendOutlineBuffer(const u32 buffer_group_id, BufferObj *buffer) {
+    std::unique_lock lock(mutex_);
+    if (buffer_group_id == 0) {
+        outline_buffers_group_0_.push_back(buffer);
+    } else if (buffer_group_id == 1) {
+        outline_buffers_group_1_.push_back(buffer);
+    } else {
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+}
+
+BufferObj *BlockColumnEntry::GetOutlineBuffer(const u32 buffer_group_id, const SizeT idx) const {
+    std::shared_lock lock(mutex_);
+    if (buffer_group_id == 0) {
+        return outline_buffers_group_0_[idx];
+    } else if (buffer_group_id == 1) {
+        return outline_buffers_group_1_[idx];
+    } else {
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+        return nullptr;
+    }
+}
+
+SizeT BlockColumnEntry::OutlineBufferCount(const u32 buffer_group_id) const {
+    std::shared_lock lock(mutex_);
+    if (buffer_group_id == 0) {
+        return outline_buffers_group_0_.size();
+    } else if (buffer_group_id == 1) {
+        return outline_buffers_group_1_.size();
+    } else {
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+        return 0;
+    }
+}
+
+u64 BlockColumnEntry::LastChunkOff(const u32 buffer_group_id) const {
+    if (buffer_group_id == 0) {
+        return last_chunk_offset_0_;
+    } else if (buffer_group_id == 1) {
+        return last_chunk_offset_1_;
+    } else {
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+        return 0;
+    }
+}
+
+void BlockColumnEntry::SetLastChunkOff(const u32 buffer_group_id, const u64 offset) {
+    if (buffer_group_id == 0) {
+        last_chunk_offset_0_ = offset;
+    } else if (buffer_group_id == 1) {
+        last_chunk_offset_1_ = offset;
+    } else {
+        String error_message = "Invalid buffer group id";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+}
+
 void BlockColumnEntry::Append(const ColumnVector *input_column_vector, u16 input_column_vector_offset, SizeT append_rows, BufferManager *buffer_mgr) {
     if (buffer_ == nullptr) {
-        UnrecoverableError("Not initialize buffer handle");
+        String error_message = "Not initialize buffer handle";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     ColumnVector &&column_vector = GetColumnVector(buffer_mgr);
     column_vector.AppendWith(*input_column_vector, input_column_vector_offset, append_rows);
@@ -172,14 +279,21 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
             break;
         }
         case kTensor:
+        case kSparse:
+        case kTensorArray:
         case kVarchar: {
             //            SizeT buffer_size = row_count * column_type->Size();
-            LOG_TRACE(fmt::format("Saving varchar {}", block_column_entry->column_id()));
+            LOG_TRACE(fmt::format("Saving column {}", block_column_entry->column_id()));
             block_column_entry->buffer_->Save();
-            LOG_TRACE(fmt::format("Saved varchar {}", block_column_entry->column_id()));
+            LOG_TRACE(fmt::format("Saved column {}", block_column_entry->column_id()));
 
             std::shared_lock lock(block_column_entry->mutex_);
-            for (auto *outline_buffer : block_column_entry->outline_buffers_) {
+            for (auto *outline_buffer : block_column_entry->outline_buffers_group_0_) {
+                if (outline_buffer != nullptr) {
+                    outline_buffer->Save();
+                }
+            }
+            for (auto *outline_buffer : block_column_entry->outline_buffers_group_1_) {
                 if (outline_buffer != nullptr) {
                     outline_buffer->Save();
                 }
@@ -191,15 +305,20 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
             //        case kPath:
             //        case kPolygon:
             //        case kBlob:
+        case kEmptyArray:
         case kMixed:
         case kNull: {
             LOG_ERROR(fmt::format("{} isn't supported", column_type->ToString()));
-            UnrecoverableError("Not implement: Invalid data type.");
+            String error_message = "Not implement: Invalid data type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case kMissing:
         case kInvalid: {
             LOG_ERROR(fmt::format("Invalid data type {}", column_type->ToString()));
-            UnrecoverableError("Invalid data type.");
+            String error_message = "Invalid data type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -208,7 +327,12 @@ void BlockColumnEntry::Cleanup() {
     if (buffer_ != nullptr) {
         buffer_->PickForCleanup();
     }
-    for (auto *outline_buffer : outline_buffers_) {
+    for (auto *outline_buffer : outline_buffers_group_0_) {
+        if (outline_buffer) {
+            outline_buffer->PickForCleanup();
+        }
+    }
+    for (auto *outline_buffer : outline_buffers_group_1_) {
         if (outline_buffer) {
             outline_buffer->PickForCleanup();
         }
@@ -220,8 +344,10 @@ nlohmann::json BlockColumnEntry::Serialize() {
     json_res["column_id"] = this->column_id_;
     {
         std::shared_lock lock(mutex_);
-        json_res["next_outline_idx"] = outline_buffers_.size();
-        json_res["last_chunk_offset"] = this->LastChunkOff();
+        json_res["next_outline_idx"] = outline_buffers_group_0_.size();
+        json_res["last_chunk_offset"] = this->LastChunkOff(0);
+        json_res["next_outline_idx_1"] = outline_buffers_group_1_.size();
+        json_res["last_chunk_offset_1"] = this->LastChunkOff(1);
     }
 
     json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
@@ -232,13 +358,26 @@ nlohmann::json BlockColumnEntry::Serialize() {
 
 UniquePtr<BlockColumnEntry>
 BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
-    ColumnID column_id = column_data_json["column_id"];
-    i32 next_outline_idx = column_data_json["next_outline_idx"];
-    TxnTimeStamp commit_ts = column_data_json["commit_ts"];
-    u64 last_chunk_offset = column_data_json["last_chunk_offset"];
-    UniquePtr<BlockColumnEntry> block_column_entry =
-        NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx, last_chunk_offset, commit_ts);
-
+    const ColumnID column_id = column_data_json["column_id"];
+    const TxnTimeStamp commit_ts = column_data_json["commit_ts"];
+    const u32 next_outline_idx_0 = column_data_json["next_outline_idx"];
+    const u64 last_chunk_offset_0 = column_data_json["last_chunk_offset"];
+    u32 next_outline_idx_1 = 0;
+    u64 last_chunk_offset_1 = 0;
+    if (auto it = column_data_json.find("next_outline_idx_1"); it != column_data_json.end()) {
+        next_outline_idx_1 = *it;
+    }
+    if (auto it = column_data_json.find("last_chunk_offset_1"); it != column_data_json.end()) {
+        last_chunk_offset_1 = *it;
+    }
+    UniquePtr<BlockColumnEntry> block_column_entry = NewReplayBlockColumnEntry(block_entry,
+                                                                               column_id,
+                                                                               buffer_mgr,
+                                                                               next_outline_idx_0,
+                                                                               next_outline_idx_1,
+                                                                               last_chunk_offset_0,
+                                                                               last_chunk_offset_1,
+                                                                               commit_ts);
     block_column_entry->begin_ts_ = column_data_json["begin_ts"];
     block_column_entry->txn_id_ = column_data_json["txn_id"];
 
@@ -247,25 +386,12 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
 
 void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts) {
     if (this->Committed()) {
-        UnrecoverableError("Column already committed");
+        String error_message = "Column already committed";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     this->txn_id_ = txn_id;
     this->Commit(commit_ts);
-}
-
-Vector<String> BlockColumnEntry::OutlinePaths() const {
-    Vector<String> outline_paths;
-    SizeT outline_file_count = 0;
-    {
-        std::shared_lock lock(mutex_);
-        outline_file_count = outline_buffers_.size();
-    }
-    for (SizeT i = 0; i < outline_file_count; ++i) {
-        auto outline_file = OutlineFilename(i);
-
-        outline_paths.push_back(LocalFileSystem::ConcatenateFilePath(*base_dir_, *outline_file));
-    }
-    return outline_paths;
 }
 
 } // namespace infinity

@@ -6,17 +6,15 @@ slug: /python_api_reference
 
 ## connect
 
-***class*** **infinity.connect(*uri = REMOTE_HOST*)**
+***class*** **infinity.connect(*uri*)**
 
 Connect to the Infinity server and return an Infinity object. 
 
 ### Parameters
 
-- `uri`: `NetworkAddress` A NetworkAddress object is a struct with two fields, one for the IP address (`str`) and the other for the port number (`int`). To access the local Infinity service:
-  ```python
-  REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)
-  ```
-  > `REMOTE_HOST` is defined in the **infinity.common** package, and the above is its default value.
+- `uri`: 
+  - `NetworkAddress` A NetworkAddress object is a struct with two fields, one for the IP address (`str`) and the other for the port number (`int`). Used when Infinity is deployed as a separate server.
+  - a path ('str') to store the Infinity data. Used when Infinity is deployed as a Python module. 
 
 ### Returns
 
@@ -25,10 +23,17 @@ Connect to the Infinity server and return an Infinity object.
 
 ### Examples
 
-```python
-infinity_obj = infinity.connect()
-infinity_obj = infinity.connect(NetworkAddress("127.0.0.1", 23817))
-```
+- If Infinity is deployed as a separate server: 
+
+   ```python
+   # If Infinity is deployed locally, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
+   infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+   ```
+
+- If Infinity is deployed as a Python module: 
+   ```python
+   infinity_obj = infinity.connect("/path/to/save/to")
+   ```
 
 ## disconnect
 
@@ -36,7 +41,7 @@ infinity_obj = infinity.connect(NetworkAddress("127.0.0.1", 23817))
 
 Disconnect the current Infinity object from the server.
 
->This method is automatically called when an Infinity object is destructed.
+> This method is automatically called when an Infinity object is destructed.
 
 ### Returns
 
@@ -352,7 +357,7 @@ Create an index by `IndexInfo` list.
   A IndexInfo struct contains three fields,`column_name`, `index_type`, and `index_param_list`.
     - **column_name : str** Name of the column to build index on.
     - **index_type : IndexType**
-      enum type which could be `IVFFlat` , `Hnsw`, `HnswLVQ` or `FullText`, defined in *infinity.index*
+      enum type: `IVFFlat` , `Hnsw`, `HnswLVQ`, `FullText`, or `BMP`. Defined in `infinity.index`.
       `Note: The difference between Hnsw and HnswLVQ is only adopting different clustering method. The former uses K-Means while the later uses LVQ(Learning Vector Quantization)`
     - **index_param_list**
       A list of InitParameter. The InitParameter struct is like a key-value pair, with two string fields named param_name and param_value. The optional parameters of each type of index are listed below:
@@ -366,6 +371,9 @@ Create an index by `IndexInfo` list.
              - `ip`: Inner product
              - `l2`: Euclidean distance
         - `FullText`: `'ANALYZER'`(default:`'standard'`)
+        - `BMP`: 
+          - `block_size=1~256`(default: 16): The size of the block in BMP index
+          - `compress_type=[compress|raww]` (default: `compress`): If set to `compress`, the block max is stored in the sparse format, which is suitable for small "block size".
 - `conflict_type`: `Enum`. See `ConflictType`, which is defined in the **infinity.common** package. 
           - `Error`
           - `Ignore`
@@ -380,7 +388,7 @@ Create an index by `IndexInfo` list.
 ```python
 db_obj.create_table("test_index_ivfflat", {
             "c1": {"type": "vector,1024,float"}}, None)
-db_obj.get_table("test_index_ivfflat")
+table_obj = db_obj.get_table("test_index_ivfflat")
 table_obj.create_index("my_index",
                         [index.IndexInfo("c1",index.IndexType.IVFFlat,
 	                    [
@@ -392,7 +400,7 @@ table_obj.create_index("my_index",
 db_obj.create_table(
             "test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 
-db_obj.get_table("test_index_hnsw")
+table_obj = db_obj.get_table("test_index_hnsw")
 table_obj.create_index("my_index",
                        [index.IndexInfo("c1",index.IndexType.Hnsw,
                        [
@@ -411,12 +419,26 @@ db_obj.create_table(
                 "body": {"type": "varchar"}
             }, None)
 
-db_obj.get_table("test_index_fulltext")
+table_obj = db_obj.get_table("test_index_fulltext")
 table_obj.create_index("my_index",
                              [index.IndexInfo("body", index.IndexType.FullText, []),
                               index.IndexInfo("doctitle", index.IndexType.FullText, []),
                               index.IndexInfo("docdate", index.IndexType.FullText, []),
                               ], None)
+```
+
+```python
+db_obj.create_table(
+            "test_index_bmp", {
+                "c1": {"type": "sparse,30000,float,int16"}
+            }, None)
+table_obj = db_obj.get_table("test_index_bmp")
+table_obj.create_index("my_index",
+                             [index.IndexInfo("c1", index.IndexType.BMP,
+                              [
+                                  index.InitParameter("block_size", "16"),
+                                  index.InitParameter("compress_type", "compress")
+                              ])], None)
 ```
 
 ## drop_index
@@ -686,6 +708,33 @@ table_obj.knn('col1', [0.1,0.2,0.3], 'float', 'l2', 100)
 table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 ```
 
+## match sparse
+
+**RemoteTable.match_sparse(*vector_column_name, sparse_data, distance_type, topn, opt_params = None*)**
+
+### Parameters
+
+- **vector_column_name : str**
+- **sparse_data** : `{"indices": list[int], "values": Union(list[int], list[float])}`
+- **distance_type : str**
+  -  `'ip'`
+- **topn : int**
+- **opt_params : dict[str, str]**
+    common options:
+      - 'alpha=0.0~1.0'(default: 1.0): A "Termination Conditions" parameter. The smaller the value, the more aggressive the pruning.
+      - 'beta=0.0~1.0'(default: 1.0): A "Query Term Pruning" parameter. The smaller the value, the more aggressive the pruning.
+
+### Returns
+- Success: Self `RemoteTable`
+- Failure: `Exception`
+
+### Examples
+
+```python
+table_obj.match_sparse('col1', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100)
+table_obj.match_sparse('col1_with_bmp_index', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
+```
+
 ## match
 
 Create a full-text search expression.
@@ -696,7 +745,7 @@ Create a full-text search expression.
     The column where text is searched, and has create full-text index on it before. 
 - **matching_text : str**
 - **options_text : str**
-    'topn=2': Retrieve the two most relevant records.
+    'topn=2': Retrieve the two most relevant records. The `topn` is `10` by default.
 
 ### Returns
 
@@ -705,7 +754,54 @@ Create a full-text search expression.
 
 ### Examples
 ```python
-table_obj.match('body', 'harmful', 'topn=2')
+questions = [
+    r"blooms",  # single term
+    r"Bloom filter",  # OR multiple terms
+    r'"Bloom filter"',  # phrase: adjacent multiple terms
+    r"space efficient",  # OR multiple terms
+    r"space\-efficient",  # Escape reserved character '-', equivalent to: `space efficient`
+    r'"space\-efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
+    r'"harmful chemical"~10',  # sloppy phrase, refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query-phrase.html
+]
+for question in questions:
+    table_obj.match('body', question, 'topn=2')
+```
+
+## match tensor
+
+**RemoteTable.match_tensor(*vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)**
+
+Build a KNN tensor search expression. Find the top n closet records to the given tensor according to chosen method.
+
+For example, find k most match tensors generated by ColBERT.
+
+### Parameters
+
+- **vector_column_name : str**
+- **tensor_data : list/np.ndarray**
+- **tensor_data_type : str**
+- **method_type : str**
+    -  `'maxsim'`
+
+- **extra_option : str** options seperated by ';'
+    - `'topn'`
+    - **EMVB index options**
+        - `'emvb_centroid_nprobe'`
+        - `'emvb_threshold_first'`
+        - `'emvb_n_doc_to_score'`
+        - `'emvb_n_doc_out_second_stage'`
+        - `'emvb_threshold_final'`
+
+### Returns
+
+- Success: Self `RemoteTable`
+- Failure: `Exception`
+
+### Examples
+
+```python
+match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim', 'topn=2')
+match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim', 'topn=10;emvb_centroid_nprobe=4;emvb_threshold_first=0.4;emvb_threshold_final=0.5')
 ```
 
 ## fusion
@@ -717,7 +813,20 @@ Build a fusion expression.
 ### Parameters
 
 - **method : str**
-- **method : options_text**
+    The supported methods are: rrf, weighted_sum, match_tensor
+- **options_text : str**
+
+    Common options:
+
+    - 'topn=10': Retrieve the 10 most relevant records. The defualt value is `100`.
+
+    Dedicated options of rrf:
+
+    - 'rank_constant=30': The default value is `60`.
+
+    Dedicated options of weighted_sum:
+
+    - 'weights=1,2,0.5': The weights of children scorers. The default weight of each weight is `1.0`.
 
 ### Returns
 
@@ -728,6 +837,9 @@ Build a fusion expression.
 
 ```python
 table_obj.fusion('rrf')
+table_obj.fusion('rrf', 'topn=10')
+table_obj.fusion('weighted_sum', 'weights=1,2,0.5')
+table_obj.fusion('match_tensor', 'topn=2', make_match_tensor_expr('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim'))
 ```
 
 ### Details
@@ -735,6 +847,28 @@ table_obj.fusion('rrf')
 `rrf`:  Reciprocal rank fusion method.
 
 [Reciprocal rank fusion (RRF)](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) is a method that combines multiple result sets with different relevance indicators into one result set. RRF does not requires tuning, and the different relevance indicators do not have to be related to each other to achieve high-quality results.
+
+## optimize
+
+**RemoteTable.optimize(*index_name, opt_params*)**
+
+### Parameters
+
+- **index_name : str**
+- **opt_params : dict[str, str]**
+    Common options:
+  - 'topk=10': Optimize the BMP index for top 10. Used only when the index is BMP.
+
+### Returns
+
+- Success: `True`
+- Failure: `Exception`
+
+### Examples
+
+```python
+table_obj.optimize('bmp_index_name', {'topk': '10'})
+```
 
 ## get result
 

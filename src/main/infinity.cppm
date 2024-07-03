@@ -47,6 +47,7 @@ public:
 
     static void LocalUnInit();
 
+    static void Hello();
     // Infinity API
 public:
     static SharedPtr<Infinity> RemoteConnect();
@@ -120,6 +121,10 @@ public:
 
     QueryResult ShowIndex(const String &db_name, const String &table_name, const String &index_name);
 
+    QueryResult ShowIndexSegment(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id);
+
+    QueryResult ShowIndexChunk(const String &db_name, const String &table_name, const String &index_name, SegmentID segment_id, ChunkID chunk_id);
+
     QueryResult ShowSegment(const String &db_name, const String &table_name, const SegmentID &segment_id);
 
     QueryResult ShowSegments(const String &db_name, const String &table_name);
@@ -135,6 +140,8 @@ public:
 
     QueryResult Import(const String &db_name, const String &table_name, const String &path, ImportOptions import_options);
 
+    QueryResult Export(const String &db_name, const String &table_name, Vector<ParsedExpr *> *columns, const String &path, ExportOptions export_options);
+
     QueryResult Delete(const String &db_name, const String &table_name, ParsedExpr *filter);
 
     QueryResult Update(const String &db_name, const String &table_name, ParsedExpr *filter, Vector<UpdateExpr *> *update_list);
@@ -149,7 +156,7 @@ public:
     QueryResult
     Search(const String &db_name, const String &table_name, SearchExpr *search_expr, ParsedExpr *filter, Vector<ParsedExpr *> *output_columns);
 
-    QueryResult Optimize(const String &db_name, const String &table_name);
+    QueryResult Optimize(const String &db_name, const String &table_name, OptimizeOptions optimize_options = OptimizeOptions{});
 
 private:
     SharedPtr<BaseSession> session_{};

@@ -32,15 +32,19 @@ export enum class VectorBufferType {
     kStandard,
     kHeap, // varchar, can be stored across multiple chunks
     kCompactBit,
-    kTensorHeap, // tensor, should be stored in one chunk (maybe not necessary?)
+    kTensorHeap, // tensor, should be stored in one chunk
+    kSparseHeap, // sparse, should be stored in one chunk
 };
 
 export class VectorBuffer {
 public:
-    static SharedPtr<VectorBuffer> Make(SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
+    static SharedPtr<VectorBuffer> Make(SizeT data_type_size, SizeT capacity, Pair<VectorBufferType, VectorBufferType> buffer_types);
 
-    static SharedPtr<VectorBuffer>
-    Make(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
+    static SharedPtr<VectorBuffer> Make(BufferManager *buffer_mgr,
+                                        BlockColumnEntry *block_column_entry,
+                                        SizeT data_type_size,
+                                        SizeT capacity,
+                                        Pair<VectorBufferType, VectorBufferType> buffer_types);
 
 public:
     explicit VectorBuffer() {
@@ -105,8 +109,10 @@ private:
 
 public:
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
+    VectorBufferType buffer_type_1_{VectorBufferType::kInvalid};
 
     UniquePtr<FixHeapManager> fix_heap_mgr_{nullptr};
+    UniquePtr<FixHeapManager> fix_heap_mgr_1_{nullptr};
 };
 
 } // namespace infinity

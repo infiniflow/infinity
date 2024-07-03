@@ -41,6 +41,13 @@ enum class ShowStmtType {
     kGlobalVariable,
     kGlobalVariables,
     kConfig,
+    kBuffer,
+    kQueries,
+    kQuery,
+    kTransactions,
+    kTransaction,
+    kIndexSegment,
+    kIndexChunk,
 };
 
 class ShowStatement : public BaseStatement {
@@ -55,7 +62,10 @@ public:
     std::optional<std::string> index_name_{};
     std::optional<int64_t> segment_id_{};
     std::optional<int64_t> block_id_{};
+    std::optional<int64_t> chunk_id_{};
     std::optional<u_int64_t> column_id_{};
+    std::optional<u_int64_t> session_id_{};
+    std::optional<u_int64_t> txn_id_{};
     std::string var_name_{};
 };
 

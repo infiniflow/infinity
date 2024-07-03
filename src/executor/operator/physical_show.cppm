@@ -31,6 +31,7 @@ import column_def;
 import data_type;
 import variables;
 import data_block;
+import logger;
 
 namespace infinity {
 
@@ -41,14 +42,17 @@ public:
                           String db_name,
                           String object_name,
                           u64 table_index,
-                          Optional<u32> segment_id,
-                          Optional<u16> block_id,
-                          Optional<u32> column_id,
+                          Optional<SegmentID> segment_id,
+                          Optional<BlockID> block_id,
+                          Optional<ChunkID> chunk_id,
+                          Optional<ColumnID> column_id,
                           Optional<String> index_name,
+                          Optional<u64> session_id,
+                          Optional<TransactionID> txn_id,
                           SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), scan_type_(type), db_name_(std::move(db_name)),
-          object_name_(std::move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id), column_id_(column_id),
-          index_name_(index_name) {}
+          object_name_(std::move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id),
+          index_name_(index_name), session_id_(session_id), txn_id_(txn_id) {}
 
     ~PhysicalShow() override = default;
 
@@ -61,7 +65,9 @@ public:
     inline SharedPtr<Vector<SharedPtr<DataType>>> GetOutputTypes() const final { return output_types_; }
 
     SizeT TaskletCount() override {
-        UnrecoverableError("Not implement: TaskletCount not Implement");
+        String error_message = "Not implement: TaskletCount not Implement";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return 0;
     }
 
@@ -81,6 +87,10 @@ private:
     void ExecuteShowTable(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowIndex(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowIndexSegment(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowIndexChunk(QueryContext *query_context, ShowOperatorState *operator_state);
 
     void ExecuteShowDatabases(QueryContext *query_context, ShowOperatorState *operator_state);
 
@@ -116,16 +126,29 @@ private:
 
     void ExecuteShowConfig(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowBuffer(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowQueries(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowQuery(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowTransactions(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowTransaction(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
     ShowType scan_type_{ShowType::kInvalid};
     String db_name_{};
     String object_name_{};
     u64 table_index_{};
 
-    Optional<u32> segment_id_{};
-    Optional<u16> block_id_{};
-    Optional<u64> column_id_{};
+    Optional<SegmentID> segment_id_{};
+    Optional<BlockID> block_id_{};
+    Optional<ChunkID> chunk_id_{};
+    Optional<ColumnID> column_id_{};
     Optional<String> index_name_{};
+    Optional<u64> session_id_{};
+    Optional<TransactionID> txn_id_{};
 
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};

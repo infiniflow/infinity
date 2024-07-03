@@ -14,7 +14,8 @@
 
 module;
 
-#include "header.h"
+#include <cmath>
+#include "../header.h"
 
 import stl;
 
@@ -38,6 +39,202 @@ void log_m256(const __m256i &value) {
     std::cout << "]" << std::endl;
 }
 
+export float F32CosBF(const float *pv1, const float *pv2, size_t dim) {
+    float dot_product = 0;
+    float norm1 = 0;
+    float norm2 = 0;
+    for (size_t i = 0; i < dim; i++) {
+        dot_product += pv1[i] * pv2[i];
+        norm1 += pv1[i] * pv1[i];
+        norm2 += pv2[i] * pv2[i];
+    }
+    return 1 - dot_product / sqrt(norm1 * norm2);
+}
+
+#if defined(USE_AVX512)
+
+export float F32CosAVX512(const float *pv1, const float *pv2, size_t dim) {
+    size_t dim16 = dim >> 4;
+
+    const float *pEnd1 = pv1 + (dim16 << 4);
+
+    __m512 mul = _mm512_set1_ps(0);
+    __m512 norm_v1 = _mm512_set1_ps(0);
+    __m512 norm_v2 = _mm512_set1_ps(0);
+
+    __m512 v1, v2;
+
+    while (pv1 < pEnd1) {
+        v1 = _mm512_loadu_ps(pv1);
+        pv1 += 16;
+        v2 = _mm512_loadu_ps(pv2);
+        pv2 += 16;
+
+        mul = _mm512_fmadd_ps(v1, v2, mul);
+        norm_v1 = _mm512_fmadd_ps(v1, v1, norm_v1);
+        norm_v2 = _mm512_fmadd_ps(v2, v2, norm_v2);
+    }
+
+    float mul_res = _mm512_reduce_add_ps(mul);
+    float v1_res = _mm512_reduce_add_ps(norm_v1);
+    float v2_res = _mm512_reduce_add_ps(norm_v2);
+
+    size_t tail = dim & 15;
+    const float *pBegin1 = pv1 + (dim & ~15);
+    const float *pBegin2 = pv2 + (dim & ~15);
+    for (size_t i = 0; i < tail; i++) {
+        mul_res += pBegin1[i] * pBegin2[i];
+        v1_res += pBegin1[i] * pBegin1[i];
+        v2_res += pBegin2[i] * pBegin2[i];
+    }
+
+    return mul_res != 0 ? mul_res / sqrt(v1_res * v2_res) : 0;
+}
+
+export float F32CosAVX512Residual(const float *pv1, const float *pv2, size_t dim) {
+    return F32CosAVX512(pv1, pv2, dim);
+}
+
+#endif
+
+#if defined(USE_AVX)
+
+export float F32CosAVX(const float *pv1, const float *pv2, size_t dim) {
+    float PORTABLE_ALIGN32 MulTmpRes[8];
+    float PORTABLE_ALIGN32 V1TmpRes[8];
+    float PORTABLE_ALIGN32 V2TmpRes[8];
+    size_t dim16 = dim >> 4;
+
+    const float *pEnd1 = pv1 + (dim16 << 4);
+
+    __m256 mul = _mm256_set1_ps(0);
+    __m256 norm_v1 = _mm256_set1_ps(0);
+    __m256 norm_v2 = _mm256_set1_ps(0);
+
+    __m256 v1, v2;
+
+    while (pv1 < pEnd1) {
+        v1 = _mm256_loadu_ps(pv1);
+        pv1 += 8;
+        v2 = _mm256_loadu_ps(pv2);
+        pv2 += 8;
+        mul = _mm256_add_ps(mul, _mm256_mul_ps(v1, v2));
+        norm_v1 = _mm256_add_ps(norm_v1, _mm256_mul_ps(v1, v1));
+        norm_v2 = _mm256_add_ps(norm_v2, _mm256_mul_ps(v2, v2));
+
+        v1 = _mm256_loadu_ps(pv1);
+        pv1 += 8;
+        v2 = _mm256_loadu_ps(pv2);
+        pv2 += 8;
+        mul = _mm256_add_ps(mul, _mm256_mul_ps(v1, v2));
+        norm_v1 = _mm256_add_ps(norm_v1, _mm256_mul_ps(v1, v1));
+        norm_v2 = _mm256_add_ps(norm_v2, _mm256_mul_ps(v2, v2));
+    }
+
+    _mm256_store_ps(MulTmpRes, mul);
+    _mm256_store_ps(V1TmpRes, norm_v1);
+    _mm256_store_ps(V2TmpRes, norm_v2);
+
+    float mul_res = MulTmpRes[0] + MulTmpRes[1] + MulTmpRes[2] + MulTmpRes[3] + MulTmpRes[4] + MulTmpRes[5] + MulTmpRes[6] + MulTmpRes[7];
+    float v1_res = V1TmpRes[0] + V1TmpRes[1] + V1TmpRes[2] + V1TmpRes[3] + V1TmpRes[4] + V1TmpRes[5] + V1TmpRes[6] + V1TmpRes[7];
+    float v2_res = V2TmpRes[0] + V2TmpRes[1] + V2TmpRes[2] + V2TmpRes[3] + V2TmpRes[4] + V2TmpRes[5] + V2TmpRes[6] + V2TmpRes[7];
+
+    size_t tail = dim & 15;
+    const float *pBegin1 = pv1 + (dim & ~15);
+    const float *pBegin2 = pv2 + (dim & ~15);
+    for (size_t i = 0; i < tail; i++) {
+        mul_res += pBegin1[i] * pBegin2[i];
+        v1_res += pBegin1[i] * pBegin1[i];
+        v2_res += pBegin2[i] * pBegin2[i];
+    }
+
+    return mul_res != 0 ? mul_res / sqrt(v1_res * v2_res) : 0;
+}
+
+export float F32CosAVXResidual(const float *pv1, const float *pv2, size_t dim) {
+    return F32CosAVX(pv1, pv2, dim);
+}
+
+#endif
+
+#if defined(USE_SSE)
+
+export float F32CosSSE(const float *pv1, const float *pv2, size_t dim) {
+    alignas(16) float MulTmpRes[4];
+    alignas(16) float V1TmpRes[4];
+    alignas(16) float V2TmpRes[4];
+    size_t dim16 = dim >> 4;
+
+    const float *pEnd1 = pv1 + (dim16 << 4);
+
+    __m128 mul = _mm_set1_ps(0);
+    __m128 norm_v1 = _mm_set1_ps(0);
+    __m128 norm_v2 = _mm_set1_ps(0);
+
+    __m128 v1, v2;
+
+    while (pv1 < pEnd1) {
+        v1 = _mm_loadu_ps(pv1);
+        pv1 += 4;
+        v2 = _mm_loadu_ps(pv2);
+        pv2 += 4;
+        mul = _mm_add_ps(mul, _mm_mul_ps(v1, v2));
+        norm_v1 = _mm_add_ps(norm_v1, _mm_mul_ps(v1, v1));
+        norm_v2 = _mm_add_ps(norm_v2, _mm_mul_ps(v2, v2));
+
+        v1 = _mm_loadu_ps(pv1);
+        pv1 += 4;
+        v2 = _mm_loadu_ps(pv2);
+        pv2 += 4;
+        mul = _mm_add_ps(mul, _mm_mul_ps(v1, v2));
+        norm_v1 = _mm_add_ps(norm_v1, _mm_mul_ps(v1, v1));
+        norm_v2 = _mm_add_ps(norm_v2, _mm_mul_ps(v2, v2));
+
+        v1 = _mm_loadu_ps(pv1);
+        pv1 += 4;
+        v2 = _mm_loadu_ps(pv2);
+        pv2 += 4;
+        mul = _mm_add_ps(mul, _mm_mul_ps(v1, v2));
+        norm_v1 = _mm_add_ps(norm_v1, _mm_mul_ps(v1, v1));
+        norm_v2 = _mm_add_ps(norm_v2, _mm_mul_ps(v2, v2));
+
+        v1 = _mm_loadu_ps(pv1);
+        pv1 += 4;
+        v2 = _mm_loadu_ps(pv2);
+        pv2 += 4;
+        mul = _mm_add_ps(mul, _mm_mul_ps(v1, v2));
+        norm_v1 = _mm_add_ps(norm_v1, _mm_mul_ps(v1, v1));
+        norm_v2 = _mm_add_ps(norm_v2, _mm_mul_ps(v2, v2));
+    }
+
+    _mm_store_ps(MulTmpRes, mul);
+    _mm_store_ps(V1TmpRes, norm_v1);
+    _mm_store_ps(V2TmpRes, norm_v2);
+
+    float mul_res = MulTmpRes[0] + MulTmpRes[1] + MulTmpRes[2] + MulTmpRes[3]; 
+    float v1_res = V1TmpRes[0] + V1TmpRes[1] + V1TmpRes[2] + V1TmpRes[3];
+    float v2_res = V2TmpRes[0] + V2TmpRes[1] + V2TmpRes[2] + V2TmpRes[3];
+
+    size_t tail = dim & 15;
+    const float *pBegin1 = pv1 + (dim & ~15);
+    const float *pBegin2 = pv2 + (dim & ~15);
+    for (size_t i = 0; i < tail; i++) {
+        mul_res += pBegin1[i] * pBegin2[i];
+        v1_res += pBegin1[i] * pBegin1[i];
+        v2_res += pBegin2[i] * pBegin2[i];
+    }
+
+    return mul_res != 0 ? mul_res / sqrt(v1_res * v2_res) : 0;
+}
+
+export float F32CosSSEResidual(const float *pv1, const float *pv2, size_t dim) {
+    return F32CosSSE(pv1, pv2, dim);
+}
+
+#endif
+
+//------------------------------//------------------------------//------------------------------
+
 export int32_t I8IPBF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     int32_t res = 0;
     for (size_t i = 0; i < dim; i++) {
@@ -47,6 +244,7 @@ export int32_t I8IPBF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
 }
 
 #if defined(USE_AVX512)
+
 export int32_t I8IPAVX512(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     size_t dim64 = dim >> 6;
     const int8_t *pend1 = pv1 + (dim64 << 6);
@@ -79,6 +277,7 @@ export int32_t I8IPAVX512Residual(const int8_t *pv1, const int8_t *pv2, size_t d
 #endif
 
 #if defined(USE_AVX)
+
 export int32_t I8IPAVX(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     size_t dim32 = dim >> 5;
     const int8_t *pend1 = pv1 + (dim32 << 5);
@@ -116,6 +315,7 @@ export int32_t I8IPAVXResidual(const int8_t *pv1, const int8_t *pv2, size_t dim)
 #endif
 
 #if defined(USE_SSE)
+
 export int32_t I8IPSSE(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     size_t dim16 = dim >> 4;
     const int8_t *pend1 = pv1 + (dim16 << 4);
@@ -235,6 +435,7 @@ export float F32L2AVXResidual(const float *pv1, const float *pv2, size_t dim) {
 #endif
 
 #if defined(USE_SSE)
+
 export float F32L2SSE(const float *pv1, const float *pv2, size_t dim) {
     alignas(16) float TmpRes[4];
     size_t dim16 = dim >> 4;
@@ -251,6 +452,7 @@ export float F32L2SSE(const float *pv1, const float *pv2, size_t dim) {
         pv2 += 4;
         diff = _mm_sub_ps(v1, v2);
         sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
+
         v1 = _mm_loadu_ps(pv1);
         pv1 += 4;
         v2 = _mm_loadu_ps(pv2);
@@ -367,6 +569,7 @@ export float F32IPAVXResidual(const float *pVect1, const float *pVect2, SizeT qt
 #endif
 
 #if defined(USE_SSE)
+
 export float F32IPSSE(const float *pVect1, const float *pVect2, SizeT qty) {
     alignas(16) float TmpRes[4];
 

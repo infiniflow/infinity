@@ -9,7 +9,7 @@ namespace infinity {
 
 export class PositionListFormatOption {
 public:
-    explicit PositionListFormatOption(optionflag_t option_flag) { Init(option_flag); }
+    explicit PositionListFormatOption(optionflag_t option_flag = OPTION_FLAG_ALL) { Init(option_flag); }
     ~PositionListFormatOption() {}
 
     inline void Init(optionflag_t option_flag) {
@@ -57,8 +57,7 @@ public:
 
 export class PositionListFormat : public PostingFields {
 public:
-    PositionListFormat(const PositionListFormatOption &option) : skiplist_format_(nullptr) { Init(option); }
-    PositionListFormat() : skiplist_format_(nullptr) {}
+    explicit PositionListFormat(const PositionListFormatOption &option) : option_(option), skiplist_format_(nullptr) { Init(option); }
 
     ~PositionListFormat() {
         if (skiplist_format_) {
@@ -67,6 +66,10 @@ public:
         }
     };
 
+    const PositionSkipListFormat *GetPositionSkipListFormat() const { return skiplist_format_; }
+    const PositionListFormatOption GetOption() const { return option_; }
+
+private:
     void Init(const PositionListFormatOption &option) {
         u8 row_count = 0;
         u32 offset = 0;
@@ -82,7 +85,8 @@ public:
         skiplist_format_->Init(option);
     }
 
-    const PositionSkipListFormat *GetPositionSkipListFormat() const { return skiplist_format_; }
+public:
+    const PositionListFormatOption option_;
 
 private:
     PositionSkipListFormat *skiplist_format_;

@@ -14,6 +14,8 @@
 
 module;
 
+import third_party;
+
 import infinity_exception;
 import bound_cast_func;
 import bool_cast;
@@ -21,7 +23,12 @@ import integer_cast;
 import float_cast;
 import embedding_cast;
 import varchar_cast;
-
+import tensor_cast;
+import tensor_array_cast;
+import empty_array_cast;
+import logger;
+import stl;
+import sparse_cast;
 import third_party;
 
 module cast_function;
@@ -32,35 +39,61 @@ template <typename SourceType>
 static BoundCastFunc NumericCast(const DataType &target) {
     switch (target.type()) {
         case kTinyInt: {
-            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kSmallInt: {
-            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kInteger: {
-            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kBigInt: {
-            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kHugeInt: {
-            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kFloat: {
-            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kDouble: {
-            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         default: {
-            UnrecoverableError(fmt::format("Can't cast to {}", target.ToString()));
+            String error_message = fmt::format("Can't cast to {}", target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
     }
 }
 
 BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
     if (source == target) {
-        UnrecoverableError(fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString()));
+        String error_message = fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     switch (source.type()) {
@@ -89,43 +122,79 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
             return BindFloatCast<DoubleT>(source, target);
         }
         case kDecimal: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kVarchar: {
             return BindVarcharCast(source, target);
         }
         case kDate: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kTime: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kDateTime: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kTimestamp: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kInterval: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kArray: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kTuple: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kPoint: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kLine: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kLineSeg: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kBox: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
 //        case kPath: {
 //            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
@@ -134,13 +203,19 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
 //            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
 //        }
         case kCircle: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
 //        case kBitmap: {
 //            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
 //        }
         case kUuid: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
 //        case kBlob: {
 //            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
@@ -148,17 +223,41 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         case kEmbedding: {
             return BindEmbeddingCast(source, target);
         }
+        case kTensor: {
+            return BindTensorCast(source, target);
+        }
+        case kTensorArray: {
+            return BindTensorArrayCast(source, target);
+        }
+        case kSparse: {
+            return BindSparseCast(source, target);
+        }
         case kRowID: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kMixed: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
         }
         case kNull: {
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
+        }
+        case kEmptyArray: {
+            return BindEmptyArrayCast(source, target);
         }
         default:
-            UnrecoverableError(fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString()));
+            String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
     }
     return BoundCastFunc(nullptr);
 }

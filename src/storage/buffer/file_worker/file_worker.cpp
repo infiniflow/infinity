@@ -33,7 +33,9 @@ FileWorker::~FileWorker() = default;
 
 void FileWorker::WriteToFile(bool to_spill) {
     if (data_ == nullptr) {
-        UnrecoverableError("No data will be written.");
+        String error_message = "No data will be written.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     LocalFileSystem fs;
 
@@ -44,7 +46,13 @@ void FileWorker::WriteToFile(bool to_spill) {
     String write_path = fmt::format("{}/{}", write_dir, *file_name_);
 
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
-    file_handler_ = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
+    auto [file_handler, status] = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
+    if(!status.ok()) {
+        LOG_CRITICAL(status.message());
+        UnrecoverableError(status.message());
+    }
+    file_handler_ = std::move(file_handler);
+
     if (to_spill) {
         auto local_file_handle = static_cast<LocalFileHandler *>(file_handler_.get());
         LOG_TRACE(fmt::format("Open spill file: {}, fd: {}", write_path, local_file_handle->fd_));
@@ -70,7 +78,12 @@ void FileWorker::ReadFromFile(bool from_spill) {
 
     String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     u8 flags = FileFlags::READ_FLAG;
-    file_handler_ = fs.OpenFile(read_path, flags, FileLockType::kReadLock);
+    auto [file_handler, status] = fs.OpenFile(read_path, flags, FileLockType::kReadLock);
+    if(!status.ok()) {
+        LOG_CRITICAL(status.message());
+        UnrecoverableError(status.message());
+    }
+    file_handler_ = std::move(file_handler);
     DeferFn defer_fn([&]() {
         file_handler_->Close();
         file_handler_ = nullptr;
@@ -118,7 +131,9 @@ void FileWorker::CleanupTempFile() const {
         fs.DeleteFile(path);
         LOG_INFO(fmt::format("Cleaned file: {}", path));
     } else {
-        UnrecoverableError(fmt::format("Cleanup: File {} not found for deletion", path));
+        String error_message = fmt::format("Cleanup: File {} not found for deletion", path);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 

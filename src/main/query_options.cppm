@@ -58,4 +58,20 @@ public:
     CopyFileType copy_file_type_{CopyFileType::kCSV};
 };
 
+export class ExportOptions {
+public:
+    char delimiter_{','};
+    bool header_{false};
+    SizeT offset_{0};
+    SizeT limit_{0};
+    SizeT row_limit_{0};
+    CopyFileType copy_file_type_{CopyFileType::kCSV};
+};
+
+export class OptimizeOptions {
+public:
+    String index_name_{};
+    Vector<InitParameter *> opt_params_{};
+};
+
 } // namespace infinity

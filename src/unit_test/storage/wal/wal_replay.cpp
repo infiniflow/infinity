@@ -457,8 +457,8 @@ TEST_F(WalReplayTest, wal_replay_append) {
 
             txn_mgr->CommitTxn(txn);
         }
-#ifdef INFINITY_DEBUG
         infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();

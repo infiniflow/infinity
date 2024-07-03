@@ -34,7 +34,10 @@ struct LogicType {
     Double = 8,
     Varchar = 9,
     Embedding = 10,
-    Invalid = 11
+    Tensor = 11,
+    TensorArray = 12,
+    Sparse = 13,
+    Invalid = 14
   };
 };
 
@@ -112,7 +115,11 @@ struct LiteralType {
     Int64 = 3,
     Null = 4,
     IntegerArray = 5,
-    DoubleArray = 6
+    DoubleArray = 6,
+    IntegerTensorArray = 7,
+    DoubleTensorArray = 8,
+    SparseIntegerArray = 9,
+    SparseDoubleArray = 10
   };
 };
 
@@ -142,7 +149,9 @@ struct CopyFileType {
     CSV = 0,
     JSON = 1,
     JSONL = 2,
-    FVECS = 3
+    FVECS = 3,
+    CSR = 4,
+    BVECS = 5
   };
 };
 
@@ -163,8 +172,11 @@ struct ColumnType {
     ColumnFloat64 = 6,
     ColumnVarchar = 7,
     ColumnEmbedding = 8,
-    ColumnRowID = 9,
-    ColumnInvalid = 10
+    ColumnTensor = 9,
+    ColumnTensorArray = 10,
+    ColumnSparse = 11,
+    ColumnRowID = 12,
+    ColumnInvalid = 13
   };
 };
 
@@ -179,7 +191,10 @@ struct IndexType {
     IVFFlat = 0,
     HnswLVQ = 1,
     Hnsw = 2,
-    FullText = 3
+    FullText = 3,
+    BMP = 4,
+    Secondary = 5,
+    EMVB = 6
   };
 };
 
@@ -219,6 +234,8 @@ class VarcharType;
 
 class EmbeddingType;
 
+class SparseType;
+
 class PhysicalType;
 
 class DataType;
@@ -233,15 +250,19 @@ class EmbeddingData;
 
 class InitParameter;
 
+class ConstantExpr;
+
 class KnnExpr;
+
+class MatchSparseExpr;
+
+class MatchTensorExpr;
 
 class MatchExpr;
 
 class FusionExpr;
 
 class SearchExpr;
-
-class ConstantExpr;
 
 class FunctionExpr;
 
@@ -258,6 +279,12 @@ class Field;
 class ColumnField;
 
 class ImportOption;
+
+class ExportOption;
+
+class OptimizeOptions;
+
+class ConnectRequest;
 
 class CommonRequest;
 
@@ -297,6 +324,8 @@ class ShowIndexRequest;
 
 class ShowIndexResponse;
 
+class OptimizeRequest;
+
 class GetDatabaseRequest;
 
 class CreateDatabaseRequest;
@@ -310,6 +339,8 @@ class DropTableRequest;
 class InsertRequest;
 
 class ImportRequest;
+
+class ExportRequest;
 
 class ExplainRequest;
 
@@ -608,11 +639,77 @@ void swap(EmbeddingType &a, EmbeddingType &b);
 
 std::ostream& operator<<(std::ostream& out, const EmbeddingType& obj);
 
+typedef struct _SparseType__isset {
+  _SparseType__isset() : dimension(false), element_type(false), index_type(false) {}
+  bool dimension :1;
+  bool element_type :1;
+  bool index_type :1;
+} _SparseType__isset;
+
+class SparseType : public virtual ::apache::thrift::TBase {
+ public:
+
+  SparseType(const SparseType&) noexcept;
+  SparseType& operator=(const SparseType&) noexcept;
+  SparseType() noexcept
+             : dimension(0),
+               element_type(static_cast<ElementType::type>(0)),
+               index_type(static_cast<ElementType::type>(0)) {
+  }
+
+  virtual ~SparseType() noexcept;
+  int64_t dimension;
+  /**
+   * 
+   * @see ElementType
+   */
+  ElementType::type element_type;
+  /**
+   * 
+   * @see ElementType
+   */
+  ElementType::type index_type;
+
+  _SparseType__isset __isset;
+
+  void __set_dimension(const int64_t val);
+
+  void __set_element_type(const ElementType::type val);
+
+  void __set_index_type(const ElementType::type val);
+
+  bool operator == (const SparseType & rhs) const
+  {
+    if (!(dimension == rhs.dimension))
+      return false;
+    if (!(element_type == rhs.element_type))
+      return false;
+    if (!(index_type == rhs.index_type))
+      return false;
+    return true;
+  }
+  bool operator != (const SparseType &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const SparseType & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(SparseType &a, SparseType &b);
+
+std::ostream& operator<<(std::ostream& out, const SparseType& obj);
+
 typedef struct _PhysicalType__isset {
-  _PhysicalType__isset() : number_type(false), varchar_type(false), embedding_type(false) {}
+  _PhysicalType__isset() : number_type(false), varchar_type(false), embedding_type(false), sparse_type(false) {}
   bool number_type :1;
   bool varchar_type :1;
   bool embedding_type :1;
+  bool sparse_type :1;
 } _PhysicalType__isset;
 
 class PhysicalType : public virtual ::apache::thrift::TBase {
@@ -627,6 +724,7 @@ class PhysicalType : public virtual ::apache::thrift::TBase {
   NumberType number_type;
   VarcharType varchar_type;
   EmbeddingType embedding_type;
+  SparseType sparse_type;
 
   _PhysicalType__isset __isset;
 
@@ -635,6 +733,8 @@ class PhysicalType : public virtual ::apache::thrift::TBase {
   void __set_varchar_type(const VarcharType& val);
 
   void __set_embedding_type(const EmbeddingType& val);
+
+  void __set_sparse_type(const SparseType& val);
 
   bool operator == (const PhysicalType & rhs) const
   {
@@ -649,6 +749,10 @@ class PhysicalType : public virtual ::apache::thrift::TBase {
     if (__isset.embedding_type != rhs.__isset.embedding_type)
       return false;
     else if (__isset.embedding_type && !(embedding_type == rhs.embedding_type))
+      return false;
+    if (__isset.sparse_type != rhs.__isset.sparse_type)
+      return false;
+    else if (__isset.sparse_type && !(sparse_type == rhs.sparse_type))
       return false;
     return true;
   }
@@ -1070,6 +1174,129 @@ void swap(InitParameter &a, InitParameter &b);
 
 std::ostream& operator<<(std::ostream& out, const InitParameter& obj);
 
+typedef struct _ConstantExpr__isset {
+  _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false), i64_tensor_array_value(false), f64_tensor_array_value(false), i64_array_idx(false) {}
+  bool literal_type :1;
+  bool bool_value :1;
+  bool i64_value :1;
+  bool f64_value :1;
+  bool str_value :1;
+  bool i64_array_value :1;
+  bool f64_array_value :1;
+  bool i64_tensor_array_value :1;
+  bool f64_tensor_array_value :1;
+  bool i64_array_idx :1;
+} _ConstantExpr__isset;
+
+class ConstantExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  ConstantExpr(const ConstantExpr&);
+  ConstantExpr& operator=(const ConstantExpr&);
+  ConstantExpr() noexcept
+               : literal_type(static_cast<LiteralType::type>(0)),
+                 bool_value(0),
+                 i64_value(0),
+                 f64_value(0),
+                 str_value() {
+  }
+
+  virtual ~ConstantExpr() noexcept;
+  /**
+   * 
+   * @see LiteralType
+   */
+  LiteralType::type literal_type;
+  bool bool_value;
+  int64_t i64_value;
+  double f64_value;
+  std::string str_value;
+  std::vector<int64_t>  i64_array_value;
+  std::vector<double>  f64_array_value;
+  std::vector<std::vector<std::vector<int64_t> > >  i64_tensor_array_value;
+  std::vector<std::vector<std::vector<double> > >  f64_tensor_array_value;
+  std::vector<int64_t>  i64_array_idx;
+
+  _ConstantExpr__isset __isset;
+
+  void __set_literal_type(const LiteralType::type val);
+
+  void __set_bool_value(const bool val);
+
+  void __set_i64_value(const int64_t val);
+
+  void __set_f64_value(const double val);
+
+  void __set_str_value(const std::string& val);
+
+  void __set_i64_array_value(const std::vector<int64_t> & val);
+
+  void __set_f64_array_value(const std::vector<double> & val);
+
+  void __set_i64_tensor_array_value(const std::vector<std::vector<std::vector<int64_t> > > & val);
+
+  void __set_f64_tensor_array_value(const std::vector<std::vector<std::vector<double> > > & val);
+
+  void __set_i64_array_idx(const std::vector<int64_t> & val);
+
+  bool operator == (const ConstantExpr & rhs) const
+  {
+    if (!(literal_type == rhs.literal_type))
+      return false;
+    if (__isset.bool_value != rhs.__isset.bool_value)
+      return false;
+    else if (__isset.bool_value && !(bool_value == rhs.bool_value))
+      return false;
+    if (__isset.i64_value != rhs.__isset.i64_value)
+      return false;
+    else if (__isset.i64_value && !(i64_value == rhs.i64_value))
+      return false;
+    if (__isset.f64_value != rhs.__isset.f64_value)
+      return false;
+    else if (__isset.f64_value && !(f64_value == rhs.f64_value))
+      return false;
+    if (__isset.str_value != rhs.__isset.str_value)
+      return false;
+    else if (__isset.str_value && !(str_value == rhs.str_value))
+      return false;
+    if (__isset.i64_array_value != rhs.__isset.i64_array_value)
+      return false;
+    else if (__isset.i64_array_value && !(i64_array_value == rhs.i64_array_value))
+      return false;
+    if (__isset.f64_array_value != rhs.__isset.f64_array_value)
+      return false;
+    else if (__isset.f64_array_value && !(f64_array_value == rhs.f64_array_value))
+      return false;
+    if (__isset.i64_tensor_array_value != rhs.__isset.i64_tensor_array_value)
+      return false;
+    else if (__isset.i64_tensor_array_value && !(i64_tensor_array_value == rhs.i64_tensor_array_value))
+      return false;
+    if (__isset.f64_tensor_array_value != rhs.__isset.f64_tensor_array_value)
+      return false;
+    else if (__isset.f64_tensor_array_value && !(f64_tensor_array_value == rhs.f64_tensor_array_value))
+      return false;
+    if (__isset.i64_array_idx != rhs.__isset.i64_array_idx)
+      return false;
+    else if (__isset.i64_array_idx && !(i64_array_idx == rhs.i64_array_idx))
+      return false;
+    return true;
+  }
+  bool operator != (const ConstantExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ConstantExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ConstantExpr &a, ConstantExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const ConstantExpr& obj);
+
 typedef struct _KnnExpr__isset {
   _KnnExpr__isset() : column_expr(false), embedding_data(false), embedding_data_type(false), distance_type(false), topn(false), opt_params(true) {}
   bool column_expr :1;
@@ -1154,6 +1381,148 @@ void swap(KnnExpr &a, KnnExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const KnnExpr& obj);
 
+typedef struct _MatchSparseExpr__isset {
+  _MatchSparseExpr__isset() : column_expr(false), query_sparse_expr(false), metric_type(false), topn(false), opt_params(true) {}
+  bool column_expr :1;
+  bool query_sparse_expr :1;
+  bool metric_type :1;
+  bool topn :1;
+  bool opt_params :1;
+} _MatchSparseExpr__isset;
+
+class MatchSparseExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  MatchSparseExpr(const MatchSparseExpr&);
+  MatchSparseExpr& operator=(const MatchSparseExpr&);
+  MatchSparseExpr() noexcept
+                  : metric_type(),
+                    topn(0) {
+
+  }
+
+  virtual ~MatchSparseExpr() noexcept;
+  ColumnExpr column_expr;
+  ConstantExpr query_sparse_expr;
+  std::string metric_type;
+  int64_t topn;
+  std::vector<InitParameter>  opt_params;
+
+  _MatchSparseExpr__isset __isset;
+
+  void __set_column_expr(const ColumnExpr& val);
+
+  void __set_query_sparse_expr(const ConstantExpr& val);
+
+  void __set_metric_type(const std::string& val);
+
+  void __set_topn(const int64_t val);
+
+  void __set_opt_params(const std::vector<InitParameter> & val);
+
+  bool operator == (const MatchSparseExpr & rhs) const
+  {
+    if (!(column_expr == rhs.column_expr))
+      return false;
+    if (!(query_sparse_expr == rhs.query_sparse_expr))
+      return false;
+    if (!(metric_type == rhs.metric_type))
+      return false;
+    if (!(topn == rhs.topn))
+      return false;
+    if (!(opt_params == rhs.opt_params))
+      return false;
+    return true;
+  }
+  bool operator != (const MatchSparseExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const MatchSparseExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(MatchSparseExpr &a, MatchSparseExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const MatchSparseExpr& obj);
+
+typedef struct _MatchTensorExpr__isset {
+  _MatchTensorExpr__isset() : search_method(false), column_expr(false), embedding_data_type(false), embedding_data(false), extra_options(false) {}
+  bool search_method :1;
+  bool column_expr :1;
+  bool embedding_data_type :1;
+  bool embedding_data :1;
+  bool extra_options :1;
+} _MatchTensorExpr__isset;
+
+class MatchTensorExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  MatchTensorExpr(const MatchTensorExpr&);
+  MatchTensorExpr& operator=(const MatchTensorExpr&);
+  MatchTensorExpr() noexcept
+                  : search_method(),
+                    embedding_data_type(static_cast<ElementType::type>(0)),
+                    extra_options() {
+  }
+
+  virtual ~MatchTensorExpr() noexcept;
+  std::string search_method;
+  ColumnExpr column_expr;
+  /**
+   * 
+   * @see ElementType
+   */
+  ElementType::type embedding_data_type;
+  EmbeddingData embedding_data;
+  std::string extra_options;
+
+  _MatchTensorExpr__isset __isset;
+
+  void __set_search_method(const std::string& val);
+
+  void __set_column_expr(const ColumnExpr& val);
+
+  void __set_embedding_data_type(const ElementType::type val);
+
+  void __set_embedding_data(const EmbeddingData& val);
+
+  void __set_extra_options(const std::string& val);
+
+  bool operator == (const MatchTensorExpr & rhs) const
+  {
+    if (!(search_method == rhs.search_method))
+      return false;
+    if (!(column_expr == rhs.column_expr))
+      return false;
+    if (!(embedding_data_type == rhs.embedding_data_type))
+      return false;
+    if (!(embedding_data == rhs.embedding_data))
+      return false;
+    if (!(extra_options == rhs.extra_options))
+      return false;
+    return true;
+  }
+  bool operator != (const MatchTensorExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const MatchTensorExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(MatchTensorExpr &a, MatchTensorExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const MatchTensorExpr& obj);
+
 typedef struct _MatchExpr__isset {
   _MatchExpr__isset() : fields(false), matching_text(false), options_text(false) {}
   bool fields :1;
@@ -1212,9 +1581,10 @@ void swap(MatchExpr &a, MatchExpr &b);
 std::ostream& operator<<(std::ostream& out, const MatchExpr& obj);
 
 typedef struct _FusionExpr__isset {
-  _FusionExpr__isset() : method(false), options_text(false) {}
+  _FusionExpr__isset() : method(false), options_text(false), optional_match_tensor_expr(false) {}
   bool method :1;
   bool options_text :1;
+  bool optional_match_tensor_expr :1;
 } _FusionExpr__isset;
 
 class FusionExpr : public virtual ::apache::thrift::TBase {
@@ -1230,6 +1600,7 @@ class FusionExpr : public virtual ::apache::thrift::TBase {
   virtual ~FusionExpr() noexcept;
   std::string method;
   std::string options_text;
+  MatchTensorExpr optional_match_tensor_expr;
 
   _FusionExpr__isset __isset;
 
@@ -1237,11 +1608,17 @@ class FusionExpr : public virtual ::apache::thrift::TBase {
 
   void __set_options_text(const std::string& val);
 
+  void __set_optional_match_tensor_expr(const MatchTensorExpr& val);
+
   bool operator == (const FusionExpr & rhs) const
   {
     if (!(method == rhs.method))
       return false;
     if (!(options_text == rhs.options_text))
+      return false;
+    if (__isset.optional_match_tensor_expr != rhs.__isset.optional_match_tensor_expr)
+      return false;
+    else if (__isset.optional_match_tensor_expr && !(optional_match_tensor_expr == rhs.optional_match_tensor_expr))
       return false;
     return true;
   }
@@ -1262,10 +1639,12 @@ void swap(FusionExpr &a, FusionExpr &b);
 std::ostream& operator<<(std::ostream& out, const FusionExpr& obj);
 
 typedef struct _SearchExpr__isset {
-  _SearchExpr__isset() : match_exprs(false), knn_exprs(false), fusion_expr(false) {}
+  _SearchExpr__isset() : match_exprs(false), knn_exprs(false), match_sparse_exprs(false), match_tensor_exprs(false), fusion_exprs(false) {}
   bool match_exprs :1;
   bool knn_exprs :1;
-  bool fusion_expr :1;
+  bool match_sparse_exprs :1;
+  bool match_tensor_exprs :1;
+  bool fusion_exprs :1;
 } _SearchExpr__isset;
 
 class SearchExpr : public virtual ::apache::thrift::TBase {
@@ -1279,7 +1658,9 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
   virtual ~SearchExpr() noexcept;
   std::vector<MatchExpr>  match_exprs;
   std::vector<KnnExpr>  knn_exprs;
-  FusionExpr fusion_expr;
+  std::vector<MatchSparseExpr>  match_sparse_exprs;
+  std::vector<MatchTensorExpr>  match_tensor_exprs;
+  std::vector<FusionExpr>  fusion_exprs;
 
   _SearchExpr__isset __isset;
 
@@ -1287,7 +1668,11 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
 
   void __set_knn_exprs(const std::vector<KnnExpr> & val);
 
-  void __set_fusion_expr(const FusionExpr& val);
+  void __set_match_sparse_exprs(const std::vector<MatchSparseExpr> & val);
+
+  void __set_match_tensor_exprs(const std::vector<MatchTensorExpr> & val);
+
+  void __set_fusion_exprs(const std::vector<FusionExpr> & val);
 
   bool operator == (const SearchExpr & rhs) const
   {
@@ -1299,9 +1684,17 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
       return false;
     else if (__isset.knn_exprs && !(knn_exprs == rhs.knn_exprs))
       return false;
-    if (__isset.fusion_expr != rhs.__isset.fusion_expr)
+    if (__isset.match_sparse_exprs != rhs.__isset.match_sparse_exprs)
       return false;
-    else if (__isset.fusion_expr && !(fusion_expr == rhs.fusion_expr))
+    else if (__isset.match_sparse_exprs && !(match_sparse_exprs == rhs.match_sparse_exprs))
+      return false;
+    if (__isset.match_tensor_exprs != rhs.__isset.match_tensor_exprs)
+      return false;
+    else if (__isset.match_tensor_exprs && !(match_tensor_exprs == rhs.match_tensor_exprs))
+      return false;
+    if (__isset.fusion_exprs != rhs.__isset.fusion_exprs)
+      return false;
+    else if (__isset.fusion_exprs && !(fusion_exprs == rhs.fusion_exprs))
       return false;
     return true;
   }
@@ -1320,105 +1713,6 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
 void swap(SearchExpr &a, SearchExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const SearchExpr& obj);
-
-typedef struct _ConstantExpr__isset {
-  _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false) {}
-  bool literal_type :1;
-  bool bool_value :1;
-  bool i64_value :1;
-  bool f64_value :1;
-  bool str_value :1;
-  bool i64_array_value :1;
-  bool f64_array_value :1;
-} _ConstantExpr__isset;
-
-class ConstantExpr : public virtual ::apache::thrift::TBase {
- public:
-
-  ConstantExpr(const ConstantExpr&);
-  ConstantExpr& operator=(const ConstantExpr&);
-  ConstantExpr() noexcept
-               : literal_type(static_cast<LiteralType::type>(0)),
-                 bool_value(0),
-                 i64_value(0),
-                 f64_value(0),
-                 str_value() {
-  }
-
-  virtual ~ConstantExpr() noexcept;
-  /**
-   * 
-   * @see LiteralType
-   */
-  LiteralType::type literal_type;
-  bool bool_value;
-  int64_t i64_value;
-  double f64_value;
-  std::string str_value;
-  std::vector<int64_t>  i64_array_value;
-  std::vector<double>  f64_array_value;
-
-  _ConstantExpr__isset __isset;
-
-  void __set_literal_type(const LiteralType::type val);
-
-  void __set_bool_value(const bool val);
-
-  void __set_i64_value(const int64_t val);
-
-  void __set_f64_value(const double val);
-
-  void __set_str_value(const std::string& val);
-
-  void __set_i64_array_value(const std::vector<int64_t> & val);
-
-  void __set_f64_array_value(const std::vector<double> & val);
-
-  bool operator == (const ConstantExpr & rhs) const
-  {
-    if (!(literal_type == rhs.literal_type))
-      return false;
-    if (__isset.bool_value != rhs.__isset.bool_value)
-      return false;
-    else if (__isset.bool_value && !(bool_value == rhs.bool_value))
-      return false;
-    if (__isset.i64_value != rhs.__isset.i64_value)
-      return false;
-    else if (__isset.i64_value && !(i64_value == rhs.i64_value))
-      return false;
-    if (__isset.f64_value != rhs.__isset.f64_value)
-      return false;
-    else if (__isset.f64_value && !(f64_value == rhs.f64_value))
-      return false;
-    if (__isset.str_value != rhs.__isset.str_value)
-      return false;
-    else if (__isset.str_value && !(str_value == rhs.str_value))
-      return false;
-    if (__isset.i64_array_value != rhs.__isset.i64_array_value)
-      return false;
-    else if (__isset.i64_array_value && !(i64_array_value == rhs.i64_array_value))
-      return false;
-    if (__isset.f64_array_value != rhs.__isset.f64_array_value)
-      return false;
-    else if (__isset.f64_array_value && !(f64_array_value == rhs.f64_array_value))
-      return false;
-    return true;
-  }
-  bool operator != (const ConstantExpr &rhs) const {
-    return !(*this == rhs);
-  }
-
-  bool operator < (const ConstantExpr & ) const;
-
-  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
-  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
-
-  virtual void printTo(std::ostream& out) const;
-};
-
-void swap(ConstantExpr &a, ConstantExpr &b);
-
-std::ostream& operator<<(std::ostream& out, const ConstantExpr& obj);
 
 typedef struct _FunctionExpr__isset {
   _FunctionExpr__isset() : function_name(false), arguments(false) {}
@@ -1795,9 +2089,8 @@ void swap(ColumnField &a, ColumnField &b);
 std::ostream& operator<<(std::ostream& out, const ColumnField& obj);
 
 typedef struct _ImportOption__isset {
-  _ImportOption__isset() : delimiter(false), copy_from(false), has_header(false), copy_file_type(false) {}
+  _ImportOption__isset() : delimiter(false), has_header(false), copy_file_type(false) {}
   bool delimiter :1;
-  bool copy_from :1;
   bool has_header :1;
   bool copy_file_type :1;
 } _ImportOption__isset;
@@ -1809,14 +2102,12 @@ class ImportOption : public virtual ::apache::thrift::TBase {
   ImportOption& operator=(const ImportOption&);
   ImportOption() noexcept
                : delimiter(),
-                 copy_from(0),
                  has_header(0),
                  copy_file_type(static_cast<CopyFileType::type>(0)) {
   }
 
   virtual ~ImportOption() noexcept;
   std::string delimiter;
-  bool copy_from;
   bool has_header;
   /**
    * 
@@ -1828,8 +2119,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 
   void __set_delimiter(const std::string& val);
 
-  void __set_copy_from(const bool val);
-
   void __set_has_header(const bool val);
 
   void __set_copy_file_type(const CopyFileType::type val);
@@ -1837,8 +2126,6 @@ class ImportOption : public virtual ::apache::thrift::TBase {
   bool operator == (const ImportOption & rhs) const
   {
     if (!(delimiter == rhs.delimiter))
-      return false;
-    if (!(copy_from == rhs.copy_from))
       return false;
     if (!(has_header == rhs.has_header))
       return false;
@@ -1861,6 +2148,181 @@ class ImportOption : public virtual ::apache::thrift::TBase {
 void swap(ImportOption &a, ImportOption &b);
 
 std::ostream& operator<<(std::ostream& out, const ImportOption& obj);
+
+typedef struct _ExportOption__isset {
+  _ExportOption__isset() : delimiter(false), has_header(false), copy_file_type(false), offset(false), limit(false), row_limit(false) {}
+  bool delimiter :1;
+  bool has_header :1;
+  bool copy_file_type :1;
+  bool offset :1;
+  bool limit :1;
+  bool row_limit :1;
+} _ExportOption__isset;
+
+class ExportOption : public virtual ::apache::thrift::TBase {
+ public:
+
+  ExportOption(const ExportOption&);
+  ExportOption& operator=(const ExportOption&);
+  ExportOption() noexcept
+               : delimiter(),
+                 has_header(0),
+                 copy_file_type(static_cast<CopyFileType::type>(0)),
+                 offset(0),
+                 limit(0),
+                 row_limit(0) {
+  }
+
+  virtual ~ExportOption() noexcept;
+  std::string delimiter;
+  bool has_header;
+  /**
+   * 
+   * @see CopyFileType
+   */
+  CopyFileType::type copy_file_type;
+  int64_t offset;
+  int64_t limit;
+  int64_t row_limit;
+
+  _ExportOption__isset __isset;
+
+  void __set_delimiter(const std::string& val);
+
+  void __set_has_header(const bool val);
+
+  void __set_copy_file_type(const CopyFileType::type val);
+
+  void __set_offset(const int64_t val);
+
+  void __set_limit(const int64_t val);
+
+  void __set_row_limit(const int64_t val);
+
+  bool operator == (const ExportOption & rhs) const
+  {
+    if (!(delimiter == rhs.delimiter))
+      return false;
+    if (!(has_header == rhs.has_header))
+      return false;
+    if (!(copy_file_type == rhs.copy_file_type))
+      return false;
+    if (!(offset == rhs.offset))
+      return false;
+    if (!(limit == rhs.limit))
+      return false;
+    if (!(row_limit == rhs.row_limit))
+      return false;
+    return true;
+  }
+  bool operator != (const ExportOption &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ExportOption & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ExportOption &a, ExportOption &b);
+
+std::ostream& operator<<(std::ostream& out, const ExportOption& obj);
+
+typedef struct _OptimizeOptions__isset {
+  _OptimizeOptions__isset() : index_name(false), opt_params(true) {}
+  bool index_name :1;
+  bool opt_params :1;
+} _OptimizeOptions__isset;
+
+class OptimizeOptions : public virtual ::apache::thrift::TBase {
+ public:
+
+  OptimizeOptions(const OptimizeOptions&);
+  OptimizeOptions& operator=(const OptimizeOptions&);
+  OptimizeOptions() noexcept
+                  : index_name() {
+
+  }
+
+  virtual ~OptimizeOptions() noexcept;
+  std::string index_name;
+  std::vector<InitParameter>  opt_params;
+
+  _OptimizeOptions__isset __isset;
+
+  void __set_index_name(const std::string& val);
+
+  void __set_opt_params(const std::vector<InitParameter> & val);
+
+  bool operator == (const OptimizeOptions & rhs) const
+  {
+    if (!(index_name == rhs.index_name))
+      return false;
+    if (!(opt_params == rhs.opt_params))
+      return false;
+    return true;
+  }
+  bool operator != (const OptimizeOptions &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const OptimizeOptions & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(OptimizeOptions &a, OptimizeOptions &b);
+
+std::ostream& operator<<(std::ostream& out, const OptimizeOptions& obj);
+
+typedef struct _ConnectRequest__isset {
+  _ConnectRequest__isset() : client_version(false) {}
+  bool client_version :1;
+} _ConnectRequest__isset;
+
+class ConnectRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ConnectRequest(const ConnectRequest&) noexcept;
+  ConnectRequest& operator=(const ConnectRequest&) noexcept;
+  ConnectRequest() noexcept
+                 : client_version(0) {
+  }
+
+  virtual ~ConnectRequest() noexcept;
+  int64_t client_version;
+
+  _ConnectRequest__isset __isset;
+
+  void __set_client_version(const int64_t val);
+
+  bool operator == (const ConnectRequest & rhs) const
+  {
+    if (!(client_version == rhs.client_version))
+      return false;
+    return true;
+  }
+  bool operator != (const ConnectRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ConnectRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ConnectRequest &a, ConnectRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ConnectRequest& obj);
 
 typedef struct _CommonRequest__isset {
   _CommonRequest__isset() : session_id(false) {}
@@ -3059,6 +3521,69 @@ void swap(ShowIndexResponse &a, ShowIndexResponse &b);
 
 std::ostream& operator<<(std::ostream& out, const ShowIndexResponse& obj);
 
+typedef struct _OptimizeRequest__isset {
+  _OptimizeRequest__isset() : db_name(false), table_name(false), optimize_options(false), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool optimize_options :1;
+  bool session_id :1;
+} _OptimizeRequest__isset;
+
+class OptimizeRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  OptimizeRequest(const OptimizeRequest&);
+  OptimizeRequest& operator=(const OptimizeRequest&);
+  OptimizeRequest() noexcept
+                  : db_name(),
+                    table_name(),
+                    session_id(0) {
+  }
+
+  virtual ~OptimizeRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  OptimizeOptions optimize_options;
+  int64_t session_id;
+
+  _OptimizeRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_optimize_options(const OptimizeOptions& val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const OptimizeRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(optimize_options == rhs.optimize_options))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const OptimizeRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const OptimizeRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(OptimizeRequest &a, OptimizeRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const OptimizeRequest& obj);
+
 typedef struct _GetDatabaseRequest__isset {
   _GetDatabaseRequest__isset() : db_name(false), session_id(false) {}
   bool db_name :1;
@@ -3426,11 +3951,10 @@ void swap(InsertRequest &a, InsertRequest &b);
 std::ostream& operator<<(std::ostream& out, const InsertRequest& obj);
 
 typedef struct _ImportRequest__isset {
-  _ImportRequest__isset() : db_name(false), table_name(false), file_name(false), file_content(false), import_option(false), session_id(false) {}
+  _ImportRequest__isset() : db_name(false), table_name(false), file_name(false), import_option(false), session_id(false) {}
   bool db_name :1;
   bool table_name :1;
   bool file_name :1;
-  bool file_content :1;
   bool import_option :1;
   bool session_id :1;
 } _ImportRequest__isset;
@@ -3444,7 +3968,6 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
                 : db_name(),
                   table_name(),
                   file_name(),
-                  file_content(),
                   session_id(0) {
   }
 
@@ -3452,7 +3975,6 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
   std::string db_name;
   std::string table_name;
   std::string file_name;
-  std::string file_content;
   ImportOption import_option;
   int64_t session_id;
 
@@ -3463,8 +3985,6 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
   void __set_table_name(const std::string& val);
 
   void __set_file_name(const std::string& val);
-
-  void __set_file_content(const std::string& val);
 
   void __set_import_option(const ImportOption& val);
 
@@ -3477,8 +3997,6 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
     if (!(table_name == rhs.table_name))
       return false;
     if (!(file_name == rhs.file_name))
-      return false;
-    if (!(file_content == rhs.file_content))
       return false;
     if (!(import_option == rhs.import_option))
       return false;
@@ -3501,6 +4019,82 @@ class ImportRequest : public virtual ::apache::thrift::TBase {
 void swap(ImportRequest &a, ImportRequest &b);
 
 std::ostream& operator<<(std::ostream& out, const ImportRequest& obj);
+
+typedef struct _ExportRequest__isset {
+  _ExportRequest__isset() : db_name(false), table_name(false), columns(false), file_name(false), export_option(false), session_id(false) {}
+  bool db_name :1;
+  bool table_name :1;
+  bool columns :1;
+  bool file_name :1;
+  bool export_option :1;
+  bool session_id :1;
+} _ExportRequest__isset;
+
+class ExportRequest : public virtual ::apache::thrift::TBase {
+ public:
+
+  ExportRequest(const ExportRequest&);
+  ExportRequest& operator=(const ExportRequest&);
+  ExportRequest() noexcept
+                : db_name(),
+                  table_name(),
+                  file_name(),
+                  session_id(0) {
+  }
+
+  virtual ~ExportRequest() noexcept;
+  std::string db_name;
+  std::string table_name;
+  std::vector<std::string>  columns;
+  std::string file_name;
+  ExportOption export_option;
+  int64_t session_id;
+
+  _ExportRequest__isset __isset;
+
+  void __set_db_name(const std::string& val);
+
+  void __set_table_name(const std::string& val);
+
+  void __set_columns(const std::vector<std::string> & val);
+
+  void __set_file_name(const std::string& val);
+
+  void __set_export_option(const ExportOption& val);
+
+  void __set_session_id(const int64_t val);
+
+  bool operator == (const ExportRequest & rhs) const
+  {
+    if (!(db_name == rhs.db_name))
+      return false;
+    if (!(table_name == rhs.table_name))
+      return false;
+    if (!(columns == rhs.columns))
+      return false;
+    if (!(file_name == rhs.file_name))
+      return false;
+    if (!(export_option == rhs.export_option))
+      return false;
+    if (!(session_id == rhs.session_id))
+      return false;
+    return true;
+  }
+  bool operator != (const ExportRequest &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const ExportRequest & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(ExportRequest &a, ExportRequest &b);
+
+std::ostream& operator<<(std::ostream& out, const ExportRequest& obj);
 
 typedef struct _ExplainRequest__isset {
   _ExplainRequest__isset() : session_id(false), db_name(false), table_name(false), select_list(true), search_expr(false), where_expr(false), group_by_list(true), having_expr(false), limit_expr(false), offset_expr(false), order_by_list(true), explain_type(false) {}

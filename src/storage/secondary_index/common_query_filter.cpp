@@ -44,6 +44,7 @@ import logical_type;
 import expression_state;
 import infinity_exception;
 import third_party;
+import logger;
 
 namespace infinity {
 
@@ -54,13 +55,14 @@ void ReadDataBlock(DataBlock *output,
                    const Vector<SizeT> &column_ids) {
     auto block_id = current_block_entry->block_id();
     auto segment_id = current_block_entry->segment_id();
-    for (SizeT output_column_id = 0; auto column_id : column_ids) {
+    for (SizeT i = 0; i < column_ids.size(); ++i) {
+        SizeT column_id = column_ids[i];
         if (column_id == COLUMN_IDENTIFIER_ROW_ID) {
             u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
-            output->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), row_count);
+            output->column_vectors[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
         } else {
             ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
-            output->column_vectors[output_column_id++]->AppendWith(column_vector, 0, row_count);
+            output->column_vectors[i]->AppendWith(column_vector, 0, row_count);
         }
     }
     output->Finalize();
@@ -180,10 +182,12 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
             bool_column->Reset();
         }
         if (segment_row_count_real < segment_row_count) {
-            UnrecoverableError(fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
-                                           segment_id,
-                                           segment_row_count_real,
-                                           segment_row_count));
+            String error_message = fmt::format("Segment_row_count mismatch: In segment {}: segment_row_count_real: {}, segment_row_count: {}",
+                                               segment_id,
+                                               segment_row_count_real,
+                                               segment_row_count);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         // merge
         std::visit(Overload{[&bitmask](Vector<u32> &v) {

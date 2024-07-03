@@ -14,28 +14,34 @@
 
 #pragma once
 
+#include "constant_expr.h"
 #include "parsed_expr.h"
-#include "type/complex/embedding_type.h"
+#include <memory>
+
 namespace infinity {
 
-enum class MatchTensorMethod : uint8_t {
+enum class MatchTensorSearchMethod : uint8_t {
     kInvalid,
     kMaxSim,
 };
 
 class MatchTensorExpr final : public ParsedExpr {
 public:
-    explicit MatchTensorExpr(bool own_memory = true) : ParsedExpr(ParsedExprType::kTensorMaxSim), own_memory_(own_memory) {}
-    ~MatchTensorExpr() override;
+    explicit MatchTensorExpr(bool own_memory = true) : ParsedExpr(ParsedExprType::kMatchTensor), own_memory_(own_memory) {}
     [[nodiscard]] std::string ToString() const override;
-    static std::string MethodToString(MatchTensorMethod method);
-
+    void SetSearchMethod(char *&raw_search_method);
+    void SetSearchMethodStr(std::string search_method);
+    void SetSearchColumn(ParsedExpr *&column_expr) noexcept;
+    void SetExtraOptions(char *&raw_options_text);
+    void SetQueryTensor(char *&raw_embedding_data_type, ConstantExpr *&raw_tensor_expr);
+    void SetQueryTensorStr(std::string embedding_data_type, const ConstantExpr *tensor_expr);
+    static std::string SearchMethodToString(MatchTensorSearchMethod method);
     const bool own_memory_;
-    MatchTensorMethod search_method_ = MatchTensorMethod::kInvalid;
-    ParsedExpr *column_expr_{};
-    void *embedding_data_ptr_{}; // Pointer to the embedding data ,the data type include float, int ,char ...., so we use void* here
-    uint32_t dimension_{};
-    EmbeddingDataType embedding_data_type_{EmbeddingDataType::kElemInvalid};
+    MatchTensorSearchMethod search_method_enum_ = MatchTensorSearchMethod::kInvalid;
+    std::unique_ptr<ParsedExpr> column_expr_;
+    EmbeddingDataType embedding_data_type_ = EmbeddingDataType::kElemInvalid;
+    std::unique_ptr<char[]> query_tensor_data_ptr_;
+    uint32_t dimension_ = 0;
     std::string options_text_;
 };
 

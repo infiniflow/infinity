@@ -28,6 +28,7 @@ import scalar_function_set;
 import third_party;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
@@ -54,7 +55,9 @@ struct ColumnValueReaderTypeLessEqualsFunction {
 
 template <>
 inline void LessEqualsFunction::Run(MixedT, BigIntT, bool &) {
-    UnrecoverableError("Not implement: LessEqualsFunction::Run");
+    String error_message = "Not implement: LessEqualsFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 template <>
@@ -64,7 +67,9 @@ inline void LessEqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 
 template <>
 inline void LessEqualsFunction::Run(MixedT, DoubleT, bool &) {
-    UnrecoverableError("Not implement: LessEqualsFunction::Run");
+    String error_message = "Not implement: LessEqualsFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 template <>
@@ -74,7 +79,9 @@ inline void LessEqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 
 template <>
 inline void LessEqualsFunction::Run(MixedT, VarcharT, bool &) {
-    UnrecoverableError("Not implement: LessEqualsFunction::Run");
+    String error_message = "Not implement: LessEqualsFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
 }
 
 template <>

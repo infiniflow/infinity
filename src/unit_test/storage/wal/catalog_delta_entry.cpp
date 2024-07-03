@@ -27,6 +27,7 @@ import index_secondary;
 import infinity_context;
 import data_type;
 import logical_type;
+import constant_expr;
 
 class CatalogDeltaEntryTest : public BaseTest {};
 
@@ -43,10 +44,20 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     auto table_entry_dir = MakeShared<String>("data/db_test/table_test");
     Vector<SharedPtr<ColumnDef>> column_defs{};
     {
-        auto column_def1 =
-            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-        auto column_def2 =
-            std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+        auto default_v_1 = std::make_shared<ConstantExpr>(LiteralType::kInteger);
+        default_v_1->integer_value_ = 33;
+        auto column_def1 = std::make_shared<ColumnDef>(0,
+                                                       std::make_shared<DataType>(LogicalType::kInteger),
+                                                       "col1",
+                                                       std::set<ConstraintType>(),
+                                                       std::move(default_v_1));
+        auto default_v_2 = std::make_shared<ConstantExpr>(LiteralType::kString);
+        default_v_2->str_value_ = strdup("test_long_str_val_kdglkwhfjlkbn.lzxncl;ha;");
+        auto column_def2 = std::make_shared<ColumnDef>(0,
+                                                       std::make_shared<DataType>(LogicalType::kVarchar),
+                                                       "col2",
+                                                       std::set<ConstraintType>(),
+                                                       std::move(default_v_2));
         column_defs.push_back(column_def1);
         column_defs.push_back(column_def2);
     }
@@ -99,7 +110,7 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
         {
             auto op = MakeUnique<AddColumnEntryOp>();
             op->encode_ = MakeUnique<String>(fmt::format("#{}#{}#{}#{}#{}", db_name, table_name, segment_id, block_id, column_id));
-            op->next_outline_idx_ = 0;
+            op->outline_infos_.resize(2);
             catalog_delta_entry1->operations().push_back(std::move(op));
         }
         {
@@ -280,7 +291,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
         auto encode = MakeShared<String>(fmt::format("#{}#{}#{}#{}#{}", *db_name, *table_name, segment_id, block_id, column_id));
         op1_same_name->encode_ = op1->encode_ = encode;
 
-        op1_same_name->next_outline_idx_ = op1->next_outline_idx_ = 0;
+        op1_same_name->outline_infos_.resize(2);
+        op1->outline_infos_.resize(2);
 
         op1->merge_flag_ = MergeFlag::kNew;
         op1_same_name->merge_flag_ = MergeFlag::kUpdate;

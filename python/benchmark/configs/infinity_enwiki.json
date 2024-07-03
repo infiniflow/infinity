@@ -6,10 +6,11 @@
     "data_link": "http://192.168.200.183:8000/enwiki-20120502-lines-10.csv",
     "insert_batch_size": 8192,
     "query_path": "datasets/enwiki/operations.txt",
+    "result_path": "datasets/enwiki/infinity_result.jsonl",
     "query_link": "to_be_set",
     "mode": "fulltext",
     "topK": 10,
-    "use_import": true,
+    "use_import": false,
     "schema": {
         "doctitle": {"type": "varchar", "default":""},
         "docdate": {"type": "varchar", "default":""},

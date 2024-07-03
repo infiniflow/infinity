@@ -85,9 +85,10 @@ WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT co
         block_info.block_id_ = 0;
         block_info.row_count_ = row_count;
         block_info.row_capacity_ = row_count;
-        Vector<Pair<i32, u64>> outline_infos;
+        Vector<Vector<Pair<u32, u64>>> outline_infos;
+        outline_infos.resize(column_count);
         for (SizeT i = 0; i < column_count; ++i) {
-            outline_infos.emplace_back(0, 0);
+            outline_infos[i].resize(2);
         }
         block_info.outline_infos_ = std::move(outline_infos);
     }
@@ -95,7 +96,7 @@ WalSegmentInfo MakeSegmentInfo(SizeT row_count, TxnTimeStamp commit_ts, SizeT co
     return segment_info;
 }
 
-void MockWalFile(const String &wal_file_path, const String &ckp_file_path) {
+void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const String &ckp_file_name) {
     for (int commit_ts = 0; commit_ts < 3; ++commit_ts) {
         SizeT row_count = DEFAULT_VECTOR_SIZE;
 
@@ -127,7 +128,9 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path) {
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
+            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -148,7 +151,9 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path) {
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
+            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -156,7 +161,7 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path) {
     }
     {
         auto entry = MakeShared<WalEntry>();
-        entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, ckp_file_path));
+        entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, ckp_file_path, ckp_file_name));
         entry->commit_ts_ = 3;
         i32 expect_size = entry->GetSizeInBytes();
         Vector<char> buf(expect_size);
@@ -167,7 +172,9 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path) {
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
+            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -186,7 +193,9 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path) {
 
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
-            UnrecoverableError(fmt::format("Failed to open wal file: {}", wal_file_path));
+            String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         ofs.write(buf.data(), ptr - buf.data());
         ofs.flush();
@@ -234,7 +243,7 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<RowID> row_ids = {RowID(1, 3)};
         entry->cmds_.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, String(GetDataDir()) + "/catalog/META_123.full.json"));
+    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, String(GetDataDir()) + "/catalog", String("META_123.full.json")));
     {
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
@@ -261,13 +270,14 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     RemoveDbDirs();
     std::filesystem::create_directories(GetWalDir());
     String wal_file_path = String(GetWalDir()) + "/wal.log";
-    String ckp_file_path = String(GetDataDir()) + "/catalog/META_123.full.json";
-    MockWalFile(wal_file_path, ckp_file_path);
+    String ckp_file_path = String(GetDataDir()) + "/catalog";
+    String ckp_file_name = String("META_123.full.json");
+    MockWalFile(wal_file_path, ckp_file_path, ckp_file_name);
     {
-        auto iterator1 = WalEntryIterator::Make(wal_file_path);
+        auto iterator1 = WalEntryIterator::Make(wal_file_path, true);
 
-        while (true) {
-            auto wal_entry = iterator1.Next();
+        while (iterator1->HasNext()) {
+            auto wal_entry = iterator1->Next();
             if (wal_entry == nullptr) {
                 break;
             }
@@ -282,11 +292,11 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     TxnTimeStamp max_commit_ts = 0;
     String catalog_path;
     {
-        auto iterator = WalEntryIterator::Make(wal_file_path);
+        auto iterator = WalEntryIterator::Make(wal_file_path, true);
 
         // phase 1: find the max commit ts and catalog path
-        while (true) {
-            auto wal_entry = iterator.Next();
+        while (iterator->HasNext()) {
+            auto wal_entry = iterator->Next();
             if (wal_entry == nullptr) {
                 break;
             }
@@ -304,8 +314,8 @@ TEST_F(WalEntryTest, WalEntryIterator) {
         }
 
         // phase 2: by the max commit ts, find the entries to replay
-        while (true) {
-            auto wal_entry = iterator.Next();
+        while (iterator->HasNext()) {
+            auto wal_entry = iterator->Next();
             if (wal_entry == nullptr) {
                 break;
             }
@@ -324,7 +334,7 @@ TEST_F(WalEntryTest, WalEntryIterator) {
         }
     }
     EXPECT_EQ(max_commit_ts, 123ul);
-    EXPECT_EQ(catalog_path, String(GetDataDir()) + "/catalog/META_123.full.json");
+    EXPECT_EQ(catalog_path, String(GetDataDir()) + "/catalog");
     EXPECT_EQ(replay_entries.size(), 1u);
 }
 
@@ -334,13 +344,14 @@ TEST_F(WalEntryTest, WalListIterator) {
     std::filesystem::create_directories(GetWalDir());
     String wal_file_path1 = String(GetWalDir()) + "/wal.log";
     String wal_file_path2 = String(GetWalDir()) + "/wal2.log";
-    String ckp_file_path = String(GetDataDir()) + "/catalog/META_123.full.json";
-    MockWalFile(wal_file_path1, ckp_file_path);
-    MockWalFile(wal_file_path2, ckp_file_path);
+    String ckp_file_path = String(GetDataDir()) + "/catalog";
+    String ckp_file_name = String("META_123.full.json");
+    MockWalFile(wal_file_path1, ckp_file_path, ckp_file_name);
+    MockWalFile(wal_file_path2, ckp_file_path, ckp_file_name);
 
     WalListIterator iterator1({wal_file_path1, wal_file_path2});
 
-    while (true) {
+    while (iterator1.HasNext()) {
         auto wal_entry = iterator1.Next();
         if (wal_entry.get() == nullptr) {
             break;
@@ -358,7 +369,7 @@ TEST_F(WalEntryTest, WalListIterator) {
         WalListIterator iterator({wal_file_path1, wal_file_path2});
 
         // phase 1: find the max commit ts and catalog path
-        while (true) {
+        while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
                 break;
@@ -377,7 +388,7 @@ TEST_F(WalEntryTest, WalListIterator) {
         }
 
         // phase 2: by the max commit ts, find the entries to replay
-        while (true) {
+        while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
                 break;

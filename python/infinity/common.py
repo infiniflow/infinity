@@ -28,13 +28,24 @@ class NetworkAddress:
 
 URI = Union[NetworkAddress, Path]
 VEC = Union[list, np.ndarray]
-INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]]]
+SPARSE = dict[str, Union[list[int], list[float]]]
+INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SPARSE]
 
-REMOTE_HOST = NetworkAddress("127.0.0.1", 23817)
-LOCAL_HOST = NetworkAddress("0.0.0.0", 23817)
+LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
 
+# test embedded_infinity
+LOCAL_INFINITY_PATH = "/var/infinity"
 
 class ConflictType(object):
     Ignore = 0
     Error = 1
     Replace = 2
+
+
+class InfinityException(Exception):
+    def __init__(self, error_code=0, error_message=None):
+        self.error_code = error_code
+        self.error_message = error_message
+
+DEFAULT_MATCH_VECTOR_TOPN = 10
+DEFAULT_MATCH_SPARSE_TOPN = 10

@@ -33,6 +33,11 @@ public:
 
 public:
     void Submit(SharedPtr<BGTask> bg_task);
+    u64 RunningTaskCount() const { return task_count_; }
+    String RunningTaskText() const {
+        std::unique_lock<std::mutex> locker(task_mutex_);
+        return task_text_;
+    }
 
 private:
     void Process();
@@ -45,6 +50,11 @@ private:
 
     WalManager *wal_manager_{};
     Catalog *catalog_{};
+
+    Atomic<u64> task_count_{};
+
+    mutable std::mutex task_mutex_;
+    String task_text_;
 };
 
 } // namespace infinity

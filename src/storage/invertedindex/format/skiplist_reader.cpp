@@ -87,10 +87,14 @@ u32 SkipListReader::GetLastKeyInBuffer() const {
 
 void SkipListReaderByteSlice::Load(const ByteSliceList *byte_slice_list, u32 start, u32 end) {
     if (start > byte_slice_list->GetTotalSize()) {
-        UnrecoverableError("start > byte_slice_list->GetTotalSize().");
+        String error_message = "start > byte_slice_list->GetTotalSize().";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (end > byte_slice_list->GetTotalSize()) {
-        UnrecoverableError("end > byte_slice_list->GetTotalSize().");
+        String error_message = "end > byte_slice_list->GetTotalSize().";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     start_ = start;
     end_ = end;
@@ -100,10 +104,14 @@ void SkipListReaderByteSlice::Load(const ByteSliceList *byte_slice_list, u32 sta
 
 void SkipListReaderByteSlice::Load(ByteSlice *byte_slice, u32 start, u32 end) {
     if (start > byte_slice->size_) {
-        UnrecoverableError("start > byte_slice->size_.");
+        String error_message = "start > byte_slice->size_.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (end > byte_slice->size_) {
-        UnrecoverableError("end > byte_slice->size_.");
+        String error_message = "end > byte_slice->size_.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     start_ = start;
@@ -121,7 +129,10 @@ Pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
             const Int32Encoder *tf_encoder = GetSkipListEncoder();
             u32 ttf_num = tf_encoder->Decode(ttf_buffer_.get(), SKIP_LIST_BUFFER_SIZE, byte_slice_reader_);
             if (ttf_num != doc_num) {
-                UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} ttf_num = {}", doc_num, ttf_num));
+                String error_message = fmt::format("SKipList decode error, doc_num = {} ttf_num = {}", doc_num, ttf_num);
+                LOG_ERROR(error_message);
+                UnrecoverableError(error_message);
+
                 return MakePair(-1, false);
             }
         }
@@ -129,13 +140,17 @@ Pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
             const Int32Encoder *block_max_tf_encoder = GetSkipListEncoder();
             u32 block_max_tf_num = block_max_tf_encoder->Decode(block_max_tf_buffer_.get(), SKIP_LIST_BUFFER_SIZE, byte_slice_reader_);
             if (block_max_tf_num != doc_num) {
-                UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} block_max_tf_num = {}", doc_num, block_max_tf_num));
+                String error_message = fmt::format("SKipList decode error, doc_num = {} block_max_tf_num = {}", doc_num, block_max_tf_num);
+                LOG_ERROR(error_message);
+                UnrecoverableError(error_message);
                 return MakePair(-1, false);
             }
             const Int16Encoder *tf_percentage_encoder = GetTermPercentageEncoder();
             u32 tf_percentage_num = tf_percentage_encoder->Decode(block_max_tf_percentage_buffer_.get(), SKIP_LIST_BUFFER_SIZE, byte_slice_reader_);
             if (tf_percentage_num != doc_num) {
-                UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num));
+                String error_message = fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num);
+                LOG_ERROR(error_message);
+                UnrecoverableError(error_message);
                 return MakePair(-1, false);
             }
         }
@@ -143,7 +158,9 @@ Pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
             const Int32Encoder *offset_encoder = GetSkipListEncoder();
             u32 len_num = offset_encoder->Decode(static_cast<u32 *>(offset_buffer_), SKIP_LIST_BUFFER_SIZE, byte_slice_reader_);
             if (len_num != doc_num) {
-                UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} offset_num = {}", doc_num, len_num));
+                String error_message = fmt::format("SKipList decode error, doc_num = {} offset_num = {}", doc_num, len_num);
+                LOG_ERROR(error_message);
+                UnrecoverableError(error_message);
                 return MakePair(-1, false);
             }
         }
@@ -155,19 +172,12 @@ Pair<int, bool> SkipListReaderByteSlice::LoadBuffer() {
 }
 
 SkipListReaderPostingByteSlice::~SkipListReaderPostingByteSlice() {
-    if (session_pool_) {
-        skiplist_buffer_->~PostingByteSlice();
-        session_pool_->Deallocate((void *)skiplist_buffer_, sizeof(PostingByteSlice));
-    } else {
-        delete skiplist_buffer_;
-    }
+    delete skiplist_buffer_;
     skiplist_buffer_ = nullptr;
 }
 
 void SkipListReaderPostingByteSlice::Load(const PostingByteSlice *posting_buffer) {
-    PostingByteSlice *skiplist_buffer = session_pool_ ? new (session_pool_->Allocate(sizeof(PostingByteSlice)))
-                                                            PostingByteSlice(session_pool_, session_pool_)
-                                                      : new PostingByteSlice(session_pool_, session_pool_);
+    PostingByteSlice *skiplist_buffer = new PostingByteSlice();
     posting_buffer->SnapShot(skiplist_buffer);
 
     skiplist_buffer_ = skiplist_buffer;
@@ -197,7 +207,9 @@ Pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
             return MakePair(0, false);
         }
         if (doc_num != ttf_num) {
-            UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} ttf_num = {}", doc_num, ttf_num));
+            String error_message = fmt::format("SKipList decode error, doc_num = {} ttf_num = {}", doc_num, ttf_num);
+            LOG_ERROR(error_message);
+            UnrecoverableError(error_message);
             return MakePair(-1, false);
         }
     }
@@ -208,7 +220,9 @@ Pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
             return MakePair(0, false);
         }
         if (doc_num != block_max_tf_num) {
-            UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} block_max_tf_num = {}", doc_num, block_max_tf_num));
+            String error_message = fmt::format("SKipList decode error, doc_num = {} block_max_tf_num = {}", doc_num, block_max_tf_num);
+            LOG_ERROR(error_message);
+            UnrecoverableError(error_message);
             return MakePair(-1, false);
         }
 
@@ -217,7 +231,9 @@ Pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
             return MakePair(0, false);
         }
         if (doc_num != tf_percentage_num) {
-            UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num));
+            String error_message = fmt::format("SKipList decode error, doc_num = {} block_max_tf_percentage_num = {}", doc_num, tf_percentage_num);
+            LOG_ERROR(error_message);
+            UnrecoverableError(error_message);
             return MakePair(-1, false);
         }
     }
@@ -227,7 +243,9 @@ Pair<int, bool> SkipListReaderPostingByteSlice::LoadBuffer() {
         return MakePair(0, false);
     }
     if (doc_num != len_num) {
-        UnrecoverableError(fmt::format("SKipList decode error, doc_num = {} len_num = {}", doc_num, len_num));
+        String error_message = fmt::format("SKipList decode error, doc_num = {} len_num = {}", doc_num, len_num);
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
         return MakePair(-1, false);
     }
 

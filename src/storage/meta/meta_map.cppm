@@ -122,7 +122,9 @@ Tuple<Meta *, Status, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetExi
         LOG_ERROR(*err_msg);
         return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg)), std::move(r_lock)};
     } else {
-        UnrecoverableError("Unimplemented");
+        String error_message = "Unimplemented";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 }
 

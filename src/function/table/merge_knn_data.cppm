@@ -22,6 +22,7 @@ import table_function;
 import base_table_ref;
 import merge_knn;
 import knn_expr;
+import internal_types;
 
 namespace infinity {
 

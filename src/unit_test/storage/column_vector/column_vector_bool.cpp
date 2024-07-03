@@ -29,8 +29,28 @@ import infinity_context;
 import global_resource_usage;
 import logical_type;
 import data_type;
+import compilation_config;
 
-class ColumnVectorBoolTest : public BaseTest {};
+class ColumnVectorBoolTest : public BaseTest {
+    void SetUp() override {
+        RemoveDbDirs();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        auto config_path = std::make_shared<std::string>(std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml");
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
+        BaseTest::TearDown();
+    }
+};
 
 TEST_F(ColumnVectorBoolTest, flat_boolean) {
     using namespace infinity;

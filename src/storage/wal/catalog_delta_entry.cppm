@@ -186,6 +186,7 @@ public:
     SizeT row_capacity_{0};
     TxnTimeStamp min_row_ts_{0};
     TxnTimeStamp max_row_ts_{0};
+    TxnTimeStamp first_delete_ts_{UNCOMMIT_TS};
     TxnTimeStamp deprecate_ts_{0};
     String segment_filter_binary_data_{};
 };
@@ -239,8 +240,7 @@ public:
     void Merge(CatalogDeltaOperation &other) override;
 
 public:
-    i32 next_outline_idx_{0};
-    u64 last_chunk_offset_{};
+    Vector<Pair<u32, u64>> outline_infos_;
 };
 
 /// class AddTableIndexEntryOp

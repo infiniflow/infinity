@@ -26,13 +26,16 @@ import scalar_function_set;
 import third_party;
 import internal_types;
 import data_type;
+import logger;
 
 namespace infinity {
 
 struct MulFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
-        UnrecoverableError("Not implement: MulFunction::Run");
+        String error_message = "Not implement: MulFunction::Run";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         return false;
     }
 };
@@ -96,14 +99,18 @@ inline bool MulFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 // Decimal * Decimal = Decimal
 template <>
 inline bool MulFunction::Run(DecimalT, DecimalT, DecimalT &) {
-    UnrecoverableError("Not implement: MulFunction::Run");
+    String error_message = "Not implement: MulFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
 // Mixed Type * i64
 template <>
 inline bool MulFunction::Run(MixedT, BigIntT, MixedT &) {
-    UnrecoverableError("Not implement: MulFunction::Run");
+    String error_message = "Not implement: MulFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -116,7 +123,9 @@ inline bool MulFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 // Mixed Type * f64
 template <>
 inline bool MulFunction::Run(MixedT, DoubleT, MixedT &) {
-    UnrecoverableError("Not implement: MulFunction::Run");
+    String error_message = "Not implement: MulFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 
@@ -129,7 +138,9 @@ inline bool MulFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 // Mixed Type * Mixed Type
 template <>
 inline bool MulFunction::Run(MixedT, MixedT, MixedT &) {
-    UnrecoverableError("Not implement: MulFunction::Run");
+    String error_message = "Not implement: MulFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 

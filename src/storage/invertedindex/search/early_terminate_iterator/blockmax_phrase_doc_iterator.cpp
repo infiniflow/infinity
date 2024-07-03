@@ -14,8 +14,47 @@ import phrase_doc_iterator;
 import blockmax_term_doc_iterator;
 import column_length_io;
 import third_party;
+import logger;
 
 namespace infinity {
+
+bool BlockMaxPhraseDocIterator::NextShallow(RowID doc_id){
+    assert(doc_id != INVALID_ROWID);
+    for (auto &it : pos_iters_) {
+        bool ok = it->SkipTo(doc_id);
+        if(!ok){
+            return false;
+        }
+    }
+    return true;
+}
+
+bool BlockMaxPhraseDocIterator::Next(RowID doc_id){
+    assert(doc_id != INVALID_ROWID);
+    assert(doc_id_ == INVALID_ROWID || doc_id_ < doc_id);
+    RowID target_doc_id = doc_id;
+    do {
+        for (auto &it : pos_iters_) {
+            target_doc_id = it->SeekDoc(target_doc_id);
+        }
+        if (target_doc_id == INVALID_ROWID) {
+            doc_id_ = INVALID_ROWID;
+            return false;
+        }
+        if (target_doc_id == pos_iters_[0]->DocID()) {
+            doc_id_ = target_doc_id;
+            PhraseColumnMatchData phrase_match_data;
+            if (GetPhraseMatchData(phrase_match_data, target_doc_id)) {
+                current_phrase_freq_ = phrase_match_data.tf_;
+                const float score = BM25Score();
+                if (score > threshold_) {
+                    return true;
+                }
+            }
+            target_doc_id++;
+        }
+    } while (1);
+}
 
 bool BlockMaxPhraseDocIterator::BlockSkipTo(RowID doc_id, float threshold) {
     if (threshold > BM25ScoreUpperBound()) [[unlikely]] {
@@ -66,51 +105,162 @@ void BlockMaxPhraseDocIterator::SeekDoc(RowID doc_id, RowID seek_end) {
     doc_id_ = doc_id;
 }
 
-bool BlockMaxPhraseDocIterator::CheckBeginPosition(pos_t position) {
-    pos_t now_position = position;
-    for (SizeT i = 1; i < pos_iters_.size(); ++i) {
-        auto& iter = pos_iters_[i];
-        pos_t next_position = 0;
-        iter->SeekPosition(now_position, next_position);
-        if (next_position != now_position + 1) {
-            return false;
+bool BlockMaxPhraseDocIterator::GetExactPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id) {
+    pos_t beg_position0 = 0;
+    pos_t now_position0 = 0;
+    while (true) {
+        pos_iters_[0]->SeekPosition(beg_position0, now_position0);
+        if (now_position0 == INVALID_POSITION) {
+            break;
         }
-        now_position = next_position;
+        beg_position0 = now_position0 + 1;
+        bool found = true;
+        for (SizeT i = 1; i < pos_iters_.size(); ++i) {
+            auto &iter = pos_iters_[i];
+            pos_t beg_position = now_position0 + i;
+            pos_t now_position = beg_position;
+            iter->SeekPosition(beg_position, now_position);
+            if (now_position != beg_position) {
+                found = false;
+                break;
+            }
+        }
+        if (found) {
+            match_data.begin_positions_.push_back(now_position0);
+        }
     }
+    if (match_data.begin_positions_.empty()) {
+        return false;
+    }
+    doc_freq_++;
+    match_data.tf_ = match_data.begin_positions_.size();
+    phrase_freq_ += match_data.tf_;
     return true;
 }
 
-bool BlockMaxPhraseDocIterator::GetPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id) {
-    if (doc_id != doc_id_) {
-        return false;
-    }
-    auto& iter = pos_iters_[0];
-    pos_t beg_position = 0;
-    match_data.tf_ = 0;
-    while (true) {
+bool BlockMaxPhraseDocIterator::GetSloppyPhraseMatchData(PhraseColumnMatchData &match_data, RowID doc_id) {
+    Vector<Vector<pos_t>> positions;
+    for (auto &pos_iter : pos_iters_) {
+        Vector<pos_t> pos_vec;
+        pos_t beg_position = 0;
         pos_t position = INVALID_POSITION;
-        iter->SeekPosition(beg_position, position);
-        if (position == INVALID_POSITION) {
-            break;
+        while (true) {
+            pos_iter->SeekPosition(beg_position, position);
+            if (position == INVALID_POSITION) {
+                break;
+            }
+            pos_vec.push_back(position);
+            beg_position = position + 1;
         }
-        if (CheckBeginPosition(position)) {
-            match_data.begin_positions_.push_back(position);
-            match_data.tf_ += 1;
-        }
-        beg_position = position + 1;
+        assert(!pos_vec.empty());
+        positions.push_back(std::move(pos_vec));
     }
-    match_data.doc_id_ = doc_id_;
-    if (match_data.begin_positions_.size()) {
-        for (SizeT i = 0; i < pos_iters_.size(); ++i) {
-            auto& iter_temp = pos_iters_[i];
-            match_data.all_tf_.emplace_back(iter_temp->GetCurrentTF());
-            match_data.all_doc_payload_.emplace_back(iter_temp->GetCurrentDocPayload());
+    /*
+    Refers to: https://lucene.apache.org/core/9_11_0/core/org/apache/lucene/search/SloppyPhraseMatcher.html
+
+    pos_i : term i's position in phrase
+    term_pos_i : term i's current position in document
+    phrase_pos_i: term_pos_i - pos_i
+
+    For a solution (term_pos_0, term_pos_1, ..., term_pos_n), it's acceptable iff:
+    for any i, j (0<=i<=n, 0<=j<=n), |phrase_pos_i - phrase_pos_j| <= slop
+
+    For an acceptable solution, its matchLength is:
+    max(|phrase_pos_i - phrase_pos_j|) for all i, j (0<=i<=n, 0<=j<=n)
+
+    For an acceptable solution, its sloppyWeight is:
+    1f / (1f + matchLength)
+
+    For a phrase, its freq is sum of every acceptable solution's sloppyWeight.
+    */
+    struct StepState {
+        SizeT pos_i;
+        SizeT term_pos_idx; // index to positions[pos_i]
+        int min_phrase_pos;
+        int max_phrase_pos;
+    };
+    struct Solution {
+        Vector<StepState> steps;
+        u32 matchLength;
+    };
+    Vector<StepState> steps = {{0, 0, int(positions[0][0]), int(positions[0][0])}};
+    Vector<Solution> solutions;
+    auto CalibrateLastStep = [this, &positions, &steps] {
+        StepState &step = steps.back();
+        if (step.term_pos_idx >= positions[step.pos_i].size())
+            return false;
+        int phrase_pos_i = int(positions[step.pos_i][step.term_pos_idx]) - int(step.pos_i);
+        if (step.pos_i == 0) {
+            step.min_phrase_pos = phrase_pos_i;
+            step.max_phrase_pos = phrase_pos_i;
+        } else {
+            StepState &prev_step = steps[steps.size() - 2];
+            step.min_phrase_pos = std::min(phrase_pos_i, prev_step.min_phrase_pos);
+            step.max_phrase_pos = std::max(phrase_pos_i, prev_step.max_phrase_pos);
+            if (step.max_phrase_pos - step.min_phrase_pos > int(this->slop_)) {
+                return false;
+            }
         }
-        if (all_doc_ids_.count(doc_id_) == 0) {
-            all_doc_ids_.insert(doc_id_);
-            doc_freq_++;
-            phrase_freq_ += match_data.begin_positions_.size();
+        return true;
+    };
+
+    while (!steps.empty()) {
+        bool ok = CalibrateLastStep();
+        if (ok) {
+            if (steps.size() == positions.size()) {
+                // got an acceptable solution
+                StepState &step = steps.back();
+                solutions.emplace_back(steps, u32(step.max_phrase_pos - step.min_phrase_pos));
+                // goto next possible step
+                steps.back().term_pos_idx++;
+            } else {
+                // advance a step
+                assert(!steps.empty());
+                steps.emplace_back(steps.size(), 0, 0, 0);
+                StepState &step = steps.back();
+                StepState &prev_step = steps[steps.size() - 2];
+                // bisect to locate the fist step.term_pos_idx which satisfies:
+                // int(positions[step.pos_i][step.term_pos_idx]) - int(step.pos_i) >= prev_step.min_phrase_pos
+                auto lower =
+                    std::lower_bound(positions[step.pos_i].begin(), positions[step.pos_i].end(), prev_step.min_phrase_pos - this->slop_ + step.pos_i);
+                step.term_pos_idx = std::distance(positions[step.pos_i].begin(), lower);
+            }
+        } else {
+            // goto next possible step
+            steps.pop_back();
+            if (steps.empty())
+                break;
+            if (steps.size() != positions.size()) {
+                assert(steps.back().term_pos_idx < positions[steps.back().pos_i].size());
+                steps.back().term_pos_idx++;
+            }
         }
+    }
+    match_data.tf_ = 0.0F;
+    for (auto &solution : solutions) {
+        match_data.tf_ += 1.0F / (1.0F + solution.matchLength);
+    }
+    if (SHOULD_LOG_DEBUG()) {
+        std::ostringstream oss;
+        oss << "Phrase \"" << terms_ptr_->at(0);
+        for (SizeT i = 1; i < terms_ptr_->size(); i++) {
+            oss << " " << terms_ptr_->at(i);
+        }
+        oss << "\"~" << slop_ << " has " << solutions.size() << " sulotions:" << std::endl;
+        for (SizeT i = 0; i < solutions.size(); i++) {
+            oss << "solution " << i << ": ";
+            Solution &solution = solutions[i];
+            for (SizeT j = 0; j < solution.steps.size(); j++) {
+                oss << "(" << solution.steps[j].pos_i << "," << solution.steps[j].term_pos_idx << "," << solution.steps[j].min_phrase_pos << ","
+                    << solution.steps[j].max_phrase_pos << ") ";
+            }
+            oss << std::endl;
+        }
+        LOG_DEBUG(oss.str());
+    }
+    if (!solutions.empty()) {
+        phrase_freq_ += match_data.tf_;
+        current_phrase_freq_ = match_data.tf_;
         return true;
     }
     return false;
@@ -179,13 +329,14 @@ void BlockMaxPhraseDocIterator::PrintTree(std::ostream &os, const String &prefix
     os << "BlockMaxPhraseDocIterator";
     os << " (weight: " << weight_ << ")";
     os << " (column: " << *column_name_ptr_ << ")";
-    os << " (phrase: ";
+    os << " (phrase:";
     for (auto term : *terms_ptr_) {
-        os << term << " ";
+        os << " " << term;
     }
     os << ")";
     os << " (doc_freq: " << DocFreq() << ")";
     os << " (bm25_score_upper_bound: " << BM25ScoreUpperBound() << ")";
+    os << " (threshold: " << threshold_ << ")";
     os << '\n';
 }
 

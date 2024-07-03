@@ -16,7 +16,7 @@ module;
 export module txn;
 
 import stl;
-
+import statement_common;
 import meta_info;
 import table_def;
 import index_base;
@@ -71,12 +71,12 @@ public:
                  BGTaskProcessor *bg_task_processor,
                  TransactionID txn_id,
                  TxnTimeStamp begin_ts,
-                 UniquePtr<String> txn_text);
+                 SharedPtr<String> txn_text);
 
     // For replay txn
     explicit Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id);
+    static UniquePtr<Txn> NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     // Txn steps:
     // 1. CreateTxn
@@ -167,6 +167,8 @@ public:
 
     Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
+    Status OptimizeIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
+
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
 
@@ -195,9 +197,6 @@ public:
     void SetTxnWrite() { txn_context_.SetTxnType(TxnType::kWrite); }
 
     // WAL and replay OPS
-    // Dangerous! only used during replaying wal.
-    void FakeCommit(TxnTimeStamp commit_ts);
-
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
     bool Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
@@ -212,6 +211,10 @@ public:
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
 
     WalEntry *GetWALEntry() const;
+
+    const SharedPtr<String> GetTxnText() const {
+        return txn_text_;
+    }
 
 private:
     void CheckTxnStatus();
@@ -245,7 +248,7 @@ private:
     bool done_bottom_{false};
 
     // String
-    UniquePtr<String> txn_text_{nullptr};
+    SharedPtr<String> txn_text_{nullptr};
 };
 
 } // namespace infinity

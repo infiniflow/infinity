@@ -30,6 +30,7 @@ import fast_rough_filter;
 import value;
 import meta_entry_interface;
 import cleanup_scanner;
+import logger;
 
 namespace infinity {
 
@@ -82,6 +83,7 @@ public:
                                                          TxnTimeStamp min_row_ts,
                                                          TxnTimeStamp max_row_ts,
                                                          TxnTimeStamp commit_ts,
+                                                         TxnTimeStamp first_delete_ts,
                                                          TxnTimeStamp deprecate_ts,
                                                          TxnTimeStamp begin_ts,
                                                          TransactionID txn_id);
@@ -112,8 +114,6 @@ public:
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 
     bool CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts, bool check_append) const;
-
-    bool CheckDeleteVisible(HashMap<BlockID, Vector<BlockOffset>> &block_offsets_map, Txn *txn) const;
 
     virtual bool CheckVisible(Txn *txn) const override;
 
@@ -171,6 +171,11 @@ public:
         return max_row_ts_;
     }
 
+    TxnTimeStamp first_delete_ts() const {
+        std::shared_lock lock(rw_locker_);
+        return first_delete_ts_;
+    }
+
     TxnTimeStamp deprecate_ts() const {
         std::shared_lock lock(rw_locker_);
         return deprecate_ts_;
@@ -206,7 +211,9 @@ protected: // protected for unit test
     // called when lock held
     void DecreaseRemainRow(SizeT decrease_row_count) {
         if (decrease_row_count > actual_row_count_) {
-            UnrecoverableError("Decrease row count exceed actual row count");
+            String error_message = "Decrease row count exceed actual row count";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         actual_row_count_ -= decrease_row_count;
     }

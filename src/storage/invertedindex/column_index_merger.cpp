@@ -7,7 +7,6 @@ module;
 module column_index_merger;
 
 import stl;
-import memory_pool;
 import byte_slice;
 import byte_slice_reader;
 import file_reader;
@@ -27,16 +26,14 @@ import file_system;
 import file_system_type;
 import infinity_exception;
 import vector_with_lock;
+import logger;
 
 namespace infinity {
-ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag, MemoryPool *memory_pool, RecyclePool *buffer_pool)
-    : index_dir_(index_dir), flag_(flag), memory_pool_(memory_pool), buffer_pool_(buffer_pool) {}
+ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag) : index_dir_(index_dir), flag_(flag) {}
 
 ColumnIndexMerger::~ColumnIndexMerger() {}
 
-SharedPtr<PostingMerger> ColumnIndexMerger::CreatePostingMerger() {
-    return MakeShared<PostingMerger>(memory_pool_, buffer_pool_, flag_, column_lengths_);
-}
+SharedPtr<PostingMerger> ColumnIndexMerger::CreatePostingMerger() { return MakeShared<PostingMerger>(flag_, column_lengths_); }
 
 void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<RowID> &base_rowids, const String &dst_base_name) {
     assert(base_names.size() == base_rowids.size());
@@ -76,20 +73,31 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
             String column_len_file = (Path(index_dir_) / base_names[i]).string() + LENGTH_SUFFIX;
             RowID base_row_id = base_rowids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
-            UniquePtr<FileHandler> file_handler = fs_.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            auto [file_handler, status] = fs_.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            if(!status.ok()) {
+                LOG_CRITICAL(status.message());
+                UnrecoverableError(status.message());
+            }
+
             const u32 file_size = fs_.GetFileSize(*file_handler);
             u32 file_read_array_len = file_size / sizeof(u32);
             unsafe_column_lengths.resize(id_offset + file_read_array_len);
             const i64 read_count = fs_.Read(*file_handler, unsafe_column_lengths.data() + id_offset, file_size);
             file_handler->Close();
             if (read_count != file_size) {
-                UnrecoverableError("ColumnIndexMerger: when loading column length file, read_count != file_size");
+                String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
 
         String column_length_file = index_prefix + LENGTH_SUFFIX;
-        UniquePtr<FileHandler> file_handler =
+        auto [file_handler, status] =
             fs_.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
+        if(!status.ok()) {
+            LOG_CRITICAL(status.message());
+            UnrecoverableError(status.message());
+        }
         fs_.Write(*file_handler, &unsafe_column_lengths[0], sizeof(unsafe_column_lengths[0]) * unsafe_column_lengths.size());
         fs_.Close(*file_handler);
     }
@@ -110,8 +118,6 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     fst_builder.Finish();
     fs_.AppendFile(dict_file, fst_file);
     fs_.DeleteFile(fst_file);
-    memory_pool_->Release();
-    buffer_pool_->Release();
 }
 
 void ColumnIndexMerger::MergeTerm(const String &term,
@@ -122,8 +128,6 @@ void ColumnIndexMerger::MergeTerm(const String &term,
     posting_merger->Merge(merging_term_postings, merge_base_rowid);
 
     posting_merger->Dump(posting_file_writer_, term_meta);
-//    memory_pool_->Reset();
-//    buffer_pool_->Reset();
 }
 
 } // namespace infinity

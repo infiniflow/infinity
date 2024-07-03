@@ -15,6 +15,9 @@ Float,
 Double,
 Varchar,
 Embedding,
+Tensor,
+TensorArray,
+Sparse,
 Invalid
 }
 
@@ -62,10 +65,17 @@ struct EmbeddingType {
 2:  ElementType element_type,
 }
 
+struct SparseType {
+1:  i64 dimension,
+2:  ElementType element_type,
+3:  ElementType index_type,
+}
+
 union PhysicalType {
 1:  NumberType number_type,
 2:  VarcharType varchar_type,
 3:  EmbeddingType embedding_type,
+4:  SparseType sparse_type,
 }
 
 struct DataType {
@@ -88,6 +98,10 @@ Int64,
 Null,
 IntegerArray,
 DoubleArray,
+IntegerTensorArray,
+DoubleTensorArray,
+SparseIntegerArray,
+SparseDoubleArray,
 }
 
 union ParsedExprType {
@@ -133,6 +147,19 @@ struct InitParameter {
 2: string param_value,
 }
 
+struct ConstantExpr {
+1: LiteralType literal_type,
+2: optional bool bool_value,
+3: optional i64 i64_value,
+4: optional double f64_value,
+5: optional string str_value,
+6: optional list<i64> i64_array_value,
+7: optional list<double> f64_array_value,
+8: optional list<list<list<i64>>> i64_tensor_array_value,
+9: optional list<list<list<double>>> f64_tensor_array_value,
+10: optional list<i64> i64_array_idx,
+}
+
 struct KnnExpr {
 1: ColumnExpr  column_expr,
 2: EmbeddingData embedding_data,
@@ -140,6 +167,22 @@ struct KnnExpr {
 4: KnnDistanceType distance_type,
 5: i64 topn,
 6: list<InitParameter> opt_params = [],
+}
+
+struct MatchSparseExpr {
+1: ColumnExpr  column_expr,
+2: ConstantExpr  query_sparse_expr,
+3: string  metric_type,
+4: i64  topn,
+5: list<InitParameter> opt_params = [],
+}
+
+struct MatchTensorExpr {
+1: string search_method,
+2: ColumnExpr column_expr,
+3: ElementType embedding_data_type,
+4: EmbeddingData embedding_data,
+5: string extra_options,
 }
 
 struct MatchExpr {
@@ -151,22 +194,15 @@ struct MatchExpr {
 struct FusionExpr {
 	1: string method,
 	2: string options_text,
+	3: optional MatchTensorExpr optional_match_tensor_expr,
 }
 
 struct SearchExpr {
 	1: optional list<MatchExpr> match_exprs,
 	2: optional list<KnnExpr> knn_exprs,
-	3: optional FusionExpr fusion_expr,
-}
-
-struct ConstantExpr {
-1: LiteralType literal_type,
-2: optional bool bool_value,
-3: optional i64 i64_value,
-4: optional double f64_value,
-5: optional string str_value,
-6: optional list<i64> i64_array_value,
-7: optional list<double> f64_array_value,
+    3: optional list<MatchSparseExpr> match_sparse_exprs
+	4: optional list<MatchTensorExpr> match_tensor_exprs,
+	5: optional list<FusionExpr> fusion_exprs,
 }
 
 struct FunctionExpr {
@@ -209,6 +245,8 @@ CSV,
 JSON,
 JSONL,
 FVECS,
+CSR,
+BVECS,
 }
 
 enum ColumnType {
@@ -221,6 +259,9 @@ ColumnFloat32,
 ColumnFloat64,
 ColumnVarchar,
 ColumnEmbedding,
+ColumnTensor,
+ColumnTensorArray,
+ColumnSparse,
 ColumnRowID,
 ColumnInvalid,
 }
@@ -233,9 +274,26 @@ struct ColumnField {
 
 struct ImportOption {
 1:  string delimiter,
-2:  bool copy_from,
-3:  bool has_header,
-4:  CopyFileType copy_file_type,
+2:  bool has_header,
+3:  CopyFileType copy_file_type,
+}
+
+struct ExportOption {
+1:  string delimiter,
+2:  bool has_header,
+3:  CopyFileType copy_file_type,
+4:  i64 offset,
+5:  i64 limit,
+6:  i64 row_limit,
+}
+
+struct OptimizeOptions {
+1:  string index_name,
+2:  list<InitParameter> opt_params = []
+}
+
+struct ConnectRequest {
+1: i64 client_version,
 }
 
 struct CommonRequest {
@@ -328,6 +386,9 @@ IVFFlat,
 HnswLVQ,
 Hnsw,
 FullText,
+BMP,
+Secondary,
+EMVB,
 }
 
 struct IndexInfo {
@@ -375,6 +436,13 @@ struct ShowIndexResponse {
 12: string segment_index_count,
 }
 
+struct OptimizeRequest {
+1: string db_name,
+2: string table_name,
+3: OptimizeOptions optimize_options,
+4: i64 session_id,
+}
+
 struct GetDatabaseRequest {
 1: string db_name,
 2: i64 session_id,
@@ -419,8 +487,16 @@ struct ImportRequest{
 1:  string db_name,
 2:  string table_name,
 3:  string file_name,
-4:  binary file_content,
-5:  ImportOption import_option,
+4:  ImportOption import_option,
+5:  i64 session_id,
+}
+
+struct ExportRequest{
+1:  string db_name,
+2:  string table_name,
+3:  list<string> columns,
+4:  string file_name,
+5:  ExportOption export_option,
 6:  i64 session_id,
 }
 
@@ -572,7 +648,7 @@ struct ShowBlockColumnResponse {
 
 // Service
 service InfinityService {
-CommonResponse Connect(),
+CommonResponse Connect(1:ConnectRequest request),
 CommonResponse Disconnect(1:CommonRequest request),
 
 CommonResponse CreateDatabase(1:CreateDatabaseRequest request),
@@ -581,6 +657,7 @@ CommonResponse CreateTable(1:CreateTableRequest request),
 CommonResponse DropTable(1:DropTableRequest request),
 CommonResponse Insert(1:InsertRequest request),
 CommonResponse Import(1:ImportRequest request),
+CommonResponse Export(1:ExportRequest request),
 SelectResponse Select(1:SelectRequest request),
 SelectResponse Explain(1:ExplainRequest request),
 CommonResponse Delete(1:DeleteRequest request),
@@ -609,5 +686,7 @@ CommonResponse GetTable(1:GetTableRequest request),
 CommonResponse CreateIndex(1:CreateIndexRequest request),
 CommonResponse DropIndex(1:DropIndexRequest request),
 ShowIndexResponse ShowIndex(1:ShowIndexRequest request),
+
+CommonResponse Optimize(1:OptimizeRequest request),
 
 }

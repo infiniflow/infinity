@@ -24,6 +24,7 @@ import scalar_function_set;
 import third_party;
 import internal_types;
 import data_type;
+import logger;
 
 module pow;
 
@@ -39,7 +40,9 @@ struct PowFunction {
 
 template <>
 inline bool PowFunction::Run(MixedT, DoubleT, DoubleT &) {
-    UnrecoverableError("Not implement: PowFunction::Run");
+    String error_message = "Not implement: PowFunction::Run";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
     return false;
 }
 

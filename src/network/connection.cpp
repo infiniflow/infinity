@@ -37,6 +37,7 @@ import session_manager;
 import type_info;
 import logical_type;
 import embedding_info;
+import sparse_info;
 import data_type;
 
 namespace infinity {
@@ -139,7 +140,9 @@ void Connection::HandleRequest() {
             break;
         }
         default: {
-            UnrecoverableError("Unknown PG command type");
+            String error_message = "Unknown PG command type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -250,9 +253,13 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 object_width = 16;
                 break;
             }
+            case LogicalType::kTensor:
+            case LogicalType::kTensorArray:
             case LogicalType::kEmbedding: {
                 if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
-                    UnrecoverableError("Not embedding type");
+                    String error_message = "Not embedding type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
 
                 EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
@@ -294,17 +301,21 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         break;
                     }
                     case kElemInvalid: {
-                        UnrecoverableError("Invalid embedding data type");
+                        String error_message = "Invalid embedding data type";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                     }
                 }
                 break;
             }
-            case LogicalType::kTensor: {
-                if (column_type->type_info()->type() != TypeInfoType::kEmbedding) {
-                    UnrecoverableError("Not tensor type");
+            case LogicalType::kSparse: {
+                if (column_type->type_info()->type() != TypeInfoType::kSparse) {
+                    String error_message = "Not sparse type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                 }
-                EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-                switch (embedding_info->Type()) {
+                const auto *sparse_info = static_cast<SparseInfo *>(column_type->type_info().get());
+                switch (sparse_info->DataType()) {
                     case kElemBit: {
                         object_id = 1000;
                         object_width = 1;
@@ -340,14 +351,18 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         object_width = 8;
                         break;
                     }
-                    case kElemInvalid: {
-                        UnrecoverableError("Invalid embedding data type");
+                    default: {
+                        String error_message = "Should not reach here";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                     }
                 }
                 break;
             }
             default: {
-                UnrecoverableError("Unexpected type");
+                String error_message = "Unexpected type";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
 
@@ -385,10 +400,12 @@ void Connection::SendQueryResponse(const QueryResult &query_result) {
             message = query_result.ToString();
             break;
         }
-        case LogicalNodeType::kImport: {
+        case LogicalNodeType::kImport:
+        case LogicalNodeType::kExport: {
             message = *query_result.result_table_->result_msg();
             break;
         }
+
         default: {
             message = fmt::format("SELECT {}", std::to_string(query_result.result_table_->row_count()));
         }

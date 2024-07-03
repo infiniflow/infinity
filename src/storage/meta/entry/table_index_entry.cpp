@@ -32,7 +32,7 @@ import base_table_ref;
 import create_index_info;
 import base_entry;
 import logger;
-
+import index_hnsw;
 import index_file_worker;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
@@ -47,7 +47,9 @@ namespace infinity {
 Vector<std::string_view> TableIndexEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
-        UnrecoverableError(fmt::format("Invalid table index entry encode: {}", encode));
+        String error_message = fmt::format("Invalid table index entry encode: {}", encode);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto decodes = TableEntry::DecodeIndex(encode.substr(0, delimiter_i));
     decodes.push_back(encode.substr(delimiter_i + 1));
@@ -67,9 +69,11 @@ TableIndexEntry::TableIndexEntry(const SharedPtr<IndexBase> &index_base,
                                  const SharedPtr<String> &index_entry_dir,
                                  TransactionID txn_id,
                                  TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kTableIndex, is_delete, TableIndexEntry::EncodeIndex(*index_base->index_name_, table_index_meta)), byte_slice_pool_(),
-      buffer_pool_(), inverting_thread_pool_(4), commiting_thread_pool_(2), table_index_meta_(table_index_meta), index_base_(std::move(index_base)),
-      index_dir_(index_entry_dir) {
+    : BaseEntry(EntryType::kTableIndex,
+                is_delete,
+                table_index_meta->GetTableEntry()->base_dir_,
+                TableIndexEntry::EncodeIndex(*index_base->index_name_, table_index_meta)),
+      table_index_meta_(table_index_meta), index_base_(std::move(index_base)), index_dir_(index_entry_dir) {
     if (!is_delete) {
         assert(index_base.get() != nullptr);
         const String &column_name = index_base->column_name();
@@ -88,8 +92,10 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     if (is_delete) {
         return MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, nullptr, txn_id, begin_ts);
     }
-    SharedPtr<String> index_dir =
-        is_delete ? MakeShared<String>("deleted") : DetermineIndexDir(*table_index_meta->GetTableEntry()->TableEntryDir(), *index_base->index_name_);
+    SharedPtr<String> temp_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->base_dir_,
+                                                   *table_index_meta->GetTableEntry()->TableEntryDir(),
+                                                   *index_base->index_name_);
+    SharedPtr<String> index_dir = temp_dir;
     auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_dir, txn_id, begin_ts);
 
     // Get column info
@@ -272,8 +278,10 @@ SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(TxnIndexStore *txn_inde
 SharedPtr<SegmentIndexEntry> TableIndexEntry::PopulateEntirely(SegmentEntry *segment_entry, Txn *txn, const PopulateEntireConfig &config) {
     switch (index_base_->index_type_) {
         case IndexType::kHnsw:
+        case IndexType::kEMVB:
         case IndexType::kFullText:
-        case IndexType::kSecondary: {
+        case IndexType::kSecondary:
+        case IndexType::kBMP: {
             break;
         }
         default: {
@@ -388,6 +396,51 @@ void TableIndexEntry::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin
     commit_ts_.store(commit_ts);
     begin_ts_ = begin_ts;
     txn_id_ = txn_id;
+}
+
+Vector<SegmentIndexEntry *> TableIndexEntry::OptimizeIndex(Txn *txn, Vector<UniquePtr<InitParameter>> opt_params, bool replay) {
+    switch (index_base_->index_type_) {
+        case IndexType::kBMP: {
+            Vector<SegmentIndexEntry *> segment_indexes;
+            {
+                SegmentIndexesGuard segment_indexes_guard = this->GetSegmentIndexesGuard();
+                for (const auto &[segment_id, segment_index_entry] : segment_indexes_guard.index_by_segment_) {
+                    segment_indexes.push_back(segment_index_entry.get());
+                }
+            }
+            for (auto *segment_index_entry : segment_indexes) {
+                segment_index_entry->OptimizeIndex(txn, opt_params);
+            }
+            return {};
+        }
+        case IndexType::kHnsw: {
+            std::unique_lock w_lock(rw_locker_);
+            Vector<SegmentIndexEntry *> segment_indexes;
+            for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+                segment_indexes.push_back(segment_index_entry.get());
+            }
+            auto *hnsw_index = static_cast<IndexHnsw *>(index_base_.get());
+            if (hnsw_index->encode_type_ != HnswEncodeType::kPlain) {
+                LOG_WARN("Not implemented");
+                break;
+            }
+            if (!replay) {
+                for (auto *segment_index_entry : segment_indexes) {
+                    segment_index_entry->OptimizeIndex(txn, opt_params);
+                }
+            }
+
+            hnsw_index->encode_type_ = HnswEncodeType::kLVQ;
+            for (auto *segment_index_entry : segment_indexes) {
+                segment_index_entry->SaveHnsw();
+            }
+            return segment_indexes;
+        }
+        default: {
+            LOG_WARN("Not implemented");
+        }
+    }
+    return {};
 }
 
 } // namespace infinity

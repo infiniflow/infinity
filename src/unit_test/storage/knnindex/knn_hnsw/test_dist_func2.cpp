@@ -20,6 +20,7 @@ import dist_func_ip;
 import data_store;
 import vec_store_type;
 import stl;
+import hnsw_common;
 
 using namespace infinity;
 
@@ -60,7 +61,8 @@ TEST_F(DistFuncTest2, test2) {
     auto lvq_store = DataStore::Make(vec_n, max_chunk_size, dim, 0 /*Mmax0*/, 0 /*Mmax*/);
     Distance distance(lvq_store.dim());
 
-    auto [start_i, end_i] = lvq_store.AddVec(vecs1.get(), vec_n);
+    auto iter = DenseVectorIter<float, LabelT>(vecs1.get(), dim, vec_n);
+    auto [start_i, end_i] = lvq_store.AddVec(std::move(iter));
     EXPECT_EQ(start_i, 0u);
     EXPECT_EQ(end_i, vec_n);
 

@@ -17,6 +17,7 @@ module;
 import stl;
 import file_system;
 import file_system_type;
+import status;
 
 export module local_file_system;
 
@@ -44,7 +45,7 @@ public:
 
     ~LocalFileSystem() override = default;
 
-    UniquePtr<FileHandler> OpenFile(const String &path, u8 flags, FileLockType lock_type) final;
+    Pair<UniquePtr<FileHandler>, Status> OpenFile(const String &path, u8 flags, FileLockType lock_type) final;
 
     i64 Read(FileHandler &file_handler, void *data, u64 nbytes) final;
 
@@ -67,6 +68,8 @@ public:
     void Close(FileHandler &file_handler) final;
 
     void AppendFile(const String &dst_path, const String &src_path) final;
+
+    void Truncate(const String &file_name, SizeT length);
 
     // Directory related methods
     bool Exists(const String &path) final; // if file or directory exists

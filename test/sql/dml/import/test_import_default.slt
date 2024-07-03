@@ -1,0 +1,26 @@
+
+statement ok
+DROP TABLE IF EXISTS test_import_default;
+
+statement ok
+CREATE TABLE test_import_default (c1 integer default 1, c2 integer default 4, c3 embedding(float, 3) default [1,2,3], c4 TensorArray(float, 3) default [[[1,2,3],[5,7,8]],[[9,9,9]]], c5 embedding(int, 3) default [1.3, 4.1, 33.7]);
+
+statement ok
+COPY test_import_default FROM '/var/infinity/test_data/pysdk_test_import_default.csv' WITH ( DELIMITER ',' );
+
+query I
+SELECT * FROM test_import_default;
+----
+1 1 [11,2.56,35.4] [[1,2,3],[5,7,8]],[[9,9,9]] [1,4,34]
+2 1 [12,3.56,35.4] [[1,2,3],[5,7,8]],[[9,9,9]] [1,4,34]
+3 1 [13,4.56,35.4] [[1,2,3],[5,7,8]],[[9,9,9]] [1,4,34]
+4 1 [14,5.56,35.4] [[1,2,3],[5,7,8]],[[9,9,9]] [1,4,34]
+5 6 [1,2,3] [[1,2,3],[5,7,8]],[[9,9,9]] [1,4,34]
+2 4 [1,2,3] [[1,2,3],[5,7,8]],[[9,9,9]] [1,4,34]
+1 3 [1,2,3] [[1,2,3],[5,7,8]],[[9,9,9]] [1,4,34]
+1 4 [1.2,3.4,5.7] [[1,2,3],[5,7,8]],[[9,9,9]] [1,4,34]
+10 20 [1,2,3] [[1,2,3],[5,7,8]],[[9,9,9]] [1,4,34]
+100 4 [1,2,3] [[1,2,3],[5,7,8]],[[9,9,9]] [1,4,34]
+
+statement ok
+DROP TABLE test_import_default;

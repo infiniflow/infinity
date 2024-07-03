@@ -18,6 +18,7 @@ class MatchExpr;
 class QueryExpr;
 class KnnExpr;
 class MatchTensorExpr;
+class MatchSparseExpr;
 class FusionExpr;
 
 class SearchExpr : public ParsedExpr {
@@ -35,8 +36,9 @@ public:
 public:
     std::vector<MatchExpr *> match_exprs_{};
     std::vector<KnnExpr *> knn_exprs_{};
-    std::vector<MatchTensorExpr *> tensor_maxsim_exprs_{};
-    FusionExpr *fusion_expr_{};
+    std::vector<MatchTensorExpr *> match_tensor_exprs_{};
+    std::vector<MatchSparseExpr *> match_sparse_exprs_{};
+    std::vector<FusionExpr *> fusion_exprs_{};
 
 private:
     std::vector<infinity::ParsedExpr *> *exprs_{};

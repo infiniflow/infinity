@@ -25,6 +25,8 @@
 
 namespace infinity {
 
+class ColumnDef;
+
 enum class LiteralType : int32_t {
     kBoolean,
     kDouble,
@@ -37,7 +39,11 @@ enum class LiteralType : int32_t {
     kTimestamp,
     kIntegerArray,
     kDoubleArray,
+    kSubArrayArray,
     kInterval,
+    kLongSparseArray,
+    kDoubleSparseArray,
+    kEmptyArray,
 };
 
 class ConstantExpr : public ParsedExpr {
@@ -58,6 +64,8 @@ public:
 
     static std::shared_ptr<ParsedExpr> Deserialize(const nlohmann::json &constant_expr);
 
+    void TrySortSparseVec(const ColumnDef *col_def);
+
 public:
     LiteralType literal_type_;
 
@@ -69,6 +77,9 @@ public:
     char *date_value_{nullptr};
     std::vector<int64_t> long_array_{};
     std::vector<double> double_array_{};
+    std::vector<std::shared_ptr<ConstantExpr>> sub_array_array_{};
+    std::pair<std::vector<int64_t>, std::vector<int64_t>> long_sparse_array_{};
+    std::pair<std::vector<int64_t>, std::vector<double>> double_sparse_array_{};
 };
 
 } // namespace infinity

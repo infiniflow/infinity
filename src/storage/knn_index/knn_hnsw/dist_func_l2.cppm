@@ -14,7 +14,7 @@
 
 module;
 
-#include "header.h"
+#include "../header.h"
 #include <ostream>
 
 import stl;
@@ -26,6 +26,9 @@ import lvq_vec_store;
 export module dist_func_l2;
 
 namespace infinity {
+
+export template <typename DataType, typename CompressType>
+class LVQL2Dist;
 
 export template <typename DataType>
 class PlainL2Dist {
@@ -78,6 +81,8 @@ public:
     DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
         return SIMDFunc(v1, v2, vec_store_meta.dim());
     }
+
+    LVQL2Dist<DataType, i8> ToLVQDistance(SizeT dim) &&;
 };
 
 export template <typename DataType, typename CompressType>
@@ -168,5 +173,10 @@ public:
                2 * beta * norm1_scale_2;
     }
 };
+
+template <typename DataType>
+LVQL2Dist<DataType, i8> PlainL2Dist<DataType>::ToLVQDistance(SizeT dim) && {
+    return LVQL2Dist<DataType, i8>(dim);
+}
 
 } // namespace infinity

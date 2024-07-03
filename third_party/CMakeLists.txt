@@ -9,15 +9,6 @@ add_subdirectory(magic_enum)
 # Build spdlog
 add_subdirectory(spdlog)
 
-set(TLSF_DIR tlsf)
-add_library(
-        tlsf
-        ${TLSF_DIR}/tlsf.cpp
-)
-
-# Build roaring
-add_subdirectory(croaring)
-
 # Build mlas
 add_subdirectory(mlas)
 
@@ -69,4 +60,9 @@ add_subdirectory(fastpfor)
 ### ijma
 ################################################################################
 add_subdirectory(ijma)
+
+################################################################################
+### opencc
+################################################################################
+add_subdirectory(opencc)
 

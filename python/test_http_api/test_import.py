@@ -489,24 +489,15 @@ class TestImport(HttpTest):
         table_name = "test_import_embedding_with_unmatched_elem_type"
 
         self.show_database(db_name)
-        self.drop_table(db_name, table_name)
-
         for i in range(len(types)):
             self.drop_table(db_name, table_name)
             self.create_table(db_name, table_name, [
                 {"name": "c1", "type": "integer"},
-                types[i]
-            ])
-            test_csv_dir = TEST_TMP_DIR + file_name
-            self.import_data(db_name, table_name, {
-                "file_path": test_csv_dir,
-                "file_type": "csv",
-                "header": False,
-                "delimiter": ","
-            }, {
-                                 "status_code": 500,
-                                 "error_code": 7012,
-                             })
+                types[i],
+            ], None, {
+                                  "status_code": 500,
+                                  "error_code": 3057,
+                              })
 
         self.drop_table(db_name, table_name)
         return

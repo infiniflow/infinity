@@ -27,13 +27,18 @@ import data_block;
 import table_def;
 import table_entry_type;
 import value;
+import logger;
 
 namespace infinity {
 
 static String TableTypeToString(TableType type) {
     switch (type) {
-        case TableType::kInvalid:
-            UnrecoverableError("Unexpected table type: Invalid");
+        case TableType::kInvalid: {
+            String error_message = "Unexpected table type: Invalid";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+            break;
+        }
         case TableType::kDataTable:
             return "DataTable";
         case TableType::kIntermediate:
@@ -49,7 +54,11 @@ static String TableTypeToString(TableType type) {
         case TableType::kCrossProduct:
             return "CrossProduct";
     }
-    UnrecoverableError("Unexpected error.");
+    String error_message = "Unexpected error.";
+    LOG_CRITICAL(error_message);
+    UnrecoverableError(error_message);
+
+    return "";
 }
 
 String DataTable::ToString() const {
@@ -78,10 +87,14 @@ SharedPtr<Vector<RowID>> DataTable::GetRowIDVector() const {
 
 void DataTable::UnionWith(const SharedPtr<DataTable> &other) {
     if (this->row_count_ != other->row_count_) {
-        UnrecoverableError(fmt::format("Can't union two table with different row count {}:{}.", this->row_count_, other->row_count_));
+        String error_message = fmt::format("Can't union two table with different row count {}:{}.", this->row_count_, other->row_count_);
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (this->data_blocks_.size() != other->data_blocks_.size()) {
-        UnrecoverableError(fmt::format("Can't union two table with different block count {}:{}.", this->data_blocks_.size(), other->data_blocks_.size()));
+        String error_message = fmt::format("Can't union two table with different block count {}:{}.", this->data_blocks_.size(), other->data_blocks_.size());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     SizeT block_count = this->data_blocks_.size();
     for (SizeT idx = 0; idx < block_count; ++idx) {

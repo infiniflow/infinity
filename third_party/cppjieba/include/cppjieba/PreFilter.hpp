@@ -28,6 +28,9 @@ class PreFilter {
     return cursor_ != sentence_.end();
   }
   Range Next() {
+    while (IsIn(symbols_, cursor_->rune) && cursor_ != sentence_.end()) {
+      cursor_++;
+    }
     Range range;
     range.begin = cursor_;
     while (cursor_ != sentence_.end()) {

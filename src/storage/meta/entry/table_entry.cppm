@@ -39,7 +39,7 @@ import meta_map;
 import meta_entry_interface;
 import cleanup_scanner;
 import random;
-import memory_pool;
+
 import meta_info;
 import block_entry;
 import column_index_reader;
@@ -78,6 +78,7 @@ public:
                         SegmentID next_segment_id);
 
     static SharedPtr<TableEntry> NewTableEntry(bool is_delete,
+                                               const SharedPtr<String> &base_dir,
                                                const SharedPtr<String> &db_entry_dir,
                                                SharedPtr<String> table_collection_name,
                                                const Vector<SharedPtr<ColumnDef>> &columns,
@@ -173,8 +174,8 @@ public:
 
     SegmentID next_segment_id() const { return next_segment_id_; }
 
-    static SharedPtr<String> DetermineTableDir(const String &parent_dir, const String &table_name) {
-        return DetermineRandomString(parent_dir, fmt::format("table_{}", table_name));
+    static SharedPtr<String> DetermineTableDir(const String&base_dir, const String &parent_dir, const String &table_name) {
+        return DetermineRandomString(base_dir, parent_dir, fmt::format("table_{}", table_name));
     }
 
     // MemIndexInsert is non-blocking. Caller must ensure there's no RowID gap between each call.
@@ -245,8 +246,6 @@ public:
     void UpdateFullTextSegmentTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {
         return fulltext_column_index_cache_.UpdateKnownUpdateTs(ts, segment_update_ts_mutex, segment_update_ts);
     }
-
-    bool CheckDeleteVisible(DeleteState &delete_state, Txn *txn);
 
 private:
     TableMeta *const table_meta_{};

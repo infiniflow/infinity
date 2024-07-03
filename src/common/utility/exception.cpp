@@ -39,11 +39,18 @@ void PrintStacktrace(const String &err_msg) {
     free(stacktrace);
 }
 
-#ifdef INFINITY_DEBUG
+#define ADD_LOG_INFO
+
+#if defined(INFINITY_DEBUG) || defined(ADD_LOG_INFO)
 
 void RecoverableError(Status status, const char *file_name, u32 line) {
     status.AppendMessage(fmt::format("@{}:{}", infinity::TrimPath(file_name), line));
     throw RecoverableException(status);
+}
+
+std::string_view GetErrorMsg(const String &message) {
+    auto pos = message.find_first_of('@', 0);
+    return {message.data(), pos};
 }
 
 void UnrecoverableError(const String &message, const char *file_name, u32 line) {
@@ -58,6 +65,10 @@ void RecoverableError(Status status) {
 
 void UnrecoverableError(const String &message) {
     throw UnrecoverableException(message);
+}
+
+std::string_view GetErrorMsg(const String &message) {
+    return message;
 }
 
 #endif

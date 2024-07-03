@@ -60,6 +60,7 @@ void Storage::Init() {
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
                                       config_ptr_->WALDir(),
+                                      config_ptr_->DataDir(),
                                       config_ptr_->WALCompactThreshold(),
                                       config_ptr_->DeltaCheckpointThreshold(),
                                       config_ptr_->FlushMethodAtCommit());
@@ -97,6 +98,7 @@ void Storage::Init() {
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
+    new_catalog_->StartMemoryIndexCommit();
     new_catalog_->MemIndexRecover(buffer_mgr_.get());
 
     bg_processor_->Start();
@@ -153,7 +155,7 @@ void Storage::Init() {
 }
 
 void Storage::UnInit() {
-    fmt::print("Shutdown storage ...\n");
+    fmt::print("Close storage ...\n");
     periodic_trigger_thread_->Stop();
     if (compact_processor_.get() != nullptr) {
         compact_processor_->Stop();
@@ -170,11 +172,11 @@ void Storage::UnInit() {
     new_catalog_.reset();
     buffer_mgr_.reset();
     config_ptr_ = nullptr;
-    fmt::print("Shutdown storage successfully\n");
+    fmt::print("Close storage successfully\n");
 }
 
-void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos) {
-    new_catalog_ = Catalog::LoadFromFiles(full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
+void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, const String &data_dir) {
+    new_catalog_ = Catalog::LoadFromFiles(data_dir, full_ckp_info, delta_ckp_infos, buffer_mgr_.get());
 }
 
 void Storage::InitNewCatalog() {

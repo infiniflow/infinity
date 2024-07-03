@@ -26,6 +26,7 @@ target_link_libraries(
         thrift.a
         c++.a
         jma
+        opencc
 )
 
 if(ENABLE_JEMALLOC)

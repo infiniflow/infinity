@@ -35,6 +35,7 @@ import expression_type;
 import base_expression;
 import logical_type;
 import internal_types;
+import value;
 
 namespace infinity {
 
@@ -65,11 +66,34 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
             for (SizeT expr_idx = 0; expr_idx < update_columns_.size(); ++expr_idx) {
                 SizeT column_idx = update_columns_[expr_idx].first;
                 const SharedPtr<BaseExpression> &expr = update_columns_[expr_idx].second;
-                SharedPtr<ColumnVector> output_column = ColumnVector::Make(column_vectors[column_idx]->data_type());
+                SharedPtr<ColumnVector> value_column = ColumnVector::Make(column_vectors[column_idx]->data_type());
                 SharedPtr<ExpressionState> expr_state = ExpressionState::CreateState(expr);
-                output_column->Initialize(expr_state->OutputColumnVector()->vector_type());
-                evaluator.Execute(expr, expr_state, output_column);
-                column_vectors[column_idx] = output_column;
+                value_column->Initialize(expr_state->OutputColumnVector()->vector_type());
+                evaluator.Execute(expr, expr_state, value_column);
+
+                if(value_column->Size() == input_data_block_ptr->row_count()) {
+                    column_vectors[column_idx] = value_column;
+                } else {
+                    // value_column only have one row;
+                    if(value_column->Size() != 1) {
+                        String error_message = "Expect the column vector has only one row";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
+                        return 0;
+                    }
+
+                    Value value = value_column->GetValue(0);
+                    SizeT row_count = input_data_block_ptr->row_count();
+
+                    SharedPtr<ColumnVector> output_column = ColumnVector::Make(value_column->data_type());
+                    output_column->Initialize();
+                    for(SizeT row_idx = 0; row_idx < row_count; ++ row_idx) {
+                        output_column->AppendValue(value);
+                    }
+                    output_column->Finalize(row_count);
+                    column_vectors[column_idx] = output_column;
+                }
+
             }
 
             SharedPtr<DataBlock> output_data_block = DataBlock::Make();

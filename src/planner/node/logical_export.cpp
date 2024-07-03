@@ -59,12 +59,24 @@ String LogicalExport::ToString(i64 &space) const {
             ss << "(JSONL) ";
             break;
         }
+        case CopyFileType::kCSR: {
+            ss << "(CSR) ";
+            break;
+        }
+        case CopyFileType::kBVECS: {
+            ss << "(BVECS) ";
+            break;
+        }
         case CopyFileType::kInvalid: {
             ss << "(Invalid) ";
             break;
         }
     }
-    ss << "to " << schema_name_ << '.' << table_name_;
+
+    ss << "to " << schema_name_ << '.' << table_name_ << ", offset " << offset_;
+    if(limit_ != 0) {
+        ss << " limit " << limit_;
+    }
 
     space += arrow_str.size();
 

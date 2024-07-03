@@ -528,7 +528,7 @@ static int yy_flex_strlen ( const char * );
 #undef yyTABLES_NAME
 #endif
 
-#line 94 "search_lexer.l"
+#line 99 "search_lexer.l"
 
 
 #line 535 "search_lexer.h"

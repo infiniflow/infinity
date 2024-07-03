@@ -30,53 +30,70 @@ import column_def;
 import index_hnsw;
 import infinity_exception;
 import index_base;
+import logger;
 
 namespace infinity {
 
 export template <typename DataType, typename LabelType>
 class AbstractHnsw {
-    using Hnsw1 = KnnHnsw<PlainIPVecStoreType<DataType>, LabelType>;
-    using Hnsw2 = KnnHnsw<PlainL2VecStoreType<DataType>, LabelType>;
-    using Hnsw3 = KnnHnsw<LVQIPVecStoreType<DataType, i8>, LabelType>;
-    using Hnsw4 = KnnHnsw<LVQL2VecStoreType<DataType, i8>, LabelType>;
+    using Hnsw1 = KnnHnsw<PlainCosVecStoreType<DataType>, LabelType>;
+    using Hnsw2 = KnnHnsw<PlainIPVecStoreType<DataType>, LabelType>;
+    using Hnsw3 = KnnHnsw<PlainL2VecStoreType<DataType>, LabelType>;
+    using Hnsw4 = KnnHnsw<LVQCosVecStoreType<DataType, i8>, LabelType>;
+    using Hnsw5 = KnnHnsw<LVQIPVecStoreType<DataType, i8>, LabelType>;
+    using Hnsw6 = KnnHnsw<LVQL2VecStoreType<DataType, i8>, LabelType>;
 
 public:
     AbstractHnsw(void *ptr, const IndexHnsw *index_hnsw) {
         switch (index_hnsw->encode_type_) {
             case HnswEncodeType::kPlain: {
                 switch (index_hnsw->metric_type_) {
-                    case MetricType::kMetricInnerProduct: {
+                    case MetricType::kMetricCosine: {
                         knn_hnsw_ptr_ = reinterpret_cast<Hnsw1 *>(ptr);
                         break;
                     }
-                    case MetricType::kMetricL2: {
+                    case MetricType::kMetricInnerProduct: {
                         knn_hnsw_ptr_ = reinterpret_cast<Hnsw2 *>(ptr);
                         break;
                     }
+                    case MetricType::kMetricL2: {
+                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw3 *>(ptr);
+                        break;
+                    }
                     default: {
-                        UnrecoverableError("HNSW supports inner product and L2 distance.");
+                        String error_message = "HNSW supports inner product and L2 distance.";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                     }
                 }
                 break;
             }
             case HnswEncodeType::kLVQ: {
                 switch (index_hnsw->metric_type_) {
-                    case MetricType::kMetricInnerProduct: {
-                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw3 *>(ptr);
-                        break;
-                    }
-                    case MetricType::kMetricL2: {
+                    case MetricType::kMetricCosine: {
                         knn_hnsw_ptr_ = reinterpret_cast<Hnsw4 *>(ptr);
                         break;
                     }
+                    case MetricType::kMetricInnerProduct: {
+                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw5 *>(ptr);
+                        break;
+                    }
+                    case MetricType::kMetricL2: {
+                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw6 *>(ptr);
+                        break;
+                    }
                     default: {
-                        UnrecoverableError("HNSW supports inner product and L2 distance.");
+                        String error_message = "HNSW supports inner product and L2 distance.";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                     }
                 }
                 break;
             }
             default: {
-                UnrecoverableError("Invalid metric type");
+                String error_message = "Invalid metric type";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }
@@ -164,8 +181,31 @@ public:
             knn_hnsw_ptr_);
     }
 
+    bool RerankDist() const {
+        return std::visit(
+            [](auto &&arg) {
+                using T = std::decay_t<decltype(*arg)>;
+                if constexpr (std::is_same_v<T, Hnsw4> || std::is_same_v<T, Hnsw5> || std::is_same_v<T, Hnsw6>) {
+                    return true;
+                } else {
+                    return false;
+                }
+            },
+            knn_hnsw_ptr_);
+    }
+
+    void CompressToLVQ() {
+        std::visit([&](auto &arg) {
+            auto new_hnsw = std::move(*arg).CompressToLVQ();
+            using NewT = std::decay_t<decltype(new_hnsw)>;
+            delete arg;
+            arg = nullptr;
+            knn_hnsw_ptr_ = new NewT(std::move(new_hnsw));
+        }, knn_hnsw_ptr_);
+    }
+
 private:
-    std::variant<Hnsw1 *, Hnsw2 *, Hnsw3 *, Hnsw4 *> knn_hnsw_ptr_;
+    std::variant<Hnsw1 *, Hnsw2 *, Hnsw3 *, Hnsw4 *, Hnsw5 *, Hnsw6 *> knn_hnsw_ptr_;
 };
 
 } // namespace infinity

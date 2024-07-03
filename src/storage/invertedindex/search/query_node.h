@@ -51,6 +51,7 @@ struct IndexReader;
 class Scorer;
 class DocIterator;
 class EarlyTerminateIterator;
+enum class EarlyTermAlgo;
 
 // step 1. get the query tree from parser
 // step 2. push down the weight to the leaf term node
@@ -83,7 +84,7 @@ struct QueryNode {
     // create the iterator from the query tree, need to be called after optimization
     virtual std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const = 0;
     virtual std::unique_ptr<EarlyTerminateIterator>
-    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const = 0;
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer, EarlyTermAlgo early_term_algo) const = 0;
     // print the query tree, for debugging
     virtual void PrintTree(std::ostream &os, const std::string &prefix = "", bool is_final = true) const = 0;
 };
@@ -98,7 +99,7 @@ struct TermQueryNode final : public QueryNode {
     void PushDownWeight(float factor) override { MultiplyWeight(factor); }
     std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
     std::unique_ptr<EarlyTerminateIterator>
-    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer, EarlyTermAlgo early_term_algo) const override;
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
 };
 
@@ -112,7 +113,7 @@ struct PhraseQueryNode final : public QueryNode {
     void PushDownWeight(float factor) override { MultiplyWeight(factor); }
     std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
     std::unique_ptr<EarlyTerminateIterator>
-    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer, EarlyTermAlgo early_term_algo) const override;
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const override;
 
     void AddTerm(const std::string &term) { terms_.emplace_back(term); }
@@ -145,28 +146,28 @@ struct NotQueryNode final : public MultiQueryNode {
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
     std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
     std::unique_ptr<EarlyTerminateIterator>
-    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer, EarlyTermAlgo early_term_algo) const override;
 };
 struct AndQueryNode final : public MultiQueryNode {
     AndQueryNode() : MultiQueryNode(QueryNodeType::AND) {}
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
     std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
     std::unique_ptr<EarlyTerminateIterator>
-    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer, EarlyTermAlgo early_term_algo) const override;
 };
 struct AndNotQueryNode final : public MultiQueryNode {
     AndNotQueryNode() : MultiQueryNode(QueryNodeType::AND_NOT) {}
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
     std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
     std::unique_ptr<EarlyTerminateIterator>
-    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer, EarlyTermAlgo early_term_algo) const override;
 };
 struct OrQueryNode final : public MultiQueryNode {
     OrQueryNode() : MultiQueryNode(QueryNodeType::OR) {}
     std::unique_ptr<QueryNode> InnerGetNewOptimizedQueryTree() override;
     std::unique_ptr<DocIterator> CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
     std::unique_ptr<EarlyTerminateIterator>
-    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const override;
+    CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer, EarlyTermAlgo early_term_algo) const override;
 };
 
 // unimplemented

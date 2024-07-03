@@ -19,7 +19,12 @@ all_structs = []
 
 
 class Iface(object):
-    def Connect(self):
+    def Connect(self, request):
+        """
+        Parameters:
+         - request
+
+        """
         pass
 
     def Disconnect(self, request):
@@ -71,6 +76,14 @@ class Iface(object):
         pass
 
     def Import(self, request):
+        """
+        Parameters:
+         - request
+
+        """
+        pass
+
+    def Export(self, request):
         """
         Parameters:
          - request
@@ -246,6 +259,14 @@ class Iface(object):
         """
         pass
 
+    def Optimize(self, request):
+        """
+        Parameters:
+         - request
+
+        """
+        pass
+
 
 class Client(Iface):
     def __init__(self, iprot, oprot=None):
@@ -254,13 +275,19 @@ class Client(Iface):
             self._oprot = oprot
         self._seqid = 0
 
-    def Connect(self):
-        self.send_Connect()
+    def Connect(self, request):
+        """
+        Parameters:
+         - request
+
+        """
+        self.send_Connect(request)
         return self.recv_Connect()
 
-    def send_Connect(self):
+    def send_Connect(self, request):
         self._oprot.writeMessageBegin('Connect', TMessageType.CALL, self._seqid)
         args = Connect_args()
+        args.request = request
         args.write(self._oprot)
         self._oprot.writeMessageEnd()
         self._oprot.trans.flush()
@@ -503,6 +530,38 @@ class Client(Iface):
         if result.success is not None:
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "Import failed: unknown result")
+
+    def Export(self, request):
+        """
+        Parameters:
+         - request
+
+        """
+        self.send_Export(request)
+        return self.recv_Export()
+
+    def send_Export(self, request):
+        self._oprot.writeMessageBegin('Export', TMessageType.CALL, self._seqid)
+        args = Export_args()
+        args.request = request
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_Export(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = Export_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        if result.success is not None:
+            return result.success
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "Export failed: unknown result")
 
     def Select(self, request):
         """
@@ -1176,6 +1235,38 @@ class Client(Iface):
             return result.success
         raise TApplicationException(TApplicationException.MISSING_RESULT, "ShowIndex failed: unknown result")
 
+    def Optimize(self, request):
+        """
+        Parameters:
+         - request
+
+        """
+        self.send_Optimize(request)
+        return self.recv_Optimize()
+
+    def send_Optimize(self, request):
+        self._oprot.writeMessageBegin('Optimize', TMessageType.CALL, self._seqid)
+        args = Optimize_args()
+        args.request = request
+        args.write(self._oprot)
+        self._oprot.writeMessageEnd()
+        self._oprot.trans.flush()
+
+    def recv_Optimize(self):
+        iprot = self._iprot
+        (fname, mtype, rseqid) = iprot.readMessageBegin()
+        if mtype == TMessageType.EXCEPTION:
+            x = TApplicationException()
+            x.read(iprot)
+            iprot.readMessageEnd()
+            raise x
+        result = Optimize_result()
+        result.read(iprot)
+        iprot.readMessageEnd()
+        if result.success is not None:
+            return result.success
+        raise TApplicationException(TApplicationException.MISSING_RESULT, "Optimize failed: unknown result")
+
 
 class Processor(Iface, TProcessor):
     def __init__(self, handler):
@@ -1189,6 +1280,7 @@ class Processor(Iface, TProcessor):
         self._processMap["DropTable"] = Processor.process_DropTable
         self._processMap["Insert"] = Processor.process_Insert
         self._processMap["Import"] = Processor.process_Import
+        self._processMap["Export"] = Processor.process_Export
         self._processMap["Select"] = Processor.process_Select
         self._processMap["Explain"] = Processor.process_Explain
         self._processMap["Delete"] = Processor.process_Delete
@@ -1210,6 +1302,7 @@ class Processor(Iface, TProcessor):
         self._processMap["CreateIndex"] = Processor.process_CreateIndex
         self._processMap["DropIndex"] = Processor.process_DropIndex
         self._processMap["ShowIndex"] = Processor.process_ShowIndex
+        self._processMap["Optimize"] = Processor.process_Optimize
         self._on_message_begin = None
 
     def on_message_begin(self, func):
@@ -1238,7 +1331,7 @@ class Processor(Iface, TProcessor):
         iprot.readMessageEnd()
         result = Connect_result()
         try:
-            result.success = self._handler.Connect()
+            result.success = self._handler.Connect(args.request)
             msg_type = TMessageType.REPLY
         except TTransport.TTransportException:
             raise
@@ -1412,6 +1505,29 @@ class Processor(Iface, TProcessor):
             msg_type = TMessageType.EXCEPTION
             result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
         oprot.writeMessageBegin("Import", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
+    def process_Export(self, seqid, iprot, oprot):
+        args = Export_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = Export_result()
+        try:
+            result.success = self._handler.Export(args.request)
+            msg_type = TMessageType.REPLY
+        except TTransport.TTransportException:
+            raise
+        except TApplicationException as ex:
+            logging.exception('TApplication exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = ex
+        except Exception:
+            logging.exception('Unexpected exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("Export", msg_type, seqid)
         result.write(oprot)
         oprot.writeMessageEnd()
         oprot.trans.flush()
@@ -1899,11 +2015,42 @@ class Processor(Iface, TProcessor):
         oprot.writeMessageEnd()
         oprot.trans.flush()
 
+    def process_Optimize(self, seqid, iprot, oprot):
+        args = Optimize_args()
+        args.read(iprot)
+        iprot.readMessageEnd()
+        result = Optimize_result()
+        try:
+            result.success = self._handler.Optimize(args.request)
+            msg_type = TMessageType.REPLY
+        except TTransport.TTransportException:
+            raise
+        except TApplicationException as ex:
+            logging.exception('TApplication exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = ex
+        except Exception:
+            logging.exception('Unexpected exception in handler')
+            msg_type = TMessageType.EXCEPTION
+            result = TApplicationException(TApplicationException.INTERNAL_ERROR, 'Internal error')
+        oprot.writeMessageBegin("Optimize", msg_type, seqid)
+        result.write(oprot)
+        oprot.writeMessageEnd()
+        oprot.trans.flush()
+
 # HELPER FUNCTIONS AND STRUCTURES
 
 
 class Connect_args(object):
+    """
+    Attributes:
+     - request
 
+    """
+
+
+    def __init__(self, request=None,):
+        self.request = request
 
     def read(self, iprot):
         if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
@@ -1914,6 +2061,12 @@ class Connect_args(object):
             (fname, ftype, fid) = iprot.readFieldBegin()
             if ftype == TType.STOP:
                 break
+            if fid == 1:
+                if ftype == TType.STRUCT:
+                    self.request = ConnectRequest()
+                    self.request.read(iprot)
+                else:
+                    iprot.skip(ftype)
             else:
                 iprot.skip(ftype)
             iprot.readFieldEnd()
@@ -1924,6 +2077,10 @@ class Connect_args(object):
             oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
             return
         oprot.writeStructBegin('Connect_args')
+        if self.request is not None:
+            oprot.writeFieldBegin('request', TType.STRUCT, 1)
+            self.request.write(oprot)
+            oprot.writeFieldEnd()
         oprot.writeFieldStop()
         oprot.writeStructEnd()
 
@@ -1942,6 +2099,8 @@ class Connect_args(object):
         return not (self == other)
 all_structs.append(Connect_args)
 Connect_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRUCT, 'request', [ConnectRequest, None], None, ),  # 1
 )
 
 
@@ -2878,6 +3037,131 @@ class Import_result(object):
         return not (self == other)
 all_structs.append(Import_result)
 Import_result.thrift_spec = (
+    (0, TType.STRUCT, 'success', [CommonResponse, None], None, ),  # 0
+)
+
+
+class Export_args(object):
+    """
+    Attributes:
+     - request
+
+    """
+
+
+    def __init__(self, request=None,):
+        self.request = request
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRUCT:
+                    self.request = ExportRequest()
+                    self.request.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('Export_args')
+        if self.request is not None:
+            oprot.writeFieldBegin('request', TType.STRUCT, 1)
+            self.request.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(Export_args)
+Export_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRUCT, 'request', [ExportRequest, None], None, ),  # 1
+)
+
+
+class Export_result(object):
+    """
+    Attributes:
+     - success
+
+    """
+
+
+    def __init__(self, success=None,):
+        self.success = success
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 0:
+                if ftype == TType.STRUCT:
+                    self.success = CommonResponse()
+                    self.success.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('Export_result')
+        if self.success is not None:
+            oprot.writeFieldBegin('success', TType.STRUCT, 0)
+            self.success.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(Export_result)
+Export_result.thrift_spec = (
     (0, TType.STRUCT, 'success', [CommonResponse, None], None, ),  # 0
 )
 
@@ -5504,6 +5788,131 @@ class ShowIndex_result(object):
 all_structs.append(ShowIndex_result)
 ShowIndex_result.thrift_spec = (
     (0, TType.STRUCT, 'success', [ShowIndexResponse, None], None, ),  # 0
+)
+
+
+class Optimize_args(object):
+    """
+    Attributes:
+     - request
+
+    """
+
+
+    def __init__(self, request=None,):
+        self.request = request
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 1:
+                if ftype == TType.STRUCT:
+                    self.request = OptimizeRequest()
+                    self.request.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('Optimize_args')
+        if self.request is not None:
+            oprot.writeFieldBegin('request', TType.STRUCT, 1)
+            self.request.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(Optimize_args)
+Optimize_args.thrift_spec = (
+    None,  # 0
+    (1, TType.STRUCT, 'request', [OptimizeRequest, None], None, ),  # 1
+)
+
+
+class Optimize_result(object):
+    """
+    Attributes:
+     - success
+
+    """
+
+
+    def __init__(self, success=None,):
+        self.success = success
+
+    def read(self, iprot):
+        if iprot._fast_decode is not None and isinstance(iprot.trans, TTransport.CReadableTransport) and self.thrift_spec is not None:
+            iprot._fast_decode(self, iprot, [self.__class__, self.thrift_spec])
+            return
+        iprot.readStructBegin()
+        while True:
+            (fname, ftype, fid) = iprot.readFieldBegin()
+            if ftype == TType.STOP:
+                break
+            if fid == 0:
+                if ftype == TType.STRUCT:
+                    self.success = CommonResponse()
+                    self.success.read(iprot)
+                else:
+                    iprot.skip(ftype)
+            else:
+                iprot.skip(ftype)
+            iprot.readFieldEnd()
+        iprot.readStructEnd()
+
+    def write(self, oprot):
+        if oprot._fast_encode is not None and self.thrift_spec is not None:
+            oprot.trans.write(oprot._fast_encode(self, [self.__class__, self.thrift_spec]))
+            return
+        oprot.writeStructBegin('Optimize_result')
+        if self.success is not None:
+            oprot.writeFieldBegin('success', TType.STRUCT, 0)
+            self.success.write(oprot)
+            oprot.writeFieldEnd()
+        oprot.writeFieldStop()
+        oprot.writeStructEnd()
+
+    def validate(self):
+        return
+
+    def __repr__(self):
+        L = ['%s=%r' % (key, value)
+             for key, value in self.__dict__.items()]
+        return '%s(%s)' % (self.__class__.__name__, ', '.join(L))
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self.__dict__ == other.__dict__
+
+    def __ne__(self, other):
+        return not (self == other)
+all_structs.append(Optimize_result)
+Optimize_result.thrift_spec = (
+    (0, TType.STRUCT, 'success', [CommonResponse, None], None, ),  # 0
 )
 fix_spec(all_structs)
 del all_structs

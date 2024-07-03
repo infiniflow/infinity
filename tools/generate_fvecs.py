@@ -2,6 +2,7 @@ import numpy as np
 import random
 import os
 import argparse
+from generate_util.format_data import format_float1
 
 
 def generate(generate_if_exists: bool, copy_dir: str):
@@ -17,7 +18,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     os.makedirs(fvecs_dir, exist_ok=True)
     os.makedirs(slt_dir, exist_ok=True)
-    if os.path.exists(fvecs_path) and os.path.exists(slt_path) and generate_if_exists:
+    if os.path.exists(fvecs_path) and os.path.exists(slt_path) and not generate_if_exists:
         print(
             "File {} and {} already existed exists. Skip Generating.".format(
                 slt_path, fvecs_path
@@ -30,8 +31,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE TABLE {} ( c1 embedding(float, {}));\n".format(
-                table_name, dim)
+            "CREATE TABLE {} ( c1 embedding(float, {}));\n".format(table_name, dim)
         )
         slt_file.write("\n")
         slt_file.write("query I\n")
@@ -49,10 +49,10 @@ def generate(generate_if_exists: bool, copy_dir: str):
             fvecs_file.write((dim).to_bytes(4, byteorder="little"))
             fvec = np.random.random(dim).astype(np.float32)
             fvec.tofile(fvecs_file)
-            fvec_str = ",".join(
-                [format(x, ".6g").rstrip("0").rstrip(".") for x in fvec]
-            )
+            fvec_str = ",".join([format_float1(x) for x in fvec])
+            slt_file.write("[")
             slt_file.write(fvec_str)
+            slt_file.write("]")
             slt_file.write("\n")
         slt_file.write("\n")
         slt_file.write("statement ok\n")
@@ -61,8 +61,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Generate fvecs data for test")
+    parser = argparse.ArgumentParser(description="Generate fvecs data for test")
 
     parser.add_argument(
         "-g",

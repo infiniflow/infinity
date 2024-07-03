@@ -24,15 +24,17 @@ import knn_expression;
 import match_tensor_expression;
 import fusion_expression;
 
-
 namespace infinity {
 
 SearchExpression::SearchExpression(Vector<SharedPtr<MatchExpression>> &match_exprs,
                                    Vector<SharedPtr<KnnExpression>> &knn_exprs,
                                    Vector<SharedPtr<MatchTensorExpression>> &match_tensor_exprs,
-                                   SharedPtr<FusionExpression> fusion_expr)
+                                   Vector<SharedPtr<MatchSparseExpression>> match_sparse_exprs,
+                                   Vector<SharedPtr<FusionExpression>> &fusion_exprs)
     : BaseExpression(ExpressionType::kSearch, Vector<SharedPtr<BaseExpression>>()), match_exprs_(match_exprs), knn_exprs_(knn_exprs),
-      match_tensor_exprs_(match_tensor_exprs), fusion_expr_(fusion_expr) {}
+      match_tensor_exprs_(match_tensor_exprs), 
+      match_sparse_exprs_(match_sparse_exprs), 
+      fusion_exprs_(fusion_exprs) {}
 
 String SearchExpression::ToString() const {
     if (!alias_.empty()) {
@@ -54,13 +56,13 @@ String SearchExpression::ToString() const {
         cnt++;
         oss << knn_expr->ToString();
     }
-    for (auto &tensor_maxsim_expr : match_tensor_exprs_) {
+    for (auto &match_tensor_expr : match_tensor_exprs_) {
         if (cnt != 0)
             oss << ", ";
         cnt++;
-        oss << tensor_maxsim_expr->ToString();
+        oss << match_tensor_expr->ToString();
     }
-    if (fusion_expr_.get() != nullptr) {
+    for (auto &fusion_expr_ : fusion_exprs_) {
         if (cnt != 0)
             oss << ", ";
         cnt++;

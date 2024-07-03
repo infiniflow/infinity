@@ -17,6 +17,7 @@ module;
 import stl;
 import file_worker;
 import buffer_handle;
+import file_worker_type;
 
 export module buffer_obj;
 
@@ -38,6 +39,14 @@ export enum class BufferType {
     kTemp,
 };
 
+export struct BufferObjectInfo {
+    String object_path_{};
+    BufferStatus buffered_status_{BufferStatus::kNew};
+    BufferType buffered_type_{BufferType::kTemp};
+    FileWorkerType file_type_{FileWorkerType::kInvalid};
+    SizeT object_size_{};
+};
+
 export String BufferStatusToString(BufferStatus status) {
     switch (status) {
         case BufferStatus::kLoaded:
@@ -55,6 +64,23 @@ export String BufferStatusToString(BufferStatus status) {
     }
 }
 
+export String BufferTypeToString(BufferType buffer_type) {
+    switch (buffer_type) {
+        case BufferType::kPersistent:
+            return "Persistent";
+        case BufferType::kEphemeral:
+            return "Ephemeral";
+        case BufferType::kTemp:
+            return "Temporary";
+    }
+}
+
+export enum class BufferFreeStatus : i8 {
+    kSuccess,
+    kLoaded,
+    kCleaned,
+};
+
 export class BufferObj {
 public:
     // called by BufferMgr::Get or BufferMgr::Allocate
@@ -70,7 +96,7 @@ public:
     BufferHandle Load();
 
     // called by BufferMgr in GC process.
-    bool Free();
+    BufferFreeStatus Free();
 
     // called when checkpoint. or in "IMPORT" operator.
     bool Save();
@@ -84,6 +110,8 @@ public:
     SizeT GetBufferSize() const { return file_worker_->GetMemoryCost(); }
 
     String GetFilename() const { return file_worker_->GetFilePath(); }
+
+    const FileWorker *file_worker() const { return file_worker_.get(); }
 
     FileWorker *file_worker() { return file_worker_.get(); }
 

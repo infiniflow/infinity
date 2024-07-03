@@ -33,6 +33,7 @@ import cleanup_scanner;
 import chunk_index_entry;
 import memory_indexer;
 import default_values;
+import statement_common;
 
 namespace infinity {
 
@@ -45,6 +46,7 @@ class BufferManager;
 struct SegmentEntry;
 struct TableEntry;
 class SecondaryIndexInMem;
+class EMVBIndexInMem;
 
 export struct PopulateEntireConfig {
     bool prepare_;
@@ -87,12 +89,16 @@ public:
 
     void SaveIndexFile();
 
+    void SaveHnsw();
+
     static UniquePtr<SegmentIndexEntry>
     Deserialize(const nlohmann::json &index_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
 
     void CommitSegmentIndex(TransactionID txn_id, TxnTimeStamp commit_ts);
 
     void CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<ChunkIndexEntry *> &old_chunks, TxnTimeStamp commit_ts);
+
+    void OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params);
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
@@ -175,9 +181,19 @@ public:
         return {chunk_index_entries_, memory_hnsw_indexer_};
     }
 
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<ChunkIndexEntry>> GetBMPIndexSnapshot() {
+        std::shared_lock lock(rw_locker_);
+        return {chunk_index_entries_, memory_hnsw_indexer_};
+    }
+
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<SecondaryIndexInMem>> GetSecondaryIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
         return {chunk_index_entries_, memory_secondary_index_};
+    }
+
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<EMVBIndexInMem>> GetEMVBIndexSnapshot() {
+        std::shared_lock lock(rw_locker_);
+        return {chunk_index_entries_, memory_emvb_index_};
     }
 
     Pair<u64, u32> GetFulltextColumnLenInfo() {
@@ -196,8 +212,9 @@ public:
 public:
     SharedPtr<ChunkIndexEntry> CreateChunkIndexEntry(SharedPtr<ColumnDef> column_def, RowID base_rowid, BufferManager *buffer_mgr);
 
-    SharedPtr<ChunkIndexEntry>
-    CreateSecondaryIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
+    SharedPtr<ChunkIndexEntry> CreateSecondaryIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
+
+    SharedPtr<ChunkIndexEntry> CreateEMVBIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
 
     void AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry);
 
@@ -244,6 +261,7 @@ private:
     SharedPtr<ChunkIndexEntry> memory_hnsw_indexer_{};
     SharedPtr<MemoryIndexer> memory_indexer_{};
     SharedPtr<SecondaryIndexInMem> memory_secondary_index_{};
+    SharedPtr<EMVBIndexInMem> memory_emvb_index_{};
 
     u64 ft_column_len_sum_{}; // increase only
     u32 ft_column_len_cnt_{}; // increase only

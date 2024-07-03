@@ -84,10 +84,14 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     UniquePtr<BoundSelectStatement> bound_select_statement = BoundSelectStatement::Make(bind_context_ptr_);
 
     if (statement.select_list_ == nullptr) {
-        UnrecoverableError("SELECT list is needed");
+        String error_message = "SELECT list is needed";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     if (statement.select_list_->empty()) {
-        UnrecoverableError("SELECT list can't be empty");
+        String error_message = "SELECT list can't be empty";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     // 1. WITH clause
@@ -236,7 +240,9 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
 
     // Trying to check if order by import new invisible column in project
     if (select_column_count < bound_select_statement->projection_expressions_.size()) {
-        UnrecoverableError("Projection expressions more than expected!");
+        String error_message = "Projection expressions more than expected!";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
         //        bind_context_ptr_->result_index_ = bind_context_ptr_->GenerateTableIndex();
         //        PruneOutput(query_context_ptr_, select_column_count, bound_select_statement);
     } else {
@@ -286,7 +292,9 @@ SharedPtr<TableRef> QueryBinder::BuildFromClause(QueryContext *query_context, co
         }
 
         case TableRefType::kDummy: {
-            UnrecoverableError("Unexpected table reference type.");
+            String error_message = "Unexpected table reference type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
 
             // TODO: No case currently, since parser doesn't support it.
@@ -411,7 +419,7 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
     return cte_table_ref_ptr;
 }
 
-SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, const TableReference *from_table) {
+SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context, const TableReference *from_table, bool update) {
     String schema_name;
     if (from_table->db_name_.empty()) {
         schema_name = query_context->schema_name();
@@ -445,6 +453,14 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
         types_ptr->emplace_back(column_def->column_type_);
         names_ptr->emplace_back(column_def->name_);
         columns.emplace_back(idx);
+    }
+    if (!update) {
+        const auto *catalog = query_context_ptr_->storage()->catalog();
+        for (const auto &[name, column_def] : catalog->special_columns_) {
+            types_ptr->emplace_back(column_def->column_type_);
+            names_ptr->emplace_back(name);
+            columns.emplace_back(column_def->id_);
+        }
     }
 
     Txn *txn = query_context->GetTxn();
@@ -766,7 +782,9 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
     switch (binding->binding_type_) {
 
         case BindingType::kInvalid: {
-            UnrecoverableError("Invalid binding type.");
+            String error_message = "Invalid binding type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             break;
         }
         case BindingType::kTable: {
@@ -975,16 +993,18 @@ void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType or
             break;
         }
         default: {
-            UnrecoverableError("Invalid KNN distance type");
+            String error_message = "Invalid KNN distance type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }
 
-SharedPtr<BaseTableRef> QueryBinder::GetTableRef(const String &db_name, const String &table_name) {
+SharedPtr<BaseTableRef> QueryBinder::GetTableRef(const String &db_name, const String &table_name, bool update) {
     TableReference from_table;
     from_table.db_name_ = db_name;
     from_table.table_name_ = table_name;
-    return BuildBaseTable(this->query_context_ptr_, &from_table);
+    return BuildBaseTable(this->query_context_ptr_, &from_table, update);
 }
 
 UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &statement) {
@@ -1016,7 +1036,7 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
 UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &statement) {
     // refers to QueryBinder::BindSelect
     UniquePtr<BoundUpdateStatement> bound_update_statement = BoundUpdateStatement::Make(bind_context_ptr_);
-    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
+    SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_, true);
 
     bound_update_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {

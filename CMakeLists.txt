@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28.1)
 
-project(infinity VERSION 0.2.0)
+project(infinity VERSION 0.2.1)
 
 if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
     message(FATAL_ERROR "This project requires the Ninja generator. Refers to https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html#generator-support")
@@ -47,7 +47,9 @@ if (CLANG_VERSION_STRING VERSION_GREATER 16)
     add_link_options($<$<COMPILE_LANGUAGE:CXX>:-Wl,-rpath,${LLVM_LIBRARY_DIRS}>)
 
 else ()
-    message(FATAL_ERROR, "Please use clang version 17.0 and above")
+
+    message(FATAL_ERROR, "Please use clang version 17.0 and above, current version: ", ${CLANG_VERSION_STRING})
+
 endif ()
 
 # Get current system time and print the build time
@@ -114,11 +116,19 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     set(CMAKE_CXX_FLAGS "-O0 -g")
     set(CMAKE_C_FLAGS "-O0 -g")
 
-    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-stack-protector -fno-omit-frame-pointer -fno-var-tracking ")
-    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=memory -fno-omit-frame-pointer")
-    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=thread -fno-omit-frame-pointer")
-    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=undefined -fno-omit-frame-pointer")
-    #    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fsanitize=cfi -fno-omit-frame-pointer")
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fno-stack-protector -fno-var-tracking ")
+    add_compile_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
+    add_link_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
+
+    add_compile_options("-fno-omit-frame-pointer")
+    add_link_options("-fno-omit-frame-pointer")
+
+#    add_compile_options("-fsanitize=undefined")
+#    add_link_options("-fsanitize=undefined")
+
+#    add_compile_options("-fsanitize=thread")
+#    add_link_options("-fsanitize=thread")
+
     set(CMAKE_DEBUG_POSTFIX "")
 
 else ()
@@ -148,7 +158,9 @@ if("${HAVE_EFFICIENT_UNALIGNED_ACCESS}" STREQUAL "CONFIG_HAVE_EFFICIENT_UNALIGNE
     add_definitions(-DHAVE_EFFICIENT_UNALIGNED_ACCESS)
 endif()
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 ADD_DEFINITIONS(-D INFINITY_DEBUG)
+endif()
 
 # find_package(Boost REQUIRED)
 find_package(Lz4 REQUIRED)
@@ -160,6 +172,19 @@ if(ENABLE_JEMALLOC AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
 endif()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+
+find_package(Python 3.8
+        REQUIRED COMPONENTS Interpreter Development.Module
+        OPTIONAL_COMPONENTS Development.SABIModule)
+
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif ()
+
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/nanobind)
 
 add_subdirectory(src)
 add_subdirectory(third_party EXCLUDE_FROM_ALL)
@@ -174,9 +199,23 @@ add_subdirectory(third_party EXCLUDE_FROM_ALL)
 add_subdirectory(benchmark)
 add_subdirectory(client)
 
+# quit early for scikit-build-core
+# does not need CPack settings
+# does not need to install the infinity target, config files and resources
+if (SKBUILD)
+    return()
+endif ()
+
 # CPack settings
 set(CPACK_PACKAGE_NAME "infinity")
-set(CPACK_PACKAGE_VERSION "0.2.0-dev")
+# dpkg requires version to be starting with number
+if(DEFINED CPACK_PACKAGE_VERSION)
+    string(REGEX REPLACE "^[^0-9]+" "" CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")
+    string(REPLACE "-" "." CPACK_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")
+endif()
+if(NOT DEFINED CPACK_PACKAGE_VERSION OR CPACK_PACKAGE_VERSION STREQUAL "")
+    set(CPACK_PACKAGE_VERSION "0.2.1.dev3")
+endif()
 set(CPACK_PACKAGE_RELEASE 1)
 set(CPACK_PACKAGE_CONTACT "Zhichang Yu <yuzhichang@gmail.com>")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The AI-native database built for LLM applications, offering incredibly fast vector and full-text search.")
@@ -192,7 +231,6 @@ set(CMAKE_INSTALL_PREFIX /usr)
 install(TARGETS infinity DESTINATION bin)
 install(FILES conf/infinity.service DESTINATION lib/systemd/system)
 install(FILES conf/infinity_conf.toml DESTINATION etc)
-install(DIRECTORY ../resource/jieba DESTINATION ../var/infinity/resource)
 
 # https://cmake.org/cmake/help/latest/cpack_gen/rpm.html
 # Specify the post-install script for RPM

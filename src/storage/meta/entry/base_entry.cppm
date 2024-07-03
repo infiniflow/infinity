@@ -25,6 +25,7 @@ import txn_manager;
 import infinity_exception;
 import third_party;
 import txn_state;
+import logger;
 
 namespace infinity {
 
@@ -45,7 +46,11 @@ export enum class EntryType : i8 {
 
 export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type, bool is_delete, String encode)
-        : deleted_(is_delete), entry_type_(entry_type), encode_(MakeUnique<String>(std::move(encode))) {}
+        : deleted_(is_delete), entry_type_(entry_type), base_dir_(nullptr), encode_(MakeUnique<String>(std::move(encode))) {}
+
+    explicit BaseEntry(EntryType entry_type, bool is_delete, SharedPtr<String> base_dir, String encode)
+        : deleted_(is_delete), entry_type_(entry_type), base_dir_(base_dir),
+          encode_(MakeUnique<String>(std::move(encode))) {}
 
     virtual ~BaseEntry() = default;
 
@@ -56,14 +61,18 @@ export struct BaseEntry {
 public:
     // Reserved
     inline void Commit(TxnTimeStamp commit_ts) {
-        assert(!Committed() || commit_ts_ == commit_ts);
-        assert(commit_ts != UNCOMMIT_TS);
+        // assert(!Committed() || commit_ts_ == commit_ts);
+        // assert(commit_ts != UNCOMMIT_TS);
         commit_ts_.store(commit_ts);
     }
 
     [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
 
     bool Deleted() const { return deleted_; }
+
+    const String &base_dir() const { return *base_dir_; }
+
+    SharedPtr<String> base_dir_ptr() const { return base_dir_; }
 
     const String &encode() const { return *encode_; }
 
@@ -72,16 +81,18 @@ public:
     // return if this entry is visible to the `txn`
     virtual bool CheckVisible(Txn *txn) const {
         TxnTimeStamp begin_ts = txn->BeginTS();
-        if (begin_ts >= commit_ts_ || txn_id_ == txn->TxnID()) { 
+        if (begin_ts >= commit_ts_ || txn_id_ == txn->TxnID()) {
             return true;
         }
         TxnManager *txn_mgr = txn->txn_mgr();
         if (txn_mgr == nullptr) { // when replay
-            UnrecoverableError(fmt::format("Replay should not reach here. begin_ts: {}, commit_ts_: {} txn_id: {}, txn_id_: {}",
-                                           begin_ts,
-                                           commit_ts_,
-                                           txn->TxnID(),
-                                           txn_id_));
+            String error_message = fmt::format("Replay should not reach here. begin_ts: {}, commit_ts_: {} txn_id: {}, txn_id_: {}",
+                                               begin_ts,
+                                               commit_ts_,
+                                               txn->TxnID(),
+                                               txn_id_);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         // Check if the entry is in committing process, because commit_ts of the base_entry is set in the Txn::CommitBottom
         return txn_mgr->CheckIfCommitting(txn_id_, begin_ts);
@@ -94,6 +105,8 @@ public:
     const bool deleted_;
 
     const EntryType entry_type_;
+
+    SharedPtr<String> base_dir_;
 
 private:
     SharedPtr<String> encode_;

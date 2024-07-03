@@ -25,6 +25,9 @@ import index_ivfflat;
 import index_hnsw;
 import index_full_text;
 import index_secondary;
+import index_emvb;
+import index_bmp;
+import bmp_util;
 import third_party;
 import status;
 
@@ -37,6 +40,9 @@ namespace infinity {
 
 String MetricTypeToString(MetricType metric_type) {
     switch (metric_type) {
+        case MetricType::kMetricCosine: {
+            return "cos";
+        }
         case MetricType::kMetricInnerProduct: {
             return "ip";
         }
@@ -50,7 +56,9 @@ String MetricTypeToString(MetricType metric_type) {
 }
 
 MetricType StringToMetricType(const String &str) {
-    if (str == "ip") {
+    if (str == "cos") {
+        return MetricType::kMetricCosine;
+    } else if (str == "ip") {
         return MetricType::kMetricInnerProduct;
     } else if (str == "l2") {
         return MetricType::kMetricL2;
@@ -95,7 +103,9 @@ void IndexBase::WriteAdv(char *&ptr) const {
 SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
     char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
-        UnrecoverableError("ptr goes out of range when reading IndexBase");
+        String error_message = "ptr goes out of range when reading IndexBase";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     IndexType index_type = ReadBufAdv<IndexType>(ptr);
     Vector<String> column_names;
@@ -132,8 +142,22 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             res = MakeShared<IndexSecondary>(index_name, file_name, std::move(column_names));
             break;
         }
+        case IndexType::kEMVB: {
+            u32 residual_pq_subspace_num = ReadBufAdv<u32>(ptr);
+            u32 residual_pq_subspace_bits = ReadBufAdv<u32>(ptr);
+            res = MakeShared<IndexEMVB>(index_name, file_name, std::move(column_names), residual_pq_subspace_num, residual_pq_subspace_bits);
+            break;
+        }
+        case IndexType::kBMP: {
+            SizeT block_size = ReadBufAdv<SizeT>(ptr);
+            BMPCompressType compress_type = ReadBufAdv<BMPCompressType>(ptr);
+            res = MakeShared<IndexBMP>(index_name, file_name, std::move(column_names), block_size, compress_type);
+            break;
+        }
         case IndexType::kInvalid: {
-            UnrecoverableError("Error index method while reading");
+            String error_message = "Error index method while reading";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         default: {
             Status status = Status::NotSupport("Not implemented");
@@ -142,7 +166,9 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
         }
     }
     if (ptr_end < ptr) {
-        UnrecoverableError("ptr goes out of range when reading IndexBase");
+        String error_message = "ptr goes out of range when reading IndexBase";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return res;
 }
@@ -205,8 +231,22 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }
+        case IndexType::kEMVB: {
+            u32 residual_pq_subspace_num = index_def_json["pq_subspace_num"];
+            u32 residual_pq_subspace_bits = index_def_json["pq_subspace_bits"];
+            res = MakeShared<IndexEMVB>(index_name, file_name, std::move(column_names), residual_pq_subspace_num, residual_pq_subspace_bits);
+            break;
+        }
+        case IndexType::kBMP: {
+            SizeT block_size = index_def_json["block_size"];
+            auto compress_type = static_cast<BMPCompressType>(index_def_json["compress_type"]);
+            res = MakeShared<IndexBMP>(index_name, file_name, std::move(column_names), block_size, compress_type);
+            break;
+        }
         case IndexType::kInvalid: {
-            UnrecoverableError("Error index method while deserializing");
+            String error_message = "Error index method while deserializing";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         default: {
             Status status = Status::NotSupport("Not implemented");

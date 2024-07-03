@@ -17,6 +17,16 @@
 
 namespace infinity {
 
+CopyStatement::~CopyStatement() {
+    if (expr_array_ != nullptr) {
+        for (auto &expr_ptr : *expr_array_) {
+            delete expr_ptr;
+        }
+        delete expr_array_;
+        expr_array_ = nullptr;
+    }
+}
+
 std::string CopyStatement::ToString() const {
     std::stringstream ss;
     std::string copy_direction;
@@ -42,6 +52,14 @@ std::string CopyStatement::ToString() const {
         }
         case CopyFileType::kJSONL: {
             file_format = "JSONL";
+            break;
+        }
+        case CopyFileType::kCSR: {
+            file_format = "CSR";
+            break;
+        }
+        case CopyFileType::kBVECS: {
+            file_format = "BVECS";
             break;
         }
         case CopyFileType::kInvalid: {

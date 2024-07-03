@@ -39,7 +39,7 @@ import segment_entry;
 import db_meta;
 import meta_map;
 import base_entry;
-
+import column_def;
 import meta_entry_interface;
 import cleanup_scanner;
 import log_file;
@@ -69,7 +69,7 @@ public:
 
     void Enqueue(SharedPtr<QueryProfiler> &&profiler) {
         std::unique_lock<std::mutex> lk(lock_);
-        if(deque_.size() >= max_size_) {
+        if (deque_.size() >= max_size_) {
             deque_.pop_back();
         }
 
@@ -79,7 +79,6 @@ public:
     QueryProfiler *GetElement(SizeT index);
 
     Vector<SharedPtr<QueryProfiler>> GetElements();
-
 };
 
 class GlobalCatalogDeltaEntry;
@@ -122,6 +121,9 @@ public:
                             TxnTimeStamp begin_ts);
 
     DBEntry *GetDatabaseReplay(const String &db_name, TransactionID txn_id, TxnTimeStamp begin_ts);
+
+    // Start memory index commit thread
+    void StartMemoryIndexCommit();
 
     // List databases
     Vector<DBEntry *> Databases(TransactionID txn_id, TxnTimeStamp begin_ts);
@@ -218,9 +220,9 @@ public:
     // Serialization and Deserialization
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
-    void SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_path);
+    void SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_path, String &full_name);
 
-    bool SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_path);
+    bool SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_path, String &delta_name);
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
 
@@ -228,19 +230,21 @@ public:
 
     static UniquePtr<Catalog> NewCatalog(SharedPtr<String> data_dir, bool create_default_db);
 
-    static UniquePtr<Catalog>
-    LoadFromFiles(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> LoadFromFiles(const String &data_dir,
+                                            const FullCatalogFileInfo &full_ckp_info,
+                                            const Vector<DeltaCatalogFileInfo> &delta_ckp_infos,
+                                            BufferManager *buffer_mgr);
 
     SizeT GetDeltaLogCount() const;
 
 private:
-    static UniquePtr<Catalog> Deserialize(const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> Deserialize(const String &data_dir, const nlohmann::json &catalog_json, BufferManager *buffer_mgr);
 
     static UniquePtr<CatalogDeltaEntry> LoadFromFileDelta(const DeltaCatalogFileInfo &delta_ckp_info);
 
     void LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buffer_mgr);
 
-    static UniquePtr<Catalog> LoadFromFile(const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr);
+    static UniquePtr<Catalog> LoadFromFile(const String &data_dir, const FullCatalogFileInfo &full_ckp_info, BufferManager *buffer_mgr);
 
 public:
     // Profile related methods
@@ -251,13 +255,9 @@ public:
 
     const Vector<SharedPtr<QueryProfiler>> GetProfileRecords() { return history_.GetElements(); }
 
-    void ResizeProfileHistory(SizeT new_size) {
-        history_.Resize(new_size);
-    }
+    void ResizeProfileHistory(SizeT new_size) { history_.Resize(new_size); }
 
-    SizeT ProfileHistorySize() const {
-        return history_.HistoryCapacity();
-    }
+    SizeT ProfileHistorySize() const { return history_.HistoryCapacity(); }
 
 public:
     const SharedPtr<String> &DataDir() const { return data_dir_; }
@@ -281,6 +281,7 @@ public:
     // Currently, these function or function set can't be changed and also will not be persistent.
     HashMap<String, SharedPtr<FunctionSet>> function_sets_{};
     HashMap<String, SharedPtr<SpecialFunction>> special_functions_{};
+    HashMap<String, UniquePtr<ColumnDef>> special_columns_{};
 
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
 
@@ -290,7 +291,7 @@ private: // TODO: remove this
     HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
 
     Atomic<bool> running_{};
-    Thread mem_index_commit_thread_{};
+    UniquePtr<Thread> mem_index_commit_thread_{};
 
     void MemIndexCommit();
 

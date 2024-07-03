@@ -69,7 +69,6 @@ protected:
         u32 run_num = rand() % 300;
         while (run_num < 100 || SIZE % run_num != 0)
             run_num = rand() % 300;
-
         for (u32 i = 0; i < run_num; ++i) {
             u64 pos = ftell(f);
             fseek(f, 2 * sizeof(u32) + sizeof(u64), SEEK_CUR);

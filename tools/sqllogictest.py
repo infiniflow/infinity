@@ -22,6 +22,12 @@ from generate_many_import import generate as generate11
 from generate_big_point_query_test_fastroughfilter import generate as generate12
 from generate_many_import_drop import generate as generate13
 from generate_mem_hnsw import generate as generate14
+from generate_big_sparse import generate as generate15
+from generate_csr import generate as generate16
+from generate_bvecs import generate as generate17
+from generate_emvb_test_data import generate as generate18
+from generate_emvb_test_data_2 import generate as generate19
+import generate_wiki_embedding
 
 class SpinnerThread(threading.Thread):
     def __init__(self):
@@ -96,7 +102,7 @@ if __name__ == "__main__":
         "-g",
         "--generate",
         type=bool,
-        default=True,
+        default=False,
         dest="generate_if_exists",
     )
     parser.add_argument(
@@ -154,7 +160,32 @@ if __name__ == "__main__":
     generate12(args.generate_if_exists, args.copy)
     generate13(args.generate_if_exists, args.copy)
     generate14(args.generate_if_exists, args.copy)
+    generate15(args.generate_if_exists, args.copy)
+    generate16(args.generate_if_exists, args.copy)
+    generate17(args.generate_if_exists, args.copy)
+    generate18(args.generate_if_exists, args.copy)
+    #generate19(args.generate_if_exists, args.copy)
+    # generate_wiki_embedding.generate()
+
     print("Generate file finshed.")
+
+    if os.path.exists("/var/infinity/test_data/test_export_embedding.jsonl"):
+        os.remove("/var/infinity/test_data/test_export_embedding.jsonl")
+
+    if os.path.exists("/var/infinity/test_data/test_export_embedding.csv"):
+        os.remove("/var/infinity/test_data/test_export_embedding.csv")
+
+    if os.path.exists("/var/infinity/test_data/test_export_default_full.jsonl"):
+        os.remove("/var/infinity/test_data/test_export_default_full.jsonl")
+
+    if os.path.exists("/var/infinity/test_data/test_export_default_full.csv"):
+        os.remove("/var/infinity/test_data/test_export_default_full.csv")
+
+    if os.path.exists("/var/infinity/test_data/test_export_default_part.jsonl"):
+        os.remove("/var/infinity/test_data/test_export_default_part.jsonl")
+
+    if os.path.exists("/var/infinity/test_data/test_export_default_part.csv"):
+        os.remove("/var/infinity/test_data/test_export_default_part.csv")
 
     print("Start copying data...")
     if args.just_copy_all_data is True:

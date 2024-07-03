@@ -14,14 +14,15 @@
 
 module;
 
+export module bg_task;
+
 import stl;
 import txn;
 import catalog;
 import catalog_delta_entry;
 import cleanup_scanner;
 import buffer_manager;
-
-export module bg_task;
+import third_party;
 
 namespace infinity {
 
@@ -36,29 +37,6 @@ export enum class BGTaskType {
     kUpdateSegmentBloomFilterData, // Not used
     kInvalid
 };
-
-export String BGTaskTypeToString(BGTaskType type) {
-    switch (type) {
-        case BGTaskType::kStopProcessor:
-            return "StopProcessor";
-        case BGTaskType::kForceCheckpoint:
-            return "ForceCheckpoint";
-        case BGTaskType::kAddDeltaEntry:
-            return "AddDeltaEntry";
-        case BGTaskType::kCheckpoint:
-            return "Checkpoint";
-        case BGTaskType::kNotifyCompact:
-            return "NotifyCompact";
-        case BGTaskType::kNotifyOptimize:
-            return "NotifyOptimize";
-        case BGTaskType::kCleanup:
-            return "Cleanup";
-        case BGTaskType::kUpdateSegmentBloomFilterData:
-            return "UpdateSegmentBloomFilterData";
-        default:
-            return "Invalid";
-    }
-}
 
 export struct BGTask {
     BGTask(BGTaskType type, bool async) : type_(type), async_(async) {}
@@ -104,7 +82,7 @@ export struct AddDeltaEntryTask final : public BGTask {
     AddDeltaEntryTask(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size)
         : BGTask(BGTaskType::kAddDeltaEntry, false), delta_entry_(std::move(delta_entry)), wal_size_(wal_size) {}
 
-    String ToString() const final { return "Add Delta Entry Task"; }
+    String ToString() const final { return fmt::format("DeltaLog: {}", delta_entry_->ToString()); }
 
     UniquePtr<CatalogDeltaEntry> delta_entry_{};
     i64 wal_size_{};
@@ -117,7 +95,14 @@ export struct CheckpointTaskBase : public BGTask {
 export struct CheckpointTask final : public CheckpointTaskBase {
     CheckpointTask(bool full_checkpoint) : CheckpointTaskBase(BGTaskType::kCheckpoint, false), is_full_checkpoint_(full_checkpoint) {}
 
-    String ToString() const final { return "Checkpoint Task"; }
+    String ToString() const final {
+        if(is_full_checkpoint_) {
+            return "Full checkpoint";
+        } else {
+            return "Delta checkpoint";
+        }
+    }
+
     bool is_full_checkpoint_{};
 };
 
@@ -127,7 +112,13 @@ export struct ForceCheckpointTask final : public CheckpointTaskBase {
 
     ~ForceCheckpointTask() = default;
 
-    String ToString() const override { return "Force Checkpoint Task"; }
+    String ToString() const override {
+        if(is_full_checkpoint_) {
+            return fmt::format("Force full checkpoint, txn: ", txn_->TxnID());
+        } else {
+            return fmt::format("Force delta checkpoint, txn: ", txn_->TxnID());
+        }
+    }
 
     Txn *txn_{};
     bool is_full_checkpoint_{};
@@ -142,7 +133,9 @@ public:
 public:
     ~CleanupTask() override = default;
 
-    String ToString() const override { return "CleanupTask"; }
+    String ToString() const override {
+        return fmt::format("CleanupTask, visible timestamp: {}", visible_ts_);
+    }
 
     void Execute() {
         CleanupScanner scanner(catalog_, visible_ts_, buffer_mgr_);

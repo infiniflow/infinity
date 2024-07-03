@@ -27,12 +27,12 @@ import block_index;
 import third_party;
 import status;
 import random;
-
+import statement_common;
 import cleanup_scanner;
 import meta_entry_interface;
 import index_file_worker;
 import column_def;
-import memory_pool;
+
 import block_entry;
 
 namespace infinity {
@@ -125,10 +125,6 @@ public:
 
     Status CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID, atomic_u64> &create_index_idxes, Txn *txn);
 
-    MemoryPool &GetFulltextByteSlicePool() { return byte_slice_pool_; }
-    RecyclePool &GetFulltextBufferPool() { return buffer_pool_; }
-    ThreadPool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
-    ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
     TxnTimeStamp GetFulltexSegmentUpdateTs() {
         std::shared_lock lock(segment_update_ts_mutex_);
         return segment_update_ts_;
@@ -143,17 +139,15 @@ public:
     // replay
     void UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
+    Vector<SegmentIndexEntry *> OptimizeIndex(Txn *txn, Vector<UniquePtr<InitParameter>> opt_params, bool replay);
+
 private:
-    static SharedPtr<String> DetermineIndexDir(const String &parent_dir, const String &index_name) {
-        return DetermineRandomString(parent_dir, fmt::format("index_{}", index_name));
+    static SharedPtr<String> DetermineIndexDir(const String &base_dir, const String &parent_dir, const String &index_name) {
+        return DetermineRandomString(base_dir, parent_dir, fmt::format("index_{}", index_name));
     }
 
 private:
     // For fulltext index
-    MemoryPool byte_slice_pool_{};
-    RecyclePool buffer_pool_{};
-    ThreadPool inverting_thread_pool_{};
-    ThreadPool commiting_thread_pool_{};
     std::shared_mutex segment_update_ts_mutex_{};
     TxnTimeStamp segment_update_ts_{0};
 

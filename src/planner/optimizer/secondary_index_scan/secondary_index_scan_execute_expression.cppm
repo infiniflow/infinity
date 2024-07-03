@@ -26,8 +26,21 @@ import filter_expression_push_down_helper;
 import internal_types;
 import third_party;
 import filter_value_type_classification;
+import logger;
 
 namespace infinity {
+
+template<typename ColumnValueType>
+ConvertToOrderedType<ColumnValueType> ConvertToOrderedKeyValueFromValue(const Value &val) {
+    ColumnValueType raw_val = val.GetValue<ColumnValueType>();
+    return ConvertToOrderedKeyValue(raw_val);
+}
+
+template<>
+ConvertToOrderedType<VarcharT> ConvertToOrderedKeyValueFromValue<VarcharT>(const Value &val) {
+    String s = val.GetVarchar();
+    return ConvertToOrderedKeyValue(s);
+}
 
 // The range will only monotonically shrink
 // MergeAnd is meaningful: reduce the search range
@@ -41,8 +54,7 @@ public:
                   "FilterExecuteSingleRangeT: Now only support integral or floating point index key type.");
 
     explicit FilterIntervalRangeT(const Value &val, FilterCompareType compare_type) {
-        ColumnValueType raw_val = val.GetValue<ColumnValueType>();
-        T val_ = ConvertToOrderedKeyValue(raw_val);
+        T val_ = ConvertToOrderedKeyValueFromValue<ColumnValueType>(val);
         AddFilter(val_, compare_type);
     }
 
@@ -97,7 +109,9 @@ private:
                 break;
             }
             default: {
-                UnrecoverableError("FilterExecuteSingleRangeT::AddFilter(): compare type error.");
+                String error_message = "FilterExecuteSingleRangeT::AddFilter(): compare type error.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
             }
         }
     }
@@ -113,7 +127,8 @@ export using FilterIntervalRange = std::variant<std::monostate,
                                                 FilterIntervalRangeT<DateT>,
                                                 FilterIntervalRangeT<TimeT>,
                                                 FilterIntervalRangeT<DateTimeT>,
-                                                FilterIntervalRangeT<TimestampT>>;
+                                                FilterIntervalRangeT<TimestampT>,
+                                                FilterIntervalRangeT<VarcharT>>;
 
 // because some rows may be deleted, kAlwaysTrue is meaningless
 // kInterval of the same column can be merged in "AND" condition

@@ -1,7 +1,7 @@
 module;
 
 import stl;
-import memory_pool;
+
 import byte_slice;
 import in_doc_pos_state;
 import position_list_decoder;
@@ -15,7 +15,7 @@ export module in_doc_state_keeper;
 namespace infinity {
 export class InDocStateKeeper {
 public:
-    InDocStateKeeper(InDocPositionState *state, MemoryPool *session_pool);
+    InDocStateKeeper(InDocPositionState *state);
 
     ~InDocStateKeeper();
 
@@ -31,6 +31,5 @@ public:
 private:
     InDocPositionState *state_ = nullptr;
     Vector<PositionListDecoder *> pos_decoders_;
-    MemoryPool *session_pool_;
 };
 } // namespace infinity

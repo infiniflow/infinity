@@ -42,6 +42,15 @@ UniquePtr<TableMeta> TableMeta::NewTableMeta(const SharedPtr<String> &db_entry_d
 
     return table_meta;
 }
+
+UniquePtr<TableMeta> TableMeta::NewTableMeta(const SharedPtr<String> &data_dir,
+                                             const SharedPtr<String> &db_entry_dir,
+                                             const SharedPtr<String> &table_name,
+                                             DBEntry *db_entry) {
+    auto table_meta = MakeUnique<TableMeta>(data_dir, db_entry_dir, table_name, db_entry);
+
+    return table_meta;
+}
 /**
  * @brief Create a new table entry.
  *        LIST: [👇(insert a new).... table_entry2 , table_entry1 , dummy_entry] insert new table entry from front.
@@ -63,7 +72,7 @@ Tuple<TableEntry *, Status> TableMeta::CreateEntry(std::shared_lock<std::shared_
                                                    TxnManager *txn_mgr,
                                                    ConflictType conflict_type) {
     auto init_table_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
-        return TableEntry::NewTableEntry(false, this->db_entry_dir_, table_name, columns, table_entry_type, this, txn_id, begin_ts);
+        return TableEntry::NewTableEntry(false, this->data_dir_, this->db_entry_dir_, table_name, columns, table_entry_type, this, txn_id, begin_ts);
     };
     return table_entry_list_.AddEntry(std::move(r_lock), std::move(init_table_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
@@ -77,6 +86,7 @@ Tuple<SharedPtr<TableEntry>, Status> TableMeta::DropEntry(std::shared_lock<std::
     auto init_drop_entry = [&](TransactionID txn_id, TxnTimeStamp begin_ts) {
         Vector<SharedPtr<ColumnDef>> dummy_columns;
         return TableEntry::NewTableEntry(true,
+                                         this->data_dir_,
                                          this->db_entry_dir_,
                                          this->table_name_,
                                          dummy_columns,
@@ -88,8 +98,7 @@ Tuple<SharedPtr<TableEntry>, Status> TableMeta::DropEntry(std::shared_lock<std::
     return table_entry_list_.DropEntry(std::move(r_lock), std::move(init_drop_entry), txn_id, begin_ts, txn_mgr, conflict_type);
 }
 
-Tuple<SharedPtr<TableInfo>, Status>
-TableMeta::GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, Txn *txn) {
+Tuple<SharedPtr<TableInfo>, Status> TableMeta::GetTableInfo(std::shared_lock<std::shared_mutex> &&r_lock, Txn *txn) {
     TransactionID txn_id = txn->TxnID();
     TxnTimeStamp begin_ts = txn->BeginTS();
     auto [table_entry, status] = table_entry_list_.GetEntry(std::move(r_lock), txn_id, begin_ts);
@@ -116,6 +125,7 @@ void TableMeta::CreateEntryReplay(std::function<SharedPtr<TableEntry>(Transactio
                                   TxnTimeStamp begin_ts) {
     auto [entry, status] = table_entry_list_.AddEntryReplay(std::move(init_entry), txn_id, begin_ts);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 }
@@ -125,6 +135,7 @@ void TableMeta::UpdateEntryReplay(std::function<void(SharedPtr<TableEntry>, Tran
                                   TxnTimeStamp begin_ts) {
     auto status = table_entry_list_.UpdateEntryReplay(std::move(update_entry), txn_id, begin_ts);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 }
@@ -134,6 +145,7 @@ void TableMeta::DropEntryReplay(std::function<SharedPtr<TableEntry>(TransactionI
                                 TxnTimeStamp begin_ts) {
     auto [dropped_entry, status] = table_entry_list_.DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 }
@@ -141,6 +153,7 @@ void TableMeta::DropEntryReplay(std::function<SharedPtr<TableEntry>(TransactionI
 TableEntry *TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [entry, status] = table_entry_list_.GetEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return entry;
@@ -193,7 +206,7 @@ UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_jso
     SharedPtr<String> db_entry_dir = MakeShared<String>(table_meta_json["db_entry_dir"]);
     SharedPtr<String> table_name = MakeShared<String>(table_meta_json["table_name"]);
     LOG_TRACE(fmt::format("load table {}", *table_name));
-    UniquePtr<TableMeta> res = MakeUnique<TableMeta>(db_entry_dir, table_name, db_entry);
+    UniquePtr<TableMeta> res = MakeUnique<TableMeta>(db_entry->base_dir_, db_entry_dir, table_name, db_entry);
     if (table_meta_json.contains("table_entries")) {
         for (const auto &table_entry_json : table_meta_json["table_entries"]) {
             UniquePtr<TableEntry> table_entry = TableEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);

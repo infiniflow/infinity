@@ -21,6 +21,7 @@ export module infinity_thrift_types;
 namespace infinity_thrift_rpc {
 
 export using infinity_thrift_rpc::InfinityServiceIf;
+export using infinity_thrift_rpc::ConnectRequest;
 export using infinity_thrift_rpc::CommonResponse;
 export using infinity_thrift_rpc::CommonRequest;
 export using infinity_thrift_rpc::CreateDatabaseRequest;
@@ -30,6 +31,7 @@ export using infinity_thrift_rpc::DropTableRequest;
 export using infinity_thrift_rpc::InsertRequest;
 export using infinity_thrift_rpc::CopyFileType;
 export using infinity_thrift_rpc::ImportRequest;
+export using infinity_thrift_rpc::ExportRequest;
 export using infinity_thrift_rpc::SelectRequest;
 export using infinity_thrift_rpc::SelectResponse;
 export using infinity_thrift_rpc::ExplainRequest;
@@ -52,6 +54,7 @@ export using infinity_thrift_rpc::CreateIndexRequest;
 export using infinity_thrift_rpc::DropIndexRequest;
 export using infinity_thrift_rpc::ListIndexRequest;
 export using infinity_thrift_rpc::ShowIndexRequest;
+export using infinity_thrift_rpc::OptimizeRequest;
 export using infinity_thrift_rpc::ListDatabaseResponse;
 export using infinity_thrift_rpc::ListTableResponse;
 export using infinity_thrift_rpc::ShowDatabaseResponse;
@@ -70,6 +73,8 @@ export using infinity_thrift_rpc::ConstantExpr;
 export using infinity_thrift_rpc::ColumnExpr;
 export using infinity_thrift_rpc::FunctionExpr;
 export using infinity_thrift_rpc::KnnExpr;
+export using infinity_thrift_rpc::MatchSparseExpr;
+export using infinity_thrift_rpc::MatchTensorExpr;
 export using infinity_thrift_rpc::MatchExpr;
 export using infinity_thrift_rpc::FusionExpr;
 export using infinity_thrift_rpc::ParsedExpr;
@@ -86,10 +91,12 @@ export using infinity_thrift_rpc::LogicType;
 export using infinity_thrift_rpc::VarcharType;
 export using infinity_thrift_rpc::PhysicalType;
 export using infinity_thrift_rpc::EmbeddingType;
+export using infinity_thrift_rpc::SparseType;
 export using infinity_thrift_rpc::InfinityServiceIfFactory;
 export using infinity_thrift_rpc::InfinityServiceProcessorFactory;
 export using infinity_thrift_rpc::InfinityServiceProcessor;
-
+export using infinity_thrift_rpc::OptimizeOptions;
+export using infinity_thrift_rpc::InitParameter;
 }
 
 

@@ -28,7 +28,7 @@ constexpr int MAX_TUPLE_LENGTH = 1024;
 
 CommonLanguageAnalyzer::CommonLanguageAnalyzer()
     : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(MakeUnique<Stemmer>()), case_sensitive_(false), contain_lower_(false),
-      extract_eng_stem_(true), extract_synonym_(false), chinese_(false), remove_stopwords_(false) {
+      extract_eng_stem_(true), extract_synonym_(false), cjk_(false), remove_stopwords_(false) {
     stemmer_->Init(STEM_LANG_ENGLISH);
 }
 
@@ -51,7 +51,7 @@ int CommonLanguageAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType 
         if (remove_stopwords_ && IsStopword())
             continue;
 
-        if (chinese_) {
+        if (cjk_) {
             int cur_word_offset = offset_;
             if (cur_word_offset == last_word_offset)
                 top_and_or_bit = Term::OR;

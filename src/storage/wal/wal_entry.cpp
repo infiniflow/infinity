@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <fstream>
 #include <vector>
 
@@ -30,9 +31,10 @@ import stl;
 
 import third_party;
 import internal_types;
-
+import logger;
 import block_entry;
 import segment_entry;
+import local_file_system;
 
 namespace infinity {
 
@@ -40,8 +42,11 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
     : block_id_(block_entry->block_id_), row_count_(block_entry->row_count_), row_capacity_(block_entry->row_capacity_) {
     outline_infos_.resize(block_entry->columns_.size());
     for (SizeT i = 0; i < block_entry->columns_.size(); i++) {
+        auto &col_i_outline_info = outline_infos_[i];
         auto *column = block_entry->columns_[i].get();
-        outline_infos_[i] = {column->OutlineBufferCount(), column->LastChunkOff()};
+        for (u32 layer_n = 0; layer_n < 2; ++layer_n) {
+            col_i_outline_info.emplace_back(column->OutlineBufferCount(layer_n), column->LastChunkOff(layer_n));
+        }
     }
 }
 
@@ -52,7 +57,10 @@ bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
 
 i32 WalBlockInfo::GetSizeInBytes() const {
     i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_);
-    size += sizeof(i32) + outline_infos_.size() * (sizeof(i32) + sizeof(u64));
+    size += sizeof(i32);
+    for (const auto &v : outline_infos_) {
+        size += sizeof(i32) + v.size() * (sizeof(u32) + sizeof(u64));
+    }
     return size;
 }
 
@@ -61,9 +69,12 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, row_capacity_);
     WriteBufAdv(buf, static_cast<i32>(outline_infos_.size()));
-    for (const auto &[idx, off] : outline_infos_) {
-        WriteBufAdv(buf, idx);
-        WriteBufAdv(buf, off);
+    for (const auto &outline_info : outline_infos_) {
+        WriteBufAdv(buf, static_cast<i32>(outline_info.size()));
+        for (const auto &[idx, off] : outline_info) {
+            WriteBufAdv(buf, idx);
+            WriteBufAdv(buf, off);
+        }
     }
 }
 
@@ -75,7 +86,14 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
     i32 count = ReadBufAdv<i32>(ptr);
     block_info.outline_infos_.resize(count);
     for (i32 i = 0; i < count; i++) {
-        block_info.outline_infos_[i] = {ReadBufAdv<i32>(ptr), ReadBufAdv<u64>(ptr)};
+        auto &outline_info = block_info.outline_infos_[i];
+        const i32 info_count = ReadBufAdv<i32>(ptr);
+        outline_info.resize(info_count);
+        for (i32 j = 0; j < info_count; j++) {
+            const auto buffer_cnt = ReadBufAdv<u32>(ptr);
+            const auto last_chunk_offset = ReadBufAdv<u64>(ptr);
+            outline_info[j] = {buffer_cnt, last_chunk_offset};
+        }
     }
     return block_info;
 }
@@ -85,8 +103,16 @@ String WalBlockInfo::ToString() const {
     ss << "block_id: " << block_id_ << ", row_count: " << row_count_ << ", row_capacity: " << row_capacity_;
     ss << ", next_outline_idxes: [";
     for (SizeT i = 0; i < outline_infos_.size(); i++) {
-        auto &[idx, off] = outline_infos_[i];
-        ss << "(" << idx << ", " << off << ")";
+        ss << "outline_buffer_group_" << i << ": [";
+        const auto &outline_info = outline_infos_[i];
+        for (SizeT j = 0; j < outline_info.size(); ++j) {
+            auto &[idx, off] = outline_info[j];
+            ss << "(" << idx << ", " << off << ")";
+            if (j != outline_info.size() - 1) {
+                ss << ", ";
+            }
+        }
+        ss << "]";
         if (i != outline_infos_.size() - 1) {
             ss << ", ";
         }
@@ -253,7 +279,8 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             i64 max_commit_ts = ReadBufAdv<i64>(ptr);
             bool is_full_checkpoint = ReadBufAdv<i8>(ptr);
             String catalog_path = ReadBufAdv<String>(ptr);
-            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, is_full_checkpoint, catalog_path);
+            String catalog_name = ReadBufAdv<String>(ptr);
+            cmd = MakeShared<WalCmdCheckpoint>(max_commit_ts, is_full_checkpoint, catalog_path, catalog_name);
             break;
         }
         case WalCommandType::CREATE_INDEX: {
@@ -289,12 +316,29 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
                 MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(new_segment_infos), std::move(deprecated_segment_ids));
             break;
         }
-        default:
-            UnrecoverableError(fmt::format("UNIMPLEMENTED ReadAdv for WalCmd command {}", int(cmd_type)));
+        case WalCommandType::OPTIMIZE: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String index_name = ReadBufAdv<String>(ptr);
+            auto param_n = ReadBufAdv<i32>(ptr);
+            Vector<UniquePtr<InitParameter>> params;
+            for (i32 i = 0; i < param_n; i++) {
+                params.push_back(InitParameter::ReadAdv(ptr));
+            }
+            cmd = MakeShared<WalCmdOptimize>(std::move(db_name), std::move(table_name), std::move(index_name), std::move(params));
+            break;
+        }
+        default: {
+            String error_message = fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type));
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
     }
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        UnrecoverableError("ptr goes out of range when reading WalCmd");
+        String error_message = "ptr goes out of range when reading WalCmd";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return cmd;
 }
@@ -390,6 +434,12 @@ bool WalCmdCompact::operator==(const WalCmd &other) const {
     return true;
 }
 
+bool WalCmdOptimize::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdOptimize *>(&other);
+    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_) &&
+           IsEqual(index_name_, other_cmd->index_name_);
+}
+
 i32 WalCmdCreateDatabase::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_dir_tail_.size();
 }
@@ -448,7 +498,7 @@ i32 WalCmdUpdateSegmentBloomFilterData::GetSizeInBytes() const {
     return sz;
 }
 
-i32 WalCmdCheckpoint::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i64) + sizeof(i8) + sizeof(i32) + this->catalog_path_.size(); }
+i32 WalCmdCheckpoint::GetSizeInBytes() const { return sizeof(WalCommandType) + sizeof(i64) + sizeof(i8) + sizeof(i32) + sizeof(i32) + this->catalog_path_.size() + this->catalog_name_.size(); }
 
 i32 WalCmdCompact::GetSizeInBytes() const {
     i32 size = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32);
@@ -456,6 +506,16 @@ i32 WalCmdCompact::GetSizeInBytes() const {
         size += segment_info.GetSizeInBytes();
     }
     return size + sizeof(i32) + this->deprecated_segment_ids_.size() * sizeof(SegmentID);
+}
+
+i32 WalCmdOptimize::GetSizeInBytes() const {
+    i32 size = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+               this->index_name_.size();
+    size += sizeof(i32);
+    for (const auto &param : this->params_) {
+        size += param->GetSizeInBytes();
+    }
+    return size;
 }
 
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
@@ -556,6 +616,7 @@ void WalCmdCheckpoint::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->max_commit_ts_);
     WriteBufAdv(buf, i8(this->is_full_checkpoint_));
     WriteBufAdv(buf, this->catalog_path_);
+    WriteBufAdv(buf, this->catalog_name_);
 }
 
 void WalCmdCompact::WriteAdv(char *&buf) const {
@@ -571,6 +632,17 @@ void WalCmdCompact::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, deprecated_n);
     for (i32 i = 0; i < deprecated_n; ++i) {
         WriteBufAdv(buf, this->deprecated_segment_ids_[i]);
+    }
+}
+
+void WalCmdOptimize::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::OPTIMIZE);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->index_name_);
+    WriteBufAdv(buf, static_cast<i32>(this->params_.size()));
+    for (const auto &param : this->params_) {
+        param->WriteAdv(buf);
     }
 }
 
@@ -637,7 +709,9 @@ void WalEntry::WriteAdv(char *&ptr) const {
 SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
     if (max_bytes <= 0) {
-        UnrecoverableError("ptr goes out of range when reading WalEntry");
+        String error_message = "ptr goes out of range when reading WalEntry";
+        LOG_WARN(error_message);
+        return nullptr;
     }
     SharedPtr<WalEntry> entry = MakeShared<WalEntry>();
     auto *header = (WalEntryHeader *)ptr;
@@ -659,7 +733,9 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     for (i32 i = 0; i < cnt; i++) {
         max_bytes = ptr_end - ptr;
         if (max_bytes <= 0) {
-            UnrecoverableError("ptr goes out of range when reading WalEntry");
+            String error_message = "ptr goes out of range when reading WalEntry";
+            LOG_WARN(error_message);
+            return nullptr;
         }
         SharedPtr<WalCmd> cmd = WalCmd::ReadAdv(ptr, max_bytes);
         entry->cmds_.push_back(cmd);
@@ -667,9 +743,20 @@ SharedPtr<WalEntry> WalEntry::ReadAdv(char *&ptr, i32 max_bytes) {
     ptr += sizeof(i32);
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        UnrecoverableError("ptr goes out of range when reading WalEntry");
+        String error_message = "ptr goes out of range when reading WalEntry";
+        LOG_WARN(error_message);
+        return nullptr;
     }
     return entry;
+}
+
+bool WalEntry::IsCheckPoint() const {
+    for (auto &cmd : cmds_) {
+        if (cmd->GetType() == WalCommandType::CHECKPOINT) {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool WalEntry::IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const {
@@ -706,7 +793,7 @@ String WalEntry::ToString() const {
         ss << "[" << WalCmd::WalCommandTypeToString(cmd->GetType()) << "]" << std::endl;
         if (cmd->GetType() == WalCommandType::CHECKPOINT) {
             auto checkpoint_cmd = dynamic_cast<const WalCmdCheckpoint *>(cmd.get());
-            ss << "catalog path: " << checkpoint_cmd->catalog_path_ << std::endl;
+            ss << "catalog path: " << fmt::format("{}/{}", checkpoint_cmd->catalog_path_, checkpoint_cmd->catalog_name_) << std::endl;
             ss << "max commit ts: " << checkpoint_cmd->max_commit_ts_ << std::endl;
             ss << "is full checkpoint: " << checkpoint_cmd->is_full_checkpoint_ << std::endl;
         } else if (cmd->GetType() == WalCommandType::IMPORT) {
@@ -798,16 +885,24 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
         case WalCommandType::COMPACT:
             command = "COMPACT";
             break;
-        default:
-            UnrecoverableError("Unknown command type");
+        case WalCommandType::OPTIMIZE:
+            command = "OPTIMIZE";
+            break;
+        default: {
+            String error_message = "Unknown command type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
     }
     return command;
 }
 
-WalEntryIterator WalEntryIterator::Make(const String &wal_path) {
+UniquePtr<WalEntryIterator> WalEntryIterator::Make(const String &wal_path, bool is_backward) {
     std::ifstream ifs(wal_path.c_str(), std::ios::binary | std::ios::ate);
     if (!ifs.is_open()) {
-        UnrecoverableError("Wal open failed");
+        String error_message = "WAL open failed";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     auto wal_size = ifs.tellg();
     Vector<char> buf(wal_size);
@@ -815,38 +910,123 @@ WalEntryIterator WalEntryIterator::Make(const String &wal_path) {
     ifs.read(buf.data(), wal_size);
     ifs.close();
 
-    return WalEntryIterator(std::move(buf), wal_size);
+    return MakeUnique<WalEntryIterator>(std::move(buf), wal_size, is_backward);
 }
 
 SharedPtr<WalEntry> WalEntryIterator::Next() {
-    if (end_ > buf_.data()) {
-        i32 entry_size;
-        std::memcpy(&entry_size, end_ - sizeof(i32), sizeof(entry_size));
-        end_ = end_ - entry_size;
-        auto entry = WalEntry::ReadAdv(end_, entry_size);
-        end_ = end_ - entry_size;
+    if (is_backward_) {
+        assert(off_ > 0);
+        i32 entry_size = *(i32 *)(buf_.data() + off_ - sizeof(i32));
+        if ((SizeT)entry_size > off_) {
+            return nullptr;
+        }
+        char *ptr = buf_.data() + off_ - (SizeT)entry_size;
+        auto entry = WalEntry::ReadAdv(ptr, entry_size);
+        if (entry.get() != nullptr) {
+            off_ -= entry_size;
+        }
         return entry;
     } else {
-        return nullptr;
+        assert(off_ < buf_.size());
+        i32 entry_size = *(i32 *)(buf_.data() + off_);
+        if (off_ + (SizeT)entry_size > buf_.size()) {
+            return nullptr;
+        }
+        char *ptr = buf_.data() + off_;
+        auto entry = WalEntry::ReadAdv(ptr, entry_size);
+        if (entry.get() != nullptr) {
+            off_ += (SizeT)entry_size;
+        }
+        return entry;
+    }
+}
+
+WalListIterator::WalListIterator(const Vector<String> &wal_list) {
+    assert(!wal_list.empty());
+    for (SizeT i = 0; i < wal_list.size(); ++i) {
+        wal_list_.push_back(wal_list[i]);
+    }
+    PurgeBadEntriesAfterLatestCheckpoint();
+    if (!wal_list_.empty())
+        iter_ = WalEntryIterator::Make(wal_list_.front(), true);
+}
+
+void WalListIterator::PurgeBadEntriesAfterLatestCheckpoint() {
+    bool found_checkpoint = false;
+    SizeT file_num = 0;
+    auto it = wal_list_.begin();
+    while (!found_checkpoint && it != wal_list_.end()) {
+        i64 bad_offset = i64(-1);
+        iter_ = WalEntryIterator::Make(*it, false);
+        while (iter_->HasNext()) {
+            auto entry = iter_->Next();
+            if (entry.get() != nullptr) {
+                if (entry->IsCheckPoint()) {
+                    found_checkpoint = true;
+                }
+            } else {
+                bad_offset = iter_->GetOffset();
+                break;
+            }
+        }
+        if (bad_offset != i64(-1)) {
+            String error_message = fmt::format("Found bad wal entry {}@{}", *it, bad_offset);
+            LOG_WARN(error_message);
+            LocalFileSystem fs;
+            if (bad_offset == 0) {
+                fs.DeleteFile(*it);
+                error_message = fmt::format("Removed wal log {}", *it);
+                LOG_WARN(error_message);
+                ++it;
+                for (SizeT i = 0; i <= file_num; ++i) {
+                    wal_list_.pop_front();
+                }
+                file_num = 0;
+            } else {
+                fs.Truncate(*it, bad_offset);
+                error_message = fmt::format("Truncated {}@{}", *it, bad_offset);
+                LOG_WARN(error_message);
+                ++it;
+                for (SizeT i = 0; i < file_num; ++i) {
+                    wal_list_.pop_front();
+                }
+                file_num = 1;
+            }
+        } else {
+            ++it;
+            ++file_num;
+        }
+    }
+    iter_.reset();
+}
+
+bool WalListIterator::HasNext() {
+    if (iter_.get() == nullptr) {
+        return false;
+    }
+    if (iter_->HasNext()) {
+        return true;
+    }
+    while (1) {
+        if (wal_list_.size() <= 1) {
+            return false;
+        }
+        wal_list_.pop_front();
+        iter_ = WalEntryIterator::Make(wal_list_.front(), true);
+        if (iter_->HasNext()) {
+            return true;
+        }
     }
 }
 
 SharedPtr<WalEntry> WalListIterator::Next() {
-    if (iter_.get() != nullptr) {
-        SharedPtr<WalEntry> entry = iter_->Next();
-
-        if (entry.get() != nullptr) {
-            return entry;
-        }
+    auto entry = iter_->Next();
+    if (entry.get() == nullptr) {
+        auto off = iter_->GetOffset();
+        String error_message = fmt::format("Found bad wal entry {}@{}", wal_list_.front(), off);
+        LOG_WARN(error_message);
     }
-    if (!wal_deque_.empty()) {
-        iter_ = MakeUnique<WalEntryIterator>(WalEntryIterator::Make(wal_deque_.front()));
-        wal_deque_.pop_front();
-
-        return Next();
-    } else {
-        return nullptr;
-    }
+    return entry;
 }
 
 } // namespace infinity

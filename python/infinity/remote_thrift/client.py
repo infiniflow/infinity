@@ -21,10 +21,11 @@ from infinity import URI
 from infinity.remote_thrift.infinity_thrift_rpc import *
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.errors import ErrorCode
-
+from infinity.common import InfinityException
 
 class ThriftInfinityClient:
     def __init__(self, uri: URI):
+        self.session_id = -1
         self.uri = uri
         self.transport = None
         self.reconnect()
@@ -40,14 +41,25 @@ class ThriftInfinityClient:
         # self.protocol = TCompactProtocol.TCompactProtocol(self.transport)
         self.client = InfinityService.Client(self.protocol)
         self.transport.open()
-        res = self.client.Connect()
+
+        # version: 0.2.0.dev2, client_version: 1
+        # version: 0.2.0.dev3, client_version: 2
+        # version: 0.2.0.dev4, client_version: 3
+        # version: 0.2.0.dev5, client_version: 4
+        # version: 0.2.0.dev6, client_version: 5
+        # version: 0.2.0.dev7, client_version: 6
+        # version: 0.2.0.dev8, client_version: 7
+        # version: 0.2.0, client_version: 8
+        # version: 0.2.1.dev3, client_version: 9
+        res = self.client.Connect(ConnectRequest(client_version=9))
+        if res.error_code != 0:
+            raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
 
     def create_database(self, db_name: str, conflict_type: CreateConflict = CreateConflict.Error):
         return self.client.CreateDatabase(CreateDatabaseRequest(session_id=self.session_id,
                                                                 db_name=db_name,
-                                                                create_option=CreateOption(
-                                                                    conflict_type=conflict_type)))
+                                                                create_option=CreateOption(conflict_type=conflict_type)))
 
     def drop_database(self, db_name: str, conflict_type: DropConflict = DropConflict.Error):
         return self.client.DropDatabase(DropDatabaseRequest(session_id=self.session_id,
@@ -163,6 +175,14 @@ class ThriftInfinityClient:
                                                 file_name=file_name,
                                                 import_option=import_options))
 
+    def export_data(self, db_name: str, table_name: str, file_name: str, export_options: {}, columns: [str]):
+        return self.client.Export(ExportRequest(session_id=self.session_id,
+                                                db_name=db_name,
+                                                table_name=table_name,
+                                                columns=columns,
+                                                file_name=file_name,
+                                                export_option=export_options))
+
     def select(self, db_name: str, table_name: str, select_list, search_expr,
                where_expr, group_by_list, limit_expr, offset_expr):
         return self.client.Select(SelectRequest(session_id=self.session_id,
@@ -238,3 +258,7 @@ class ThriftInfinityClient:
         return self.client.ShowBlockColumn(
             ShowBlockColumnRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
                                    segment_id=segment_id, block_id=block_id, column_id=column_id))
+
+    def optimize(self, db_name: str, table_name: str, optimize_opt: ttypes.OptimizeOptions):
+        return self.client.Optimize(OptimizeRequest(session_id=self.session_id, db_name=db_name, table_name=table_name,
+                                                    optimize_options=optimize_opt))

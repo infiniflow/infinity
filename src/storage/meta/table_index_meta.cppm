@@ -100,6 +100,8 @@ private:
 public:
     const SharedPtr<String> &index_name() const { return index_name_; }
 
+    TableEntry *table_entry() const { return table_entry_; }
+
 private:
     SharedPtr<String> index_name_{};
     TableEntry *table_entry_{};

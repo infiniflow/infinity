@@ -33,6 +33,7 @@ import internal_types;
 import data_type;
 import logical_type;
 import filter_expression_push_down_helper;
+import logger;
 
 namespace infinity {
 
@@ -57,7 +58,9 @@ private:
             if (function_name == "AND" or function_name == "OR") {
                 for (auto &arg : function_expression->arguments()) {
                     if (not BuildFilterEvaluator(arg)) {
-                        UnrecoverableError(fmt::format("BuildFilterEvaluator(): subexpression error in \"{}\".", expression->Name()));
+                        String error_message = fmt::format("BuildFilterEvaluator(): subexpression error in \"{}\".", expression->Name());
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                         return false;
                     }
                 }
@@ -66,7 +69,9 @@ private:
                     result_.emplace_back(combine_type);
                     return true;
                 } else {
-                    UnrecoverableError(fmt::format("BuildFilterEvaluator(): function name error in: {}.", expression->Name()));
+                    String error_message = fmt::format("BuildFilterEvaluator(): function name error in: {}.", expression->Name());
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     return false;
                 }
             } else {
@@ -100,22 +105,30 @@ private:
                                 break;
                             }
                             default: {
-                                UnrecoverableError(fmt::format("BuildFilterEvaluator(): compare type error in: {}.", expression->Name()));
+                                String error_message = fmt::format("BuildFilterEvaluator(): compare type error in: {}.", expression->Name());
+                                LOG_CRITICAL(error_message);
+                                UnrecoverableError(error_message);
                                 return false;
                             }
                         }
                         return true;
                     } else {
-                        UnrecoverableError(fmt::format("BuildFilterEvaluator(): unwind cast error in: {}.", expression->Name()));
+                        String error_message = fmt::format("BuildFilterEvaluator(): unwind cast error in: {}.", expression->Name());
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
                         return false;
                     }
                 } else {
-                    UnrecoverableError(fmt::format("BuildFilterEvaluator(): function name error: {}.", expression->Name()));
+                    String error_message = fmt::format("BuildFilterEvaluator(): function name error: {}.", expression->Name());
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
                     return false;
                 }
             }
         } else {
-            UnrecoverableError(fmt::format("BuildFilterEvaluator(): expression type error: {}.", expression->Name()));
+            String error_message = fmt::format("BuildFilterEvaluator(): expression type error: {}.", expression->Name());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return false;
         }
     }
@@ -126,7 +139,9 @@ private:
         } else if (function_name == "OR") {
             return BooleanCombineType::kOr;
         } else {
-            UnrecoverableError(fmt::format("GetBooleanCombineType(): function name error: {}.", function_name));
+            String error_message = fmt::format("GetBooleanCombineType(): function name error: {}.", function_name);
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
             return BooleanCombineType::kInvalid;
         }
     }
@@ -143,7 +158,9 @@ Vector<FilterEvaluatorElem> BuildSecondaryIndexScanMiddleCommand(SharedPtr<BaseE
     if (filter_builder.Solve()) {
         filter_evaluator = std::move(filter_builder.GetResult());
     } else {
-        UnrecoverableError("PhysicalIndexScan::Init(): filter solver error.");
+        String error_message = "PhysicalIndexScan::Init(): filter solver error.";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
     return filter_evaluator;
 }

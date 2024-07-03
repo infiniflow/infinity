@@ -24,7 +24,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('Usage: ' + sys.argv[0] + ' [-h host[:port]] [-u url] [-f[ramed]] [-s[sl]] [-novalidate] [-ca_certs certs] [-keyfile keyfile] [-certfile certfile] function [arg1 [arg2...]]')
     print('')
     print('Functions:')
-    print('  CommonResponse Connect()')
+    print('  CommonResponse Connect(ConnectRequest request)')
     print('  CommonResponse Disconnect(CommonRequest request)')
     print('  CommonResponse CreateDatabase(CreateDatabaseRequest request)')
     print('  CommonResponse DropDatabase(DropDatabaseRequest request)')
@@ -32,6 +32,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  CommonResponse DropTable(DropTableRequest request)')
     print('  CommonResponse Insert(InsertRequest request)')
     print('  CommonResponse Import(ImportRequest request)')
+    print('  CommonResponse Export(ExportRequest request)')
     print('  SelectResponse Select(SelectRequest request)')
     print('  SelectResponse Explain(ExplainRequest request)')
     print('  CommonResponse Delete(DeleteRequest request)')
@@ -53,6 +54,7 @@ if len(sys.argv) <= 1 or sys.argv[1] == '--help':
     print('  CommonResponse CreateIndex(CreateIndexRequest request)')
     print('  CommonResponse DropIndex(DropIndexRequest request)')
     print('  ShowIndexResponse ShowIndex(ShowIndexRequest request)')
+    print('  CommonResponse Optimize(OptimizeRequest request)')
     print('')
     sys.exit(0)
 
@@ -133,10 +135,10 @@ client = InfinityService.Client(protocol)
 transport.open()
 
 if cmd == 'Connect':
-    if len(args) != 0:
-        print('Connect requires 0 args')
+    if len(args) != 1:
+        print('Connect requires 1 args')
         sys.exit(1)
-    pp.pprint(client.Connect())
+    pp.pprint(client.Connect(eval(args[0]),))
 
 elif cmd == 'Disconnect':
     if len(args) != 1:
@@ -179,6 +181,12 @@ elif cmd == 'Import':
         print('Import requires 1 args')
         sys.exit(1)
     pp.pprint(client.Import(eval(args[0]),))
+
+elif cmd == 'Export':
+    if len(args) != 1:
+        print('Export requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.Export(eval(args[0]),))
 
 elif cmd == 'Select':
     if len(args) != 1:
@@ -305,6 +313,12 @@ elif cmd == 'ShowIndex':
         print('ShowIndex requires 1 args')
         sys.exit(1)
     pp.pprint(client.ShowIndex(eval(args[0]),))
+
+elif cmd == 'Optimize':
+    if len(args) != 1:
+        print('Optimize requires 1 args')
+        sys.exit(1)
+    pp.pprint(client.Optimize(eval(args[0]),))
 
 else:
     print('Unrecognized method %s' % cmd)

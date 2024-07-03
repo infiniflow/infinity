@@ -52,6 +52,10 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
             dist_func_ = L2Distance<f32, f32, f32, SizeT>;
             break;
         }
+        case KnnDistanceType::kCosine: {
+            dist_func_ = CosineDistance<f32, f32, f32, SizeT>;
+            break;
+        }
         case KnnDistanceType::kInnerProduct: {
             dist_func_ = IPDistance<f32, f32, f32, SizeT>;
             break;
@@ -65,8 +69,8 @@ KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
 
 // --------------------------------------------
 
-KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 current_parallel_idx)
-    : knn_scan_shared_data_(shared_data), task_id_(current_parallel_idx) {
+KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 current_parallel_idx, bool execute_block_scan_job)
+    : knn_scan_shared_data_(shared_data), task_id_(current_parallel_idx), execute_block_scan_job_(execute_block_scan_job) {
     switch (knn_scan_shared_data_->elem_type_) {
         case EmbeddingDataType::kElemFloat: {
             Init<f32>();
@@ -85,7 +89,9 @@ template <typename DataType>
 void KnnScanFunctionData::Init() {
     switch (knn_scan_shared_data_->knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
-            UnrecoverableError("Invalid Knn distance type");
+            String error_message = "Invalid Knn distance type";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {

@@ -14,11 +14,26 @@
 
 module;
 
-import stl;
-
 module file_writer;
 
+import stl;
+import file_system;
+import file_system_type;
+import infinity_exception;
+import logger;
+
 namespace infinity {
+
+FileWriter::FileWriter(FileSystem &fs, const String &path, SizeT buffer_size, u8 file_flags)
+    : fs_(fs), path_(path), data_(MakeUnique<char_t[]>(buffer_size)), offset_(0), total_written_(0), buffer_size_(buffer_size) {
+    // Fixme: Open file out of constructor
+    auto [file_handler, status] = fs.OpenFile(path, file_flags, FileLockType::kWriteLock);
+    if(!status.ok()) {
+        LOG_CRITICAL(status.message());
+        UnrecoverableError(status.message());
+    }
+    file_handler_ = std::move(file_handler);
+}
 
 void FileWriter::WriteByte(const u8 b) {
     if (offset_ == buffer_size_) {

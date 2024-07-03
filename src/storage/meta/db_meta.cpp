@@ -68,6 +68,7 @@ void DBMeta::CreateEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, T
                                TxnTimeStamp begin_ts) {
     auto [entry, status] = db_entry_list_.AddEntryReplay(std::move(init_entry), txn_id, begin_ts);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 }
@@ -77,6 +78,7 @@ void DBMeta::DropEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, Txn
                              TxnTimeStamp begin_ts) {
     auto [dropped_entry, status] = db_entry_list_.DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 }
@@ -84,6 +86,7 @@ void DBMeta::DropEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, Txn
 DBEntry *DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [entry, status] = db_entry_list_.GetEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
+        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return entry;
@@ -133,10 +136,10 @@ nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts) {
     return json_res;
 }
 
-UniquePtr<DBMeta> DBMeta::Deserialize(const nlohmann::json &db_meta_json, BufferManager *buffer_mgr) {
-    SharedPtr<String> data_dir = MakeShared<String>(db_meta_json["data_dir"]);
+UniquePtr<DBMeta> DBMeta::Deserialize(const String &data_dir, const nlohmann::json &db_meta_json, BufferManager *buffer_mgr) {
+    SharedPtr<String> data_dir_ptr = MakeShared<String>(data_dir);
     SharedPtr<String> db_name = MakeShared<String>(db_meta_json["db_name"]);
-    UniquePtr<DBMeta> res = MakeUnique<DBMeta>(data_dir, db_name);
+    UniquePtr<DBMeta> res = MakeUnique<DBMeta>(data_dir_ptr, db_name);
 
     if (db_meta_json.contains("db_entries")) {
         for (const auto &db_entry_json : db_meta_json["db_entries"]) {
