@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from abc import ABC, abstractmethod
-from enum import Enum
 
-from infinity import URI
 
 # abstract class
 class InfinityConnection(ABC):

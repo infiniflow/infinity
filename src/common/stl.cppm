@@ -28,7 +28,6 @@ module;
 #include <cstdlib>
 #include <cstring>
 #include <exception>
-#include <source_location>
 #include <filesystem>
 #include <forward_list>
 #include <functional>
@@ -41,6 +40,8 @@ module;
 #include <random>
 #include <set>
 #include <shared_mutex>
+#include <source_location>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -83,10 +84,11 @@ export namespace std {
     using std::strtod;
 
     using std::bit_cast;
-    using std::memcpy;
-    using std::strcmp;
-    using std::memset;
+    using std::bit_ceil;
     using std::memcmp;
+    using std::memcpy;
+    using std::memset;
+    using std::strcmp;
     using std::strlen;
 
     using std::time;

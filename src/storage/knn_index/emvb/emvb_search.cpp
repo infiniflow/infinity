@@ -15,7 +15,6 @@
 module;
 
 #include <algorithm>
-#include <array>
 #include <bitset>
 #include <cassert>
 #include <cstdlib>
@@ -258,7 +257,7 @@ auto EMVBSearch<FIXED_QUERY_TOKEN_NUM>::compute_topk_documents_selected(const f3
         embedding_id_buffer.Resize(doclen + 8);
         const auto embedding_id_ptr = embedding_id_buffer.GetPtr();
         // auto buffer_centroids = embedding_id_ptr
-        std::array<f32, FIXED_QUERY_TOKEN_NUM> maxs = {};
+        Array<f32, FIXED_QUERY_TOKEN_NUM> maxs = {};
         for (u32 query_token_id = 0; query_token_id < FIXED_QUERY_TOKEN_NUM; ++query_token_id) {
             // TODO: transpose?
             for (u32 j = 0; j < doclen; ++j) {

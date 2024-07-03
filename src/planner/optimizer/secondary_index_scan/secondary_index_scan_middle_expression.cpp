@@ -15,7 +15,6 @@
 module;
 
 #include <memory>
-#include <string>
 
 module secondary_index_scan_middle_expression;
 
@@ -76,12 +75,12 @@ private:
                 }
             } else {
                 // "[cast] x compare value_expr"
-                static constexpr std::array<const char *, 5> compare_functions = {"<", ">", "<=", ">=", "="};
-                static constexpr std::array<FilterCompareType, 5> corresponding_compare_types = {FilterCompareType::kLess,
-                                                                                                 FilterCompareType::kGreater,
-                                                                                                 FilterCompareType::kLessEqual,
-                                                                                                 FilterCompareType::kGreaterEqual,
-                                                                                                 FilterCompareType::kEqual};
+                static constexpr Array<const char *, 5> compare_functions = {"<", ">", "<=", ">=", "="};
+                static constexpr Array<FilterCompareType, 5> corresponding_compare_types = {FilterCompareType::kLess,
+                                                                                            FilterCompareType::kGreater,
+                                                                                            FilterCompareType::kLessEqual,
+                                                                                            FilterCompareType::kGreaterEqual,
+                                                                                            FilterCompareType::kEqual};
                 if (auto it = std::find(compare_functions.begin(), compare_functions.end(), function_name); it != compare_functions.end()) {
                     auto compare_type = corresponding_compare_types[std::distance(compare_functions.begin(), it)];
                     auto &left = function_expression->arguments()[0];  // [cast] x

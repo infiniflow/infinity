@@ -15,6 +15,7 @@
 module;
 
 #include <string>
+
 module filter_expression_push_down;
 
 import stl;
@@ -356,8 +357,8 @@ private:
             case ExpressionType::kFunction: {
                 auto function_expression = std::static_pointer_cast<FunctionExpression>(expression);
                 auto const &f_name = function_expression->ScalarFunctionName();
-                static constexpr std::array<const char *, 5> IndexScanSupportedCompareFunctionNames = {"<", ">", "<=", ">=", "="};
-                static constexpr std::array<const char *, 5> IndexScanSupportedCompareFunctionNamesCorrespondingReverse = {">", "<", ">=", "<=", "="};
+                static constexpr Array<const char *, 5> IndexScanSupportedCompareFunctionNames = {"<", ">", "<=", ">=", "="};
+                static constexpr Array<const char *, 5> IndexScanSupportedCompareFunctionNamesCorrespondingReverse = {">", "<", ">=", "<=", "="};
                 // depth 0: <, >, <=, >=, = function
                 if (auto name_iter = std::find(IndexScanSupportedCompareFunctionNames.begin(), IndexScanSupportedCompareFunctionNames.end(), f_name);
                     name_iter != IndexScanSupportedCompareFunctionNames.end()) {
@@ -619,15 +620,15 @@ public:
         // known expression 3 : "and" or "or" expression
         switch (expression->type()) {
             case ExpressionType::kFunction: {
-                static constexpr std::array<const char *, 4> Case2FunctionNames = {"<", ">", "<=", ">="};
-                static constexpr std::array<FilterCompareType, 4> Case2CompareTypes = {FilterCompareType::kLess,
-                                                                                       FilterCompareType::kGreater,
-                                                                                       FilterCompareType::kLessEqual,
-                                                                                       FilterCompareType::kGreaterEqual};
-                static constexpr std::array<FilterCompareType, 4> Case2ReverseCompareTypes = {FilterCompareType::kGreater,
-                                                                                              FilterCompareType::kLess,
-                                                                                              FilterCompareType::kGreaterEqual,
-                                                                                              FilterCompareType::kLessEqual};
+                static constexpr Array<const char *, 4> Case2FunctionNames = {"<", ">", "<=", ">="};
+                static constexpr Array<FilterCompareType, 4> Case2CompareTypes = {FilterCompareType::kLess,
+                                                                                  FilterCompareType::kGreater,
+                                                                                  FilterCompareType::kLessEqual,
+                                                                                  FilterCompareType::kGreaterEqual};
+                static constexpr Array<FilterCompareType, 4> Case2ReverseCompareTypes = {FilterCompareType::kGreater,
+                                                                                         FilterCompareType::kLess,
+                                                                                         FilterCompareType::kGreaterEqual,
+                                                                                         FilterCompareType::kLessEqual};
                 auto function_expression = std::static_pointer_cast<FunctionExpression>(expression);
                 if (auto const &f_name = function_expression->ScalarFunctionName(); f_name == "AND") {
                     // known expression 3

@@ -120,8 +120,8 @@ void BufferWriter::flush(SizeT bytes) {
     if ((RingBufferIterator::Distance(start_pos_, current_pos_) < 0)) {
         bytes_sent = boost::asio::write(
             *socket_,
-            std::array<boost::asio::mutable_buffer, 2>{boost::asio::buffer(start_pos_.position_addr(), PG_MSG_BUFFER_SIZE - start_pos_.position_),
-                                                       boost::asio::buffer(data_.begin(), current_pos_.position_)},
+            Array<boost::asio::mutable_buffer, 2>{boost::asio::buffer(start_pos_.position_addr(), PG_MSG_BUFFER_SIZE - start_pos_.position_),
+                                                  boost::asio::buffer(data_.begin(), current_pos_.position_)},
             boost::asio::transfer_at_least(bytes_to_send),
             boost_error);
     } else {

@@ -37,7 +37,7 @@ void VariantEmplaceFunc(InnerMinMaxDataFilter *ptr) {
 
 template <std::size_t... I>
 consteval auto GetVariantEmplaceFuncs(std::index_sequence<I...>) {
-    return std::array<VariantEmplaceFuncType *, sizeof...(I)>{VariantEmplaceFunc<I>...};
+    return Array<VariantEmplaceFuncType *, sizeof...(I)>{VariantEmplaceFunc<I>...};
 }
 
 static constexpr auto VariantEmplaceFuncs = GetVariantEmplaceFuncs(std::make_index_sequence<std::variant_size_v<InnerMinMaxDataFilter>>{});

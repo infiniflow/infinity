@@ -165,8 +165,8 @@ void BufferReader::receive_more(SizeT bytes) {
     } else {
         bytes_read = boost::asio::read(
             *socket_,
-            std::array<boost::asio::mutable_buffer, 2>{boost::asio::buffer(current_pos_.position_addr(), PG_MSG_BUFFER_SIZE - current_pos_.position_),
-                                                       boost::asio::buffer(&data_[0], start_pos_.position_ - 1)},
+            Array<boost::asio::mutable_buffer, 2>{boost::asio::buffer(current_pos_.position_addr(), PG_MSG_BUFFER_SIZE - current_pos_.position_),
+                                                  boost::asio::buffer(&data_[0], start_pos_.position_ - 1)},
             boost::asio::transfer_at_least(bytes - size()),
             boost_error);
     }

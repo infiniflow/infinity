@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "time_type.h"
-#include <format>
+#include "spdlog/fmt/fmt.h"
 
 namespace infinity {
 // min time: 00:00:00.000
@@ -49,9 +49,9 @@ void TimeType::FromString(const char *time_ptr, size_t length) {
 std::string TimeType::ToString() const {
     int32_t hour{}, minute{}, second{};
     if (!Time2HMS(value, hour, minute, second)) {
-        ParserError(std::format("Invalid second value: {}", value));
+        ParserError(fmt::format("Invalid second value: {}", value));
     }
-    return std::format("{:02d}:{:02d}:{:02d}", hour, minute, second);
+    return fmt::format("{:02d}:{:02d}:{:02d}", hour, minute, second);
 }
 
 bool TimeType::Add(TimeType input, IntervalType interval, TimeType &output) {

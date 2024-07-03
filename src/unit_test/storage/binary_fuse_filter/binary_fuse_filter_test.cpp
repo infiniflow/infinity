@@ -22,7 +22,7 @@ class BinaryFuseFilterTest : public BaseTest {};
 TEST_F(BinaryFuseFilterTest, test_2000) {
     using namespace infinity;
     constexpr u64 NUM = 2000;
-    std::array<u64, NUM> data;
+    Array<u64, NUM> data;
     for (u64 i = 0; i < NUM; ++i) {
         data[i] = i * NUM;
     }

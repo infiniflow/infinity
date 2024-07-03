@@ -29,7 +29,7 @@ class SIMDTest : public BaseTest {};
 TEST_F(SIMDTest, testsum256) {
     constexpr u32 test_sum256_loop = 20;
 
-    std::array<f32, 8> random_f32 = {};
+    Array<f32, 8> random_f32 = {};
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<f32> dis(-1024.0f, 1024.0f);

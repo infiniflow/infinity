@@ -15,9 +15,7 @@
 module;
 
 #include <algorithm>
-#include <array>
 #include <sstream>
-#include <string>
 
 module index_emvb;
 
@@ -65,8 +63,8 @@ String IndexEMVB::BuildOtherParamsString() const {
     return fmt::format("pq_subspace_num = {}, pq_subspace_bits = {}.", residual_pq_subspace_num_, residual_pq_subspace_bits_);
 }
 
-constexpr std::array<u32, 8> accepable_residual_pq_subspace_num = {1, 2, 4, 8, 16, 32, 64, 128};
-constexpr std::array<u32, 2> accepable_residual_pq_subspace_bits = {8, 16};
+constexpr Array<u32, 8> accepable_residual_pq_subspace_num = {1, 2, 4, 8, 16, 32, 64, 128};
+constexpr Array<u32, 2> accepable_residual_pq_subspace_bits = {8, 16};
 
 SharedPtr<IndexBase>
 IndexEMVB::Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {

@@ -41,7 +41,7 @@ template <typename T>
 class TestPGM : public BaseTest {
 public:
     using PGM = PGMT<T>::type;
-    std::array<T, TestNum> data;
+    Array<T, TestNum> data;
     uint32_t cnt = TestNum;
     std::unique_ptr<PGM> pgm;
 

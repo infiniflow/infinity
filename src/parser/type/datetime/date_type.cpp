@@ -14,7 +14,7 @@
 
 #include "date_type.h"
 #include "parser_assert.h"
-#include <format>
+#include "spdlog/fmt/fmt.h"
 
 namespace infinity {
 
@@ -109,10 +109,10 @@ void DateType::FromString(const char *date_ptr, size_t length, size_t &end_lengt
 std::string DateType::ToString() const {
     int32_t year{0}, month{0}, day{0};
     if (!Date2YMD(value, year, month, day)) {
-        ParserError(std::format("Invalid date: {}-{}-{}", year, month, day));
+        ParserError(fmt::format("Invalid date: {}-{}-{}", year, month, day));
     }
     // TODO: format for negative year?
-    return std::format("{:04d}-{:02d}-{:02d}", year, month, day);
+    return fmt::format("{:04d}-{:02d}-{:02d}", year, month, day);
 }
 
 bool DateType::ConvertFromString(const char *date_ptr, size_t length, DateType &date, size_t &end_length) {
