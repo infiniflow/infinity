@@ -66,7 +66,8 @@ template <typename DataType, typename IdxType>
 SizeT TailFwd<DataType, IdxType>::GetSizeInBytes() const {
     SizeT size = sizeof(SizeT);
     for (const auto &tail_terms : tail_terms_) {
-        size += sizeof(SizeT) + tail_terms.size() * (sizeof(IdxType) + sizeof(DataType));
+        const auto [indices, data] = tail_terms;
+        size += sizeof(SizeT) + indices.size() * sizeof(IdxType) + data.size() * sizeof(DataType);
     }
     return size;
 }
@@ -76,25 +77,28 @@ void TailFwd<DataType, IdxType>::WriteAdv(char *&p) const {
     SizeT tail_num = tail_terms_.size();
     WriteBufAdv<SizeT>(p, tail_num);
     for (const auto &tail_terms : tail_terms_) {
-        SizeT term_num = tail_terms.size();
+        const auto &[indices, data] = tail_terms;
+        SizeT term_num = indices.size();
         WriteBufAdv<SizeT>(p, term_num);
-        for (const auto &[term_id, score] : tail_terms) {
-            WriteBufAdv<IdxType>(p, term_id);
-            WriteBufAdv<DataType>(p, score);
-        }
+        WriteBufVecAdv(p, indices.data(), indices.size());
+        WriteBufVecAdv(p, data.data(), data.size());
     }
 }
 
 template <typename DataType, typename IdxType>
 TailFwd<DataType, IdxType> TailFwd<DataType, IdxType>::ReadAdv(const char *&p) {
     SizeT tail_num = ReadBufAdv<SizeT>(p);
-    Vector<Vector<Pair<IdxType, DataType>>> tail_terms(tail_num);
+    Vector<Pair<Vector<IdxType>, Vector<DataType>>> tail_terms(tail_num);
     for (SizeT i = 0; i < tail_num; ++i) {
         SizeT term_num = ReadBufAdv<SizeT>(p);
-        tail_terms[i].resize(term_num);
+        auto &[indices, data] = tail_terms[i];
+        indices.resize(term_num);
+        data.resize(term_num);
         for (SizeT j = 0; j < term_num; ++j) {
-            tail_terms[i][j].first = ReadBufAdv<IdxType>(p);
-            tail_terms[i][j].second = ReadBufAdv<DataType>(p);
+            indices[j] = ReadBufAdv<IdxType>(p);
+        }
+        for (SizeT j = 0; j < term_num; ++j) {
+            data[j] = ReadBufAdv<DataType>(p);
         }
     }
     return TailFwd(std::move(tail_terms));
