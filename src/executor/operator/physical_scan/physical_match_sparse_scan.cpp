@@ -123,7 +123,8 @@ SizeT PhysicalMatchSparseScan::GetTaskletCount(QueryContext *query_context) {
         for (const auto &[idx_name, table_index_meta] : *map_guard) {
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
             if (!status.ok()) {
-                RecoverableError(status);
+                // maybe already dropped
+                continue;
             }
             const String column_name = table_index_entry->index_base()->column_name();
             SizeT column_id = table_entry->GetColumnIdByName(column_name);

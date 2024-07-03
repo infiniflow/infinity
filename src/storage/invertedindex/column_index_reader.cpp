@@ -154,8 +154,8 @@ IndexReader TableIndexReaderCache::GetIndexReader(Txn *txn, TableEntry *self_tab
         for (auto map_guard = self_table_entry_ptr->IndexMetaMap(); auto &[index_name, table_index_meta] : *map_guard) {
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
-                // Table index entry isn't found
-                RecoverableError(status);
+                // already dropped
+                continue;
             }
             // check index type
             const IndexBase *index_base = table_index_entry->index_base();
