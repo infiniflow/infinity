@@ -223,9 +223,9 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
         for (auto &[index_name, table_index_meta] : *map_guard) {
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
-                // Table index entry isn't found
-                LOG_ERROR(status.message());
-                RecoverableError(status);
+                // already dropped
+                LOG_WARN(status.message());
+                continue;
             }
 
             const String column_name = table_index_entry->index_base()->column_name();
