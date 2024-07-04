@@ -81,7 +81,9 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
 
             const u32 file_size = fs_.GetFileSize(*file_handler);
             u32 file_read_array_len = file_size / sizeof(u32);
-            unsafe_column_lengths.resize(id_offset + file_read_array_len);
+            if (unsafe_column_lengths.size() < id_offset + file_read_array_len) {
+                unsafe_column_lengths.resize(id_offset + file_read_array_len);
+            }
             const i64 read_count = fs_.Read(*file_handler, unsafe_column_lengths.data() + id_offset, file_size);
             file_handler->Close();
             if (read_count != file_size) {
