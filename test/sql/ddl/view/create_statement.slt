@@ -2,30 +2,30 @@ statement ok
 CREATE TABLE INTEGERS (i INTEGER);
 
 statement ok
-CREATE TABLE names (id BIGINT PRIMARY KEY, name VARCHAR, age INTEGER);
+CREATE TABLE sqllogic_names (id BIGINT PRIMARY KEY, name VARCHAR, age INTEGER);
 
 
 #query TTTIIII
 #SHOW TABLES
 #----
 #default c1  Collection 0 0 0 8192
-#default names    Table 3 0 0 8192
+#default sqllogic_names    Table 3 0 0 8192
 #default integers Table 1 0 0 8192
 
 #statement ok
-#INSERT INTO names(id, name, age) VALUES(1, 'Abby', 24);
+#INSERT INTO sqllogic_names(id, name, age) VALUES(1, 'Abby', 24);
 
 #statement ok
-#INSERT INTO names(id, name, age) VALUES(2, 'Bob', 25);
+#INSERT INTO sqllogic_names(id, name, age) VALUES(2, 'Bob', 25);
 
 #statement ok
-#INSERT INTO names(id, name, age) VALUES(3, 'Carol', 23);
+#INSERT INTO sqllogic_names(id, name, age) VALUES(3, 'Carol', 23);
 
 #statement ok
-#INSERT INTO names(id, name, age) VALUES(4, 'Dora', 29);
+#INSERT INTO sqllogic_names(id, name, age) VALUES(4, 'Dora', 29);
 
 #query ITI
-#SELECT * FROM names;
+#SELECT * FROM sqllogic_names;
 #----
 #1	Abby	24
 #2	Bob	    25
@@ -34,7 +34,7 @@ CREATE TABLE names (id BIGINT PRIMARY KEY, name VARCHAR, age INTEGER);
 
 #statement ok
 #CREATE VIEW view1 (c1, c2) as
-#SELECT id, age FROM names;
+#SELECT id, age FROM sqllogic_names;
 
 #query TTI
 #SHOW VIEWS;
@@ -46,7 +46,7 @@ statement ok
 DROP TABLE INTEGERS;
 
 statement ok
-DROP TABLE names;
+DROP TABLE sqllogic_names;
 
 
 statement ok
