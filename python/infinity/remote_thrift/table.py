@@ -494,8 +494,8 @@ class RemoteTable(Table, ABC):
 
     def optimize(self, index_name: str, opt_params: dict[str, str]):
         opt_options = ttypes.OptimizeOptions()
-        opt_options.index_name_ = index_name
-        opt_options.opt_params_ = [ttypes.InitParameter(k, v) for k, v in opt_params.items()]
+        opt_options.index_name = index_name
+        opt_options.opt_params = [ttypes.InitParameter(k, v) for k, v in opt_params.items()]
         return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
 
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:
