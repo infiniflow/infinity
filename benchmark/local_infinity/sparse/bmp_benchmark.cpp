@@ -65,6 +65,40 @@ int main(int argc, char *argv[]) {
             SaveGroundtruth(topk, query_n, new_indices.get(), scores.get(), opt.groundtruth_save_path_);
             break;
         }
+        case ModeType::kOptimize: {
+            auto [file_handler, status] = fs.OpenFile(opt.index_save_path_.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
+            if (!status.ok()) {
+                UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
+            }
+            auto inner = [&](auto &index) {
+                BMPOptimizeOptions optimize_options{.topk_ = opt.topk_, .bp_reorder_ = opt.bp_reorder_};
+                std::cout << "Optimizing index...\n";
+                index.Optimize(optimize_options);
+                std::cout << "Index built\n";
+
+                auto [file_handler, status] = fs.OpenFile(opt.index_save_path_.string(), FileFlags::WRITE_FLAG, FileLockType::kNoLock);
+                if (!status.ok()) {
+                    UnrecoverableError(fmt::format("Failed to open file: {}", opt.index_save_path_.string()));
+                }
+                index.Save(*file_handler);
+            };
+            switch (opt.type_) {
+                case BMPCompressType::kCompressed: {
+                    BMPAlg<f32, i16, BMPCompressType::kCompressed> index = BMPAlg<f32, i16, BMPCompressType::kCompressed>::Load(*file_handler);
+                    inner(index);
+                    break;
+                }
+                case BMPCompressType::kRaw: {
+                    BMPAlg<f32, i16, BMPCompressType::kRaw> index = BMPAlg<f32, i16, BMPCompressType::kRaw>::Load(*file_handler);
+                    inner(index);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Unknown compress type");
+                }
+            }
+            break;
+        }
         case ModeType::kImport: {
             SparseMatrix<f32, i32> data_mat = DecodeSparseDataset(opt.data_path_);
             profiler.Begin();
@@ -131,7 +165,7 @@ int main(int argc, char *argv[]) {
             auto inner = [&](auto &index) {
                 auto [top_k, all_query_n, _1, _2] = DecodeGroundtruth(opt.groundtruth_path_, true);
                 if ((int)top_k != opt.topk_) {
-                    UnrecoverableError(fmt::format("Topk mismatch: {} vs {}", top_k, opt.topk_));
+                    std::cout << fmt::format("Topk mismatch: {} vs {}", top_k, opt.topk_) << std::endl;
                 }
                 Vector<Pair<Vector<u32>, Vector<f32>>> query_result;
                 {
@@ -149,7 +183,7 @@ int main(int argc, char *argv[]) {
                     profiler.Begin();
                     query_result = Search(thread_n,
                                           query_mat,
-                                          top_k,
+                                          opt.topk_,
                                           query_n,
                                           [&](const SparseVecRef<f32, i32> &query, u32 topk) -> Pair<Vector<u32>, Vector<f32>> {
                                               Vector<i16> indices(query.nnz_);

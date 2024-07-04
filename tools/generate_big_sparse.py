@@ -140,8 +140,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
     index_name = "bmp_index"
     topk = 3
-    query_n = 1
-    qsparsity = 0.05
+    query_n = 10
+    qsparsity = 0.005
     qindptr, qindices, qdata = generate_sparse_data(query_n, max_dim, qsparsity)
 
     with open(bmp_knn_slt_path, "w") as bmp_knn_slt_file:
@@ -188,7 +188,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
                     table_name,
                     ",".join(
                         [
-                            "{}:{}".format(i, d)
+                            "{}:{}".format(i, d) # sparse_format_float(d)
                             for (i, d) in zip(qindices[start:end], qdata[start:end])
                         ]
                     ),
