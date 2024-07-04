@@ -180,6 +180,7 @@ enum class ModeType : i8 {
     kImport,
     kQuery,
     kShuffle,
+    kOptimize,
 };
 
 enum class DataSetType : u8 {
@@ -193,11 +194,10 @@ public:
     BenchmarkOption() : app_("sparse benchmark") {}
 
     void Parse(int argc, char *argv[]) {
-        Map<String, ModeType> mode_type_map = {
-            {"import", ModeType::kImport},
-            {"query", ModeType::kQuery},
-            {"shuffle", ModeType::kShuffle},
-        };
+        Map<String, ModeType> mode_type_map = {{"import", ModeType::kImport},
+                                               {"query", ModeType::kQuery},
+                                               {"shuffle", ModeType::kShuffle},
+                                               {"optimize", ModeType::kOptimize}};
         Map<String, DataSetType> dataset_type_map = {
             {"small", DataSetType::kSmall},
             {"1M", DataSetType::k1M},
@@ -227,12 +227,11 @@ public:
                 if (!shuffled_) {
                     data_path_ /= "base_small.csr";
                     groundtruth_path_ /= "base_small.dev.gt";
-                    index_save_path_ /= fmt::format("small_{}.bin", index_name);
                 } else {
                     data_path_ /= "base_small_shuffled.csr";
                     groundtruth_path_ /= "base_small_shuffled.dev.gt";
-                    index_save_path_ /= fmt::format("small_shuffled_{}.bin", index_name);
                 }
+                index_save_path_ /= fmt::format("small_{}.bin", index_name);
                 data_save_path_ /= "base_small_shuffled.csr";
                 groundtruth_save_path_ /= "base_small_shuffled.dev.gt";
                 break;
@@ -241,12 +240,11 @@ public:
                 if (!shuffled_) {
                     data_path_ /= "base_1M.csr";
                     groundtruth_path_ /= "base_1M.dev.gt";
-                    index_save_path_ /= fmt::format("1M_{}.bin", index_name);
                 } else {
                     data_path_ /= "base_1M_shuffled.csr";
                     groundtruth_path_ /= "base_1M_shuffled.dev.gt";
-                    index_save_path_ /= fmt::format("1M_shuffled_{}.bin", index_name);
                 }
+                index_save_path_ /= fmt::format("1M_{}.bin", index_name);
                 data_save_path_ /= "base_1M_shuffled.csr";
                 groundtruth_save_path_ /= "base_1M_shuffled.dev.gt";
                 break;
@@ -255,12 +253,11 @@ public:
                 if (!shuffled_) {
                     data_path_ /= "base_full.csr";
                     groundtruth_path_ /= "base_full.dev.gt";
-                    index_save_path_ /= fmt::format("full_{}.bin", index_name);
                 } else {
                     data_path_ /= "base_full_shuffled.csr";
                     groundtruth_path_ /= "base_full_shuffled.dev.gt";
-                    index_save_path_ /= fmt::format("full_shuffled_{}.bin", index_name);
                 }
+                index_save_path_ /= fmt::format("full_{}.bin", index_name);
                 data_save_path_ /= "base_full_shuffled.csr";
                 groundtruth_save_path_ /= "base_full_shuffled.dev.gt";
                 break;
@@ -283,6 +280,7 @@ public:
     bool shuffled_ = false;
     i64 query_n_ = 0;
     i32 thread_n_ = 1;
+    i32 test_i_ = 0;
 
     Path data_path_;
     Path query_path_;
@@ -303,7 +301,7 @@ public:
         app_.add_option("--budget_ratio", budget_ratio_, "Budget radio")->required(false)->transform(CLI::Range(0.0, 100.0));
     }
 
-    String IndexName() const override { return "linscan"; }
+    String IndexName() const override { return fmt::format("linscan_i{}", test_i_); }
 
 public:
     bool bf_ = false;
@@ -329,13 +327,7 @@ public:
         app_.add_option("--beta", beta_, "Beta")->required(false)->transform(CLI::Range(0.0, 100.0));
     }
 
-    String IndexName() const override {
-        String name = fmt::format("bmp_block{}_type{}", block_size_, static_cast<i8>(type_));
-        if (bp_reorder_) {
-            name += "_bp";
-        }
-        return name;
-    }
+    String IndexName() const override { return fmt::format("bmp_block{}_{}_i{}", block_size_, BMPCompressTypeToString(type_), test_i_); }
 
 public:
     BMPCompressType type_ = BMPCompressType::kCompressed;
