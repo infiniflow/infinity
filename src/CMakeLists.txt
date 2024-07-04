@@ -333,21 +333,18 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         zsv_parser
         newpfor
         fastpfor
+        jma
+        opencc
         lz4.a
         atomic.a
         event.a
         oatpp.a
-        jma
-        opencc
+        c++.a
+        c++abi.a
 )
 
-# WARN: python modules shall dynamicly link to libstdc++!!!
-#target_link_options(embedded_infinity_ext PRIVATE -static-libstdc++ -static-libgcc)
+# WARN: python modules shall not link to static libstdc++!!!
 target_link_options(embedded_infinity_ext PRIVATE -static-libgcc)
-
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-    target_link_libraries(embedded_infinity_ext PRIVATE libasan.a)
-endif ()
 
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
