@@ -14,10 +14,11 @@
 
 import os
 import infinity
+import numpy as np
 from tqdm import tqdm
 import infinity.index as index
 from infinity.common import ConflictType, LOCAL_HOST
-from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield
+from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield, read_colbert_data_yield
 from infinity.errors import ErrorCode
 
 
@@ -34,6 +35,10 @@ def get_all_part_begin_ends(total_row_count: int):
     return result
 
 
+def get_bit_array(float_array: list[list]):
+    return [[1.0 if x > 0.0 else 0.0 for x in one_list] for one_list in float_array]
+
+
 # fulltext column, dense embedding column, sparse embedding column
 class InfinityClientForInsert:
     def __init__(self):
@@ -41,7 +46,9 @@ class InfinityClientForInsert:
         self.test_table_name_prefix = "mldr_test_table_text_dense_sparse_"
         self.test_table_schema = {"docid_col": {"type": "varchar"}, "fulltext_col": {"type": "varchar"},
                                   "dense_col": {"type": "vector,1024,float"},
-                                  "sparse_col": {"type": "sparse,250002,float,int"}}
+                                  "sparse_col": {"type": "sparse,250002,float,int"},
+                                  "colbert_col": {"type": "tensor,128,float"},
+                                  "colbert_bit_col": {"type": "tensor,128,bit"}}
         self.infinity_obj = infinity.connect(LOCAL_HOST)
         self.infinity_db = self.infinity_obj.create_database(self.test_db_name, ConflictType.Ignore)
         self.infinity_table = None
@@ -67,6 +74,9 @@ class InfinityClientForInsert:
         sparse_embedding_dir = input("Input sparse embedding data files dir: ")
         print("Input begin and end position pairs of sparse embedding data to insert:")
         sparse_part_begin_ends = get_all_part_begin_ends(total_num)
+        colbert_embedding_dir = input("Input colbert embedding data files dir: ")
+        print("Input begin and end position pairs of colbert embedding data to insert:")
+        colbert_part_begin_ends = get_all_part_begin_ends(total_num)
         insert_num = total_num
         batch_size = 1024
         print("Start inserting data...")
@@ -76,6 +86,9 @@ class InfinityClientForInsert:
         sparse_data = None
         sparse_pos_part_end = 0
         sparse_pair_id_next = 0
+        colbert_data = None
+        colbert_pos_part_end = 0
+        colbert_pair_id_next = 0
         for begin_idx in tqdm(range(0, insert_num, batch_size)):
             end_idx = min(begin_idx + batch_size, insert_num)
             buffer = []
@@ -90,13 +103,20 @@ class InfinityClientForInsert:
                     sparse_pair_id_next += 1
                     sparse_base_name = f"sparse-{sparse_pos_part_begin}-{sparse_pos_part_end}.data"
                     sparse_data = read_mldr_sparse_embedding_yield(os.path.join(sparse_embedding_dir, sparse_base_name))
+                if row_pos == colbert_pos_part_end:
+                    colbert_pos_part_begin, colbert_pos_part_end = colbert_part_begin_ends[colbert_pair_id_next]
+                    colbert_pair_id_next += 1
+                    colbert_base_name = f"colbert-{colbert_pos_part_begin}-{colbert_pos_part_end}.data"
+                    colbert_data = read_colbert_data_yield(os.path.join(colbert_embedding_dir, colbert_base_name))
                 docid_str = docid_list[row_pos]
                 insert_dense_data = next(dense_data)
                 insert_sparse_data = next(sparse_data)
+                colbert_list = next(colbert_data)
                 if int(docid_str.split('-')[-1]) >= 189796:
                     continue
                 insert_dict = {"docid_col": docid_str, "fulltext_col": corpus_text_list[row_pos],
-                               "dense_col": insert_dense_data, "sparse_col": insert_sparse_data}
+                               "dense_col": insert_dense_data, "sparse_col": insert_sparse_data,
+                               "colbert_col": colbert_list, "colbert_bit_col": get_bit_array(colbert_list)}
                 buffer.append(insert_dict)
             if len(buffer) > 0:
                 self.infinity_table.insert(buffer)

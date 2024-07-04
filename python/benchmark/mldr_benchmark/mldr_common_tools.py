@@ -197,3 +197,19 @@ def read_mldr_sparse_embedding_yield(file_path: str):
                 yield one_dict
     else:
         raise ValueError(f"Unsupported file: {file_path}")
+
+
+def read_colbert_data_yield(file_path: str):
+    with open(file_path, 'rb') as f:
+        while True:
+            try:
+                tensor_len = struct.unpack('<i', f.read(4))[0]
+                one_tensor = []
+                for i in range(tensor_len):
+                    dim = struct.unpack('<i', f.read(4))[0]
+                    vec = struct.unpack('{}f'.format(dim), f.read(4 * dim))
+                    assert dim == len(vec)
+                    one_tensor.append(list(vec))
+                yield one_tensor
+            except struct.error:
+                break
