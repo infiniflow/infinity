@@ -76,7 +76,6 @@ class TestInfinity:
         self.test_infinity_obj._test_drop_option(conflict_type)
 
     @pytest.mark.parametrize("table_name", ["test_show_table"])
-    # @pytest.mark.parametrize("", [""], indirect=True)
     def test_show_valid_table(self, table_name):
         self.test_infinity_obj._test_show_valid_table(table_name)
 
@@ -88,17 +87,14 @@ class TestInfinity:
                                             pytest.param(()),
                                             pytest.param({}),
                                             ])
-    # @pytest.mark.parametrize("", [""], indirect=True)
     def test_show_invalid_table(self, table_name):
         self.test_infinity_obj._test_show_invalid_table(table_name)
 
     @pytest.mark.parametrize("table_name", [pytest.param("not_exist_name")])
-    # @pytest.mark.parametrize("", [""], indirect=True)
     def test_show_not_exist_table(self, table_name):
         self.test_infinity_obj._test_show_not_exist_table(table_name)
 
     @pytest.mark.parametrize("column_name", ["test_show_table_columns"])
-    # @pytest.mark.parametrize("", [""], indirect=True)
     def test_show_table_columns_with_valid_name(self, column_name):
         self.test_infinity_obj._test_show_table_columns_with_valid_name(column_name)
 
@@ -111,7 +107,6 @@ class TestInfinity:
                                              pytest.param(()),
                                              pytest.param({}),
                                              ])
-    # @pytest.mark.parametrize("", [""], indirect=True)
     def test_show_table_columns_with_invalid_name(self, column_name):
         self.test_infinity_obj._test_show_table_columns_with_invalid_name(column_name)
 

@@ -38,16 +38,16 @@ statement ok
 DROP TABLE ddl3;
 
 statement ok
-CREATE DATABASE s1;
+CREATE DATABASE sqllogic_s1;
 
 statement ok
-CREATE TABLE s1.ddl1 (i INTEGER);
+CREATE TABLE sqllogic_s1.ddl1 (i INTEGER);
 
 statement ok
-DROP TABLE s1.ddl1
+DROP TABLE sqllogic_s1.ddl1
 
 statement ok
-DROP DATABASE s1;
+DROP DATABASE sqllogic_s1;
 
 statement ok
 DROP TABLE IF EXISTS descr1;

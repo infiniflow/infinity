@@ -1,41 +1,41 @@
 statement ok
-DROP TABLE IF EXISTS test_export_jsonl;
+DROP TABLE IF EXISTS sqllogic_test_export_jsonl;
 
 statement ok
-DROP TABLE IF EXISTS test_export_csv;
+DROP TABLE IF EXISTS sqllogic_test_export_csv;
 
 statement ok
-CREATE TABLE test_export_jsonl (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
+CREATE TABLE sqllogic_test_export_jsonl (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
 
 statement ok
-CREATE TABLE test_export_csv (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
+CREATE TABLE sqllogic_test_export_csv (name VARCHAR, age INT, array EMBEDDING(FLOAT, 4));
 
 statement ok
-INSERT INTO test_export_jsonl VALUES(3, '4433252', [1.1, 2.03, 3.04, 4.0]);
+INSERT INTO sqllogic_test_export_jsonl VALUES(3, '4433252', [1.1, 2.03, 3.04, 4.0]);
 
 statement ok
-INSERT INTO test_export_jsonl VALUES(4, '4433253', [1.9, 2.0, 3.045, 4.5]);
+INSERT INTO sqllogic_test_export_jsonl VALUES(4, '4433253', [1.9, 2.0, 3.045, 4.5]);
 
 query III
-SELECT * FROM test_export_jsonl;
+SELECT * FROM sqllogic_test_export_jsonl;
 ----
 3 4433252 [1.1,2.03,3.04,4]
 4 4433253 [1.9,2,3.045,4.5]
 
 query I
-COPY test_export_jsonl TO '/var/infinity/test_data/test_export_embedding.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+COPY sqllogic_test_export_jsonl TO '/var/infinity/test_data/test_export_embedding.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
 
 query I
-COPY test_export_jsonl TO '/var/infinity/test_data/test_export_embedding.csv' WITH (FORMAT CSV, DELIMITER ',');
+COPY sqllogic_test_export_jsonl TO '/var/infinity/test_data/test_export_embedding.csv' WITH (FORMAT CSV, DELIMITER ',');
 
 query I
-COPY test_export_jsonl FROM '/var/infinity/test_data/test_export_embedding.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+COPY sqllogic_test_export_jsonl FROM '/var/infinity/test_data/test_export_embedding.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
 
 query I
-COPY test_export_csv FROM '/var/infinity/test_data/test_export_embedding.csv' WITH (FORMAT CSV, DELIMITER ',');
+COPY sqllogic_test_export_csv FROM '/var/infinity/test_data/test_export_embedding.csv' WITH (FORMAT CSV, DELIMITER ',');
 
 query III
-SELECT * FROM test_export_jsonl;
+SELECT * FROM sqllogic_test_export_jsonl;
 ----
 3 4433252 [1.1,2.03,3.04,4]
 4 4433253 [1.9,2,3.045,4.5]
@@ -43,23 +43,23 @@ SELECT * FROM test_export_jsonl;
 4 4433253 [1.9,2,3.045,4.5]
 
 query III
-SELECT count(*) FROM test_export_jsonl;
+SELECT count(*) FROM sqllogic_test_export_jsonl;
 ----
 4
 
 statement ok
-DROP TABLE test_export_jsonl;
+DROP TABLE sqllogic_test_export_jsonl;
 
 query III
-SELECT * FROM test_export_csv;
+SELECT * FROM sqllogic_test_export_csv;
 ----
 3 4433252 [1.1,2.03,3.04,4]
 4 4433253 [1.9,2,3.045,4.5]
 
 query III
-SELECT count(*) FROM test_export_csv;
+SELECT count(*) FROM sqllogic_test_export_csv;
 ----
 2
 
 statement ok
-DROP TABLE IF EXISTS test_export_csv;
+DROP TABLE IF EXISTS sqllogic_test_export_csv;

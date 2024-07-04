@@ -11,7 +11,7 @@ from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 kRunningTime = 30
 kNumThread = 8
 
-db_names = ["a", "b", "c", "d", "e"]
+db_names = ["dll_parallel_a", "dll_parallel_b", "dll_parallel_c", "dll_parallel_d", "dll_parallel_e"]
 table_names = ["vec1", "vec2", "vec3", "fulltext1", "fulltext2", "fulltext3"]
 vec_columns = [{"c1": {"type": "vector,1024,float"}, "c2": {"type": "vector,512,int"}, "c3": {"type": "int"}},
                {"c1": {"type": "vector,512,float"}, "c2": {"type": "vector,1024,int"}, "c3": {"type": "float"}}]
@@ -46,7 +46,7 @@ class TestDDLParallel:
         databases = infinity_obj.list_databases().db_names
         print(databases)
         for db_name in databases:
-            if db_name != "default_db":
+            if db_name != "default_db" and db_name.startswith('dll_parallel'):
                 infinity_obj.drop_database(db_name, conflict_type=ConflictType.Ignore)
         print(infinity_obj.list_databases().db_names)
 
