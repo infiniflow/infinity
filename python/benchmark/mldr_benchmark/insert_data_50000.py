@@ -131,7 +131,7 @@ class InfinityClientForInsert:
                                                                                                   "compress")])],
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        self.infinity_table.optimize("bmp_index", {"topk": "1000"})
+        self.infinity_table.optimize("bmp_index", {"topk": "1000", "bp_reorder": {}})
         print("Finish creating BMP index.")
 
 
