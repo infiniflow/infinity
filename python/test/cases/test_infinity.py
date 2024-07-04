@@ -18,5 +18,6 @@ class TestInfinity:
     @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_get_infinity(self):
         self.test_infinity_obj._test_get_database()
+
     def test_list_infinity(self):
         self.test_infinity_obj._test_list_database()

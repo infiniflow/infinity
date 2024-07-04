@@ -12,7 +12,7 @@ from infinity.db import Database
 kRunningTime = 30
 kNumThread = 4
 
-table_name = "insert_delete_ddl_test"
+table_name = "parallel_insert_delete_ddl_test"
 index_name = "c1 verctor index"
 
 

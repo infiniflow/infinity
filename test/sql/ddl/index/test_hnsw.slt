@@ -3,32 +3,32 @@
 # group: [ddl, test_hnsw]
 
 statement ok
-DROP TABLE IF EXISTS test_hnsw;
+DROP TABLE IF EXISTS sqllogic_test_hnsw;
 
 # Expecting IDENTIFIER or PRIMARY or UNIQUE
 statement ok
-CREATE TABLE test_hnsw (col1 embedding(float,128));
+CREATE TABLE sqllogic_test_hnsw (col1 embedding(float,128));
 
 # import data from fvecs file
 statement ok
-COPY test_hnsw FROM '/var/infinity/test_data/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
+COPY sqllogic_test_hnsw FROM '/var/infinity/test_data/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
 
 statement ok
-CREATE INDEX idx1 ON test_hnsw (col1) USING Hnsw WITH (M = 16, ef_construction = 50, ef = 50, metric = l2);
+CREATE INDEX idx1 ON sqllogic_test_hnsw (col1) USING Hnsw WITH (M = 16, ef_construction = 50, ef = 50, metric = l2);
 
 statement ok
-DROP INDEX idx1 ON test_hnsw;
+DROP INDEX idx1 ON sqllogic_test_hnsw;
 
 # default parameters
 statement ok
-CREATE INDEX idx2 ON test_hnsw (col1) USING Hnsw WITH (metric = l2);
+CREATE INDEX idx2 ON sqllogic_test_hnsw (col1) USING Hnsw WITH (metric = l2);
 
 # duplicate index name
 statement error
-CREATE INDEX idx2 ON test_hnsw (col1) USING Hnsw WITH (metric = l2);
+CREATE INDEX idx2 ON sqllogic_test_hnsw (col1) USING Hnsw WITH (metric = l2);
 
 statement ok
-CREATE INDEX IF NOT EXISTS idx2 ON test_hnsw (col1) USING Hnsw WITH (metric = l2);
+CREATE INDEX IF NOT EXISTS idx2 ON sqllogic_test_hnsw (col1) USING Hnsw WITH (metric = l2);
 
 statement ok
-DROP TABLE test_hnsw;
+DROP TABLE sqllogic_test_hnsw;

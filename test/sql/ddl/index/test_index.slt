@@ -3,45 +3,45 @@
 # group: [ddl, test_index]
 
 statement ok
-DROP TABLE IF EXISTS test_index;
+DROP TABLE IF EXISTS sqllogic_test_index;
 
 # Expecting IDENTIFIER or PRIMARY or UNIQUE
 statement ok
-CREATE TABLE test_index (col1 embedding(float,128));
+CREATE TABLE sqllogic_test_index (col1 embedding(float,128));
 
 # import data from fvecs file
 statement ok
-COPY test_index FROM '/var/infinity/test_data/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
+COPY sqllogic_test_index FROM '/var/infinity/test_data/test.fvecs' WITH ( DELIMITER ',', FORMAT fvecs);
 
 statement ok
-CREATE INDEX idx1 ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
 
 statement error
-CREATE INDEX idx1 ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
 
 statement ok
-CREATE INDEX IF NOT EXISTS idx1 ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX IF NOT EXISTS idx1 ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
 
 statement error
-CREATE INDEX ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
 
 statement ok
-DROP INDEX idx1 ON test_index;
+DROP INDEX idx1 ON sqllogic_test_index;
 
 statement error
-DROP INDEX idx1 ON test_index;
+DROP INDEX idx1 ON sqllogic_test_index;
 
 statement ok
-DROP INDEX IF EXISTS idx1 ON test_index;
+DROP INDEX IF EXISTS idx1 ON sqllogic_test_index;
 
 statement ok
-CREATE INDEX idx1 ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
 
 statement ok
-DROP INDEX idx1 ON test_index;
+DROP INDEX idx1 ON sqllogic_test_index;
 
 statement ok
-CREATE INDEX idx1 ON test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
+CREATE INDEX idx1 ON sqllogic_test_index (col1) USING IVFFlat WITH (centroids_count = 128, metric = l2);
 
 statement ok
-DROP TABLE test_index;
+DROP TABLE sqllogic_test_index;

@@ -76,40 +76,13 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > debug.log 2>&1" &
 
-      - name: pysdk remote infinity test debug version
+      - name: Run pysdk remote infinity & parallel & http_api & sqllogic test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib64/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pysdk_remote_infinity_test.py" && sleep 1s
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib64/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
 
-      - name: parallel test debug version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib64/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 tools/run_parallel_test.py" && sleep 1s
-
-      - name: http_api test debug version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib64/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 tools/run_http_api.py" && sleep 1s
-
-      - name: Stop infinity pysdk & http_api debug
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh 20 $(pidof cmake-build-debug/src/infinity)
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Start infinity sqllogictest debug version
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          # Run a command in the background
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-debug/src/infinity > debug.log 2>&1" &
-
-      - name: sqllogictest debug version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib64/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 tools/sqllogictest.py"
-
-      - name: Stop infinity sqllogictest debug
+      - name: Stop infinity pysdk & http_api & sqllogictest debug
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
           sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh 20 $(pidof cmake-build-debug/src/infinity)
@@ -182,37 +155,11 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
+          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > release.log 2>&1" &
 
-      - name: pysdk remote infinity test release version
+      - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pysdk_remote_infinity_test.py" && sleep 1s
-
-      - name: parallel test release version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_parallel_test.py" && sleep 1s
-
-      - name: http_api test release version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_http_api.py" && sleep 1s
-
-      - name: Stop infinity release
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh 20 $(pidof cmake-build-release/src/infinity)
-          if [ $? -ne 0 ]; then
-            echo "Failed to kill infinity debug version"
-            exit 1
-          fi
-
-      - name: Start infinity release version
-        if: ${{ !cancelled() && !failure() }}
-        run: |
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
-
-      - name: sqllogictest release version
-        if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/sqllogictest.py"
+        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_pytest_parallel.py" && sleep 1s
 
       - name: Stop infinity release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
