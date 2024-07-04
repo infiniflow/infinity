@@ -16,7 +16,7 @@ RUN apt install -y wget curl emacs-nox vim git build-essential ninja-build bison
 # build dependencies
 RUN apt install -y liblz4-dev zlib1g-dev libboost1.81-dev liburing-dev libgflags-dev libevent-dev libjemalloc-dev python3-dev
 
-# CMake 3.28+ is requrired for C++20 modules.
+# CMake 3.28+ is required for C++20 modules.
 # download https://github.com/Kitware/CMake/releases/download/v3.29.3/cmake-3.29.3-linux-x86_64.tar.gz
 RUN --mount=type=bind,source=cmake-3.29.3-linux-x86_64.tar.gz,target=/root/cmake-3.29.3-linux-x86_64.tar.gz \
     cd /root && tar xzf cmake-3.29.3-linux-x86_64.tar.gz && cp -rf cmake-3.29.3-linux-x86_64/bin/* /usr/local/bin && cp -rf cmake-3.29.3-linux-x86_64/share/* /usr/local/share && rm -fr cmake-3.29.3-linux-x86_64
