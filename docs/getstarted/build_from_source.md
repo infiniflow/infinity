@@ -47,7 +47,7 @@ git clone https://github.com/infiniflow/infinity.git
 ```shell
 cd infinity && mkdir cmake-build-debug
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7
+docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7_clang18
 docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build ."
 ```
 
@@ -75,7 +75,7 @@ unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
 sudo add-apt-repository -P ppa:ubuntu-toolchain-r/test
 sudo add-apt-repository -P ppa:mhier/libboost-latest
-sudo apt update && sudo apt install g++-13 clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
+sudo apt update && sudo apt install libc++-18-dev clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
 ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
 ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
 ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
@@ -128,7 +128,7 @@ wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-lin
 tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
 wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
-sudo apt install -y ninja-build clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
+sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
 sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
 sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
 sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy

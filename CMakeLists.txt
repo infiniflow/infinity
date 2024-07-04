@@ -24,6 +24,28 @@ if (CLANG_VERSION_STRING VERSION_GREATER 16)
     # Print CMake version and project name
     message(STATUS "Building ${PROJECT_NAME} with CMake version: ${CMAKE_VERSION} On CLANG-${CLANG_VERSION_STRING}")
 
+    set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wno-unused-parameter -Wno-unused-private-field")
+    set(CMAKE_CXX_STANDARD_REQUIRED YES)
+    set(CMAKE_CXX_EXTENSIONS OFF)
+
+    SET(CMAKE_FIND_PACKAGE_SORT_ORDER NATURAL)
+    SET(CMAKE_FIND_PACKAGE_SORT_DIRECTION DEC)
+
+    find_package(LLVM REQUIRED CONFIG)
+
+    message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+    message(STATUS "Using LLVM Header in: ${LLVM_INCLUDE_DIRS}")
+    message(STATUS "Using LLVM Library in: ${LLVM_LIBRARY_DIRS}")
+
+
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-isystem>)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${LLVM_INCLUDE_DIRS}/c++/v1>)
+
+    add_link_options($<$<COMPILE_LANGUAGE:CXX>:-nostdlib++>)
+    add_link_options($<$<COMPILE_LANGUAGE:CXX>:-L${LLVM_LIBRARY_DIRS}>)
+    add_link_options($<$<COMPILE_LANGUAGE:CXX>:-Wl,-rpath,${LLVM_LIBRARY_DIRS}>)
+
 else ()
 
     message(FATAL_ERROR, "Please use clang version 17.0 and above, current version: ", ${CLANG_VERSION_STRING})
@@ -120,8 +142,6 @@ else ()
 endif ()
 
 MESSAGE(STATUS "C++ Compilation flags: " ${CMAKE_CXX_FLAGS})
-
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc -z noexecstack")
 
 #add_definitions(-march=native)
 add_definitions(-DSIMDE_ENABLE_NATIVE_ALIASES)

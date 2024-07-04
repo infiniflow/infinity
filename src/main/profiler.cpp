@@ -30,18 +30,19 @@ namespace infinity {
 
 void BaseProfiler::Begin() {
     finished_ = false;
-    begin_ts_ = Now();
+    begin_ts_ = std::chrono::system_clock::now();
 }
 
 void BaseProfiler::End() {
     if (finished_)
         return;
-    end_ts_ = Now();
+    end_ts_ = std::chrono::system_clock::now();
     finished_ = true;
 }
 
 std::string BaseProfiler::BeginTime() {
 
+//    const std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> begin_ts = const_cast<std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>>(begin_ts_);
     std::time_t now_time_t  = std::chrono::system_clock::to_time_t(begin_ts_);
     std::tm* now_tm = std::localtime(&now_time_t);
 
@@ -63,6 +64,7 @@ std::string BaseProfiler::BeginTime() {
 }
 
 std::string BaseProfiler::EndTime() {
+//    const std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> end_ts = const_cast<std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>>(end_ts_);
     std::time_t now_time_t  = std::chrono::system_clock::to_time_t(end_ts_);
     std::tm* now_tm = std::localtime(&now_time_t);
 
@@ -74,18 +76,20 @@ std::string BaseProfiler::EndTime() {
 
     std::chrono::milliseconds ms;
     std::chrono::microseconds cs;
-    std::chrono::nanoseconds ns;
+//    std::chrono::nanoseconds ns;
 
     ms = std::chrono::duration_cast<std::chrono::milliseconds>(end_ts_.time_since_epoch()) % 1000;
     cs = std::chrono::duration_cast<std::chrono::microseconds>(end_ts_.time_since_epoch()) % 1000000;
-    ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_ts_.time_since_epoch()) % 1000000000;
-    ss << buffer << "." << ms.count() << "." << cs.count() % 1000 << "." << ns.count() % 1000;
+//    ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end_ts_.time_since_epoch()) % 1000000000;
+    ss << buffer << "." << ms.count() << "." << cs.count() % 1000;
+//    ss << buffer << "." << ms.count() << "." << cs.count() % 1000 << "." << ns.count() % 1000;
     return ss.str();
 }
 
 NanoSeconds BaseProfiler::ElapsedInternal() const {
-    auto now = finished_ ? end_ts_ : Now();
-    return ElapsedFromStart(now, begin_ts_);
+    auto now = finished_ ? end_ts_ : std::chrono::system_clock::now();
+
+    return now - begin_ts_;
 }
 
 String BaseProfiler::ElapsedToString(NanoSeconds duration, i64 scale) {

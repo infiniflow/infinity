@@ -617,8 +617,16 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str) {
     auto ret = std::sscanf(str.data(), "%a", &value);
     ParserAssert(ret == str.size(), "Error: parse float error");
 #else
-    auto res = std::from_chars(str.begin(), str.end(), value);
-    if(res.ptr != str.data() + str.size()) {
+    // Used in libc++
+    try {
+        std::string float_str;
+        size_t len = str.end() - str.begin();
+        float_str.reserve(len);
+        for(size_t i = 0; i < len; ++ i) {
+            float_str.push_back(str[i]);
+        }
+        value = std::stof(float_str);
+    } catch(const std::exception &e) {
         std::string error_message = fmt::format("Error: parse float: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
@@ -637,8 +645,15 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
     auto ret = std::sscanf(str.data(), "%la", &value);
     ParserAssert(ret == str.size(), "Error: parse double error");
 #else
-    auto res = std::from_chars(str.begin(), str.end(), value);
-    if(res.ptr != str.data() + str.size()) {
+    try {
+        std::string double_str;
+        size_t len = str.end() - str.begin();
+        double_str.reserve(len);
+        for(size_t i = 0; i < len; ++ i) {
+            double_str.push_back(str[i]);
+        }
+        value = std::stod(str.data());
+    } catch(const std::exception &e) {
         std::string error_message = fmt::format("Error: parse double: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);

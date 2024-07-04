@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
 
+# This script will download the following files:
+# bison-3.8.2.tar.xz
+# binutils-2.41.tar.xz
+# gcc-13.2.0.tar.xz
+# cmake-3.28.3-linux-x86_64.tar.gz
+# ninja-linux.zip
+# llvm-project-17.0.6.src.tar.xz
+# boost_1_81_0.tar.bz2
+# flex-2.6.4.tar.gz
+# liburing-2.5.tar.gz
+# libevent-2.1.12-stable.tar.gz
+# lz4-1.9.4.tar.gz
+
 download()
 {
     echo "download $1"

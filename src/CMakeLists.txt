@@ -286,6 +286,9 @@ target_link_libraries(infinity
         lz4.a
         atomic.a
         event.a
+        c++.a
+        c++abi.a
+#        profiler
         oatpp.a
         jma
         opencc
@@ -330,16 +333,18 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         zsv_parser
         newpfor
         fastpfor
+        jma
+        opencc
         lz4.a
         atomic.a
         event.a
         oatpp.a
-        jma
-        opencc
+        c++.a
+        c++abi.a
 )
 
-# WARN: python modules shall dynamicly link to libstdc++!!!
-#target_link_options(embedded_infinity_ext PRIVATE -static-libstdc++ -static-libgcc)
+# WARN: python modules shall not link to static libstdc++!!!
+target_link_options(embedded_infinity_ext PRIVATE -static-libgcc)
 
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -458,6 +463,8 @@ target_link_libraries(unit_test
         lz4.a
         atomic.a
         thrift.a
+        c++.a
+        c++abi.a
         jma
         opencc
 )
@@ -485,6 +492,48 @@ target_include_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/thr
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/pgm/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include")
 target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
+
+target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
+
+add_executable(test_hnsw "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/storage/knnindex/knn_hnsw/test_hnsw.cpp")
+target_include_directories(test_hnsw PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
+target_include_directories(test_hnsw PUBLIC "${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include")
+
+target_link_libraries(test_hnsw
+    infinity_core
+    gtest
+    gtest_main
+    c++.a
+    c++abi.a
+)
+
+add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/storage/knnindex/knn_hnsw/test_hnsw_bitmask.cpp")
+
+target_link_directories(test_hnsw_bitmask PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_include_directories(test_hnsw_bitmask PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
+target_include_directories(test_hnsw_bitmask PUBLIC "${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include")
+
+target_link_libraries(test_hnsw_bitmask
+    infinity_core
+    gtest
+    gtest_main
+    sql_parser
+    onnxruntime_mlas
+    zsv_parser
+    roaring
+    newpfor
+    fastpfor
+
+    thrift.a
+    thriftnb.a
+    lz4.a
+    atomic.a
+    event.a
+    c++.a
+    c++abi.a
+    jma
+    #        profiler
+)
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)

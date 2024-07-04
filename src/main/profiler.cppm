@@ -64,8 +64,12 @@ private:
 
     [[nodiscard]] NanoSeconds ElapsedInternal() const;
 
-    TimePoint<Clock> begin_ts_{};
-    TimePoint<Clock> end_ts_{};
+    std::chrono::time_point<std::chrono::system_clock> begin_ts_{};
+    std::chrono::time_point<std::chrono::system_clock> end_ts_{};
+    // std::chrono::system_clock<Clock, std::chrono::nanoseconds> begin_ts_{};
+    // std::chrono::system_clock<Clock, std::chrono::nanoseconds> end_ts_{};
+    // TimePoint<Clock> begin_ts_{};
+    // TimePoint<Clock> end_ts_{};
 
     bool finished_ = false;
     String name_{};
