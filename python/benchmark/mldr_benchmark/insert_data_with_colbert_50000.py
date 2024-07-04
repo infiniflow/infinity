@@ -109,11 +109,13 @@ class InfinityClientForInsert:
                     colbert_base_name = f"colbert-{colbert_pos_part_begin}-{colbert_pos_part_end}.data"
                     colbert_data = read_colbert_data_yield(os.path.join(colbert_embedding_dir, colbert_base_name))
                 docid_str = docid_list[row_pos]
+                insert_dense_data = next(dense_data)
+                insert_sparse_data = next(sparse_data)
+                colbert_list = next(colbert_data)
                 if int(docid_str.split('-')[-1]) >= 189796:
                     continue
-                colbert_list = next(colbert_data)
                 insert_dict = {"docid_col": docid_str, "fulltext_col": corpus_text_list[row_pos],
-                               "dense_col": next(dense_data), "sparse_col": next(sparse_data),
+                               "dense_col": insert_dense_data, "sparse_col": insert_sparse_data,
                                "colbert_col": colbert_list, "colbert_bit_col": get_bit_array(colbert_list)}
                 buffer.append(insert_dict)
             if len(buffer) > 0:

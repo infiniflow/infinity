@@ -91,10 +91,12 @@ class InfinityClientForInsert:
                     sparse_base_name = f"sparse-{sparse_pos_part_begin}-{sparse_pos_part_end}.data"
                     sparse_data = read_mldr_sparse_embedding_yield(os.path.join(sparse_embedding_dir, sparse_base_name))
                 docid_str = docid_list[row_pos]
+                insert_dense_data = next(dense_data)
+                insert_sparse_data = next(sparse_data)
                 if int(docid_str.split('-')[-1]) >= 189796:
                     continue
                 insert_dict = {"docid_col": docid_str, "fulltext_col": corpus_text_list[row_pos],
-                               "dense_col": next(dense_data), "sparse_col": next(sparse_data)}
+                               "dense_col": insert_dense_data, "sparse_col": insert_sparse_data}
                 buffer.append(insert_dict)
             if len(buffer) > 0:
                 self.infinity_table.insert(buffer)
