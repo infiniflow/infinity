@@ -89,8 +89,6 @@ public:
 
     void SaveIndexFile();
 
-    void SaveHnsw();
-
     static UniquePtr<SegmentIndexEntry>
     Deserialize(const nlohmann::json &index_entry_json, TableIndexEntry *table_index_entry, BufferManager *buffer_mgr, TableEntry *table_entry);
 
@@ -98,7 +96,7 @@ public:
 
     void CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<ChunkIndexEntry *> &old_chunks, TxnTimeStamp commit_ts);
 
-    void OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params);
+    void OptimizeIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 

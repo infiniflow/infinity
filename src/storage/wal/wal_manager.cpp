@@ -856,10 +856,7 @@ void WalManager::WalCmdOptimizeReplay(WalCmdOptimize &cmd, TransactionID txn_id,
         UnrecoverableError(error_message);
     }
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
-    Vector<SegmentIndexEntry *> segment_index_entries = table_index_entry->OptimizeIndex(fake_txn.get(), std::move(cmd.params_), true /*replay*/);
-    TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
-    auto *txn_table_store = fake_txn->GetTxnTableStore(table_entry);
-    txn_table_store->AddSegmentIndexesStore(table_index_entry, std::move(segment_index_entries));
+    table_index_entry->OptimizeIndex(fake_txn.get(), std::move(cmd.params_), true /*replay*/);
 }
 
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
