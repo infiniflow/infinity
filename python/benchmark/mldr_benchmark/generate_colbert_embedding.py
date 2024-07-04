@@ -39,7 +39,7 @@ class FakeBGEM3FlagModelColBERTV2:
         colbert_result = []
         for one_text in tqdm(text, desc="Generating ColBERT-v2.0 embeddings"):
             chunks = self.text_splitter.create_documents([one_text])
-            subtext_tensor = [self.ckpt.docFromText([chunk.page_content])[0] for chunk in chunks]
+            subtext_tensor = [self.ckpt.docFromText([chunk.page_content], to_cpu=True)[0].numpy() for chunk in chunks]
             # now concatenate them together
             concatenated = np.concatenate(subtext_tensor)
             assert concatenated.ndim == 2 and concatenated.shape[1] == 128
@@ -58,7 +58,7 @@ class FakeBGEM3FlagModelJinaColBERT:
         assert return_colbert_vecs is True and return_dense is False and return_sparse is False
         colbert_result = []
         for one_text in tqdm(text, desc="Generating jina-colbert-v1-en embeddings"):
-            text_tensor = self.ckpt.docFromText([one_text])[0]
+            text_tensor = self.ckpt.docFromText([one_text], to_cpu=True)[0].numpy()
             assert text_tensor.ndim == 2 and text_tensor.shape[1] == 128
             colbert_result.append(text_tensor)
         return {'colbert_vecs': colbert_result}
