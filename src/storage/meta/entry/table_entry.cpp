@@ -714,7 +714,7 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
         segment_index_entry->MemIndexInsert(block_entry, range.start_offset_, range.row_count_, txn->CommitTS(), txn->buffer_mgr());
         if ((i == dump_idx && segment_index_entry->MemIndexRowCount() >= infinity::InfinityContext::instance().config()->MemIndexCapacity()) ||
             (i == num_ranges - 1 && segment_entry->Room() <= 0)) {
-            SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump();
+            SharedPtr<ChunkIndexEntry> chunk_index_entry = segment_index_entry->MemIndexDump(txn);
             String *index_name = index_base->index_name_.get();
             String message = fmt::format("Table {}.{} index {} segment {} MemIndex dumped.", *GetDBName(), *table_name_, *index_name, seg_id);
             LOG_INFO(message);
@@ -738,7 +738,7 @@ void TableEntry::MemIndexDump(Txn *txn, bool spill) {
         if (!status.ok())
             continue;
         TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
-        SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(txn_index_store, spill);
+        SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(txn, txn_index_store, spill);
         if (chunk_index_entry.get() != nullptr) {
             chunk_index_entry->Commit(txn->CommitTS());
             txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());

@@ -621,6 +621,10 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
                 WalCmdOptimizeReplay(*optimize_cmd, entry.txn_id_, entry.commit_ts_);
                 break;
             }
+            case WalCommandType::DUMP_INDEX: {
+                WalCmdDumpIndexReplay(*static_cast<WalCmdDumpIndex *>(cmd.get()), entry.txn_id_, entry.commit_ts_);
+                break;
+            }
             default: {
                 String error_message = "WalManager::ReplayWalEntry unknown wal command type";
                 LOG_CRITICAL(error_message);
@@ -857,6 +861,43 @@ void WalManager::WalCmdOptimizeReplay(WalCmdOptimize &cmd, TransactionID txn_id,
     }
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
     table_index_entry->OptimizeIndex(fake_txn.get(), std::move(cmd.params_), true /*replay*/);
+}
+
+void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
+    auto [table_index_entry, status] = storage_->catalog()->GetIndexByName(cmd.db_name_, cmd.table_name_, cmd.index_name_, txn_id, commit_ts);
+    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+    auto *buffer_mgr = storage_->buffer_manager();
+    if (!status.ok()) {
+        String error_message = fmt::format("Wal Replay: Get index failed {}", status.message());
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    SegmentIndexEntry *segment_index_entry = nullptr;
+    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
+    {
+        auto &index_by_segment = table_index_entry->index_by_segment();
+        auto iter = index_by_segment.find(cmd.segment_id_);
+        if (iter == index_by_segment.end()) {
+            auto create_index_param =
+                SegmentIndexEntry::GetCreateIndexParam(table_index_entry->table_index_def(), 0 /*segment_offset*/, table_index_entry->column_def());
+            iter = index_by_segment
+                       .emplace(cmd.segment_id_,
+                                SegmentIndexEntry::NewIndexEntry(table_index_entry, cmd.segment_id_, fake_txn.get(), create_index_param.get()))
+                       .first;
+        }
+        segment_index_entry = iter->second.get();
+    }
+
+    for (const auto &chunk_info : cmd.chunk_infos_) {
+        segment_index_entry->AddChunkIndexEntryReplayWal(chunk_info.chunk_id_,
+                                                         table_entry,
+                                                         chunk_info.base_name_,
+                                                         chunk_info.base_rowid_,
+                                                         chunk_info.row_count_,
+                                                         commit_ts,
+                                                         chunk_info.deprecate_ts_,
+                                                         buffer_mgr);
+    }
 }
 
 void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {
