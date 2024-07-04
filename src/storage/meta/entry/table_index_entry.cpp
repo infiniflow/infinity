@@ -266,10 +266,10 @@ void TableIndexEntry::MemIndexCommit() {
     }
 }
 
-SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(TxnIndexStore *txn_index_store, bool spill) {
+SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(Txn *txn, TxnIndexStore *txn_index_store, bool spill) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     if (last_segment_.get() != nullptr) {
-        chunk_index_entry = last_segment_->MemIndexDump();
+        chunk_index_entry = last_segment_->MemIndexDump(txn);
         txn_index_store->chunk_index_entries_.push_back(chunk_index_entry.get());
     }
     return chunk_index_entry;
@@ -398,7 +398,7 @@ void TableIndexEntry::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin
     txn_id_ = txn_id;
 }
 
-void TableIndexEntry::OptimizeIndex(Txn *txn, Vector<UniquePtr<InitParameter>> opt_params, bool replay) {
+void TableIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay) {
     auto *table_entry = table_index_meta_->GetTableEntry();
     auto *txn_table_store = txn->GetTxnTableStore(table_entry);
     switch (index_base_->index_type_) {
@@ -408,7 +408,7 @@ void TableIndexEntry::OptimizeIndex(Txn *txn, Vector<UniquePtr<InitParameter>> o
             }
             std::unique_lock w_lock(rw_locker_);
             for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-                segment_index_entry->OptimizeIndex(txn_table_store, opt_params, false /*replay*/);
+                segment_index_entry->OptimizeIndex(index_base_.get(), txn, txn_table_store, opt_params, false /*replay*/);
             }
             break;
         }
@@ -425,13 +425,14 @@ void TableIndexEntry::OptimizeIndex(Txn *txn, Vector<UniquePtr<InitParameter>> o
                     LOG_WARN("Not implemented");
                     break;
                 }
-                if (!replay) {
-                    for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-                        segment_index_entry->OptimizeIndex(txn_table_store, opt_params, false /*replay*/);
-                    }
-                }
+                IndexHnsw old_index_hnsw = *hnsw_index;
                 hnsw_index->encode_type_ = HnswEncodeType::kLVQ;
                 txn_table_store->AddIndexStore(this);
+                if (!replay) {
+                    for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+                        segment_index_entry->OptimizeIndex(static_cast<IndexBase *>(&old_index_hnsw), txn, txn_table_store, opt_params, false /*replay*/);
+                    }
+                }
             }
             break;
         }

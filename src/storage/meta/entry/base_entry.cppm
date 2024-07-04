@@ -61,9 +61,9 @@ export struct BaseEntry {
 public:
     // Reserved
     inline void Commit(TxnTimeStamp commit_ts) {
-        // assert(!Committed() || commit_ts_ == commit_ts);
-        // assert(commit_ts != UNCOMMIT_TS);
-        commit_ts_.store(commit_ts);
+        if (commit_ts_ == UNCOMMIT_TS) {
+            commit_ts_.store(commit_ts);
+        }
     }
 
     [[nodiscard]] inline bool Committed() const { return commit_ts_ != UNCOMMIT_TS; }
