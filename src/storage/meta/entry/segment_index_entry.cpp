@@ -399,12 +399,15 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     const IndexBase *index_base = table_index_entry_->index_base();
     switch (index_base->index_type_) {
+        case IndexType::kBMP:
         case IndexType::kHnsw: {
             if (memory_hnsw_indexer_.get() == nullptr) {
                 return nullptr;
             }
+            std::unique_lock lck(rw_locker_);
             auto dump_indexer = std::exchange(memory_hnsw_indexer_, nullptr);
-            this->AddChunkIndexEntry(dump_indexer);
+            dump_indexer->SaveIndexFile();
+            chunk_index_entries_.push_back(dump_indexer);
             return dump_indexer;
         }
         case IndexType::kFullText: {
@@ -801,7 +804,7 @@ void SegmentIndexEntry::CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<
     // LOG_INFO(ss.str());
 }
 
-void SegmentIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params) {
+void SegmentIndexEntry::OptimizeIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay) {
     switch (table_index_entry_->index_base()->index_type_) {
         case IndexType::kBMP: {
             Optional<BMPOptimizeOptions> ret = BMPUtil::ParseBMPOptimizeOptions(opt_params);
@@ -827,25 +830,37 @@ void SegmentIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParam
                 BufferHandle buffer_handle = chunk_index_entry->GetIndex();
                 auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
                 optimize_index(abstract_bmp);
+                chunk_index_entry->SaveIndexFile();
             }
             if (memory_index_entry.get() != nullptr) {
                 BufferHandle buffer_handle = memory_index_entry->GetIndex();
                 auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
                 optimize_index(abstract_bmp);
+
+                auto dump_index_entry = this->MemIndexDump(false /*spill*/);
+                txn_table_store->AddChunkIndexStore(table_index_entry_, dump_index_entry.get());
             }
             break;
         }
         case IndexType::kHnsw: {
+            if (replay) {
+                break;
+            }
+
             const auto [chunk_index_entries, memory_index_entry] = this->GetHnswIndexSnapshot();
             for (const auto &chunk_index_entry : chunk_index_entries) {
                 BufferHandle buffer_handle = chunk_index_entry->GetIndex();
                 auto *file_worker = static_cast<HnswFileWorker *>(buffer_handle.GetFileWorkerMut());
                 file_worker->CompressToLVQ();
+                chunk_index_entry->SaveIndexFile();
             }
             if (memory_index_entry.get() != nullptr) {
                 BufferHandle buffer_handle = memory_index_entry->GetIndex();
                 auto *file_worker = static_cast<HnswFileWorker *>(buffer_handle.GetFileWorkerMut());
                 file_worker->CompressToLVQ();
+
+                auto dump_index_entry = this->MemIndexDump(false /*spill*/);
+                txn_table_store->AddChunkIndexStore(table_index_entry_, dump_index_entry.get());
             }
             break;
         }
@@ -1064,15 +1079,6 @@ void SegmentIndexEntry::SaveIndexFile() {
     }
     for (auto &chunk_index_entry : chunk_index_entries_) {
         chunk_index_entry->SaveIndexFile();
-    }
-}
-
-void SegmentIndexEntry::SaveHnsw() {
-    for (auto &chunk_index_entry : chunk_index_entries_) {
-        chunk_index_entry->Save();
-    }
-    if (memory_hnsw_indexer_.get() != nullptr) {
-        memory_hnsw_indexer_->Save();
     }
 }
 

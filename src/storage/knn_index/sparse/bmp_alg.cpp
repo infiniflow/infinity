@@ -253,6 +253,12 @@ void BMPAlg<DataType, IdxType, CompressType>::AddDoc(const SparseVecRef<DataType
 }
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
+SizeT BMPAlg<DataType, IdxType, CompressType>::DocNum() const {
+    std::shared_lock lock(mtx_);
+    return doc_ids_.size();
+}
+
+template <typename DataType, typename IdxType, BMPCompressType CompressType>
 void BMPAlg<DataType, IdxType, CompressType>::Optimize(const BMPOptimizeOptions &options) {
     std::unique_lock lock(mtx_);
 
