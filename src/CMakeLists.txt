@@ -287,6 +287,7 @@ target_link_libraries(infinity
         atomic.a
         event.a
         c++.a
+        c++abi.a
 #        profiler
         oatpp.a
         jma
@@ -466,6 +467,7 @@ target_link_libraries(unit_test
         atomic.a
         thrift.a
         c++.a
+        c++abi.a
         jma
         opencc
 )
@@ -505,6 +507,7 @@ target_link_libraries(test_hnsw
     gtest
     gtest_main
     c++.a
+    c++abi.a
 )
 
 add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/storage/knnindex/knn_hnsw/test_hnsw_bitmask.cpp")
@@ -530,6 +533,7 @@ target_link_libraries(test_hnsw_bitmask
     atomic.a
     event.a
     c++.a
+    c++abi.a
     jma
     #        profiler
 )
