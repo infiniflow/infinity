@@ -50,8 +50,8 @@ DROP TABLE names;
 
 
 statement ok
-CREATE DATABASE s1;
+CREATE DATABASE sqllogic_s1;
 
 
 statement ok
-DROP DATABASE s1;
+DROP DATABASE sqllogic_s1;

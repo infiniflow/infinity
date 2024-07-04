@@ -1,11 +1,11 @@
 statement ok
-DROP DATABASE IF EXISTS db1;
+DROP DATABASE IF EXISTS sqllogic_db1;
 
 statement ok
-CREATE DATABASE IF NOT EXISTS db1;
+CREATE DATABASE IF NOT EXISTS sqllogic_db1;
 
 statement ok
-USE db1;
+USE sqllogic_db1;
 
 statement ok
 CREATE TABLE test_secondary_index (c1 integer, c2 boolean);
@@ -32,15 +32,15 @@ statement ok
 USE default_db;
 
 statement ok
-DROP DATABASE db1;
+DROP DATABASE sqllogic_db1;
 
 ###############################################################
 
 statement ok
-CREATE DATABASE IF NOT EXISTS db1;
+CREATE DATABASE IF NOT EXISTS sqllogic_db1;
 
 statement ok
-USE db1;
+USE sqllogic_db1;
 
 statement ok
 CREATE TABLE test_secondary_index (c1 integer, c2 boolean);
@@ -67,15 +67,15 @@ statement ok
 USE default_db;
 
 statement ok
-DROP DATABASE db1;
+DROP DATABASE sqllogic_db1;
 
 ###############################################################
 
 statement ok
-CREATE DATABASE IF NOT EXISTS db1;
+CREATE DATABASE IF NOT EXISTS sqllogic_db1;
 
 statement ok
-USE db1;
+USE sqllogic_db1;
 
 statement ok
 CREATE TABLE test_secondary_index (c1 integer, c2 boolean);
@@ -102,6 +102,6 @@ statement ok
 USE default_db;
 
 statement ok
-DROP DATABASE db1;
+DROP DATABASE sqllogic_db1;
 
 ###############################################################
