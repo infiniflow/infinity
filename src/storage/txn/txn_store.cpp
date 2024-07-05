@@ -510,6 +510,7 @@ bool TxnStore::CheckConflict(const TxnStore &other_txn_store) {
         if (other_iter == other_txn_store.txn_tables_store_.end()) {
             continue;
         }
+
         const TxnTableStore *other_table_store = other_iter->second.get();
         if (table_store->CheckConflict(other_table_store)) {
             return true;

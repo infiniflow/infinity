@@ -15,57 +15,28 @@
 import os
 import time
 from tqdm import tqdm
-from mldr_common_tools import fvecs_read_yield, read_mldr_sparse_embedding_yield
 from mldr_common_tools import QueryArgs, check_languages
 from mldr_common_tools import FakeJScoredDoc, get_queries_and_qids, save_result
+from mldr_common_tools import query_yields, apply_funcs
 from transformers import HfArgumentParser
 import infinity
 from infinity.common import LOCAL_HOST
 
-text_to_replace = "&|!+-–():\'\"?~^"
-text_to_replace_with = " " * len(text_to_replace)
-query_translation_table = str.maketrans(text_to_replace, text_to_replace_with)
-
-
-def bm25_query_yield(queries: list[str], embedding_file: str):
-    for query in queries:
-        yield query.translate(query_translation_table)
-
-
-def dense_query_yield(queries: list[str], embedding_file: str):
-    return fvecs_read_yield(embedding_file)
-
-
-def sparse_query_yield(queries: list[str], embedding_file: str):
-    return read_mldr_sparse_embedding_yield(embedding_file)
-
-
-def apply_bm25(table, query_str: str, max_hits: int):
-    return table.match('fulltext_col', query_str, f'topn={max_hits}')
-
-
-def apply_dense(table, query_embedding, max_hits: int):
-    return table.knn("dense_col", query_embedding, "float", "ip", max_hits)
-
-
-def apply_sparse(table, query_embedding: dict, max_hits: int):
-    return table.match_sparse("sparse_col", query_embedding, "ip", max_hits, {"alpha": "1.0", "beta": "1.0"})
-
-
-apply_funcs = {'bm25': apply_bm25, 'dense': apply_dense, 'sparse': apply_sparse}
-
 
 class InfinityClientForSearch:
-    def __init__(self):
+    def __init__(self, with_colbert: bool):
         self.test_db_name = "default_db"
         self.test_table_name_prefix = "mldr_test_table_text_dense_sparse_"
         self.test_table_schema = {"docid_col": {"type": "varchar"}, "fulltext_col": {"type": "varchar"},
                                   "dense_col": {"type": "vector,1024,float"},
                                   "sparse_col": {"type": "sparse,250002,float,int"}}
+        if with_colbert:
+            self.test_table_name_prefix += "colbert_"
+            self.test_table_schema["colbert_col"] = {"type": "tensor,128,float"}
+            self.test_table_schema["colbert_bit_col"] = {"type": "tensor,128,bit"}
         self.infinity_obj = infinity.connect(LOCAL_HOST)
         self.infinity_db = self.infinity_obj.get_database(self.test_db_name)
         self.infinity_table = None
-        self.query_yields = {'bm25': bm25_query_yield, 'dense': dense_query_yield, 'sparse': sparse_query_yield}
 
     def get_test_table(self, language_suffix: str):
         table_name = self.test_table_name_prefix + language_suffix
@@ -97,8 +68,8 @@ class InfinityClientForSearch:
                 print(f"Start to search for weighted sum method: {query_type_comb_str}")
                 embedding_files_list = [os.path.join(save_dir, f"query_embedding_{lang}_{query_type}.data") for
                                         query_type in query_type_comb]
-                query_yields_list = [self.query_yields[query_type](queries, embedding_file) for
-                                     query_type, embedding_file in zip(query_type_comb, embedding_files_list)]
+                query_yields_list = [query_yields[query_type](queries, embedding_file) for query_type, embedding_file in
+                                     zip(query_type_comb, embedding_files_list)]
                 apply_funcs_list = [apply_funcs[query_type] for query_type in query_type_comb]
                 total_query_time: float = 0.0
                 total_query_num: int = len(qids)
@@ -124,5 +95,5 @@ if __name__ == "__main__":
     parser = HfArgumentParser([QueryArgs])
     query_args: QueryArgs = parser.parse_args_into_dataclasses()[0]
     languages = check_languages(query_args.languages)
-    infinity_client = InfinityClientForSearch()
+    infinity_client = InfinityClientForSearch(query_args.with_colbert)
     infinity_client.main(languages=languages, save_dir=query_args.query_result_dave_dir)

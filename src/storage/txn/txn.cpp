@@ -229,6 +229,8 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
+    LOG_TRACE("Txn::CreateTable try to insert a created table placeholder on catalog");
+
     auto [table_entry, table_status] = catalog_->CreateTable(db_name, txn_id_, begin_ts, table_def, conflict_type, txn_mgr_);
 
     if (table_entry == nullptr) {
@@ -238,6 +240,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
     txn_store_.AddTableStore(table_entry);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateTable>(std::move(db_name), table_entry->GetPathNameTail(), table_def));
 
+    LOG_TRACE("Txn::CreateTable created table entry is inserted.");
     return Status::OK();
 }
 
@@ -246,6 +249,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
+    LOG_TRACE("Txn::DropTableCollectionByName try to insert a dropped table placeholder on catalog");
     auto [table_entry, table_status] = catalog_->DropTableByName(db_name, table_name, conflict_type, txn_id_, begin_ts, txn_mgr_);
 
     if (table_entry.get() == nullptr) {
@@ -254,6 +258,8 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
 
     txn_store_.DropTableStore(table_entry.get());
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropTable>(db_name, table_name));
+
+    LOG_TRACE("Txn::DropTableCollectionByName dropped table entry is inserted.");
     return Status::OK();
 }
 
