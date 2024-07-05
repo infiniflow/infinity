@@ -24,3 +24,6 @@ DELETE FROM test_select_ts WHERE c1 = 1;
 
 statement ok
 SELECT ROW_ID(), DELETE_TIMESTAMP() FROM test_select_ts;
+
+statement ok
+DROP TABLE test_select_ts;

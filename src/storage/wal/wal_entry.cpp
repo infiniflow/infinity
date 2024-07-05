@@ -34,6 +34,8 @@ import internal_types;
 import logger;
 import block_entry;
 import segment_entry;
+import segment_index_entry;
+import chunk_index_entry;
 import local_file_system;
 
 namespace infinity {
@@ -184,6 +186,44 @@ String WalSegmentInfo::ToString() const {
     return ss.str();
 }
 
+WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
+    : chunk_id_(chunk_index_entry->chunk_id_), base_name_(chunk_index_entry->base_name_), base_rowid_(chunk_index_entry->base_rowid_),
+      row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {}
+
+bool WalChunkIndexInfo::operator==(const WalChunkIndexInfo &other) const {
+    return chunk_id_ == other.chunk_id_ && base_name_ == other.base_name_ && base_rowid_ == other.base_rowid_ && row_count_ == other.row_count_ &&
+           deprecate_ts_ == other.deprecate_ts_;
+}
+
+i32 WalChunkIndexInfo::GetSizeInBytes() const {
+    return sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(deprecate_ts_);
+}
+
+void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
+    WriteBufAdv(buf, chunk_id_);
+    WriteBufAdv(buf, base_name_);
+    WriteBufAdv(buf, base_rowid_);
+    WriteBufAdv(buf, row_count_);
+    WriteBufAdv(buf, deprecate_ts_);
+}
+
+WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(char *&ptr) {
+    WalChunkIndexInfo chunk_index_info;
+    chunk_index_info.chunk_id_ = ReadBufAdv<ChunkID>(ptr);
+    chunk_index_info.base_name_ = ReadBufAdv<String>(ptr);
+    chunk_index_info.base_rowid_ = ReadBufAdv<RowID>(ptr);
+    chunk_index_info.row_count_ = ReadBufAdv<u32>(ptr);
+    chunk_index_info.deprecate_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+    return chunk_index_info;
+}
+
+String WalChunkIndexInfo::ToString() const {
+    std::stringstream ss;
+    ss << "chunk_id: " << chunk_id_ << ", base_name: " << base_name_ << ", base_rowid: " << base_rowid_.ToString() << ", row_count: " << row_count_
+       << ", deprecate_ts: " << deprecate_ts_;
+    return ss.str();
+}
+
 SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
     char *const ptr_end = ptr + max_bytes;
     SharedPtr<WalCmd> cmd = nullptr;
@@ -316,6 +356,31 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
                 MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(new_segment_infos), std::move(deprecated_segment_ids));
             break;
         }
+        case WalCommandType::OPTIMIZE: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String index_name = ReadBufAdv<String>(ptr);
+            auto param_n = ReadBufAdv<i32>(ptr);
+            Vector<UniquePtr<InitParameter>> params;
+            for (i32 i = 0; i < param_n; i++) {
+                params.push_back(InitParameter::ReadAdv(ptr));
+            }
+            cmd = MakeShared<WalCmdOptimize>(std::move(db_name), std::move(table_name), std::move(index_name), std::move(params));
+            break;
+        }
+        case WalCommandType::DUMP_INDEX: {
+            String db_name = ReadBufAdv<String>(ptr);
+            String table_name = ReadBufAdv<String>(ptr);
+            String index_name = ReadBufAdv<String>(ptr);
+            SegmentID segment_id = ReadBufAdv<SegmentID>(ptr);
+            i32 chunk_n = ReadBufAdv<i32>(ptr);
+            Vector<WalChunkIndexInfo> chunk_infos;
+            for (i32 i = 0; i < chunk_n; ++i) {
+                chunk_infos.push_back(WalChunkIndexInfo::ReadBufferAdv(ptr));
+            }
+            cmd = MakeShared<WalCmdDumpIndex>(std::move(db_name), std::move(table_name), std::move(index_name), segment_id, std::move(chunk_infos));
+            break;
+        }
         default: {
             String error_message = fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type));
             LOG_CRITICAL(error_message);
@@ -422,6 +487,18 @@ bool WalCmdCompact::operator==(const WalCmd &other) const {
     return true;
 }
 
+bool WalCmdOptimize::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdOptimize *>(&other);
+    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_) &&
+           IsEqual(index_name_, other_cmd->index_name_);
+}
+
+bool WalCmdDumpIndex::operator==(const WalCmd &other) const {
+    auto other_cmd = dynamic_cast<const WalCmdDumpIndex *>(&other);
+    return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_) &&
+           IsEqual(index_name_, other_cmd->index_name_) && segment_id_ == other_cmd->segment_id_ && chunk_infos_ == other_cmd->chunk_infos_;
+}
+
 i32 WalCmdCreateDatabase::GetSizeInBytes() const {
     return sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->db_dir_tail_.size();
 }
@@ -488,6 +565,25 @@ i32 WalCmdCompact::GetSizeInBytes() const {
         size += segment_info.GetSizeInBytes();
     }
     return size + sizeof(i32) + this->deprecated_segment_ids_.size() * sizeof(SegmentID);
+}
+
+i32 WalCmdOptimize::GetSizeInBytes() const {
+    i32 size = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+               this->index_name_.size();
+    size += sizeof(i32);
+    for (const auto &param : this->params_) {
+        size += param->GetSizeInBytes();
+    }
+    return size;
+}
+
+i32 WalCmdDumpIndex::GetSizeInBytes() const {
+    i32 size = sizeof(WalCommandType) + sizeof(i32) + this->db_name_.size() + sizeof(i32) + this->table_name_.size() + sizeof(i32) +
+               this->index_name_.size() + sizeof(SegmentID) + sizeof(i32);
+    for (const auto &chunk_info : this->chunk_infos_) {
+        size += chunk_info.GetSizeInBytes();
+    }
+    return size;
 }
 
 void WalCmdCreateDatabase::WriteAdv(char *&buf) const {
@@ -604,6 +700,29 @@ void WalCmdCompact::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, deprecated_n);
     for (i32 i = 0; i < deprecated_n; ++i) {
         WriteBufAdv(buf, this->deprecated_segment_ids_[i]);
+    }
+}
+
+void WalCmdOptimize::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::OPTIMIZE);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->index_name_);
+    WriteBufAdv(buf, static_cast<i32>(this->params_.size()));
+    for (const auto &param : this->params_) {
+        param->WriteAdv(buf);
+    }
+}
+
+void WalCmdDumpIndex::WriteAdv(char *&buf) const {
+    WriteBufAdv(buf, WalCommandType::DUMP_INDEX);
+    WriteBufAdv(buf, this->db_name_);
+    WriteBufAdv(buf, this->table_name_);
+    WriteBufAdv(buf, this->index_name_);
+    WriteBufAdv(buf, this->segment_id_);
+    WriteBufAdv(buf, static_cast<i32>(this->chunk_infos_.size()));
+    for (const auto &chunk_info : this->chunk_infos_) {
+        chunk_info.WriteBufferAdv(buf);
     }
 }
 
@@ -845,6 +964,12 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
             break;
         case WalCommandType::COMPACT:
             command = "COMPACT";
+            break;
+        case WalCommandType::OPTIMIZE:
+            command = "OPTIMIZE";
+            break;
+        case WalCommandType::DUMP_INDEX:
+            command = "DUMP_INDEX";
             break;
         default: {
             String error_message = "Unknown command type";

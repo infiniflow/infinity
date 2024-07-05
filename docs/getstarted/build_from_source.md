@@ -47,7 +47,7 @@ git clone https://github.com/infiniflow/infinity.git
 ```shell
 cd infinity && mkdir cmake-build-debug
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7
+docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7_clang18
 docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build ."
 ```
 
@@ -72,15 +72,15 @@ tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
 wget https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
 unzip ninja-linux.zip && sudo cp ninja /usr/local/bin && rm ninja
-echo 'deb https://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main' | sudo tee /etc/apt/sources.list.d/llvm17.list
-wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
 sudo add-apt-repository -P ppa:ubuntu-toolchain-r/test
 sudo add-apt-repository -P ppa:mhier/libboost-latest
-sudo apt update && sudo apt install g++-13 clang-17 clang-tools-17 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev liburing-dev libjemalloc-dev python3-dev
-ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/bin/clang-scan-deps
-ln -s /usr/bin/clang-format-17 /usr/bin/clang-format
-ln -s /usr/bin/clang-tidy-17 /usr/bin/clang-tidy
-ln -s /usr/bin/llvm-symbolizer-17 /usr/bin/llvm-symbolizer
+sudo apt update && sudo apt install libc++-18-dev clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
+sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
+sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
+sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
+sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
+sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
 ### Step2 Download the source code
@@ -102,8 +102,8 @@ If the installed version is under v0.7.4, you can download the include files dir
 ```shell
 git config --global --add safe.directory infinity
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
-export CC=/usr/bin/clang-17
-export CXX=/usr/bin/clang++-17
+export CC=/usr/bin/clang-18
+export CXX=/usr/bin/clang++-18
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
 cmake --build .
 ```
@@ -128,11 +128,13 @@ sudo apt update && sudo apt install -y git wget
 wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
 tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
 sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
-sudo apt install -y ninja-build clang-17 clang-tools-17 llvm-17 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev liburing-dev libjemalloc-dev python3-dev
-ln -s /usr/lib/llvm-17/bin/clang-scan-deps /usr/bin/clang-scan-deps
-ln -s /usr/bin/clang-format-17 /usr/bin/clang-format
-ln -s /usr/bin/clang-tidy-17 /usr/bin/clang-tidy
-ln -s /usr/bin/llvm-symbolizer-17 /usr/bin/llvm-symbolizer
+wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
+sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
+sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
+sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
+sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
+sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
+sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
 ### Step2 Download Source Code
@@ -146,8 +148,53 @@ git clone https://github.com/infiniflow/infinity.git
 ```shell
 git config --global --add safe.directory infinity
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
-export CC=/usr/bin/clang-17
-export CXX=/usr/bin/clang++-17
+export CC=/usr/bin/clang-18
+export CXX=/usr/bin/clang++-18
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake --build .
+```
+
+### Step4 Start up Infinity server
+
+```shell
+sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
+ulimit -n 500000
+./cmake-build-debug/src/infinity
+```
+
+## Build from source on Ubuntu 24.04
+
+This section provides instructions on building Infinity from source on Ubuntu 24.04.
+
+### Step1 Install dependencies
+
+```shell
+sudo apt update && sudo apt install -y git wget lsb-release software-properties-common
+wget https://github.com/Kitware/CMake/releases/download/v3.29.0/cmake-3.29.0-linux-x86_64.tar.gz
+tar zxvf cmake-3.29.0-linux-x86_64.tar.gz
+sudo cp -rf cmake-3.29.0-linux-x86_64/bin/* /usr/local/bin && sudo cp -rf cmake-3.29.0-linux-x86_64/share/* /usr/local/share && rm -rf cmake-3.29.0-linux-x86_64
+wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm llvm.sh
+sudo apt install -y ninja-build clang-tools-18 flex libc++-18-dev libboost1.83-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
+sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
+sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
+sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
+sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
+sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
+```
+
+### Step2 Download Source Code
+
+```shell
+git clone https://github.com/infiniflow/infinity.git
+```
+
+### Step3 Build source code
+
+```shell
+git config --global --add safe.directory infinity
+cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
+export CC=/usr/bin/clang-18
+export CXX=/usr/bin/clang++-18
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
 cmake --build .
 ```

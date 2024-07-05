@@ -316,6 +316,10 @@ class RemoteTable(Table, ABC):
         options.has_header = False
         options.delimiter = ','
         options.copy_file_type = ttypes.CopyFileType.CSV
+        options.offset = 0
+        options.limit = 0
+        options.row_limit = 0
+
         if export_options != None:
             for k, v in export_options.items():
                 key = k.lower()
@@ -325,6 +329,8 @@ class RemoteTable(Table, ABC):
                         options.copy_file_type = ttypes.CopyFileType.CSV
                     elif file_type == 'jsonl':
                         options.copy_file_type = ttypes.CopyFileType.JSONL
+                    elif file_type == 'fvecs':
+                        options.copy_file_type = ttypes.CopyFileType.FVECS
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
@@ -337,6 +343,21 @@ class RemoteTable(Table, ABC):
                         options.has_header = v
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
+                elif key == 'offset':
+                    if isinstance(v, int):
+                        options.offset = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'offset' field")
+                elif key == 'limit':
+                    if isinstance(v, int):
+                        options.limit = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'limit' field")
+                elif key == 'row_limit':
+                    if isinstance(v, int):
+                        options.row_limit = v
+                    else:
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Integer value is expected in 'row_limit' field")
                 else:
                     raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
 
@@ -473,8 +494,8 @@ class RemoteTable(Table, ABC):
 
     def optimize(self, index_name: str, opt_params: dict[str, str]):
         opt_options = ttypes.OptimizeOptions()
-        opt_options.index_name_ = index_name
-        opt_options.opt_params_ = [ttypes.InitParameter(k, v) for k, v in opt_params.items()]
+        opt_options.index_name = index_name
+        opt_options.opt_params = [ttypes.InitParameter(k, v) for k, v in opt_params.items()]
         return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
 
     def _execute_query(self, query: Query) -> tuple[dict[str, list[Any]], dict[str, Any]]:

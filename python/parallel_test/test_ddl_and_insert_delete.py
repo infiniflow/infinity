@@ -12,7 +12,7 @@ from infinity.db import Database
 kRunningTime = 30
 kNumThread = 4
 
-table_name = "insert_delete_ddl_test"
+table_name = "parallel_insert_delete_ddl_test"
 index_name = "c1 verctor index"
 
 
@@ -28,6 +28,11 @@ class TestInsertDeleteUpdate:
             threads[i].start()
         for i in range(len(threads)):
             threads[i].join()
+
+        infinity_obj = connection_pool.get_conn()
+        db_obj = infinity_obj.get_database("default_db")
+        res = db_obj.drop_table(table_name, ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
 
 
 def create_table(db_obj: Database):

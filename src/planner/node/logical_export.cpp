@@ -76,7 +76,11 @@ String LogicalExport::ToString(i64 &space) const {
             break;
         }
     }
-    ss << "to " << schema_name_ << '.' << table_name_;
+
+    ss << "to " << schema_name_ << '.' << table_name_ << ", offset " << offset_;
+    if(limit_ != 0) {
+        ss << " limit " << limit_;
+    }
 
     space += arrow_str.size();
 

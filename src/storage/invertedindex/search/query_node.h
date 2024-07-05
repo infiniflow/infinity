@@ -89,7 +89,7 @@ struct QueryNode {
     virtual void PrintTree(std::ostream &os, const std::string &prefix = "", bool is_final = true) const = 0;
 };
 
-struct TermQueryNode final : public QueryNode {
+struct TermQueryNode : public QueryNode {
     std::string term_;
     std::string column_;
     bool position_{false};

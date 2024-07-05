@@ -84,7 +84,7 @@ TEST_F(RepeatReplayTest, append) {
         }
         {
             std::string v2 = "v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2v2";
-            column_vectors[1]->AppendByStringView(v2, ',');
+            column_vectors[1]->AppendByStringView(v2);
         }
         auto data_block = DataBlock::Make();
         data_block->Init(column_vectors);

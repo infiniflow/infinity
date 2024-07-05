@@ -266,6 +266,7 @@ SizeT BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const
 }
 
 void BlockEntry::CommitFlushed(TxnTimeStamp commit_ts) {
+    std::unique_lock w_lock(rw_locker_);
     auto block_version_handle = block_version_->Load();
     auto *block_version = reinterpret_cast<BlockVersion *>(block_version_handle.GetDataMut());
     if (!block_version->created_.empty()) {
@@ -275,7 +276,7 @@ void BlockEntry::CommitFlushed(TxnTimeStamp commit_ts) {
     }
     block_version->created_.emplace_back(commit_ts, this->row_count_);
 
-    FlushVersion(commit_ts);
+    FlushVersionNoLock(commit_ts);
 }
 
 void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
@@ -328,7 +329,7 @@ ColumnVector BlockEntry::GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offs
     return column_vector;
 }
 
-void BlockEntry::FlushData(SizeT start_row_count, SizeT checkpoint_row_count) {
+void BlockEntry::FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count) {
     SizeT column_count = this->columns_.size();
     SizeT column_idx = 0;
     while (column_idx < column_count) {
@@ -339,13 +340,21 @@ void BlockEntry::FlushData(SizeT start_row_count, SizeT checkpoint_row_count) {
     }
 }
 
-bool BlockEntry::FlushVersion(TxnTimeStamp checkpoint_ts) {
-    std::shared_lock<std::shared_mutex> lock(this->rw_locker_);
+bool BlockEntry::FlushVersionNoLock(TxnTimeStamp checkpoint_ts) {
     // Skip if entry has been flushed at some previous checkpoint, or is invisible at current checkpoint.
     if (this->max_row_ts_ != 0 && (this->max_row_ts_ <= this->checkpoint_ts_ || this->min_row_ts_ > checkpoint_ts)) {
         return false;
     }
 
+    auto block_version_handle = block_version_->Load();
+    // call GetDataMut to set BufferObj type to BufferType::kEphemeral
+    auto *block_version = reinterpret_cast<BlockVersion *>(block_version_handle.GetDataMut());
+    if (block_version->deleted_.size() != this->row_capacity_) {
+        auto err_info = fmt::format("BlockEntry::FlushVersionNoLock: block_version->deleted_.size() {} != this->row_capacity_ {}",
+                                    block_version->deleted_.size(),
+                                    this->row_capacity_);
+        UnrecoverableError(err_info);
+    }
     auto *version_file_worker = static_cast<VersionFileWorker *>(block_version_->file_worker());
     version_file_worker->SetCheckpointTS(checkpoint_ts);
     block_version_->Save();
@@ -354,6 +363,7 @@ bool BlockEntry::FlushVersion(TxnTimeStamp checkpoint_ts) {
 }
 
 void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
+    std::unique_lock w_lock(rw_locker_);
     LOG_TRACE(fmt::format("Segment: {}, Block: {} is flushing", this->segment_entry_->segment_id(), this->block_id_));
     if (checkpoint_ts < this->checkpoint_ts_) {
         UnrecoverableError(
@@ -361,14 +371,14 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
     }
 
     LOG_TRACE("Block entry flush before flush version");
-    bool flush = FlushVersion(checkpoint_ts);
+    bool flush = FlushVersionNoLock(checkpoint_ts);
     if (flush) {
         auto block_version_handle = block_version_->Load();
         auto *block_version = static_cast<const BlockVersion *>(block_version_handle.GetData());
         SizeT checkpoint_row_count = block_version->GetRowCount(checkpoint_ts);
 
         LOG_TRACE("Block entry flush before flush data");
-        FlushData(this->checkpoint_row_count_, checkpoint_row_count);
+        FlushDataNoLock(this->checkpoint_row_count_, checkpoint_row_count);
         this->checkpoint_ts_ = checkpoint_ts;
         this->checkpoint_row_count_ = checkpoint_row_count;
         LOG_TRACE(fmt::format("Segment: {}, Block {} is flushed {} rows",
@@ -378,7 +388,7 @@ void BlockEntry::Flush(TxnTimeStamp checkpoint_ts) {
     }
 }
 
-void BlockEntry::FlushForImport() { FlushData(0, this->row_count_); }
+void BlockEntry::FlushForImport() { FlushDataNoLock(0, this->row_count_); }
 
 void BlockEntry::LoadFilterBinaryData(const String &block_filter_data) { fast_rough_filter_.DeserializeFromString(block_filter_data); }
 

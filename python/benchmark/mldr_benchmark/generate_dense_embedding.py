@@ -2,14 +2,11 @@
 python generate_dense_embedding.py \
 --begin_pos 0 \
 --end_pos 200000 \
---encoder BAAI/bge-m3 \
 --languages ar de en es fr hi it ja ko pt ru th zh \
 --embedding_save_dir ./corpus-embedding \
 --max_passage_length 8192 \
 --batch_size 1 \
 --fp16 True \
---pooling_method cls \
---normalize_embeddings True
 """
 import os
 import struct
@@ -19,84 +16,21 @@ from tqdm import tqdm
 from FlagEmbedding import FlagModel
 from dataclasses import dataclass, field
 from transformers import HfArgumentParser
+from mldr_common_tools import EvalArgs, check_languages, load_corpus
 
 
 @dataclass
 class ModelArgs:
-    encoder: str = field(
-        default="BAAI/bge-m3",
-        metadata={'help': 'Name or path of encoder'}
-    )
-    fp16: bool = field(
-        default=True,
-        metadata={'help': 'Use fp16 in inference?'}
-    )
-    pooling_method: str = field(
-        default='cls',
-        metadata={'help': "Pooling method. Avaliable methods: 'cls', 'mean'"}
-    )
-    normalize_embeddings: bool = field(
-        default=True,
-        metadata={'help': "Normalize embeddings or not"}
-    )
-
-
-@dataclass
-class EvalArgs:
-    begin_pos: int = field(
-        metadata={'help': 'Begin pos'}
-    )
-    end_pos: int = field(
-        metadata={'help': 'End pos'}
-    )
-    languages: str = field(
-        default="en",
-        metadata={'help': 'Languages to evaluate. Avaliable languages: ar de en es fr hi it ja ko pt ru th zh',
-                  "nargs": "+"}
-    )
-    embedding_save_dir: str = field(
-        default='./corpus-embedding',
-        metadata={
-            'help': 'Dir to save embedding. Corpus embedding will be saved to `embedding_save_dir/{encoder_name}/{lang}/dense.fvecs`.'}
-    )
-    max_passage_length: int = field(
-        default=8192,
-        metadata={'help': 'Max passage length.'}
-    )
-    batch_size: int = field(
-        default=1,
-        metadata={'help': 'Inference batch size.'}
-    )
-    overwrite: bool = field(
-        default=False,
-        metadata={'help': 'Whether to overwrite embedding'}
-    )
+    encoder: str = field(default="BAAI/bge-m3", metadata={'help': 'Name or path of encoder'})
+    fp16: bool = field(default=True, metadata={'help': 'Use fp16 in inference?'})
+    pooling_method: str = field(default='cls', metadata={'help': "Pooling method. Avaliable methods: 'cls', 'mean'"})
+    normalize_embeddings: bool = field(default=True, metadata={'help': "Normalize embeddings or not"})
 
 
 def get_model(model_args: ModelArgs):
-    model = FlagModel(
-        model_args.encoder,
-        pooling_method=model_args.pooling_method,
-        normalize_embeddings=model_args.normalize_embeddings,
-        use_fp16=model_args.fp16
-    )
+    model = FlagModel(model_args.encoder, pooling_method=model_args.pooling_method,
+                      normalize_embeddings=model_args.normalize_embeddings, use_fp16=model_args.fp16)
     return model
-
-
-def check_languages(languages):
-    if isinstance(languages, str):
-        languages = [languages]
-    avaliable_languages = ['ar', 'de', 'en', 'es', 'fr', 'hi', 'it', 'ja', 'ko', 'pt', 'ru', 'th', 'zh']
-    for lang in languages:
-        if lang not in avaliable_languages:
-            raise ValueError(f"Language `{lang}` is not supported. Avaliable languages: {avaliable_languages}")
-    return languages
-
-
-def load_corpus(lang: str):
-    corpus = datasets.load_dataset('Shitao/MLDR', f'corpus-{lang}', split='corpus',
-                                   download_config=datasets.DownloadConfig(resume_download=True))
-    return corpus
 
 
 def generate_dense(model: FlagModel, corpus: datasets.Dataset, max_passage_length: int, batch_size: int, begin_pos: int,
@@ -150,14 +84,9 @@ def main():
         print(f"Start generating embedding of {lang} ...")
         corpus = load_corpus(lang)
 
-        dense_embeddings = generate_dense(
-            model=model,
-            corpus=corpus,
-            max_passage_length=eval_args.max_passage_length,
-            batch_size=eval_args.batch_size,
-            begin_pos=eval_args.begin_pos,
-            end_pos=eval_args.end_pos
-        )
+        dense_embeddings = generate_dense(model=model, corpus=corpus, max_passage_length=eval_args.max_passage_length,
+                                          batch_size=eval_args.batch_size, begin_pos=eval_args.begin_pos,
+                                          end_pos=eval_args.end_pos)
         save_result(dense_embeddings, dense_save_file)
 
     print("==================================================")

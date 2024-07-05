@@ -52,7 +52,6 @@
 *_REMOTE_*
 
 # build directory of Gradle, CMake etc
-tmp
 build*/
 cmake-build-*
 .idea
@@ -128,6 +127,7 @@ callgrind.out.*
 # ignore all benchmark datasets
 python/benchmark/datasets/
 
-.venv/
+.venv*/
+tmp*/
 
 dist/

@@ -194,6 +194,16 @@ public:
             knn_hnsw_ptr_);
     }
 
+    void CompressToLVQ() {
+        std::visit([&](auto &arg) {
+            auto new_hnsw = std::move(*arg).CompressToLVQ();
+            using NewT = std::decay_t<decltype(new_hnsw)>;
+            delete arg;
+            arg = nullptr;
+            knn_hnsw_ptr_ = new NewT(std::move(new_hnsw));
+        }, knn_hnsw_ptr_);
+    }
+
 private:
     std::variant<Hnsw1 *, Hnsw2 *, Hnsw3 *, Hnsw4 *, Hnsw5 *, Hnsw6 *> knn_hnsw_ptr_;
 };

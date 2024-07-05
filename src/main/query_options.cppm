@@ -62,6 +62,9 @@ export class ExportOptions {
 public:
     char delimiter_{','};
     bool header_{false};
+    SizeT offset_{0};
+    SizeT limit_{0};
+    SizeT row_limit_{0};
     CopyFileType copy_file_type_{CopyFileType::kCSV};
 };
 

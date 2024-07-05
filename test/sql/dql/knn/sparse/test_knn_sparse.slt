@@ -23,6 +23,22 @@ SELECT c1 FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], '
 1
 
 query I
+SELECT c1 FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [80:3.0,20:2.0,0:1.0], 'ip', 3);
+----
+4
+2
+1
+
+query I
+SELECT c1 FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 6);
+----
+4
+2
+1
+3
+5
+
+query I
 SELECT c1 FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 10);
 ----
 4

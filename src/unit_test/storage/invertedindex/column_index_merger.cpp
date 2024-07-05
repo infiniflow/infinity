@@ -115,8 +115,6 @@ void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
         Value v = Value::MakeVarchar(paragraphs[i]);
         column->AppendValue(v);
     }
-
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(index_dir);
     for (SizeT i = 0; i < chunk_names.size(); ++i) {
         MemoryIndexer indexer(index_dir, chunk_names[i], base_row_ids[i], flag_, "standard");
         indexer.Insert(column, row_offsets[i], row_counts[i]);

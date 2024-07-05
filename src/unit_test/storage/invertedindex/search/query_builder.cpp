@@ -70,9 +70,12 @@ public:
 };
 
 // treat it as TERM in optimization
-struct MockQueryNode : public QueryNode {
+struct MockQueryNode : public TermQueryNode {
     Vector<RowID> doc_ids_;
-    MockQueryNode(Vector<RowID> doc_ids) : QueryNode(QueryNodeType::TERM), doc_ids_(std::move(doc_ids)) {}
+    MockQueryNode(Vector<RowID> doc_ids, const char *term, const char *column) : TermQueryNode(), doc_ids_(std::move(doc_ids)) {
+        term_ = term;
+        column_ = column;
+    }
 
     void PushDownWeight(float factor) final { MultiplyWeight(factor); }
     std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, IndexReader &, Scorer *) const final {
@@ -85,7 +88,7 @@ struct MockQueryNode : public QueryNode {
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final {
         os << prefix;
         os << (is_final ? "└──" : "├──");
-        os << "MockQueryNode";
+        os << "MockQueryNode (term: " << term_ << ", column: " << column_ << ")";
         int print_child_num = std::min<int>(doc_ids_.size(), 5);
         os << " (first " << print_child_num << " doc_ids_: ";
         for (int i = 0; i < print_child_num; ++i) {
@@ -176,8 +179,8 @@ TEST_F(QueryBuilderTest, test_and) {
             auto vec_A = get_random_doc_ids(rng, TestAndVecN);
             auto vec_B = get_random_doc_ids(rng, TestAndVecN);
             std::set_intersection(vec_A.begin(), vec_A.end(), vec_B.begin(), vec_B.end(), std::back_inserter(vec_AB_and));
-            and_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_A)));
-            and_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B)));
+            and_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_A), "A", "body"));
+            and_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B), "B", "body"));
         }
         auto and_CDE = MakeUnique<AndQueryNode>();
         Vector<RowID> vec_CDE_and;
@@ -188,13 +191,13 @@ TEST_F(QueryBuilderTest, test_and) {
                 auto vec_C = get_random_doc_ids(rng, TestAndVecN);
                 auto vec_D = get_random_doc_ids(rng, TestAndVecN);
                 std::set_intersection(vec_C.begin(), vec_C.end(), vec_D.begin(), vec_D.end(), std::back_inserter(vec_CD_and));
-                and_CD->Add(MakeUnique<MockQueryNode>(std::move(vec_C)));
-                and_CD->Add(MakeUnique<MockQueryNode>(std::move(vec_D)));
+                and_CD->Add(MakeUnique<MockQueryNode>(std::move(vec_C), "C", "body"));
+                and_CD->Add(MakeUnique<MockQueryNode>(std::move(vec_D), "D", "body"));
             }
             auto vec_E = get_random_doc_ids(rng, TestAndVecN);
             std::set_intersection(vec_CD_and.begin(), vec_CD_and.end(), vec_E.begin(), vec_E.end(), std::back_inserter(vec_CDE_and));
             and_CDE->Add(std::move(and_CD));
-            and_CDE->Add(MakeUnique<MockQueryNode>(std::move(vec_E)));
+            and_CDE->Add(MakeUnique<MockQueryNode>(std::move(vec_E), "E", "body"));
         }
         and_root->Add(std::move(and_AB));
         and_root->Add(std::move(and_CDE));
@@ -239,8 +242,8 @@ TEST_F(QueryBuilderTest, test_or) {
             auto vec_A = get_random_doc_ids(rng, TestOrVecN);
             auto vec_B = get_random_doc_ids(rng, TestOrVecN);
             std::set_union(vec_A.begin(), vec_A.end(), vec_B.begin(), vec_B.end(), std::back_inserter(vec_AB_or));
-            or_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_A)));
-            or_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B)));
+            or_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_A), "A", "body"));
+            or_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B), "B", "body"));
         }
         auto or_CDE = MakeUnique<OrQueryNode>();
         Vector<RowID> vec_CDE_or;
@@ -251,13 +254,13 @@ TEST_F(QueryBuilderTest, test_or) {
                 auto vec_C = get_random_doc_ids(rng, TestOrVecN);
                 auto vec_D = get_random_doc_ids(rng, TestOrVecN);
                 std::set_union(vec_C.begin(), vec_C.end(), vec_D.begin(), vec_D.end(), std::back_inserter(vec_CD_or));
-                or_CD->Add(MakeUnique<MockQueryNode>(std::move(vec_C)));
-                or_CD->Add(MakeUnique<MockQueryNode>(std::move(vec_D)));
+                or_CD->Add(MakeUnique<MockQueryNode>(std::move(vec_C), "C", "body"));
+                or_CD->Add(MakeUnique<MockQueryNode>(std::move(vec_D), "D", "body"));
             }
             auto vec_E = get_random_doc_ids(rng, TestOrVecN);
             std::set_union(vec_CD_or.begin(), vec_CD_or.end(), vec_E.begin(), vec_E.end(), std::back_inserter(vec_CDE_or));
             or_CDE->Add(std::move(or_CD));
-            or_CDE->Add(MakeUnique<MockQueryNode>(std::move(vec_E)));
+            or_CDE->Add(MakeUnique<MockQueryNode>(std::move(vec_E), "E", "body"));
         }
         or_root->Add(std::move(or_AB));
         or_root->Add(std::move(or_CDE));
@@ -308,26 +311,26 @@ TEST_F(QueryBuilderTest, test_and_not) {
                     auto vec_A = get_random_doc_ids(rng, TestOrVecN);
                     auto vec_B = get_random_doc_ids(rng, TestOrVecN);
                     std::set_union(vec_A.begin(), vec_A.end(), vec_B.begin(), vec_B.end(), std::back_inserter(vec_AB_or));
-                    or_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_A)));
-                    or_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B)));
+                    or_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_A), "A", "body"));
+                    or_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B), "B", "body"));
                 }
                 auto vec_C = get_random_doc_ids(rng, TestOrVecN);
                 std::set_union(vec_AB_or.begin(), vec_AB_or.end(), vec_C.begin(), vec_C.end(), std::back_inserter(vec_ABC_or));
                 or_ABC->Add(std::move(or_AB));
-                or_ABC->Add(MakeUnique<MockQueryNode>(std::move(vec_C)));
+                or_ABC->Add(MakeUnique<MockQueryNode>(std::move(vec_C), "C", "body"));
             }
             auto vec_D = get_random_doc_ids(rng, TestNotVecN);
             std::set_difference(vec_ABC_or.begin(), vec_ABC_or.end(), vec_D.begin(), vec_D.end(), std::back_inserter(vec_ABC_D_and_not));
             and_not_ABC_D->Add(std::move(or_ABC));
             auto not_D = MakeUnique<NotQueryNode>();
-            not_D->Add(MakeUnique<MockQueryNode>(std::move(vec_D)));
+            not_D->Add(MakeUnique<MockQueryNode>(std::move(vec_D), "D", "body"));
             and_not_ABC_D->Add(std::move(not_D));
         }
         auto vec_E = get_random_doc_ids(rng, TestNotVecN);
         std::set_difference(vec_ABC_D_and_not.begin(), vec_ABC_D_and_not.end(), vec_E.begin(), vec_E.end(), std::back_inserter(expect_result));
         and_not_root->Add(std::move(and_not_ABC_D));
         auto not_E = MakeUnique<NotQueryNode>();
-        not_E->Add(MakeUnique<MockQueryNode>(std::move(vec_E)));
+        not_E->Add(MakeUnique<MockQueryNode>(std::move(vec_E), "E", "body"));
         and_not_root->Add(std::move(not_E));
     }
     OStringStream oss;
@@ -381,26 +384,26 @@ TEST_F(QueryBuilderTest, test_and_not2) {
                     auto vec_A = get_random_doc_ids(rng, TestAndVecN);
                     auto vec_B = get_random_doc_ids(rng, TestAndVecN);
                     std::set_intersection(vec_A.begin(), vec_A.end(), vec_B.begin(), vec_B.end(), std::back_inserter(vec_AB_and));
-                    and_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_A)));
-                    and_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B)));
+                    and_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_A), "A", "body"));
+                    and_AB->Add(MakeUnique<MockQueryNode>(std::move(vec_B), "B", "body"));
                 }
                 auto vec_C = get_random_doc_ids(rng, TestNotVecN);
                 std::set_difference(vec_AB_and.begin(), vec_AB_and.end(), vec_C.begin(), vec_C.end(), std::back_inserter(vec_AB_C_and_not));
                 and_not_AB_C->Add(std::move(and_AB));
                 auto not_C = MakeUnique<NotQueryNode>();
-                not_C->Add(MakeUnique<MockQueryNode>(std::move(vec_C)));
+                not_C->Add(MakeUnique<MockQueryNode>(std::move(vec_C), "C", "body"));
                 and_not_AB_C->Add(std::move(not_C));
             }
             auto vec_D = get_random_doc_ids(rng, TestAndVecN);
             std::set_intersection(vec_AB_C_and_not.begin(), vec_AB_C_and_not.end(), vec_D.begin(), vec_D.end(), std::back_inserter(vec_ABC_D_and));
             and_ABC_D->Add(std::move(and_not_AB_C));
-            and_ABC_D->Add(MakeUnique<MockQueryNode>(std::move(vec_D)));
+            and_ABC_D->Add(MakeUnique<MockQueryNode>(std::move(vec_D), "D", "body"));
         }
         auto vec_E = get_random_doc_ids(rng, TestAndVecN);
         std::set_difference(vec_ABC_D_and.begin(), vec_ABC_D_and.end(), vec_E.begin(), vec_E.end(), std::back_inserter(expect_result));
         and_not_root->Add(std::move(and_ABC_D));
         auto not_E = MakeUnique<NotQueryNode>();
-        not_E->Add(MakeUnique<MockQueryNode>(std::move(vec_E)));
+        not_E->Add(MakeUnique<MockQueryNode>(std::move(vec_E), "E", "body"));
         and_not_root->Add(std::move(not_E));
     }
     OStringStream oss;

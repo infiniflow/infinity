@@ -1,10 +1,11 @@
+#! /usr/bin/env python3
 import argparse
-import itertools
 import os
 import subprocess
 import sys
-import threading
 import time
+
+python_executable = sys.executable
 
 
 def python_sdk_test(python_test_dir: str, pytest_mark: str):
@@ -13,7 +14,16 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print(f"start pysdk test with {pytest_mark}")
     process = subprocess.Popen(
         # ["python", "-m", "pytest", "--tb=line", '-s', '-x', '-m', pytest_mark, f'{python_test_dir}/test'],
-        ["python", "-m", "pytest", "--tb=line", '-x', '-m', pytest_mark, f'{python_test_dir}/test/infinity'],
+        [
+            python_executable,
+            "-m",
+            "pytest",
+            "--tb=line",
+            "-x",
+            "-m",
+            pytest_mark,
+            f"{python_test_dir}/test/cases",
+        ],
         stdout=sys.stdout,
         stderr=sys.stderr,
         universal_newlines=True,
@@ -25,7 +35,6 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
     print("pysdk test finished.")
 
 
-
 if __name__ == "__main__":
     print("Note: this script must be run under root directory of the project.")
     current_path = os.getcwd()
@@ -35,7 +44,7 @@ if __name__ == "__main__":
         "-m",
         "--pytest_mark",
         type=str,
-        default='not complex and not slow',
+        default="not complex and not slow",
         dest="pytest_mark",
     )
     args = parser.parse_args()

@@ -1,14 +1,14 @@
 statement ok
-DROP TABLE IF EXISTS d;
+DROP TABLE IF EXISTS sqllogic_d;
 
 statement ok
-CREATE TABLE d (d date, t time, dt datetime, ts timestamp);
+CREATE TABLE sqllogic_d (d date, t time, dt datetime, ts timestamp);
 
 statement ok
-COPY d FROM '/var/infinity/test_data/test_import_time.csv' WITH ( DELIMITER ',' );
+COPY sqllogic_d FROM '/var/infinity/test_data/test_import_time.csv' WITH ( DELIMITER ',' );
 
 query I
-SELECT * FROM d;
+SELECT * FROM sqllogic_d;
 ----
 2024-01-22 00:03:55 1970-05-06 11:45:01 3322-05-30 11:45:01
 2024-02-22 00:06:55 1993-08-06 01:45:00 5322-11-16 21:04:01
@@ -17,4 +17,4 @@ SELECT * FROM d;
 2064-01-18 07:33:25 2054-06-06 22:04:57 0022-09-06 23:59:59
 
 statement ok
-DROP TABLE d;
+DROP TABLE sqllogic_d;

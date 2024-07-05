@@ -74,6 +74,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[6] = String("0.2.0.dev7");
     client_version_map_[7] = String("0.2.0.dev8");
     client_version_map_[8] = String("0.2.0");
+    client_version_map_[9] = String("0.2.1.dev3");
 }
 
 Pair<const char*, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -418,6 +419,9 @@ void InfinityThriftService::Export(infinity_thrift_rpc::CommonResponse &response
         ProcessStatus(response, Status::SyntaxError("CSV file delimiter isn't a char."));
     }
     export_options.delimiter_ = delimiter_string[0];
+    export_options.offset_ = request.export_option.offset;
+    export_options.limit_ = request.export_option.limit;
+    export_options.row_limit_ = request.export_option.row_limit;
 
     const QueryResult result = infinity->Export(request.db_name, request.table_name, export_columns, request.file_name.c_str(), export_options);
     ProcessQueryResult(response, result);

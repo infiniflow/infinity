@@ -46,11 +46,14 @@ public:
                             bool header,
                             char delimiter,
                             CopyFileType type,
+                            SizeT offset,
+                            SizeT limit,
+                            SizeT row_limit,
                             Vector<u64> column_idx_array,
                             SharedPtr<BlockIndex> block_index,
                             SharedPtr<Vector<LoadMeta>> load_metas)
         : PhysicalOperator(PhysicalOperatorType::kExport, nullptr, nullptr, id, load_metas), table_entry_(table_entry), file_type_(type), file_path_(std::move(file_path)),
-          table_name_(std::move(table_name)), schema_name_(std::move(schema_name)), header_(header), delimiter_(delimiter), column_idx_array_(std::move(column_idx_array)), block_index_(std::move(block_index)) {}
+          table_name_(std::move(table_name)), schema_name_(std::move(schema_name)), header_(header), delimiter_(delimiter), offset_(offset), limit_(limit), row_limit_(row_limit), column_idx_array_(std::move(column_idx_array)), block_index_(std::move(block_index)) {}
 
     ~PhysicalExport() override = default;
 
@@ -105,6 +108,9 @@ private:
     String schema_name_{"default_db"};
     bool header_{false};
     char delimiter_{','};
+    SizeT offset_{};
+    SizeT limit_{};
+    SizeT row_limit_{};
     Vector<u64> column_idx_array_;
     SharedPtr<BlockIndex> block_index_{};
 };

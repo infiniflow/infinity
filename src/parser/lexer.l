@@ -150,6 +150,7 @@ QUERY           { return QUERY; }
 RAW             { return RAW; }
 REAL            { return REAL; }
 RIGHT           { return RIGHT; }
+ROWLIMIT        { return ROWLIMIT; }
 SEARCH          { return SEARCH; }
 SECOND          { return SECOND; }
 SECONDS         { return SECONDS; }
@@ -157,7 +158,7 @@ SELECT          { return SELECT; }
 SESSION         { return SESSION; }
 SET             { return SET; }
 SEGMENT         { return SEGMENT; }
-SEGMENTS         { return SEGMENTS; }
+SEGMENTS        { return SEGMENTS; }
 SHOW            { return SHOW; }
 SMALLINT        { return SMALLINT; }
 SPARSE          { return SPARSE; }
@@ -201,7 +202,7 @@ YEARS           { return YEARS; }
 
 [-+*/(){},.;<>=^%:?[\]|]    { return yytext[0]; }
 
--?[0-9]+"."[0-9]* |
+-?[0-9]+"."[0-9]*((E|e)-?[0-9]+)? |
 "."[0-9]*  {
     yylval->double_value = atof(yytext);
     return DOUBLE_VALUE;

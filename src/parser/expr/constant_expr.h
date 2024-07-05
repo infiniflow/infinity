@@ -25,6 +25,8 @@
 
 namespace infinity {
 
+class ColumnDef;
+
 enum class LiteralType : int32_t {
     kBoolean,
     kDouble,
@@ -61,6 +63,8 @@ public:
     nlohmann::json Serialize() const;
 
     static std::shared_ptr<ParsedExpr> Deserialize(const nlohmann::json &constant_expr);
+
+    void TrySortSparseVec(const ColumnDef *col_def);
 
 public:
     LiteralType literal_type_;

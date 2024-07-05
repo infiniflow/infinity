@@ -1,38 +1,41 @@
 statement ok
-DROP TABLE IF EXISTS test_bmp;
+DROP TABLE IF EXISTS sqllogic_test_bmp;
 
 statement ok
-CREATE TABLE test_bmp (col1 INT, col2 SPARSE(FLOAT,30000));
+CREATE TABLE sqllogic_test_bmp (col1 INT, col2 SPARSE(FLOAT,30000));
 
 statement ok
-CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16);
+CREATE INDEX idx1 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 16);
 
 statement error
-CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16);
+CREATE INDEX idx1 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 16);
 
 statement ok
-DROP INDEX idx1 ON test_bmp;
+DROP INDEX idx1 ON sqllogic_test_bmp;
 
 statement error
-CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 0);
+CREATE INDEX idx1 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 0);
 
 statement error
-CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 257);
+CREATE INDEX idx1 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 257);
 
 statement error
-CREATE INDEX idx1 ON test_bmp (col1) USING Bmp WITH (block_size = 16);
+CREATE INDEX idx1 ON sqllogic_test_bmp (col1) USING Bmp WITH (block_size = 16);
 
 statement ok
-CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 256);
+CREATE INDEX idx1 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 256);
 
 statement ok
-DROP INDEX idx1 ON test_bmp;
+DROP INDEX idx1 ON sqllogic_test_bmp;
 
 statement error
-CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = wrong_compress_type);
+CREATE INDEX idx1 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = wrong_compress_type);
 
 statement ok
-CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = compress);
+CREATE INDEX idx1 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = compress);
 
 statement ok
-CREATE INDEX idx2 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = raww);
+CREATE INDEX idx2 ON sqllogic_test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = raww);
+
+statement ok
+DROP TABLE sqllogic_test_bmp;

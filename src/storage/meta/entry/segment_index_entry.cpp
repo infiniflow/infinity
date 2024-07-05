@@ -63,6 +63,8 @@ import secondary_index_in_mem;
 import emvb_index;
 import emvb_index_in_mem;
 import bmp_util;
+import hnsw_util;
+import wal_entry;
 
 namespace infinity {
 
@@ -395,21 +397,24 @@ void SegmentIndexEntry::MemIndexCommit() {
     memory_indexer_->Commit();
 }
 
-SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(Txn *txn, bool spill) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     const IndexBase *index_base = table_index_entry_->index_base();
     switch (index_base->index_type_) {
+        case IndexType::kBMP:
         case IndexType::kHnsw: {
             if (memory_hnsw_indexer_.get() == nullptr) {
-                return nullptr;
+                break;
             }
-            auto dump_indexer = std::exchange(memory_hnsw_indexer_, nullptr);
-            this->AddChunkIndexEntry(dump_indexer);
-            return dump_indexer;
+            std::unique_lock lck(rw_locker_);
+            chunk_index_entry = std::exchange(memory_hnsw_indexer_, nullptr);
+            chunk_index_entry->SaveIndexFile();
+            chunk_index_entries_.push_back(chunk_index_entry);
+            break;
         }
         case IndexType::kFullText: {
             if (memory_indexer_.get() == nullptr) {
-                return nullptr;
+                break;
             }
             memory_indexer_->Dump(false, spill);
             if (!spill) {
@@ -418,18 +423,18 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
                 this->UpdateFulltextColumnLenInfo(memory_indexer_->GetColumnLengthSum(), memory_indexer_->GetDocCount());
                 memory_indexer_.reset();
             }
-            return chunk_index_entry;
+            break;
         }
         case IndexType::kSecondary: {
             if (memory_secondary_index_.get() == nullptr) {
-                return nullptr;
+                break;
             }
             std::unique_lock lck(rw_locker_);
             chunk_index_entry = memory_secondary_index_->Dump(this, buffer_manager_);
             chunk_index_entry->SaveIndexFile();
             chunk_index_entries_.push_back(chunk_index_entry);
             memory_secondary_index_.reset();
-            return chunk_index_entry;
+            break;
         }
         case IndexType::kEMVB: {
             if (memory_emvb_index_.get() == nullptr) {
@@ -440,12 +445,26 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
             chunk_index_entry->SaveIndexFile();
             chunk_index_entries_.push_back(chunk_index_entry);
             memory_emvb_index_.reset();
-            return chunk_index_entry;
+            break;
         }
         default: {
-            return nullptr;
+            UnrecoverableError("Not implemented.");
+            break;
         }
     }
+    if (txn != nullptr) {
+        String index_name = *table_index_entry_->GetIndexName();
+        TableEntry *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
+        String table_name = *table_entry->GetTableName();
+        String db_name = *table_entry->GetDBName();
+
+        Vector<WalChunkIndexInfo> chunk_infos;
+        chunk_infos.emplace_back(chunk_index_entry.get());
+        auto wal_cmd =
+            MakeShared<WalCmdDumpIndex>(std::move(db_name), std::move(table_name), std::move(index_name), segment_id_, std::move(chunk_infos));
+        txn->AddWalCmd(wal_cmd);
+    }
+    return chunk_index_entry;
 }
 
 void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id) {
@@ -582,7 +601,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
                 memory_secondary_index_->Insert(block_id, block_column_entry, buffer_mgr, 0, block_entry->row_count());
             }
-            MemIndexDump();
+            MemIndexDump(txn);
             break;
         }
         case IndexType::kEMVB: {
@@ -801,7 +820,11 @@ void SegmentIndexEntry::CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<
     // LOG_INFO(ss.str());
 }
 
-void SegmentIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params) {
+void SegmentIndexEntry::OptimizeIndex(IndexBase *index_base,
+                                      Txn *txn,
+                                      TxnTableStore *txn_table_store,
+                                      const Vector<UniquePtr<InitParameter>> &opt_params,
+                                      bool replay) {
     switch (table_index_entry_->index_base()->index_type_) {
         case IndexType::kBMP: {
             Optional<BMPOptimizeOptions> ret = BMPUtil::ParseBMPOptimizeOptions(opt_params);
@@ -827,16 +850,48 @@ void SegmentIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParam
                 BufferHandle buffer_handle = chunk_index_entry->GetIndex();
                 auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
                 optimize_index(abstract_bmp);
+                chunk_index_entry->SaveIndexFile();
             }
             if (memory_index_entry.get() != nullptr) {
                 BufferHandle buffer_handle = memory_index_entry->GetIndex();
                 auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
                 optimize_index(abstract_bmp);
+
+                auto dump_index_entry = this->MemIndexDump(txn, false /*spill*/);
+                txn_table_store->AddChunkIndexStore(table_index_entry_, dump_index_entry.get());
+            }
+            break;
+        }
+        case IndexType::kHnsw: {
+            if (replay) {
+                break;
+            }
+            auto params = HnswUtil::ParseOptimizeOptions(opt_params);
+            if (!params) {
+                return;
+            }
+            auto optimize_index = [&](ChunkIndexEntry *chunk_index_entry) {
+                BufferHandle buffer_handle = chunk_index_entry->GetIndex();
+                auto *file_worker = static_cast<HnswFileWorker *>(buffer_handle.GetFileWorkerMut());
+                if (params->compress_to_lvq) {
+                    file_worker->CompressToLVQ(static_cast<IndexHnsw *>(index_base));
+                }
+            };
+
+            const auto [chunk_index_entries, memory_index_entry] = this->GetHnswIndexSnapshot();
+            for (const auto &chunk_index_entry : chunk_index_entries) {
+                optimize_index(chunk_index_entry.get());
+                chunk_index_entry->SaveIndexFile();
+            }
+            if (memory_index_entry.get() != nullptr) {
+                optimize_index(memory_index_entry.get());
+                auto dump_index_entry = this->MemIndexDump(txn, false /*spill*/);
+                txn_table_store->AddChunkIndexStore(table_index_entry_, dump_index_entry.get());
             }
             break;
         }
         default: {
-            UnrecoverableError("Not implemented");
+            LOG_WARN("Not implemented");
         }
     }
 }
@@ -1081,6 +1136,19 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String 
     SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this, base_name, base_rowid, row_count, buffer_manager_);
     chunk_index_entries_.push_back(chunk_index_entry);
     return chunk_index_entry;
+}
+
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkID chunk_id,
+                                                                          TableEntry *table_entry,
+                                                                          const String &base_name,
+                                                                          RowID base_rowid,
+                                                                          u32 row_count,
+                                                                          TxnTimeStamp commit_ts,
+                                                                          TxnTimeStamp deprecate_ts,
+                                                                          BufferManager *buffer_mgr) {
+    auto ret = this->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
+    ++next_chunk_id_;
+    return ret;
 }
 
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID chunk_id,

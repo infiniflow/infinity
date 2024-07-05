@@ -22,7 +22,7 @@ import table_def;
 import index_base;
 import data_block;
 import stl;
-
+import statement_common;
 import infinity_exception;
 import internal_types;
 
@@ -30,6 +30,7 @@ namespace infinity {
 
 class BlockEntry;
 class SegmentEntry;
+class ChunkIndexEntry;
 enum class SegmentStatus;
 
 export enum class WalCommandType : i8 {
@@ -63,6 +64,12 @@ export enum class WalCommandType : i8 {
     // -----------------------------
     CHECKPOINT = 99,
     COMPACT = 100,
+
+    // -----------------------------
+    // Other
+    // -----------------------------
+    OPTIMIZE = 101,
+    DUMP_INDEX = 102,
 };
 
 export struct WalBlockInfo {
@@ -105,6 +112,28 @@ export struct WalSegmentInfo {
     void WriteBufferAdv(char *&buf) const;
 
     static WalSegmentInfo ReadBufferAdv(char *&ptr);
+
+    String ToString() const;
+};
+
+export struct WalChunkIndexInfo {
+    ChunkID chunk_id_{};
+    String base_name_{};
+    RowID base_rowid_{};
+    u32 row_count_{};
+    TxnTimeStamp deprecate_ts_{};
+
+    WalChunkIndexInfo() = default;
+
+    explicit WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry);
+
+    bool operator==(const WalChunkIndexInfo &other) const;
+
+    [[nodiscard]] i32 GetSizeInBytes() const;
+
+    void WriteBufferAdv(char *&buf) const;
+
+    static WalChunkIndexInfo ReadBufferAdv(char *&ptr);
 
     String ToString() const;
 };
@@ -349,12 +378,48 @@ export struct WalCmdCompact : public WalCmd {
 
     void WriteAdv(char *&buf) const override;
 
-    static WalCmdCompact ReadBufferAdv(char *&ptr);
-
     const String db_name_{};
     const String table_name_{};
     const Vector<WalSegmentInfo> new_segment_infos_{};
     const Vector<SegmentID> deprecated_segment_ids_{};
+};
+
+export struct WalCmdOptimize : public WalCmd {
+    WalCmdOptimize(String db_name, String table_name, String index_name, Vector<UniquePtr<InitParameter>> params)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), params_(std::move(params)) {}
+
+    WalCommandType GetType() override { return WalCommandType::OPTIMIZE; }
+
+    bool operator==(const WalCmd &other) const override;
+
+    i32 GetSizeInBytes() const override;
+
+    void WriteAdv(char *&buf) const override;
+
+    String db_name_{};
+    String table_name_{};
+    String index_name_{};
+    Vector<UniquePtr<InitParameter>> params_{};
+};
+
+export struct WalCmdDumpIndex : public WalCmd {
+    WalCmdDumpIndex(String db_name, String table_name, String index_name, SegmentID segment_id, Vector<WalChunkIndexInfo> chunk_infos)
+        : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), segment_id_(segment_id),
+          chunk_infos_(std::move(chunk_infos)) {}
+
+    WalCommandType GetType() override { return WalCommandType::DUMP_INDEX; }
+
+    bool operator==(const WalCmd &other) const override;
+
+    i32 GetSizeInBytes() const override;
+
+    void WriteAdv(char *&buf) const override;
+
+    String db_name_{};
+    String table_name_{};
+    String index_name_{};
+    SegmentID segment_id_{};
+    Vector<WalChunkIndexInfo> chunk_infos_{};
 };
 
 export struct WalEntryHeader {
@@ -362,7 +427,7 @@ export struct WalEntryHeader {
     // the same value to assist backward iterating.
     u32 checksum_{}; // crc32 of the entry, including the header and the
     // payload. User shall populate it before writing to wal.
-    i64 txn_id_{};    // txn id of the entry
+    i64 txn_id_{};             // txn id of the entry
     TxnTimeStamp commit_ts_{}; // commit timestamp of the txn
 };
 
@@ -388,7 +453,6 @@ export struct WalEntry : WalEntryHeader {
     [[nodiscard]] bool IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const;
 
     [[nodiscard]] String ToString() const;
-
 };
 
 // Forward and backward iterator of WAL entries in a given WAL file

@@ -139,7 +139,8 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
         data_ptr_ = buffer_->GetDataMut();
     } else {
         // Initialize after reset will come to this branch
-        if (vector_buffer_types.first == VectorBufferType::kHeap or vector_buffer_types.first == VectorBufferType::kTensorHeap) {
+        if (const auto t = vector_buffer_types.first;
+            t == VectorBufferType::kHeap or t == VectorBufferType::kTensorHeap or t == VectorBufferType::kSparseHeap) {
             if (buffer_->fix_heap_mgr_.get() != nullptr or buffer_->fix_heap_mgr_1_.get() != nullptr) {
                 String error_message = "Vector heap should be null.";
                 LOG_CRITICAL(error_message);
@@ -1504,7 +1505,7 @@ Vector<std::string_view> SplitArrayElement(std::string_view data, char delimiter
     return ret;
 }
 
-Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, char delimiter, const u32 unit_embedding_dim) {
+Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, const u32 unit_embedding_dim) {
     SizeT data_size = data.size();
     if (data_size < 2 || data[0] != '[' || data[data_size - 1] != ']') {
         Status status = Status::ImportFileFormatError("TensorArray data must be surrounded by [ and ]");
@@ -1536,7 +1537,7 @@ Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, 
             LOG_ERROR(status.message());
             RecoverableError(status);
         }
-        auto sub_result = SplitTensorElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), delimiter, unit_embedding_dim);
+        auto sub_result = SplitTensorElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), ',', unit_embedding_dim);
         ret.emplace_back(std::move(sub_result));
         bg_id = ed_id + 1;
     }
@@ -1545,7 +1546,7 @@ Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, 
 
 } // namespace
 
-void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
+void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *column_def) {
     SizeT index = tail_index_++;
     switch (data_type_->type()) {
         case kBoolean: {
@@ -1594,7 +1595,7 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
         }
         case kEmbedding: {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
-            Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
+            Vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
             if (embedding_info->Dimension() < ele_str_views.size()) {
                 Status status = Status::ImportFileFormatError("Embedding data size exceeds dimension.");
                 LOG_ERROR(status.message());
@@ -1641,7 +1642,7 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
         case kTensor: {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             const auto unit_embedding_dim = embedding_info->Dimension();
-            Vector<std::string_view> ele_str_views = SplitTensorElement(sv, delimiter, unit_embedding_dim);
+            Vector<std::string_view> ele_str_views = SplitTensorElement(sv, ',', unit_embedding_dim);
             if (ele_str_views.size() == 0 or ele_str_views.size() % unit_embedding_dim != 0) {
                 Status status = Status::ImportFileFormatError("Embedding data size is not multiple of tensor unit dimension.");
                 LOG_ERROR(status.message());
@@ -1688,7 +1689,7 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
         case kTensorArray: {
             auto embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
             const auto unit_embedding_dim = embedding_info->Dimension();
-            Vector<Vector<std::string_view>> ele_str_views = SplitTensorArrayElement(sv, delimiter, unit_embedding_dim);
+            Vector<Vector<std::string_view>> ele_str_views = SplitTensorArrayElement(sv, unit_embedding_dim);
             if (ele_str_views.size() == 0) {
                 Status status = Status::ImportFileFormatError("TensorArray data size is 0.");
                 LOG_ERROR(status.message());
@@ -1755,34 +1756,34 @@ void ColumnVector::AppendByStringView(std::string_view sv, char delimiter) {
         }
         case kSparse: {
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
-            Vector<std::string_view> ele_str_views = SplitArrayElement(sv, delimiter);
+            Vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
             switch(sparse_info->DataType()) {
                 case kElemBit: {
-                    AppendSparse<BooleanT>(ele_str_views, index);
+                    AppendSparse<BooleanT>(ele_str_views, index, column_def);
                     break;
                 }
                 case kElemInt8: {
-                    AppendSparse<TinyIntT>(ele_str_views, index);
+                    AppendSparse<TinyIntT>(ele_str_views, index, column_def);
                     break;
                 }
                 case kElemInt16: {
-                    AppendSparse<SmallIntT>(ele_str_views, index);
+                    AppendSparse<SmallIntT>(ele_str_views, index, column_def);
                     break;
                 }
                 case kElemInt32: {
-                    AppendSparse<IntegerT>(ele_str_views, index);
+                    AppendSparse<IntegerT>(ele_str_views, index, column_def);
                     break;
                 }
                 case kElemInt64: {
-                    AppendSparse<BigIntT>(ele_str_views, index);
+                    AppendSparse<BigIntT>(ele_str_views, index, column_def);
                     break;
                 }
                 case kElemFloat: {
-                    AppendSparse<FloatT>(ele_str_views, index);
+                    AppendSparse<FloatT>(ele_str_views, index, column_def);
                     break;
                 }
                 case kElemDouble: {
-                    AppendSparse<DoubleT>(ele_str_views, index);
+                    AppendSparse<DoubleT>(ele_str_views, index, column_def);
                     break;
                 }
                 default: {
@@ -2227,16 +2228,22 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
     // read variable part
     if (const auto data_t = data_type->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
         i32 heap_len = ReadBufAdv<i32>(ptr);
-        if (heap_len > 0) {
-            column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, heap_len);
-            ptr += heap_len;
+        const i32 one_chunk_size = column_vector->buffer_->fix_heap_mgr_->current_chunk_size();
+        while (heap_len > 0) {
+            const i32 real_append_size = std::min(heap_len, one_chunk_size);
+            column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, real_append_size);
+            ptr += real_append_size;
+            heap_len -= real_append_size;
         }
     }
     if (const auto data_t = data_type->type(); data_t == kTensorArray) {
         i32 heap_len_1 = ReadBufAdv<i32>(ptr);
-        if (heap_len_1 > 0) {
-            column_vector->buffer_->fix_heap_mgr_1_->AppendToHeap(ptr, heap_len_1);
-            ptr += heap_len_1;
+        const i32 one_chunk_size = column_vector->buffer_->fix_heap_mgr_1_->current_chunk_size();
+        while (heap_len_1 > 0) {
+            const i32 real_append_size = std::min(heap_len_1, one_chunk_size);
+            column_vector->buffer_->fix_heap_mgr_1_->AppendToHeap(ptr, real_append_size);
+            ptr += real_append_size;
+            heap_len_1 -= real_append_size;
         }
     }
 
@@ -2336,7 +2343,7 @@ Vector<std::string_view> SplitTensorElement(std::string_view data, char delimite
         }
     }
     if (!have_child_embedding) {
-        return SplitArrayElement(data, delimiter);
+        return SplitArrayElement(data, ',');
     }
     std::string_view child_data = data.substr(1, data_size - 2);
     Vector<std::string_view> ret;
@@ -2357,7 +2364,7 @@ Vector<std::string_view> SplitTensorElement(std::string_view data, char delimite
             LOG_ERROR(status.message());
             RecoverableError(status);
         }
-        Vector<std::string_view> sub_result = SplitArrayElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), delimiter);
+        Vector<std::string_view> sub_result = SplitArrayElement(child_data.substr(next_bg_id, ed_id - next_bg_id + 1), ',');
         if (sub_result.size() != unit_embedding_dim) {
             Status status = Status::ImportFileFormatError("Tensor data member embedding size must be equal to unit embedding dimension.");
             LOG_ERROR(status.message());

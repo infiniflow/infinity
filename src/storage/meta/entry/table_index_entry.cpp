@@ -24,7 +24,7 @@ import local_file_system;
 import default_values;
 import index_base;
 import segment_iter;
-
+import hnsw_util;
 import infinity_exception;
 import index_full_text;
 import catalog_delta_entry;
@@ -32,7 +32,7 @@ import base_table_ref;
 import create_index_info;
 import base_entry;
 import logger;
-
+import index_hnsw;
 import index_file_worker;
 import annivfflat_index_file_worker;
 import hnsw_file_worker;
@@ -95,7 +95,7 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     SharedPtr<String> temp_dir = DetermineIndexDir(*table_index_meta->GetTableEntry()->base_dir_,
                                                    *table_index_meta->GetTableEntry()->TableEntryDir(),
                                                    *index_base->index_name_);
-    SharedPtr<String> index_dir = is_delete ? MakeShared<String>("deleted") : temp_dir;
+    SharedPtr<String> index_dir = temp_dir;
     auto table_index_entry = MakeShared<TableIndexEntry>(index_base, is_delete, table_index_meta, index_dir, txn_id, begin_ts);
 
     // Get column info
@@ -266,10 +266,10 @@ void TableIndexEntry::MemIndexCommit() {
     }
 }
 
-SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(TxnIndexStore *txn_index_store, bool spill) {
+SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(Txn *txn, TxnIndexStore *txn_index_store, bool spill) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     if (last_segment_.get() != nullptr) {
-        chunk_index_entry = last_segment_->MemIndexDump();
+        chunk_index_entry = last_segment_->MemIndexDump(txn);
         txn_index_store->chunk_index_entries_.push_back(chunk_index_entry.get());
     }
     return chunk_index_entry;
@@ -398,16 +398,47 @@ void TableIndexEntry::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin
     txn_id_ = txn_id;
 }
 
-void TableIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params) {
-    Vector<SegmentIndexEntry *> segment_indexes;
-    {
-        SegmentIndexesGuard segment_indexes_guard = this->GetSegmentIndexesGuard();
-        for (const auto &[segment_id, segment_index_entry] : segment_indexes_guard.index_by_segment_) {
-            segment_indexes.push_back(segment_index_entry.get());
+void TableIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay) {
+    auto *table_entry = table_index_meta_->GetTableEntry();
+    auto *txn_table_store = txn->GetTxnTableStore(table_entry);
+    switch (index_base_->index_type_) {
+        case IndexType::kBMP: {
+            if (replay) {
+                break;
+            }
+            std::unique_lock w_lock(rw_locker_);
+            for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+                segment_index_entry->OptimizeIndex(index_base_.get(), txn, txn_table_store, opt_params, false /*replay*/);
+            }
+            break;
         }
-    }
-    for (auto *segment_index_entry : segment_indexes) {
-        segment_index_entry->OptimizeIndex(txn, opt_params);
+        case IndexType::kHnsw: {
+            std::unique_lock w_lock(rw_locker_);
+
+            auto params = HnswUtil::ParseOptimizeOptions(opt_params);
+            if (!params) {
+                break;
+            }
+            auto *hnsw_index = static_cast<IndexHnsw *>(index_base_.get());
+            if (params->compress_to_lvq) {
+                if (hnsw_index->encode_type_ != HnswEncodeType::kPlain) {
+                    LOG_WARN("Not implemented");
+                    break;
+                }
+                IndexHnsw old_index_hnsw = *hnsw_index;
+                hnsw_index->encode_type_ = HnswEncodeType::kLVQ;
+                txn_table_store->AddIndexStore(this);
+                if (!replay) {
+                    for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+                        segment_index_entry->OptimizeIndex(static_cast<IndexBase *>(&old_index_hnsw), txn, txn_table_store, opt_params, false /*replay*/);
+                    }
+                }
+            }
+            break;
+        }
+        default: {
+            LOG_WARN("Not implemented");
+        }
     }
 }
 

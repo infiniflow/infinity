@@ -19,7 +19,7 @@ export module hnsw_file_worker;
 import stl;
 import index_file_worker;
 import hnsw_alg;
-
+import index_hnsw;
 import index_base;
 import knn_expr;
 import column_def;
@@ -49,6 +49,8 @@ public:
     void FreeInMemory() override;
 
     FileWorkerType Type() const override { return FileWorkerType::kHNSWIndexFile; }
+
+    void CompressToLVQ(IndexHnsw *index_hnsw);
 
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;

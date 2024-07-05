@@ -96,7 +96,8 @@ public:
 
     void CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<ChunkIndexEntry *> &old_chunks, TxnTimeStamp commit_ts);
 
-    void OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params);
+    void
+    OptimizeIndex(IndexBase *index_base, Txn *txn, TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
@@ -121,7 +122,7 @@ public:
     void MemIndexCommit();
 
     // Dump or spill the memory indexer
-    SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false);
+    SharedPtr<ChunkIndexEntry> MemIndexDump(Txn *txn, bool spill = false);
 
     // Init the mem index from previously spilled one.
     void MemIndexLoad(const String &base_name, RowID base_row_id);
@@ -217,6 +218,15 @@ public:
     void AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry);
 
     SharedPtr<ChunkIndexEntry> AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count);
+
+    SharedPtr<ChunkIndexEntry> AddChunkIndexEntryReplayWal(ChunkID chunk_id,
+                                                           TableEntry *table_entry,
+                                                           const String &base_name,
+                                                           RowID base_rowid,
+                                                           u32 row_count,
+                                                           TxnTimeStamp commit_ts,
+                                                           TxnTimeStamp deprecate_ts,
+                                                           BufferManager *buffer_mgr);
 
     SharedPtr<ChunkIndexEntry> AddChunkIndexEntryReplay(ChunkID chunk_id,
                                                         TableEntry *table_entry,

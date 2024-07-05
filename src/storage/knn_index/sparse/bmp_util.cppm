@@ -32,7 +32,7 @@ export enum class BMPCompressType : i8 {
     kInvalid = 2,
 };
 
-export BMPCompressType BMCompressTypeFromString(const String &compress_type_str) {
+export BMPCompressType BMPCompressTypeFromString(const String &compress_type_str) {
     if (IsEqual(compress_type_str, "raww")) {
         return BMPCompressType::kRaw;
     } else if (IsEqual(compress_type_str, "compress")) {
@@ -42,7 +42,7 @@ export BMPCompressType BMCompressTypeFromString(const String &compress_type_str)
     }
 }
 
-export String BMCompressTypeToString(BMPCompressType compress_type) {
+export String BMPCompressTypeToString(BMPCompressType compress_type) {
     switch (compress_type) {
         case BMPCompressType::kRaw: {
             return "raw";
@@ -64,6 +64,7 @@ export struct BmpSearchOptions {
 
 export struct BMPOptimizeOptions {
     i32 topk_ = 0;
+    bool bp_reorder_ = false;
 };
 
 export class BMPUtil {

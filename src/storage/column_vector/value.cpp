@@ -1238,6 +1238,10 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
             json[name] = "[]";
             return;
         }
+        case LogicalType::kSparse: {
+            json[name] = "[]";
+            return;
+        }
         default: {
             String error_message = fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString());
             LOG_ERROR(error_message);

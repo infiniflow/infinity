@@ -15,6 +15,8 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    c++.a
+    c++abi.a
     jma
     opencc
     Arrow::arrow_shared
@@ -40,6 +42,8 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    c++.a
+    c++abi.a
     jma
     opencc
     Arrow::arrow_shared
@@ -63,6 +67,8 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    c++.a
+    c++abi.a
     jma
     opencc
     Arrow::arrow_shared
@@ -88,6 +94,8 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    c++.a
+    c++abi.a
     jma
     opencc
     Arrow::arrow_shared
@@ -112,6 +120,8 @@ target_link_libraries(
     lz4.a
     atomic.a
     jma
+    c++.a
+    c++abi.a
     opencc
     Arrow::arrow_shared
     Parquet::parquet_shared
@@ -134,6 +144,30 @@ target_link_libraries(
     lz4.a
     atomic.a
     jma
+    c++.a
+    c++abi.a
+    opencc
+)
+
+add_executable(hnsw_benchmark
+    ./knn/hnsw_benchmark.cpp
+)
+
+target_include_directories(hnsw_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(
+    hnsw_benchmark
+    infinity_core
+    benchmark_profiler
+    sql_parser
+    onnxruntime_mlas
+    zsv_parser
+    newpfor
+    fastpfor
+    lz4.a
+    atomic.a
+    jma
+    c++.a
+    c++abi.a
     opencc
     Arrow::arrow_shared
     Parquet::parquet_shared
@@ -146,6 +180,7 @@ if(ENABLE_JEMALLOC)
     target_link_libraries(fulltext_benchmark jemalloc.a)
     target_link_libraries(sparse_benchmark jemalloc.a)
     target_link_libraries(bmp_benchmark jemalloc.a)
+    target_link_libraries(hnsw_benchmark jemalloc.a)
 endif()
 
 # add_definitions(-march=native)

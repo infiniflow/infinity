@@ -165,9 +165,9 @@ public:
     inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
 
 private:
-    void FlushData(SizeT start_row_count, SizeT checkpoint_row_count);
+    void FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count);
 
-    bool FlushVersion(TxnTimeStamp checkpoint_ts);
+    bool FlushVersionNoLock(TxnTimeStamp checkpoint_ts);
 
 protected:
     mutable std::shared_mutex rw_locker_{};

@@ -43,7 +43,7 @@ IndexBMP::Make(SharedPtr<String> index_name, const String &file_name, Vector<Str
                 RecoverableError(status);
             }
         } else if (para->param_name_ == "compress_type") {
-            compress_type = BMCompressTypeFromString(para->param_value_);
+            compress_type = BMPCompressTypeFromString(para->param_value_);
         } else {
             Status status = Status::InvalidIndexParam(para->param_name_);
             LOG_ERROR(status.message());
@@ -104,14 +104,14 @@ void IndexBMP::WriteAdv(char *&ptr) const {
 String IndexBMP::ToString() const {
     std::stringstream ss;
     ss << IndexBase::ToString() << ", " << block_size_;
-    ss << ", " << BMCompressTypeToString(compress_type_);
+    ss << ", " << BMPCompressTypeToString(compress_type_);
     return ss.str();
 }
 
 String IndexBMP::BuildOtherParamsString() const {
     std::stringstream ss;
     ss << "block_size = " << block_size_;
-    ss << ", compress_type = " << BMCompressTypeToString(compress_type_);
+    ss << ", compress_type = " << BMPCompressTypeToString(compress_type_);
     return ss.str();
 }
 

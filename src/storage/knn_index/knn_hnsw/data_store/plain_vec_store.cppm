@@ -43,6 +43,12 @@ private:
 public:
     PlainVecStoreMeta() : dim_(0) {}
     PlainVecStoreMeta(This &&other) : dim_(std::exchange(other.dim_, 0)) {}
+    PlainVecStoreMeta &operator=(This &&other) {
+        if (this != &other) {
+            dim_ = std::exchange(other.dim_, 0);
+        }
+        return *this;
+    }
 
     static This Make(SizeT dim) { return This(dim); }
     static This Make(SizeT dim, bool) { return This(dim); }

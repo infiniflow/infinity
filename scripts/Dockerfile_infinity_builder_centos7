@@ -6,10 +6,9 @@
 # gcc-13.2.0.tar.xz
 # cmake-3.29.3-linux-x86_64.tar.gz
 # ninja-linux.zip
-# llvm-project-17.0.6.src.tar.xz
+# llvm-project-18.1.8.src.tar.xz
 # boost_1_81_0.tar.bz2
 # flex-2.6.4.tar.gz
-# liburing-2.5.tar.gz
 # libevent-2.1.12-stable.tar.gz
 # lz4-1.9.4.tar.gz
 # jemalloc-5.3.0.tar.bz2
@@ -17,12 +16,16 @@
 # openssl-1.1.1w.tar.gz
 # Python-3.12.4.tar.xz
 
-FROM centos:7
+FROM centos:7.9.2009
 
-RUN yum -y upgrade \
-    && yum -y install git make wget which vim file gcc-c++ \
+RUN rm -f /etc/yum.repos.d/* && sed -i 's/^enabled=1/enabled=0/' /etc/yum/pluginconf.d/fastestmirror.conf
+# https://www.getpagespeed.com/server-setup/how-to-fix-yum-after-centos-6-went-eol
+COPY centos7-vault.repo /etc/yum.repos.d/
+
+RUN yum -y install git make wget which vim file gcc-c++ \
         python3 python3-devel gettext-devel openssl-devel \
         unzip bzip2 libtool m4 tree rpm-build postgresql \
+    && yum clean all \
     && echo '/usr/local/lib' >> /etc/ld.so.conf.d/local.conf \
     && echo '/usr/local/lib64' >> /etc/ld.so.conf.d/local.conf
 
@@ -64,22 +67,22 @@ RUN --mount=type=bind,source=ninja-linux.zip,target=/root/ninja-linux.zip \
     cd /root && unzip ninja-linux.zip \
     && cp ninja /usr/local/bin && rm ninja
 
-# Install clang-17.0.6
+# Install clang-18.1.8
 # Add -DCLANG_DEFAULT_LINKER=lld to use lld by default
 # infinity seems to be incompatible with the lld linker
-RUN --mount=type=bind,source=llvm-project-17.0.6.src.tar.xz,target=/root/llvm-project-17.0.6.src.tar.xz \
-    cd /root && tar xf llvm-project-17.0.6.src.tar.xz \
-    && cd llvm-project-17.0.6.src && mkdir build && cd build \
+RUN --mount=type=bind,source=llvm-project-18.1.8.src.tar.xz,target=/root/llvm-project-18.1.8.src.tar.xz \
+    cd /root && tar xf llvm-project-18.1.8.src.tar.xz \
+    && cd llvm-project-18.1.8.src && mkdir build && cd build \
     && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_JOB_POOLS:STRING=link_pool=1 \
+        -DCMAKE_JOB_POOLS:STRING=link_pool=3 \
         -DCMAKE_JOB_POOL_LINK:STRING=link_pool \
         -DGCC_INSTALL_PREFIX=/usr/local \
         -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;lld;lldb" \
-        -DLLVM_ENABLE_RUNTIMES="compiler-rt" \
-        -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON \
+        -DLLVM_ENABLE_RUNTIMES="compiler-rt;libcxx;libcxxabi;libunwind" \
+        -DLIBCXXABI_USE_LLVM_UNWINDER=ON \
         -DLLVM_TARGETS_TO_BUILD=X86 ../llvm \
-    && ninja -j12 install/strip \
-    && ldconfig && cd /root && rm -rf llvm-project-17.0.6.src
+    && ninja install/strip \
+    && ldconfig && cd /root && rm -rf llvm-project-18.1.8.src
 
 # Install boost-1.81.0
 RUN --mount=type=bind,source=boost_1_81_0.tar.bz2,target=/root/boost_1_81_0.tar.bz2 \
@@ -95,19 +98,13 @@ RUN --mount=type=bind,source=flex-2.6.4.tar.gz,target=/root/flex-2.6.4.tar.gz  \
     && make -j && make install \
     && ldconfig && cd /root && rm -rf flex-2.6.4
 
-# Install liburing-2.5
-RUN --mount=type=bind,source=liburing-2.5.tar.gz,target=/root/liburing-2.5.tar.gz  \
-    cd /root && tar xf liburing-2.5.tar.gz \
-    && cd liburing-liburing-2.5 && make -j install \
-    && ldconfig && cd /root && rm -rf liburing-liburing-2.5
-
 # Install libevent-2.1.12
 RUN --mount=type=bind,source=libevent-2.1.12-stable.tar.gz,target=/root/libevent-2.1.12-stable.tar.gz  \
     cd /root && tar xf libevent-2.1.12-stable.tar.gz \
     && cd libevent-2.1.12-stable && mkdir build && cd build \
     && cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_C_FLAGS="-fPIC" .. \
-    && ninja -j0 install \
+    && ninja install \
     && ldconfig && cd /root && rm -rf libevent-2.1.12-stable
 
 # Install lz4-1.9.4
@@ -156,20 +153,44 @@ RUN --mount=type=bind,source=openssl-1.1.1w.tar.gz,target=/root/openssl-1.1.1w.t
 RUN yum install -y gdbm-devel sqlite-devel xz-devel libffi-devel libuuid-devel bzip2-devel readline-devel tk-devel \
     && yum clean all
 
+# We need build a wheel for each supported Python minor version. Refers to https://github.com/wjakob/nanobind/pull/561.
+# Install Python 3.10
+RUN --mount=type=bind,source=Python-3.10.14.tar.xz,target=/root/Python-3.10.14.tar.xz  \
+    cd /root && tar xJf Python-3.10.14.tar.xz \
+    && cd Python-3.10.14 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
+    && ldconfig && cd /root && rm -rf Python-3.10.14
+
+# Install Python 3.11
+RUN --mount=type=bind,source=Python-3.11.9.tar.xz,target=/root/Python-3.11.9.tar.xz  \
+cd /root && tar xJf Python-3.11.9.tar.xz \
+&& cd Python-3.11.9 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
+&& ldconfig && cd /root && rm -rf Python-3.11.9
+
 # Install Python 3.12
 RUN --mount=type=bind,source=Python-3.12.4.tar.xz,target=/root/Python-3.12.4.tar.xz  \
-    cd /root && tar xJf Python-3.12.4.tar.xz \
-    && cd Python-3.12.4 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
-    && ldconfig && cd /root && rm -rf Python-3.12.4
+cd /root && tar xJf Python-3.12.4.tar.xz \
+&& cd Python-3.12.4 && ./configure --with-openssl=/usr/local/openssl --with-openssl-rpath=auto --enable-shared && make -j 8 && make install \
+&& ldconfig && cd /root && rm -rf Python-3.12.4
 
-# Create a python virtual environment. Set PATH so that the shell activate this virtual environment automatically when entering a container from this image.
-RUN /usr/local/bin/python3 -m venv /usr/local/venv
-ENV PATH="/usr/local/venv/bin:/usr/local/bin:$PATH"
-RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ && pip3 config set global.trusted-host pypi.tuna.tsinghua.edu.cn && pip3 install wheel twine
+RUN pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple/ && pip3 config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 
-# infinity python SDK dependencies
-COPY python/requirements.txt .
-RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt pip3 install --no-input -r /root/requirements.txt
+# Install tools for building and uploading a python wheel.
+RUN /usr/local/bin/pip3.10 install wheel auditwheel patchelf twine
+RUN /usr/local/bin/pip3.11 install wheel auditwheel patchelf twine
+RUN /usr/local/bin/pip3.12 install wheel auditwheel patchelf twine
+
+# Create a python virtual environment for each python version. Set PATH so that the shell activate a virtual environment automatically when entering a container from this image.
+RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt /usr/local/bin/python3.10 -m venv /usr/local/venv310 && source /usr/local/venv310/bin/activate && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt
+
+RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt /usr/local/bin/python3.11 -m venv /usr/local/venv311 && source /usr/local/venv311/bin/activate && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt
+
+RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.txt /usr/local/bin/python3.12 -m venv /usr/local/venv312 && source /usr/local/venv312/bin/activate && pip3 install --no-input wheel && pip3 install --no-input -r /root/requirements.txt
+
+# https://github.com/llvm/llvm-project/issues/96210
+# https://github.com/llvm/llvm-project/issues/57276
+RUN cp /usr/local/include/x86_64-unknown-linux-gnu/c++/v1/__config_site /usr/local/include/c++/v1
+
+ENV PATH="/usr/local/venv310/bin:$PATH"
 
 ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local
 

@@ -46,7 +46,7 @@ void BMPIvt<DataType, CompressType>::WriteAdv(char *&p) const {
 }
 
 template <typename DataType, BMPCompressType CompressType>
-BMPIvt<DataType, CompressType> BMPIvt<DataType, CompressType>::ReadAdv(char *&p) {
+BMPIvt<DataType, CompressType> BMPIvt<DataType, CompressType>::ReadAdv(const char *&p) {
     SizeT posting_size = ReadBufAdv<SizeT>(p);
     Vector<BlockPostings<DataType, CompressType>> postings(posting_size);
     for (SizeT i = 0; i < posting_size; ++i) {
@@ -66,7 +66,8 @@ template <typename DataType, typename IdxType>
 SizeT TailFwd<DataType, IdxType>::GetSizeInBytes() const {
     SizeT size = sizeof(SizeT);
     for (const auto &tail_terms : tail_terms_) {
-        size += sizeof(SizeT) + tail_terms.size() * (sizeof(IdxType) + sizeof(DataType));
+        const auto [indices, data] = tail_terms;
+        size += sizeof(SizeT) + indices.size() * sizeof(IdxType) + data.size() * sizeof(DataType);
     }
     return size;
 }
@@ -76,25 +77,28 @@ void TailFwd<DataType, IdxType>::WriteAdv(char *&p) const {
     SizeT tail_num = tail_terms_.size();
     WriteBufAdv<SizeT>(p, tail_num);
     for (const auto &tail_terms : tail_terms_) {
-        SizeT term_num = tail_terms.size();
+        const auto &[indices, data] = tail_terms;
+        SizeT term_num = indices.size();
         WriteBufAdv<SizeT>(p, term_num);
-        for (const auto &[term_id, score] : tail_terms) {
-            WriteBufAdv<IdxType>(p, term_id);
-            WriteBufAdv<DataType>(p, score);
-        }
+        WriteBufVecAdv(p, indices.data(), indices.size());
+        WriteBufVecAdv(p, data.data(), data.size());
     }
 }
 
 template <typename DataType, typename IdxType>
-TailFwd<DataType, IdxType> TailFwd<DataType, IdxType>::ReadAdv(char *&p) {
+TailFwd<DataType, IdxType> TailFwd<DataType, IdxType>::ReadAdv(const char *&p) {
     SizeT tail_num = ReadBufAdv<SizeT>(p);
-    Vector<Vector<Pair<IdxType, DataType>>> tail_terms(tail_num);
+    Vector<Pair<Vector<IdxType>, Vector<DataType>>> tail_terms(tail_num);
     for (SizeT i = 0; i < tail_num; ++i) {
         SizeT term_num = ReadBufAdv<SizeT>(p);
-        tail_terms[i].resize(term_num);
+        auto &[indices, data] = tail_terms[i];
+        indices.resize(term_num);
+        data.resize(term_num);
         for (SizeT j = 0; j < term_num; ++j) {
-            tail_terms[i][j].first = ReadBufAdv<IdxType>(p);
-            tail_terms[i][j].second = ReadBufAdv<DataType>(p);
+            indices[j] = ReadBufAdv<IdxType>(p);
+        }
+        for (SizeT j = 0; j < term_num; ++j) {
+            data[j] = ReadBufAdv<DataType>(p);
         }
     }
     return TailFwd(std::move(tail_terms));
@@ -112,11 +116,8 @@ template class TailFwd<f64, i8>;
 template <typename DataType, typename IdxType>
 SizeT BlockFwd<DataType, IdxType>::GetSizeInBytes() const {
     SizeT size = sizeof(block_size_) + sizeof(SizeT);
-    for (const auto &block_terms : block_terms_) {
-        size += sizeof(SizeT);
-        for (const auto &[term_id, block_offsets, scores] : block_terms) {
-            size += sizeof(IdxType) + sizeof(SizeT) + block_offsets.size() * sizeof(BMPBlockOffset) + scores.size() * sizeof(DataType);
-        }
+    for (const auto &block_terms : block_terms_list_) {
+        size += block_terms.GetSizeInBytes();
     }
     size += tail_fwd_.GetSizeInBytes();
     return size;
@@ -125,46 +126,26 @@ SizeT BlockFwd<DataType, IdxType>::GetSizeInBytes() const {
 template <typename DataType, typename IdxType>
 void BlockFwd<DataType, IdxType>::WriteAdv(char *&p) const {
     WriteBufAdv<SizeT>(p, block_size_);
-    SizeT block_num = block_terms_.size();
+    SizeT block_num = block_terms_list_.size();
     WriteBufAdv<SizeT>(p, block_num);
-    for (const auto &block_terms : block_terms_) {
-        SizeT term_num = block_terms.size();
-        WriteBufAdv<SizeT>(p, term_num);
-        for (const auto &[term_id, block_offsets, scores] : block_terms) {
-            WriteBufAdv<IdxType>(p, term_id);
-            SizeT inner_num = block_offsets.size();
-            WriteBufAdv<SizeT>(p, inner_num);
-            WriteBufCharsAdv(p, reinterpret_cast<const char *>(block_offsets.data()), sizeof(BMPBlockOffset) * block_offsets.size());
-            WriteBufCharsAdv(p, reinterpret_cast<const char *>(scores.data()), sizeof(DataType) * scores.size());
-        }
+    for (const auto &block_terms : block_terms_list_) {
+        block_terms.WriteAdv(p);
     }
     tail_fwd_.WriteAdv(p);
 }
 
 template <typename DataType, typename IdxType>
-BlockFwd<DataType, IdxType> BlockFwd<DataType, IdxType>::ReadAdv(char *&p) {
+BlockFwd<DataType, IdxType> BlockFwd<DataType, IdxType>::ReadAdv(const char *&p) {
     SizeT block_size = ReadBufAdv<SizeT>(p);
     SizeT block_num = ReadBufAdv<SizeT>(p);
-    Vector<Vector<Tuple<IdxType, Vector<BMPBlockOffset>, Vector<DataType>>>> block_terms(block_num);
+    Vector<BlockTerms<DataType, IdxType>> block_terms_list;
+    block_terms_list.reserve(block_num);
     for (SizeT i = 0; i < block_num; ++i) {
-        SizeT term_num = ReadBufAdv<SizeT>(p);
-        block_terms[i].resize(term_num);
-        for (SizeT j = 0; j < term_num; ++j) {
-            IdxType term_id = ReadBufAdv<IdxType>(p);
-            SizeT inner_num = ReadBufAdv<SizeT>(p);
-            Vector<BMPBlockOffset> block_offsets(inner_num);
-            Vector<DataType> scores(inner_num);
-            for (SizeT k = 0; k < inner_num; ++k) {
-                block_offsets[k] = ReadBufAdv<BMPBlockOffset>(p);
-            }
-            for (SizeT k = 0; k < inner_num; ++k) {
-                scores[k] = ReadBufAdv<DataType>(p);
-            }
-            block_terms[i][j] = {term_id, std::move(block_offsets), std::move(scores)};
-        }
+        auto block_terms = BlockTerms<DataType, IdxType>::ReadAdv(p);
+        block_terms_list.push_back(std::move(block_terms));
     }
     auto tail_fwd = TailFwd<DataType, IdxType>::ReadAdv(p);
-    return BlockFwd(block_size, std::move(block_terms), std::move(tail_fwd));
+    return BlockFwd(block_size, std::move(block_terms_list), std::move(tail_fwd));
 }
 
 template class BlockFwd<f32, i32>;
@@ -195,7 +176,7 @@ BMPAlg<DataType, IdxType, CompressType> BMPAlg<DataType, IdxType, CompressType>:
     file_handler.Read(&size, sizeof(size));
     auto buffer = MakeUnique<char[]>(size);
     file_handler.Read(buffer.get(), size);
-    char *p = buffer.get();
+    const char *p = buffer.get();
     return ReadAdv(p);
 }
 
@@ -219,11 +200,11 @@ void BMPAlg<DataType, IdxType, CompressType>::WriteAdv(char *&p) const {
     block_fwd_.WriteAdv(p);
     SizeT doc_num = doc_ids_.size();
     WriteBufAdv<SizeT>(p, doc_num);
-    WriteBufCharsAdv(p, reinterpret_cast<const char *>(doc_ids_.data()), sizeof(BMPDocID) * doc_ids_.size());
+    WriteBufVecAdv(p, doc_ids_.data(), doc_ids_.size());
 }
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
-BMPAlg<DataType, IdxType, CompressType> BMPAlg<DataType, IdxType, CompressType>::ReadAdv(char *&p) {
+BMPAlg<DataType, IdxType, CompressType> BMPAlg<DataType, IdxType, CompressType>::ReadAdv(const char *&p) {
     auto postings = BMPIvt<DataType, CompressType>::ReadAdv(p);
     auto block_fwd = BlockFwd<DataType, IdxType>::ReadAdv(p);
     SizeT doc_num = ReadBufAdv<SizeT>(p);

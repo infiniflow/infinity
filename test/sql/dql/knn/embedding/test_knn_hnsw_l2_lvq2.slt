@@ -1,0 +1,63 @@
+statement ok
+DROP TABLE IF EXISTS test_knn_hnsw_l2;
+
+statement ok
+CREATE TABLE test_knn_hnsw_l2(c1 INT, c2 EMBEDDING(FLOAT, 4));
+
+statement ok
+CREATE INDEX idx1 ON test_knn_hnsw_l2 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+statement ok
+INSERT INTO test_knn_hnsw_l2 VALUES (2, [0.1, 0.2, 0.3, -0.2]);
+
+statement ok
+INSERT INTO test_knn_hnsw_l2 VALUES (4, [0.2, 0.1, 0.3, 0.4]);
+
+statement ok
+INSERT INTO test_knn_hnsw_l2 VALUES (6, [0.3, 0.2, 0.1, 0.4]), (8, [0.4, 0.3, 0.2, 0.1]);
+
+query I
+SELECT c1 FROM test_knn_hnsw_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4);
+----
+8
+6
+4
+
+statement ok
+OPTIMIZE idx1 ON test_knn_hnsw_l2 WITH (compress_to_lvq);
+
+query I
+SELECT c1 FROM test_knn_hnsw_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 4, rerank);
+----
+8
+6
+4
+
+statement ok
+INSERT INTO test_knn_hnsw_l2 VALUES (2, [0.1, 0.2, 0.3, -0.2]);
+
+statement ok
+INSERT INTO test_knn_hnsw_l2 VALUES (4, [0.2, 0.1, 0.3, 0.4]);
+
+statement ok
+INSERT INTO test_knn_hnsw_l2 VALUES (6, [0.3, 0.2, 0.1, 0.4]), (8, [0.4, 0.3, 0.2, 0.1]);
+
+query I
+SELECT c1 FROM test_knn_hnsw_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 8, rerank);
+----
+8
+8
+6
+
+statement ok
+COPY test_knn_hnsw_l2 FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+
+query I
+SELECT c1 FROM test_knn_hnsw_l2 SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'l2', 3) WITH (ef = 12, rerank);
+----
+8
+8
+8
+
+statement ok
+DROP TABLE test_knn_hnsw_l2;

@@ -391,6 +391,7 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
 }
 
 void SegmentEntry::CommitFlushed(TxnTimeStamp commit_ts) {
+    std::shared_lock w_lock(rw_locker_);
     for (auto &block_entry : block_entries_) {
         block_entry->CommitFlushed(commit_ts);
     }

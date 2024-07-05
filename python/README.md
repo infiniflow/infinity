@@ -7,30 +7,7 @@
 - upload to pypi.org
 - install new python SDK
 
-# build python SDK
-Execute the following command under the root path of infinity project, but not python SDK project root path.
-
-```shell
-rm -f dist/* && pip wheel . -w dist
-```
-
-Note: This command will compile C++ code, which may take a long time. You can use `-v` to display the compilation details, i.e. `rm -f dist/* && pip wheel . -v -w dist`
-
-# install python SDK
-```shell
-pip uninstall -y infinity-sdk && pip install dist/*.whl
-```
-
-This will install infinity-sdk and its dependencies.
-
-# upload to pypi.org
-```shell
-twine upload dist/*.whl
-```
-
-Enter your pypi API token according to the prompt.
-
-Note that pypi allow a version of a package [be uploaded only once](https://pypi.org/help/#file-name-reuse). You need to change the `version` inside the `pyproject.toml` before build and upload.
+Please see [releases.yml](https://github.com/infiniflow/infinity/blob/main/.github/workflows/release.yml) for details.
 
 # using
 
@@ -66,19 +43,19 @@ pip install . -v --config-settings=cmake.build-type="Debug"  --config-settings=b
 ```
 Note: If you run with the debug version, you must set the **libasan** environment variable, for example
 ```shell
-LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 python3 hello_infinity.py
+LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 python3 example/simple_example.py
 ```
 Note: When running with the debug version infinity-sdk, you may find some memory leaks caused by arrow. You can use `ASAN_OPTIONS=detect_leaks=0` to disable memory leak detection, for example
 ```shell
-LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 hello_infinity.py
+LD_PRELOAD=/lib/x86_64-linux-gnu/libasan.so.8 ASAN_OPTIONS=detect_leaks=0 python3 example/simple_example.py
 ```
 
 # run pysdk test
-Run a local infinity test
+Run a local infinity test in project root directory
 ```shell
-pytest --local-infinity test/infinity/test_basic.py::TestInfinity::test_basic
+pytest --local-infinity python/test/cases/test_basic.py::TestInfinity::test_basic
 ```
-Run a remote infinity test
+Run a remote infinity test in project root directory
 ```shell
-pytest test/infinity/test_basic.py::TestInfinity::test_basic
+pytest python/test/cases/test_basic.py::TestInfinity::test_basic
 ```

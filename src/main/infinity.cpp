@@ -850,6 +850,9 @@ QueryResult Infinity::Export(const String &db_name, const String &table_name, Ve
     export_statement->header_ = export_options.header_;
     export_statement->copy_file_type_ = export_options.copy_file_type_;
     export_statement->delimiter_ = export_options.delimiter_;
+    export_statement->offset_ = export_options.offset_;
+    export_statement->limit_ = export_options.limit_;
+    export_statement->row_limit_ = export_options.row_limit_;
 
     QueryResult result = query_context_ptr->QueryStatement(export_statement.get());
     return result;

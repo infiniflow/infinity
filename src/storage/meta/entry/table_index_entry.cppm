@@ -114,7 +114,7 @@ public:
 
     // MemIndexCommit is blocking.
     // Dump or spill the memory indexer
-    SharedPtr<ChunkIndexEntry> MemIndexDump(TxnIndexStore *txn_index_store, bool spill = false);
+    SharedPtr<ChunkIndexEntry> MemIndexDump(Txn *txn, TxnIndexStore *txn_index_store, bool spill = false);
 
     // PopulateEntirely is blocking.
     // Populate index entirely for the segment
@@ -139,7 +139,7 @@ public:
     // replay
     void UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    void OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params);
+    void OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &base_dir, const String &parent_dir, const String &index_name) {

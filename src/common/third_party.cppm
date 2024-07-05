@@ -132,6 +132,7 @@ export using magic_enum::underlying_type_t;
 
 namespace moodycamel {
 export using moodycamel::ConcurrentQueue;
+export using moodycamel::BlockingConcurrentQueue;
 }
 
 namespace arrow {
