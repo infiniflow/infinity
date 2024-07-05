@@ -46,6 +46,27 @@ module;
 #include "oatpp/network/tcp/server/ConnectionProvider.hpp"
 #include "oatpp/web/server/HttpConnectionHandler.hpp"
 
+#include "arrow/api.h"
+#include "arrow/array.h"
+#include "arrow/array/array_base.h"
+#include "arrow/chunked_array.h"
+#include "arrow/io/api.h"
+#include "arrow/io/caching.h"
+#include "arrow/io/file.h"
+#include "arrow/memory_pool.h"
+#include "arrow/record_batch.h"
+#include "arrow/result.h"
+#include "arrow/status.h"
+#include "arrow/table.h"
+#include "arrow/type_fwd.h"
+#include "parquet/arrow/reader.h"
+#include "parquet/arrow/writer.h"
+#include <arrow/array/array_nested.h>
+#include <arrow/array/array_primitive.h>
+#include <arrow/io/interfaces.h>
+#include <arrow/type.h>
+#include "arrow/array/builder_primitive.h"
+
 #pragma clang diagnostic pop
 
 export module third_party;
@@ -112,6 +133,67 @@ export using magic_enum::underlying_type_t;
 namespace moodycamel {
 export using moodycamel::ConcurrentQueue;
 }
+
+namespace arrow {
+export using Status = arrow::Status;
+export using ReadableFile = arrow::io::ReadableFile;
+export using RandomAccessFile = arrow::io::RandomAccessFile;
+export using Table = arrow::Table;
+
+export using ChunkedArray = arrow::ChunkedArray;
+export using ArrayBuilder = arrow::ArrayBuilder;
+export using Array = arrow::Array;
+export using BooleanArray = arrow::BooleanArray;
+export using UInt8Array = arrow::UInt8Array;
+export using Int8Array = arrow::Int8Array;
+export using Int16Array = arrow::Int16Array;
+export using Int32Array = arrow::Int32Array;
+export using Int64Array = arrow::Int64Array;
+export using FloatArray = arrow::FloatArray;
+export using DoubleArray = arrow::DoubleArray;
+export using Decimal128Array = arrow::Decimal128Array;
+export using Date32Array = arrow::Date32Array;
+export using Time32Array = arrow::Time32Array;
+export using TimestampArray = arrow::TimestampArray;
+export using DurationArray = arrow::DurationArray;
+export using StringArray = arrow::StringArray;
+export using ListArray = arrow::ListArray;
+export using BinaryArray = arrow::BinaryArray;
+
+export using UInt8Builder = arrow::UInt8Builder;
+export using Int8Builder = arrow::Int8Builder;
+export using Int16Builder = arrow::Int16Builder;
+export using Int32Builder = arrow::Int32Builder;
+export using Int64Builder = arrow::Int64Builder;
+export using FloatBuilder = arrow::FloatBuilder;
+export using DoubleBuilder = arrow::DoubleBuilder;
+export using Decimal128Builder = arrow::Decimal128Builder;
+export using Date32Builder = arrow::Date32Builder;
+export using Time32Builder = arrow::Time32Builder;
+export using TimestampBuilder = arrow::TimestampBuilder;
+export using DurationBuilder = arrow::DurationBuilder;
+export using StringBuilder = arrow::StringBuilder;
+export using ListBuilder = arrow::ListBuilder;
+
+export using RecordBatchReader = arrow::RecordBatchReader;
+export using RecordBatch = arrow::RecordBatch;
+export using MemoryPool = arrow::MemoryPool;
+export MemoryPool *DefaultMemoryPool() { return arrow::default_memory_pool(); }
+
+export using DataType = arrow::DataType;
+export using Field = arrow::Field;
+export using Schema = arrow::Schema;
+export using ParquetFileReader = parquet::arrow::FileReader;
+export using ParquetFileWriter = parquet::arrow::FileWriter;
+export using ArrowWriterProperties = parquet::ArrowWriterProperties;
+} // namespace arrow
+
+namespace parquet {
+export ::arrow::Status
+OpenFile(std::shared_ptr<::arrow::RandomAccessFile> file, ::arrow::MemoryPool *pool, std::unique_ptr<parquet::arrow::FileReader> *reader) {
+    return parquet::arrow::OpenFile(file, pool, reader);
+}
+} // namespace parquet
 
 namespace infinity {
 

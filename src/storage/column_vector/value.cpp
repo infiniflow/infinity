@@ -35,20 +35,20 @@ namespace infinity {
 
 namespace {
 template <typename T>
-void Embedding2JsonInternal(const EmbeddingType &embedding, size_t dimension, nlohmann::json& embedding_json) {
+void Embedding2JsonInternal(const EmbeddingType &embedding, size_t dimension, nlohmann::json &embedding_json) {
     for (size_t i = 0; i < dimension; ++i) {
         embedding_json.push_back(((T *)(embedding.ptr))[i]);
     }
 }
 
-void BitmapEmbedding2JsonInternal(const EmbeddingType &embedding, size_t dimension, nlohmann::json& embedding_json) {
-    if(dimension % 8 != 0) {
+void BitmapEmbedding2JsonInternal(const EmbeddingType &embedding, size_t dimension, nlohmann::json &embedding_json) {
+    if (dimension % 8 != 0) {
         Status status = Status::SyntaxError("Binary embedding dimension should be the times of 8.");
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
-    auto *array = reinterpret_cast<const u8*>(embedding.ptr);
+    auto *array = reinterpret_cast<const u8 *>(embedding.ptr);
     for (size_t i = 0; i < dimension / 8; ++i) {
         const u8 byte = array[i];
         for (size_t j = 0; j < 8; ++j) {
@@ -58,7 +58,7 @@ void BitmapEmbedding2JsonInternal(const EmbeddingType &embedding, size_t dimensi
     }
 }
 
-void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, nlohmann::json& embedding_json) {
+void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, nlohmann::json &embedding_json) {
     switch (type) {
         case kElemBit: {
             BitmapEmbedding2JsonInternal(embedding, dimension, embedding_json);
@@ -96,7 +96,81 @@ void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size
     }
 }
 
+// Need to move up
+void BitmapEmbedding2ArrowInternal(const EmbeddingType &embedding, size_t dimension, SharedPtr<arrow::ArrayBuilder> &array_builder) {
+    if (dimension % 8 != 0) {
+        Status status = Status::SyntaxError("Binary embedding dimension should be the times of 8.");
+        LOG_ERROR(status.message());
+        RecoverableError(status);
+    }
+
+    auto list_builder = std::dynamic_pointer_cast<arrow::ListBuilder>(array_builder);
+    auto builder = dynamic_cast<arrow::UInt8Builder *>(list_builder->value_builder());
+    auto *array = reinterpret_cast<const u8 *>(embedding.ptr);
+    for (size_t i = 0; i < dimension; ++i) {
+        auto status = builder->Append(array[i]);
+    }
 }
+
+void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, SharedPtr<arrow::ArrayBuilder> &array_builder) {
+    auto list_builder = std::dynamic_pointer_cast<arrow::ListBuilder>(array_builder);
+    auto status = list_builder->Append();
+    switch (type) {
+        case kElemBit: {
+            BitmapEmbedding2ArrowInternal(embedding, dimension, array_builder);
+            break;
+        }
+        case kElemInt8: {
+            auto builder = dynamic_cast<arrow::Int8Builder *>(list_builder->value_builder());
+            for (size_t i = 0; i < dimension; ++i) {
+                auto status = builder->Append(((int8_t *)(embedding.ptr))[i]);
+            }
+            break;
+        }
+        case kElemInt16: {
+            auto builder = dynamic_cast<arrow::Int16Builder *>(list_builder->value_builder());
+            for (size_t i = 0; i < dimension; ++i) {
+                auto status = builder->Append(((int16_t *)(embedding.ptr))[i]);
+            }
+            break;
+        }
+        case kElemInt32: {
+            auto builder = dynamic_cast<arrow::Int32Builder *>(list_builder->value_builder());
+            for (size_t i = 0; i < dimension; ++i) {
+                auto status = builder->Append(((int32_t *)(embedding.ptr))[i]);
+            }
+            break;
+        }
+        case kElemInt64: {
+            auto builder = dynamic_cast<arrow::Int64Builder *>(list_builder->value_builder());
+            for (size_t i = 0; i < dimension; ++i) {
+                auto status = builder->Append(((int64_t *)(embedding.ptr))[i]);
+            }
+            break;
+        }
+        case kElemFloat: {
+            auto builder = dynamic_cast<arrow::FloatBuilder *>(list_builder->value_builder());
+            for (size_t i = 0; i < dimension; ++i) {
+                auto status = builder->Append(((float *)(embedding.ptr))[i]);
+            }
+            break;
+        }
+        case kElemDouble: {
+            auto builder = dynamic_cast<arrow::DoubleBuilder *>(list_builder->value_builder());
+            for (size_t i = 0; i < dimension; ++i) {
+                auto status = builder->Append(((double *)(embedding.ptr))[i]);
+            }
+            break;
+        }
+        default: {
+            Status status = Status::SyntaxError("Unexpected embedding type");
+            LOG_ERROR(status.message());
+            RecoverableError(status);
+        }
+    }
+}
+
+} // namespace
 
 // Value maker
 Value Value::MakeValue(DataType type) {
@@ -245,11 +319,11 @@ Value Value::MakeRow(RowID input) {
     return value;
 }
 
-//Value Value::MakeVarchar(const String &str) {
-//    Value value(LogicalType::kVarchar);
-//    value.value_info_ = MakeShared<StringValueInfo>(str);
-//    return value;
-//}
+// Value Value::MakeVarchar(const String &str) {
+//     Value value(LogicalType::kVarchar);
+//     value.value_info_ = MakeShared<StringValueInfo>(str);
+//     return value;
+// }
 
 Value Value::MakeVarchar(const std::string_view str_view) {
     Value value(LogicalType::kVarchar);
@@ -1167,6 +1241,89 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
         default: {
             String error_message = fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString());
             LOG_ERROR(error_message);
+            UnrecoverableError(error_message);
+        }
+    }
+}
+
+void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<arrow::ArrayBuilder> &array_builder) {
+    switch (data_type->type()) {
+        case LogicalType::kBoolean: {
+            auto builder = std::dynamic_pointer_cast<::arrow::UInt8Builder>(array_builder);
+            auto status = builder->Append(value_.boolean);
+            break;
+        }
+        case LogicalType::kTinyInt: {
+            auto builder = std::dynamic_pointer_cast<::arrow::Int8Builder>(array_builder);
+            auto status = builder->Append(value_.tiny_int);
+            break;
+        }
+        case LogicalType::kSmallInt: {
+            auto builder = std::dynamic_pointer_cast<::arrow::Int16Builder>(array_builder);
+            auto status = builder->Append(value_.small_int);
+            break;
+        }
+        case LogicalType::kInteger: {
+            auto builder = std::dynamic_pointer_cast<::arrow::Int32Builder>(array_builder);
+            auto status = builder->Append(value_.integer);
+            break;
+        }
+        case LogicalType::kBigInt: {
+            auto builder = std::dynamic_pointer_cast<::arrow::Int64Builder>(array_builder);
+            auto status = builder->Append(value_.big_int);
+            break;
+        }
+        case LogicalType::kFloat: {
+            auto builder = std::dynamic_pointer_cast<::arrow::FloatBuilder>(array_builder);
+            auto status = builder->Append(value_.float32);
+            break;
+        }
+        case LogicalType::kDouble: {
+            auto builder = std::dynamic_pointer_cast<::arrow::DoubleBuilder>(array_builder);
+            auto status = builder->Append(value_.float64);
+            break;
+        }
+        case LogicalType::kDate: {
+            auto builder = std::dynamic_pointer_cast<::arrow::Date32Builder>(array_builder);
+            auto status = builder->Append(value_.date.value);
+            break;
+        }
+        case LogicalType::kTime: {
+            auto builder = std::dynamic_pointer_cast<::arrow::Time32Builder>(array_builder);
+            auto status = builder->Append(value_.time.value);
+            break;
+        }
+        case LogicalType::kDateTime: {
+            auto builder = std::dynamic_pointer_cast<::arrow::TimestampBuilder>(array_builder);
+            auto status = builder->Append(value_.timestamp.GetEpochTime());
+            break;
+        }
+        case LogicalType::kInterval: {
+            auto builder = std::dynamic_pointer_cast<::arrow::DurationBuilder>(array_builder);
+            auto status = builder->Append(value_.interval.value);
+            break;
+        }
+        case LogicalType::kVarchar: {
+            auto builder = std::dynamic_pointer_cast<::arrow::StringBuilder>(array_builder);
+            auto status = builder->Append(value_info_->Get<StringValueInfo>().GetString());
+            break;
+        }
+        case LogicalType::kEmbedding: {
+            auto embedding_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
+            Span<char> data_span = this->GetEmbedding();
+            if (data_span.size() != embedding_info->Size()) {
+                String error_message = "Embedding data size mismatch.";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+            const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
+            Embedding2Arrow(embedding, embedding_info->Type(), embedding_info->Dimension(), array_builder);
+            break;
+        }
+        case LogicalType::kDecimal:
+        default: {
+            String error_message = "Invalid data type";
+            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

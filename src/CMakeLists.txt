@@ -289,6 +289,8 @@ target_link_libraries(infinity
         oatpp.a
         jma
         opencc
+        Arrow::arrow_shared
+        Parquet::parquet_shared
 )
 
 if (ENABLE_JEMALLOC)
@@ -338,6 +340,8 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         oatpp.a
         jma
         opencc
+        Arrow::arrow_shared
+        Parquet::parquet_shared
 )
 target_link_options(embedded_infinity_ext PRIVATE -static-libstdc++ -static-libgcc)
 
@@ -464,6 +468,8 @@ target_link_libraries(unit_test
         thrift.a
         jma
         opencc
+        Arrow::arrow_shared
+        Parquet::parquet_shared
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")

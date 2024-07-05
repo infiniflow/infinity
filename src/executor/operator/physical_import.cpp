@@ -46,6 +46,7 @@ import txn_store;
 import file_system_type;
 import file_system;
 import buffer_handle;
+import data_file_worker;
 
 import infinity_exception;
 import zsv;
@@ -101,6 +102,10 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
             ImportBVECS(query_context, import_op_state);
             break;
         }
+        case CopyFileType::kPARQUET: {
+            ImportPARQUET(query_context, import_op_state);
+            break;
+        }
         case CopyFileType::kInvalid: {
             String error_message = "Invalid file type";
             LOG_CRITICAL(error_message);
@@ -135,7 +140,7 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     LocalFileSystem fs;
 
     auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     DeferFn defer_fn([&]() { fs.Close(*file_handler); });
@@ -156,7 +161,8 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
     if ((int)embedding_info->Dimension() != dimension) {
-        Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
+        Status status = Status::ImportFileFormatError(
+            fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
@@ -181,7 +187,8 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         i32 dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
-            Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+            Status status =
+                Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
             LOG_ERROR(status.message());
             RecoverableError(status);
         }
@@ -236,7 +243,7 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
     LocalFileSystem fs;
 
     auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     DeferFn defer_fn([&]() { fs.Close(*file_handler); });
@@ -257,7 +264,8 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
     if ((int)embedding_info->Dimension() != dimension) {
-        Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
+        Status status = Status::ImportFileFormatError(
+            fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
@@ -284,14 +292,15 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         i32 dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
-            Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+            Status status =
+                Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
             LOG_ERROR(status.message());
             RecoverableError(status);
         }
         fs.Read(*file_handler, i8_buffer.get(), sizeof(i8) * dimension);
 
-        FloatT* dst_ptr = reinterpret_cast<FloatT*>(buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension);
-        for(i32 i = 0; i < dimension; ++ i) {
+        FloatT *dst_ptr = reinterpret_cast<FloatT *>(buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension);
+        for (i32 i = 0; i < dimension; ++i) {
             i8 value = (i8_buffer.get())[i];
             dst_ptr[i] = static_cast<FloatT>(value);
         }
@@ -325,7 +334,7 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
 
 template <typename IdxT>
 UniquePtr<char[]> ConvertCSRIndice(const i32 *tmp_indice_ptr, SizeT nnz) {
-    auto res = MakeUnique<char []>(sizeof(IdxT) * nnz);
+    auto res = MakeUnique<char[]>(sizeof(IdxT) * nnz);
     auto *ptr = reinterpret_cast<IdxT *>(res.get());
     for (SizeT i = 0; i < nnz; ++i) {
         if (tmp_indice_ptr[i] < 0 || tmp_indice_ptr[i] > std::numeric_limits<IdxT>::max()) {
@@ -611,7 +620,7 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
     {
         LocalFileSystem fs;
         auto [file_handler, status] = fs.OpenFile(file_path_, FileFlags::READ_FLAG, FileLockType::kReadLock);
-        if(!status.ok()) {
+        if (!status.ok()) {
             UnrecoverableError(status.message());
         }
         DeferFn file_defer([&]() { fs.Close(*file_handler); });
@@ -673,7 +682,7 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
 
         JSONLRowHandler(json_entry, column_vectors);
         block_entry->IncreaseRowCount(1);
-        ++ row_count;
+        ++row_count;
     }
 
     segment_entry->AppendBlockEntry(std::move(block_entry));
@@ -932,7 +941,7 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
                 }
                 if (res->literal_type_ == LiteralType::kLongSparseArray) {
                     const auto &value_obj = iter.value();
-                    switch(value_obj.type()) {
+                    switch (value_obj.type()) {
                         case nlohmann::json::value_t::number_unsigned:
                         case nlohmann::json::value_t::number_integer: {
                             res->long_sparse_array_.first.push_back(key);
@@ -947,7 +956,7 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
                     }
                 } else {
                     const auto &value_obj = iter.value();
-                    switch(value_obj.type()) {
+                    switch (value_obj.type()) {
                         case nlohmann::json::value_t::number_float: {
                             res->double_sparse_array_.first.push_back(key);
                             res->double_sparse_array_.second.push_back(value_obj.get<double>());
@@ -1025,8 +1034,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemInt8: {
                             Vector<i8> &&embedding = line_json[column_def->name_].get<Vector<i8>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 LOG_ERROR(status.message());
                                 RecoverableError(status);
                             }
@@ -1036,8 +1046,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemInt16: {
                             Vector<i16> &&embedding = line_json[column_def->name_].get<Vector<i16>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 LOG_ERROR(status.message());
                                 RecoverableError(status);
                             }
@@ -1047,8 +1058,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemInt32: {
                             Vector<i32> &&embedding = line_json[column_def->name_].get<Vector<i32>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 LOG_ERROR(status.message());
                                 RecoverableError(status);
                             }
@@ -1058,8 +1070,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemInt64: {
                             Vector<i64> &&embedding = line_json[column_def->name_].get<Vector<i64>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 LOG_ERROR(status.message());
                                 RecoverableError(status);
                             }
@@ -1069,8 +1082,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemFloat: {
                             Vector<float> &&embedding = line_json[column_def->name_].get<Vector<float>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 LOG_ERROR(status.message());
                                 RecoverableError(status);
                             }
@@ -1080,8 +1094,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemDouble: {
                             Vector<double> &&embedding = line_json[column_def->name_].get<Vector<double>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 LOG_ERROR(status.message());
                                 RecoverableError(status);
                             }
@@ -1129,6 +1144,206 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
             Status status = Status::ImportFileFormatError(fmt::format("Column {} not found in JSON.", column_def->name_));
             LOG_ERROR(status.message());
             RecoverableError(status);
+        }
+    }
+}
+
+void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state) {
+    Txn *txn = query_context->GetTxn();
+    u64 segment_id = Catalog::GetNextSegmentID(table_entry_);
+    SizeT row_count = 0;
+
+    arrow::MemoryPool *pool = arrow::DefaultMemoryPool();
+    SharedPtr<arrow::RandomAccessFile> file;
+
+    file = arrow::ReadableFile::Open(file_path_, pool).ValueOrDie();
+    UniquePtr<arrow::ParquetFileReader> arrow_reader;
+
+    SharedPtr<arrow::Table> table;
+    auto status = parquet::OpenFile(file, pool, &arrow_reader);
+    if (!status.ok()) {
+        Status::FileNotFound(file_path_);
+    }
+    status = arrow_reader->ReadTable(&table);
+    if (!status.ok()) {
+        Status::ImportFileFormatError(status.ToString());
+    }
+
+    row_count = table->num_rows();
+
+    SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+    UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
+
+    Vector<ColumnVector> column_vectors;
+    for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+        auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
+        column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+    }
+
+    Vector<i64> chunk_idxs(table_entry_->ColumnCount(), 0);
+    Vector<i64> value_idxs(table_entry_->ColumnCount(), 0);
+    for (SizeT i = 0; i < row_count; ++i) {
+        for (SizeT column_idx = 0; column_idx < table_entry_->ColumnCount(); ++column_idx) {
+            SharedPtr<arrow::ChunkedArray> column = table->column(column_idx);
+            auto &column_vector = column_vectors[column_idx];
+            auto array = column->chunk(chunk_idxs[column_idx]);
+            ParquetValueHandler(array, column_vector, value_idxs[column_idx]);
+            if (++value_idxs[column_idx] >= array->length()) {
+                ++chunk_idxs[column_idx];
+                value_idxs[column_idx] = 0;
+            }
+        }
+
+        block_entry->IncreaseRowCount(1);
+        if (block_entry->GetAvailableCapacity() <= 0) {
+            segment_entry->AppendBlockEntry(std::move(block_entry));
+            if (segment_entry->Room() <= 0) {
+                SaveSegmentData(table_entry_, txn, segment_entry);
+                segment_id = Catalog::GetNextSegmentID(table_entry_);
+                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
+            }
+            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+            column_vectors.clear();
+            for (SizeT i = 0; i < table_entry_->ColumnCount(); ++i) {
+                auto *block_column_entry = block_entry->GetColumnBlockEntry(i);
+                column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
+            }
+        }
+    }
+
+    if (block_entry->row_count() > 0) {
+        segment_entry->AppendBlockEntry(std::move(block_entry));
+    }
+    if (segment_entry->row_count() > 0) {
+        SaveSegmentData(table_entry_, txn, segment_entry);
+    }
+
+    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", row_count));
+    import_op_state->result_msg_ = std::move(result_msg);
+}
+
+void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx) {
+    switch (column_vector.data_type()->type()) {
+        case kBoolean: {
+            auto value = std::dynamic_pointer_cast<arrow::BooleanArray>(array)->Value(value_idx);
+            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            break;
+        }
+        case kTinyInt: {
+            auto value = std::dynamic_pointer_cast<arrow::Int8Array>(array)->Value(value_idx);
+            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            break;
+        }
+        case kSmallInt: {
+            auto value = std::dynamic_pointer_cast<arrow::Int16Array>(array)->Value(value_idx);
+            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            break;
+        }
+        case kInteger: {
+            auto value = std::dynamic_pointer_cast<arrow::Int32Array>(array)->Value(value_idx);
+            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            break;
+        }
+        case kBigInt: {
+            auto value = std::dynamic_pointer_cast<arrow::Int64Array>(array)->Value(value_idx);
+            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            break;
+        }
+        case kFloat: {
+            auto value = std::dynamic_pointer_cast<arrow::FloatArray>(array)->Value(value_idx);
+            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            break;
+        }
+        case kDouble: {
+            auto value = std::dynamic_pointer_cast<arrow::DoubleArray>(array)->Value(value_idx);
+            column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
+            break;
+        }
+        case kVarchar: {
+            String value_str = std::dynamic_pointer_cast<arrow::BinaryArray>(array)->GetString(value_idx);
+            std::string_view value(value_str);
+            column_vector.AppendByStringView(value, ',');
+            break;
+        }
+        case kEmbedding: {
+            auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
+            auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
+            SizeT dim = embedding_info->Dimension();
+            i64 start_offset = list_array->value_offset(value_idx);
+            i64 end_offset = list_array->value_offset(value_idx + 1);
+            if (end_offset - start_offset != (i64)dim) {
+                String error_message =
+                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, end_offset - start_offset);
+                LOG_ERROR(error_message);
+                UnrecoverableError(error_message);
+            }
+            switch (embedding_info->Type()) {
+                case kElemInt8: {
+                    Vector<i8> embedding;
+                    for (i64 j = start_offset; j < end_offset; ++j) {
+                        i8 value = std::dynamic_pointer_cast<arrow::Int8Array>(list_array->values())->Value(j);
+                        embedding.push_back(value);
+                    }
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                case kElemInt16: {
+                    Vector<i16> embedding;
+                    for (i64 j = start_offset; j < end_offset; ++j) {
+                        i16 value = std::dynamic_pointer_cast<arrow::Int16Array>(list_array->values())->Value(j);
+                        embedding.push_back(value);
+                    }
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                case kElemInt32: {
+                    Vector<i32> embedding;
+                    for (i64 j = start_offset; j < end_offset; ++j) {
+                        i32 value = std::dynamic_pointer_cast<arrow::Int32Array>(list_array->values())->Value(j);
+                        embedding.push_back(value);
+                    }
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                case kElemInt64: {
+                    Vector<i64> embedding;
+                    for (i64 j = start_offset; j < end_offset; ++j) {
+                        i64 value = std::dynamic_pointer_cast<arrow::Int64Array>(list_array->values())->Value(j);
+                        embedding.push_back(value);
+                    }
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                case kElemFloat: {
+                    Vector<float> embedding;
+                    for (i64 j = start_offset; j < end_offset; ++j) {
+                        float value = std::dynamic_pointer_cast<arrow::FloatArray>(list_array->values())->Value(j);
+                        embedding.push_back(value);
+                    }
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                case kElemDouble: {
+                    Vector<double> embedding;
+                    for (i64 j = start_offset; j < end_offset; ++j) {
+                        double value = std::dynamic_pointer_cast<arrow::DoubleArray>(list_array->values())->Value(j);
+                        embedding.push_back(value);
+                    }
+                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                    break;
+                }
+                default: {
+                    String error_message = "Not implement: Embedding type.";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                }
+            }
+            break;
+        }
+        default: {
+            String error_message = "Not implement: Invalid data type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }

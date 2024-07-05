@@ -68,6 +68,10 @@ String LogicalImport::ToString(i64 &space) const {
             ss << "(BVECS) ";
             break;
         }
+        case CopyFileType::kPARQUET: {
+            ss << "(PARQUET) ";
+            break;
+        }
         case CopyFileType::kInvalid: {
             ss << "(Invalid) ";
             break;

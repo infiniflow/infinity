@@ -26,6 +26,8 @@ target_link_libraries(
         thrift.a
         jma
         opencc
+        Arrow::arrow_shared
+        Parquet::parquet_shared
 )
 
 if(ENABLE_JEMALLOC)

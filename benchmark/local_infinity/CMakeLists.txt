@@ -17,6 +17,8 @@ target_link_libraries(
     atomic.a
     jma
     opencc
+    Arrow::arrow_shared
+    Parquet::parquet_shared
 )
 
 # ########################################
@@ -40,6 +42,8 @@ target_link_libraries(
     atomic.a
     jma
     opencc
+    Arrow::arrow_shared
+    Parquet::parquet_shared
 )
 
 # query benchmark
@@ -61,6 +65,8 @@ target_link_libraries(
     atomic.a
     jma
     opencc
+    Arrow::arrow_shared
+    Parquet::parquet_shared
 )
 
 # ########################################
@@ -84,6 +90,8 @@ target_link_libraries(
     atomic.a
     jma
     opencc
+    Arrow::arrow_shared
+    Parquet::parquet_shared
 )
 
 # ########################################
@@ -105,6 +113,8 @@ target_link_libraries(
     atomic.a
     jma
     opencc
+    Arrow::arrow_shared
+    Parquet::parquet_shared
 )
 
 add_executable(bmp_benchmark
@@ -125,6 +135,8 @@ target_link_libraries(
     atomic.a
     jma
     opencc
+    Arrow::arrow_shared
+    Parquet::parquet_shared
 )
 
 if(ENABLE_JEMALLOC)

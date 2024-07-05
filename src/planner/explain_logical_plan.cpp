@@ -2015,6 +2015,11 @@ void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vec
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kPARQUET: {
+            SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: PARQUET", String(intent_size, ' ')));
+            result->emplace_back(file_type);
+            break;
+        }
         case CopyFileType::kInvalid: {
             String error_message = "Invalid file type";
             LOG_CRITICAL(error_message);
@@ -2096,6 +2101,11 @@ void ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vec
         }
         case CopyFileType::kBVECS: {
             SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: BVECS", String(intent_size, ' ')));
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kPARQUET : {
+            SharedPtr<String> file_type = MakeShared<String>(fmt::format("{} - type: PARQUET", String(intent_size, ' ')));
             result->emplace_back(file_type);
             break;
         }

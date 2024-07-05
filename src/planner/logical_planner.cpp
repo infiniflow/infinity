@@ -896,7 +896,8 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     switch (statement->copy_file_type_) {
         case CopyFileType::kJSONL:
         case CopyFileType::kFVECS:
-        case CopyFileType::kCSV: {
+        case CopyFileType::kCSV: 
+        case CopyFileType::kPARQUET: {
             break;
         }
         default: {

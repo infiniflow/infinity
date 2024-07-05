@@ -59,7 +59,7 @@ void FragmentTask::OnExecute() {
     // For streaming type, we need to run sink each execution
 
     PhysicalSource *source_op = fragment_context->GetSourceOperator();
-    if(source_state_->state_type_ == SourceStateType::kQueue) {
+    if (source_state_->state_type_ == SourceStateType::kQueue) {
         // For debug
         LOG_TRACE(PhysOpsToString());
     }
