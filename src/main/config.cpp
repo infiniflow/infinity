@@ -344,7 +344,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
         }
 
         SizeT lru_num = DEFAULT_BUFFER_MANAGER_LRU_COUNT;
-        UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, std::numeric_limits<i64>::max(), 0);
+        UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, 100, 1);
         status = global_options_.AddOption(std::move(lru_num_option));
         if(!status.ok()) {
             fmt::print("Fatal: {}", status.message());
@@ -1228,7 +1228,7 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                             } else {
                                 return Status::InvalidConfig("'lru_num' field isn't integer.");
                             }
-                            UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, std::numeric_limits<i64>::max(), 0);
+                            UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, 100, 1);
                             if (!lru_num_option->Validate()) {
                                 return Status::InvalidConfig(fmt::format("Invalid LRU num: {}", 0));
                             }
@@ -1259,6 +1259,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                     UniquePtr<IntegerOption> buffer_manager_size_option =
                         MakeUnique<IntegerOption>(BUFFER_MANAGER_SIZE_OPTION_NAME, buffer_manager_size, std::numeric_limits<i64>::max(), 0);
                     Status status = global_options_.AddOption(std::move(buffer_manager_size_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kLRUNum) == nullptr) {
+                    // LRU Num
+                    i64 lru_num = DEFAULT_BUFFER_MANAGER_LRU_COUNT;
+                    UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, 100, 1);
+                    Status status = global_options_.AddOption(std::move(lru_num_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
