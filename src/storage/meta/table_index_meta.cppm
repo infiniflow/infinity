@@ -110,14 +110,6 @@ private:
 
     EntryList<TableIndexEntry> index_entry_list_{};
 
-private:
-    // TODO: remove it
-    std::shared_mutex &rw_locker() { return index_entry_list_.rw_locker_; }
-
-public:
-    // TODO: remove it
-    // List<SharedPtr<TableIndexEntry>> &index_entry_list() { return index_entry_list_.entry_list_; }
-
 public:
     void Cleanup() override;
 
