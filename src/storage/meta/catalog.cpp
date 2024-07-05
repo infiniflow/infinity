@@ -501,7 +501,7 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, bool create_d
         SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
         // TODO commit ts == 0 is true??
         db_entry->commit_ts_ = 0;
-        db_meta->db_entry_list().emplace_front(std::move(db_entry));
+        db_meta->PushFrontEntry(db_entry);
 
         catalog->db_meta_map()["default_db"] = std::move(db_meta);
     }

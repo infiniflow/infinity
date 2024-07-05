@@ -135,23 +135,21 @@ public:
     }
 private:
     // helper
-    FindResult FindEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
+    FindResult FindEntryNoLock(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);
 
     FindResult FindEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Pair<Entry *, FindResult> GetEntryInner1(TransactionID txn_id, TxnTimeStamp begin_ts);
+    Pair<Entry *, FindResult> GetEntryInner1NoLock(TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    Pair<Entry *, Status> GetEntryInner2(Entry *entry_ptr, FindResult find_res);
+    Pair<Entry *, Status> GetEntryInner2NoLock(Entry *entry_ptr, FindResult find_res);
 
-    // List<SharedPtr<Entry>> entry_list_;
-public: // TODO: make both private
     mutable std::shared_mutex rw_locker_{};
 
     List<SharedPtr<Entry>> entry_list_;
 };
 
 template <EntryConcept Entry>
-FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
+FindResult EntryList<Entry>::FindEntryNoLock(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr) {
     FindResult find_res = FindResult::kNotFound;
     bool continue_loop = true;
     for (auto iter = entry_list_.begin(); iter != entry_list_.end() && continue_loop; ++iter) {
@@ -234,7 +232,7 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_m
                                                   ConflictType conflict_type) {
     std::unique_lock lock(rw_locker_);
     parent_r_lock.unlock();
-    FindResult find_res = this->FindEntry(txn_id, begin_ts, txn_mgr);
+    FindResult find_res = this->FindEntryNoLock(txn_id, begin_ts, txn_mgr);
     switch (find_res) {
         case FindResult::kUncommittedDelete:
         case FindResult::kNotFound: {
@@ -294,7 +292,7 @@ Tuple<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntry(std::shared_lock<std
                                                             ConflictType conflict_type) {
     std::unique_lock lock(rw_locker_);
     parent_r_lock.unlock();
-    FindResult find_res = this->FindEntry(txn_id, begin_ts, txn_mgr);
+    FindResult find_res = this->FindEntryNoLock(txn_id, begin_ts, txn_mgr);
     switch (find_res) {
         case FindResult::kUncommittedDelete:
         case FindResult::kNotFound: {
@@ -346,7 +344,7 @@ Tuple<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntry(std::shared_lock<std
 }
 
 template <EntryConcept Entry>
-Pair<Entry *, FindResult> EntryList<Entry>::GetEntryInner1(TransactionID txn_id, TxnTimeStamp begin_ts) {
+Pair<Entry *, FindResult> EntryList<Entry>::GetEntryInner1NoLock(TransactionID txn_id, TxnTimeStamp begin_ts) {
     Entry *entry_ptr = nullptr;
     FindResult find_res = FindResult::kNotFound;
     for (const auto &entry : entry_list_) {
@@ -374,7 +372,7 @@ Pair<Entry *, FindResult> EntryList<Entry>::GetEntryInner1(TransactionID txn_id,
 }
 
 template <EntryConcept Entry>
-Pair<Entry *, Status> EntryList<Entry>::GetEntryInner2(Entry *entry_ptr, FindResult find_res) {
+Pair<Entry *, Status> EntryList<Entry>::GetEntryInner2NoLock(Entry *entry_ptr, FindResult find_res) {
     switch (find_res) {
         case FindResult::kNotFound: {
             auto err_msg = MakeUnique<String>("Not existed entry.");
@@ -407,18 +405,18 @@ template <EntryConcept Entry>
 Tuple<Entry *, Status> EntryList<Entry>::GetEntry(std::shared_lock<std::shared_mutex> &&parent_lock, TransactionID txn_id, TxnTimeStamp begin_ts) {
     std::shared_lock r_lock(rw_locker_);
     parent_lock.unlock();
-    auto [entry_ptr, find_res] = this->GetEntryInner1(txn_id, begin_ts);
+    auto [entry_ptr, find_res] = this->GetEntryInner1NoLock(txn_id, begin_ts);
     r_lock.unlock();
 
-    return this->GetEntryInner2(entry_ptr, find_res);
+    return this->GetEntryInner2NoLock(entry_ptr, find_res);
 }
 
 template <EntryConcept Entry>
 Tuple<Entry *, Status> EntryList<Entry>::GetEntryNolock(TransactionID txn_id, TxnTimeStamp begin_ts) {
     std::shared_lock r_lock(rw_locker_);
-    auto [entry_ptr, find_res] = this->GetEntryInner1(txn_id, begin_ts);
+    auto [entry_ptr, find_res] = this->GetEntryInner1NoLock(txn_id, begin_ts);
     r_lock.unlock();
-    return this->GetEntryInner2(entry_ptr, find_res);
+    return this->GetEntryInner2NoLock(entry_ptr, find_res);
 }
 
 template <EntryConcept Entry>
@@ -545,6 +543,7 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
     return entry_list_.empty();
 }
 
+// TODO: check if this need to lock
 template <EntryConcept Entry>
 void EntryList<Entry>::Cleanup() {
     for (auto iter = entry_list_.begin(); iter != entry_list_.end(); ++iter) {
