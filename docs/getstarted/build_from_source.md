@@ -76,10 +76,11 @@ wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && sudo ./llvm.sh 18 && rm
 sudo add-apt-repository -P ppa:ubuntu-toolchain-r/test
 sudo add-apt-repository -P ppa:mhier/libboost-latest
 sudo apt update && sudo apt install libc++-18-dev clang-tools-18 flex libboost1.81-dev liblz4-dev zlib1g-dev libevent-dev libjemalloc-dev python3-dev
-ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
-ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
-ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
-ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
+sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
+sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
+sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
+sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
+sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
 ### Step2 Download the source code
@@ -133,6 +134,7 @@ sudo ln -s /usr/lib/llvm-18/bin/clang-scan-deps /usr/bin/clang-scan-deps
 sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
 sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
 sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
+sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
 ```
 
 ### Step2 Download Source Code
