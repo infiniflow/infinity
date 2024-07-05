@@ -134,7 +134,7 @@ bool TxnManager::CheckConflict(Txn *txn) {
         // LOG_INFO(fmt::format("Txn {} check conflict", txn->TxnID()));
         for (auto *finishing_txn : finishing_txns_) {
             // LOG_INFO(fmt::format("Txn {} tries to test txn {}", txn->TxnID(), finishing_txn->TxnID()));
-            const auto &finishing_state = finishing_txn->GetTxnState();
+            auto finishing_state = finishing_txn->GetTxnState();
             bool add = false;
             if (finishing_state == TxnState::kCommitted) {
                 TxnTimeStamp committed_ts = finishing_txn->CommittedTS();

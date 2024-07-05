@@ -55,7 +55,8 @@ void Storage::Init() {
     // Construct buffer manager
     buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
                                             MakeShared<String>(config_ptr_->DataDir()),
-                                            MakeShared<String>(config_ptr_->TempDir()));
+                                            MakeShared<String>(config_ptr_->TempDir()),
+                                            DEFAULT_BUFFER_MANAGER_LRU_COUNT);
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,

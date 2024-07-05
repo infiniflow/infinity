@@ -457,10 +457,10 @@ TxnTimeStamp Txn::Commit() {
     return commit_ts;
 }
 
-bool Txn::CheckConflict(Txn *txn) {
-    LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, txn->txn_id_));
+bool Txn::CheckConflict(Txn *other_txn) {
+    LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, other_txn->txn_id_));
 
-    return txn_store_.CheckConflict(txn->txn_store_);
+    return txn_store_.CheckConflict(other_txn->txn_store_);
 }
 
 void Txn::CommitBottom() {
