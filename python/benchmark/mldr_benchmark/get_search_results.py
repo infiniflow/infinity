@@ -20,9 +20,9 @@ from FlagEmbedding import BGEM3FlagModel
 from tqdm import tqdm
 import numpy as np
 import struct
-from mldr_common_tools import fvecs_read_yield, read_mldr_sparse_embedding_yield
 from mldr_common_tools import QueryArgs, check_languages, check_query_types
 from mldr_common_tools import FakeJScoredDoc, get_queries_and_qids, save_result
+from mldr_common_tools import query_yields, apply_funcs
 from transformers import HfArgumentParser
 import infinity
 from infinity.common import LOCAL_HOST
@@ -35,11 +35,6 @@ class ModelArgs:
 
 def get_model(model_args: ModelArgs):
     return BGEM3FlagModel("BAAI/bge-m3", use_fp16=model_args.fp16)
-
-
-text_to_replace = "&|!+-–():\'\"?~^"
-text_to_replace_with = " " * len(text_to_replace)
-query_translation_table = str.maketrans(text_to_replace, text_to_replace_with)
 
 
 def prepare_dense_embedding(embedding_file: str, model: BGEM3FlagModel, queries: list[str], qids: list[int]):
@@ -73,34 +68,6 @@ def prepare_sparse_embedding(embedding_file: str, model: BGEM3FlagModel, queries
     return
 
 
-def bm25_query_yield(queries: list[str], embedding_file: str):
-    for query in queries:
-        yield query.translate(query_translation_table)
-
-
-def dense_query_yield(queries: list[str], embedding_file: str):
-    return fvecs_read_yield(embedding_file)
-
-
-def sparse_query_yield(queries: list[str], embedding_file: str):
-    return read_mldr_sparse_embedding_yield(embedding_file)
-
-
-def apply_bm25(table, query_str: str, max_hits: int):
-    return table.match('fulltext_col', query_str, f'topn={max_hits}')
-
-
-def apply_dense(table, query_embedding, max_hits: int):
-    return table.knn("dense_col", query_embedding, "float", "ip", max_hits)
-
-
-def apply_sparse(table, query_embedding: dict, max_hits: int):
-    return table.match_sparse("sparse_col", query_embedding, "ip", max_hits, {"alpha": "1.0", "beta": "1.0"})
-
-
-apply_funcs = {'bm25': apply_bm25, 'dense': apply_dense, 'sparse': apply_sparse}
-
-
 def powerset_above_2(s: list):
     return chain.from_iterable(combinations(s, r) for r in range(2, len(s) + 1))
 
@@ -116,7 +83,6 @@ class InfinityClientForSearch:
         self.infinity_db = self.infinity_obj.get_database(self.test_db_name)
         self.infinity_table = None
         self.prepare_embedding_funcs = {'dense': prepare_dense_embedding, 'sparse': prepare_sparse_embedding}
-        self.query_yields = {'bm25': bm25_query_yield, 'dense': dense_query_yield, 'sparse': sparse_query_yield}
         self.query_funcs = {'bm25': self.bm25_query, 'dense': self.dense_query, 'sparse': self.sparse_query}
 
     def get_test_table(self, language_suffix: str):
@@ -137,9 +103,8 @@ class InfinityClientForSearch:
 
     def sparse_query(self, query_embedding: dict, max_hits: int):
         result = self.infinity_table.output(["docid_col", "_similarity"]).match_sparse("sparse_col", query_embedding,
-                                                                                       "ip", max_hits,
-                                                                                       {"alpha": "1.0",
-                                                                                        "beta": "1.0"}).to_pl()
+                                                                                       "ip", max_hits, {"alpha": "1.0",
+                                                                                                        "beta": "1.0"}).to_pl()
         return result['docid_col'], result['SIMILARITY']
 
     def fusion_query(self, query_targets_list: list, apply_funcs_list: list, max_hits: int):
@@ -165,7 +130,7 @@ class InfinityClientForSearch:
                     if not os.path.exists(embedding_file):
                         print(f"Start to prepare embedding for query method: {query_type}")
                         self.prepare_embedding_funcs[query_type](embedding_file, model, queries, qids)
-                query_yield = self.query_yields[query_type](queries, embedding_file)
+                query_yield = query_yields[query_type](queries, embedding_file)
                 query_func = self.query_funcs[query_type]
                 print(f"Start to search for query method: {query_type}")
                 total_query_time: float = 0.0
@@ -192,10 +157,10 @@ class InfinityClientForSearch:
             for query_type_comb in powerset_above_2(query_types):
                 query_type_comb_str = '_'.join(query_type_comb)
                 print(f"Start to search for fusion method: {query_type_comb_str}")
-                embedding_files_list = [os.path.join(save_dir, f"query_embedding_{lang}_{query_type}.data")
-                                        for query_type in query_type_comb]
-                query_yields_list = [self.query_yields[query_type](queries, embedding_file)
-                                     for query_type, embedding_file in zip(query_type_comb, embedding_files_list)]
+                embedding_files_list = [os.path.join(save_dir, f"query_embedding_{lang}_{query_type}.data") for
+                                        query_type in query_type_comb]
+                query_yields_list = [query_yields[query_type](queries, embedding_file) for query_type, embedding_file in
+                                     zip(query_type_comb, embedding_files_list)]
                 apply_funcs_list = [apply_funcs[query_type] for query_type in query_type_comb]
                 total_query_time: float = 0.0
                 total_query_num: int = len(qids)

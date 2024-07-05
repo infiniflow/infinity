@@ -231,3 +231,38 @@ def get_all_part_begin_ends(total_row_count: int):
 def get_bit_array(float_array: list[list]):
     return [[1 if x > 0.0 else 0 for x in one_list] for one_list in float_array]
 
+
+text_to_replace = "&|!+-–():\'\"?~^"
+text_to_replace_with = " " * len(text_to_replace)
+query_translation_table = str.maketrans(text_to_replace, text_to_replace_with)
+
+
+def bm25_query_yield(queries: list[str], embedding_file: str):
+    for query in queries:
+        yield query.translate(query_translation_table)
+
+def dense_query_yield(queries: list[str], embedding_file: str):
+    return fvecs_read_yield(embedding_file)
+
+
+def sparse_query_yield(queries: list[str], embedding_file: str):
+    return read_mldr_sparse_embedding_yield(embedding_file)
+
+
+query_yields = {'bm25': bm25_query_yield, 'dense': dense_query_yield, 'sparse': sparse_query_yield}
+
+
+def apply_bm25(table, query_str: str, max_hits: int):
+    return table.match('fulltext_col', query_str, f'topn={max_hits}')
+
+
+def apply_dense(table, query_embedding, max_hits: int):
+    return table.knn("dense_col", query_embedding, "float", "ip", max_hits)
+
+
+def apply_sparse(table, query_embedding: dict, max_hits: int):
+    return table.match_sparse("sparse_col", query_embedding, "ip", max_hits, {"alpha": "1.0", "beta": "1.0"})
+
+
+apply_funcs = {'bm25': apply_bm25, 'dense': apply_dense, 'sparse': apply_sparse}
+

@@ -22,7 +22,6 @@ from infinity.common import ConflictType, LOCAL_HOST
 from infinity.errors import ErrorCode
 
 
-# fulltext column, dense embedding column, sparse embedding column
 class InfinityClientForInsert:
     def __init__(self):
         self.test_db_name = "default_db"
