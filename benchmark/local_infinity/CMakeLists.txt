@@ -19,8 +19,8 @@ target_link_libraries(
     c++abi.a
     jma
     opencc
-    Arrow::arrow_shared
-    Parquet::parquet_shared
+    Arrow::arrow_static
+    Parquet::parquet_static
 )
 
 # ########################################
@@ -46,8 +46,8 @@ target_link_libraries(
     c++abi.a
     jma
     opencc
-    Arrow::arrow_shared
-    Parquet::parquet_shared
+    Arrow::arrow_static
+    Parquet::parquet_static
 )
 
 # query benchmark
@@ -71,8 +71,8 @@ target_link_libraries(
     c++abi.a
     jma
     opencc
-    Arrow::arrow_shared
-    Parquet::parquet_shared
+    Arrow::arrow_static
+    Parquet::parquet_static
 )
 
 # ########################################
@@ -98,8 +98,8 @@ target_link_libraries(
     c++abi.a
     jma
     opencc
-    Arrow::arrow_shared
-    Parquet::parquet_shared
+    Arrow::arrow_static
+    Parquet::parquet_static
 )
 
 # ########################################
@@ -123,8 +123,8 @@ target_link_libraries(
     c++.a
     c++abi.a
     opencc
-    Arrow::arrow_shared
-    Parquet::parquet_shared
+    Arrow::arrow_static
+    Parquet::parquet_static
 )
 
 add_executable(bmp_benchmark
@@ -169,8 +169,8 @@ target_link_libraries(
     c++.a
     c++abi.a
     opencc
-    Arrow::arrow_shared
-    Parquet::parquet_shared
+    Arrow::arrow_static
+    Parquet::parquet_static
 )
 
 if(ENABLE_JEMALLOC)

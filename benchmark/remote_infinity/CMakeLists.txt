@@ -28,8 +28,8 @@ target_link_libraries(
         c++abi.a
         jma
         opencc
-        Arrow::arrow_shared
-        Parquet::parquet_shared
+        Arrow::arrow_static
+        Parquet::parquet_static
 )
 
 if(ENABLE_JEMALLOC)

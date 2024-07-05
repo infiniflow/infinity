@@ -292,8 +292,8 @@ target_link_libraries(infinity
         oatpp.a
         jma
         opencc
-        Arrow::arrow_shared
-        Parquet::parquet_shared
+        Arrow::arrow_static
+        Parquet::parquet_static
 )
 
 if (ENABLE_JEMALLOC)
@@ -345,8 +345,8 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         c++abi.a
         jma
         opencc
-        Arrow::arrow_shared
-        Parquet::parquet_shared
+        Arrow::arrow_static
+        Parquet::parquet_static
 )
 
 # WARN: python modules shall not link to static libstdc++!!!
@@ -473,8 +473,8 @@ target_link_libraries(unit_test
         c++abi.a
         jma
         opencc
-        Arrow::arrow_shared
-        Parquet::parquet_shared
+        Arrow::arrow_static
+        Parquet::parquet_static
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -541,8 +541,8 @@ target_link_libraries(test_hnsw_bitmask
     c++abi.a
     jma
     #        profiler
-    Arrow::arrow_shared
-    Parquet::parquet_shared
+    Arrow::arrow_static
+    Parquet::parquet_static
 )
 
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
