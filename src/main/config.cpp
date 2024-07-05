@@ -343,6 +343,14 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
             UnrecoverableError(status.message());
         }
 
+        SizeT lru_num = DEFAULT_BUFFER_MANAGER_LRU_COUNT;
+        UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, std::numeric_limits<i64>::max(), 0);
+        status = global_options_.AddOption(std::move(lru_num_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Temp Dir
         String temp_dir = "/var/infinity/tmp";
         UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
@@ -1213,6 +1221,20 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                             global_options_.AddOption(std::move(buffer_manager_size_option));
                             break;
                         }
+                        case GlobalOptionIndex::kLRUNum: {
+                            i64 lru_num = DEFAULT_BUFFER_MANAGER_LRU_COUNT;
+                            if(elem.second.is_integer()) {
+                                lru_num = elem.second.value_or(lru_num);
+                            } else {
+                                return Status::InvalidConfig("'lru_num' field isn't integer.");
+                            }
+                            UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, std::numeric_limits<i64>::max(), 0);
+                            if (!lru_num_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid LRU num: {}", 0));
+                            }
+                            global_options_.AddOption(std::move(lru_num_option));
+                            break;
+                        }
                         case GlobalOptionIndex::kTempDir: {
                             String temp_dir = "/var/infinity/tmp";
                             if (elem.second.is_string()) {
@@ -1704,6 +1726,11 @@ i64 Config::MemIndexCapacity() {
 i64 Config::BufferManagerSize() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kBufferManagerSize);
+}
+
+SizeT Config::LRUNum() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kLRUNum);
 }
 
 String Config::TempDir() {

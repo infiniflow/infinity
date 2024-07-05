@@ -82,7 +82,7 @@ public:
 
     // Buffer
     i64 BufferManagerSize();
-
+    SizeT LRUNum();
     String TempDir();
 
     // WAL

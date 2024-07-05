@@ -199,6 +199,7 @@ export {
     constexpr std::string_view MEM_INDEX_CAPACITY_OPTION_NAME = "mem_index_capacity";
 
     constexpr std::string_view BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
+    constexpr std::string_view LRU_NUM_OPTION_NAME = "lru_num";
     constexpr std::string_view TEMP_DIR_OPTION_NAME = "temp_dir";
     constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";
     constexpr std::string_view WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";

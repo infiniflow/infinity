@@ -53,6 +53,7 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(MEM_INDEX_CAPACITY_OPTION_NAME)] = GlobalOptionIndex::kMemIndexCapacity;
 
     name2index_[String(BUFFER_MANAGER_SIZE_OPTION_NAME)] = GlobalOptionIndex::kBufferManagerSize;
+    name2index_[String(LRU_NUM_OPTION_NAME)] = GlobalOptionIndex::kLRUNum;
     name2index_[String(TEMP_DIR_OPTION_NAME)] = GlobalOptionIndex::kTempDir;
     name2index_[String(WAL_DIR_OPTION_NAME)] = GlobalOptionIndex::kWALDir;
     name2index_[String(WAL_COMPACT_THRESHOLD_OPTION_NAME)] = GlobalOptionIndex::kWALCompactThreshold;

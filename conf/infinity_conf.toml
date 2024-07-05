@@ -35,6 +35,7 @@ mem_index_capacity       = 1048576
 
 [buffer]
 buffer_manager_size        = "4GB"
+lru_num                 = 7
 temp_dir                = "/var/infinity/tmp"
 
 [wal]
