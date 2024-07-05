@@ -520,10 +520,9 @@ target_link_libraries(test_hnsw_bitmask
     sql_parser
     onnxruntime_mlas
     zsv_parser
-    roaring
     newpfor
     fastpfor
-
+    opencc
     thrift.a
     thriftnb.a
     lz4.a

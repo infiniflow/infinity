@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "hnsw_benchmark_util.h"
-#include "CLI11.hpp"
 
 import stl;
 import third_party;
