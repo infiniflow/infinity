@@ -99,8 +99,7 @@ public:
         try {
             app_.parse(argc, argv);
         } catch (const CLI::ParseError &e) {
-            std::cout << e.what() << std::endl;
-            exit(1);
+            UnrecoverableError(e.what());
         }
         ParseInner();
     }
@@ -151,7 +150,7 @@ private:
 
 using LabelT = i32;
 using Hnsw = KnnHnsw<PlainL2VecStoreType<float>, LabelT>;
-using HnswLVQ = KnnHnsw<LVQL2VecStoreType<float, int8_t>, LabelT>;
+using HnswLVQ = KnnHnsw<LVQL2VecStoreType<float, i8>, LabelT>;
 
 template <typename HnswT, typename HnswT2>
 void Build(const BenchmarkOption &option) {

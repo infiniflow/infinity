@@ -157,7 +157,7 @@ TEST_F(BufferManagerTest, cleanup_test) {
             EXPECT_LE(write_n, k);
 
             buffer_mgr.RemoveClean();
-            CheckFileNum(file_num, file_num - write_n - file_num1);
+            CheckFileNum(file_num, file_num - k - file_num1);
         }
         for (SizeT i = file_num1; i < file_num; ++i) {
             auto *buffer_obj = buffer_objs[i];

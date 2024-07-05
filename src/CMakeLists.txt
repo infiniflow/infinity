@@ -495,45 +495,6 @@ target_include_directories(unit_test PUBLIC "${CMAKE_SOURCE_DIR}/third_party/ope
 
 target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 
-add_executable(test_hnsw "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/storage/knnindex/knn_hnsw/test_hnsw.cpp")
-target_include_directories(test_hnsw PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
-target_include_directories(test_hnsw PUBLIC "${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include")
-
-target_link_libraries(test_hnsw
-    infinity_core
-    gtest
-    gtest_main
-    c++.a
-    c++abi.a
-)
-
-add_executable(test_hnsw_bitmask "${CMAKE_CURRENT_SOURCE_DIR}/unit_test/storage/knnindex/knn_hnsw/test_hnsw_bitmask.cpp")
-
-target_link_directories(test_hnsw_bitmask PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_include_directories(test_hnsw_bitmask PUBLIC "${CMAKE_SOURCE_DIR}/unit_test")
-target_include_directories(test_hnsw_bitmask PUBLIC "${CMAKE_SOURCE_DIR}/third_party/googletest/googletest/include")
-
-target_link_libraries(test_hnsw_bitmask
-    infinity_core
-    gtest
-    gtest_main
-    sql_parser
-    onnxruntime_mlas
-    zsv_parser
-    newpfor
-    fastpfor
-    opencc
-    thrift.a
-    thriftnb.a
-    lz4.a
-    atomic.a
-    event.a
-    c++.a
-    c++abi.a
-    jma
-    #        profiler
-)
-
 # target_compile_options(unit_test PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-mavx2 -mfma -mf16c -mpopcnt>)
 if (SUPPORT_AVX2 EQUAL 0 OR SUPPORT_AVX512 EQUAL 0)
     message("Compiled by AVX2 or AVX512")
