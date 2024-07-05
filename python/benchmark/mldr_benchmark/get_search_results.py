@@ -71,6 +71,34 @@ def prepare_sparse_embedding(embedding_file: str, model_args: ModelArgs, queries
     return
 
 
+def bm25_query_yield(queries: list[str], embedding_file: str):
+    for query in queries:
+        yield query.translate(query_translation_table)
+
+
+def dense_query_yield(queries: list[str], embedding_file: str):
+    return fvecs_read_yield(embedding_file)
+
+
+def sparse_query_yield(queries: list[str], embedding_file: str):
+    return read_mldr_sparse_embedding_yield(embedding_file)
+
+
+def apply_bm25(table, query_str: str, max_hits: int):
+    return table.match('fulltext_col', query_str, f'topn={max_hits}')
+
+
+def apply_dense(table, query_embedding, max_hits: int):
+    return table.knn("dense_col", query_embedding, "float", "ip", max_hits, {"ef": str(max_hits)})
+
+
+def apply_sparse(table, query_embedding: dict, max_hits: int):
+    return table.match_sparse("sparse_col", query_embedding, "ip", max_hits, {"alpha": "0.9", "beta": "0.5"})
+
+
+apply_funcs = {'bm25': apply_bm25, 'dense': apply_dense, 'sparse': apply_sparse}
+
+
 def prepare_colbert_embedding(embedding_file: str, model_args: ModelArgs, queries: list[str], qids: list[int]):
     model = get_colbert_model(model_args)
     query_embedding = model.encode_query(queries)
@@ -109,12 +137,31 @@ class InfinityClientForSearch:
         self.infinity_table = self.infinity_db.get_table(table_name)
         print(f"Get table {table_name} successfully.")
 
+    def bm25_query(self, query_str: str, max_hits: int):
+        # query_str = query.translate(query_translation_table)
+        result = self.infinity_table.output(["docid_col", "_score"]).match('fulltext_col', query_str,
+                                                                           f'topn={max_hits}').to_pl()
+        return result['docid_col'], result['SCORE']
+
+    def dense_query(self, query_embedding, max_hits: int):
+        result = self.infinity_table.output(["docid_col", "_similarity"]).knn("dense_col", query_embedding, "float",
+                                                                              "ip", max_hits, {"ef": str(max_hits)}).to_pl()
+        return result['docid_col'], result['SIMILARITY']
+
+    def sparse_query(self, query_embedding: dict, max_hits: int):
+        result = self.infinity_table.output(["docid_col", "_similarity"]).match_sparse("sparse_col", query_embedding,
+                                                                                       "ip", max_hits,
+                                                                                       {"alpha": "0.9",
+                                                                                        "beta": "0.5"}).to_pl()
+        return result['docid_col'], result['SIMILARITY']
+
     def common_single_query_func(self, query_type: str, query_target, max_hits: int):
         str_params = single_query_func_params[query_type]
         result_table = self.infinity_table.output(["docid_col", str_params[0]])
         result_table = apply_funcs[query_type](result_table, query_target, max_hits)
         result = result_table.to_pl()
         return result['docid_col'], result[str_params[1]]
+
 
     def fusion_query(self, query_targets_list: list, apply_funcs_list: list, max_hits: int):
         result_table = self.infinity_table.output(["docid_col", "_score"])
@@ -124,6 +171,7 @@ class InfinityClientForSearch:
         result = result_table.to_pl()
         return result['docid_col'], result['SCORE']
 
+      
     def main(self, languages: list[str], query_types: list[str], model_args: ModelArgs, save_dir: str):
         for lang in languages:
             print(f"Start to search for language: {lang}")

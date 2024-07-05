@@ -28,8 +28,63 @@ import infinity_exception;
 import buffer_obj;
 
 namespace infinity {
-BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, SharedPtr<String> temp_dir)
-    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), memory_limit_(memory_limit), current_memory_size_(0) {
+
+void LRUCache::RemoveClean(const Vector<BufferObj *> &buffer_obj) {
+    std::unique_lock lock(locker_);
+    for (auto *buffer_obj : buffer_obj) {
+        if (auto iter = gc_map_.find(buffer_obj); iter != gc_map_.end()) {
+            gc_list_.erase(iter->second);
+            gc_map_.erase(iter);
+        }
+    }
+}
+
+SizeT LRUCache::WaitingGCObjectCount() {
+    std::unique_lock lock(locker_);
+    return gc_map_.size();
+}
+
+SizeT LRUCache::RequestSpace(SizeT need_space) {
+    SizeT free_space = 0;
+    std::unique_lock lock(locker_);
+    auto iter = gc_list_.begin();
+    while (free_space < need_space && iter != gc_list_.end()) {
+        auto *buffer_obj = *iter;
+        free_space += buffer_obj->GetBufferSize();
+        // Free return false when the buffer is freed by cleanup
+        // will not dead lock because caller is in kNew or kFree state, and `buffer_obj` is in kUnloaded or state
+        if (buffer_obj->Free()) {
+            iter = gc_list_.erase(iter);
+            gc_map_.erase(buffer_obj);
+        } else {
+            ++iter;
+        }
+    }
+    return free_space;
+}
+
+void LRUCache::PushGCQueue(BufferObj *buffer_obj) {
+    std::unique_lock lock(locker_);
+    auto iter = gc_map_.find(buffer_obj);
+    if (iter != gc_map_.end()) {
+        gc_list_.erase(iter->second);
+    }
+    gc_list_.push_back(buffer_obj);
+    gc_map_[buffer_obj] = --gc_list_.end();
+}
+
+bool LRUCache::RemoveFromGCQueue(BufferObj *buffer_obj) {
+    std::unique_lock lock(locker_);
+    if (auto iter = gc_map_.find(buffer_obj); iter != gc_map_.end()) {
+        gc_list_.erase(iter->second);
+        gc_map_.erase(iter);
+        return true;
+    }
+    return false;
+}
+
+BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, SharedPtr<String> temp_dir, SizeT lru_count)
+    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), memory_limit_(memory_limit), current_memory_size_(0), lru_caches_(lru_count) {
     LocalFileSystem fs;
     if (!fs.Exists(*data_dir_)) {
         fs.CreateDirectory(*data_dir_);
@@ -75,6 +130,19 @@ BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker) {
     return res;
 }
 
+Vector<SizeT> BufferManager::WaitingGCObjectCount() {
+    Vector<SizeT> size_list(lru_caches_.size());
+    for (SizeT i = 0; i < lru_caches_.size(); ++i) {
+        size_list[i] = lru_caches_[i].WaitingGCObjectCount();
+    }
+    return size_list;
+}
+
+SizeT BufferManager::BufferedObjectCount() {
+    std::unique_lock lock(w_locker_);
+    return buffer_map_.size();
+}
+
 void BufferManager::RemoveClean() {
     Vector<BufferObj *> clean_list;
     {
@@ -94,11 +162,8 @@ void BufferManager::RemoveClean() {
         buffer_obj->CleanupTempFile();
     }
 
-    {
-        std::unique_lock lock(gc_locker_);
-        for (auto *buffer_obj : clean_list) {
-            gc_set_.erase(buffer_obj);
-        }
+    for (auto &lru_cache : lru_caches_) {
+        lru_cache.RemoveClean(clean_list);
     }
     {
         std::unique_lock lock(w_locker_);
@@ -114,45 +179,53 @@ void BufferManager::RemoveClean() {
     }
 }
 
-SizeT BufferManager::WaitingGCObjectCount() {
-    std::unique_lock lock(gc_locker_);
-    return gc_set_.size();
-}
-
-SizeT BufferManager::BufferedObjectCount() {
-    std::unique_lock lock(w_locker_);
-    return buffer_map_.size();
+Vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
+    Vector<BufferObjectInfo> result;
+    {
+        std::unique_lock lock(w_locker_);
+        result.reserve(buffer_map_.size());
+        for (const auto &buffer_pair : buffer_map_) {
+            BufferObjectInfo buffer_object_info;
+            buffer_object_info.object_path_ = buffer_pair.first;
+            BufferObj *buffer_object_ptr = buffer_pair.second.get();
+            buffer_object_info.buffered_status_ = buffer_object_ptr->status();
+            buffer_object_info.buffered_type_ = buffer_object_ptr->type();
+            buffer_object_info.file_type_ = buffer_object_ptr->file_worker()->Type();
+            buffer_object_info.object_size_ = buffer_object_ptr->GetBufferSize();
+            result.emplace_back(buffer_object_info);
+        }
+    }
+    return result;
 }
 
 void BufferManager::RequestSpace(SizeT need_size) {
     std::unique_lock lock(gc_locker_);
-    auto iter = gc_set_.begin();
-    while (current_memory_size_ + need_size > memory_limit_ && iter != gc_set_.end()) {
-        auto *buffer_obj = *iter;
-
-        // Free return false when the buffer is freed by cleanup
-        // will not dead lock because caller is in kNew or kFree state, and `buffer_obj` is in kUnloaded or kLoaded state
-        auto status = buffer_obj->Free();
-        if (status == BufferFreeStatus::kCleaned) {
-            ++iter;
-        } else {
-            if (status == BufferFreeStatus::kSuccess) {
-                current_memory_size_ -= buffer_obj->GetBufferSize();
-            }
-            iter = gc_set_.erase(iter);
-        }
+    SizeT free_space = memory_limit_ - current_memory_size_;
+    if (free_space >= need_size) {
+        current_memory_size_ += need_size;
+        return;
     }
-    if (current_memory_size_ + need_size > memory_limit_) {
+    SizeT round_robin = round_robin_;
+    do {
+        free_space += lru_caches_[round_robin_].RequestSpace(need_size);
+        round_robin_ = (round_robin_ + 1) % lru_caches_.size();
+    } while (free_space < need_size && round_robin_ != round_robin);
+    if (free_space < need_size) {
         String error_message = "Out of memory.";
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
-    current_memory_size_ += need_size;
+    current_memory_size_ += -free_space + need_size;
 }
 
 void BufferManager::PushGCQueue(BufferObj *buffer_obj) {
-    std::unique_lock lock(gc_locker_);
-    gc_set_.insert(buffer_obj);
+    SizeT idx = LRUIdx(buffer_obj);
+    lru_caches_[idx].PushGCQueue(buffer_obj);
+}
+
+bool BufferManager::RemoveFromGCQueue(BufferObj *buffer_obj) {
+    SizeT idx = LRUIdx(buffer_obj);
+    return lru_caches_[idx].RemoveFromGCQueue(buffer_obj);
 }
 
 void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
@@ -161,9 +234,8 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
         clean_list_.emplace_back(buffer_obj);
     }
     if (do_free) {
-        std::unique_lock lock(gc_locker_);
         current_memory_size_ -= buffer_obj->GetBufferSize();
-        if (!RemoveFromGCQueueInner(buffer_obj)) {
+        if (!RemoveFromGCQueue(buffer_obj)) {
             String error_message = fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", buffer_obj->GetFilename());
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
@@ -208,31 +280,9 @@ void BufferManager::MoveTemp(BufferObj *buffer_obj) {
     }
 }
 
-bool BufferManager::RemoveFromGCQueueInner(BufferObj *buffer_obj) {
-    if (auto iter = gc_set_.find(buffer_obj); iter != gc_set_.end()) {
-        gc_set_.erase(iter);
-        return true;
-    }
-    return false;
-}
-
-Vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
-    Vector<BufferObjectInfo> result;
-    {
-        std::unique_lock lock(w_locker_);
-        result.reserve(buffer_map_.size());
-        for(const auto& buffer_pair: buffer_map_) {
-            BufferObjectInfo buffer_object_info;
-            buffer_object_info.object_path_ = buffer_pair.first;
-            BufferObj* buffer_object_ptr = buffer_pair.second.get();
-            buffer_object_info.buffered_status_ = buffer_object_ptr->status();
-            buffer_object_info.buffered_type_ = buffer_object_ptr->type();
-            buffer_object_info.file_type_ = buffer_object_ptr->file_worker()->Type();
-            buffer_object_info.object_size_ = buffer_object_ptr->GetBufferSize();
-            result.emplace_back(buffer_object_info);
-        }
-    }
-    return result;
+SizeT BufferManager::LRUIdx(BufferObj *buffer_obj) const {
+    auto p = reinterpret_cast<u64>(buffer_obj);
+    return p % lru_caches_.size();
 }
 
 } // namespace infinity

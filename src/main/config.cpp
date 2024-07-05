@@ -343,6 +343,14 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
             UnrecoverableError(status.message());
         }
 
+        SizeT lru_num = DEFAULT_BUFFER_MANAGER_LRU_COUNT;
+        UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, 100, 1);
+        status = global_options_.AddOption(std::move(lru_num_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Temp Dir
         String temp_dir = "/var/infinity/tmp";
         UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
@@ -1213,6 +1221,20 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                             global_options_.AddOption(std::move(buffer_manager_size_option));
                             break;
                         }
+                        case GlobalOptionIndex::kLRUNum: {
+                            i64 lru_num = DEFAULT_BUFFER_MANAGER_LRU_COUNT;
+                            if(elem.second.is_integer()) {
+                                lru_num = elem.second.value_or(lru_num);
+                            } else {
+                                return Status::InvalidConfig("'lru_num' field isn't integer.");
+                            }
+                            UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, 100, 1);
+                            if (!lru_num_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid LRU num: {}", 0));
+                            }
+                            global_options_.AddOption(std::move(lru_num_option));
+                            break;
+                        }
                         case GlobalOptionIndex::kTempDir: {
                             String temp_dir = "/var/infinity/tmp";
                             if (elem.second.is_string()) {
@@ -1237,6 +1259,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                     UniquePtr<IntegerOption> buffer_manager_size_option =
                         MakeUnique<IntegerOption>(BUFFER_MANAGER_SIZE_OPTION_NAME, buffer_manager_size, std::numeric_limits<i64>::max(), 0);
                     Status status = global_options_.AddOption(std::move(buffer_manager_size_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kLRUNum) == nullptr) {
+                    // LRU Num
+                    i64 lru_num = DEFAULT_BUFFER_MANAGER_LRU_COUNT;
+                    UniquePtr<IntegerOption> lru_num_option = MakeUnique<IntegerOption>(LRU_NUM_OPTION_NAME, lru_num, 100, 1);
+                    Status status = global_options_.AddOption(std::move(lru_num_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -1704,6 +1735,11 @@ i64 Config::MemIndexCapacity() {
 i64 Config::BufferManagerSize() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kBufferManagerSize);
+}
+
+SizeT Config::LRUNum() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kLRUNum);
 }
 
 String Config::TempDir() {

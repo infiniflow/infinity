@@ -17,6 +17,7 @@ module;
 import stl;
 import file_worker;
 // import specific_concurrent_queue;
+import default_values;
 
 export module buffer_manager;
 
@@ -25,9 +26,31 @@ namespace infinity {
 class BufferObj;
 class BufferObjectInfo;
 
+class LRUCache {
+public:
+    void RemoveClean(const Vector<BufferObj *> &buffer_obj);
+
+    SizeT WaitingGCObjectCount();
+
+    SizeT RequestSpace(SizeT need_space);
+
+    void PushGCQueue(BufferObj *buffer_obj);
+
+    bool RemoveFromGCQueue(BufferObj *buffer_obj);
+
+private:
+    std::mutex locker_{};
+    using GCListIter = List<BufferObj *>::iterator;
+    HashMap<BufferObj *, GCListIter> gc_map_{};
+    List<BufferObj *> gc_list_{};
+};
+
 export class BufferManager {
 public:
-    explicit BufferManager(u64 memory_limit, SharedPtr<String> data_dir, SharedPtr<String> temp_dir);
+    explicit BufferManager(u64 memory_limit,
+                           SharedPtr<String> data_dir,
+                           SharedPtr<String> temp_dir,
+                           SizeT lru_count = DEFAULT_BUFFER_MANAGER_LRU_COUNT);
 
     ~BufferManager();
 
@@ -49,7 +72,7 @@ public:
 
     u64 memory_usage() { return current_memory_size_; }
 
-    SizeT WaitingGCObjectCount();
+    Vector<SizeT> WaitingGCObjectCount();
 
     SizeT BufferedObjectCount();
 
@@ -66,6 +89,8 @@ private:
     // BufferHandle calls it, after unload.
     void PushGCQueue(BufferObj *buffer_obj);
 
+    bool RemoveFromGCQueue(BufferObj *buffer_obj);
+
     void AddToCleanList(BufferObj *buffer_obj, bool do_free);
 
     void AddTemp(BufferObj *buffer_obj);
@@ -74,8 +99,7 @@ private:
 
     void MoveTemp(BufferObj *buffer_obj);
 
-private:
-    bool RemoveFromGCQueueInner(BufferObj *buffer_obj);
+    SizeT LRUIdx(BufferObj *buffer_obj) const;
 
 private:
     SharedPtr<String> data_dir_;
@@ -88,8 +112,8 @@ private:
     HashMap<String, UniquePtr<BufferObj>> buffer_map_{};
 
     std::mutex gc_locker_{};
-    using GCListIter = List<BufferObj *>::iterator;
-    HashSet<BufferObj *> gc_set_{};
+    Vector<LRUCache> lru_caches_{};
+    SizeT round_robin_{};
 
     std::mutex clean_locker_{};
     Vector<BufferObj *> clean_list_{};

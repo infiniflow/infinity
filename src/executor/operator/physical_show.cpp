@@ -3465,7 +3465,9 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
             output_block_ptr->Init(output_column_types);
 
             BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-            Value value = Value::MakeBigInt(buffer_manager->WaitingGCObjectCount());
+            Vector<SizeT> size_list = buffer_manager->WaitingGCObjectCount();
+            SizeT total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
+            Value value = Value::MakeBigInt(total_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
             break;
@@ -3914,7 +3916,9 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 {
                     // option value
                     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
-                    Value value = Value::MakeVarchar(std::to_string(buffer_manager->WaitingGCObjectCount()));
+                    Vector<SizeT> size_list = buffer_manager->WaitingGCObjectCount();
+                    SizeT total_size = std::accumulate(size_list.begin(), size_list.end(), 0);
+                    Value value = Value::MakeVarchar(std::to_string(total_size));
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
                 }
