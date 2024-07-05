@@ -24,12 +24,16 @@ from infinity.common import LOCAL_HOST
 
 
 class InfinityClientForSearch:
-    def __init__(self):
+    def __init__(self, with_colbert: bool):
         self.test_db_name = "default_db"
         self.test_table_name_prefix = "mldr_test_table_text_dense_sparse_"
         self.test_table_schema = {"docid_col": {"type": "varchar"}, "fulltext_col": {"type": "varchar"},
                                   "dense_col": {"type": "vector,1024,float"},
                                   "sparse_col": {"type": "sparse,250002,float,int"}}
+        if with_colbert:
+            self.test_table_name_prefix += "colbert_"
+            self.test_table_schema["colbert_col"] = {"type": "tensor,128,float"}
+            self.test_table_schema["colbert_bit_col"] = {"type": "tensor,128,bit"}
         self.infinity_obj = infinity.connect(LOCAL_HOST)
         self.infinity_db = self.infinity_obj.get_database(self.test_db_name)
         self.infinity_table = None
@@ -91,5 +95,5 @@ if __name__ == "__main__":
     parser = HfArgumentParser([QueryArgs])
     query_args: QueryArgs = parser.parse_args_into_dataclasses()[0]
     languages = check_languages(query_args.languages)
-    infinity_client = InfinityClientForSearch()
+    infinity_client = InfinityClientForSearch(query_args.with_colbert)
     infinity_client.main(languages=languages, save_dir=query_args.query_result_dave_dir)
