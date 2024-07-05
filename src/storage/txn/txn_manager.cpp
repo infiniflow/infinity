@@ -323,6 +323,10 @@ void TxnManager::FinishTxn(Txn *txn) {
         txn->SetTxnCommitted(finished_ts);
     } else if (state == TxnState::kRollbacking) {
         txn->SetTxnRollbacked();
+    } else {
+        String error_message = fmt::format("Invalid transaction status: {}", ToString(state));
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
     }
 
     TxnTimeStamp least_uncommitted_begin_ts = txn->CommitTS() + 1;
