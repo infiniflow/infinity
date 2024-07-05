@@ -13,25 +13,12 @@
 # limitations under the License.
 
 import os
-import infinity
 from tqdm import tqdm
+from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield, get_all_part_begin_ends
+import infinity
 import infinity.index as index
 from infinity.common import ConflictType, LOCAL_HOST
-from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield
 from infinity.errors import ErrorCode
-
-
-def get_all_part_begin_ends(total_row_count: int):
-    result = []
-    pos_now = 0
-    while pos_now < total_row_count:
-        new_pos = int(input("input part end position: "))
-        if pos_now >= new_pos or new_pos > total_row_count:
-            print("Invalid value. Input again.")
-            continue
-        result.append((pos_now, new_pos))
-        pos_now = new_pos
-    return result
 
 
 # fulltext column, dense embedding column, sparse embedding column

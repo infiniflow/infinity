@@ -213,3 +213,21 @@ def read_colbert_data_yield(file_path: str):
                 yield one_tensor
             except struct.error:
                 break
+
+
+def get_all_part_begin_ends(total_row_count: int):
+    result = []
+    pos_now = 0
+    while pos_now < total_row_count:
+        new_pos = int(input("input part end position: "))
+        if pos_now >= new_pos or new_pos > total_row_count:
+            print("Invalid value. Input again.")
+            continue
+        result.append((pos_now, new_pos))
+        pos_now = new_pos
+    return result
+
+
+def get_bit_array(float_array: list[list]):
+    return [[1 if x > 0.0 else 0 for x in one_list] for one_list in float_array]
+

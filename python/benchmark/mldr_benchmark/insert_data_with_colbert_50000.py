@@ -14,29 +14,12 @@
 
 import os
 import infinity
-import numpy as np
 from tqdm import tqdm
+from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield, read_colbert_data_yield
+from mldr_common_tools import get_all_part_begin_ends, get_bit_array
 import infinity.index as index
 from infinity.common import ConflictType, LOCAL_HOST
-from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield, read_colbert_data_yield
 from infinity.errors import ErrorCode
-
-
-def get_all_part_begin_ends(total_row_count: int):
-    result = []
-    pos_now = 0
-    while pos_now < total_row_count:
-        new_pos = int(input("input part end position: "))
-        if pos_now >= new_pos or new_pos > total_row_count:
-            print("Invalid value. Input again.")
-            continue
-        result.append((pos_now, new_pos))
-        pos_now = new_pos
-    return result
-
-
-def get_bit_array(float_array: list[list]):
-    return [[1.0 if x > 0.0 else 0.0 for x in one_list] for one_list in float_array]
 
 
 # fulltext column, dense embedding column, sparse embedding column
@@ -78,7 +61,6 @@ class InfinityClientForInsert:
         print("Input begin and end position pairs of colbert embedding data to insert:")
         colbert_part_begin_ends = get_all_part_begin_ends(total_num)
         insert_num = total_num
-        batch_size = 1024
         print("Start inserting data...")
         dense_data = None
         dense_pos_part_end = 0
@@ -89,41 +71,36 @@ class InfinityClientForInsert:
         colbert_data = None
         colbert_pos_part_end = 0
         colbert_pair_id_next = 0
-        for begin_idx in tqdm(range(0, insert_num, batch_size)):
-            end_idx = min(begin_idx + batch_size, insert_num)
-            buffer = []
-            for row_pos in range(begin_idx, end_idx):
-                if row_pos == dense_pos_part_end:
-                    dense_pos_part_begin, dense_pos_part_end = dense_part_begin_ends[dense_pair_id_next]
-                    dense_pair_id_next += 1
-                    dense_base_name = f"dense-{dense_pos_part_begin}-{dense_pos_part_end}.fvecs"
-                    dense_data = fvecs_read_yield(os.path.join(dense_embedding_dir, dense_base_name))
-                if row_pos == sparse_pos_part_end:
-                    sparse_pos_part_begin, sparse_pos_part_end = sparse_part_begin_ends[sparse_pair_id_next]
-                    sparse_pair_id_next += 1
-                    sparse_base_name = f"sparse-{sparse_pos_part_begin}-{sparse_pos_part_end}.data"
-                    sparse_data = read_mldr_sparse_embedding_yield(os.path.join(sparse_embedding_dir, sparse_base_name))
-                if row_pos == colbert_pos_part_end:
-                    colbert_pos_part_begin, colbert_pos_part_end = colbert_part_begin_ends[colbert_pair_id_next]
-                    colbert_pair_id_next += 1
-                    colbert_base_name = f"colbert-{colbert_pos_part_begin}-{colbert_pos_part_end}.data"
-                    colbert_data = read_colbert_data_yield(os.path.join(colbert_embedding_dir, colbert_base_name))
-                docid_str = docid_list[row_pos]
-                insert_dense_data = next(dense_data)
-                insert_sparse_data = next(sparse_data)
-                colbert_list = next(colbert_data)
-                if int(docid_str.split('-')[-1]) >= 189796:
-                    continue
-                insert_dict = {"docid_col": docid_str, "fulltext_col": corpus_text_list[row_pos],
-                               "dense_col": insert_dense_data, "sparse_col": insert_sparse_data,
-                               "colbert_col": colbert_list, "colbert_bit_col": get_bit_array(colbert_list)}
-                buffer.append(insert_dict)
-            if len(buffer) > 0:
-                self.infinity_table.insert(buffer)
-                del buffer
+        for row_pos in tqdm(range(insert_num)):
+            if row_pos == dense_pos_part_end:
+                dense_pos_part_begin, dense_pos_part_end = dense_part_begin_ends[dense_pair_id_next]
+                dense_pair_id_next += 1
+                dense_base_name = f"dense-{dense_pos_part_begin}-{dense_pos_part_end}.fvecs"
+                dense_data = fvecs_read_yield(os.path.join(dense_embedding_dir, dense_base_name))
+            if row_pos == sparse_pos_part_end:
+                sparse_pos_part_begin, sparse_pos_part_end = sparse_part_begin_ends[sparse_pair_id_next]
+                sparse_pair_id_next += 1
+                sparse_base_name = f"sparse-{sparse_pos_part_begin}-{sparse_pos_part_end}.data"
+                sparse_data = read_mldr_sparse_embedding_yield(os.path.join(sparse_embedding_dir, sparse_base_name))
+            if row_pos == colbert_pos_part_end:
+                colbert_pos_part_begin, colbert_pos_part_end = colbert_part_begin_ends[colbert_pair_id_next]
+                colbert_pair_id_next += 1
+                colbert_base_name = f"colbert-{colbert_pos_part_begin}-{colbert_pos_part_end}.data"
+                colbert_data = read_colbert_data_yield(os.path.join(colbert_embedding_dir, colbert_base_name))
+            docid_str = docid_list[row_pos]
+            insert_dense_data = next(dense_data)
+            insert_sparse_data = next(sparse_data)
+            colbert_list = next(colbert_data)
+            if int(docid_str.split('-')[-1]) >= 189796:
+                continue
+            insert_dict = {"docid_col": docid_str, "fulltext_col": corpus_text_list[row_pos],
+                           "dense_col": insert_dense_data, "sparse_col": insert_sparse_data,
+                           "colbert_col": colbert_list, "colbert_bit_col": get_bit_array(colbert_list)}
+            self.infinity_table.insert(insert_dict)
         print("Finish inserting data.")
         del dense_data
         del sparse_data
+        del colbert_data
         del docid_list
         del corpus_text_list
         print("Start creating fulltext index.")
@@ -155,6 +132,15 @@ class InfinityClientForInsert:
         assert res.error_code == ErrorCode.OK
         self.infinity_table.optimize("bmp_index", {"topk": "1000"})
         print("Finish creating BMP index.")
+        print("Start creating EMVB index...")
+        res = self.infinity_table.create_index("emvb_index",
+                                               [index.IndexInfo("colbert_col",
+                                                                index.IndexType.EMVB,
+                                                                [index.InitParameter("pq_subspace_num", "32"),
+                                                                 index.InitParameter("pq_subspace_bits", "8")]),
+                                                ], ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        print("Finish creating EMVB index.")
 
 
 if __name__ == "__main__":
