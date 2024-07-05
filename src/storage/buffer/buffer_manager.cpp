@@ -282,7 +282,7 @@ void BufferManager::MoveTemp(BufferObj *buffer_obj) {
 
 SizeT BufferManager::LRUIdx(BufferObj *buffer_obj) const {
     auto p = reinterpret_cast<u64>(buffer_obj);
-    return std::hash<u64>()(p) % lru_caches_.size();
+    return p % lru_caches_.size();
 }
 
 } // namespace infinity
