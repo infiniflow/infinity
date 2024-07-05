@@ -103,13 +103,12 @@ void HnswFileWorker::FreeInMemory() {
     data_ = nullptr;
 }
 
-void HnswFileWorker::CompressToLVQ() {
+void HnswFileWorker::CompressToLVQ(IndexHnsw *index_hnsw) {
     if (!data_) {
         String error_message = "CompressToLVQ: Data is not allocated.";
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
     EmbeddingDataType embedding_type = GetType();
     switch (embedding_type) {
         case kElemFloat: {

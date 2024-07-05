@@ -130,11 +130,7 @@ Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vecto
 }
 
 Status Txn::OptimizeIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params) {
-    Vector<SegmentIndexEntry *> segment_index_entries = table_index_entry->OptimizeIndex(this, std::move(init_params), false /*replay*/);
-    TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
-    auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
-
-    txn_table_store->AddSegmentIndexesStore(table_index_entry, std::move(segment_index_entries));
+    table_index_entry->OptimizeIndex(this, init_params, false /*replay*/);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdOptimize>(db_name_,
                                                            *table_index_entry->table_index_meta()->table_entry()->GetTableName(),
