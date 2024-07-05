@@ -4185,7 +4185,7 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
                 }
                 {
                     // option description
-                    Value value = Value::MakeVarchar("File description opened count by Infinity.");
+                    Value value = Value::MakeVarchar("Infinity system CPU usage.");
                     ValueExpression value_expr(value);
                     value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
                 }
