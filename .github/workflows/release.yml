@@ -71,7 +71,7 @@ jobs:
         BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | tr -d ' ')
         echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
         TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-        sudo docker rm -f ${BUILDER_CONTAINER} && sudo docker run -d --privileged --name ${BUILDER_CONTAINER} --network=host -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7_clang18
+        sudo docker rm -f ${BUILDER_CONTAINER} && sudo docker run -d --privileged --name ${BUILDER_CONTAINER} -e TZ=$TZ -v $PWD:/infinity infiniflow/infinity_builder:centos7_clang18
 
     - name: Build release version
       run: |
