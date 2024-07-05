@@ -498,18 +498,19 @@ void TxnStore::MaintainCompactionAlg() const {
     }
 }
 
-bool TxnStore::CheckConflict(const TxnStore &txn_store) {
+bool TxnStore::CheckConflict(const TxnStore &other_txn_store) {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        for (const auto [table_entry, _] : txn_store.txn_tables_) {
+        for (const auto [table_entry, _] : other_txn_store.txn_tables_) {
             if (table_name == *table_entry->GetTableName()) {
                 return true;
             }
         }
 
-        auto other_iter = txn_store.txn_tables_store_.find(table_name);
-        if (other_iter == txn_store.txn_tables_store_.end()) {
+        auto other_iter = other_txn_store.txn_tables_store_.find(table_name);
+        if (other_iter == other_txn_store.txn_tables_store_.end()) {
             continue;
         }
+
         const TxnTableStore *other_table_store = other_iter->second.get();
         if (table_store->CheckConflict(other_table_store)) {
             return true;
