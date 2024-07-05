@@ -66,6 +66,8 @@ private:
     // BufferHandle calls it, after unload.
     void PushGCQueue(BufferObj *buffer_obj);
 
+    bool RemoveFromGCQueue(BufferObj *buffer_obj);
+
     void AddToCleanList(BufferObj *buffer_obj, bool do_free);
 
     void AddTemp(BufferObj *buffer_obj);
@@ -89,7 +91,8 @@ private:
 
     std::mutex gc_locker_{};
     using GCListIter = List<BufferObj *>::iterator;
-    HashSet<BufferObj *> gc_set_{};
+    HashMap<BufferObj *, GCListIter> gc_map_{};
+    List<BufferObj *> gc_list_{};
 
     std::mutex clean_locker_{};
     Vector<BufferObj *> clean_list_{};

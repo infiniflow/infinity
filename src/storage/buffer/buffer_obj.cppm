@@ -75,12 +75,6 @@ export String BufferTypeToString(BufferType buffer_type) {
     }
 }
 
-export enum class BufferFreeStatus : i8 {
-    kSuccess,
-    kLoaded,
-    kCleaned,
-};
-
 export class BufferObj {
 public:
     // called by BufferMgr::Get or BufferMgr::Allocate
@@ -96,7 +90,7 @@ public:
     BufferHandle Load();
 
     // called by BufferMgr in GC process.
-    BufferFreeStatus Free();
+    bool Free();
 
     // called when checkpoint. or in "IMPORT" operator.
     bool Save();
