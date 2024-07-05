@@ -121,7 +121,7 @@ class InfinityClientForInsert:
         print("Finish creating Hnsw index.")
         print("Start creating BMP index...")
         res = self.infinity_table.create_index("bmp_index", [index.IndexInfo("sparse_col", index.IndexType.BMP,
-                                                                             [index.InitParameter("block_size", "16"),
+                                                                             [index.InitParameter("block_size", "8"),
                                                                               index.InitParameter("compress_type",
                                                                                                   "compress")])],
                                                ConflictType.Error)

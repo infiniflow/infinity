@@ -17,8 +17,8 @@
             "type": "HNSW",
             "params": {
                 "M": 16, 
-                "ef_construction": 200,
-                "ef": 200,
+                "ef_construction": 800,
+                "ef": 800,
                 "metric": "l2",
                 "encode": "lvq"
             }

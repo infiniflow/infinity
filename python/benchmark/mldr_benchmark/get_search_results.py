@@ -91,11 +91,11 @@ def apply_bm25(table, query_str: str, max_hits: int):
 
 
 def apply_dense(table, query_embedding, max_hits: int):
-    return table.knn("dense_col", query_embedding, "float", "ip", max_hits)
+    return table.knn("dense_col", query_embedding, "float", "ip", max_hits, {"ef": str(max_hits)})
 
 
 def apply_sparse(table, query_embedding: dict, max_hits: int):
-    return table.match_sparse("sparse_col", query_embedding, "ip", max_hits, {"alpha": "1.0", "beta": "1.0"})
+    return table.match_sparse("sparse_col", query_embedding, "ip", max_hits, {"alpha": "0.9", "beta": "0.5"})
 
 
 apply_funcs = {'bm25': apply_bm25, 'dense': apply_dense, 'sparse': apply_sparse}
@@ -132,14 +132,14 @@ class InfinityClientForSearch:
 
     def dense_query(self, query_embedding, max_hits: int):
         result = self.infinity_table.output(["docid_col", "_similarity"]).knn("dense_col", query_embedding, "float",
-                                                                              "ip", max_hits).to_pl()
+                                                                              "ip", max_hits, {"ef": str(max_hits)}).to_pl()
         return result['docid_col'], result['SIMILARITY']
 
     def sparse_query(self, query_embedding: dict, max_hits: int):
         result = self.infinity_table.output(["docid_col", "_similarity"]).match_sparse("sparse_col", query_embedding,
                                                                                        "ip", max_hits,
-                                                                                       {"alpha": "1.0",
-                                                                                        "beta": "1.0"}).to_pl()
+                                                                                       {"alpha": "0.9",
+                                                                                        "beta": "0.5"}).to_pl()
         return result['docid_col'], result['SIMILARITY']
 
     def fusion_query(self, query_targets_list: list, apply_funcs_list: list, max_hits: int):

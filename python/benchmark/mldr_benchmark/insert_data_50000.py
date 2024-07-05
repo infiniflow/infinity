@@ -119,8 +119,8 @@ class InfinityClientForInsert:
         res = self.infinity_table.create_index("hnsw_index", [index.IndexInfo("dense_col", index.IndexType.Hnsw,
                                                                               [index.InitParameter("M", "16"),
                                                                                index.InitParameter("ef_construction",
-                                                                                                   "200"),
-                                                                               index.InitParameter("ef", "200"),
+                                                                                                   "1000"),
+                                                                               index.InitParameter("ef", "1000"),
                                                                                index.InitParameter("metric", "ip"),
                                                                                index.InitParameter("encode", "lvq")])],
                                                ConflictType.Error)
@@ -128,12 +128,12 @@ class InfinityClientForInsert:
         print("Finish creating Hnsw index.")
         print("Start creating BMP index...")
         res = self.infinity_table.create_index("bmp_index", [index.IndexInfo("sparse_col", index.IndexType.BMP,
-                                                                             [index.InitParameter("block_size", "16"),
+                                                                             [index.InitParameter("block_size", "8"),
                                                                               index.InitParameter("compress_type",
                                                                                                   "compress")])],
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        self.infinity_table.optimize("bmp_index", {"topk": "1000", "bp_reorder": {}})
+        self.infinity_table.optimize("bmp_index", {"topk": "1000", "bp_reorder": ""})
         print("Finish creating BMP index.")
 
 
