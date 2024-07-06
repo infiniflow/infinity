@@ -42,10 +42,10 @@ def check_languages(languages):
 
 def check_query_types(query_types):
     available_query_types = ['bm25', 'dense', 'sparse', 'colbert']
-    if query_types == 'all' or (len(query_types) == 1 and query_types[0] == 'all'):
-        return available_query_types
     if isinstance(query_types, str):
         query_types = [query_types]
+    if query_types == ['all']:
+        return available_query_types
     for query_type in query_types:
         if query_type not in available_query_types:
             raise ValueError(
