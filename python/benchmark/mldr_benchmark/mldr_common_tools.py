@@ -267,7 +267,7 @@ def apply_bm25(table, query_str: str, max_hits: int):
 
 
 def apply_dense(table, query_embedding, max_hits: int):
-    return table.knn("dense_col", query_embedding, "float", "ip", max_hits)
+    return table.knn("dense_col", query_embedding, "float", "ip", max_hits, {"ef": str(max_hits)})
 
 
 def apply_sparse(table, query_embedding: dict, max_hits: int):
