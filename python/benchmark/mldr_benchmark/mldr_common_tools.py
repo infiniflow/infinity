@@ -46,7 +46,7 @@ def check_query_types(query_types):
     available_query_types = ['bm25', 'dense', 'sparse', 'colbert']
     if isinstance(query_types, str):
         query_types = [query_types]
-    if query_types == ['all']:
+    if 'all' in query_types:
         return available_query_types
     for query_type in query_types:
         if query_type not in available_query_types:
