@@ -28,6 +28,8 @@ class QueryArgs:
     query_result_dave_dir: str = field(default='./query-results', metadata={'help': 'Dir to save query result.'})
     query_types: str = field(default="bm25",
                              metadata={'help': 'Query method. Available methods: bm25, dense, sparse', "nargs": "+"})
+    colbert_rerank: bool = field(default=False, metadata={'help': 'Whether to use colbert to rerank.'})
+    colbert_bit_rerank: bool = field(default=False, metadata={'help': 'Whether to use colbert bit to rerank.'})
 
 
 def check_languages(languages):

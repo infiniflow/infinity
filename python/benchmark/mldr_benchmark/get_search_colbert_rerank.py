@@ -16,16 +16,16 @@ import os
 from itertools import chain, combinations
 import time
 from dataclasses import dataclass, field
-from FlagEmbedding import BGEM3FlagModel
 from tqdm import tqdm
 import numpy as np
 import struct
 from mldr_common_tools import QueryArgs, check_languages, check_query_types
 from mldr_common_tools import FakeJScoredDoc, get_queries_and_qids, save_result
-from mldr_common_tools import query_yields, apply_funcs, get_colbert_model, save_colbert_list
+from mldr_common_tools import query_yields, apply_funcs
 from transformers import HfArgumentParser
 import infinity
 from infinity.common import LOCAL_HOST
+from infinity.remote_thrift.types import make_match_tensor_expr
 
 
 @dataclass
@@ -34,12 +34,19 @@ class ModelArgs:
     fp16: bool = field(default=True, metadata={'help': 'Use fp16 in inference?'})
 
 
+class RerankOption:
+    colbert = "colbert"
+    colbert_bit = "colbert_bit"
+
+
+def apply_colbert_rerank(result_table, rerank_tensor, max_hits: int, rerank_option):
+    colbert_rerank_column_name = {'colbert': 'colbert_col', 'colbert_bit': 'colbert_bit_col'}
+    rerank_expr = make_match_tensor_expr(colbert_rerank_column_name[rerank_option], rerank_tensor, 'float', 'maxsim')
+    return result_table.fusion('match_tensor', f'topn={max_hits}', rerank_expr)
+
+
 def powerset_above_2(s: list):
     return chain.from_iterable(combinations(s, r) for r in range(2, len(s) + 1))
-
-
-single_query_func_params = {'colbert': ('_score', 'SCORE'), 'bm25': ('_score', 'SCORE'),
-                            'dense': ('_similarity', 'SIMILARITY'), 'sparse': ('_similarity', 'SIMILARITY')}
 
 
 class InfinityClientForSearch:
@@ -62,22 +69,23 @@ class InfinityClientForSearch:
         self.infinity_table = self.infinity_db.get_table(table_name)
         print(f"Get table {table_name} successfully.")
 
-    def common_single_query_func(self, query_type: str, query_target, max_hits: int):
-        str_params = single_query_func_params[query_type]
-        result_table = self.infinity_table.output(["docid_col", str_params[0]])
+    def rerank_single_query_func(self, query_type: str, query_target, rerank_target, max_hits: int, rerank_option):
+        result_table = self.infinity_table.output(["docid_col", "_score"])
         result_table = apply_funcs[query_type](result_table, query_target, max_hits)
+        result_table = apply_colbert_rerank(result_table, rerank_target, max_hits, rerank_option)
         result = result_table.to_pl()
-        return result['docid_col'], result[str_params[1]]
+        return result['docid_col'], result['SCORE']
 
-    def fusion_query(self, query_targets_list: list, apply_funcs_list: list, max_hits: int):
+    def rerank_rff_query_func(self, query_targets_list, apply_funcs_list, rerank_target, max_hits: int, rerank_option):
         result_table = self.infinity_table.output(["docid_col", "_score"])
         for query_target, apply_func in zip(query_targets_list, apply_funcs_list):
             result_table = apply_func(result_table, query_target, max_hits)
         result_table = result_table.fusion('rrf', options_text=f'topn={max_hits}')
+        result_table = apply_colbert_rerank(result_table, rerank_target, max_hits, rerank_option)
         result = result_table.to_pl()
         return result['docid_col'], result['SCORE']
 
-    def main(self, languages: list[str], query_types: list[str], model_args: ModelArgs, save_dir: str):
+    def main(self, languages: list[str], query_types: list[str], model_args: ModelArgs, save_dir: str, rerank_option):
         for lang in languages:
             print(f"Start to search for language: {lang}")
             self.get_test_table(lang)
@@ -87,19 +95,24 @@ class InfinityClientForSearch:
             print(f"Average query chars: {sum([len(q) for q in queries]) / len(queries)}")
             for query_type in query_types:
                 embedding_file = None
-                if query_type in self.prepare_embedding_funcs:
+                if query_type != "bm25":
                     embedding_file = os.path.join(save_dir, f"query_embedding_{lang}_{query_type}.data")
                     if not os.path.exists(embedding_file):
                         raise ValueError(f"Embedding file {embedding_file} does not exist.")
+                colbert_file = os.path.join(save_dir, f"query_embedding_{lang}_colbert.data")
                 query_yield = query_yields[query_type](queries, embedding_file)
+                rerank_yield = query_yields['colbert'](queries, colbert_file)
                 print(f"Start to search for query method: {query_type}")
                 total_query_time: float = 0.0
                 total_query_num: int = len(qids)
                 result_list = []
-                for query, qid in tqdm(zip(queries, qids), total=total_query_num):
+                for qid in tqdm(qids, total=total_query_num):
                     query_target = next(query_yield)
+                    rerank_target = next(rerank_yield)
                     time_start = time.time()
-                    docid_list, score_list = self.common_single_query_func(query_type, query_target, max_hits=1000)
+                    docid_list, score_list = self.rerank_single_query_func(query_type, query_target,
+                                                                           rerank_target=rerank_target, max_hits=1000,
+                                                                           rerank_option=rerank_option)
                     time_end = time.time()
                     total_query_time += time_end - time_start
                     result = []
@@ -107,7 +120,7 @@ class InfinityClientForSearch:
                         result.append(FakeJScoredDoc(docid, score))
                     result_list.append((qid, result))
                 print(f"Average query time: {1000.0 * total_query_time / float(total_query_num)} ms.")
-                save_path = os.path.join(save_dir, f"{lang}_{query_type}.txt")
+                save_path = os.path.join(save_dir, f"{lang}_{query_type}_rerank_{rerank_option}.txt")
                 print(f"Save search result to: {save_path}")
                 save_result(result_list, save_path, qids, max_hits=1000)
             if len(query_types) < 2:
@@ -119,16 +132,21 @@ class InfinityClientForSearch:
                 print(f"Start to search for fusion method: {query_type_comb_str}")
                 embedding_files_list = [os.path.join(save_dir, f"query_embedding_{lang}_{query_type}.data") for
                                         query_type in query_type_comb]
+                colbert_file = os.path.join(save_dir, f"query_embedding_{lang}_colbert.data")
                 query_yields_list = [query_yields[query_type](queries, embedding_file) for query_type, embedding_file in
                                      zip(query_type_comb, embedding_files_list)]
+                rerank_yield = query_yields['colbert'](queries, colbert_file)
                 apply_funcs_list = [apply_funcs[query_type] for query_type in query_type_comb]
                 total_query_time: float = 0.0
                 total_query_num: int = len(qids)
                 result_list = []
-                for query, qid in tqdm(zip(queries, qids), total=total_query_num):
+                for qid in tqdm(qids, total=total_query_num):
                     query_targets_list = [next(query_yield) for query_yield in query_yields_list]
+                    rerank_target = next(rerank_yield)
                     time_start = time.time()
-                    docid_list, score_list = self.fusion_query(query_targets_list, apply_funcs_list, max_hits=1000)
+                    docid_list, score_list = self.rerank_rff_query_func(query_targets_list, apply_funcs_list,
+                                                                        rerank_target=rerank_target, max_hits=1000,
+                                                                        rerank_option=rerank_option)
                     time_end = time.time()
                     total_query_time += time_end - time_start
                     result = []
@@ -136,7 +154,7 @@ class InfinityClientForSearch:
                         result.append(FakeJScoredDoc(docid, score))
                     result_list.append((qid, result))
                 print(f"Average query time: {1000.0 * total_query_time / float(total_query_num)} ms.")
-                save_path = os.path.join(save_dir, f"{lang}_fusion_{query_type_comb_str}.txt")
+                save_path = os.path.join(save_dir, f"{lang}_fusion_{query_type_comb_str}_rerank_{rerank_option}.txt")
                 print(f"Save search result to: {save_path}")
                 save_result(result_list, save_path, qids, max_hits=1000)
 
@@ -150,6 +168,14 @@ if __name__ == "__main__":
     query_types = check_query_types(query_args.query_types)
     if 'colbert' in query_types and not query_args.with_colbert:
         raise ValueError("Colbert query type is enabled but with_colbert is False.")
+    rerank_options = []
+    if query_args.colbert_rerank:
+        rerank_options.append(RerankOption.colbert)
+    if query_args.colbert_bit_rerank:
+        rerank_options.append(RerankOption.colbert_bit)
+    if len(rerank_options) == 0:
+        raise ValueError("No rerank option is enabled.")
     infinity_client = InfinityClientForSearch(query_args.with_colbert)
-    infinity_client.main(languages=languages, query_types=query_types, model_args=model_args,
-                         save_dir=query_args.query_result_dave_dir)
+    for one_rerank_option in rerank_options:
+        infinity_client.main(languages=languages, query_types=query_types, model_args=model_args,
+                             save_dir=query_args.query_result_dave_dir, rerank_option=one_rerank_option)
