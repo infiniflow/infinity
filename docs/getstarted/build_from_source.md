@@ -16,9 +16,9 @@ Infinity can only be compiled natively on Linux. If your operating system is not
 
 Build the whole project, especially the link stage, requires much RAM. The host may become unresponsive due to the very slow kernel oom killer. To lessen the chances of it happening, it is recommended to install [earlyoom](https://github.com/rfjakob/earlyoom). Furthermore, you need to tell cmake to limit the concurrent link process:
 
-`-DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=2`
+`-DCMAKE_JOB_POOLS:STRING='link=4'`
 
-The recommended `link_pool` size is:
+The recommended link pool size is:
 
 - 1 for 6GB
 - 2 for 16GB
@@ -47,7 +47,7 @@ git clone https://github.com/infiniflow/infinity.git
 ```shell
 cd infinity && mkdir cmake-build-debug
 TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7_clang18
+docker run -d --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7_clang18
 docker exec infinity_build bash -c "cd /infinity/cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON .. && cmake --build ."
 ```
 
