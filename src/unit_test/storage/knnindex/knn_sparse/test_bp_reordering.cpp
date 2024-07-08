@@ -30,36 +30,31 @@ using namespace infinity;
 
 class BPReorderingTest : public BaseTest {
 protected:
-    f32 cost_func(i32 data_n, i32 query_n, const Vector<Vector<i32>> &fwd) {
-        Vector<Vector<i32>> ivt = Fwd2Ivt(fwd, query_n);
-        f32 cost = 0;
-        for (auto &posting : ivt) {
-            if (posting.empty()) {
-                continue;
-            }
-            for (SizeT i = 0; i < posting.size() - 1; ++i) {
-                float r = std::log2(posting[i + 1] - posting[i]);
-                cost += r;
+    i64 cost_func(i32 data_n, i32 query_n, const Vector<Vector<i32>> &fwd) {
+        Vector<i32> last_doc_id(query_n, -1);
+        i64 cost = 0;
+        for (size_t doc_id = 0; doc_id < fwd.size(); ++doc_id) {
+            for (const auto &term_id : fwd[doc_id]) {
+                if (last_doc_id[term_id] != -1) {
+                    i64 r = std::log2(doc_id - last_doc_id[term_id]);
+                    cost += r;
+                }
+                last_doc_id[term_id] = doc_id;
             }
         }
         return cost;
     }
 
-    f32 cost_func(i32 data_n, i32 query_n, const Vector<Vector<i32>> &fwd, const Vector<i32> &reorder) {
-        Vector<i32> permutation(reorder.size());
-        for (i32 i = 0; i < (i32)reorder.size(); ++i) {
-            permutation[reorder[i]] = i;
-        }
-        Vector<Vector<i32>> ivt = Fwd2Ivt(fwd, query_n);
-        f32 cost = 0;
-        for (auto &posting : ivt) {
-            if (posting.empty()) {
-                continue;
-            }
-            std::sort(posting.begin(), posting.end(), [&](i32 a, i32 b) { return permutation[a] < permutation[b]; });
-            for (SizeT i = 0; i < posting.size() - 1; ++i) {
-                float r = std::log2(permutation[posting[i + 1]] - permutation[posting[i]]);
-                cost += r;
+    i64 cost_func(i32 data_n, i32 query_n, const Vector<Vector<i32>> &fwd, const Vector<i32> &permu) {
+        Vector<i32> last_doc_id(query_n, -1);
+        i64 cost = 0;
+        for (SizeT i = 0; i < permu.size(); ++i) {
+            for (const auto &term_id : fwd[permu[i]]) {
+                if (last_doc_id[term_id] != -1) {
+                    i64 r = std::log2(i - last_doc_id[term_id]);
+                    cost += r;
+                }
+                last_doc_id[term_id] = i;
             }
         }
         return cost;
@@ -157,14 +152,14 @@ TEST_F(BPReorderingTest, test1) {
         // auto rng = std::default_random_engine{};
         // std::shuffle(fwd.begin(), fwd.end(), rng);
 
-        f32 old_cost = cost_func(data_n, query_n, fwd);
+        i64 old_cost = cost_func(data_n, query_n, fwd);
 
         BPReordering<i32, i32> bp;
         for (i32 i = 0; i < data_n; ++i) {
             bp.AddDoc(&fwd[i]);
         }
         Vector<i32> reorder = bp(query_n, std::log2(data_n));
-        f32 new_cost = cost_func(data_n, query_n, fwd, reorder);
+        i64 new_cost = cost_func(data_n, query_n, fwd, reorder);
 
         // Vector<i32> gt_reorder = {0, 1, 4, 2, 5, 6, 3, 7, 8};
 
@@ -186,8 +181,8 @@ TEST_F(BPReorderingTest, test2) {
     }
     Vector<i32> reorder = bp(query_n);
 
-    f32 old_cost = cost_func(data_n, query_n, fwd);
-    f32 new_cost = cost_func(data_n, query_n, fwd, reorder);
+    i64 old_cost = cost_func(data_n, query_n, fwd);
+    i64 new_cost = cost_func(data_n, query_n, fwd, reorder);
 
     std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
     ASSERT_LE(new_cost, old_cost);
@@ -219,14 +214,14 @@ TEST_F(BPReorderingTest, test3) {
     // auto rng = std::default_random_engine{};
     // std::shuffle(fwd.begin(), fwd.end(), rng);
 
-    f32 old_cost = cost_func(data_n, dataset.ncol_, fwd);
+    i64 old_cost = cost_func(data_n, dataset.ncol_, fwd);
 
     BPReordering<i32, i32> bp;
     for (i32 i = 0; i < data_n; ++i) {
         bp.AddDoc(&fwd[i]);
     }
     Vector<i32> reorder = bp(dataset.ncol_);
-    f32 new_cost = cost_func(data_n, dataset.ncol_, fwd, reorder);
+    i64 new_cost = cost_func(data_n, dataset.ncol_, fwd, reorder);
 
     std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
 }

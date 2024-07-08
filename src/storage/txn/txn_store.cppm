@@ -207,6 +207,8 @@ public:
 
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
 
+    TxnTableStore *GetExistTxnTableStore(TableEntry *table_entry) const;
+
     void AddDeltaOp(CatalogDeltaEntry *local_delta_opsm, TxnManager *txn_mgr) const;
 
     void MaintainCompactionAlg() const;
