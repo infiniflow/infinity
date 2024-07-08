@@ -96,8 +96,8 @@ public:
 
     void CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<ChunkIndexEntry *> &old_chunks, TxnTimeStamp commit_ts);
 
-    void
-    OptimizeIndex(IndexBase *index_base, Txn *txn, TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
+    SharedPtr<ChunkIndexEntry>
+    OptIndex(IndexBase *index_base, TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
@@ -122,7 +122,7 @@ public:
     void MemIndexCommit();
 
     // Dump or spill the memory indexer
-    SharedPtr<ChunkIndexEntry> MemIndexDump(Txn *txn, bool spill = false);
+    SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false);
 
     // Init the mem index from previously spilled one.
     void MemIndexLoad(const String &base_name, RowID base_row_id);

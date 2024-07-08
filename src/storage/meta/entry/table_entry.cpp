@@ -339,7 +339,9 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         }
     }
     // Populate index entirely for the segment
-    TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
+
+    // create txn_table_store in Txn::Import
+    TxnTableStore *txn_table_store = txn->GetExistTxnTableStore(this);
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, txn->BeginTS());
@@ -685,7 +687,8 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
 
     SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(seg_id, MAX_TIMESTAMP);
     SharedPtr<SegmentIndexEntry> segment_index_entry;
-    TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
+    // create txn_table_store in `Txn::Append`
+    TxnTableStore *txn_table_store = txn->GetExistTxnTableStore(this);
     bool created = table_index_entry->GetOrCreateSegment(seg_id, txn, segment_index_entry);
     if (created) {
         Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
@@ -730,22 +733,22 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
     }
 }
 
-void TableEntry::MemIndexDump(Txn *txn, bool spill) {
-    TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
-    auto index_meta_map_guard = index_meta_map_.GetMetaMap();
-    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
-        auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
-        if (!status.ok())
-            continue;
-        TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
-        SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(txn, txn_index_store, spill);
-        if (chunk_index_entry.get() != nullptr) {
-            chunk_index_entry->Commit(txn->CommitTS());
-            txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
-            table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
-        }
-    }
-}
+// void TableEntry::MemIndexDump(Txn *txn, bool spill) {
+//     TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
+//     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
+//     for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+//         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+//         if (!status.ok())
+//             continue;
+//         TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
+//         SharedPtr<ChunkIndexEntry> chunk_index_entry = table_index_entry->MemIndexDump(txn, txn_index_store, spill);
+//         if (chunk_index_entry.get() != nullptr) {
+//             chunk_index_entry->Commit(txn->CommitTS());
+//             txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
+//             table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
+//         }
+//     }
+// }
 
 void TableEntry::MemIndexCommit() {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
