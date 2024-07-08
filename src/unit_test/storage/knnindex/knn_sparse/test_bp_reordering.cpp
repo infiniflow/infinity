@@ -33,13 +33,13 @@ protected:
     i64 cost_func(i32 data_n, i32 query_n, const Vector<Vector<i32>> &fwd) {
         Vector<i32> last_doc_id(query_n, -1);
         i64 cost = 0;
-        for (int doc_id = 0; doc_id < fwd.size(); ++doc_id) {
+        for (size_t doc_id = 0; doc_id < fwd.size(); ++doc_id) {
             for (const auto &term_id : fwd[doc_id]) {
-                if (last_term_[term_id] != -1) {
+                if (last_doc_id[term_id] != -1) {
                     i64 r = std::log2(doc_id - last_doc_id[term_id]);
                     cost += r;
                 }
-                last_doc_id[term_id] = doc_;
+                last_doc_id[term_id] = doc_id;
             }
         }
         return cost;
@@ -48,13 +48,13 @@ protected:
     i64 cost_func(i32 data_n, i32 query_n, const Vector<Vector<i32>> &fwd, const Vector<i32> &permu) {
         Vector<i32> last_doc_id(query_n, -1);
         i64 cost = 0;
-        for (i32 doc_id : permu) {
-            for (const auto &term_id : fwd[doc_id]) {
-                if (last_term_[term_id] != -1) {
-                    i64 r = std::log2(doc_id - last_doc_id[term_id]);
+        for (SizeT i = 0; i < permu.size(); ++i) {
+            for (const auto &term_id : fwd[permu[i]]) {
+                if (last_doc_id[term_id] != -1) {
+                    i64 r = std::log2(i - last_doc_id[term_id]);
                     cost += r;
                 }
-                last_doc_id[term_id] = doc_;
+                last_doc_id[term_id] = i;
             }
         }
         return cost;
