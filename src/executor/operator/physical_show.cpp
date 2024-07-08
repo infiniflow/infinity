@@ -71,6 +71,8 @@ import bg_task;
 import buffer_obj;
 import file_worker_type;
 import system_info;
+import wal_entry;
+import catalog_delta_entry;
 
 namespace infinity {
 
@@ -81,7 +83,7 @@ void PhysicalShow::Init() {
     output_names_ = MakeShared<Vector<String>>();
     output_types_ = MakeShared<Vector<SharedPtr<DataType>>>();
 
-    switch (scan_type_) {
+    switch (show_type_) {
         case ShowType::kShowDatabase: {
             output_names_->reserve(2);
             output_types_->reserve(2);
@@ -437,6 +439,34 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowLogs: {
+            output_names_->reserve(4);
+            output_types_->reserve(4);
+            output_names_->emplace_back("commit_ts");
+            output_names_->emplace_back("transaction_id");
+            output_names_->emplace_back("command_type");
+            output_names_->emplace_back("text");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowType::kShowDeltaLogs: {
+            output_names_->reserve(5);
+            output_types_->reserve(5);
+            output_names_->emplace_back("begin_ts");
+            output_names_->emplace_back("commit_ts");
+            output_names_->emplace_back("transaction_id");
+            output_names_->emplace_back("command_type");
+            output_names_->emplace_back("text");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             LOG_ERROR(status.message());
@@ -449,7 +479,7 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
     ShowOperatorState *show_operator_state = (ShowOperatorState *)(operator_state);
     DeferFn defer_fn([&]() { show_operator_state->SetComplete(); });
 
-    switch (scan_type_) {
+    switch (show_type_) {
         case ShowType::kShowDatabase: {
             ExecuteShowDatabase(query_context, show_operator_state);
             break;
@@ -556,6 +586,14 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowTransaction: {
             ExecuteShowTransaction(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowLogs: {
+            ExecuteShowLogs(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowDeltaLogs: {
+            ExecuteShowDeltaLogs(query_context, show_operator_state);
             break;
         }
         default: {
@@ -4705,6 +4743,176 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
             Value value = Value::MakeVarchar(txn_string);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return ;
+}
+
+void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorState *operator_state) {
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, bigint_type, "commit_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, bigint_type, "transaction_id", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "command_type", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "text", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_logs"), column_defs);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        bigint_type,
+        varchar_type,
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    WalManager *wal_manager = query_context->storage()->wal_manager();
+    Vector<SharedPtr<WalEntry>> wal_entries = wal_manager->CollectWalEntries();
+    LOG_TRACE(fmt::format("WAL Entries count: {}", wal_entries.size()));
+
+    for(const auto& wal_entry_ref: wal_entries) {
+        for(const auto& cmd_ref: wal_entry_ref->cmds_) {
+            if (output_block_ptr.get() == nullptr) {
+                output_block_ptr = DataBlock::MakeUniquePtr();
+                output_block_ptr->Init(column_types);
+            }
+
+            {
+                // transaction_id
+                Value value = Value::MakeBigInt(wal_entry_ref->txn_id_);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+            }
+
+            {
+                // commit_ts
+                Value value = Value::MakeBigInt(wal_entry_ref->commit_ts_);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+            }
+
+            {
+                // command_type
+                String command_type = WalCmd::WalCommandTypeToString(cmd_ref->GetType());
+                Value value = Value::MakeVarchar(command_type);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+            }
+
+            {
+                // command_text
+                String command_text = cmd_ref->ToString();
+                Value value = Value::MakeVarchar(command_text);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            }
+
+            ++ row_count;
+            if (row_count == output_block_ptr->capacity()) {
+                output_block_ptr->Finalize();
+                operator_state->output_.emplace_back(std::move(output_block_ptr));
+                output_block_ptr = nullptr;
+                row_count = 0;
+            }
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return ;
+}
+
+void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperatorState *operator_state) {
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, bigint_type, "begin_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, bigint_type, "commit_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, bigint_type, "transaction_id", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "command_type", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "text", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_delta_logs"), column_defs);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        bigint_type,
+        bigint_type,
+        varchar_type,
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    auto catalog = query_context->GetTxn()->GetCatalog();
+    Vector<CatalogDeltaOpBrief> delta_log_brief_array = catalog->GetDeltaLogBriefs();
+
+    for(const auto& delta_op_brief: delta_log_brief_array) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+//        TxnTimeStamp begin_ts_{0};
+//        TxnTimeStamp commit_ts_{0};
+//        TransactionID txn_id_{0};
+//        CatalogDeltaOpType type_{CatalogDeltaOpType::INVALID};
+//        SharedPtr<String> text_ptr;
+
+        {
+            // begin_ts
+            Value value = Value::MakeBigInt(delta_op_brief.begin_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // commit_ts_
+            Value value = Value::MakeBigInt(delta_op_brief.commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // txn_id_
+            Value value = Value::MakeBigInt(delta_op_brief.txn_id_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+        {
+            // delta op type
+            Value value = Value::MakeVarchar(ToString(delta_op_brief.type_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+        {
+            // delta op text
+            Value value = Value::MakeVarchar(*delta_op_brief.text_ptr);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        ++ row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
         }
     }
 

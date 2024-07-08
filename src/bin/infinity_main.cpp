@@ -27,6 +27,7 @@ import infinity_exception;
 import infinity_context;
 import thrift_server;
 import http_server;
+import logger;
 
 namespace {
 
@@ -72,7 +73,7 @@ void ShutdownServer() {
 
     http_server.Shutdown();
 
-    fmt::print("HTTP Server is shutdown.\n");
+    infinity::LOG_INFO("HTTP Server is shutdown.");
 
 #if THRIFT_SERVER_TYPE == 0
 
@@ -88,11 +89,14 @@ void ShutdownServer() {
 
 #endif
 
-    fmt::print("Thrift Server is shutdown.\n");
+    infinity::LOG_INFO("Thrift Server is shutdown.");
 
     pg_server.Shutdown();
-    fmt::print("PG Server is shutdown.\n");
+
+    infinity::LOG_INFO("PG Server is shutdown.");
+
     infinity::InfinityContext::instance().UnInit();
+
     fmt::print("Shutdown infinity server successfully\n");
 }
 

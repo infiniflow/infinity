@@ -266,6 +266,17 @@ String DataBlock::ToString() const {
     return ss.str();
 }
 
+String DataBlock::ToBriefString() const {
+    std::stringstream ss;
+    ss << "row count: " << row_count_ << std::endl;
+    ss << "column: ";
+    for (SizeT idx = 0; idx < column_count_; ++ idx) {
+        ss << column_vectors[idx]->data_type()->ToString() << " ";
+    }
+    ss << std::endl;
+    return ss.str();
+}
+
 void DataBlock::FillRowIDVector(SharedPtr<Vector<RowID>> &row_ids, u32 block_id) const {
     if (!finalized) {
         String error_message = "DataBlock isn't finalized.";

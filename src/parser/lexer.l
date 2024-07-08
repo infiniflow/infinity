@@ -72,6 +72,7 @@ DECIMAL         { return DECIMAL; }
 DEFAULT         { return DEFAULT; }
 DELETE          { return DELETE; }
 DELIMITER       { return DELIMITER; }
+DELTA           { return DELTA; }
 DESC            { return DESC; }
 DROP            { return DROP; }
 ELSE            { return ELSE; }
@@ -117,6 +118,7 @@ LIKE            { return LIKE; }
 LIMIT           { return LIMIT; }
 LINE            { return LINE; }
 LOG             { return LOG; }
+LOGS            { return LOGS; }
 LOGICAL         { return LOGICAL; }
 LSEG            { return LSEG; }
 MATCH           { return MATCH; }
