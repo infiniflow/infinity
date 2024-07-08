@@ -286,7 +286,14 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
         beginned_txns_.pop_front();
     }
     TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
-    return std::min(first_uncommitted_begin_ts, checkpointed_ts);
+    TxnTimeStamp res = std::min(first_uncommitted_begin_ts, checkpointed_ts);
+    for (auto *txn : finished_txns_) {
+        if (txn->CommittedTS() > res) {
+            break;
+        }
+        res = std::min(res, txn->BeginTS());
+    }
+    return res;
 }
 
 // A Txn can be deleted when there is no uncommitted txn whose begin is less than the commit ts of the txn
