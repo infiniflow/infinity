@@ -20,8 +20,21 @@ module;
 module periodic_trigger_thread;
 
 import stl;
+import logger;
 
 namespace infinity {
+
+void PeriodicTriggerThread::Start() {
+    LOG_INFO("Periodic trigger start ...");
+    running_.store(true);
+    thread_ = Thread([this] { Run(); });
+}
+
+void PeriodicTriggerThread::Stop() {
+    running_.store(false);
+    thread_.join();
+    LOG_INFO("Periodic trigger stop ...");
+}
 
 void PeriodicTriggerThread::Run() {
     while (running_.load()) {

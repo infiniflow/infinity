@@ -48,6 +48,8 @@ namespace infinity {
 
 class TxnManager;
 class Txn;
+struct CatalogDeltaOpBrief;
+
 class ProfileHistory {
 private:
     mutable std::mutex lock_{};
@@ -236,6 +238,8 @@ public:
                                             BufferManager *buffer_mgr);
 
     SizeT GetDeltaLogCount() const;
+
+    Vector<CatalogDeltaOpBrief> GetDeltaLogBriefs() const;
 
 private:
     static UniquePtr<Catalog> Deserialize(const String &data_dir, const nlohmann::json &catalog_json, BufferManager *buffer_mgr);

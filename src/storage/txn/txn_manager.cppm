@@ -44,7 +44,7 @@ public:
                         TxnTimeStamp start_ts,
                         bool enable_compaction);
 
-    ~TxnManager() { Stop(); }
+    ~TxnManager() = default;
 
     Txn *BeginTxn(UniquePtr<String> txn_text);
 

@@ -50,7 +50,7 @@ public:
                           Optional<u64> session_id,
                           Optional<TransactionID> txn_id,
                           SharedPtr<Vector<LoadMeta>> load_metas)
-        : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), scan_type_(type), db_name_(std::move(db_name)),
+        : PhysicalOperator(PhysicalOperatorType::kShow, nullptr, nullptr, id, load_metas), show_type_(type), db_name_(std::move(db_name)),
           object_name_(std::move(object_name)), table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id),
           index_name_(index_name), session_id_(session_id), txn_id_(txn_id) {}
 
@@ -71,7 +71,7 @@ public:
         return 0;
     }
 
-    inline ShowType scan_type() const { return scan_type_; }
+    inline ShowType show_type() const { return show_type_; }
 
     inline const String &db_name() const { return db_name_; };
 
@@ -136,8 +136,12 @@ private:
 
     void ExecuteShowTransaction(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowLogs(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
-    ShowType scan_type_{ShowType::kInvalid};
+    ShowType show_type_{ShowType::kInvalid};
     String db_name_{};
     String object_name_{};
     u64 table_index_{};
