@@ -175,7 +175,6 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
 void TaskScheduler::RunTask(FragmentTask *task) {
 
     bool finish = false;
-    bool error = false;
     task->fragment_context()->notifier()->SetTaskN(1);
     do {
         task->TryIntoWorkerLoop();
@@ -186,11 +185,11 @@ void TaskScheduler::RunTask(FragmentTask *task) {
                 finish = true;
             }
         } else {
-            error = true;
+            task->fragment_context()->notifier()->SetError(task->fragment_context());
             finish = true;
         }
     } while (!finish);
-    task->fragment_context()->notifier()->FinishTask(error, task->fragment_context());
+    task->fragment_context()->notifier()->FinishTask();
 }
 
 void TaskScheduler::ScheduleFragment(PlanFragment *plan_fragment) {
@@ -236,26 +235,25 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
         if (iter == task_lists.end()) {
             iter = task_lists.begin();
         }
-        auto &fragment_task = *iter;
+        auto *fragment_task = *iter;
         if (fragment_task->IsTerminator()) {
             break;
         }
         auto *fragment_ctx = fragment_task->fragment_context();
-        if (!fragment_ctx->notifier()->StartTask()) {
-            --worker_workloads_[worker_id];
-            iter = task_lists.erase(iter);
-            continue;
-        }
-
-        fragment_task->OnExecute();
-        fragment_task->SetLastWorkID(worker_id);
 
         bool error = false;
         bool finish = false;
-
-        if (fragment_task->status() != FragmentTaskStatus::kError) {
+        if (!fragment_ctx->notifier()->StartTask()) {
+            error = true;
+        } else {
+            fragment_task->OnExecute();
+            fragment_task->SetLastWorkID(worker_id);
+            if (fragment_task->status() == FragmentTaskStatus::kError) {
+                error = true;
+            }
+        }
+        if (!error) {
             if (fragment_task->IsComplete()) {
-                // auto *sink_op = fragment_ctx->GetSinkOperator();
                 --worker_workloads_[worker_id];
                 fragment_task->CompleteTask();
                 iter = task_lists.erase(iter);
@@ -267,15 +265,13 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
                 ++iter;
             }
         } else {
-            error = true;
-            finish = true;
             --worker_workloads_[worker_id];
+            fragment_ctx->notifier()->SetError(fragment_ctx);
+            fragment_task->CompleteTask();
             iter = task_lists.erase(iter);
         }
         if (finish || error) {
-            fragment_ctx->notifier()->FinishTask(error, fragment_ctx);
-        } else {
-            fragment_ctx->notifier()->UnstartTask();
+            fragment_ctx->notifier()->FinishTask();
         }
     }
 }
