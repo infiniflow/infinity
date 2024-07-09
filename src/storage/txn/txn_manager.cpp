@@ -288,9 +288,6 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
     TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
     TxnTimeStamp res = std::min(first_uncommitted_begin_ts, checkpointed_ts);
     for (auto *txn : finished_txns_) {
-        if (txn->CommittedTS() > res) {
-            break;
-        }
         res = std::min(res, txn->BeginTS());
     }
     return res;
