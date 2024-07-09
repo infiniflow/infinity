@@ -866,7 +866,7 @@ UniquePtr<PhysicalOperator> PhysicalPlanner::BuildExcept(const SharedPtr<Logical
 UniquePtr<PhysicalOperator> PhysicalPlanner::BuildShow(const SharedPtr<LogicalNode> &logical_operator) const {
     SharedPtr<LogicalShow> logical_show = static_pointer_cast<LogicalShow>(logical_operator);
     return MakeUnique<PhysicalShow>(logical_show->node_id(),
-                                    logical_show->scan_type(),
+                                    logical_show->show_type(),
                                     logical_show->schema_name(),
                                     logical_show->object_name(),
                                     logical_show->table_index(),

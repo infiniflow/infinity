@@ -397,7 +397,7 @@ void SegmentIndexEntry::MemIndexCommit() {
     memory_indexer_->Commit();
 }
 
-SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(Txn *txn, bool spill) {
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     const IndexBase *index_base = table_index_entry_->index_base();
     switch (index_base->index_type_) {
@@ -451,18 +451,6 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(Txn *txn, bool spill)
             UnrecoverableError("Not implemented.");
             break;
         }
-    }
-    if (txn != nullptr) {
-        String index_name = *table_index_entry_->GetIndexName();
-        TableEntry *table_entry = table_index_entry_->table_index_meta()->GetTableEntry();
-        String table_name = *table_entry->GetTableName();
-        String db_name = *table_entry->GetDBName();
-
-        Vector<WalChunkIndexInfo> chunk_infos;
-        chunk_infos.emplace_back(chunk_index_entry.get());
-        auto wal_cmd =
-            MakeShared<WalCmdDumpIndex>(std::move(db_name), std::move(table_name), std::move(index_name), segment_id_, std::move(chunk_infos));
-        txn->AddWalCmd(wal_cmd);
     }
     return chunk_index_entry;
 }
@@ -820,16 +808,13 @@ void SegmentIndexEntry::CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<
     // LOG_INFO(ss.str());
 }
 
-void SegmentIndexEntry::OptimizeIndex(IndexBase *index_base,
-                                      Txn *txn,
-                                      TxnTableStore *txn_table_store,
-                                      const Vector<UniquePtr<InitParameter>> &opt_params,
-                                      bool replay) {
+SharedPtr<ChunkIndexEntry>
+SegmentIndexEntry::OptIndex(IndexBase *index_base, TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay) {
     switch (table_index_entry_->index_base()->index_type_) {
         case IndexType::kBMP: {
             Optional<BMPOptimizeOptions> ret = BMPUtil::ParseBMPOptimizeOptions(opt_params);
             if (!ret) {
-                return;
+                break;
             }
             const auto &options = ret.value();
             const auto [chunk_index_entries, memory_index_entry] = this->GetBMPIndexSnapshot();
@@ -857,8 +842,9 @@ void SegmentIndexEntry::OptimizeIndex(IndexBase *index_base,
                 auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
                 optimize_index(abstract_bmp);
 
-                auto dump_index_entry = this->MemIndexDump(txn, false /*spill*/);
+                auto dump_index_entry = this->MemIndexDump(false /*spill*/);
                 txn_table_store->AddChunkIndexStore(table_index_entry_, dump_index_entry.get());
+                return dump_index_entry;
             }
             break;
         }
@@ -868,7 +854,7 @@ void SegmentIndexEntry::OptimizeIndex(IndexBase *index_base,
             }
             auto params = HnswUtil::ParseOptimizeOptions(opt_params);
             if (!params) {
-                return;
+                break;
             }
             auto optimize_index = [&](ChunkIndexEntry *chunk_index_entry) {
                 BufferHandle buffer_handle = chunk_index_entry->GetIndex();
@@ -885,8 +871,9 @@ void SegmentIndexEntry::OptimizeIndex(IndexBase *index_base,
             }
             if (memory_index_entry.get() != nullptr) {
                 optimize_index(memory_index_entry.get());
-                auto dump_index_entry = this->MemIndexDump(txn, false /*spill*/);
+                auto dump_index_entry = this->MemIndexDump(false /*spill*/);
                 txn_table_store->AddChunkIndexStore(table_index_entry_, dump_index_entry.get());
+                return dump_index_entry;
             }
             break;
         }
@@ -894,6 +881,7 @@ void SegmentIndexEntry::OptimizeIndex(IndexBase *index_base,
             LOG_WARN("Not implemented");
         }
     }
+    return nullptr;
 }
 
 bool SegmentIndexEntry::Flush(TxnTimeStamp checkpoint_ts) {

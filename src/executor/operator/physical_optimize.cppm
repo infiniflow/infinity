@@ -64,7 +64,7 @@ public:
 private:
     void OptimizeIndex(QueryContext *query_context, OperatorState *operator_state);
 
-    void OptimizeAIndex(QueryContext *query_context, OperatorState *operator_state);
+    void OptIndex(QueryContext *query_context, OperatorState *operator_state);
 
 private:
     String db_name_{};

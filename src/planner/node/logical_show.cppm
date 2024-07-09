@@ -54,6 +54,9 @@ export enum class ShowType {
     kShowGlobalVariables,
     kShowConfig,
     kShowBuffer,
+    kShowLogs,
+    kShowDeltaLogs,
+    kShowCatalogs,
 };
 
 export String ToString(ShowType type);
@@ -72,7 +75,7 @@ public:
                          Optional<String> index_name = None,
                          Optional<TransactionID> session_id = None,
                          Optional<u64> txn_id = None)
-        : LogicalNode(node_id, LogicalNodeType::kShow), scan_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
+        : LogicalNode(node_id, LogicalNodeType::kShow), show_type_(type), schema_name_(std::move(schema_name)), object_name_(std::move(object_name)),
           table_index_(table_index), segment_id_(segment_id), block_id_(block_id), chunk_id_(chunk_id), column_id_(column_id), index_name_(index_name), session_id_(session_id), txn_id_(txn_id) {}
 
     [[nodiscard]] Vector<ColumnBinding> GetColumnBindings() const final;
@@ -85,7 +88,7 @@ public:
 
     inline String name() final { return "LogicalShow"; }
 
-    [[nodiscard]] ShowType scan_type() const { return scan_type_; }
+    [[nodiscard]] ShowType show_type() const { return show_type_; }
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
@@ -108,7 +111,7 @@ public:
     [[nodiscard]] inline const Optional<String> index_name() const { return index_name_; }
 
 private:
-    ShowType scan_type_{ShowType::kInvalid};
+    ShowType show_type_{ShowType::kInvalid};
     String schema_name_;
     String object_name_; // It could be table/collection/view name
     u64 table_index_{};

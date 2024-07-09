@@ -1119,4 +1119,8 @@ void Catalog::InitDeltaEntry(TxnTimeStamp max_commit_ts) { global_catalog_delta_
 
 SizeT Catalog::GetDeltaLogCount() const { return global_catalog_delta_entry_->OpSize(); }
 
+Vector<CatalogDeltaOpBrief> Catalog::GetDeltaLogBriefs() const {
+    return global_catalog_delta_entry_->GetOperationBriefs();
+}
+
 } // namespace infinity

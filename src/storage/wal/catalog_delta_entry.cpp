@@ -35,6 +35,27 @@ import logger;
 
 namespace infinity {
 
+String ToString(CatalogDeltaOpType op_type) {
+    switch(op_type) {
+        case CatalogDeltaOpType::ADD_DATABASE_ENTRY: { return "AddDatabase"; }
+        case CatalogDeltaOpType::ADD_TABLE_ENTRY: { return "AddTable"; }
+        case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: { return "AddSegment"; }
+        case CatalogDeltaOpType::ADD_BLOCK_ENTRY: { return "AddBlock"; }
+        case CatalogDeltaOpType::ADD_COLUMN_ENTRY: { return "AddColumn"; }
+        case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: { return "AddTableIndex"; }
+        case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: { return "AddSegmentIndex"; }
+        case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: { return "AddChunkIndex"; }
+        case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: { return "SealSegment"; }
+        case CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED: { return "SealBlock"; }
+        case CatalogDeltaOpType::INVALID: {
+            String error_message = "Invalid catalog delta operation type.";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+    }
+    return String();
+}
+
 SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     SizeT size = sizeof(TxnTimeStamp) + sizeof(merge_flag_) + sizeof(TransactionID) + sizeof(TxnTimeStamp);
     size += sizeof(i32) + encode_->size();
@@ -1198,6 +1219,26 @@ void GlobalCatalogDeltaEntry::PruneOpWithSamePrefix(const String &encode1) {
         }
         iter = delta_ops_.erase(iter); // is prefix
     }
+}
+
+Vector<CatalogDeltaOpBrief> GlobalCatalogDeltaEntry::GetOperationBriefs() const {
+    Vector<CatalogDeltaOpBrief> res;
+    {
+        std::lock_guard<std::mutex> lock(catalog_delta_locker_);
+        res.reserve(delta_ops_.size());
+        for(const auto& op_pair: delta_ops_) {
+            CatalogDeltaOperation* delta_op = op_pair.second.get();
+
+            res.push_back({
+                delta_op->begin_ts_,
+                delta_op->commit_ts_,
+                delta_op->txn_id_,
+                delta_op->type_,
+                MakeShared<String>(delta_op->ToString())
+            });
+        }
+    }
+    return res;
 }
 
 } // namespace infinity

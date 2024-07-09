@@ -28,6 +28,8 @@ class QueryArgs:
     query_result_dave_dir: str = field(default='./query-results', metadata={'help': 'Dir to save query result.'})
     query_types: str = field(default="bm25",
                              metadata={'help': 'Query method. Available methods: bm25, dense, sparse', "nargs": "+"})
+    colbert_rerank: bool = field(default=False, metadata={'help': 'Whether to use colbert to rerank.'})
+    colbert_bit_rerank: bool = field(default=False, metadata={'help': 'Whether to use colbert bit to rerank.'})
 
 
 def check_languages(languages):
@@ -42,10 +44,10 @@ def check_languages(languages):
 
 def check_query_types(query_types):
     available_query_types = ['bm25', 'dense', 'sparse', 'colbert']
-    if query_types == 'all' or (len(query_types) == 1 and query_types[0] == 'all'):
-        return available_query_types
     if isinstance(query_types, str):
         query_types = [query_types]
+    if 'all' in query_types:
+        return available_query_types
     for query_type in query_types:
         if query_type not in available_query_types:
             raise ValueError(
@@ -267,7 +269,7 @@ def apply_bm25(table, query_str: str, max_hits: int):
 
 
 def apply_dense(table, query_embedding, max_hits: int):
-    return table.knn("dense_col", query_embedding, "float", "ip", max_hits)
+    return table.knn("dense_col", query_embedding, "float", "ip", max_hits, {"ef": str(max_hits)})
 
 
 def apply_sparse(table, query_embedding: dict, max_hits: int):
