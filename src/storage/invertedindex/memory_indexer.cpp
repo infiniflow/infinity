@@ -170,24 +170,26 @@ SizeT MemoryIndexer::CommitOffline(SizeT wait_if_empty_ms) {
         return 0;
     }
 
-    if (nullptr == spill_file_handle_) {
-        PrepareSpillFile();
-    }
     Vector<SharedPtr<ColumnInverter>> inverters;
     this->ring_sorted_.GetBatch(inverters, wait_if_empty_ms);
     SizeT num = inverters.size();
-    if (num > 0) {
-        for (auto &inverter : inverters) {
-            inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_, buf_writer_);
-            num_runs_++;
-        }
+    if (!num) {
+        return num;
     }
-    if (num > 0) {
-        std::unique_lock<std::mutex> lock(mutex_);
-        inflight_tasks_ -= num;
-        if (inflight_tasks_ == 0) {
-            cv_.notify_all();
-        }
+
+    if (nullptr == spill_file_handle_) {
+        PrepareSpillFile();
+    }
+
+    for (auto &inverter : inverters) {
+        inverter->SpillSortResults(this->spill_file_handle_, this->tuple_count_, buf_writer_);
+        num_runs_++;
+    }
+
+    std::unique_lock<std::mutex> task_lock(mutex_);
+    inflight_tasks_ -= num;
+    if (inflight_tasks_ == 0) {
+        cv_.notify_all();
     }
     return num;
 }
