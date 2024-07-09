@@ -37,6 +37,10 @@ class LocalInfinityClient:
         Infinity.LocalInit(path)
         self.client = Infinity.LocalConnect()
 
+    def __del__(self):
+        if self.client is not None:
+            self.disconnect()
+
     def disconnect(self):
         Infinity.LocalUnInit()
         self.client = None

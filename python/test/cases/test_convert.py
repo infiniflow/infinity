@@ -5,19 +5,23 @@ from infinity.common import ConflictType
 
 from internal.test_convert import TestConvert
 
-@pytest.mark.usefixtures("local_infinity")
+@pytest.fixture(scope="class")
+def local_infinity(request):
+    return request.config.getoption("--local-infinity")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity):
+    if local_infinity:
+        uri = common_values.TEST_LOCAL_PATH
+    else:
+        uri = common_values.TEST_LOCAL_HOST
+    request.cls.uri = uri
+    request.cls.test_infinity_obj = TestConvert(uri)
+    yield
+    request.cls.test_infinity_obj.disconnect()
+
+@pytest.mark.usefixtures("setup_class")
 class TestInfinity:
-    @pytest.fixture(autouse=True)
-    def setup(self, local_infinity):
-        if local_infinity:
-            self.uri = common_values.TEST_LOCAL_PATH
-        else:
-            self.uri = common_values.TEST_LOCAL_HOST
-        self.test_infinity_obj = TestConvert(self.uri)
-
-    def teardown(self):
-        self.test_infinity_obj.disconnect()
-
     def test_to_pl(self):
         self.test_infinity_obj._test_to_pl()
     def test_to_pa(self):
