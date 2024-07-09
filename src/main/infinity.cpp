@@ -990,6 +990,7 @@ QueryResult Infinity::Optimize(const String &db_name, const String &table_name, 
         for (auto *param_ptr : optimize_option.opt_params_) {
             auto param = MakeUnique<InitParameter>(std::move(param_ptr->param_name_), std::move(param_ptr->param_value_));
             optimize_statement->opt_params_.push_back(std::move(param));
+            delete param_ptr;
         }
     }
 
