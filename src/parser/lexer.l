@@ -48,6 +48,7 @@ BUFFER          { return BUFFER; }
 BY              { return BY; }
 CASE            { return CASE; }
 CAST            { return CAST; }
+CATALOGS        { return CATALOGS; }
 CHUNK           { return CHUNK; }
 CIRCLE          { return CIRCLE; }
 COLLECTION      { return COLLECTION; }

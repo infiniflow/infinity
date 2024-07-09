@@ -173,6 +173,8 @@ public:
 
     Status BuildShowDeltaLogs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowCatalogs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     // Flush
     Status BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 

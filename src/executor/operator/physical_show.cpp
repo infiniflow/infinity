@@ -467,6 +467,15 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowCatalogs: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("max_commit_timestamp");
+            output_names_->emplace_back("file_path");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(varchar_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
             LOG_ERROR(status.message());
@@ -594,6 +603,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowDeltaLogs: {
             ExecuteShowDeltaLogs(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowCatalogs: {
+            ExecuteShowCatalogs(query_context, show_operator_state);
             break;
         }
         default: {
@@ -4870,12 +4883,6 @@ void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperato
             output_block_ptr->Init(column_types);
         }
 
-//        TxnTimeStamp begin_ts_{0};
-//        TxnTimeStamp commit_ts_{0};
-//        TransactionID txn_id_{0};
-//        CatalogDeltaOpType type_{CatalogDeltaOpType::INVALID};
-//        SharedPtr<String> text_ptr;
-
         {
             // begin_ts
             Value value = Value::MakeBigInt(delta_op_brief.begin_ts_);
@@ -4920,5 +4927,86 @@ void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperato
     operator_state->output_.emplace_back(std::move(output_block_ptr));
     return ;
 }
+
+void PhysicalShow::ExecuteShowCatalogs(QueryContext *query_context, ShowOperatorState *operator_state) {
+
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, bigint_type, "max_commit_timestamp", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "file_path", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_delta_logs"), column_defs);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    WalManager *wal_manager = query_context->storage()->wal_manager();
+    auto catalog_fileinfo = wal_manager->GetCatalogFiles();
+    if (!catalog_fileinfo.has_value()) {
+        String error_message = fmt::format("Can't get catalog files");
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    auto &[full_catalog_file_info, delta_catalog_file_infos] = catalog_fileinfo.value();
+
+    {
+        {
+            // full_ckp_commit_ts
+            Value value = Value::MakeBigInt(full_catalog_file_info.max_commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // full_ckp_catalog_file_path
+            Value value = Value::MakeVarchar(full_catalog_file_info.path_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        ++row_count;
+    }
+
+    for(const auto& delta_catalog_file_info: delta_catalog_file_infos) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // delta_ckp_commit_ts
+            Value value = Value::MakeBigInt(delta_catalog_file_info.max_commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // delta_ckp_catalog_file_path
+            Value value = Value::MakeVarchar(delta_catalog_file_info.path_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        ++ row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return ;
+}
+
 
 } // namespace infinity

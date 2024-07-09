@@ -22,6 +22,7 @@ import wal_entry;
 import options;
 import catalog_delta_entry;
 import blocking_queue;
+import log_file;
 
 namespace infinity {
 
@@ -63,6 +64,8 @@ public:
     String GetWalFilename() const;
 
     i64 ReplayWalFile();
+
+    Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> GetCatalogFiles() const;
 
     Vector<SharedPtr<WalEntry>> CollectWalEntries() const;
 

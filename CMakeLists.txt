@@ -120,6 +120,14 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     add_compile_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
     add_link_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
 
+    option(LEAK "Memory leak detection" OFF)
+    message("Check memory leak: " "${LEAK}")
+    if(LEAK)
+        message("Check memory leak")
+        add_compile_options(-fsanitize=leak)
+        add_link_options(-fsanitize=leak)
+    endif()
+
     add_compile_options("-fno-omit-frame-pointer")
     add_link_options("-fno-omit-frame-pointer")
 
