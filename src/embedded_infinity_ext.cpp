@@ -185,9 +185,6 @@ NB_MODULE(embedded_infinity_ext, m) {
     nb::class_<WrapSearchExpr>(m, "WrapSearchExpr")
         .def(nb::init<>())
         .def_rw("match_exprs", &WrapSearchExpr::match_exprs)
-        .def_rw("knn_exprs", &WrapSearchExpr::knn_exprs)
-        .def_rw("match_tensor_exprs", &WrapSearchExpr::match_tensor_exprs)
-        .def_rw("match_sparse_exprs", &WrapSearchExpr::match_sparse_exprs)
         .def_rw("fusion_exprs", &WrapSearchExpr::fusion_exprs);
 
     // Bind WrapParsedExpr
@@ -201,6 +198,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("between_expr", &WrapParsedExpr::between_expr)
         .def_rw("knn_expr", &WrapParsedExpr::knn_expr)
         .def_rw("match_expr", &WrapParsedExpr::match_expr)
+        .def_rw("match_sparse_expr", &WrapParsedExpr::match_sparse_expr)
+        .def_rw("match_tensor_expr", &WrapParsedExpr::match_tensor_expr)
         .def_rw("fusion_expr", &WrapParsedExpr::fusion_expr)
         .def_rw("search_expr", &WrapParsedExpr::search_expr);
 
@@ -378,6 +377,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kIn", ParsedExprType::kIn)
         .value("kKnn", ParsedExprType::kKnn)
         .value("kMatch", ParsedExprType::kMatch)
+        .value("kMatchSparse", ParsedExprType::kMatchSparse)
         .value("kMatchTensor", ParsedExprType::kMatchTensor)
         .value("kFusion", ParsedExprType::kFusion)
         .value("kSearch", ParsedExprType::kSearch)

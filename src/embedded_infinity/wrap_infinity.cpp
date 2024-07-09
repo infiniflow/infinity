@@ -337,25 +337,29 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
 
 ParsedExpr *WrapParsedExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
-
-    if (type == ParsedExprType::kConstant) {
-        return constant_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kColumn) {
-        return column_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kFunction) {
-        return function_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kBetween) {
-        return between_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kKnn) {
-        return knn_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kMatch) {
-        return match_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kFusion) {
-        return fusion_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kSearch) {
-        return search_expr.GetParsedExpr(status);
-    } else {
-        status = Status::InvalidParsedExprType();
+    switch (type) {
+        case ParsedExprType::kConstant:
+            return constant_expr.GetParsedExpr(status);
+        case ParsedExprType::kColumn:
+            return column_expr.GetParsedExpr(status);
+        case ParsedExprType::kFunction:
+            return function_expr.GetParsedExpr(status);
+        case ParsedExprType::kBetween:
+            return between_expr.GetParsedExpr(status);
+        case ParsedExprType::kKnn:
+            return knn_expr.GetParsedExpr(status);
+        case ParsedExprType::kMatch:
+            return match_expr.GetParsedExpr(status);
+        case ParsedExprType::kMatchSparse:
+            return match_sparse_expr.GetParsedExpr(status);
+        case ParsedExprType::kMatchTensor:
+            return match_tensor_expr.GetParsedExpr(status);
+        case ParsedExprType::kFusion:
+            return fusion_expr.GetParsedExpr(status);
+        case ParsedExprType::kSearch:
+            return search_expr.GetParsedExpr(status);
+        default:
+            status = Status::InvalidParsedExprType();
     }
     return nullptr;
 }
