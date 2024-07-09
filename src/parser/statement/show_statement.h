@@ -50,6 +50,7 @@ enum class ShowStmtType {
     kIndexChunk,
     kLogs,
     kDeltaLogs,
+    kCatalogs,
 };
 
 class ShowStatement : public BaseStatement {

@@ -990,6 +990,17 @@ bool WalEntry::IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCh
     return true;
 }
 
+WalCmdCheckpoint* WalEntry::GetCheckPoint() const {
+    auto iter = cmds_.begin();
+    while (iter != cmds_.end()) {
+        if ((*iter)->GetType() == WalCommandType::CHECKPOINT) {
+            return static_cast<WalCmdCheckpoint *>((*iter).get());
+        }
+        ++iter;
+    }
+    return nullptr;
+}
+
 String WalEntry::ToString() const {
     std::stringstream ss;
     ss << "\n======= WAL ENTRY =======" << std::endl;

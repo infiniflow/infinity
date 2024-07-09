@@ -86,6 +86,8 @@ String ToString(ShowType type) {
             return "Show logs";
         case ShowType::kShowDeltaLogs:
             return "Show delta logs";
+        case ShowType::kShowCatalogs:
+            return "Show catalogs";
         case ShowType::kInvalid: {
             String error_message = "Invalid chunk scan type";
             LOG_CRITICAL(error_message);

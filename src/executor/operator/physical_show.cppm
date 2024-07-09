@@ -140,6 +140,8 @@ private:
 
     void ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowCatalogs(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
     ShowType show_type_{ShowType::kInvalid};
     String db_name_{};
