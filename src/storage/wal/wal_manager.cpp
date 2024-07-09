@@ -992,12 +992,14 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
     for (const SegmentID segment_id : cmd.deprecated_segment_ids_) {
         auto segment_entry = table_entry->GetSegmentByID(segment_id, commit_ts);
         if (!segment_entry->TrySetCompacting(nullptr)) { // fake set because check
-            String error_message = "Assert: Replay segment should be compactable.";
+            String error_message = fmt::format("Replaying segment: {} from table: {} with status: {}, can't be compacted",
+                                               segment_id, cmd.table_name_, ToString(segment_entry->status()));
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!segment_entry->SetNoDelete()) {
-            String error_message = "Assert: Replay segment should be compactable.";
+            String error_message = fmt::format("Replaying segment: {} from table: {} can't be set no delete, can't be compacted",
+                                               segment_id, cmd.table_name_);
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
