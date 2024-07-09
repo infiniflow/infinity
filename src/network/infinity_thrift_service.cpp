@@ -481,113 +481,35 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     if (request.__isset.search_expr) {
         search_expr = new SearchExpr();
         auto search_expr_list = new Vector<ParsedExpr *>();
-        SizeT knn_expr_count = request.search_expr.knn_exprs.size();
-        SizeT match_sparse_expr_count = request.search_expr.match_sparse_exprs.size();
-        SizeT match_tensor_expr_count = request.search_expr.match_tensor_exprs.size();
         SizeT match_expr_count = request.search_expr.match_exprs.size();
         SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
-        SizeT total_expr_count = knn_expr_count + match_expr_count + match_tensor_expr_count + fusion_expr_count;
+        SizeT total_expr_count = match_expr_count + fusion_expr_count;
         search_expr_list->reserve(total_expr_count);
-        for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
-            auto [knn_expr, knn_expr_status] = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
-            if (!knn_expr_status.ok()) {
-
-                if (output_columns != nullptr) {
-                    for (auto &expr_ptr : *output_columns) {
-                        delete expr_ptr;
-                    }
-                    delete output_columns;
-                    output_columns = nullptr;
-                }
-
-                if (search_expr_list != nullptr) {
-                    for (auto &expr_ptr : *search_expr_list) {
-                        delete expr_ptr;
-                    }
-                    delete search_expr_list;
-                    search_expr_list = nullptr;
-                }
-
-                if (knn_expr != nullptr) {
-                    delete knn_expr;
-                    knn_expr = nullptr;
-                }
-
-                if (search_expr != nullptr) {
-                    delete search_expr;
-                    search_expr = nullptr;
-                }
-
-                ProcessStatus(response, knn_expr_status);
-                return;
-            }
-            search_expr_list->emplace_back(knn_expr);
-        }
-
-        for (SizeT idx = 0; idx < match_sparse_expr_count; ++idx) {
-            auto [match_sparse_expr, match_sparse_status] = GetMatchSparseExprFromProto(request.search_expr.match_sparse_exprs[idx]);
-            if (!match_sparse_status.ok()) {
-                if (output_columns != nullptr) {
-                    for (auto &expr_ptr : *output_columns) {
-                        delete expr_ptr;
-                    }
-                    delete output_columns;
-                    output_columns = nullptr;
-                }
-                if (search_expr_list != nullptr) {
-                    for (auto &expr_ptr : *search_expr_list) {
-                        delete expr_ptr;
-                    }
-                    delete search_expr_list;
-                    search_expr_list = nullptr;
-                }
-                if (match_sparse_expr != nullptr) {
-                    delete match_sparse_expr;
-                    match_sparse_expr = nullptr;
-                }
-                if (search_expr != nullptr) {
-                    delete search_expr;
-                    search_expr = nullptr;
-                }
-                ProcessStatus(response, match_sparse_status);
-                return;
-            }
-            search_expr_list->emplace_back(match_sparse_expr);
-        }
-
-        for (SizeT idx = 0; idx < match_tensor_expr_count; ++idx) {
-            auto [match_tensor_expr, match_tensor_status] = GetMatchTensorExprFromProto(request.search_expr.match_tensor_exprs[idx]);
-            if (!match_tensor_status.ok()) {
-                if (output_columns != nullptr) {
-                    for (auto &expr_ptr : *output_columns) {
-                        delete expr_ptr;
-                    }
-                    delete output_columns;
-                    output_columns = nullptr;
-                }
-                if (search_expr_list != nullptr) {
-                    for (auto &expr_ptr : *search_expr_list) {
-                        delete expr_ptr;
-                    }
-                    delete search_expr_list;
-                    search_expr_list = nullptr;
-                }
-                if (match_tensor_expr != nullptr) {
-                    delete match_tensor_expr;
-                    match_tensor_expr = nullptr;
-                }
-                if (search_expr != nullptr) {
-                    delete search_expr;
-                    search_expr = nullptr;
-                }
-                ProcessStatus(response, match_tensor_status);
-                return;
-            }
-            search_expr_list->emplace_back(match_tensor_expr);
-        }
-
         for (SizeT idx = 0; idx < match_expr_count; ++idx) {
-            ParsedExpr *match_expr = GetMatchExprFromProto(request.search_expr.match_exprs[idx]);
+            Status status;
+            ParsedExpr *match_expr = GetGenericMatchExprFromProto(status, request.search_expr.match_exprs[idx]);
+            if (!status.ok()) {
+                if (output_columns != nullptr) {
+                    for (auto &expr_ptr : *output_columns) {
+                        delete expr_ptr;
+                    }
+                    delete output_columns;
+                    output_columns = nullptr;
+                }
+                if (search_expr_list != nullptr) {
+                    for (auto &expr_ptr : *search_expr_list) {
+                        delete expr_ptr;
+                    }
+                    delete search_expr_list;
+                    search_expr_list = nullptr;
+                }
+                if (search_expr != nullptr) {
+                    delete search_expr;
+                    search_expr = nullptr;
+                }
+                ProcessStatus(response, status);
+                return;
+            }
             search_expr_list->emplace_back(match_expr);
         }
 
@@ -727,15 +649,14 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
     if (request.__isset.search_expr) {
         search_expr = new SearchExpr();
         auto search_expr_list = new Vector<ParsedExpr *>();
-        SizeT knn_expr_count = request.search_expr.knn_exprs.size();
         SizeT match_expr_count = request.search_expr.match_exprs.size();
         SizeT fusion_expr_count = request.search_expr.fusion_exprs.size();
-        SizeT total_expr_count = knn_expr_count + match_expr_count + fusion_expr_count;
+        SizeT total_expr_count = match_expr_count + fusion_expr_count;
         search_expr_list->reserve(total_expr_count);
-        for (SizeT idx = 0; idx < knn_expr_count; ++idx) {
-            auto [knn_expr, knn_expr_status] = GetKnnExprFromProto(request.search_expr.knn_exprs[idx]);
-            if (!knn_expr_status.ok()) {
-
+        for (SizeT idx = 0; idx < match_expr_count; ++idx) {
+            Status status;
+            auto match_expr = GetGenericMatchExprFromProto(status, request.search_expr.match_exprs[idx]);
+            if (!status.ok()) {
                 if (output_columns != nullptr) {
                     for (auto &expr_ptr : *output_columns) {
                         delete expr_ptr;
@@ -752,19 +673,13 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
                     search_expr_list = nullptr;
                 }
 
-                if (knn_expr != nullptr) {
-                    delete knn_expr;
-                    knn_expr = nullptr;
+                if (match_expr != nullptr) {
+                    delete match_expr;
                 }
 
-                ProcessStatus(response, knn_expr_status);
+                ProcessStatus(response, status);
                 return;
             }
-            search_expr_list->emplace_back(knn_expr);
-        }
-
-        for (SizeT idx = 0; idx < match_expr_count; ++idx) {
-            ParsedExpr *match_expr = GetMatchExprFromProto(request.search_expr.match_exprs[idx]);
             search_expr_list->emplace_back(match_expr);
         }
 
@@ -1831,7 +1746,7 @@ FunctionExpr *InfinityThriftService::GetFunctionExprFromProto(Status &status, co
     return parsed_expr;
 }
 
-Tuple<KnnExpr *, Status> InfinityThriftService::GetKnnExprFromProto(const infinity_thrift_rpc::KnnExpr &expr) {
+KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infinity_thrift_rpc::KnnExpr &expr) {
     auto knn_expr = new KnnExpr(false);
     knn_expr->column_expr_ = GetColumnExprFromProto(expr.column_expr);
 
@@ -1839,24 +1754,27 @@ Tuple<KnnExpr *, Status> InfinityThriftService::GetKnnExprFromProto(const infini
     if (knn_expr->distance_type_ == KnnDistanceType::kInvalid) {
         delete knn_expr;
         knn_expr = nullptr;
-        return {nullptr, Status::InvalidKnnDistanceType()};
+        status = Status::InvalidKnnDistanceType();
+        return nullptr;
     }
     knn_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
     if (knn_expr->embedding_data_type_ == EmbeddingDataType::kElemInvalid) {
         delete knn_expr;
         knn_expr = nullptr;
-        return {nullptr, Status::InvalidEmbeddingDataType("invalid")};
+        status = Status::InvalidEmbeddingDataType("invalid");
+        return nullptr;
     }
 
-    auto [embedding_data_ptr, dimension, status] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+    auto [embedding_data_ptr, dimension, status2] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
     knn_expr->embedding_data_ptr_ = embedding_data_ptr;
     knn_expr->dimension_ = dimension;
-    if (!status.ok()) {
+    if (!status2.ok()) {
         if (knn_expr != nullptr) {
             delete knn_expr;
             knn_expr = nullptr;
         }
-        return {nullptr, status};
+        status = status2;
+        return nullptr;
     }
 
     knn_expr->topn_ = expr.topn;
@@ -1864,7 +1782,8 @@ Tuple<KnnExpr *, Status> InfinityThriftService::GetKnnExprFromProto(const infini
         delete knn_expr;
         knn_expr = nullptr;
         String topn = std::to_string(expr.topn);
-        return {nullptr, Status::InvalidParameterValue("topn", topn, "topn should be greater than 0")};
+        status = Status::InvalidParameterValue("topn", topn, "topn should be greater than 0");
+        return nullptr;
     }
 
     knn_expr->opt_params_ = new Vector<InitParameter *>();
@@ -1874,20 +1793,20 @@ Tuple<KnnExpr *, Status> InfinityThriftService::GetKnnExprFromProto(const infini
         init_parameter->param_value_ = param.param_value;
         knn_expr->opt_params_->emplace_back(init_parameter);
     }
-    return {knn_expr, status};
+    status = Status::OK();
+    return knn_expr;
 }
 
-Tuple<MatchSparseExpr *, Status> InfinityThriftService::GetMatchSparseExprFromProto(const infinity_thrift_rpc::MatchSparseExpr &expr)  {
+MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &status, const infinity_thrift_rpc::MatchSparseExpr &expr) {
     auto match_sparse_expr = new MatchSparseExpr(true);
     auto *column_expr = static_cast<ParsedExpr *>(GetColumnExprFromProto(expr.column_expr));
     match_sparse_expr->SetSearchColumn(column_expr);
 
-    Status status;
     auto *constant_expr = GetConstantFromProto(status, expr.query_sparse_expr);
     if (!status.ok()) {
         delete match_sparse_expr;
         match_sparse_expr = nullptr;
-        return {nullptr, status};
+        return nullptr;
     }
     match_sparse_expr->SetQuerySparse(constant_expr);
 
@@ -1902,25 +1821,28 @@ Tuple<MatchSparseExpr *, Status> InfinityThriftService::GetMatchSparseExprFromPr
     }
     match_sparse_expr->SetOptParams(expr.topn, opt_params_ptr);
 
-    return {match_sparse_expr, status};
+    status = Status::OK();
+    return match_sparse_expr;
 }
 
-Pair<MatchTensorExpr *, Status> InfinityThriftService::GetMatchTensorExprFromProto(const infinity_thrift_rpc::MatchTensorExpr &expr) {
+MatchTensorExpr *InfinityThriftService::GetMatchTensorExprFromProto(Status &status, const infinity_thrift_rpc::MatchTensorExpr &expr) {
     auto match_tensor_expr = MakeUnique<MatchTensorExpr>();
     match_tensor_expr->SetSearchMethodStr(expr.search_method);
     match_tensor_expr->column_expr_.reset(GetColumnExprFromProto(expr.column_expr));
     match_tensor_expr->embedding_data_type_ = GetEmbeddingDataTypeFromProto(expr.embedding_data_type);
-    auto [embedding_data_ptr, dimension, status] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
-    if (!status.ok()) {
+    auto [embedding_data_ptr, dimension, status2] = GetEmbeddingDataTypeDataPtrFromProto(expr.embedding_data);
+    if (!status2.ok()) {
         match_tensor_expr.reset();
-        return {nullptr, status};
+        status = status2;
+        return nullptr;
     }
     match_tensor_expr->dimension_ = dimension;
     const auto copy_bytes = EmbeddingT::EmbeddingSize(match_tensor_expr->embedding_data_type_, match_tensor_expr->dimension_);
     match_tensor_expr->query_tensor_data_ptr_ = MakeUniqueForOverwrite<char[]>(copy_bytes);
     std::memcpy(match_tensor_expr->query_tensor_data_ptr_.get(), embedding_data_ptr, copy_bytes);
     match_tensor_expr->options_text_ = expr.extra_options;
-    return {match_tensor_expr.release(), status};
+    status = Status::OK();
+    return match_tensor_expr.release();
 }
 
 MatchExpr *InfinityThriftService::GetMatchExprFromProto(const infinity_thrift_rpc::MatchExpr &expr) {
@@ -1931,12 +1853,33 @@ MatchExpr *InfinityThriftService::GetMatchExprFromProto(const infinity_thrift_rp
     return match_expr;
 }
 
+ParsedExpr *InfinityThriftService::GetGenericMatchExprFromProto(Status &status, const infinity_thrift_rpc::GenericMatchExpr &expr) {
+    if (expr.__isset.match_vector_expr == true) {
+        auto parsed_expr = GetKnnExprFromProto(status, *expr.match_vector_expr);
+        return parsed_expr;
+    } else if (expr.__isset.match_sparse_expr == true) {
+        auto parsed_expr = GetMatchSparseExprFromProto(status, *expr.match_sparse_expr);
+        return parsed_expr;
+    } else if (expr.__isset.match_tensor_expr == true) {
+        auto parsed_expr = GetMatchTensorExprFromProto(status, *expr.match_tensor_expr);
+        return parsed_expr;
+    } else if (expr.__isset.match_text_expr == true) {
+        auto parsed_expr = GetMatchExprFromProto(*expr.match_text_expr);
+        status = Status::OK();
+        return parsed_expr;
+    } else {
+        status = Status::InvalidParsedExprType();
+    }
+    return nullptr;
+}
+
 FusionExpr *InfinityThriftService::GetFusionExprFromProto(const infinity_thrift_rpc::FusionExpr &expr) {
     auto fusion_expr = MakeUnique<FusionExpr>();
     fusion_expr->method_ = expr.method;
     fusion_expr->SetOptions(expr.options_text);
     if (expr.__isset.optional_match_tensor_expr) {
-        const auto [result_ptr, status] = GetMatchTensorExprFromProto(expr.optional_match_tensor_expr);
+        Status status;
+        const auto result_ptr = GetMatchTensorExprFromProto(status, expr.optional_match_tensor_expr);
         fusion_expr->match_tensor_expr_.reset(result_ptr);
         if (!status.ok()) {
             fusion_expr.reset();
@@ -1956,8 +1899,7 @@ ParsedExpr *InfinityThriftService::GetParsedExprFromProto(Status &status, const 
         auto parsed_expr = GetFunctionExprFromProto(status, *expr.type.function_expr);
         return parsed_expr;
     } else if (expr.type.__isset.knn_expr == true) {
-        auto [parsed_expr, knn_expr_status] = GetKnnExprFromProto(*expr.type.knn_expr);
-        status = knn_expr_status;
+        auto parsed_expr = GetKnnExprFromProto(status, *expr.type.knn_expr);
         return parsed_expr;
     } else if (expr.type.__isset.match_expr == true) {
         auto parsed_expr = GetMatchExprFromProto(*expr.type.match_expr);
