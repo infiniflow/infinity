@@ -293,14 +293,16 @@ struct SQL_LTYPE {
     PROFILES = 421,                /* PROFILES  */
     VARIABLES = 422,               /* VARIABLES  */
     VARIABLE = 423,                /* VARIABLE  */
-    SEARCH = 424,                  /* SEARCH  */
-    MATCH = 425,                   /* MATCH  */
-    MAXSIM = 426,                  /* MAXSIM  */
-    QUERY = 427,                   /* QUERY  */
-    QUERIES = 428,                 /* QUERIES  */
-    FUSION = 429,                  /* FUSION  */
-    ROWLIMIT = 430,                /* ROWLIMIT  */
-    NUMBER = 431                   /* NUMBER  */
+    DELTA = 424,                   /* DELTA  */
+    LOGS = 425,                    /* LOGS  */
+    SEARCH = 426,                  /* SEARCH  */
+    MATCH = 427,                   /* MATCH  */
+    MAXSIM = 428,                  /* MAXSIM  */
+    QUERY = 429,                   /* QUERY  */
+    QUERIES = 430,                 /* QUERIES  */
+    FUSION = 431,                  /* FUSION  */
+    ROWLIMIT = 432,                /* ROWLIMIT  */
+    NUMBER = 433                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -386,7 +388,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 390 "parser.h"
+#line 392 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

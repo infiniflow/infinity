@@ -37,15 +37,9 @@ public:
         return id;
     }
 
-    void Start() {
-        running_.store(true);
-        thread_ = Thread([this] { Run(); });
-    }
+    void Start();
 
-    void Stop() {
-        running_.store(false);
-        thread_.join();
-    }
+    void Stop();
 
     void Run();
 

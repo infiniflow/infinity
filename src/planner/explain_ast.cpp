@@ -682,6 +682,14 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW CONFIG"));
             break;
         }
+        case ShowStmtType::kLogs: {
+            result->emplace_back(MakeShared<String>("SHOW LOGS"));
+            break;
+        }
+        case ShowStmtType::kDeltaLogs: {
+            result->emplace_back(MakeShared<String>("SHOW DELTA LOGS"));
+            break;
+        }
     }
 }
 

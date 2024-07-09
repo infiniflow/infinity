@@ -175,14 +175,7 @@ String WalSegmentInfo::ToString() const {
     std::stringstream ss;
     ss << "segment_id: " << segment_id_ << ", column_count: " << column_count_ << ", row_count: " << row_count_
        << ", actual_row_count: " << actual_row_count_ << ", row_capacity: " << row_capacity_;
-    ss << ", block_infos: [";
-    for (SizeT i = 0; i < block_infos_.size(); i++) {
-        ss << block_infos_[i].ToString();
-        if (i != block_infos_.size() - 1) {
-            ss << ", ";
-        }
-    }
-    ss << "]";
+    ss << ", block_info count: " << block_infos_.size() << std::endl;
     return ss.str();
 }
 
@@ -726,6 +719,141 @@ void WalCmdDumpIndex::WriteAdv(char *&buf) const {
     }
 }
 
+String WalCmdCreateDatabase::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "db dir: " << db_dir_tail_ << std::endl;
+    return ss.str();
+}
+
+String WalCmdDropDatabase::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    return ss.str();
+}
+
+String WalCmdCreateTable::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_def_->ToString() << std::endl;
+    ss << "table dir: " << table_dir_tail_ << std::endl;
+    return ss.str();
+}
+
+String WalCmdDropTable::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    return ss.str();
+}
+
+String WalCmdCreateIndex::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "index def: " << index_base_->ToString() << std::endl;
+    return ss.str();
+}
+
+String WalCmdDropIndex::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "index name: " << index_name_ << std::endl;
+    return ss.str();
+}
+
+String WalCmdImport::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    auto &segment_info = segment_info_;
+    ss << segment_info.ToString() << std::endl;
+    return ss.str();
+}
+
+String WalCmdAppend::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << block_->ToBriefString();
+    return ss.str();
+}
+
+String WalCmdDelete::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "delete row cout: " << row_ids_.size() << std::endl;
+    return ss.str();
+}
+
+String WalCmdSetSegmentStatusSealed::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "segment id: " << segment_id_ << std::endl;
+    return ss.str();
+}
+
+String WalCmdUpdateSegmentBloomFilterData::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "segment id: " << segment_id_ << std::endl;
+    return ss.str();
+}
+
+String WalCmdCheckpoint::ToString() const {
+    std::stringstream ss;
+    ss << "catalog path: " << fmt::format("{}/{}", catalog_path_, catalog_name_) << std::endl;
+    ss << "max commit ts: " << max_commit_ts_ << std::endl;
+    ss << "is full checkpoint: " << is_full_checkpoint_ << std::endl;
+    return ss.str();
+}
+
+String WalCmdCompact::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "deprecated segment: ";
+    for(SegmentID segment_id: deprecated_segment_ids_) {
+        ss << segment_id << " | ";
+    }
+    ss << std::endl;
+    ss << "new segment: ";
+    for(auto& new_seg_info: new_segment_infos_) {
+        ss << new_seg_info.ToString() << " | ";
+    }
+    ss << std::endl;
+    return String();
+}
+
+String WalCmdOptimize::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "index name: " << index_name_ << std::endl;
+    ss << "index parameter: ";
+    for(auto& param_ptr: params_) {
+        ss << param_ptr->ToString() << " | ";
+    }
+    return ss.str();
+}
+
+String WalCmdDumpIndex::ToString() const {
+    std::stringstream ss;
+    ss << "db name: " << db_name_ << std::endl;
+    ss << "table name: " << table_name_ << std::endl;
+    ss << "index name: " << index_name_ << std::endl;
+    ss << "segment id: " << segment_id_ << std::endl;
+    ss << "index parameter: ";
+    for(auto& chunk_info: chunk_infos_) {
+        ss << chunk_info.ToString() << " | ";
+    }
+    return ss.str();
+}
+
 bool WalEntry::operator==(const WalEntry &other) const {
     if (this->txn_id_ != other.txn_id_ || this->commit_ts_ != other.commit_ts_ || this->cmds_.size() != other.cmds_.size()) {
         return false;
@@ -871,47 +999,7 @@ String WalEntry::ToString() const {
     ss << "size: " << size_ << std::endl;
     for (const auto &cmd : cmds_) {
         ss << "[" << WalCmd::WalCommandTypeToString(cmd->GetType()) << "]" << std::endl;
-        if (cmd->GetType() == WalCommandType::CHECKPOINT) {
-            auto checkpoint_cmd = dynamic_cast<const WalCmdCheckpoint *>(cmd.get());
-            ss << "catalog path: " << fmt::format("{}/{}", checkpoint_cmd->catalog_path_, checkpoint_cmd->catalog_name_) << std::endl;
-            ss << "max commit ts: " << checkpoint_cmd->max_commit_ts_ << std::endl;
-            ss << "is full checkpoint: " << checkpoint_cmd->is_full_checkpoint_ << std::endl;
-        } else if (cmd->GetType() == WalCommandType::IMPORT) {
-            auto import_cmd = dynamic_cast<const WalCmdImport *>(cmd.get());
-            ss << "db name: " << import_cmd->db_name_ << std::endl;
-            ss << "table name: " << import_cmd->table_name_ << std::endl;
-            auto &segment_info = import_cmd->segment_info_;
-            ss << segment_info.ToString();
-        } else if (cmd->GetType() == WalCommandType::APPEND) {
-            auto append_cmd = dynamic_cast<const WalCmdAppend *>(cmd.get());
-            ss << "db name: " << append_cmd->db_name_ << std::endl;
-            ss << "table name: " << append_cmd->table_name_ << std::endl;
-            ss << append_cmd->block_->ToString();
-        } else if (cmd->GetType() == WalCommandType::DELETE) {
-            auto delete_cmd = dynamic_cast<const WalCmdDelete *>(cmd.get());
-            ss << "db name: " << delete_cmd->db_name_ << std::endl;
-            ss << "table name: " << delete_cmd->table_name_ << std::endl;
-            ss << "row ids: ";
-            for (const auto &row_id : delete_cmd->row_ids_) {
-                ss << row_id.ToString() << " ";
-            }
-            ss << std::endl;
-        } else if (cmd->GetType() == WalCommandType::CREATE_INDEX) {
-            auto create_index_cmd = dynamic_cast<const WalCmdCreateIndex *>(cmd.get());
-            ss << "db name: " << create_index_cmd->db_name_ << std::endl;
-            ss << "table name: " << create_index_cmd->table_name_ << std::endl;
-            ss << "index def: " << create_index_cmd->index_base_->ToString() << std::endl;
-        } else if (cmd->GetType() == WalCommandType::SET_SEGMENT_STATUS_SEALED) {
-            auto set_sealed_cmd = dynamic_cast<const WalCmdSetSegmentStatusSealed *>(cmd.get());
-            ss << "db name: " << set_sealed_cmd->db_name_ << std::endl;
-            ss << "table name: " << set_sealed_cmd->table_name_ << std::endl;
-            ss << "segment id: " << set_sealed_cmd->segment_id_ << std::endl;
-        } else if (cmd->GetType() == WalCommandType::UPDATE_SEGMENT_BLOOM_FILTER_DATA) {
-            auto update_filter_cmd = dynamic_cast<const WalCmdUpdateSegmentBloomFilterData *>(cmd.get());
-            ss << "db name: " << update_filter_cmd->db_name_ << std::endl;
-            ss << "table name: " << update_filter_cmd->table_name_ << std::endl;
-            ss << "segment id: " << update_filter_cmd->segment_id_ << std::endl;
-        }
+        ss << cmd->ToString();
     }
     ss << "========================" << std::endl;
     return ss.str();

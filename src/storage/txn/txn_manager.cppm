@@ -44,13 +44,11 @@ public:
                         TxnTimeStamp start_ts,
                         bool enable_compaction);
 
-    ~TxnManager() { Stop(); }
+    ~TxnManager() = default;
 
     Txn *BeginTxn(UniquePtr<String> txn_text);
 
     Txn *GetTxn(TransactionID txn_id);
-
-    SharedPtr<Txn> GetTxnPtr(TransactionID txn_id);
 
     TxnState GetTxnState(TransactionID txn_id);
 
@@ -71,8 +69,6 @@ public:
     TxnTimeStamp GetCommitTimeStampW(Txn *txn);
 
     bool CheckConflict(Txn *txn);
-
-    void Invalidate(TxnTimeStamp commit_ts);
 
     void SendToWAL(Txn *txn);
 
@@ -110,7 +106,6 @@ private:
     void FinishTxn(Txn *txn);
 
 public:
-
     bool enable_compaction() const { return enable_compaction_; }
 
     u64 NextSequence() { return ++sequence_; }
@@ -123,9 +118,10 @@ private:
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     WalManager *wal_mgr_;
 
-    Deque<WeakPtr<Txn>> beginned_txns_;                // sorted by begin ts
-    HashSet<Txn *> finishing_txns_;                    // the txns for conflict check
-    Deque<Pair<TxnTimeStamp, Txn *>> finished_txns_;   // sorted by finished ts
+    Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
+    HashSet<Txn *> finishing_txns_; // the txns in committing stage, can use flat_map
+    Deque<Txn *> finished_txns_;  // the txns that committed_ts
+
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 
     Atomic<TxnTimeStamp> start_ts_{}; // The next txn ts

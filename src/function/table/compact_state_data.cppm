@@ -115,8 +115,10 @@ public:
 
     void AddNewIndexSegment(TableIndexEntry *table_index_entry, SegmentIndexEntry *index_segment_entry) {
         std::lock_guard lock(mutex2_);
-        auto *index_index = new_table_ref_->index_index_.get();
-        index_index->Insert(table_index_entry, index_segment_entry);
+        if (new_table_ref_->index_index_.get() == nullptr) {
+            new_table_ref_->index_index_ = MakeShared<IndexIndex>();
+        }
+        new_table_ref_->index_index_->Insert(table_index_entry, index_segment_entry);
     }
 
     BaseTableRef *GetNewTableRef() const { return new_table_ref_.get(); }

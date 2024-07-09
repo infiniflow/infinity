@@ -285,7 +285,8 @@ SizeT SegmentEntry::row_count(TxnTimeStamp check_ts) const {
 
 // One writer
 u64 SegmentEntry::AppendData(TransactionID txn_id, TxnTimeStamp commit_ts, AppendState *append_state_ptr, BufferManager *buffer_mgr, Txn *txn) {
-    TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
+    // create table store in `Txn::Append`
+    TxnTableStore *txn_store = txn->GetExistTxnTableStore(table_entry_);
 
     std::unique_lock lck(this->rw_locker_); // FIXME: lock scope too large
     if (this->status_ != SegmentStatus::kUnsealed) {
@@ -368,7 +369,8 @@ SizeT SegmentEntry::DeleteData(TransactionID txn_id,
                                TxnTimeStamp commit_ts,
                                const HashMap<BlockID, Vector<BlockOffset>> &block_row_hashmap,
                                Txn *txn) {
-    TxnTableStore *txn_store = txn->GetTxnTableStore(table_entry_);
+    // create table store in `Txn::Delete`
+    TxnTableStore *txn_store = txn->GetExistTxnTableStore(table_entry_);
     SizeT delete_row_n = 0;
 
     for (const auto &[block_id, delete_rows] : block_row_hashmap) {

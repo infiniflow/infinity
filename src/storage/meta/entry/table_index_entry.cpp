@@ -398,9 +398,9 @@ void TableIndexEntry::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin
     txn_id_ = txn_id;
 }
 
-void TableIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay) {
-    auto *table_entry = table_index_meta_->GetTableEntry();
-    auto *txn_table_store = txn->GetTxnTableStore(table_entry);
+Vector<SharedPtr<ChunkIndexEntry>>
+TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay) {
+    Vector<SharedPtr<ChunkIndexEntry>> res;
     switch (index_base_->index_type_) {
         case IndexType::kBMP: {
             if (replay) {
@@ -408,7 +408,10 @@ void TableIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParamet
             }
             std::unique_lock w_lock(rw_locker_);
             for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-                segment_index_entry->OptimizeIndex(index_base_.get(), txn, txn_table_store, opt_params, false /*replay*/);
+                auto p = segment_index_entry->OptIndex(index_base_.get(), txn_table_store, opt_params, false /*replay*/);
+                if (p.get() != nullptr) {
+                    res.push_back(p);
+                }
             }
             break;
         }
@@ -430,7 +433,11 @@ void TableIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParamet
                 txn_table_store->AddIndexStore(this);
                 if (!replay) {
                     for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-                        segment_index_entry->OptimizeIndex(static_cast<IndexBase *>(&old_index_hnsw), txn, txn_table_store, opt_params, false /*replay*/);
+                        auto p =
+                            segment_index_entry->OptIndex(static_cast<IndexBase *>(&old_index_hnsw), txn_table_store, opt_params, false /*replay*/);
+                        if (p.get() != nullptr) {
+                            res.push_back(p);
+                        }
                     }
                 }
             }
@@ -440,6 +447,7 @@ void TableIndexEntry::OptimizeIndex(Txn *txn, const Vector<UniquePtr<InitParamet
             LOG_WARN("Not implemented");
         }
     }
+    return res;
 }
 
 } // namespace infinity

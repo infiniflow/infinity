@@ -386,7 +386,7 @@ struct SQL_LTYPE {
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
 %token DATA LOG BUFFER TRANSACTIONS TRANSACTION
-%token USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE
+%token USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
 
 %token NUMBER
@@ -1810,7 +1810,7 @@ show_statement: SHOW DATABASES {
     $$->table_name_ = $3->table_name_ptr_;
     free($3->table_name_ptr_);
     delete $3;
-};
+}
 | SHOW TABLE table_name INDEX IDENTIFIER {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kIndex;
@@ -1824,7 +1824,7 @@ show_statement: SHOW DATABASES {
 
     $$->index_name_ = $5;
     free($5);
-};
+}
 | SHOW TABLE table_name INDEX IDENTIFIER SEGMENT LONG_VALUE {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kIndexSegment;
@@ -1840,7 +1840,7 @@ show_statement: SHOW DATABASES {
     free($5);
 
     $$->segment_id_ = $7;
-};
+}
 | SHOW TABLE table_name INDEX IDENTIFIER SEGMENT LONG_VALUE CHUNK LONG_VALUE {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kIndexChunk;
@@ -1857,7 +1857,15 @@ show_statement: SHOW DATABASES {
 
       $$->segment_id_ = $7;
       $$->chunk_id_ = $9;
-  };
+}
+| SHOW LOGS {
+      $$ = new infinity::ShowStatement();
+      $$->show_type_ = infinity::ShowStmtType::kLogs;
+}
+| SHOW DELTA LOGS {
+      $$ = new infinity::ShowStatement();
+      $$->show_type_ = infinity::ShowStmtType::kDeltaLogs;
+};
 
 /*
  * FLUSH STATEMENT

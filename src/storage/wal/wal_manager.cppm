@@ -64,6 +64,8 @@ public:
 
     i64 ReplayWalFile();
 
+    Vector<SharedPtr<WalEntry>> CollectWalEntries() const;
+
     void ReplayWalEntry(const WalEntry &entry);
 
     void RecycleWalFile(TxnTimeStamp full_ckp_ts);
