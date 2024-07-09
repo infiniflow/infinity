@@ -56,6 +56,7 @@ export enum class ShowType {
     kShowBuffer,
     kShowLogs,
     kShowDeltaLogs,
+    kShowCatalogs,
 };
 
 export String ToString(ShowType type);

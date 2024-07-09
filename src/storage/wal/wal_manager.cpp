@@ -555,6 +555,71 @@ i64 WalManager::ReplayWalFile() {
     return system_start_ts;
 }
 
+Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::GetCatalogFiles() const {
+    LocalFileSystem fs;
+
+    Vector<String> wal_list{};
+    {
+        auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
+        if (!wal_infos.empty()) {
+            std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
+              return a.max_commit_ts_ > b.max_commit_ts_;
+            });
+        }
+        if (temp_wal_info.has_value()) {
+            wal_list.push_back(temp_wal_info->path_);
+            LOG_INFO(fmt::format("Find temp wal file: {}", temp_wal_info->path_));
+        }
+        for (const auto &wal_info : wal_infos) {
+            wal_list.push_back(wal_info.path_);
+            LOG_INFO(fmt::format("Find wal file: {}", wal_info.path_));
+        }
+        // e.g. wal_list = {wal.log , wal.log.100 , wal.log.50}
+    }
+
+    if (wal_list.empty()) {
+        String error_message = "No WAL file found";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+        return None;
+    }
+
+    TxnTimeStamp max_commit_ts = 0;
+    String catalog_dir = "";
+    TxnTimeStamp system_start_ts = 0;
+    {
+        WalListIterator iterator(wal_list);
+        while (iterator.HasNext()) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
+                String error_message = "Found unexpected bad wal entry";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+            LOG_TRACE(wal_entry->ToString());
+
+            WalCmdCheckpoint *checkpoint_cmd = wal_entry->GetCheckPoint();
+            if (checkpoint_cmd != nullptr) {
+                max_commit_ts = checkpoint_cmd->max_commit_ts_;
+                std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
+                catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
+                system_start_ts = wal_entry->commit_ts_;
+                break;
+            }
+        }
+        LOG_INFO(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
+    }
+
+    if (system_start_ts == 0) {
+        // once wal is not empty, a checkpoint should always be found.
+        String error_message = "No checkpoint found in wal";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
+    return CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_commit_ts);
+}
+
 Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
     LocalFileSystem fs;
     Vector<SharedPtr<WalEntry>> wal_entries;
