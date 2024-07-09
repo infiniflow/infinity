@@ -140,6 +140,10 @@ std::string ShowStatement::ToString() const {
             ss << "Show config";
             break;
         }
+        case ShowStmtType::kCatalogs: {
+            ss << "Show catalogs";
+            break;
+        }
     }
     return ss.str();
 }
