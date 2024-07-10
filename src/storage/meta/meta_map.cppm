@@ -94,9 +94,10 @@ Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const 
             }
             return_meta_ptr = iter->second.get();
         }
-        r_lock.lock();
+        r_lock.lock(); // FIXME: This lock gap might introduce bug.
     } else {
         LOG_TRACE("Add new entry in existed meta_map");
+        return_meta_ptr = iter->second.get();
     }
     return {return_meta_ptr, std::move(r_lock)};
 }
