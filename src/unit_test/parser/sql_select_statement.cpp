@@ -1403,7 +1403,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     EXPECT_EQ(select_statement->search_expr_->type_, ParsedExprType::kSearch);
     auto *search_expr = (SearchExpr *)(select_statement->search_expr_);
 
-    EXPECT_EQ(search_expr->match_exprs_.size(), 4u);
+    EXPECT_EQ(search_expr->match_exprs_.size(), 10u);
     auto *match_expr0 = (MatchExpr *)(search_expr->match_exprs_[0]);
     EXPECT_EQ(match_expr0->fields_, String("author^2,name^5"));
     EXPECT_EQ(match_expr0->matching_text_, String("frank dune"));
@@ -1418,8 +1418,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     auto *query_expr1 = (MatchExpr *)(search_expr->match_exprs_[3]);
     EXPECT_EQ(query_expr1->matching_text_, String(R"##(_exists_:"author" AND page_count:>200 AND (name:/star./ OR name:duna~))##"));
 
-    EXPECT_EQ(search_expr->knn_exprs_.size(), 6u);
-    auto *knn_expr0 = (KnnExpr *)(search_expr->knn_exprs_[0]);
+    auto *knn_expr0 = (KnnExpr *)(search_expr->match_exprs_[4]);
     EXPECT_EQ(knn_expr0->distance_type_, KnnDistanceType::kL2);
     auto *knn0_col_expr = (ColumnExpr *)(knn_expr0->column_expr_);
     EXPECT_EQ(knn0_col_expr->names_[0], "c1");
@@ -1432,7 +1431,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     }
     EXPECT_EQ(knn_expr0->topn_, 3);
 
-    auto *knn_expr1 = (KnnExpr *)(search_expr->knn_exprs_[1]);
+    auto *knn_expr1 = (KnnExpr *)(search_expr->match_exprs_[5]);
     EXPECT_EQ(knn_expr1->distance_type_, KnnDistanceType::kCosine);
     auto *knn1_col_expr = (ColumnExpr *)(knn_expr1->column_expr_);
     EXPECT_EQ(knn1_col_expr->names_[0], "c1");
@@ -1445,7 +1444,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     }
     EXPECT_EQ(knn_expr1->topn_, 3);
 
-    auto *knn_expr2 = (KnnExpr *)(search_expr->knn_exprs_[2]);
+    auto *knn_expr2 = (KnnExpr *)(search_expr->match_exprs_[6]);
     EXPECT_EQ(knn_expr2->distance_type_, KnnDistanceType::kCosine);
     auto *knn2_col_expr = (ColumnExpr *)(knn_expr2->column_expr_);
     EXPECT_EQ(knn2_col_expr->names_[0], "c1");
@@ -1458,7 +1457,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     }
     EXPECT_EQ(knn_expr2->topn_, 3);
 
-    auto *knn_expr3 = (KnnExpr *)(search_expr->knn_exprs_[3]);
+    auto *knn_expr3 = (KnnExpr *)(search_expr->match_exprs_[7]);
     EXPECT_EQ(knn_expr3->distance_type_, KnnDistanceType::kInnerProduct);
     auto *knn3_col_expr = (ColumnExpr *)(knn_expr3->column_expr_);
     EXPECT_EQ(knn3_col_expr->names_[0], "c1");
@@ -1471,7 +1470,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     }
     EXPECT_EQ(knn_expr3->topn_, 3);
 
-    auto *knn_expr4 = (KnnExpr *)(search_expr->knn_exprs_[4]);
+    auto *knn_expr4 = (KnnExpr *)(search_expr->match_exprs_[8]);
     EXPECT_EQ(knn_expr4->distance_type_, KnnDistanceType::kHamming);
     auto *knn4_col_expr = (ColumnExpr *)(knn_expr0->column_expr_);
     EXPECT_EQ(knn4_col_expr->names_[0], "c1");
@@ -1498,7 +1497,7 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
     }
     EXPECT_EQ(knn_expr4->topn_, 3);
 
-    auto *knn_expr5 = (KnnExpr *)(search_expr->knn_exprs_[5]);
+    auto *knn_expr5 = (KnnExpr *)(search_expr->match_exprs_[9]);
     EXPECT_EQ(knn_expr5->distance_type_, KnnDistanceType::kInnerProduct);
     auto *knn5_col_expr = (ColumnExpr *)(knn_expr5->column_expr_);
     EXPECT_EQ(knn5_col_expr->names_[0], "c1");

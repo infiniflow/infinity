@@ -684,24 +684,31 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSpar
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
-    Vector<SharedPtr<MatchExpression>> match_exprs;
-    Vector<SharedPtr<KnnExpression>> knn_exprs;
-    Vector<SharedPtr<MatchTensorExpression>> match_tensor_exprs;
-    Vector<SharedPtr<MatchSparseExpression>> match_sparse_exprs;
+    Vector<SharedPtr<BaseExpression>> match_exprs;
     Vector<SharedPtr<FusionExpression>> fusion_exprs;
-    for (MatchExpr *match_expr : expr.match_exprs_) {
-        match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
-    }
-    for (KnnExpr *knn_expr : expr.knn_exprs_) {
-        knn_exprs.push_back(static_pointer_cast<KnnExpression>(BuildKnnExpr(*knn_expr, bind_context_ptr, depth, false)));
-    }
-    for (MatchTensorExpr *match_tensor_expr : expr.match_tensor_exprs_) {
-        match_tensor_exprs.push_back(
-            static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*match_tensor_expr, bind_context_ptr, depth, false)));
-    }
-    for (MatchSparseExpr *match_sparse_expr : expr.match_sparse_exprs_) {
-        match_sparse_exprs.push_back(
-            static_pointer_cast<MatchSparseExpression>(BuildMatchSparseExpr(std::move(*match_sparse_expr), bind_context_ptr, depth, false)));
+    for (ParsedExpr *match_expr : expr.match_exprs_) {
+        switch (match_expr->type_) {
+            case ParsedExprType::kKnn:
+                match_exprs.push_back(BuildKnnExpr(*static_cast<KnnExpr *>(match_expr), bind_context_ptr, depth, false));
+                break;
+            case ParsedExprType::kMatch: {
+                MatchExpr *match_text_expr = static_cast<MatchExpr *>(match_expr);
+                match_exprs.push_back(
+                    MakeShared<MatchExpression>(match_text_expr->fields_, match_text_expr->matching_text_, match_text_expr->options_text_));
+                break;
+            }
+            case ParsedExprType::kMatchTensor:
+                match_exprs.push_back(BuildMatchTensorExpr(*static_cast<MatchTensorExpr *>(match_expr), bind_context_ptr, depth, false));
+                break;
+            case ParsedExprType::kMatchSparse:
+                match_exprs.push_back(BuildMatchSparseExpr(std::move(*static_cast<MatchSparseExpr *>(match_expr)), bind_context_ptr, depth, false));
+                break;
+            default: {
+                const auto error_info = fmt::format("Unsupported match expression: {}", match_expr->ToString());
+                LOG_ERROR(error_info);
+                RecoverableError(Status::SyntaxError(error_info));
+            }
+        }
     }
     for (FusionExpr *fusion_expr : expr.fusion_exprs_) {
         auto output_expr = MakeShared<FusionExpression>(fusion_expr->method_, fusion_expr->options_);
@@ -711,8 +718,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
         }
         fusion_exprs.push_back(std::move(output_expr));
     }
-    SharedPtr<SearchExpression> bound_search_expr =
-        MakeShared<SearchExpression>(match_exprs, knn_exprs, match_tensor_exprs, match_sparse_exprs, fusion_exprs);
+    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, fusion_exprs);
     return bound_search_expr;
 }
 

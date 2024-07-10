@@ -14,8 +14,9 @@
 
 module;
 
-#include <sstream>
 #include <csignal>
+#include <cstdio>
+#include <sstream>
 //#include "gperftools/profiler.h"
 
 module query_context;
@@ -222,7 +223,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         query_result.status_.Init(ErrorCode::kParserError, e.what());
 
     } catch (UnrecoverableException &e) {
-
+        printf("UnrecoverableException %s\n", e.what());
         LOG_CRITICAL(e.what());
         raise(SIGUSR1);
 //        throw e;
