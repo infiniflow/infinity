@@ -55,7 +55,8 @@ void Storage::Init() {
     // Construct buffer manager
     buffer_mgr_ = MakeUnique<BufferManager>(config_ptr_->BufferManagerSize(),
                                             MakeShared<String>(config_ptr_->DataDir()),
-                                            MakeShared<String>(config_ptr_->TempDir()));
+                                            MakeShared<String>(config_ptr_->TempDir()),
+                                            config_ptr_->LRUNum());
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
@@ -155,13 +156,14 @@ void Storage::Init() {
 }
 
 void Storage::UnInit() {
-    fmt::print("Close storage ...\n");
+    LOG_INFO("Close storage ...\n");
     periodic_trigger_thread_->Stop();
     if (compact_processor_.get() != nullptr) {
         compact_processor_->Stop();
     }
     bg_processor_->Stop();
     wal_mgr_->Stop();
+    txn_mgr_->Stop();
 
     txn_mgr_.reset();
     if (compact_processor_.get() != nullptr) {
@@ -172,7 +174,7 @@ void Storage::UnInit() {
     new_catalog_.reset();
     buffer_mgr_.reset();
     config_ptr_ = nullptr;
-    fmt::print("Close storage successfully\n");
+    LOG_INFO("Close storage successfully\n");
 }
 
 void Storage::AttachCatalog(const FullCatalogFileInfo &full_ckp_info, const Vector<DeltaCatalogFileInfo> &delta_ckp_infos, const String &data_dir) {

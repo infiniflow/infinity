@@ -182,7 +182,7 @@ public:
     void MemIndexInsert(Txn *txn, Vector<AppendRange> &append_ranges);
 
     // Dump or spill the memory indexer
-    void MemIndexDump(Txn *txn, bool spill = false);
+    // void MemIndexDump(Txn *txn, bool spill = false);
 
     // User shall invoke this reguarly to populate recently inserted rows into the fulltext index. Noop for other types of index.
     void MemIndexCommit();

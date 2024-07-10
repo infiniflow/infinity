@@ -59,7 +59,7 @@ export {
     constexpr u64 MAX_VECTOR_CHUNK_COUNT = std::numeric_limits<u64>::max();
     // Each row has one chunk.
     constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L;
-    constexpr u64 DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE = 8192UL * 128UL * 4UL;
+    constexpr u64 DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE = 8192UL * 128UL * 8UL;
 
     // segment related constants
     constexpr SizeT DEFAULT_SEGMENT_CAPACITY = 1024 * 8192; // 1024 * 8192 = 8M rows
@@ -167,6 +167,7 @@ export {
     constexpr u32 DEFAULT_FUSION_OPTION_TOP_N = 100;
 
     constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
+    constexpr SizeT DEFAULT_BUFFER_MANAGER_LRU_COUNT = 7;
     constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "4GB"; // 4Gib
 
     constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
@@ -198,6 +199,7 @@ export {
     constexpr std::string_view MEM_INDEX_CAPACITY_OPTION_NAME = "mem_index_capacity";
 
     constexpr std::string_view BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
+    constexpr std::string_view LRU_NUM_OPTION_NAME = "lru_num";
     constexpr std::string_view TEMP_DIR_OPTION_NAME = "temp_dir";
     constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";
     constexpr std::string_view WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";

@@ -284,9 +284,9 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     }
 }
 
-bool TxnTableStore::CheckConflict(const TxnTableStore *txn_table_store) const {
+bool TxnTableStore::CheckConflict(const TxnTableStore *other_table_store) const {
     for (const auto &[index_name, _] : txn_indexes_store_) {
-        for (const auto [index_entry, _] : txn_table_store->txn_indexes_) {
+        for (const auto [index_entry, _] : other_table_store->txn_indexes_) {
             if (index_name == *index_entry->GetIndexName()) {
                 return true;
             }
@@ -294,7 +294,7 @@ bool TxnTableStore::CheckConflict(const TxnTableStore *txn_table_store) const {
     }
 
     const auto &delete_state = delete_state_;
-    const auto &other_delete_state = txn_table_store->delete_state_;
+    const auto &other_delete_state = other_table_store->delete_state_;
     if (delete_state.rows_.empty() || other_delete_state.rows_.empty()) {
         return false;
     }
@@ -473,6 +473,15 @@ TxnTableStore *TxnStore::GetTxnTableStore(TableEntry *table_entry) {
     return iter->second.get();
 }
 
+TxnTableStore *TxnStore::GetExistTxnTableStore(TableEntry *table_entry) const {
+    const String &table_name = *table_entry->GetTableName();
+    auto iter = txn_tables_store_.find(table_name);
+    if (iter == txn_tables_store_.end()) {
+        UnrecoverableError("txn table store not exist");
+    }
+    return iter->second.get();
+}
+
 void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr) const {
     TxnTimeStamp commit_ts = txn_->CommitTS();
     Vector<Pair<DBEntry *, int>> txn_dbs_vec(txn_dbs_.begin(), txn_dbs_.end());
@@ -498,18 +507,19 @@ void TxnStore::MaintainCompactionAlg() const {
     }
 }
 
-bool TxnStore::CheckConflict(const TxnStore &txn_store) {
+bool TxnStore::CheckConflict(const TxnStore &other_txn_store) {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
-        for (const auto [table_entry, _] : txn_store.txn_tables_) {
+        for (const auto [table_entry, _] : other_txn_store.txn_tables_) {
             if (table_name == *table_entry->GetTableName()) {
                 return true;
             }
         }
 
-        auto other_iter = txn_store.txn_tables_store_.find(table_name);
-        if (other_iter == txn_store.txn_tables_store_.end()) {
+        auto other_iter = other_txn_store.txn_tables_store_.find(table_name);
+        if (other_iter == other_txn_store.txn_tables_store_.end()) {
             continue;
         }
+
         const TxnTableStore *other_table_store = other_iter->second.get();
         if (table_store->CheckConflict(other_table_store)) {
             return true;

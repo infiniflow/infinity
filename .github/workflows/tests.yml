@@ -50,13 +50,15 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | tr -d ' ')
+          CPUS=${CPUS:-$(nproc)}
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+          echo "CPUS=${CPUS}" >> $GITHUB_ENV
           TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run -d --privileged --name ${BUILDER_CONTAINER} -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7_clang18
+          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot --cpus ${CPUS} infiniflow/infinity_builder:centos7_clang18
 
       - name: Build debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity test_main"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-debug && mkdir -p cmake-build-debug && cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug  -DCMAKE_JOB_POOLS:STRING=link=4 -S /infinity -B /infinity/cmake-build-debug && cmake --build /infinity/cmake-build-debug --target infinity test_main"
 
       - name: Unit test debug version
         if: ${{ !cancelled() && !failure() }}
@@ -134,13 +136,15 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: |
           BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | tr -d ' ')
+          CPUS=${CPUS:-$(nproc)}
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+          echo "CPUS=${CPUS}" >> $GITHUB_ENV
           TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run -d --privileged --name ${BUILDER_CONTAINER} -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7_clang18
+          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot --cpus ${CPUS} infiniflow/infinity_builder:centos7_clang18
 
       - name: Build release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=4 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity test_main knn_import_benchmark knn_query_benchmark"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOLS:STRING=link=4 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity test_main knn_import_benchmark knn_query_benchmark"
 
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
@@ -187,7 +191,9 @@ jobs:
 
       - name: Prepare sift dataset
         if: ${{ !cancelled() && !failure() }}
-        run: sudo chmod +x ./tools/ci_tools/check_benchmark_result.py && sudo mkdir -p test/data/benchmark && sudo ln -s $HOME/benchmark/sift1M test/data/benchmark/sift_1m
+        run: |
+          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
+          sudo chmod +x ./tools/ci_tools/check_benchmark_result.py && sudo mkdir -p test/data/benchmark && sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/sift1M test/data/benchmark/sift_1m
 
       - name: Generate config file
         if: ${{ !cancelled() && !failure() }}
@@ -199,11 +205,11 @@ jobs:
 
       - name: Benchmark sift search 1 thread repeat 50 times
         if: ${{ !cancelled() && !failure() }}
-        run: truncate --size 0 $HOME/benchmark/benchmark_sift_1_thread_latest_output.log ; echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | tee $HOME/benchmark/benchmark_sift_1_thread_latest_output.log ; cat $HOME/benchmark/benchmark_sift_1_thread_latest_output.log | ./tools/ci_tools/collect_benchmark_result.py $HOME/benchmark/benchmark_sift_1_thread.log ; ./tools/ci_tools/check_benchmark_result.py sift_1 $HOME/benchmark/benchmark_sift_1_thread.log
+        run: rm -f benchmark_sift_1_thread_latest_output.log ; echo "1 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | tee benchmark_sift_1_thread_latest_output.log ; cat benchmark_sift_1_thread_latest_output.log | ./tools/ci_tools/collect_benchmark_result.py benchmark_sift_1_thread.log ; ./tools/ci_tools/check_benchmark_result.py sift_1 benchmark_sift_1_thread.log
 
       - name: Benchmark sift search 8 threads repeat 50 times
         if: ${{ !cancelled() && !failure() }}
-        run: truncate --size 0 $HOME/benchmark/benchmark_sift_8_threads_latest_output.log ; echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | tee $HOME/benchmark/benchmark_sift_8_threads_latest_output.log ; cat $HOME/benchmark/benchmark_sift_8_threads_latest_output.log | ./tools/ci_tools/collect_benchmark_result.py $HOME/benchmark/benchmark_sift_8_threads.log ; ./tools/ci_tools/check_benchmark_result.py sift_8 $HOME/benchmark/benchmark_sift_8_threads.log
+        run: rm -f benchmark_sift_8_threads_latest_output.log ; echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | tee benchmark_sift_8_threads_latest_output.log ; cat benchmark_sift_8_threads_latest_output.log | ./tools/ci_tools/collect_benchmark_result.py benchmark_sift_8_threads.log ; ./tools/ci_tools/check_benchmark_result.py sift_8 benchmark_sift_8_threads.log
 
       - name: Destroy builder container
         if: always()  # always run this step even if previous steps failed

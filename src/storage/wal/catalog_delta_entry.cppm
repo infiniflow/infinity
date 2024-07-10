@@ -68,6 +68,8 @@ export enum class CatalogDeltaOpType : i8 {
     SET_BLOCK_STATUS_SEALED = 22,
 };
 
+export String ToString(CatalogDeltaOpType op_type);
+
 export enum class MergeFlag : u8 {
     kInvalid = 0,
     kDelete = 1,
@@ -361,6 +363,14 @@ private:
     Vector<UniquePtr<CatalogDeltaOperation>> operations_{};
 };
 
+export struct CatalogDeltaOpBrief {
+    TxnTimeStamp begin_ts_{0};
+    TxnTimeStamp commit_ts_{0};
+    TransactionID txn_id_{0};
+    CatalogDeltaOpType type_{CatalogDeltaOpType::INVALID};
+    SharedPtr<String> text_ptr;
+};
+
 export class GlobalCatalogDeltaEntry {
 public:
     GlobalCatalogDeltaEntry() = default;
@@ -378,6 +388,8 @@ public:
     UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp max_commit_ts);
 
     Tuple<TxnTimeStamp, i64> GetCheckpointState() const { return {max_commit_ts_, wal_size_}; }
+
+    Vector<CatalogDeltaOpBrief> GetOperationBriefs() const;
 
     SizeT OpSize() const;
 

@@ -133,16 +133,17 @@ export enum class GlobalOptionIndex {
     kOptimizeIndexInterval = 18,
     kMemIndexCapacity = 19,
     kBufferManagerSize = 20,
-    kTempDir = 21,
-    kWALDir = 22,
-    kWALCompactThreshold = 23,
-    kFullCheckpointInterval = 24,
-    kDeltaCheckpointInterval = 25,
-    kDeltaCheckpointThreshold = 26,
-    kFlushMethodAtCommit = 27,
-    kResourcePath = 28,
-    kRecordRunningQuery = 29,
-    kInvalid = 30
+    kLRUNum = 21,
+    kTempDir = 22,
+    kWALDir = 23,
+    kWALCompactThreshold = 24,
+    kFullCheckpointInterval = 25,
+    kDeltaCheckpointInterval = 26,
+    kDeltaCheckpointThreshold = 27,
+    kFlushMethodAtCommit = 28,
+    kResourcePath = 29,
+    kRecordRunningQuery = 30,
+    kInvalid = 31
 };
 
 export struct GlobalOptions {

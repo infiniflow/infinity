@@ -427,13 +427,13 @@ protected:
     using Super = SortMerger<KeyType, LenType>;
     using typename Super::KeyAddr;
     FILE *run_file_{nullptr};
+    UniquePtr<DirectIO> io_stream_;
 
     void PredictImpl(DirectIO &io_stream);
 
     void MergeImpl();
 public:
-    SortMergerTermTuple(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2)
-        : Super(filenm, group_size, bs, output_num) {}
+    SortMergerTermTuple(const char *filenm, u32 group_size = 4, u32 bs = 100000000, u32 output_num = 2);
 
     void Run(Vector<UniquePtr<Thread>>& threads);
 

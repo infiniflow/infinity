@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include "CLI11.hpp"
+
 import stl;
 import file_system;
 import local_file_system;

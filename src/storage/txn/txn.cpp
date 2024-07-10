@@ -129,17 +129,34 @@ Txn::Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vecto
     return compact_status;
 }
 
-Status Txn::OptimizeIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params) {
-    table_index_entry->OptimizeIndex(this, init_params, false /*replay*/);
+Status Txn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params) {
+    TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
+    TxnTableStore *txn_table_store = this->GetTxnTableStore(table_entry);
 
-    wal_entry_->cmds_.push_back(MakeShared<WalCmdOptimize>(db_name_,
-                                                           *table_index_entry->table_index_meta()->table_entry()->GetTableName(),
-                                                           *table_index_entry->GetIndexName(),
-                                                           std::move(init_params)));
+    Vector<SharedPtr<ChunkIndexEntry>> dumped_chunks = table_index_entry->OptIndex(txn_table_store, init_params, false /*replay*/);
+
+    String index_name = *table_index_entry->GetIndexName();
+    String table_name = *table_entry->GetTableName();
+
+    if (!dumped_chunks.empty()) {
+        Vector<WalChunkIndexInfo> chunk_infos;
+        SegmentID segment_id = dumped_chunks[0]->segment_index_entry_->segment_id();
+        for (const auto &dumped_chunk : dumped_chunks) {
+            if (segment_id != dumped_chunk->segment_index_entry_->segment_id()) {
+                UnrecoverableError("Not implemented");
+            }
+            chunk_infos.emplace_back(dumped_chunk.get());
+        }
+        wal_entry_->cmds_.push_back(MakeShared<WalCmdDumpIndex>(db_name_, table_name, index_name, segment_id, std::move(chunk_infos)));
+    }
+
+    wal_entry_->cmds_.push_back(MakeShared<WalCmdOptimize>(db_name_, table_name, index_name, std::move(init_params)));
     return Status::OK();
 }
 
 TxnTableStore *Txn::GetTxnTableStore(TableEntry *table_entry) { return txn_store_.GetTxnTableStore(table_entry); }
+
+TxnTableStore *Txn::GetExistTxnTableStore(TableEntry *table_entry) const { return txn_store_.GetExistTxnTableStore(table_entry); }
 
 void Txn::CheckTxnStatus() {
     TxnState txn_state = txn_context_.GetTxnState();
@@ -229,6 +246,8 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
+    LOG_TRACE("Txn::CreateTable try to insert a created table placeholder on catalog");
+
     auto [table_entry, table_status] = catalog_->CreateTable(db_name, txn_id_, begin_ts, table_def, conflict_type, txn_mgr_);
 
     if (table_entry == nullptr) {
@@ -238,6 +257,7 @@ Status Txn::CreateTable(const String &db_name, const SharedPtr<TableDef> &table_
     txn_store_.AddTableStore(table_entry);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCreateTable>(std::move(db_name), table_entry->GetPathNameTail(), table_def));
 
+    LOG_TRACE("Txn::CreateTable created table entry is inserted.");
     return Status::OK();
 }
 
@@ -246,6 +266,7 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
 
     TxnTimeStamp begin_ts = txn_context_.GetBeginTS();
 
+    LOG_TRACE("Txn::DropTableCollectionByName try to insert a dropped table placeholder on catalog");
     auto [table_entry, table_status] = catalog_->DropTableByName(db_name, table_name, conflict_type, txn_id_, begin_ts, txn_mgr_);
 
     if (table_entry.get() == nullptr) {
@@ -254,6 +275,8 @@ Status Txn::DropTableCollectionByName(const String &db_name, const String &table
 
     txn_store_.DropTableStore(table_entry.get());
     wal_entry_->cmds_.push_back(MakeShared<WalCmdDropTable>(db_name, table_name));
+
+    LOG_TRACE("Txn::DropTableCollectionByName dropped table entry is inserted.");
     return Status::OK();
 }
 
@@ -457,10 +480,10 @@ TxnTimeStamp Txn::Commit() {
     return commit_ts;
 }
 
-bool Txn::CheckConflict(Txn *txn) {
-    LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, txn->txn_id_));
+bool Txn::CheckConflict(Txn *other_txn) {
+    LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, other_txn->txn_id_));
 
-    return txn_store_.CheckConflict(txn->txn_store_);
+    return txn_store_.CheckConflict(other_txn->txn_store_);
 }
 
 void Txn::CommitBottom() {

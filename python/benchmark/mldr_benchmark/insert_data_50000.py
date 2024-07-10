@@ -13,25 +13,12 @@
 # limitations under the License.
 
 import os
-import infinity
 from tqdm import tqdm
+from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield, get_all_part_begin_ends
+import infinity
 import infinity.index as index
 from infinity.common import ConflictType, LOCAL_HOST
-from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield
 from infinity.errors import ErrorCode
-
-
-def get_all_part_begin_ends(total_row_count: int):
-    result = []
-    pos_now = 0
-    while pos_now < total_row_count:
-        new_pos = int(input("input part end position: "))
-        if pos_now >= new_pos or new_pos > total_row_count:
-            print("Invalid value. Input again.")
-            continue
-        result.append((pos_now, new_pos))
-        pos_now = new_pos
-    return result
 
 
 # fulltext column, dense embedding column, sparse embedding column
@@ -119,8 +106,8 @@ class InfinityClientForInsert:
         res = self.infinity_table.create_index("hnsw_index", [index.IndexInfo("dense_col", index.IndexType.Hnsw,
                                                                               [index.InitParameter("M", "16"),
                                                                                index.InitParameter("ef_construction",
-                                                                                                   "200"),
-                                                                               index.InitParameter("ef", "200"),
+                                                                                                   "1000"),
+                                                                               index.InitParameter("ef", "1000"),
                                                                                index.InitParameter("metric", "ip"),
                                                                                index.InitParameter("encode", "lvq")])],
                                                ConflictType.Error)
@@ -128,12 +115,12 @@ class InfinityClientForInsert:
         print("Finish creating Hnsw index.")
         print("Start creating BMP index...")
         res = self.infinity_table.create_index("bmp_index", [index.IndexInfo("sparse_col", index.IndexType.BMP,
-                                                                             [index.InitParameter("block_size", "16"),
+                                                                             [index.InitParameter("block_size", "8"),
                                                                               index.InitParameter("compress_type",
                                                                                                   "compress")])],
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        self.infinity_table.optimize("bmp_index", {"topk": "1000", "bp_reorder": {}})
+        self.infinity_table.optimize("bmp_index", {"topk": "1000", "bp_reorder": ""})
         print("Finish creating BMP index.")
 
 
