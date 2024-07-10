@@ -118,7 +118,7 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fno-stack-protector -fno-var-tracking ")
     add_compile_options(-fsanitize=address -fsanitize-recover=all)
-    add_link_options(-fsanitize=address -fsanitize-recover=all
+    add_link_options(-fsanitize=address -fsanitize-recover=all)
 
     option(LEAK "Memory leak detection" OFF)
     message("Check memory leak: " "${LEAK}")
