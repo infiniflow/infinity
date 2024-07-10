@@ -589,7 +589,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
                 memory_secondary_index_->Insert(block_id, block_column_entry, buffer_mgr, 0, block_entry->row_count());
             }
-            MemIndexDump(txn);
+            MemIndexDump();
             break;
         }
         case IndexType::kEMVB: {
