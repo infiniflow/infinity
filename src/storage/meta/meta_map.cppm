@@ -49,6 +49,8 @@ public:
     };
 
 public:
+    void AddNewMetaNoLock(const String& meta_name, UniquePtr<Meta> meta);
+
     Tuple<Meta *, std::shared_lock<std::shared_mutex>> GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func);
 
     Meta *GetMetaNoLock(const String &name, std::function<UniquePtr<Meta>()> &&init_func) {
@@ -68,11 +70,56 @@ public:
 
     void Cleanup();
 
-public:                                     // TODO: make both private
-    mutable std::shared_mutex rw_locker_{}; // FIX
+    Tuple<Vector<String>, Vector<Meta*>> GetAllMeta() const;
 
+    Meta* GetMetaPtrByName(const String& name) const;
+
+    SizeT Size() const {
+        std::shared_lock r_lock(rw_locker_);
+        return meta_map_.size();
+    }
+
+    std::shared_mutex& GetMetaLock() {
+        return rw_locker_;
+    }
+
+private:
+
+    mutable std::shared_mutex rw_locker_{};
     Map meta_map_;
 };
+
+template <MetaConcept Meta>
+Tuple<Vector<String>, Vector<Meta*>> MetaMap<Meta>::GetAllMeta() const {
+    Vector<String> meta_name_array;
+    Vector<Meta*> meta_ptr_array;
+    std::shared_lock r_lock(rw_locker_);
+    SizeT size = meta_map_.size();
+    meta_name_array.reserve(size);
+    meta_ptr_array.reserve(size);
+
+    for(const auto& meta_pair: meta_map_) {
+        meta_name_array.push_back(meta_pair.first);
+        meta_ptr_array.push_back(meta_pair.second.get());
+    }
+    return {meta_name_array, meta_ptr_array};
+}
+
+template <MetaConcept Meta>
+Meta* MetaMap<Meta>::GetMetaPtrByName(const String& name) const {
+    std::shared_lock r_lock(rw_locker_);
+    auto iter = meta_map_.find(name);
+    if(iter == meta_map_.end()) {
+        return nullptr;
+    } else {
+        return iter->second.get();
+    }
+}
+
+template <MetaConcept Meta>
+void MetaMap<Meta>::AddNewMetaNoLock(const String& meta_name, UniquePtr<Meta> meta) {
+    meta_map_.emplace(std::move(meta_name), std::move(meta));
+}
 
 template <MetaConcept Meta>
 Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func) {

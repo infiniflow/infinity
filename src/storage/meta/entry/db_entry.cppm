@@ -148,9 +148,9 @@ private:
     MetaMap<TableMeta> table_meta_map_{};
 
 private: // TODO: remote it
-    std::shared_mutex &rw_locker() { return table_meta_map_.rw_locker_; }
+    std::shared_mutex &GetTableMetaLock() { return table_meta_map_.GetMetaLock(); }
 
-    HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
+//    HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
 
 public:
     void PickCleanup(CleanupScanner *scanner) override;
