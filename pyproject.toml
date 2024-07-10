@@ -33,7 +33,7 @@ readme = "README.md"
 minimum-version = "0.4"
 cmake.targets = ["embedded_infinity_ext"]
 
-build-dir = "build/{wheel_tag}"
+build-dir = "build/{wheel_tag}/{build_type}"
 
 wheel.py-api = "cp310"
 wheel.packages = ["python/infinity"]
