@@ -169,24 +169,19 @@ SharedPtr<String> TableMeta::ToString() {
 
 nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
-    Vector<TableEntry *> table_candidates;
-    {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker());
-        json_res["db_entry_dir"] = *this->db_entry_dir_;
-        json_res["table_name"] = *this->table_name_;
-        // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
-        table_candidates.reserve(this->table_entry_list().size());
-        for (auto &table_entry : this->table_entry_list()) {
-            if (table_entry->entry_type_ == EntryType::kTable && table_entry->commit_ts_ <= max_commit_ts) {
-                // Put it to candidate list
-                table_candidates.push_back((TableEntry *)table_entry.get());
-            }
-        }
-    }
-    for (TableEntry *table_entry : table_candidates) {
+
+    json_res["db_entry_dir"] = *this->db_entry_dir_;
+    json_res["table_name"] = *this->table_name_;
+
+    Vector<BaseEntry *> entry_candidates = table_entry_list_.GetCandidateEntry(max_commit_ts, EntryType::kTable);
+
+    for (const auto &entry : entry_candidates) {
+        TableEntry* table_entry = static_cast<TableEntry*>(entry);
         json_res["table_entries"].emplace_back(table_entry->Serialize(max_commit_ts));
     }
+
     return json_res;
+
 }
 
 /**
@@ -209,13 +204,20 @@ UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_jso
     if (table_meta_json.contains("table_entries")) {
         for (const auto &table_entry_json : table_meta_json["table_entries"]) {
             UniquePtr<TableEntry> table_entry = TableEntry::Deserialize(table_entry_json, res.get(), buffer_mgr);
-            res->table_entry_list().emplace_back(std::move(table_entry));
+            res->PushBackEntry(std::move(table_entry));
         }
     }
-    res->table_entry_list().sort(
-        [](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
+    res->Sort();
 
     return res;
+}
+
+void TableMeta::Sort() {
+    table_entry_list_.SortEntryListByTS();
+}
+
+void TableMeta::PushBackEntry(const SharedPtr<TableEntry>& new_table_entry) {
+    table_entry_list_.PushBackEntry(new_table_entry);
 }
 
 void TableMeta::Cleanup() { table_entry_list_.Cleanup(); }

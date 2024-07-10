@@ -168,26 +168,11 @@ SharedPtr<String> TableIndexMeta::ToString() {
 nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
-    Vector<TableIndexEntry *> table_index_entry_candidates;
-    {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker());
-        json_res["index_name"] = *this->index_name_;
+    json_res["index_name"] = *this->index_name_;
+    Vector<BaseEntry *> entry_candidates = index_entry_list_.GetCandidateEntry(max_commit_ts, EntryType::kTableIndex);
 
-        table_index_entry_candidates.reserve(this->index_entry_list().size());
-        for (const auto &base_entry : this->index_entry_list()) {
-            if (base_entry->entry_type_ != EntryType::kTableIndex) {
-                String error_message = "Unexpected entry type during serialize table index meta";
-                LOG_CRITICAL(error_message);
-                UnrecoverableError(error_message);
-            }
-            if (base_entry->commit_ts_ <= max_commit_ts) {
-                // Put it to candidate list
-                table_index_entry_candidates.push_back((TableIndexEntry *)base_entry.get());
-            }
-        }
-    }
-
-    for (const auto &table_index_entry : table_index_entry_candidates) {
+    for (const auto &entry : entry_candidates) {
+        TableIndexEntry* table_index_entry = static_cast<TableIndexEntry*>(entry);
         json_res["index_entries"].emplace_back(table_index_entry->Serialize(max_commit_ts));
     }
     return json_res;
@@ -204,10 +189,14 @@ TableIndexMeta::Deserialize(const nlohmann::json &table_index_meta_json, TableEn
         // traverse reversely because a dummy head has been inserted
         for (auto iter = entries.rbegin(); iter != entries.rend(); iter++) {
             auto entry = TableIndexEntry::Deserialize(*iter, res.get(), buffer_mgr, table_entry);
-            res->index_entry_list().emplace_front(std::move(entry));
+            res->PushFrontEntry(entry);
         }
     }
     return res;
+}
+
+void TableIndexMeta::PushFrontEntry(const SharedPtr<TableIndexEntry>& new_table_index_entry) {
+    index_entry_list_.PushFrontEntry(new_table_index_entry);
 }
 
 void TableIndexMeta::Cleanup() { index_entry_list_.Cleanup(); }
