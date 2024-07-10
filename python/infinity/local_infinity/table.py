@@ -19,7 +19,7 @@ from typing import Optional, Union, List, Any
 import numpy as np
 from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.embedded_infinity_ext import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, \
-    ParsedExprType, WrapUpdateExpr, ExportOptions, OptimizeOptions
+    ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.common import INSERT_DATA, VEC, SPARSE, InfinityException
 from infinity.errors import ErrorCode
@@ -427,7 +427,7 @@ class LocalTable(Table, ABC):
         return self.query_builder.explain(explain_type)
     
     def optimize(self, index_name: str, opt_params: dict[str, str]):
-        opt_options = OptimizeOptions()
+        opt_options = WrapOptimizeOptions()
         opt_options.index_name = index_name
         opt_options.opt_params = [InitParameter(k, v).to_local_type() for k, v in opt_params.items()]
         return self._conn.optimize(db_name=self._db_name, table_name=self._table_name, optimize_opt=opt_options)
