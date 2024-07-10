@@ -27,15 +27,25 @@ from sqlglot import condition, maybe_parse
 from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
-from infinity.remote_thrift.types import logic_type_to_dtype, make_match_tensor_expr, make_match_sparse_expr
+from infinity.remote_thrift.types import (
+    logic_type_to_dtype,
+    make_match_tensor_expr,
+    make_match_sparse_expr,
+)
 from infinity.remote_thrift.utils import traverse_conditions, parse_expr
 
-'''FIXME: How to disable validation of only the search field?'''
+"""FIXME: How to disable validation of only the search field?"""
 
 
 class Query(ABC):
-    def __init__(self, columns: Optional[List[ParsedExpr]], search: Optional[SearchExpr], filter: Optional[ParsedExpr],
-                 limit: Optional[ParsedExpr], offset: Optional[ParsedExpr]):
+    def __init__(
+        self,
+        columns: Optional[List[ParsedExpr]],
+        search: Optional[SearchExpr],
+        filter: Optional[ParsedExpr],
+        limit: Optional[ParsedExpr],
+        offset: Optional[ParsedExpr],
+    ):
         self.columns = columns
         self.search = search
         self.filter = filter
@@ -44,8 +54,15 @@ class Query(ABC):
 
 
 class ExplainQuery(Query):
-    def __init__(self, columns: Optional[List[ParsedExpr]], search: Optional[SearchExpr], filter: Optional[ParsedExpr],
-                 limit: Optional[ParsedExpr], offset: Optional[ParsedExpr], explain_type: Optional[ExplainType]):
+    def __init__(
+        self,
+        columns: Optional[List[ParsedExpr]],
+        search: Optional[SearchExpr],
+        filter: Optional[ParsedExpr],
+        limit: Optional[ParsedExpr],
+        offset: Optional[ParsedExpr],
+        explain_type: Optional[ExplainType],
+    ):
         super().__init__(columns, search, filter, limit, offset)
         self.explain_type = explain_type
 
@@ -66,17 +83,25 @@ class InfinityThriftQueryBuilder(ABC):
         self._limit = None
         self._offset = None
 
-    def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int = DEFAULT_MATCH_VECTOR_TOPN, knn_params: {} = None) -> InfinityThriftQueryBuilder:
+    def knn(
+        self,
+        vector_column_name: str,
+        embedding_data: VEC,
+        embedding_data_type: str,
+        distance_type: str,
+        topn: int = DEFAULT_MATCH_VECTOR_TOPN,
+        knn_params: {} = None,
+    ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
-        if self._search.knn_exprs is None:
-            self._search.knn_exprs = list()
+            self._search.match_exprs = list()
 
         column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
 
         if not isinstance(topn, int):
-            raise InfinityException(3073, f"Invalid topn, type should be embedded, but get {type(topn)}")
+            raise InfinityException(
+                3073, f"Invalid topn, type should be embedded, but get {type(topn)}"
+            )
 
         # type casting
         if isinstance(embedding_data, list):
@@ -86,48 +111,53 @@ class InfinityThriftQueryBuilder(ABC):
         elif isinstance(embedding_data, np.ndarray):
             embedding_data = embedding_data.tolist()
         else:
-            raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}")
+            raise InfinityException(
+                ErrorCode.INVALID_DATA_TYPE,
+                f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}",
+            )
 
-        if (embedding_data_type == 'tinyint' or
-            embedding_data_type == 'smallint' or
-            embedding_data_type == 'int' or
-            embedding_data_type == 'bigint'):
+        if (
+            embedding_data_type == "tinyint"
+            or embedding_data_type == "smallint"
+            or embedding_data_type == "int"
+            or embedding_data_type == "bigint"
+        ):
             embedding_data = [int(x) for x in embedding_data]
 
         data = EmbeddingData()
         elem_type = ElementType.ElementFloat32
-        if embedding_data_type == 'bit':
+        if embedding_data_type == "bit":
             elem_type = ElementType.ElementBit
             raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
-        elif embedding_data_type == 'tinyint':
+        elif embedding_data_type == "tinyint":
             elem_type = ElementType.ElementInt8
             data.i8_array_value = embedding_data
-        elif embedding_data_type == 'smallint':
+        elif embedding_data_type == "smallint":
             elem_type = ElementType.ElementInt16
             data.i16_array_value = embedding_data
-        elif embedding_data_type == 'int':
+        elif embedding_data_type == "int":
             elem_type = ElementType.ElementInt32
             data.i32_array_value = embedding_data
-        elif embedding_data_type == 'bigint':
+        elif embedding_data_type == "bigint":
             elem_type = ElementType.ElementInt64
             data.i64_array_value = embedding_data
-        elif embedding_data_type == 'float':
+        elif embedding_data_type == "float":
             elem_type = ElementType.ElementFloat32
             data.f32_array_value = embedding_data
-        elif embedding_data_type == 'double':
+        elif embedding_data_type == "double":
             elem_type = ElementType.ElementFloat64
             data.f64_array_value = embedding_data
         else:
             raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
 
         dist_type = KnnDistanceType.L2
-        if distance_type == 'l2':
+        if distance_type == "l2":
             dist_type = KnnDistanceType.L2
-        elif distance_type == 'cosine':
+        elif distance_type == "cosine":
             dist_type = KnnDistanceType.Cosine
-        elif distance_type == 'ip':
+        elif distance_type == "ip":
             dist_type = KnnDistanceType.InnerProduct
-        elif distance_type == 'hamming':
+        elif distance_type == "hamming":
             dist_type = KnnDistanceType.Hamming
         else:
             raise InfinityException(3056, f"Invalid distance type {distance_type}")
@@ -137,48 +167,79 @@ class InfinityThriftQueryBuilder(ABC):
             for k, v in knn_params.items():
                 knn_opt_params.append(InitParameter(k, v))
 
-        knn_expr = KnnExpr(column_expr=column_expr, embedding_data=data, embedding_data_type=elem_type,
-                           distance_type=dist_type, topn=topn, opt_params=knn_opt_params)
-        self._search.knn_exprs.append(knn_expr)
+        knn_expr = KnnExpr(
+            column_expr=column_expr,
+            embedding_data=data,
+            embedding_data_type=elem_type,
+            distance_type=dist_type,
+            topn=topn,
+            opt_params=knn_opt_params,
+        )
+        generic_match_expr = GenericMatchExpr(match_vector_expr=knn_expr)
+        self._search.match_exprs.append(generic_match_expr)
         return self
 
-    def match_sparse(self, vector_column_name: str, sparse_data: SPARSE, metric_type: str, topn: int, opt_params: {} = None) \
-        -> InfinityThriftQueryBuilder:
+    def match_sparse(
+        self,
+        vector_column_name: str,
+        sparse_data: SPARSE,
+        metric_type: str,
+        topn: int,
+        opt_params: {} = None,
+    ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
-        if self._search.match_sparse_exprs is None:
-            self._search.match_sparse_exprs = list()
+            self._search.match_exprs = list()
 
-        match_sparse_expr = make_match_sparse_expr(vector_column_name, sparse_data, metric_type, topn, opt_params)
-    
-        self._search.match_sparse_exprs.append(match_sparse_expr)
+        match_sparse_expr = make_match_sparse_expr(
+            vector_column_name, sparse_data, metric_type, topn, opt_params
+        )
+        generic_match_expr = GenericMatchExpr(match_sparse_expr=match_sparse_expr)
+        self._search.match_exprs.append(generic_match_expr)
         return self
 
-    def match(self, fields: str, matching_text: str, options_text: str = '') -> InfinityThriftQueryBuilder:
+    def match(
+        self, fields: str, matching_text: str, options_text: str = ""
+    ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
-        if self._search.match_exprs is None:
             self._search.match_exprs = list()
         match_expr = MatchExpr()
         match_expr.fields = fields
         match_expr.matching_text = matching_text
         match_expr.options_text = options_text
-        self._search.match_exprs.append(match_expr)
+        generic_match_expr = GenericMatchExpr(match_text_expr=match_expr)
+        self._search.match_exprs.append(generic_match_expr)
         return self
 
-    def match_tensor(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, method_type: str,
-                     extra_option: str) -> InfinityThriftQueryBuilder:
+    def match_tensor(
+        self,
+        vector_column_name: str,
+        embedding_data: VEC,
+        embedding_data_type: str,
+        method_type: str,
+        extra_option: str,
+    ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
-        if self._search.match_tensor_exprs is None:
-            self._search.match_tensor_exprs = list()
-        match_tensor_expr = make_match_tensor_expr(vector_column_name, embedding_data, embedding_data_type,
-                                                   method_type, extra_option)
-        self._search.match_tensor_exprs.append(match_tensor_expr)
+            self._search.match_exprs = list()
+        match_tensor_expr = make_match_tensor_expr(
+            vector_column_name,
+            embedding_data,
+            embedding_data_type,
+            method_type,
+            extra_option,
+        )
+        generic_match_expr = GenericMatchExpr(match_tensor_expr=match_tensor_expr)
+        self._search.match_exprs.append(generic_match_expr)
         return self
 
-    def fusion(self, method: str, options_text: str = '',
-               match_tensor_expr: MatchTensorExpr = None) -> InfinityThriftQueryBuilder:
+    def fusion(
+        self,
+        method: str,
+        options_text: str = "",
+        match_tensor_expr: MatchTensorExpr = None,
+    ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
         if self._search.fusion_exprs is None:
@@ -197,16 +258,14 @@ class InfinityThriftQueryBuilder(ABC):
         return self
 
     def limit(self, limit: Optional[int]) -> InfinityThriftQueryBuilder:
-        constant_exp = ConstantExpr(
-            literal_type=LiteralType.Int64, i64_value=limit)
+        constant_exp = ConstantExpr(literal_type=LiteralType.Int64, i64_value=limit)
         expr_type = ParsedExprType(constant_expr=constant_exp)
         limit_expr = ParsedExpr(type=expr_type)
         self._limit = limit_expr
         return self
 
     def offset(self, offset: Optional[int]) -> InfinityThriftQueryBuilder:
-        constant_exp = ConstantExpr(
-            literal_type=LiteralType.Int64, i64_value=offset)
+        constant_exp = ConstantExpr(literal_type=LiteralType.Int64, i64_value=offset)
         expr_type = ParsedExprType(constant_expr=constant_exp)
         offset_expr = ParsedExpr(type=expr_type)
         self._offset = offset_expr
@@ -257,7 +316,7 @@ class InfinityThriftQueryBuilder(ABC):
             search=self._search,
             filter=self._filter,
             limit=self._limit,
-            offset=self._offset
+            offset=self._offset,
         )
         self.reset()
         return self._table._execute_query(query)
@@ -266,8 +325,7 @@ class InfinityThriftQueryBuilder(ABC):
         df_dict = {}
         data_dict, data_type_dict = self.to_result()
         for k, v in data_dict.items():
-            data_series = pd.Series(
-                v, dtype=logic_type_to_dtype(data_type_dict[k]))
+            data_series = pd.Series(v, dtype=logic_type_to_dtype(data_type_dict[k]))
             df_dict[k] = data_series
         return pd.DataFrame(df_dict)
 
@@ -284,6 +342,6 @@ class InfinityThriftQueryBuilder(ABC):
             filter=self._filter,
             limit=self._limit,
             offset=self._offset,
-            explain_type=explain_type
+            explain_type=explain_type,
         )
         return self._table._explain_query(query)

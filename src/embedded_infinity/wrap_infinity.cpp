@@ -316,34 +316,7 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
     auto search_expr = new SearchExpr();
     search_expr->match_exprs_.reserve(match_exprs.size());
     for (SizeT i = 0; i < match_exprs.size(); ++i) {
-        search_expr->match_exprs_.emplace_back(dynamic_cast<MatchExpr *>(match_exprs[i].GetParsedExpr(status)));
-        if (status.code_ != ErrorCode::kOk) {
-            delete search_expr;
-            search_expr = nullptr;
-            return nullptr;
-        }
-    }
-    search_expr->knn_exprs_.reserve(knn_exprs.size());
-    for (SizeT i = 0; i < knn_exprs.size(); ++i) {
-        search_expr->knn_exprs_.emplace_back(dynamic_cast<KnnExpr *>(knn_exprs[i].GetParsedExpr(status)));
-        if (status.code_ != ErrorCode::kOk) {
-            delete search_expr;
-            search_expr = nullptr;
-            return nullptr;
-        }
-    }
-    search_expr->match_tensor_exprs_.reserve(match_tensor_exprs.size());
-    for (SizeT i = 0; i < match_tensor_exprs.size(); ++i) {
-        search_expr->match_tensor_exprs_.emplace_back(dynamic_cast<MatchTensorExpr *>(match_tensor_exprs[i].GetParsedExpr(status)));
-        if (status.code_ != ErrorCode::kOk) {
-            delete search_expr;
-            search_expr = nullptr;
-            return nullptr;
-        }
-    }
-    search_expr->match_sparse_exprs_.reserve(match_sparse_exprs.size());
-    for (SizeT i = 0; i < match_sparse_exprs.size(); ++i) {
-        search_expr->match_sparse_exprs_.emplace_back(dynamic_cast<MatchSparseExpr *>(match_sparse_exprs[i].GetParsedExpr(status)));
+        search_expr->match_exprs_.emplace_back(match_exprs[i].GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
             delete search_expr;
             search_expr = nullptr;
@@ -364,25 +337,29 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
 
 ParsedExpr *WrapParsedExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
-
-    if (type == ParsedExprType::kConstant) {
-        return constant_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kColumn) {
-        return column_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kFunction) {
-        return function_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kBetween) {
-        return between_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kKnn) {
-        return knn_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kMatch) {
-        return match_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kFusion) {
-        return fusion_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kSearch) {
-        return search_expr.GetParsedExpr(status);
-    } else {
-        status = Status::InvalidParsedExprType();
+    switch (type) {
+        case ParsedExprType::kConstant:
+            return constant_expr.GetParsedExpr(status);
+        case ParsedExprType::kColumn:
+            return column_expr.GetParsedExpr(status);
+        case ParsedExprType::kFunction:
+            return function_expr.GetParsedExpr(status);
+        case ParsedExprType::kBetween:
+            return between_expr.GetParsedExpr(status);
+        case ParsedExprType::kKnn:
+            return knn_expr.GetParsedExpr(status);
+        case ParsedExprType::kMatch:
+            return match_expr.GetParsedExpr(status);
+        case ParsedExprType::kMatchSparse:
+            return match_sparse_expr.GetParsedExpr(status);
+        case ParsedExprType::kMatchTensor:
+            return match_tensor_expr.GetParsedExpr(status);
+        case ParsedExprType::kFusion:
+            return fusion_expr.GetParsedExpr(status);
+        case ParsedExprType::kSearch:
+            return search_expr.GetParsedExpr(status);
+        default:
+            status = Status::InvalidParsedExprType();
     }
     return nullptr;
 }

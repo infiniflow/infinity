@@ -152,13 +152,15 @@ private:
 
     static FunctionExpr *GetFunctionExprFromProto(Status &status, const infinity_thrift_rpc::FunctionExpr &function_expr);
 
-    static Tuple<KnnExpr *, Status> GetKnnExprFromProto(const infinity_thrift_rpc::KnnExpr &expr);
+    static KnnExpr *GetKnnExprFromProto(Status &status, const infinity_thrift_rpc::KnnExpr &expr);
 
-    static Tuple<MatchSparseExpr *, Status> GetMatchSparseExprFromProto(const infinity_thrift_rpc::MatchSparseExpr &expr);
+    static MatchSparseExpr *GetMatchSparseExprFromProto(Status &status, const infinity_thrift_rpc::MatchSparseExpr &expr);
 
-    static Pair<MatchTensorExpr *, Status> GetMatchTensorExprFromProto(const infinity_thrift_rpc::MatchTensorExpr &expr);
+    static MatchTensorExpr *GetMatchTensorExprFromProto(Status &status, const infinity_thrift_rpc::MatchTensorExpr &expr);
 
     static MatchExpr *GetMatchExprFromProto(const infinity_thrift_rpc::MatchExpr &expr);
+
+    static ParsedExpr *GetGenericMatchExprFromProto(Status &status, const infinity_thrift_rpc::GenericMatchExpr &expr);
 
     static FusionExpr *GetFusionExprFromProto(const infinity_thrift_rpc::FusionExpr &expr);
 
