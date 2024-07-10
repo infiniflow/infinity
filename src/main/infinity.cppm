@@ -94,7 +94,7 @@ public:
                             const String &table_name,
                             Vector<ColumnDef *> column_defs,
                             Vector<TableConstraint *> constraints,
-                            const CreateTableOptions &create_table_options);
+                            CreateTableOptions create_table_options);
 
     QueryResult DropTable(const String &db_name, const String &table_name, const DropTableOptions &drop_table_options);
 

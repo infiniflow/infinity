@@ -332,10 +332,10 @@ NB_MODULE(embedded_infinity_ext, m) {
 
     nb::class_<DropDatabaseOptions>(m, "DropDatabaseOptions").def(nb::init<>()).def_rw("conflict_type", &DropDatabaseOptions::conflict_type_);
 
-    nb::class_<CreateTableOptions>(m, "CreateTableOptions")
+    nb::class_<WrapCreateTableOptions>(m, "WrapCreateTableOptions")
         .def(nb::init<>())
-        .def_rw("conflict_type", &CreateTableOptions::conflict_type_)
-        .def_rw("properties", &CreateTableOptions::properties_);
+        .def_rw("conflict_type", &WrapCreateTableOptions::conflict_type_)
+        .def_rw("properties", &WrapCreateTableOptions::properties_);
 
     nb::class_<DropTableOptions>(m, "DropTableOptions").def(nb::init<>()).def_rw("conflict_type", &DropTableOptions::conflict_type_);
 
@@ -358,10 +358,10 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("row_limit", &ExportOptions::row_limit_)
         .def_rw("copy_file_type", &ExportOptions::copy_file_type_);
 
-    nb::class_<OptimizeOptions>(m, "OptimizeOptions")
+    nb::class_<WrapOptimizeOptions>(m, "WrapOptimizeOptions")
         .def(nb::init<>())
-        .def_rw("index_name", &OptimizeOptions::index_name_)
-        .def_rw("opt_params", &OptimizeOptions::opt_params_);
+        .def_rw("index_name", &WrapOptimizeOptions::index_name_)
+        .def_rw("opt_params", &WrapOptimizeOptions::opt_params_);
 
     // parsed_expr
     nb::enum_<ParsedExprType>(m, "ParsedExprType")
