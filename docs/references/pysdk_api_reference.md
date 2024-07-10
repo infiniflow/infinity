@@ -37,7 +37,7 @@ Connect to the Infinity server and return an Infinity object.
 
 ## disconnect
 
-**infinity.disconnet()**
+**infinity.disconnect()**
 
 Disconnect the current Infinity object from the server.
 
@@ -177,7 +177,7 @@ Create a table with a given name, defining each column in it.
 
 - **table_name : str(not empty)**  Name of the table.
 - **columns_definition : dict[str, str]**
-A dict object whose key value pair indicates name of the column and its datatype. Especially, a vector column should be declared as `"vector, \<dimision>\, \<datatype>\"`
+A dict object whose key value pair indicates name of the column and its datatype. Especially, a vector column should be declared as `"vector, \<dimension>\, \<datatype>\"`
 - **conflict_type : ConflictType** enum type defined in the `infinity.common` package:
   - `Error`
   - `Ignore`
