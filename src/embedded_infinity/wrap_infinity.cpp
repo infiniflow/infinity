@@ -487,7 +487,7 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
                                 const String &db_name,
                                 const String &table_name,
                                 Vector<WrapColumnDef> column_defs,
-                                const CreateTableOptions &create_table_options) {
+                                WrapCreateTableOptions create_table_options) {
     Vector<TableConstraint *> constraints;
     Vector<ColumnDef *> column_defs_ptr;
     for (SizeT i = 0; i < column_defs.size(); ++i) {
@@ -516,7 +516,12 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
         auto column_def = new ColumnDef(wrap_column_def.id, column_type, wrap_column_def.column_name, wrap_column_def.constraints, default_expr);
         column_defs_ptr.push_back(column_def);
     }
-    auto query_result = instance.CreateTable(db_name, table_name, std::move(column_defs_ptr), constraints, create_table_options);
+    CreateTableOptions options;
+    options.conflict_type_ = create_table_options.conflict_type_;
+    for (auto &property : create_table_options.properties_) {
+        options.properties_.emplace_back(new InitParameter(std::move(property.param_name_), std::move(property.param_value_)));
+    }
+    auto query_result = instance.CreateTable(db_name, table_name, std::move(column_defs_ptr), constraints, std::move(options));
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
@@ -1227,8 +1232,13 @@ WrapQueryResult WrapShowTables(Infinity &instance, const String &db_name) {
     return wrap_query_result;
 }
 
-WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, OptimizeOptions optimize_options) {
-    auto query_result = instance.Optimize(db_name, table_name, std::move(optimize_options));
+WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, WrapOptimizeOptions optimize_options) {
+    OptimizeOptions options;
+    options.index_name_ = std::move(optimize_options.index_name_);
+    for (auto &param : optimize_options.opt_params_) {
+        options.opt_params_.emplace_back(new InitParameter(std::move(param.param_name_), std::move(param.param_value_)));
+    }
+    auto query_result = instance.Optimize(db_name, table_name, std::move(options));
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 

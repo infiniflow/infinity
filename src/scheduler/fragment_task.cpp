@@ -165,7 +165,7 @@ bool FragmentTask::CompleteTask() {
     // One thread reach here
     if (status_ == FragmentTaskStatus::kRunning) {
         status_ = FragmentTaskStatus::kFinished;
-    } else {
+    } else if (status_ != FragmentTaskStatus::kError) {
         String error_message = "Status should be an error status";
         LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);

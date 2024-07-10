@@ -41,12 +41,11 @@ MlasGemmQuantFixupZeroPointA<MLAS_GEMM_QUANT_KERNEL_DEFAULT>(
     bool AIsSigned
     )
 {
-    //if (AIsSigned) {
-    //    ZeroPointA = (uint8_t)(ZeroPointA ^ 0x80);
-    //}
+    if (AIsSigned) {
+        ZeroPointA = (uint8_t)(ZeroPointA ^ 0x80);
+    }
 
-    //return ZeroPointA;
-    return AIsSigned ? (uint8_t)(ZeroPointA ^ 0x80):ZeroPointA;
+    return ZeroPointA;
 }
 
 template<>
@@ -57,12 +56,11 @@ MlasGemmQuantFixupZeroPointB<MLAS_GEMM_QUANT_KERNEL_DEFAULT>(
     bool BIsSigned
     )
 {
-//    if (BIsSigned) {
-//        ZeroPointB = MLAS_GEMM_QUANT_KERNEL_DEFAULT::OffsetBType(ZeroPointB ^ 0x80);
-//    }
+    if (BIsSigned) {
+        ZeroPointB = MLAS_GEMM_QUANT_KERNEL_DEFAULT::OffsetBType(ZeroPointB ^ 0x80);
+    }
 
-//    return ZeroPointB;
-    return BIsSigned ? MLAS_GEMM_QUANT_KERNEL_DEFAULT::OffsetBType(ZeroPointB ^ 0x80):ZeroPointB;
+    return ZeroPointB;
 }
 
 template<>

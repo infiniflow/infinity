@@ -58,14 +58,13 @@ export String FragmentType2String(FragmentType type) {
 
 export class Notifier {
     SizeT all_task_n_ = 0;
-    SizeT start_task_n_ = 0;
     bool error_ = false;
     FragmentContext *error_fragment_ctx_ = nullptr;
 
     std::mutex locker_{};
     std::condition_variable cv_{};
 
-    bool Check() const { return all_task_n_ == 0 || (error_ && start_task_n_ == 0); }
+    bool Check() const { return all_task_n_ == 0; };
 
 public:
     void SetTaskN(SizeT all_task_n) { all_task_n_ = all_task_n; }
@@ -77,29 +76,20 @@ public:
 
     bool StartTask() {
         std::unique_lock<std::mutex> lk(locker_);
-        if (!error_) {
-            ++start_task_n_;
-            return true;
-        }
-        return false;
+        return !error_;
     }
 
-    void FinishTask(bool error, FragmentContext *fragment_ctx) {
+    void SetError(FragmentContext *fragment_ctx) {
         std::unique_lock<std::mutex> lk(locker_);
-        if (error && !error_) {
+        if (!error_) {
             error_fragment_ctx_ = fragment_ctx;
             error_ = true;
         }
-        --start_task_n_;
-        --all_task_n_;
-        if (this->Check()) {
-            cv_.notify_one();
-        }
     }
 
-    void UnstartTask() {
+    void FinishTask() {
         std::unique_lock<std::mutex> lk(locker_);
-        --start_task_n_;
+        --all_task_n_;
         if (this->Check()) {
             cv_.notify_one();
         }

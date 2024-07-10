@@ -29,6 +29,11 @@ class ThriftInfinityClient:
         self.uri = uri
         self.transport = None
         self.reconnect()
+        self._is_connected = True
+    
+    def __del__(self):
+        if self._is_connected:
+            self.disconnect()
 
     def reconnect(self):
         if self.transport is not None:
@@ -225,11 +230,14 @@ class ThriftInfinityClient:
 
     def disconnect(self):
         res = None
+        if not self._is_connected:
+            return CommonResponse(ErrorCode.OK, "Already disconnected")
         try:
             res = self.client.Disconnect(CommonRequest(session_id=self.session_id))
         except Exception:
             pass
         self.transport.close()
+        self._is_connected = False
         return res
 
     def show_tables(self, db_name: str):
