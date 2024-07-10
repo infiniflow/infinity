@@ -72,6 +72,8 @@ public:
 
     [[nodiscard]] String ToString() const;
 
+    [[nodiscard]] String ToBriefString() const;
+
     [[nodiscard]] bool Finalized() const { return finalized; }
 
     void FillRowIDVector(SharedPtr<Vector<RowID>> &row_ids, u32 block_id) const;

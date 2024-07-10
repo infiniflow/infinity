@@ -473,6 +473,15 @@ TxnTableStore *TxnStore::GetTxnTableStore(TableEntry *table_entry) {
     return iter->second.get();
 }
 
+TxnTableStore *TxnStore::GetExistTxnTableStore(TableEntry *table_entry) const {
+    const String &table_name = *table_entry->GetTableName();
+    auto iter = txn_tables_store_.find(table_name);
+    if (iter == txn_tables_store_.end()) {
+        UnrecoverableError("txn table store not exist");
+    }
+    return iter->second.get();
+}
+
 void TxnStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr) const {
     TxnTimeStamp commit_ts = txn_->CommitTS();
     Vector<Pair<DBEntry *, int>> txn_dbs_vec(txn_dbs_.begin(), txn_dbs_.end());

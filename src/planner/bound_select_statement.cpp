@@ -70,6 +70,9 @@ import subquery_table_ref;
 import cross_product_table_ref;
 import join_table_ref;
 import knn_expression;
+import match_expression;
+import match_tensor_expression;
+import match_sparse_expression;
 import third_party;
 import table_reference;
 import common_query_filter;
@@ -157,10 +160,9 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         return root;
     } else {
         SharedPtr<LogicalNode> root = nullptr;
-        const SizeT num_children = search_expr_->match_exprs_.size() + search_expr_->knn_exprs_.size() + search_expr_->match_tensor_exprs_.size() +
-                                   search_expr_->match_sparse_exprs_.size();
+        const SizeT num_children = search_expr_->match_exprs_.size();
         if (num_children <= 0) {
-            String error_message = "SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR expression or MATCH SPARSE expression";
+            String error_message = "SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR or MATCH SPARSE expression";
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
@@ -176,86 +178,107 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         Vector<SharedPtr<LogicalNode>> match_knn_nodes;
         match_knn_nodes.reserve(num_children);
         for (auto &match_expr : search_expr_->match_exprs_) {
-            SharedPtr<LogicalMatch> match_node = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_expr);
-            match_node->filter_expression_ = filter_expr;
-            match_node->common_query_filter_ = common_query_filter;
-            match_node->index_reader_ = base_table_ref->table_entry_ptr_->GetFullTextIndexReader(query_context->GetTxn());
+            switch (match_expr->type()) {
+                case ExpressionType::kMatch: {
+                    SharedPtr<LogicalMatch> match_node = MakeShared<LogicalMatch>(bind_context->GetNewLogicalNodeId(),
+                                                                                  base_table_ref,
+                                                                                  std::dynamic_pointer_cast<MatchExpression>(match_expr));
+                    match_node->filter_expression_ = filter_expr;
+                    match_node->common_query_filter_ = common_query_filter;
+                    match_node->index_reader_ = base_table_ref->table_entry_ptr_->GetFullTextIndexReader(query_context->GetTxn());
 
-            const Map<String, String> &column2analyzer = match_node->index_reader_.GetColumn2Analyzer();
-            SearchOptions search_ops(match_node->match_expr_->options_text_);
+                    const Map<String, String> &column2analyzer = match_node->index_reader_.GetColumn2Analyzer();
+                    SearchOptions search_ops(match_node->match_expr_->options_text_);
 
-            // option: threshold
-            const String &threshold = search_ops.options_["threshold"];
-            match_node->begin_threshold_ = strtof(threshold.c_str(), nullptr);
+                    // option: threshold
+                    const String &threshold = search_ops.options_["threshold"];
+                    match_node->begin_threshold_ = strtof(threshold.c_str(), nullptr);
 
-            // option: default field
-            auto iter = search_ops.options_.find("default_field");
-            String default_field;
-            if(iter != search_ops.options_.end()) {
-                default_field = iter->second;
-            }
+                    // option: default field
+                    auto iter = search_ops.options_.find("default_field");
+                    String default_field;
+                    if (iter != search_ops.options_.end()) {
+                        default_field = iter->second;
+                    }
 
-            // option: block max
-            iter = search_ops.options_.find("block_max");
-            if(iter == search_ops.options_.end() or iter->second == "true" or iter->second == "bmw") {
-                match_node->early_term_algo_ = EarlyTermAlgo::kBMW;
-            } else if(iter->second == "bmm") {
-                match_node->early_term_algo_ = EarlyTermAlgo::kBMM;
-            } else if(iter->second == "false") {
-                match_node->early_term_algo_ = EarlyTermAlgo::kNaive;
-            } else if(iter->second == "compare") {
-                match_node->early_term_algo_ = EarlyTermAlgo::kCompare;
-            } else {
-                Status status = Status::SyntaxError("block_max option must be empty, true, false or compare");
-                LOG_ERROR(status.message());
-                RecoverableError(status);
-            }
+                    // option: block max
+                    iter = search_ops.options_.find("block_max");
+                    if (iter == search_ops.options_.end() or iter->second == "true" or iter->second == "bmw") {
+                        match_node->early_term_algo_ = EarlyTermAlgo::kBMW;
+                    } else if (iter->second == "bmm") {
+                        match_node->early_term_algo_ = EarlyTermAlgo::kBMM;
+                    } else if (iter->second == "false") {
+                        match_node->early_term_algo_ = EarlyTermAlgo::kNaive;
+                    } else if (iter->second == "compare") {
+                        match_node->early_term_algo_ = EarlyTermAlgo::kCompare;
+                    } else {
+                        Status status = Status::SyntaxError("block_max option must be empty, true, false or compare");
+                        LOG_ERROR(status.message());
+                        RecoverableError(status);
+                    }
 
-            // option: top n
-            iter = search_ops.options_.find("topn");
-            if (iter != search_ops.options_.end()) {
-                i32 top_n_option = std::strtol(iter->second.c_str(), nullptr, 0);
-                if (top_n_option <= 0) {
-                    Status status = Status::SyntaxError("top n must be a positive integer");
-                    LOG_ERROR(status.message());
-                    RecoverableError(status);
+                    // option: top n
+                    iter = search_ops.options_.find("topn");
+                    if (iter != search_ops.options_.end()) {
+                        i32 top_n_option = std::strtol(iter->second.c_str(), nullptr, 0);
+                        if (top_n_option <= 0) {
+                            Status status = Status::SyntaxError("top n must be a positive integer");
+                            LOG_ERROR(status.message());
+                            RecoverableError(status);
+                        }
+                        match_node->top_n_ = top_n_option;
+                    } else {
+                        match_node->top_n_ = DEFAULT_MATCH_TEXT_OPTION_TOP_N;
+                    }
+
+                    SearchDriver search_driver(column2analyzer, default_field);
+                    UniquePtr<QueryNode> query_tree =
+                        search_driver.ParseSingleWithFields(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
+                    if (query_tree.get() == nullptr) {
+                        Status status = Status::ParseMatchExprFailed(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
+                        LOG_ERROR(status.message());
+                        RecoverableError(status);
+                    }
+
+                    match_node->query_tree_ = std::move(query_tree);
+                    match_knn_nodes.push_back(std::move(match_node));
+                    break;
                 }
-                match_node->top_n_ = top_n_option;
-            } else {
-                match_node->top_n_ = DEFAULT_MATCH_TEXT_OPTION_TOP_N;
+                case ExpressionType::kKnn: {
+                    SharedPtr<LogicalKnnScan> knn_scan =
+                        BuildInitialKnnScan(table_ref_ptr_, std::dynamic_pointer_cast<KnnExpression>(match_expr), query_context, bind_context);
+                    knn_scan->filter_expression_ = filter_expr;
+                    knn_scan->common_query_filter_ = common_query_filter;
+                    match_knn_nodes.push_back(std::move(knn_scan));
+                    break;
+                }
+                case ExpressionType::kMatchTensor: {
+                    auto match_tensor_node = MakeShared<LogicalMatchTensorScan>(bind_context->GetNewLogicalNodeId(),
+                                                                                base_table_ref,
+                                                                                std::dynamic_pointer_cast<MatchTensorExpression>(match_expr));
+                    match_tensor_node->filter_expression_ = filter_expr;
+                    match_tensor_node->common_query_filter_ = common_query_filter;
+                    match_tensor_node->InitExtraOptions();
+                    match_knn_nodes.push_back(std::move(match_tensor_node));
+                    break;
+                }
+                case ExpressionType::kMatchSparse: {
+                    auto match_sparse_node = MakeShared<LogicalMatchSparseScan>(bind_context->GetNewLogicalNodeId(),
+                                                                                base_table_ref,
+                                                                                std::dynamic_pointer_cast<MatchSparseExpression>(match_expr));
+                    match_sparse_node->filter_expression_ = filter_expr;
+                    match_sparse_node->common_query_filter_ = common_query_filter;
+                    match_knn_nodes.push_back(std::move(match_sparse_node));
+                    break;
+                }
+                default: {
+                    String error_message = "Unsupported match expression type";
+                    LOG_CRITICAL(error_message);
+                    UnrecoverableError(error_message);
+                }
             }
-
-            SearchDriver search_driver(column2analyzer, default_field);
-            UniquePtr<QueryNode> query_tree = search_driver.ParseSingleWithFields(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
-            if (query_tree.get() == nullptr) {
-                Status status = Status::ParseMatchExprFailed(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
-                LOG_ERROR(status.message());
-                RecoverableError(status);
-            }
-
-            match_node->query_tree_ = std::move(query_tree);
-            match_knn_nodes.push_back(std::move(match_node));
-        }
-        for (auto &match_tensor_expr : search_expr_->match_tensor_exprs_) {
-            auto match_tensor_node = MakeShared<LogicalMatchTensorScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_tensor_expr);
-            match_tensor_node->filter_expression_ = filter_expr;
-            match_tensor_node->common_query_filter_ = common_query_filter;
-            match_tensor_node->InitExtraOptions();
-            match_knn_nodes.push_back(std::move(match_tensor_node));
-        }
-        for (auto &match_sparse_expr : search_expr_->match_sparse_exprs_) {
-            auto match_sparse_node = MakeShared<LogicalMatchSparseScan>(bind_context->GetNewLogicalNodeId(), base_table_ref, match_sparse_expr);
-            match_sparse_node->filter_expression_ = filter_expr;
-            match_sparse_node->common_query_filter_ = common_query_filter;
-            match_knn_nodes.push_back(std::move(match_sparse_node));
         }
         bind_context->GenerateTableIndex();
-        for (auto &knn_expr : search_expr_->knn_exprs_) {
-            SharedPtr<LogicalKnnScan> knn_scan = BuildInitialKnnScan(table_ref_ptr_, knn_expr, query_context, bind_context);
-            knn_scan->filter_expression_ = filter_expr;
-            knn_scan->common_query_filter_ = common_query_filter;
-            match_knn_nodes.push_back(std::move(knn_scan));
-        }
         if (!(search_expr_->fusion_exprs_.empty())) {
             auto firstfusionNode = MakeShared<LogicalFusion>(bind_context->GetNewLogicalNodeId(), base_table_ref, search_expr_->fusion_exprs_[0]);
             firstfusionNode->set_left_node(match_knn_nodes[0]);

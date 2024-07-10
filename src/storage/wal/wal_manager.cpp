@@ -488,11 +488,14 @@ i64 WalManager::ReplayWalFile() {
 
         // phase 2: by the max commit ts, find the entries to replay
         LOG_INFO("Replay phase 2: by the max commit ts, find the entries to replay");
-        bool found_bad_entry = false;
         while (iterator.HasNext()) {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
-                found_bad_entry = true;
+                String error_message = "Found unexpected bad wal entry";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+                // TODO: clean the wal entries, disk break will reach this place.
+                // replay_entries.clear();
                 break;
             }
             LOG_TRACE(wal_entry->ToString());
@@ -502,9 +505,6 @@ i64 WalManager::ReplayWalFile() {
             } else {
                 break;
             }
-        }
-        if (found_bad_entry) {
-            replay_entries.clear();
         }
     }
 
@@ -553,6 +553,159 @@ i64 WalManager::ReplayWalFile() {
 
     // start mem index comment thread
     return system_start_ts;
+}
+
+Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::GetCatalogFiles() const {
+    LocalFileSystem fs;
+
+    Vector<String> wal_list{};
+    {
+        auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
+        if (!wal_infos.empty()) {
+            std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
+              return a.max_commit_ts_ > b.max_commit_ts_;
+            });
+        }
+        if (temp_wal_info.has_value()) {
+            wal_list.push_back(temp_wal_info->path_);
+            LOG_INFO(fmt::format("Find temp wal file: {}", temp_wal_info->path_));
+        }
+        for (const auto &wal_info : wal_infos) {
+            wal_list.push_back(wal_info.path_);
+            LOG_INFO(fmt::format("Find wal file: {}", wal_info.path_));
+        }
+        // e.g. wal_list = {wal.log , wal.log.100 , wal.log.50}
+    }
+
+    if (wal_list.empty()) {
+        String error_message = "No WAL file found";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+        return None;
+    }
+
+    TxnTimeStamp max_commit_ts = 0;
+    String catalog_dir = "";
+    TxnTimeStamp system_start_ts = 0;
+    {
+        WalListIterator iterator(wal_list);
+        while (iterator.HasNext()) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
+                String error_message = "Found unexpected bad wal entry";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+            LOG_TRACE(wal_entry->ToString());
+
+            WalCmdCheckpoint *checkpoint_cmd = wal_entry->GetCheckPoint();
+            if (checkpoint_cmd != nullptr) {
+                max_commit_ts = checkpoint_cmd->max_commit_ts_;
+                std::string catalog_path = fmt::format("{}/{}", data_path_, "catalog");
+                catalog_dir = Path(fmt::format("{}/{}", catalog_path, checkpoint_cmd->catalog_name_)).parent_path().string();
+                system_start_ts = wal_entry->commit_ts_;
+                break;
+            }
+        }
+        LOG_INFO(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
+    }
+
+    if (system_start_ts == 0) {
+        // once wal is not empty, a checkpoint should always be found.
+        String error_message = "No checkpoint found in wal";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+    LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
+    return CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_commit_ts);
+}
+
+Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
+    LocalFileSystem fs;
+    Vector<SharedPtr<WalEntry>> wal_entries;
+
+    Vector<String> wal_list{};
+    {
+        auto [active_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
+        if (!wal_infos.empty()) {
+            std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
+              return a.max_commit_ts_ > b.max_commit_ts_;
+            });
+        }
+        if (active_wal_info.has_value()) {
+            wal_list.push_back(active_wal_info->path_);
+            LOG_TRACE(fmt::format("Find active WAL file: {}", active_wal_info->path_));
+        }
+        wal_list.reserve(wal_infos.size());
+        for (const auto &wal_info : wal_infos) {
+            wal_list.push_back(wal_info.path_);
+            LOG_TRACE(fmt::format("Find WAL file: {}", wal_info.path_));
+        }
+        // e.g. wal_list = {wal.log , wal.log.100 , wal.log.50}
+    }
+
+    if (wal_list.empty()) {
+        String error_message = "No WAL file found";
+        LOG_CRITICAL(error_message);
+        UnrecoverableError(error_message);
+    }
+
+    TxnTimeStamp max_commit_ts = 0;
+    TxnTimeStamp system_start_ts = 0;
+
+    {
+        // if no checkpoint, max_commit_ts is 0
+        WalListIterator iterator(wal_list);
+        // phase 1: find the max commit ts and catalog path
+        LOG_TRACE("Check WAL: to find the max commit ts");
+        while (iterator.HasNext()) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
+                String error_message = "Found unexpected bad wal entry";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+
+            LOG_TRACE(wal_entry->ToString());
+
+            WalCmdCheckpoint *checkpoint_cmd = nullptr;
+            wal_entries.push_back(wal_entry);
+            if (wal_entry->IsCheckPoint(wal_entries, checkpoint_cmd)) {
+                max_commit_ts = checkpoint_cmd->max_commit_ts_;
+                system_start_ts = wal_entry->commit_ts_;
+                break;
+            }
+        }
+
+        if (system_start_ts == 0) {
+            // once wal is not empty, a checkpoint should always be found.
+            String error_message = "No checkpoint found in WAL";
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
+        }
+
+        LOG_TRACE(fmt::format("Find checkpoint max commit ts: {}", max_commit_ts));
+
+        while (iterator.HasNext()) {
+            auto wal_entry = iterator.Next();
+            if (wal_entry.get() == nullptr) {
+                String error_message = "Found unexpected bad wal entry";
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+
+            LOG_TRACE(wal_entry->ToString());
+
+            if (wal_entry->commit_ts_ > max_commit_ts) {
+                wal_entries.push_back(wal_entry);
+            } else {
+                break;
+            }
+        }
+    }
+
+    std::reverse(wal_entries.begin(), wal_entries.end());
+    return wal_entries;
 }
 
 void WalManager::ReplayWalEntry(const WalEntry &entry) {
@@ -839,12 +992,14 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
     for (const SegmentID segment_id : cmd.deprecated_segment_ids_) {
         auto segment_entry = table_entry->GetSegmentByID(segment_id, commit_ts);
         if (!segment_entry->TrySetCompacting(nullptr)) { // fake set because check
-            String error_message = "Assert: Replay segment should be compactable.";
+            String error_message = fmt::format("Replaying segment: {} from table: {} with status: {}, can't be compacted",
+                                               segment_id, cmd.table_name_, ToString(segment_entry->status()));
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!segment_entry->SetNoDelete()) {
-            String error_message = "Assert: Replay segment should be compactable.";
+            String error_message = fmt::format("Replaying segment: {} from table: {} can't be set no delete, can't be compacted",
+                                               segment_id, cmd.table_name_);
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
@@ -860,7 +1015,10 @@ void WalManager::WalCmdOptimizeReplay(WalCmdOptimize &cmd, TransactionID txn_id,
         UnrecoverableError(error_message);
     }
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
-    table_index_entry->OptimizeIndex(fake_txn.get(), std::move(cmd.params_), true /*replay*/);
+    
+    TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
+    auto *txn_store = fake_txn->GetTxnTableStore(table_entry);
+    table_index_entry->OptIndex(txn_store, std::move(cmd.params_), true /*replay*/);
 }
 
 void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_id, TxnTimeStamp commit_ts) {

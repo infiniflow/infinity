@@ -4,8 +4,8 @@ import subprocess
 
 def get_path(executable):
     try:
-        complete_path = subprocess.check_output(['which', executable])
-        return complete_path.decode('utf-8').strip()
+        complete_path = subprocess.check_output(["which", executable])
+        return complete_path.decode("utf-8").strip()
     except subprocess.CalledProcessError:
         return None
 
@@ -21,7 +21,7 @@ def fix_python_import_path(filename: str):
     # to    from . import infinity_brpc_pb2 as infinity__brpc__pb2
     # replace with your actual file path
     # Read the file
-    with open(filename, 'r') as file:
+    with open(filename, "r") as file:
         lines = file.readlines()
 
     for i in range(7 if len(lines) >= 7 else len(lines)):
@@ -34,7 +34,7 @@ def fix_python_import_path(filename: str):
             lines[i] = new_line  # replace the line
 
         # Write back to the file
-    with open(filename, 'w') as file:
+    with open(filename, "w") as file:
         file.writelines(lines)
 
 
@@ -44,10 +44,15 @@ def generate_thrift():
     cpp_dir = infinity_proj_dir + "/src/network/infinity_thrift"
     create_dir([python_dir, cpp_dir])
     infinity_thrift_file = infinity_proj_dir + "/thrift/infinity.thrift"
-    os.system("thrift --version")
-    os.system(f"thrift --out {python_dir} --gen py {infinity_thrift_file}")
-    os.system(f"thrift -r --out {cpp_dir} --gen cpp:no_skeleton {infinity_thrift_file}")
+    cmds = [
+        "thrift --version",
+        f"thrift --out {python_dir} --gen py {infinity_thrift_file}",
+        f"thrift -r --out {cpp_dir} --gen cpp:no_skeleton {infinity_thrift_file}",
+    ]
+    for cmd in cmds:
+        print(cmd)
+        os.system(cmd)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     generate_thrift()

@@ -1252,7 +1252,7 @@ void ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vector<
 }
 
 void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<SharedPtr<String>>> &result, i64 intent_size) {
-    switch (show_node->scan_type()) {
+    switch (show_node->show_type()) {
         case ShowType::kShowDatabase: {
             String show_str;
             if (intent_size != 0) {
@@ -1779,6 +1779,48 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
             String output_columns_str = String(intent_size, ' ');
             output_columns_str += fmt::format(" - config: {}", show_node->object_name());
             result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowLogs: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW LOGS ";
+            } else {
+                show_str = "SHOW LOGS ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+            break;
+        }
+        case ShowType::kShowDeltaLogs: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW DELTA LOGS ";
+            } else {
+                show_str = "SHOW DELTA LOGS ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+            break;
+        }
+        case ShowType::kShowCatalogs: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW CATALOGS ";
+            } else {
+                show_str = "SHOW CATALOGS ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
             break;
         }
         case ShowType::kInvalid: {

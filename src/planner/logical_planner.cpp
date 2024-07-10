@@ -1250,6 +1250,15 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kBuffer: {
             return BuildShowBuffer(statement, bind_context_ptr);
         }
+        case ShowStmtType::kLogs: {
+            return BuildShowLogs(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kDeltaLogs: {
+            return BuildShowDeltaLogs(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kCatalogs: {
+            return BuildShowCatalogs(statement, bind_context_ptr);
+        }
         default: {
             String error_message = "Unexpected show statement type.";
             LOG_CRITICAL(error_message);
@@ -1575,6 +1584,39 @@ Status LogicalPlanner::BuildShowConfig(const ShowStatement *statement, SharedPtr
 Status LogicalPlanner::BuildShowBuffer(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowBuffer,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowLogs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowLogs,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowDeltaLogs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowDeltaLogs,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowCatalogs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowCatalogs,
                                                                   query_context_ptr_->schema_name(),
                                                                   statement->var_name_,
                                                                   bind_context_ptr->GenerateTableIndex());

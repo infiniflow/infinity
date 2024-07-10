@@ -190,6 +190,13 @@ RUN --mount=type=bind,source=python/requirements.txt,target=/root/requirements.t
 # https://github.com/llvm/llvm-project/issues/57276
 RUN cp /usr/local/include/x86_64-unknown-linux-gnu/c++/v1/__config_site /usr/local/include/c++/v1
 
+# Install thrift 0.20.0
+RUN --mount=type=bind,source=thrift-0.20.0.tar.gz,target=/root/thrift-0.20.0.tar.gz  \
+    cd /root && tar xzf thrift-0.20.0.tar.gz \
+    && cd thrift-0.20.0/build && cmake -G Ninja .. && ninja thrift-compiler \
+    && cp compiler/cpp/bin/thrift /usr/local/bin/thrift \
+    && cd /root && rm -rf thrift-0.20.0
+
 ENV PATH="/usr/local/venv310/bin:$PATH"
 
 ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local

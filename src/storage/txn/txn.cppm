@@ -167,7 +167,7 @@ public:
 
     Status Compact(TableEntry *table_entry, Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> &&segment_data, CompactStatementType type);
 
-    Status OptimizeIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
+    Status OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitParameter>> init_params);
 
     // Getter
     BufferManager *buffer_mgr() const { return buffer_mgr_; }
@@ -210,11 +210,11 @@ public:
     // Create txn store if not exists
     TxnTableStore *GetTxnTableStore(TableEntry *table_entry);
 
+    TxnTableStore *GetExistTxnTableStore(TableEntry *table_entry) const;
+
     WalEntry *GetWALEntry() const;
 
-    const SharedPtr<String> GetTxnText() const {
-        return txn_text_;
-    }
+    const SharedPtr<String> GetTxnText() const { return txn_text_; }
 
 private:
     void CheckTxnStatus();

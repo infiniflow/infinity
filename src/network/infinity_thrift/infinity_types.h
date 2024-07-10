@@ -260,6 +260,8 @@ class MatchTensorExpr;
 
 class MatchExpr;
 
+class GenericMatchExpr;
+
 class FusionExpr;
 
 class SearchExpr;
@@ -826,12 +828,14 @@ void swap(DataType &a, DataType &b);
 std::ostream& operator<<(std::ostream& out, const DataType& obj);
 
 typedef struct _ParsedExprType__isset {
-  _ParsedExprType__isset() : constant_expr(false), column_expr(false), function_expr(false), between_expr(false), knn_expr(false), match_expr(false), fusion_expr(false), search_expr(false) {}
+  _ParsedExprType__isset() : constant_expr(false), column_expr(false), function_expr(false), between_expr(false), knn_expr(false), match_sparse_expr(false), match_tensor_expr(false), match_expr(false), fusion_expr(false), search_expr(false) {}
   bool constant_expr :1;
   bool column_expr :1;
   bool function_expr :1;
   bool between_expr :1;
   bool knn_expr :1;
+  bool match_sparse_expr :1;
+  bool match_tensor_expr :1;
   bool match_expr :1;
   bool fusion_expr :1;
   bool search_expr :1;
@@ -848,6 +852,8 @@ class ParsedExprType : public virtual ::apache::thrift::TBase {
                    function_expr(),
                    between_expr(),
                    knn_expr(),
+                   match_sparse_expr(),
+                   match_tensor_expr(),
                    match_expr(),
                    fusion_expr(),
                    search_expr() {
@@ -859,6 +865,8 @@ class ParsedExprType : public virtual ::apache::thrift::TBase {
   ::std::shared_ptr<FunctionExpr> function_expr;
   ::std::shared_ptr<BetweenExpr> between_expr;
   ::std::shared_ptr<KnnExpr> knn_expr;
+  ::std::shared_ptr<MatchSparseExpr> match_sparse_expr;
+  ::std::shared_ptr<MatchTensorExpr> match_tensor_expr;
   ::std::shared_ptr<MatchExpr> match_expr;
   ::std::shared_ptr<FusionExpr> fusion_expr;
   ::std::shared_ptr<SearchExpr> search_expr;
@@ -874,6 +882,10 @@ class ParsedExprType : public virtual ::apache::thrift::TBase {
   void __set_between_expr(::std::shared_ptr<BetweenExpr> val);
 
   void __set_knn_expr(::std::shared_ptr<KnnExpr> val);
+
+  void __set_match_sparse_expr(::std::shared_ptr<MatchSparseExpr> val);
+
+  void __set_match_tensor_expr(::std::shared_ptr<MatchTensorExpr> val);
 
   void __set_match_expr(::std::shared_ptr<MatchExpr> val);
 
@@ -902,6 +914,14 @@ class ParsedExprType : public virtual ::apache::thrift::TBase {
     if (__isset.knn_expr != rhs.__isset.knn_expr)
       return false;
     else if (__isset.knn_expr && !(knn_expr == rhs.knn_expr))
+      return false;
+    if (__isset.match_sparse_expr != rhs.__isset.match_sparse_expr)
+      return false;
+    else if (__isset.match_sparse_expr && !(match_sparse_expr == rhs.match_sparse_expr))
+      return false;
+    if (__isset.match_tensor_expr != rhs.__isset.match_tensor_expr)
+      return false;
+    else if (__isset.match_tensor_expr && !(match_tensor_expr == rhs.match_tensor_expr))
       return false;
     if (__isset.match_expr != rhs.__isset.match_expr)
       return false;
@@ -1580,6 +1600,78 @@ void swap(MatchExpr &a, MatchExpr &b);
 
 std::ostream& operator<<(std::ostream& out, const MatchExpr& obj);
 
+typedef struct _GenericMatchExpr__isset {
+  _GenericMatchExpr__isset() : match_vector_expr(false), match_sparse_expr(false), match_tensor_expr(false), match_text_expr(false) {}
+  bool match_vector_expr :1;
+  bool match_sparse_expr :1;
+  bool match_tensor_expr :1;
+  bool match_text_expr :1;
+} _GenericMatchExpr__isset;
+
+class GenericMatchExpr : public virtual ::apache::thrift::TBase {
+ public:
+
+  GenericMatchExpr(const GenericMatchExpr&);
+  GenericMatchExpr& operator=(const GenericMatchExpr&);
+  GenericMatchExpr() noexcept
+                   : match_vector_expr(),
+                     match_sparse_expr(),
+                     match_tensor_expr(),
+                     match_text_expr() {
+  }
+
+  virtual ~GenericMatchExpr() noexcept;
+  ::std::shared_ptr<KnnExpr> match_vector_expr;
+  ::std::shared_ptr<MatchSparseExpr> match_sparse_expr;
+  ::std::shared_ptr<MatchTensorExpr> match_tensor_expr;
+  ::std::shared_ptr<MatchExpr> match_text_expr;
+
+  _GenericMatchExpr__isset __isset;
+
+  void __set_match_vector_expr(::std::shared_ptr<KnnExpr> val);
+
+  void __set_match_sparse_expr(::std::shared_ptr<MatchSparseExpr> val);
+
+  void __set_match_tensor_expr(::std::shared_ptr<MatchTensorExpr> val);
+
+  void __set_match_text_expr(::std::shared_ptr<MatchExpr> val);
+
+  bool operator == (const GenericMatchExpr & rhs) const
+  {
+    if (__isset.match_vector_expr != rhs.__isset.match_vector_expr)
+      return false;
+    else if (__isset.match_vector_expr && !(match_vector_expr == rhs.match_vector_expr))
+      return false;
+    if (__isset.match_sparse_expr != rhs.__isset.match_sparse_expr)
+      return false;
+    else if (__isset.match_sparse_expr && !(match_sparse_expr == rhs.match_sparse_expr))
+      return false;
+    if (__isset.match_tensor_expr != rhs.__isset.match_tensor_expr)
+      return false;
+    else if (__isset.match_tensor_expr && !(match_tensor_expr == rhs.match_tensor_expr))
+      return false;
+    if (__isset.match_text_expr != rhs.__isset.match_text_expr)
+      return false;
+    else if (__isset.match_text_expr && !(match_text_expr == rhs.match_text_expr))
+      return false;
+    return true;
+  }
+  bool operator != (const GenericMatchExpr &rhs) const {
+    return !(*this == rhs);
+  }
+
+  bool operator < (const GenericMatchExpr & ) const;
+
+  uint32_t read(::apache::thrift::protocol::TProtocol* iprot) override;
+  uint32_t write(::apache::thrift::protocol::TProtocol* oprot) const override;
+
+  virtual void printTo(std::ostream& out) const;
+};
+
+void swap(GenericMatchExpr &a, GenericMatchExpr &b);
+
+std::ostream& operator<<(std::ostream& out, const GenericMatchExpr& obj);
+
 typedef struct _FusionExpr__isset {
   _FusionExpr__isset() : method(false), options_text(false), optional_match_tensor_expr(false) {}
   bool method :1;
@@ -1639,11 +1731,8 @@ void swap(FusionExpr &a, FusionExpr &b);
 std::ostream& operator<<(std::ostream& out, const FusionExpr& obj);
 
 typedef struct _SearchExpr__isset {
-  _SearchExpr__isset() : match_exprs(false), knn_exprs(false), match_sparse_exprs(false), match_tensor_exprs(false), fusion_exprs(false) {}
+  _SearchExpr__isset() : match_exprs(false), fusion_exprs(false) {}
   bool match_exprs :1;
-  bool knn_exprs :1;
-  bool match_sparse_exprs :1;
-  bool match_tensor_exprs :1;
   bool fusion_exprs :1;
 } _SearchExpr__isset;
 
@@ -1656,21 +1745,12 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
   }
 
   virtual ~SearchExpr() noexcept;
-  std::vector<MatchExpr>  match_exprs;
-  std::vector<KnnExpr>  knn_exprs;
-  std::vector<MatchSparseExpr>  match_sparse_exprs;
-  std::vector<MatchTensorExpr>  match_tensor_exprs;
+  std::vector<GenericMatchExpr>  match_exprs;
   std::vector<FusionExpr>  fusion_exprs;
 
   _SearchExpr__isset __isset;
 
-  void __set_match_exprs(const std::vector<MatchExpr> & val);
-
-  void __set_knn_exprs(const std::vector<KnnExpr> & val);
-
-  void __set_match_sparse_exprs(const std::vector<MatchSparseExpr> & val);
-
-  void __set_match_tensor_exprs(const std::vector<MatchTensorExpr> & val);
+  void __set_match_exprs(const std::vector<GenericMatchExpr> & val);
 
   void __set_fusion_exprs(const std::vector<FusionExpr> & val);
 
@@ -1679,18 +1759,6 @@ class SearchExpr : public virtual ::apache::thrift::TBase {
     if (__isset.match_exprs != rhs.__isset.match_exprs)
       return false;
     else if (__isset.match_exprs && !(match_exprs == rhs.match_exprs))
-      return false;
-    if (__isset.knn_exprs != rhs.__isset.knn_exprs)
-      return false;
-    else if (__isset.knn_exprs && !(knn_exprs == rhs.knn_exprs))
-      return false;
-    if (__isset.match_sparse_exprs != rhs.__isset.match_sparse_exprs)
-      return false;
-    else if (__isset.match_sparse_exprs && !(match_sparse_exprs == rhs.match_sparse_exprs))
-      return false;
-    if (__isset.match_tensor_exprs != rhs.__isset.match_tensor_exprs)
-      return false;
-    else if (__isset.match_tensor_exprs && !(match_tensor_exprs == rhs.match_tensor_exprs))
       return false;
     if (__isset.fusion_exprs != rhs.__isset.fusion_exprs)
       return false;

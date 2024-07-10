@@ -48,6 +48,9 @@ enum class ShowStmtType {
     kTransaction,
     kIndexSegment,
     kIndexChunk,
+    kLogs,
+    kDeltaLogs,
+    kCatalogs,
 };
 
 class ShowStatement : public BaseStatement {
