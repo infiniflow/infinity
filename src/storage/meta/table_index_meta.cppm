@@ -97,6 +97,8 @@ private:
 
     static UniquePtr<TableIndexMeta> Deserialize(const nlohmann::json &index_def_meta_json, TableEntry *table_entry, BufferManager *buffer_mgr);
 
+    void PushFrontEntry(const SharedPtr<TableIndexEntry>& new_table_index_entry);
+
 public:
     const SharedPtr<String> &index_name() const { return index_name_; }
 
@@ -107,14 +109,6 @@ private:
     TableEntry *table_entry_{};
 
     EntryList<TableIndexEntry> index_entry_list_{};
-
-private:
-    // TODO: remove it
-    std::shared_mutex &rw_locker() { return index_entry_list_.rw_locker_; }
-
-public:
-    // TODO: remove it
-    List<SharedPtr<TableIndexEntry>> &index_entry_list() { return index_entry_list_.entry_list_; }
 
 public:
     void Cleanup() override;

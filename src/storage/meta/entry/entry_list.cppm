@@ -98,6 +98,7 @@ public:
         std::shared_lock lock(rw_locker_);
         return entry_list_.size();
     }
+
     inline void PushFrontEntry(const SharedPtr<Entry>& entry) {
         std::unique_lock lock(rw_locker_);
         entry_list_.push_front(entry);
@@ -106,6 +107,31 @@ public:
     inline void PushBackEntry(const SharedPtr<Entry>& entry) {
         std::unique_lock lock(rw_locker_);
         entry_list_.push_back(entry);
+    }
+
+    Vector<BaseEntry *> GetCandidateEntry(TxnTimeStamp max_commit_ts, EntryType entry_type) {
+        std::shared_lock lock(rw_locker_);
+        Vector<BaseEntry*> result;
+        result.reserve(entry_list_.size());
+        for (const auto &base_entry : entry_list_) {
+            if (base_entry->entry_type_ != entry_type) {
+                String error_message = fmt::format("Unexpected entry type {}", ToString(entry_type));
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+            if (base_entry->commit_ts_ <= max_commit_ts) {
+                // Put it to candidate list
+                result.push_back(base_entry.get());
+            }
+        }
+        return result;
+    }
+
+    void SortEntryListByTS() {
+        // New->Old
+        entry_list_.sort([](const SharedPtr<BaseEntry> &entry_left, const SharedPtr<BaseEntry> &entry_right) {
+            return entry_left->commit_ts_ > entry_right->commit_ts_;
+        });
     }
 private:
     // helper
@@ -117,7 +143,6 @@ private:
 
     Pair<Entry *, Status> GetEntryInner2NoLock(Entry *entry_ptr, FindResult find_res);
 
-public: // TODO: make both private
     mutable std::shared_mutex rw_locker_{};
 
     List<SharedPtr<Entry>> entry_list_;
