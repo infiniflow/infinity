@@ -162,9 +162,8 @@ TableEntry *TableMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_t
 const SharedPtr<String> &TableMeta::db_name_ptr() const { return db_entry_->db_name_ptr(); }
 
 SharedPtr<String> TableMeta::ToString() {
-    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
     SharedPtr<String> res = MakeShared<String>(
-        fmt::format("TableMeta, db_entry_dir: {}, table name: {}, entry count: ", *db_entry_dir_, *table_name_, table_entry_list().size()));
+        fmt::format("TableMeta, db_entry_dir: {}, table name: {}, entry count: ", *db_entry_dir_, *table_name_, table_entry_list_.size()));
     return res;
 }
 

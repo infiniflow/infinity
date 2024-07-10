@@ -76,6 +76,7 @@ public:                                     // TODO: make both private
 
 template <MetaConcept Meta>
 Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const String &name, std::function<UniquePtr<Meta>()> &&init_func) {
+    Meta* return_meta_ptr{nullptr};
     std::shared_lock r_lock(rw_locker_);
     auto iter = meta_map_.find(name);
     if (iter == meta_map_.end()) {
@@ -89,13 +90,16 @@ Tuple<Meta *, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetMeta(const 
             } else {
                 LOG_TRACE("Add new entry in existed meta_map");
                 iter = meta_map_.emplace(name, std::move(new_meta)).first;
+
             }
+            return_meta_ptr = iter->second.get();
         }
-        r_lock.lock();
+        r_lock.lock(); // FIXME: This lock gap might introduce bug.
     } else {
         LOG_TRACE("Add new entry in existed meta_map");
+        return_meta_ptr = iter->second.get();
     }
-    return {iter->second.get(), std::move(r_lock)};
+    return {return_meta_ptr, std::move(r_lock)};
 }
 
 template <MetaConcept Meta>
