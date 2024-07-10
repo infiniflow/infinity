@@ -23,7 +23,7 @@ PROJECT (5)
      - output columns: [title, num, __score, __rowid]
   -> KNN SCAN (3)
      - table name: explain_fusion(default_db.explain_fusion)
-     - table index: #5
+     - table index: #4
      - embedding info: vec
        - element type: FLOAT32
        - dimension: 4

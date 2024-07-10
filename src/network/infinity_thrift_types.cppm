@@ -76,6 +76,7 @@ export using infinity_thrift_rpc::KnnExpr;
 export using infinity_thrift_rpc::MatchSparseExpr;
 export using infinity_thrift_rpc::MatchTensorExpr;
 export using infinity_thrift_rpc::MatchExpr;
+export using infinity_thrift_rpc::GenericMatchExpr;
 export using infinity_thrift_rpc::FusionExpr;
 export using infinity_thrift_rpc::ParsedExpr;
 export using infinity_thrift_rpc::KnnDistanceType;

@@ -212,10 +212,7 @@ export struct WrapMatchSparseExpr {
 };
 
 export struct WrapSearchExpr {
-    Vector<WrapMatchExpr> match_exprs{};
-    Vector<WrapKnnExpr> knn_exprs{};
-    Vector<WrapMatchTensorExpr> match_tensor_exprs{};
-    Vector<WrapMatchSparseExpr> match_sparse_exprs{};
+    Vector<WrapParsedExpr> match_exprs{};
     Vector<WrapFusionExpr> fusion_exprs{};
 
     ParsedExpr *GetParsedExpr(Status &status);
@@ -230,6 +227,8 @@ export struct WrapParsedExpr {
     WrapFunctionExpr function_expr;
     WrapBetweenExpr between_expr;
     WrapKnnExpr knn_expr;
+    WrapMatchSparseExpr match_sparse_expr;
+    WrapMatchTensorExpr match_tensor_expr;
     WrapMatchExpr match_expr;
     WrapFusionExpr fusion_expr;
     WrapSearchExpr search_expr;
