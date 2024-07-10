@@ -17,7 +17,7 @@ RAG enables the retrieval of external data from a variety of sources, including 
 
 Hybrid search combines text and semantic (vector) queries to find more accurate and relevant results. This technique combines multiple search algorithms, such as keyword search, natural language search, and semantic search, to enhance the accuracy of search results.
 
-A hybrid search combines various search strategies, whilst a fused search goes a step further by taking over the decision-making process previously managed by the upper-level application. It merges the obtained results and returns the results by itself.
+A hybrid search combines various search strategies, while a fused search goes a step further by taking over the decision-making process previously managed by the upper-level application. It merges the obtained results and returns the results by itself.
 
 
 ## What is an AI-native database? Is it just a paraphrase of vector database?
