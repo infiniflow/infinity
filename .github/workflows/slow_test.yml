@@ -1,8 +1,11 @@
 name: slow_tests
 
 on:
-  schedule:
-    - cron: '0 13 * * *'  # This schedule runs every 13:00:00Z(21:00:00+08:00)
+  # The "create tags" trigger is specifically focused on the creation of new tags, while the "push tags" trigger is activated when tags are pushed, including both new tag creations and updates to existing tags.
+  create:
+    tags:
+      - "v*.*.*"                  # normal release
+      - "nightly"                 # the only one mutable tag
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
@@ -40,7 +43,7 @@ jobs:
         run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git
 
       - name: Build infinity-sdk
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: ${{ !cancelled() && !failure() }}
         run: |
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -rf dist && /usr/local/bin/pip3.10 wheel . -v -w dist --config-settings=wheel.py-api=cp310 --config-settings=build-dir='cmake-build-release' && /usr/local/bin/pip3.11 wheel . -v -w dist --config-settings=wheel.py-api=cp311 --config-settings=build-dir='cmake-build-release' && /usr/local/bin/pip3.12 wheel . -v -w dist --config-settings=wheel.py-api=cp312 --config-settings=build-dir='cmake-build-release' && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*linux_x86_64.whl"
 
@@ -53,15 +56,15 @@ jobs:
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && mkdir -p /var/infinity && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
       - name: Test embedded infinity for Python 3.11
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && mkdir -p /var/infinity && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
       - name: Test embedded infinity for Python 3.12
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && mkdir -p /var/infinity && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
       - name: Prepare sift dataset
         if: ${{ !cancelled() && !failure() }}
