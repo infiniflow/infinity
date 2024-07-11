@@ -174,6 +174,7 @@ endif()
 find_package(Lz4 REQUIRED)
 find_package(Arrow REQUIRED)
 find_package(Parquet REQUIRED)
+find_package(Protobuf REQUIRED)
 
 # You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
 option(ENABLE_JEMALLOC "Enable jemalloc support" ON)

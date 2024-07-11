@@ -292,6 +292,7 @@ target_link_libraries(infinity
         oatpp.a
         jma
         opencc
+        protobuf::libprotobuf
         Arrow::arrow_static
         Parquet::parquet_static
 )
@@ -345,6 +346,7 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         c++abi.a
         jma
         opencc
+        protobuf::libprotobuf
         Arrow::arrow_static
         Parquet::parquet_static
 )
@@ -473,6 +475,7 @@ target_link_libraries(unit_test
         c++abi.a
         jma
         opencc
+        protobuf::libprotobuf
         Arrow::arrow_static
         Parquet::parquet_static
 )

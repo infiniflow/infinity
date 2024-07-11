@@ -28,6 +28,7 @@ target_link_libraries(
         c++abi.a
         jma
         opencc
+        protobuf::libprotobuf
         Arrow::arrow_static
         Parquet::parquet_static
 )
