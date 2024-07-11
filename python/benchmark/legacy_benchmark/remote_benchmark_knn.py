@@ -20,11 +20,9 @@ import struct
 import time
 import traceback
 
-from infinity.common import LOCAL_HOST
-from infinity.remote_thrift.client import ThriftInfinityClient
+import infinity
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
-from infinity.remote_thrift.table import RemoteTable
-
+from infinity.common import LOCAL_HOST, LOCAL_INFINITY_PATH
 
 def fvecs_read_all(filename):
     vectors = []
@@ -112,17 +110,21 @@ def trace_unhandled_exceptions(func):
 
 
 @trace_unhandled_exceptions
-def work(queries, topk, metric_type, column_name, data_type, ef: int, table_name="sift_benchmark"):
-    conn = ThriftInfinityClient(LOCAL_HOST)
+def work(queries, topk, metric_type, column_name, data_type,ef: int, remote: bool, table_name="sift_benchmark"):
+    infinity_obj = None
+    if remote:
+        infinity_obj = infinity.connect(LOCAL_HOST)
+    else:
+        infinity_obj = infinity.connect(LOCAL_INFINITY_PATH)
+    table = infinity_obj.get_database("default_db").get_table(table_name)
     for query in queries:
         # print(len(query))
-        table = RemoteTable(conn, "default_db", table_name)
         # table.knn(column_name, query_vec, data_type, metric_type, topk).output(["_row_id"]).to_result()
         query_builder = InfinityThriftQueryBuilder(table)
         query_builder.output(["_row_id"])
         query_builder.knn(column_name, query, data_type, metric_type, topk, {"ef": str(ef)})
         query_builder.to_result()
-    conn.disconnect()
+    infinity_obj.disconnect()
 
 
 def fvecs_read(filename):
@@ -137,7 +139,7 @@ def fvecs_read(filename):
                 break
 
 
-def process_pool(threads, rounds, query_path, ef: int, table_name):
+def process_pool(threads, rounds, query_path, ef: int, remote: bool, table_name):
     if not os.path.exists(query_path):
         print(f"File: {query_path} doesn't exist")
         raise Exception(f"File: {query_path} doesn't exist")
@@ -155,7 +157,7 @@ def process_pool(threads, rounds, query_path, ef: int, table_name):
         p = multiprocessing.Pool(threads)
         start = time.time()
         for idx in range(threads):
-            p.apply_async(work, args=(queries[idx], 100, "l2", "col1", "float", ef, table_name))
+            p.apply_async(work, args=(queries[idx], 100, "l2", "col1", "float", ef, remote, table_name))
         p.close()
         p.join()
         end = time.time()
@@ -169,7 +171,7 @@ def process_pool(threads, rounds, query_path, ef: int, table_name):
         print(result)
 
 
-def one_thread(rounds, query_path, ground_truth_path, ef: int, table_name):
+def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, table_name):
     if not os.path.exists(query_path):
         print(f"File: {query_path} doesn't exist")
         raise Exception(f"File: {query_path} doesn't exist")
@@ -177,8 +179,13 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, table_name):
     results = []
     queries = fvecs_read_all(query_path)
 
-    conn = ThriftInfinityClient(LOCAL_HOST)
-    table = RemoteTable(conn, "default_db", table_name)
+    infinity_obj = None
+    if remote:
+        infinity_obj = infinity.connect(LOCAL_HOST)
+    else:
+        infinity_obj = infinity.connect(LOCAL_INFINITY_PATH)
+
+    table = infinity_obj.get_database("default_db").get_table(table_name)
     query_builder = InfinityThriftQueryBuilder(table)
     query_builder.output(["_row_id"])
     query_builder.knn('col1', queries[0], 'float', 'l2', 100, {'ef': str(ef)})
@@ -233,7 +240,7 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, table_name):
         print(result)
 
 
-def benchmark(threads, rounds, data_set, ef: int, path):
+def benchmark(threads, rounds, data_set, ef: int, remote: bool, path):
     if not os.path.exists(path):
         print(f"Path: {path} doesn't exist")
         raise Exception(f"Path: {path} doesn't exist")
@@ -243,12 +250,12 @@ def benchmark(threads, rounds, data_set, ef: int, path):
         if threads > 1:
             print(f"Multi-threads: {threads}")
             print(f"Rounds: {rounds}")
-            process_pool(threads, rounds, query_path, ef, "sift_benchmark")
+            process_pool(threads, rounds, query_path, ef, remote, "sift_benchmark")
 
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, "sift_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, remote, "sift_benchmark")
     elif data_set == "gist_1m":
         query_path = path + "/gist_query.fvecs"
         ground_truth_path = path + "/gist_groundtruth.ivecs"
@@ -260,8 +267,17 @@ def benchmark(threads, rounds, data_set, ef: int, path):
         else:
             print(f"Single-thread")
             print(f"Rounds: {rounds}")
-            one_thread(rounds, query_path, ground_truth_path, ef, "gist_benchmark")
+            one_thread(rounds, query_path, ground_truth_path, ef, remote, "gist_benchmark")
 
+def str2bool(value):
+    if isinstance(value, bool):
+        return value
+    if value.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif value.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Boolean value expected")
 
 if __name__ == '__main__':
     current_path = os.getcwd()
@@ -295,10 +311,17 @@ if __name__ == '__main__':
         default=100,
         dest="ef"
     )
+    parser.add_argument(
+        "-R",
+        "--remote",
+        type=str2bool,
+        default=True,
+        dest="remote"
+    )
 
     data_dir = current_path + "/test/data/benchmark/" + parser.parse_args().data_set
     print(f"Data Dir: {data_dir}")
 
     args = parser.parse_args()
 
-    benchmark(args.threads, args.rounds, args.data_set, args.ef, path=data_dir)
+    benchmark(args.threads, args.rounds, args.data_set, args.ef, args.remote, path=data_dir)
