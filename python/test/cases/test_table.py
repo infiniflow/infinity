@@ -21,52 +21,12 @@ def setup_class(request, local_infinity):
     yield
     request.cls.test_infinity_obj.disconnect()
 
-# @pytest.mark.usefixtures("setup_class")
+@pytest.mark.usefixtures("setup_class")
 @pytest.mark.usefixtures("local_infinity")
 class TestInfinity:
-    @pytest.fixture(autouse=True)
-    def setup(self, request, local_infinity):
-        if 'skip_setup' in request.keywords:
-            yield
-        else:
-            if local_infinity:
-                self.uri = common_values.TEST_LOCAL_PATH
-            else:
-                self.uri = common_values.TEST_LOCAL_HOST
-            self.test_infinity_obj = TestTable(self.uri)
-            yield
-            self.teardown()
-
-    def teardown(self):
-        if hasattr(self, 'test_infinity_obj'):
-            self.test_infinity_obj.disconnect()
-    def test_table(self):
-        # self.test_infinity_obj._test_version()
-        self.test_infinity_obj._test_table()
-        self.test_infinity_obj._test_show_tables()
-        self.test_infinity_obj._test_create_varchar_table()
-        self.test_infinity_obj._test_create_embedding_table()
-        self.test_infinity_obj._test_create_tensor_table()
-        self.test_infinity_obj._test_create_tensorarray_table()
-        self.test_infinity_obj._test_create_table_with_invalid_column_name()
-        self.test_infinity_obj._test_table_with_different_column_name()
-        # create/drop/show/get valid table name with different column types
-        self.test_infinity_obj._test_table_with_different_column_types()
-        # create/drop/show/get table with 10000 columns with various column types.
-        self.test_infinity_obj._test_table_with_various_column_types()
-        self.test_infinity_obj._test_table_with_invalid_options()
-        self.test_infinity_obj._test_create_drop_table()
-        self.test_infinity_obj._test_create_1K_table()
-
-
-    # todo fix
-    # local infinity disconnect = uninit, db obj cannot know weather disconnected
-    @pytest.mark.usefixtures("skip_if_local_infinity")
-    def test_after_disconnect_use_table(self):
-        self.test_infinity_obj._test_after_disconnect_use_table()
-
     @pytest.mark.parametrize("column_name", common_values.invalid_name_array)
     def test_create_table_with_invalid_column_name_python(self, column_name):
+        print("test test_create_table_with_invalid_column_name_python begin")
         self.test_infinity_obj._test_create_table_with_invalid_column_name_python(column_name)
 
     # create/drop table with different invalid options
@@ -87,18 +47,13 @@ class TestInfinity:
     def test_table_with_different_invalid_options(self, invalid_option_array):
         self.test_infinity_obj._test_table_with_different_invalid_options(invalid_option_array)
 
-    # create/drop/show/get 1000 tables with 10000 columns with various column types.
-    @pytest.mark.slow
-    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST") != "1", reason="Cost too much time")
-    def test_create_10k_table(self):
-        self.test_infinity_obj._test_create_10K_table()
-
     @trace_expected_exceptions
     def test_create_or_drop_same_table_in_different_thread(self):
         self.test_infinity_obj._test_create_or_drop_same_table_in_different_thread()
 
     def test_create_empty_column_table(self):
         self.test_infinity_obj._test_create_empty_column_table()
+
 
     @pytest.mark.parametrize("types", [
         "int", "int8", "int16", "int32", "int64", "integer",
@@ -194,3 +149,38 @@ class TestInfinity:
 
     def test_create_duplicated_table_with_replace_option(self):
         self.test_infinity_obj._test_create_duplicated_table_with_replace_option()
+
+    def test_table(self):
+        # self.test_infinity_obj._test_version()
+        self.test_infinity_obj._test_table()
+        self.test_infinity_obj._test_show_tables()
+        self.test_infinity_obj._test_create_varchar_table()
+        self.test_infinity_obj._test_create_embedding_table()
+        self.test_infinity_obj._test_create_tensor_table()
+        self.test_infinity_obj._test_create_tensorarray_table()
+        self.test_infinity_obj._test_create_table_with_invalid_column_name()
+        self.test_infinity_obj._test_table_with_different_column_name()
+        # create/drop/show/get valid table name with different column types
+        self.test_infinity_obj._test_table_with_different_column_types()
+        # create/drop/show/get table with 10000 columns with various column types.
+        self.test_infinity_obj._test_table_with_various_column_types()
+        self.test_infinity_obj._test_table_with_invalid_options()
+        self.test_infinity_obj._test_create_drop_table()
+
+    # todo fix
+    # local infinity disconnect = uninit, db obj cannot know weather disconnected
+    @pytest.mark.usefixtures("skip_if_local_infinity")
+    def test_after_disconnect_use_table(self):
+        self.test_infinity_obj._test_after_disconnect_use_table()
+
+    # create/drop/show/get 1000 tables with 10000 columns with various column types.
+    @pytest.mark.slow
+    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST") != "1", reason="Cost too much time")
+    def test_create_10k_table(self):
+        self.test_infinity_obj._test_create_10K_table()
+
+    def test_create_1K_table(self):
+        self.test_infinity_obj._test_create_1K_table()
+
+
+
