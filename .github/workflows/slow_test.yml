@@ -25,20 +25,49 @@ jobs:
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
         run: |
-          TZ=$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')
-          sudo docker rm -f infinity_build && sudo docker run -d --privileged --name infinity_build -e TZ=$TZ -v $PWD:/infinity -v /boot:/boot infiniflow/infinity_builder:centos7_clang18
+          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | tr -d ' ')
+          CPUS=${CPUS:-$(nproc)}
+          echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
+          echo "CPUS=${CPUS}" >> $GITHUB_ENV
+          TZ=${TZ:-$(readlink -f /etc/localtime | awk -F '/zoneinfo/' '{print $2}')}
+          sudo docker rm -f -v ${BUILDER_CONTAINER} && sudo docker run -d --name ${BUILDER_CONTAINER} -e TZ=$TZ -e CMAKE_BUILD_PARALLEL_LEVEL=${CPUS} -v $PWD:/infinity -v /boot:/boot --cpus ${CPUS} infiniflow/infinity_builder:centos7_clang18
 
       - name: Build release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOL_LINK:STRING=link_pool -DCMAKE_JOB_POOLS:STRING=link_pool=2 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOLS:STRING=link=4 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release"
+
+      - name: Download resources
+        run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git
+
+      - name: Build infinity-sdk
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -rf dist && /usr/local/bin/pip3.10 wheel . -v -w dist --config-settings=wheel.py-api=cp310 --config-settings=build-dir='cmake-build-release' && /usr/local/bin/pip3.11 wheel . -v -w dist --config-settings=wheel.py-api=cp311 --config-settings=build-dir='cmake-build-release' && /usr/local/bin/pip3.12 wheel . -v -w dist --config-settings=wheel.py-api=cp312 --config-settings=build-dir='cmake-build-release' && auditwheel repair --plat manylinux_2_17_x86_64 dist/infinity*linux_x86_64.whl"
 
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/python && rm -fr dist/* && python setup.py sdist bdist_wheel && pip uninstall -y infinity-sdk && pip install dist/*.whl"
+        run: |
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && pip3 uninstall -y infinity-sdk && pip3 install wheelhouse/infinity*-cp310-*.whl"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv311/bin/activate && pip3 uninstall -y infinity-sdk && pip3 install wheelhouse/infinity*-cp311-*.whl"
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv312/bin/activate && pip3 uninstall -y infinity-sdk && pip3 install wheelhouse/infinity*-cp312-*.whl"
 
-      - name: Prepare dataset
+      - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo mkdir -p test/data/benchmark && sudo ln -s $HOME/benchmark/dbpedia-entity test/data/benchmark/dbpedia-entity && sudo ln -s $HOME/benchmark/sift1M test/data/benchmark/sift_1m
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+
+      - name: Test embedded infinity for Python 3.11
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+
+      - name: Test embedded infinity for Python 3.12
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+
+      - name: Prepare sift dataset
+        if: ${{ !cancelled() && !failure() }}
+        run: |
+          RUNNER_WORKSPACE_PREFIX=${RUNNER_WORKSPACE_PREFIX:-$HOME}
+          sudo chmod +x ./tools/ci_tools/check_benchmark_result.py && sudo mkdir -p test/data/benchmark && sudo ln -s ${RUNNER_WORKSPACE_PREFIX}/benchmark/sift1M test/data/benchmark/sift_1m
 
       - name: benchmark test
         if: ${{ !cancelled() && !failure() }}
@@ -61,7 +90,7 @@ jobs:
       - name: Stop infinity release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh 10s $(pidof cmake-build-release/src/infinity)
+          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh 10 $(pidof cmake-build-release/src/infinity)
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
@@ -71,3 +100,10 @@ jobs:
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: cat release.log 2>/dev/null || true
+
+      - name: Destroy builder container
+        if: always()  # always run this step even if previous steps failed
+        run: |
+          if [ -n "${BUILDER_CONTAINER}" ]; then
+            sudo docker rm -f -v ${BUILDER_CONTAINER}
+          fi
