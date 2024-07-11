@@ -42,6 +42,8 @@ class LocalInfinityClient:
         self.client = None
         return LocalQueryResult(PyErrorCode.OK, "")
 
+    def hello(self):
+        self.client.Hello()
     # convert embedded_error code to python error code
     def convert_res(self, res, has_db_names=False, has_table_names=False, has_result_data=False, has_db_name=False):
         if has_db_names:

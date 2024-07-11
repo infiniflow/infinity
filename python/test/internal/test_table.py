@@ -17,7 +17,6 @@ import sys
 
 import pytest
 import polars as pl
-print(sys.path)
 from common import common_values
 from infinity.common import ConflictType, InfinityException
 import infinity

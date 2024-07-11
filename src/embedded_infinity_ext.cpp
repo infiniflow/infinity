@@ -159,7 +159,9 @@ NB_MODULE(embedded_infinity_ext, m) {
     nb::class_<WrapFusionExpr>(m, "WrapFusionExpr")
         .def(nb::init<>())
         .def_rw("method", &WrapFusionExpr::method)
-        .def_rw("options_text", &WrapFusionExpr::options_text);
+        .def_rw("options_text", &WrapFusionExpr::options_text)
+        .def_rw("has_match_tensor_expr", &WrapFusionExpr::has_match_tensor_expr)
+        .def_rw("match_tensor_expr", &WrapFusionExpr::match_tensor_expr);
 
     // Bind WrapMatchTensorExpr
     nb::class_<WrapMatchTensorExpr>(m, "WrapMatchTensorExpr")
@@ -167,7 +169,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("own_memory", &WrapMatchTensorExpr::own_memory)
         .def_rw("search_method", &WrapMatchTensorExpr::search_method)
         .def_rw("column_expr", &WrapMatchTensorExpr::column_expr)
-        .def_rw("tensor_expr", &WrapMatchTensorExpr::tensor_expr)
+        .def_rw("embedding_data", &WrapMatchTensorExpr::embedding_data)
         .def_rw("embedding_data_type", &WrapMatchTensorExpr::embedding_data_type)
         .def_rw("options_text", &WrapMatchTensorExpr::options_text);
 

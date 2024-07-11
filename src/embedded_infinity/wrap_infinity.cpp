@@ -267,6 +267,12 @@ ParsedExpr *WrapFusionExpr::GetParsedExpr(Status &status) {
     auto fusion_expr = new FusionExpr();
     fusion_expr->method_ = method;
     fusion_expr->options_ = MakeShared<SearchOptions>(options_text);
+    if (has_match_tensor_expr) {
+        fusion_expr->match_tensor_expr_.reset(dynamic_cast<MatchTensorExpr*>(match_tensor_expr.GetParsedExpr(status)));
+    } else {
+        fusion_expr->match_tensor_expr_ = nullptr;
+    }
+
     return fusion_expr;
 }
 
@@ -274,6 +280,26 @@ ParsedExpr *WrapMatchTensorExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
     auto match_tensor_expr = new MatchTensorExpr(own_memory);
+    match_tensor_expr->SetSearchMethodStr(search_method);
+    match_tensor_expr->column_expr_.reset(column_expr.GetParsedExpr(status));
+    match_tensor_expr->options_text_ = options_text;
+    match_tensor_expr->embedding_data_type_ = embedding_data_type;
+
+    if (status.code_ != ErrorCode::kOk) {
+        delete match_tensor_expr;
+        return nullptr;
+    }
+
+    auto [embedding_data_ptr, dimension] = GetEmbeddingDataTypeDataPtrFromProto(embedding_data, status);
+    if (status.code_ != ErrorCode::kOk) {
+        delete match_tensor_expr;
+        return nullptr;
+    }
+    match_tensor_expr->dimension_ = dimension;
+    const auto copy_bytes = EmbeddingT::EmbeddingSize(match_tensor_expr->embedding_data_type_, match_tensor_expr->dimension_);
+    match_tensor_expr->query_tensor_data_ptr_ = MakeUniqueForOverwrite<char[]>(copy_bytes);
+    std::memcpy(match_tensor_expr->query_tensor_data_ptr_.get(), embedding_data_ptr, copy_bytes);
+
     return match_tensor_expr;
 }
 

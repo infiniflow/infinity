@@ -63,7 +63,9 @@ namespace infinity {
 
 u64 Infinity::GetSessionId() { return session_->session_id(); }
 
-void Infinity::Hello() { std::cout << "hello infinity" << std::endl; }
+void Infinity::Hello() {
+    fmt::print("hello infinity\n");
+}
 
 void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
@@ -964,6 +966,18 @@ Infinity::Search(const String &db_name, const String &table_name, SearchExpr *se
     select_statement->select_list_ = output_columns;
     select_statement->where_expr_ = filter;
     select_statement->search_expr_ = search_expr;
+    fmt::print("in search, table name : {}\n", table_name);
+    if (search_expr != nullptr) {
+        fmt::print("in search, search expr : {}\n", search_expr->ToString());
+    }
+
+    if (filter != nullptr) {
+        fmt::print("in search, filter : {}\n", filter->ToString());
+    }
+
+    for (auto& output_column : *output_columns) {
+        fmt::print("in search, output column : {}\n", output_column->ToString());
+    }
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     return result;
