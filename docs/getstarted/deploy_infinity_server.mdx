@@ -30,7 +30,7 @@ This approach allows you to embed Infinity as a module in a Python application. 
 ### Install Infinity as a module
 
 ```
-pip install infinity-sdk==0.2.1.dev4
+pip install infinity-sdk==0.2.1.dev5
 ```
 
 ### Create an Infinity object
@@ -81,7 +81,7 @@ docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=50
 If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using Docker. Suppose you've installed Ubuntu in WSL2:
 
 1. Follow [this](https://learn.microsoft.com/en-us/windows/wsl/systemd) to enable systemd inside WSL2.
-2. Install Install docker-ce according to the [instructions here](https://docs.docker.com/engine/install/ubuntu).
+2. Install docker-ce according to the [instructions here](https://docs.docker.com/engine/install/ubuntu).
 3. If you have installed Docker Desktop version 4.29+ for Windows: **Settings** **>** **Features in development**, then select **Enable host networking**.
 4. Pull the Docker image and start Infinity: 
 
@@ -98,7 +98,7 @@ If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using 
 ### Install Infinity client
 
 ```
-pip install infinity-sdk==0.2.1.dev4
+pip install infinity-sdk==0.2.1.dev5
 ```
 
 ### Connect to Infinity Server 
@@ -140,14 +140,14 @@ This section provides instructions on deploying Infinity using binary package on
 
 Fedora/RHEL/CentOS/OpenSUSE
 ```bash
-sudo rpm -i infinity-0.2.1.dev4-x86_64.rpm
+sudo rpm -i infinity-0.2.1.dev5-x86_64.rpm
 sudo systemctl start infinity
 ```
   </TabItem>
   <TabItem value="ubuntu">
 
 ```bash
-sudo dpkg -i infinity-0.2.1.dev4-x86_64.deb
+sudo dpkg -i infinity-0.2.1.dev5-x86_64.deb
 sudo systemctl start infinity
 ```
 
@@ -157,7 +157,7 @@ sudo systemctl start infinity
 ### Install Infinity client
 
 ```
-pip install infinity-sdk==0.2.1.dev4
+pip install infinity-sdk==0.2.1.dev5
 ```
 
 ### Connect to Infinity Server 

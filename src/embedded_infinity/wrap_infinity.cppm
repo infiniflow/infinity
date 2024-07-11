@@ -44,6 +44,7 @@ import between_expr;
 import parsed_expr;
 import search_expr;
 import internal_types;
+import extra_ddl_info;
 
 namespace nb = nanobind;
 
@@ -99,6 +100,16 @@ export struct WrapColumnDef {
     String column_name;
     Set<ConstraintType> constraints;
     WrapConstantExpr constant_expr;
+};
+
+export struct WrapCreateTableOptions {
+    ConflictType conflict_type_{ConflictType::kError};
+    Vector<InitParameter> properties_;
+};
+
+export struct WrapOptimizeOptions {
+    String index_name_;
+    Vector<InitParameter> opt_params_;
 };
 
 export struct WrapQueryResult {
@@ -281,7 +292,7 @@ export WrapQueryResult WrapCreateTable(Infinity &instance,
                                        const String &db_name,
                                        const String &table_name,
                                        Vector<WrapColumnDef> column_defs,
-                                       const CreateTableOptions &create_table_options);
+                                       WrapCreateTableOptions create_table_options);
 
 export WrapQueryResult WrapDropTable(Infinity &instance, const String &db_name, const String &table_name, const DropTableOptions &drop_table_options);
 
@@ -363,6 +374,6 @@ export WrapQueryResult WrapSearch(Infinity &instance,
                                   WrapParsedExpr *limit_expr = nullptr,
                                   WrapParsedExpr *offset_expr = nullptr);
 
-export WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, OptimizeOptions optimize_options);
+export WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, WrapOptimizeOptions optimize_options);
 
 } // namespace infinity

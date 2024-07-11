@@ -137,49 +137,19 @@ protected:
 };
 
 TEST_F(BPReorderingTest, test1) {
-    Vector<Pair<i32, i32>> term_infos{{3, 0}, {2, 3}, {4, 5}};
-    i32 query_n = 0;
-    for (const auto &[term_num, term_off] : term_infos) {
-        query_n += term_num;
-    }
-    for (i32 data_n = 10; data_n < 100; ++data_n) {
-        Vector<Vector<i32>> fwd(data_n);
-        for (i32 i = 0; i < data_n; ++i) {
-            for (const auto &[term_num, term_off] : term_infos) {
-                fwd[i].push_back(term_off + i % term_num);
-            }
-        }
-        // auto rng = std::default_random_engine{};
-        // std::shuffle(fwd.begin(), fwd.end(), rng);
-
-        i64 old_cost = cost_func(data_n, query_n, fwd);
-
-        BPReordering<i32, i32> bp;
-        for (i32 i = 0; i < data_n; ++i) {
-            bp.AddDoc(&fwd[i]);
-        }
-        Vector<i32> reorder = bp(query_n, std::log2(data_n));
-        i64 new_cost = cost_func(data_n, query_n, fwd, reorder);
-
-        // Vector<i32> gt_reorder = {0, 1, 4, 2, 5, 6, 3, 7, 8};
-
-        std::cout << fmt::format("data_n: {}, old_cost: {}, new_cost: {}\n", data_n, old_cost, new_cost);
-    }
-}
-
-TEST_F(BPReorderingTest, test2) {
-    i32 data_n = 1000;
-    i32 query_n = 1000;
+    i32 data_n = 10000;
+    i32 query_n = 10000;
     i32 edge_n = data_n * query_n / 10;
     // i32 m = 100;
     // assert(data_n % m == 0);
     Vector<Vector<i32>> fwd = GenerateFwd(data_n, query_n, edge_n);
 
-    BPReordering<i32, i32> bp;
+    BPReordering<i32, i32> bp(query_n);
+    bp.set_terminate_length(4);
     for (i32 i = 0; i < data_n; ++i) {
         bp.AddDoc(&fwd[i]);
     }
-    Vector<i32> reorder = bp(query_n);
+    Vector<i32> reorder = bp();
 
     i64 old_cost = cost_func(data_n, query_n, fwd);
     i64 new_cost = cost_func(data_n, query_n, fwd, reorder);
@@ -188,11 +158,11 @@ TEST_F(BPReorderingTest, test2) {
     ASSERT_LE(new_cost, old_cost);
 }
 
-TEST_F(BPReorderingTest, test3) {
-    GTEST_SKIP() << "Skip this test. This program is not a test but for preprocessing data.";
+TEST_F(BPReorderingTest, test2) {
+    // GTEST_SKIP() << "Skip this test. This program is not a test but for preprocessing data.";
 
     LocalFileSystem fs;
-    Path dataset_path = Path(test_data_path()) / "benchmark" / "splade" / "base_small_shuffled.csr";
+    Path dataset_path = Path(test_data_path()) / "benchmark" / "splade" / "base_small.csr";
     auto [file_handler, status] = fs.OpenFile(dataset_path.string(), FileFlags::READ_FLAG, FileLockType::kNoLock);
     if (!status.ok()) {
         std::cout << String(status.message()) << std::endl;
@@ -216,12 +186,13 @@ TEST_F(BPReorderingTest, test3) {
 
     i64 old_cost = cost_func(data_n, dataset.ncol_, fwd);
 
-    BPReordering<i32, i32> bp;
+    BPReordering<i32, i32> bp(dataset.ncol_);
     for (i32 i = 0; i < data_n; ++i) {
         bp.AddDoc(&fwd[i]);
     }
-    Vector<i32> reorder = bp(dataset.ncol_);
+    Vector<i32> reorder = bp();
     i64 new_cost = cost_func(data_n, dataset.ncol_, fwd, reorder);
 
     std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
+    EXPECT_LE(new_cost, old_cost);
 }

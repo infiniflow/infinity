@@ -114,10 +114,11 @@ private:
 
     void DropEntryReplay(std::function<SharedPtr<TableEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
 
-    // GetEntryReplay(txn_id, begin_ts);
     TableEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
-    //
 
+    void PushBackEntry(const SharedPtr<TableEntry>& new_table_entry);
+
+    void Sort();
 private:
     SharedPtr<String> data_dir_{};
     SharedPtr<String> db_entry_dir_{};
@@ -127,12 +128,6 @@ private:
 
 private:
     EntryList<TableEntry> table_entry_list_{};
-
-    // TODO: remove
-    std::shared_mutex &rw_locker() { return table_entry_list_.rw_locker_; };
-
-    // TODO: remove
-    List<SharedPtr<TableEntry>> &table_entry_list() { return table_entry_list_.entry_list_; }
 
 public:
     void Cleanup() override;

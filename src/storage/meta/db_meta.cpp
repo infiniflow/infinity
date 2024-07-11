@@ -105,32 +105,26 @@ DBMeta::GetDatabaseInfo(std::shared_lock<std::shared_mutex> &&r_lock, Transactio
 }
 
 SharedPtr<String> DBMeta::ToString() {
-    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
     SharedPtr<String> res = MakeShared<String>(
-        fmt::format("DBMeta, data_dir: {}, db name: {}, entry count: ", *this->data_dir_, *this->db_name_, this->db_entry_list().size()));
+        fmt::format("DBMeta, data_dir: {}, db name: {}, entry count: ", *this->data_dir_, *this->db_name_, db_entry_list_.size()));
     return res;
 }
 
 nlohmann::json DBMeta::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
-    Vector<DBEntry *> db_candidates;
-    {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker());
-        json_res["data_dir"] = *this->data_dir_;
-        json_res["db_name"] = *this->db_name_;
-        // Need to find the full history of the entry till given timestamp. Note that GetEntry returns at most one valid entry at given timestamp.
-        db_candidates.reserve(this->db_entry_list().size());
-        for (auto &db_entry : this->db_entry_list()) {
-            if (db_entry->entry_type_ == EntryType::kDatabase && db_entry->commit_ts_ <= max_commit_ts) {
-                // Put it to candidate list
-                db_candidates.push_back((DBEntry *)db_entry.get());
-            }
-        }
-    }
-    for (DBEntry *db_entry : db_candidates) {
+
+    json_res["data_dir"] = *this->data_dir_;
+    json_res["db_name"] = *this->db_name_;
+
+    Vector<BaseEntry *> entry_candidates = db_entry_list_.GetCandidateEntry(max_commit_ts, EntryType::kDatabase);
+
+    for (const auto &entry : entry_candidates) {
+        DBEntry* db_entry = static_cast<DBEntry*>(entry);
         json_res["db_entries"].emplace_back(db_entry->Serialize(max_commit_ts));
     }
+
     return json_res;
+
 }
 
 UniquePtr<DBMeta> DBMeta::Deserialize(const String &data_dir, const nlohmann::json &db_meta_json, BufferManager *buffer_mgr) {
@@ -140,11 +134,25 @@ UniquePtr<DBMeta> DBMeta::Deserialize(const String &data_dir, const nlohmann::js
 
     if (db_meta_json.contains("db_entries")) {
         for (const auto &db_entry_json : db_meta_json["db_entries"]) {
-            res->db_entry_list().emplace_back(DBEntry::Deserialize(db_entry_json, res.get(), buffer_mgr));
+            auto db_entry = DBEntry::Deserialize(db_entry_json, res.get(), buffer_mgr);
+            res->PushBackEntry(std::move(db_entry));
         }
     }
-    res->db_entry_list().sort([](const SharedPtr<BaseEntry> &ent1, const SharedPtr<BaseEntry> &ent2) { return ent1->commit_ts_ > ent2->commit_ts_; });
+    res->Sort();
+
     return res;
+}
+
+void DBMeta::Sort() {
+    db_entry_list_.SortEntryListByTS();
+}
+
+void DBMeta::PushBackEntry(const SharedPtr<DBEntry>& new_db_entry) {
+    db_entry_list_.PushBackEntry(new_db_entry);
+}
+
+void DBMeta::PushFrontEntry(const SharedPtr<DBEntry>& new_db_entry) {
+    db_entry_list_.PushFrontEntry(new_db_entry);
 }
 
 void DBMeta::Cleanup() { db_entry_list_.Cleanup(); }

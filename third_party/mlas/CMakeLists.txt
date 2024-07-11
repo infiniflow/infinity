@@ -1,34 +1,239 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License.
 
-set(MLAS_SRC_DIR lib)
+set(MLAS_ROOT ${CMAKE_SOURCE_DIR}/third_party/mlas)
+set(MLAS_SRC_DIR ${MLAS_ROOT}/lib)
+set(MLAS_INC_DIR ${MLAS_ROOT}/inc)
 
-set(MLAS_AMX_SUPPORTED FALSE)
+function(onnxruntime_add_include_to_target dst_target)
+    foreach(src_target ${ARGN})
+        if(TARGET ${src_target})
+            target_include_directories(${dst_target} PRIVATE $<TARGET_PROPERTY:${src_target},INTERFACE_INCLUDE_DIRECTORIES>)
+            target_compile_definitions(${dst_target} PRIVATE $<TARGET_PROPERTY:${src_target},INTERFACE_COMPILE_DEFINITIONS>)
+            target_sources(${dst_target} PRIVATE $<TARGET_PROPERTY:${src_target},INTERFACE_SOURCES>)
+        endif()
+    endforeach()
+endfunction()
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 11)
-  # match assembler version, AMX instructions are supported from 2.38
-  if (CMAKE_ASM_COMPILER_ID STREQUAL "GNU")
-    execute_process(
-        COMMAND as --version
-        OUTPUT_VARIABLE _as_version
-    )
-    # 2.38 or later
-    if (_as_version MATCHES "GNU.[Aa]ssembler.*(2\\.38|2\\.39|2\\.[4-9][0-9]|[3-9]\\.[0-9][0-9])")
-        set(MLAS_AMX_SUPPORTED TRUE)
+function(onnxruntime_set_compile_flags target_name)
+    if (CPUINFO_SUPPORTED)
+        onnxruntime_add_include_to_target(${target_name} cpuinfo::cpuinfo)
     endif()
-  endif()
-endif()
+    if(onnxruntime_ENABLE_LAZY_TENSOR)
+        target_compile_definitions(${target_name} PRIVATE ENABLE_LAZY_TENSOR)
+    endif()
+    if (onnxruntime_ENABLE_CPU_FP16_OPS)
+        target_compile_definitions(${target_name} PRIVATE ENABLE_CPU_FP16_TRAINING_OPS)
+    endif()
+    if(onnxruntime_DISABLE_ABSEIL)
+        target_compile_definitions(${target_name} PRIVATE DISABLE_ABSEIL)
+    endif()
+    if(UNIX)
+        target_compile_definitions(${target_name} PRIVATE PLATFORM_POSIX)
+    endif()
+    target_compile_definitions(${target_name} PRIVATE EIGEN_USE_THREADS)
+    if (onnxruntime_DISABLE_CONTRIB_OPS)
+        target_compile_definitions(${target_name} PRIVATE DISABLE_CONTRIB_OPS)
+    endif()
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-  set(MLAS_AMX_SUPPORTED TRUE)
-endif()
+    if (onnxruntime_DISABLE_ML_OPS)
+        target_compile_definitions(${target_name} PRIVATE DISABLE_ML_OPS)
+    endif()
+
+    if (onnxruntime_DISABLE_SPARSE_TENSORS)
+        target_compile_definitions(${target_name} PRIVATE DISABLE_SPARSE_TENSORS)
+    endif()
+
+    if (onnxruntime_DISABLE_OPTIONAL_TYPE)
+        target_compile_definitions(${target_name} PRIVATE DISABLE_OPTIONAL_TYPE)
+    endif()
+
+    if (onnxruntime_DISABLE_FLOAT8_TYPES)
+        target_compile_definitions(${target_name} PRIVATE DISABLE_FLOAT8_TYPES)
+    endif()
+
+    if (onnxruntime_ENABLE_ATEN)
+        target_compile_definitions(${target_name} PRIVATE ENABLE_ATEN)
+    endif()
+
+    if(USE_NEURAL_SPEED)
+        target_compile_definitions(${target_name} PRIVATE ORT_NEURAL_SPEED)
+    endif()
+
+    set_target_properties(${target_name} PROPERTIES COMPILE_WARNING_AS_ERROR ON)
+    if (onnxruntime_USE_CUDA)
+        # Suppress a "conversion_function_not_usable" warning in gsl/span
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xcudafe \"--diag_suppress=conversion_function_not_usable\">")
+        target_compile_definitions(${target_name} PRIVATE -DDISABLE_CUSPARSE_DEPRECATED)
+    endif()
+    if (MSVC)
+        foreach(CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORY ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+            target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX,C>:/external:I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORY}>")
+        endforeach()
+
+        foreach(onnxruntime_external_lib IN LISTS onnxruntime_EXTERNAL_LIBRARIES)
+            #TODO: the list contains cmake keywords like "debug". We should exclude them.
+            if(TARGET ${onnxruntime_external_lib})
+                get_target_property(onnxruntime_external_lib_include_dirs ${onnxruntime_external_lib} INTERFACE_INCLUDE_DIRECTORIES)
+                foreach(onnxruntime_external_lib_include_dir IN LISTS onnxruntime_external_lib_include_dirs)
+                    if(onnxruntime_external_lib_include_dir MATCHES "^\\$")
+                        if(onnxruntime_external_lib_include_dir MATCHES "^\\$<BUILD_INTERFACE:([^>]+)>$")
+                            string(REGEX REPLACE "^\\$<BUILD_INTERFACE:([^>]+)>$" "\\1" onnxruntime_external_lib_include_dir_cmake "${onnxruntime_external_lib_include_dir}")
+                            cmake_path(NATIVE_PATH onnxruntime_external_lib_include_dir_cmake NORMALIZE onnxruntime_external_lib_include_dir_native)
+                            target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX,C>:/external:I${onnxruntime_external_lib_include_dir_native}>")
+                        endif()
+                    else()
+                        cmake_path(NATIVE_PATH onnxruntime_external_lib_include_dir NORMALIZE onnxruntime_external_lib_include_dir_native)
+                        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX,C>:/external:I${onnxruntime_external_lib_include_dir_native}>")
+                    endif()
+                endforeach()
+            endif()
+        endforeach()
+        target_compile_definitions(${target_name} PRIVATE -DPLATFORM_WINDOWS -DNOGDI -DNOMINMAX -D_USE_MATH_DEFINES -D_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
+        if (onnxruntime_ENABLE_MEMLEAK_CHECKER)
+            target_compile_definitions(${target_name} PRIVATE -DONNXRUNTIME_ENABLE_MEMLEAK_CHECK)
+        endif()
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /utf-8>" "$<$<COMPILE_LANGUAGE:CXX,C>:/utf-8>")
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /sdl>" "$<$<COMPILE_LANGUAGE:CXX,C>:/sdl>")
+        set_target_properties(${target_name}
+                PROPERTIES VS_GLOBAL_CAExcludePath "${ORT_BINARY_DIR};${ORT_SOURCE_DIR}")
+        # We do not treat warnings from 3rd-party libraries as errors. In order to do that, we need to add their header files locations to /external:I.
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX,C>:/experimental:external>" "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /experimental:external>")
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX,C>:/external:W0>" "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /external:W0>")
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX,C>:/external:templates->" "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /external:templates->")
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX,C>:/external:I${CMAKE_CURRENT_SOURCE_DIR}>" "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /external:I${CMAKE_CURRENT_SOURCE_DIR}>")
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX,C>:/external:I${CMAKE_CURRENT_BINARY_DIR}>" "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /external:I${CMAKE_CURRENT_BINARY_DIR}>")
+        if (onnxruntime_ENABLE_STATIC_ANALYSIS)
+            target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /analyze>" "$<$<COMPILE_LANGUAGE:CXX,C>:/analyze>")
+            if (onnxruntime_REDIRECT_STATIC_ANALYSIS_OUTPUTS_TO_FILE)
+                target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /analyze:autolog:ext.sarif>" "$<$<COMPILE_LANGUAGE:CXX,C>:/analyze:autolog:ext.sarif>")
+            endif()
+            target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /analyze:external->" "$<$<COMPILE_LANGUAGE:CXX,C>:/analyze:external->")
+            target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /wd6385>" )
+            # There are many such warnings from STL:
+            # include\list(148): warning C6011: Dereferencing NULL pointer '_Mycont'. : Lines: 146, 147, 148
+            target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options /wd6011>" )
+        endif()
+    else()
+        # Enable warning
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options -Wall>" "$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Wall>")
+        target_compile_options(${target_name} PRIVATE "$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Wextra>")
+        if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+            #external/protobuf/src/google/protobuf/arena.h:445:18: error: unused parameter 'p'
+            target_compile_options(${target_name} PRIVATE "-Wno-unused-parameter")
+        endif()
+        target_compile_definitions(${target_name} PUBLIC -DNSYNC_ATOMIC_CPP11)
+        onnxruntime_add_include_to_target(${target_name} nsync::nsync_cpp)
+    endif()
+    foreach(ORT_FLAG ${ORT_PROVIDER_FLAGS})
+        target_compile_definitions(${target_name} PRIVATE ${ORT_FLAG})
+    endforeach()
+    if (HAS_DEPRECATED_COPY)
+        #too many such errors in eigen
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options -Wno-deprecated-copy>" "$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-copy>")
+    endif()
+    foreach(FLAG ${ORT_WARNING_FLAGS})
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${FLAG}>")
+    endforeach()
+    if (onnxruntime_USE_CUDA)
+        foreach(FLAG ${ORT_WARNING_FLAGS})
+            target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:--compiler-options ${FLAG}>")
+        endforeach()
+        if (NVCC_HAS_STRICT_ALIASING AND "${target_name}" MATCHES "cuda")
+            target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CUDA>:-Wno-strict-aliasing>")
+        endif()
+        if (HAS_STRICT_ALIASING AND NOT "${target_name}" MATCHES "cuda")
+            target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-Wno-strict-aliasing>")
+        endif()
+    endif()
+    if (onnxruntime_USE_ROCM)
+        # flags are detected with CXX language mode, some flags are not supported with hipclang
+        # because we may mix gcc and hipclang
+        set(ORT_HIP_WARNING_FLAGS ${ORT_WARNING_FLAGS})
+        list(REMOVE_ITEM ORT_HIP_WARNING_FLAGS -Wno-nonnull-compare)
+
+        # float16.h:90:12: error: ‘tmp’ is used uninitialized
+        list(APPEND ORT_HIP_WARNING_FLAGS -Wno-uninitialized)
+        list(APPEND ORT_HIP_WARNING_FLAGS -Wno-deprecated-copy)
+
+        # some #pragma unroll will fail, do not treat them as error
+        # #warning must not be treated as error
+        list(APPEND ORT_HIP_WARNING_FLAGS -Wno-error=pass-failed "-Wno-error=#warnings")
+
+        # otherwise error: builtin __has_trivial_assign is deprecated; use __is_trivially_assignable instead
+        if (ROCM_VERSION_DEV VERSION_GREATER_EQUAL "5.4")
+            list(APPEND ORT_HIP_WARNING_FLAGS "-Wno-deprecated-builtins")
+        endif()
+
+        foreach(FLAG ${ORT_HIP_WARNING_FLAGS})
+            target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:HIP>:SHELL:${FLAG}>")
+        endforeach()
+    endif()
+endfunction()
+
+function(onnxruntime_set_source_file_properties target_name)
+    get_target_property(srcs ${target_name} SOURCES)
+
+    # enable ARC for Objective-C/C++
+    set(objective_c_cc_srcs ${srcs})
+    list(FILTER objective_c_cc_srcs INCLUDE REGEX "\\.mm?$")
+    set_property(SOURCE ${objective_c_cc_srcs} APPEND PROPERTY COMPILE_OPTIONS "-fobjc-arc")
+endfunction()
+
+function(onnxruntime_configure_target target_name)
+    target_link_directories(${target_name} PRIVATE ${onnxruntime_LINK_DIRS})
+    onnxruntime_set_compile_flags(${target_name})
+    onnxruntime_set_source_file_properties(${target_name})
+    if(WIN32 AND onnxruntime_ENABLE_STATIC_ANALYSIS AND onnxruntime_USE_CUSTOM_STATIC_ANALYSIS_RULES)
+        set_target_properties(${target_name} PROPERTIES VS_USER_PROPS ${PROJECT_SOURCE_DIR}/EnableVisualStudioCodeAnalysis.props)
+    endif()
+    target_include_directories(${target_name} PRIVATE ${CMAKE_CURRENT_BINARY_DIR} ${ONNXRUNTIME_ROOT} ${abseil_cpp_SOURCE_DIR})
+    if (onnxruntime_ENABLE_TRAINING_OPS)
+        target_include_directories(${target_name} PRIVATE ${ORTTRAINING_ROOT})
+    endif()
+    if (onnxruntime_ENABLE_LTO)
+        set_target_properties(${target_name} PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+        set_target_properties(${target_name} PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+        set_target_properties(${target_name} PROPERTIES INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL TRUE)
+    endif()
+
+    if (onnxruntime_BUILD_KERNEL_EXPLORER)
+        get_target_property(target_type ${target_name} TYPE)
+        if (target_type STREQUAL "MODULE_LIBRARY" OR target_type STREQUAL "SHARED_LIBRARY")
+            set_property(TARGET ${target_name}
+                    APPEND_STRING PROPERTY LINK_FLAGS " -Xlinker --version-script=${ONNXRUNTIME_ROOT}/python/tools/kernel_explorer/version_script.lds ")
+        endif()
+    endif()
+
+    # Keep BinSkim happy
+    if(MSVC AND NOT onnxruntime_target_platform MATCHES "ARM")
+        target_link_options(${target_name} PRIVATE "/CETCOMPAT")
+    endif()
+
+endfunction()
+
+function(onnxruntime_add_executable target_name)
+    add_executable(${target_name} ${ARGN})
+    onnxruntime_configure_target(${target_name})
+    if (MSVC AND onnxruntime_target_platform STREQUAL "x86")
+        target_link_options(${target_name} PRIVATE /SAFESEH)
+    endif()
+endfunction()
+
+
+function(onnxruntime_add_static_library target_name)
+    add_library(${target_name} STATIC ${ARGN})
+    onnxruntime_configure_target(${target_name})
+endfunction()
 
 #
 # All hardware agnostic source files here
 # hardware specific files would cause trouble in
 # multi-target build
 #
-add_library(onnxruntime_mlas
+
+onnxruntime_add_static_library(onnxruntime_mlas
+  ${MLAS_SRC_DIR}/mlasi.h
   ${MLAS_SRC_DIR}/platform.cpp
   ${MLAS_SRC_DIR}/threading.cpp
   ${MLAS_SRC_DIR}/sgemm.cpp
@@ -53,12 +258,24 @@ add_library(onnxruntime_mlas
   ${MLAS_SRC_DIR}/qpostprocessor.cpp
   ${MLAS_SRC_DIR}/qlgavgpool.cpp
   ${MLAS_SRC_DIR}/qdwconv_kernelsize.cpp
+  ${MLAS_SRC_DIR}/sqnbitgemm.h
+  ${MLAS_SRC_DIR}/sqnbitgemm.cpp
+  ${MLAS_SRC_DIR}/sqnbitgemm_q8_block.h
 )
 
-if(MLAS_AMX_SUPPORTED)
-  target_compile_definitions(onnxruntime_mlas PRIVATE MLAS_AMX_SUPPORTED)
-else()
-  message(WARNING "AMX instructions NOT supported due to lack of compiler tool chain!")
+target_sources(onnxruntime_mlas PRIVATE
+  ${MLAS_INC_DIR}/mlas_float16.h
+  ${MLAS_INC_DIR}/mlas_gemm_postprocessor.h
+  ${MLAS_INC_DIR}/mlas_q4.h
+  ${MLAS_INC_DIR}/mlas_qnbit.h
+  ${MLAS_INC_DIR}/mlas.h
+)
+
+if (NOT onnxruntime_ORT_MINIMAL_BUILD)
+  target_sources(onnxruntime_mlas PRIVATE
+    ${MLAS_SRC_DIR}/q4_dq.cpp
+    ${MLAS_SRC_DIR}/q4gemm.cpp
+  )
 endif()
 
 set(ONNXRUNTIME_MLAS_LIBS onnxruntime_mlas)
@@ -87,6 +304,7 @@ function(setup_mlas_source_for_windows)
         ${MLAS_SRC_DIR}/qgemm_kernel_neon.cpp
         ${MLAS_SRC_DIR}/qgemm_kernel_udot.cpp
         ${MLAS_SRC_DIR}/qgemm_kernel_sdot.cpp
+        ${MLAS_SRC_DIR}/sqnbitgemm_kernel_neon.cpp
       )
 
       set(mlas_platform_preprocess_srcs
@@ -172,6 +390,9 @@ function(setup_mlas_source_for_windows)
       ${MLAS_SRC_DIR}/qgemm_kernel_sse.cpp
       ${MLAS_SRC_DIR}/qgemm_kernel_sse41.cpp
       ${MLAS_SRC_DIR}/intrinsics/avx512/quantize_avx512f.cpp
+      ${MLAS_SRC_DIR}/sqnbitgemm_kernel_avx2.cpp
+      ${MLAS_SRC_DIR}/sqnbitgemm_kernel_avx512.cpp
+      ${MLAS_SRC_DIR}/sqnbitgemm_kernel_avx512vnni.cpp
       ${MLAS_SRC_DIR}/amd64/QgemmU8S8KernelAmx.asm
       ${MLAS_SRC_DIR}/amd64/QgemmU8S8KernelAvx2.asm
       ${MLAS_SRC_DIR}/amd64/QgemmU8U8KernelAvx2.asm
@@ -202,12 +423,18 @@ function(setup_mlas_source_for_windows)
       ${MLAS_SRC_DIR}/amd64/sgemma.asm
       ${MLAS_SRC_DIR}/amd64/cvtfp16a.asm
       ${MLAS_SRC_DIR}/amd64/SoftmaxKernelAvx.asm
+      ${MLAS_SRC_DIR}/amd64/SoftmaxKernelAvx512F.asm
       ${MLAS_SRC_DIR}/amd64/TransKernelFma3.asm
       ${MLAS_SRC_DIR}/amd64/TransKernelAvx512F.asm
       ${MLAS_SRC_DIR}/amd64/LogisticKernelFma3.asm
       ${MLAS_SRC_DIR}/amd64/TanhKernelFma3.asm
       ${MLAS_SRC_DIR}/amd64/ErfKernelFma3.asm
     )
+    if (NOT onnxruntime_ORT_MINIMAL_BUILD)
+      target_sources(onnxruntime_mlas PRIVATE
+        ${MLAS_SRC_DIR}/q4gemm_avx512.cpp
+      )
+    endif()
   else()
     target_sources(onnxruntime_mlas PRIVATE
       ${MLAS_SRC_DIR}/qgemm_kernel_sse.cpp
@@ -218,7 +445,7 @@ function(setup_mlas_source_for_windows)
   endif()
 endfunction()
 
-if (onnxruntime_BUILD_WEBASSEMBLY)
+if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   if (onnxruntime_ENABLE_WEBASSEMBLY_SIMD)
     file(GLOB_RECURSE mlas_platform_srcs
       "${MLAS_SRC_DIR}/wasm_simd/*.cpp"
@@ -291,14 +518,16 @@ else()
           set(X86 TRUE)
         elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64)$")
           set(X86_64 TRUE)
+        elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^loongarch64.*")
+          set(LOONGARCH64 TRUE)
         endif()
     endif()
 
     if(APPLE)
       get_target_property(ONNXRUNTIME_MLAS_MACOSX_ARCH onnxruntime_mlas OSX_ARCHITECTURES)
     endif()
-    list(LENGTH ONNXRUNTIME_MLAS_MACOSX_ARCH  ONNXRUNTIME_MLAS_MACOSX_ARCH_LENGH)
-    if(ONNXRUNTIME_MLAS_MACOSX_ARCH_LENGH GREATER 1)
+    list(LENGTH ONNXRUNTIME_MLAS_MACOSX_ARCH ONNXRUNTIME_MLAS_MACOSX_ARCH_LENGTH)
+    if(ONNXRUNTIME_MLAS_MACOSX_ARCH_LENGTH GREATER 1)
         set(ONNXRUNTIME_MLAS_MULTI_ARCH TRUE)
     endif()
     #If ONNXRUNTIME_MLAS_MULTI_ARCH is true, we need to go through every if branch below
@@ -343,20 +572,33 @@ else()
           ${MLAS_SRC_DIR}/qgemm_kernel_neon.cpp
           ${MLAS_SRC_DIR}/qgemm_kernel_udot.cpp
           ${MLAS_SRC_DIR}/qgemm_kernel_sdot.cpp
+          ${MLAS_SRC_DIR}/sqnbitgemm_kernel_neon.cpp
         )
+        set_source_files_properties(${MLAS_SRC_DIR}/sqnbitgemm_kernel_neon.cpp
+                                    PROPERTIES COMPILE_FLAGS " -march=armv8.2-a+dotprod")
         if (NOT APPLE)
           set(mlas_platform_srcs
             ${mlas_platform_srcs}
             ${MLAS_SRC_DIR}/aarch64/HalfGemmKernelNeon.S
+            ${MLAS_SRC_DIR}/aarch64/QgemmS8S8KernelSmmla.S
+            ${MLAS_SRC_DIR}/aarch64/QgemmU8X8KernelUmmla.S
+            ${MLAS_SRC_DIR}/aarch64/SbgemmKernelNeon.S
             ${MLAS_SRC_DIR}/activate_fp16.cpp
             ${MLAS_SRC_DIR}/dwconv.cpp
             ${MLAS_SRC_DIR}/halfgemm_kernel_neon.cpp
             ${MLAS_SRC_DIR}/pooling_fp16.cpp
+            ${MLAS_SRC_DIR}/qgemm_kernel_smmla.cpp
+            ${MLAS_SRC_DIR}/qgemm_kernel_ummla.cpp
+            ${MLAS_SRC_DIR}/sbgemm_kernel_neon.cpp
           )
           set_source_files_properties(${MLAS_SRC_DIR}/aarch64/HalfGemmKernelNeon.S PROPERTIES COMPILE_FLAGS " -march=armv8.2-a+fp16 ")
+          set_source_files_properties(${MLAS_SRC_DIR}/aarch64/QgemmS8S8KernelSmmla.S PROPERTIES COMPILE_FLAGS " -march=armv8.2-a+i8mm ")
+          set_source_files_properties(${MLAS_SRC_DIR}/aarch64/QgemmU8X8KernelUmmla.S PROPERTIES COMPILE_FLAGS " -march=armv8.2-a+i8mm ")
+          set_source_files_properties(${MLAS_SRC_DIR}/aarch64/SbgemmKernelNeon.S PROPERTIES COMPILE_FLAGS " -march=armv8.2-a+bf16 ")
           set_source_files_properties(${MLAS_SRC_DIR}/activate_fp16.cpp PROPERTIES COMPILE_FLAGS " -march=armv8.2-a+fp16 ")
           set_source_files_properties(${MLAS_SRC_DIR}/dwconv.cpp PROPERTIES COMPILE_FLAGS " -march=armv8.2-a+fp16 ")
           set_source_files_properties(${MLAS_SRC_DIR}/pooling_fp16.cpp PROPERTIES COMPILE_FLAGS " -march=armv8.2-a+fp16 ")
+          set_source_files_properties(${MLAS_SRC_DIR}/sbgemm_kernel_neon.cpp PROPERTIES COMPILE_FLAGS " -march=armv8.2-a+bf16 ")
         endif()
 
         if(ONNXRUNTIME_MLAS_MULTI_ARCH)
@@ -514,6 +756,7 @@ else()
           ${MLAS_SRC_DIR}/x86_64/ErfKernelFma3.S
           ${MLAS_SRC_DIR}/intrinsics/avx2/qladd_avx2.cpp
           ${MLAS_SRC_DIR}/intrinsics/avx2/qdwconv_avx2.cpp
+          ${MLAS_SRC_DIR}/sqnbitgemm_kernel_avx2.cpp
         )
         set_source_files_properties(${mlas_platform_srcs_avx2} PROPERTIES COMPILE_FLAGS "-mavx2 -mfma")
 
@@ -521,6 +764,7 @@ else()
           ${MLAS_SRC_DIR}/x86_64/DgemmKernelAvx512F.S
           ${MLAS_SRC_DIR}/x86_64/SgemmKernelAvx512F.S
           ${MLAS_SRC_DIR}/x86_64/SconvKernelAvx512F.S
+          ${MLAS_SRC_DIR}/x86_64/SoftmaxKernelAvx512F.S
           ${MLAS_SRC_DIR}/x86_64/SpoolKernelAvx512F.S
           ${MLAS_SRC_DIR}/x86_64/TransKernelAvx512F.S
           ${MLAS_SRC_DIR}/intrinsics/avx512/quantize_avx512f.cpp
@@ -532,8 +776,14 @@ else()
           ${MLAS_SRC_DIR}/x86_64/QgemvU8S8KernelAvx512Vnni.S
           ${MLAS_SRC_DIR}/x86_64/QgemmU8X8KernelAvx512Core.S
           ${MLAS_SRC_DIR}/x86_64/ConvSymKernelAvx512Core.S
+          ${MLAS_SRC_DIR}/sqnbitgemm_kernel_avx512.cpp
         )
         set_source_files_properties(${mlas_platform_srcs_avx512core} PROPERTIES COMPILE_FLAGS "-mavx512bw -mavx512dq -mavx512vl")
+
+        set(mlas_platform_srcs_avx512vnni
+          ${MLAS_SRC_DIR}/sqnbitgemm_kernel_avx512vnni.cpp
+        )
+        set_source_files_properties(${mlas_platform_srcs_avx512vnni} PROPERTIES COMPILE_FLAGS "-mfma -mavx512vnni -mavx512bw -mavx512dq -mavx512vl -mavx512f")
 
         set(mlas_platform_srcs
           ${MLAS_SRC_DIR}/activate_fp16.cpp
@@ -546,16 +796,25 @@ else()
           ${mlas_platform_srcs_avx2}
           ${mlas_platform_srcs_avx512f}
           ${mlas_platform_srcs_avx512core}
+          ${mlas_platform_srcs_avx512vnni}
         )
 
-        if(MLAS_AMX_SUPPORTED)
+        if (NOT onnxruntime_ORT_MINIMAL_BUILD)
           set(mlas_platform_srcs
             ${mlas_platform_srcs}
+            ${MLAS_SRC_DIR}/q4gemm_avx512.cpp
+          )
+          set_source_files_properties(${MLAS_SRC_DIR}/q4gemm_avx512.cpp PROPERTIES COMPILE_FLAGS "-mfma -mavx512vnni -mavx512bw -mavx512dq -mavx512vl -mavx512f")
+        endif()
+        if(NOT APPLE)
+          set(mlas_platform_srcs
+            ${mlas_platform_srcs}
+	        ${MLAS_SRC_DIR}/x86_64/QgemmU8S8KernelAmxCommon.S
             ${MLAS_SRC_DIR}/qgemm_kernel_amx.cpp
             ${MLAS_SRC_DIR}/x86_64/QgemmU8S8KernelAmx.S
-          )
-          set_source_files_properties(${MLAS_SRC_DIR}/qgemm_kernel_amx.cpp PROPERTIES COMPILE_FLAGS "-mamx-tile -mamx-int8 -mavx2 -mavx512bw -mavx512dq -mavx512vl")
-          set_source_files_properties(${MLAS_SRC_DIR}/x86_64/QgemmU8S8KernelAmx.S PROPERTIES COMPILE_FLAGS "-mamx-tile -mamx-int8 -mavx2 -mavx512bw -mavx512dq -mavx512vl")
+            )
+          set_source_files_properties(${MLAS_SRC_DIR}/qgemm_kernel_amx.cpp PROPERTIES COMPILE_FLAGS "-mavx2 -mavx512bw -mavx512dq -mavx512vl -mavx512f")
+          set_source_files_properties(${MLAS_SRC_DIR}/x86_64/QgemmU8S8KernelAmx.S PROPERTIES COMPILE_FLAGS "-mavx2 -mavx512bw -mavx512dq -mavx512vl -mavx512f")
         endif()
 
         if(ONNXRUNTIME_MLAS_MULTI_ARCH)
@@ -567,6 +826,26 @@ else()
           set(MLAS_SOURCE_IS_NOT_SET 0)
         endif()
     endif()
+    if(LOONGARCH64 AND MLAS_SOURCE_IS_NOT_SET)
+        set(mlas_platform_srcs
+          ${MLAS_SRC_DIR}/qgemm_kernel_lsx.cpp
+          ${MLAS_SRC_DIR}/loongarch64/SgemmKernelLasx.S
+          ${MLAS_SRC_DIR}/loongarch64/DgemmKernelLsx.S
+          ${MLAS_SRC_DIR}/loongarch64/DgemmKernelLasx.S
+          ${MLAS_SRC_DIR}/loongarch64/SgemmKernelLsx.S
+          ${MLAS_SRC_DIR}/loongarch64/SconvKernelLsx.S
+          ${MLAS_SRC_DIR}/loongarch64/SconvKernelLasx.S
+          ${MLAS_SRC_DIR}/loongarch64/SpoolKernelLSX.S
+          ${MLAS_SRC_DIR}/loongarch64/SpoolKernelLasx.S
+          ${MLAS_SRC_DIR}/loongarch64/SgemmTransposePackB16x4LSX.S
+          ${MLAS_SRC_DIR}/loongarch64/SgemmTransposePackB16x4Lasx.S
+          ${MLAS_SRC_DIR}/loongarch64/SoftmaxKernelLasx.S
+            )
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mlsx -mlasx")
+        if(NOT ONNXRUNTIME_MLAS_MULTI_ARCH)
+          set(MLAS_SOURCE_IS_NOT_SET 0)
+        endif()
+    endif()
     if(NOT ONNXRUNTIME_MLAS_MULTI_ARCH AND MLAS_SOURCE_IS_NOT_SET)
         file(GLOB_RECURSE mlas_platform_srcs
           "${MLAS_SRC_DIR}/scalar/*.cpp")
@@ -574,10 +853,26 @@ else()
     target_sources(onnxruntime_mlas PRIVATE ${mlas_platform_srcs})
 endif()
 
+
 foreach(mlas_target ${ONNXRUNTIME_MLAS_LIBS})
-    target_include_directories(${mlas_target} PRIVATE inc ${MLAS_SRC_DIR})
+    target_include_directories(${mlas_target} PRIVATE ${MLAS_INC_DIR} ${MLAS_SRC_DIR})
+    onnxruntime_add_include_to_target(${mlas_target} ${GSL_TARGET})
+
+    set_target_properties(${mlas_target} PROPERTIES FOLDER "ONNXRuntime")
 endforeach()
-set_target_properties(onnxruntime_mlas PROPERTIES FOLDER "ONNXRuntime")
+
+if (WIN32)
+  target_compile_options(onnxruntime_mlas PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:/wd6385>" "$<$<COMPILE_LANGUAGE:CXX>:/wd4127>")
+  if (onnxruntime_ENABLE_STATIC_ANALYSIS)
+    target_compile_options(onnxruntime_mlas PRIVATE  "$<$<COMPILE_LANGUAGE:CXX>:/analyze:stacksize 131072>")
+  endif()
+endif()
+
+if (PLATFORM_NAME STREQUAL "macabi")
+  # Needed for maccatalyst C compilation
+  # i.e. the flags below add "--target=x86_64-apple-ios14.0-macabi -ffunction-sections -fdata-sections"
+  target_compile_options(onnxruntime_mlas PRIVATE ${CMAKE_C_FLAGS})
+endif()
 
 if (NOT onnxruntime_BUILD_SHARED_LIB)
     install(TARGETS onnxruntime_mlas
@@ -586,3 +881,61 @@ if (NOT onnxruntime_BUILD_SHARED_LIB)
             RUNTIME   DESTINATION ${CMAKE_INSTALL_BINDIR}
             FRAMEWORK DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
+
+# set up source group for MLAS source files
+block()
+  set(source_group_srcs)
+  foreach(mlas_target ${ONNXRUNTIME_MLAS_LIBS})
+    get_target_property(mlas_target_srcs ${mlas_target} SOURCES)
+    foreach(mlas_target_src ${mlas_target_srcs})
+      cmake_path(IS_PREFIX MLAS_ROOT ${mlas_target_src} in_mlas_root)
+      if(in_mlas_root)
+        list(APPEND source_group_srcs ${mlas_target_src})
+      endif()
+    endforeach()
+  endforeach()
+  source_group(TREE ${MLAS_ROOT} FILES ${source_group_srcs})
+endblock()
+
+#
+#if (NOT onnxruntime_ORT_MINIMAL_BUILD)
+#
+#  #
+#  # Command line tool for quantization and de-quantization of 2-D fp32 tensors
+#  # based on block-wise quantization of int4
+#  #
+#
+#  onnxruntime_add_executable(onnxruntime_mlas_q4dq
+#    ${MLAS_SRC_DIR}/q4_dq_cli.cpp
+#  )
+#  target_include_directories(onnxruntime_mlas_q4dq PRIVATE ${MLAS_INC_DIR} ${MLAS_SRC_DIR})
+#  set_target_properties(onnxruntime_mlas_q4dq PROPERTIES FOLDER "ONNXRuntimeTest")
+#
+#  target_link_libraries(onnxruntime_mlas_q4dq PRIVATE ${ONNXRUNTIME_MLAS_LIBS} onnxruntime_common)
+#  if (CPUINFO_SUPPORTED AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+#    target_link_libraries(onnxruntime_mlas_q4dq PRIVATE cpuinfo)
+#  endif()
+#  if(NOT WIN32)
+#    target_link_libraries(onnxruntime_mlas_q4dq PRIVATE nsync::nsync_cpp ${CMAKE_DL_LIBS})
+#  endif()
+#  if (CMAKE_SYSTEM_NAME STREQUAL "Android")
+#    target_link_libraries(onnxruntime_mlas_q4dq PRIVATE ${android_shared_libs})
+#  endif()
+#
+#  if(WIN32)
+#    target_link_libraries(onnxruntime_mlas_q4dq PRIVATE debug Dbghelp Advapi32)
+#  endif()
+#  if (onnxruntime_LINK_LIBATOMIC)
+#    target_link_libraries(onnxruntime_mlas_q4dq PRIVATE atomic)
+#  endif()
+#  target_link_libraries(onnxruntime_mlas_q4dq PRIVATE Threads::Threads)
+#
+#  if (CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+#    if (onnxruntime_ENABLE_WEBASSEMBLY_THREADS)
+#      set_target_properties(onnxruntime_mlas_q4dq PROPERTIES LINK_FLAGS "-s ALLOW_MEMORY_GROWTH=1 -s PROXY_TO_PTHREAD=1 -s EXIT_RUNTIME=1")
+#    else()
+#      set_target_properties(onnxruntime_mlas_q4dq PROPERTIES LINK_FLAGS "-s ALLOW_MEMORY_GROWTH=1")
+#    endif()
+#  endif()
+#
+#endif()

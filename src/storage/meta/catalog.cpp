@@ -207,18 +207,18 @@ void Catalog::RemoveDBEntry(DBEntry *db_entry, TransactionID txn_id) {
 }
 
 Vector<DBEntry *> Catalog::Databases(TransactionID txn_id, TxnTimeStamp begin_ts) {
-    this->rw_locker().lock_shared();
-
     Vector<DBEntry *> res;
-    res.reserve(this->db_meta_map().size());
-    for (const auto &db_meta_pair : this->db_meta_map()) {
-        DBMeta *db_meta = db_meta_pair.second.get();
-        auto [db_entry, status] = db_meta->GetEntryNolock(txn_id, begin_ts);
-        if (status.ok()) {
-            res.emplace_back(db_entry);
+    res.reserve(db_meta_map_.Size());
+
+    {
+        auto [_, db_meta_ptrs, meta_lock] = db_meta_map_.GetAllMetaGuard();
+        for (const auto &db_meta_ptr : db_meta_ptrs) {
+            auto [db_entry, status] = db_meta_ptr->GetEntryNolock(txn_id, begin_ts);
+            if (status.ok()) {
+                res.emplace_back(db_entry);
+            }
         }
     }
-    this->rw_locker().unlock_shared();
     return res;
 }
 
@@ -469,21 +469,16 @@ Tuple<SpecialFunction *, Status> Catalog::GetSpecialFunctionByNameNoExcept(Catal
 
 nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
-    Vector<DBMeta *> databases;
-    {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker());
-        json_res["data_dir"] = *this->data_dir_;
-        TransactionID next_txn_id = this->next_txn_id_;
-        json_res["next_txn_id"] = next_txn_id;
-        json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
-        databases.reserve(this->db_meta_map().size());
-        for (auto &db_meta : this->db_meta_map()) {
-            databases.push_back(db_meta.second.get());
-        }
-    }
+    json_res["data_dir"] = *this->data_dir_;
+    TransactionID next_txn_id = this->next_txn_id_;
+    json_res["next_txn_id"] = next_txn_id;
+    json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
 
-    for (auto &db_meta : databases) {
-        json_res["databases"].emplace_back(db_meta->Serialize(max_commit_ts));
+    {
+        auto [_, db_meta_ptrs, meta_lock] = db_meta_map_.GetAllMetaGuard();
+        for (DBMeta *db_meta_ptr : db_meta_ptrs) {
+            json_res["databases"].emplace_back(db_meta_ptr->Serialize(max_commit_ts));
+        }
     }
     return json_res;
 }
@@ -496,9 +491,9 @@ UniquePtr<Catalog> Catalog::NewCatalog(SharedPtr<String> data_dir, bool create_d
         SharedPtr<DBEntry> db_entry = DBEntry::NewDBEntry(db_meta.get(), false, db_meta->data_dir(), db_meta->db_name(), 0, 0);
         // TODO commit ts == 0 is true??
         db_entry->commit_ts_ = 0;
-        db_meta->db_entry_list().emplace_front(std::move(db_entry));
+        db_meta->PushFrontEntry(db_entry);
 
-        catalog->db_meta_map()["default_db"] = std::move(db_meta);
+        catalog->db_meta_map_.AddNewMetaNoLock("default_db", std::move(db_meta));
     }
     return catalog;
 }
@@ -937,7 +932,7 @@ UniquePtr<Catalog> Catalog::Deserialize(const String &data_dir, const nlohmann::
     if (catalog_json.contains("databases")) {
         for (const auto &db_json : catalog_json["databases"]) {
             UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(*catalog->data_dir_, db_json, buffer_mgr);
-            catalog->db_meta_map().emplace(*db_meta->db_name(), std::move(db_meta));
+            catalog->db_meta_map_.AddNewMetaNoLock(*db_meta->db_name(), std::move(db_meta));
         }
     }
     return catalog;

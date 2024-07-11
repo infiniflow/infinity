@@ -37,6 +37,10 @@ class LocalInfinityClient:
         Infinity.LocalInit(path)
         self.client = Infinity.LocalConnect()
 
+    def __del__(self):
+        if self.client is not None:
+            self.disconnect()
+
     def disconnect(self):
         Infinity.LocalUnInit()
         self.client = None
@@ -81,7 +85,7 @@ class LocalInfinityClient:
                      conflict_type: ConflictType = ConflictType.kError, properties: list = None):
         if self.client == None:
             raise Exception("Local infinity is not connected")
-        create_table_options = CreateTableOptions()
+        create_table_options = WrapCreateTableOptions()
         create_table_options.conflict_type = conflict_type
         return self.convert_res(self.client.CreateTable(db_name,
                                                         table_name,
@@ -223,5 +227,5 @@ class LocalInfinityClient:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowBlockColumn(db_name, table_name, segment_id, block_id, column_id))
     
-    def optimize(self, db_name: str, table_name: str, optimize_opt: OptimizeOptions):
+    def optimize(self, db_name: str, table_name: str, optimize_opt: WrapOptimizeOptions):
         return self.convert_res(self.client.Optimize(db_name, table_name, optimize_opt))

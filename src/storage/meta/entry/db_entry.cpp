@@ -245,35 +245,31 @@ Status DBEntry::GetTablesDetail(Txn *txn, Vector<TableDetail> &output_table_arra
 }
 
 SharedPtr<String> DBEntry::ToString() {
-    std::shared_lock<std::shared_mutex> r_locker(this->rw_locker());
     SharedPtr<String> res = MakeShared<String>(
-        fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *db_entry_dir_, txn_id_, this->table_meta_map().size()));
+        fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *db_entry_dir_, txn_id_, table_meta_map_.Size()));
     return res;
 }
 
 nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts) {
     nlohmann::json json_res;
 
-    Vector<TableMeta *> table_metas;
+    json_res["db_name"] = *this->db_name_;
+    json_res["txn_id"] = this->txn_id_;
+    json_res["begin_ts"] = this->begin_ts_;
+    json_res["commit_ts"] = this->commit_ts_.load();
+    json_res["deleted"] = this->deleted_;
+    if (!this->deleted_) {
+        json_res["db_entry_dir"] = *this->db_entry_dir_;
+    }
+    json_res["entry_type"] = this->entry_type_;
+
     {
-        std::shared_lock<std::shared_mutex> lck(this->rw_locker());
-        json_res["db_name"] = *this->db_name_;
-        json_res["txn_id"] = this->txn_id_;
-        json_res["begin_ts"] = this->begin_ts_;
-        json_res["commit_ts"] = this->commit_ts_.load();
-        json_res["deleted"] = this->deleted_;
-        if (!this->deleted_) {
-            json_res["db_entry_dir"] = *this->db_entry_dir_;
-        }
-        json_res["entry_type"] = this->entry_type_;
-        table_metas.reserve(this->table_meta_map().size());
-        for (auto &table_meta_pair : this->table_meta_map()) {
-            table_metas.push_back(table_meta_pair.second.get());
+        auto [_, table_meta_ptrs, meta_lock] = table_meta_map_.GetAllMetaGuard();
+        for (TableMeta *table_meta : table_meta_ptrs) {
+            json_res["tables"].emplace_back(table_meta->Serialize(max_commit_ts));
         }
     }
-    for (TableMeta *table_meta : table_metas) {
-        json_res["tables"].emplace_back(table_meta->Serialize(max_commit_ts));
-    }
+
     return json_res;
 }
 
@@ -297,7 +293,7 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
     if (db_entry_json.contains("tables")) {
         for (const auto &table_meta_json : db_entry_json["tables"]) {
             UniquePtr<TableMeta> table_meta = TableMeta::Deserialize(table_meta_json, res.get(), buffer_mgr);
-            res->table_meta_map().emplace(*table_meta->table_name_, std::move(table_meta));
+            res->table_meta_map_.AddNewMetaNoLock(*table_meta->table_name_, std::move(table_meta));
         }
     }
 

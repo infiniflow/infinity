@@ -44,6 +44,41 @@ export enum class EntryType : i8 {
     kBlockColumn,
 };
 
+export String ToString(EntryType entry_type) {
+    switch(entry_type) {
+        case EntryType::kDatabase: {
+            return "database";
+        }
+        case EntryType::kTable: {
+            return "table";
+        }
+        case EntryType::kTableIndex: {
+            return "table_index";
+        }
+        case EntryType::kSegmentIndex: {
+            return "segment_index";
+        }
+        case EntryType::kChunkIndex: {
+            return "chunk_index";
+        }
+        case EntryType::kView: {
+            return "view";
+        }
+        case EntryType::kColumn: {
+            return "column";
+        }
+        case EntryType::kSegment: {
+            return "segment";
+        }
+        case EntryType::kBlock: {
+            return "block";
+        }
+        case EntryType::kBlockColumn: {
+            return "block_column";
+        }
+    }
+}
+
 export struct BaseEntry {
     explicit BaseEntry(EntryType entry_type, bool is_delete, String encode)
         : deleted_(is_delete), entry_type_(entry_type), base_dir_(nullptr), encode_(MakeUnique<String>(std::move(encode))) {}
