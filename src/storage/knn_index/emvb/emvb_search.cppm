@@ -17,6 +17,8 @@ module;
 export module emvb_search;
 import stl;
 import emvb_shared_vec;
+import simd_init;
+import simd_functions;
 
 namespace infinity {
 
@@ -44,6 +46,7 @@ class EMVBSearch {
     const f32 *centroids_data_;                     // centroids data
     const EMVBSharedVec<u32> *centroids_to_docid_;  // docids belonging to each centroid
     const EMVBProductQuantizer *product_quantizer_; // product quantizer for residuals of the embeddings
+    FilterScoresOutputIdsFuncType filter_scores_output_ids_func_ptr = GetSIMD_FUNCTIONS().FilterScoresOutputIds_func_ptr_;
 
 public:
     EMVBSearch(u32 embedding_dimension,

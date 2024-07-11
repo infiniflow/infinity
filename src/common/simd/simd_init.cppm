@@ -19,15 +19,30 @@ import stl;
 
 namespace infinity {
 
-const Vector<char const *> &GetSupportedSimdTypesList();
-bool IsSSE2Supported();
-bool IsAVX2Supported();
-bool IsAVX512Supported();
+export const Vector<char const *> &GetSupportedSimdTypesList();
+export bool IsSSE2Supported();
+export bool IsAVX2Supported();
+export bool IsAVX512Supported();
 
-struct SIMD_FUNCTIONS {
-    SIMD_FUNCTIONS();
-};
+export using F32DistanceFuncType = f32(*)(const f32 *, const f32 *, SizeT);
+export using I8DistanceFuncType = i32(*)(const i8 *, const i8 *, SizeT);
+export using FilterScoresOutputIdsFuncType = u32 * (*)(u32 *, f32, const f32 *, u32);
 
-const SIMD_FUNCTIONS &GetSIMD_FUNCTIONS();
+export F32DistanceFuncType GetL2DistanceFuncPtr();
+export F32DistanceFuncType GetIPDistanceFuncPtr();
+export F32DistanceFuncType GetCosineDistanceFuncPtr();
+export F32DistanceFuncType Get_HNSW_F32L2_ptr();
+export F32DistanceFuncType Get_HNSW_F32L2_16_ptr();
+export F32DistanceFuncType Get_HNSW_F32IP_ptr();
+export F32DistanceFuncType Get_HNSW_F32IP_16_ptr();
+export F32DistanceFuncType Get_HNSW_F32Cos_ptr();
+export F32DistanceFuncType Get_HNSW_F32Cos_16_ptr();
+
+export I8DistanceFuncType Get_HNSW_I8IP_ptr();
+export I8DistanceFuncType Get_HNSW_I8IP_16_ptr();
+export I8DistanceFuncType Get_HNSW_I8IP_32_ptr();
+export I8DistanceFuncType Get_HNSW_I8IP_64_ptr();
+
+export FilterScoresOutputIdsFuncType GetFilterScoresOutputIdsFuncPtr();
 
 } // namespace infinity
