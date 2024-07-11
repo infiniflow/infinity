@@ -229,7 +229,7 @@ public:
 
     void GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer);
 
-    Tuple<Vector<String>, Vector<TableIndexMeta*>> GetAllIndexMap() const;
+    Tuple<Vector<String>, Vector<TableIndexMeta*>, std::shared_lock<std::shared_mutex>> GetAllIndexMapGuard() const;
 
     TableIndexMeta* GetIndexMetaPtrByName(const String& name) const;
 

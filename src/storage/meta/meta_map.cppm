@@ -70,7 +70,7 @@ public:
 
     void Cleanup();
 
-    Tuple<Vector<String>, Vector<Meta*>> GetAllMeta() const;
+    Tuple<Vector<String>, Vector<Meta*>, std::shared_lock<std::shared_mutex>> GetAllMetaGuard() const;
 
     Meta* GetMetaPtrByName(const String& name) const;
 
@@ -90,7 +90,7 @@ private:
 };
 
 template <MetaConcept Meta>
-Tuple<Vector<String>, Vector<Meta*>> MetaMap<Meta>::GetAllMeta() const {
+Tuple<Vector<String>, Vector<Meta*>, std::shared_lock<std::shared_mutex>> MetaMap<Meta>::GetAllMetaGuard() const {
     Vector<String> meta_name_array;
     Vector<Meta*> meta_ptr_array;
     std::shared_lock r_lock(rw_locker_);
@@ -102,7 +102,7 @@ Tuple<Vector<String>, Vector<Meta*>> MetaMap<Meta>::GetAllMeta() const {
         meta_name_array.push_back(meta_pair.first);
         meta_ptr_array.push_back(meta_pair.second.get());
     }
-    return {meta_name_array, meta_ptr_array};
+    return {meta_name_array, meta_ptr_array, std::move(r_lock)};
 }
 
 template <MetaConcept Meta>
@@ -183,7 +183,7 @@ template <MetaConcept Meta>
 void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
     Vector<Meta *> metas;
     {
-        std::unique_lock w_lock(rw_locker_);
+        std::shared_lock r_lock(rw_locker_);
         for (auto &[name, meta] : meta_map_) {
             metas.push_back(meta.get());
         }

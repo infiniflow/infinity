@@ -1042,23 +1042,25 @@ nlohmann::json TableEntry::Serialize(TxnTimeStamp max_commit_ts) {
         }
     }
 
-    auto [table_index_name_candidates, table_index_meta_candidates] = index_meta_map_.GetAllMeta();
+    {
+        auto [table_index_name_candidates, table_index_meta_candidates, meta_lock] = index_meta_map_.GetAllMetaGuard();
 
-    // Serialize segments
-    for (const auto &segment_entry : segment_candidates) {
-        json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
-        checkpoint_row_count += segment_entry->checkpoint_row_count();
-    }
-    json_res["row_count"] = checkpoint_row_count;
-    json_res["unsealed_id"] = unsealed_id_;
+        // Serialize segments
+        for (const auto &segment_entry : segment_candidates) {
+            json_res["segments"].emplace_back(segment_entry->Serialize(max_commit_ts));
+            checkpoint_row_count += segment_entry->checkpoint_row_count();
+        }
+        json_res["row_count"] = checkpoint_row_count;
+        json_res["unsealed_id"] = unsealed_id_;
 
-    // Serialize indexes
-    SizeT table_index_count = table_index_meta_candidates.size();
-    for (SizeT idx = 0; idx < table_index_count; ++idx) {
-        TableIndexMeta *table_index_meta = table_index_meta_candidates[idx];
-        nlohmann::json index_def_meta_json = table_index_meta->Serialize(max_commit_ts);
-        index_def_meta_json["index_name"] = table_index_name_candidates[idx];
-        json_res["table_indexes"].emplace_back(index_def_meta_json);
+        // Serialize indexes
+        SizeT table_index_count = table_index_meta_candidates.size();
+        for (SizeT idx = 0; idx < table_index_count; ++idx) {
+            TableIndexMeta *table_index_meta = table_index_meta_candidates[idx];
+            nlohmann::json index_def_meta_json = table_index_meta->Serialize(max_commit_ts);
+            index_def_meta_json["index_name"] = table_index_name_candidates[idx];
+            json_res["table_indexes"].emplace_back(index_def_meta_json);
+        }
     }
 
     return json_res;
@@ -1240,8 +1242,8 @@ void TableEntry::Cleanup() {
 
 IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn, this); }
 
-Tuple<Vector<String>, Vector<TableIndexMeta*>> TableEntry::GetAllIndexMap() const {
-    return index_meta_map_.GetAllMeta();
+Tuple<Vector<String>, Vector<TableIndexMeta*>, std::shared_lock<std::shared_mutex>> TableEntry::GetAllIndexMapGuard() const {
+    return index_meta_map_.GetAllMetaGuard();
 }
 
 TableIndexMeta* TableEntry::GetIndexMetaPtrByName(const String& name) const {

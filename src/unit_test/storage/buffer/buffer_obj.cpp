@@ -620,29 +620,28 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
 
         auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
         EXPECT_TRUE(status.ok());
+        {
+            auto [_, table_index_metas, table_index_meta_lock] = table_entry->GetAllIndexMapGuard();
+            SizeT index_size = table_index_metas.size();
+            for (SizeT i = 0; i < index_size; ++i) {
+                //            String& index_name = index_names[i];
+                auto &table_index_meta = table_index_metas[i];
+                auto [table_index_entry, table_index_status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
+                EXPECT_TRUE(table_index_status.ok());
 
-        auto [_, table_index_metas] = table_entry->GetAllIndexMap();
-        SizeT index_size = table_index_metas.size();
-        for(SizeT i = 0; i < index_size; ++ i) {
-//            String& index_name = index_names[i];
-            auto& table_index_meta = table_index_metas[i];
-            auto [table_index_entry, table_index_status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
-            EXPECT_TRUE(table_index_status.ok());
+                auto &index_by_segment = table_index_entry->index_by_segment();
+                auto iter = index_by_segment.find(0);
+                if (iter != index_by_segment.end()) {
+                    auto &segment_index_entry = iter->second;
 
-            auto &index_by_segment = table_index_entry->index_by_segment();
-            auto iter = index_by_segment.find(0);
-            if (iter != index_by_segment.end()) {
-                auto &segment_index_entry = iter->second;
-
-                Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-                segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
-                for (auto &chunk_index_entry : chunk_index_entries) {
-                    auto index_handle = chunk_index_entry->GetIndex();
+                    Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
+                    for (auto &chunk_index_entry : chunk_index_entries) {
+                        auto index_handle = chunk_index_entry->GetIndex();
+                    }
                 }
             }
-
         }
-
         txn_mgr->CommitTxn(txn);
     }
     {

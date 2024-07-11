@@ -212,11 +212,13 @@ Vector<DBEntry *> Catalog::Databases(TransactionID txn_id, TxnTimeStamp begin_ts
     Vector<DBEntry *> res;
     res.reserve(db_meta_map_.Size());
 
-    auto [_, db_meta_ptrs] = db_meta_map_.GetAllMeta();
-    for (const auto &db_meta_ptr : db_meta_ptrs) {
-        auto [db_entry, status] = db_meta_ptr->GetEntryNolock(txn_id, begin_ts);
-        if (status.ok()) {
-            res.emplace_back(db_entry);
+    {
+        auto [_, db_meta_ptrs, meta_lock] = db_meta_map_.GetAllMetaGuard();
+        for (const auto &db_meta_ptr : db_meta_ptrs) {
+            auto [db_entry, status] = db_meta_ptr->GetEntryNolock(txn_id, begin_ts);
+            if (status.ok()) {
+                res.emplace_back(db_entry);
+            }
         }
     }
     return res;
@@ -477,9 +479,11 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
     json_res["next_txn_id"] = next_txn_id;
     json_res["full_ckp_commit_ts"] = this->full_ckp_commit_ts_;
 
-    auto [_, db_meta_ptrs] = db_meta_map_.GetAllMeta();
-    for (DBMeta *db_meta_ptr : db_meta_ptrs) {
-        json_res["databases"].emplace_back(db_meta_ptr->Serialize(max_commit_ts));
+    {
+        auto [_, db_meta_ptrs, meta_lock] = db_meta_map_.GetAllMetaGuard();
+        for (DBMeta *db_meta_ptr : db_meta_ptrs) {
+            json_res["databases"].emplace_back(db_meta_ptr->Serialize(max_commit_ts));
+        }
     }
     return json_res;
 }

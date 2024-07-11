@@ -268,9 +268,11 @@ nlohmann::json DBEntry::Serialize(TxnTimeStamp max_commit_ts) {
     }
     json_res["entry_type"] = this->entry_type_;
 
-    auto [_, table_meta_ptrs] = table_meta_map_.GetAllMeta();
-    for (TableMeta *table_meta : table_meta_ptrs) {
-        json_res["tables"].emplace_back(table_meta->Serialize(max_commit_ts));
+    {
+        auto [_, table_meta_ptrs, meta_lock] = table_meta_map_.GetAllMetaGuard();
+        for (TableMeta *table_meta : table_meta_ptrs) {
+            json_res["tables"].emplace_back(table_meta->Serialize(max_commit_ts));
+        }
     }
 
     return json_res;
