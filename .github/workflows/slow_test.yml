@@ -2,7 +2,7 @@ name: slow_tests
 
 on:
   schedule:
-    - cron: '0 21 * * *'  # This schedule runs every 21:00:00Z(05:00:00+08:00)
+    - cron: '0 13 * * *'  # This schedule runs every 13:00:00Z(21:00:00+08:00)
 
 # https://docs.github.com/en/actions/using-jobs/using-concurrency
 concurrency:
