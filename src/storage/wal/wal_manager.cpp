@@ -192,6 +192,10 @@ void WalManager::Flush() {
                 // UnrecoverableError(fmt::format("WalEntry of txn_id {} commands is empty", entry->txn_id_));
             }
 
+            for(const SharedPtr<WalCmd>& cmd: entry->cmds_) {
+                LOG_TRACE(fmt::format("WAL CMD: {}", cmd->ToString()));
+            }
+
             i32 exp_size = entry->GetSizeInBytes();
             Vector<char> buf(exp_size);
             char *ptr = buf.data();
