@@ -1042,8 +1042,8 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     return false;
 }
 
-void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size) {
-    global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry), wal_size);
+void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
+    global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry));
 }
 
 void Catalog::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->ReplayDeltaEntry(std::move(delta_entry)); }
@@ -1086,10 +1086,6 @@ void Catalog::MemIndexRecover(BufferManager *buffer_manager) {
 void Catalog::StartMemoryIndexCommit() {
     mem_index_commit_thread_ = MakeUnique<Thread>([this] { MemIndexCommitLoop(); });
 }
-
-Tuple<TxnTimeStamp, i64> Catalog::GetCheckpointState() const { return global_catalog_delta_entry_->GetCheckpointState(); }
-
-void Catalog::InitDeltaEntry(TxnTimeStamp max_commit_ts) { global_catalog_delta_entry_->InitMaxCommitTS(max_commit_ts); }
 
 SizeT Catalog::GetDeltaLogCount() const { return global_catalog_delta_entry_->OpSize(); }
 

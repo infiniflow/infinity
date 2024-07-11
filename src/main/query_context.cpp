@@ -144,7 +144,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
             }
         }
 
-        this->BeginTxn();
+        this->BeginTxn(statement);
 //        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
 //                        session_ptr_->GetTxn()->TxnID(),
 //                        session_ptr_->GetTxn()->BeginTS(),
@@ -316,9 +316,10 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts,
     return true;
 }
 
-void QueryContext::BeginTxn() {
+void QueryContext::BeginTxn(const BaseStatement *statement) {
     if (session_ptr_->GetTxn() == nullptr) {
-        Txn* new_txn = storage_->txn_manager()->BeginTxn(nullptr);
+        bool is_checkpoint = statement != nullptr && statement->type_ == StatementType::kFlush;
+        Txn* new_txn = storage_->txn_manager()->BeginTxn(nullptr, is_checkpoint);
         session_ptr_->SetTxn(new_txn);
     }
 }

@@ -55,9 +55,9 @@ public:
 
     bool TrySubmitCheckpointTask(SharedPtr<CheckpointTaskBase> ckp_task);
 
-    void Checkpoint(bool is_full_checkpoint, TxnTimeStamp max_commit_ts, i64 wal_size);
+    void Checkpoint(bool is_full_checkpoint);
 
-    void Checkpoint(ForceCheckpointTask *ckp_task, TxnTimeStamp max_commit_ts, i64 wal_size);
+    void Checkpoint(ForceCheckpointTask *ckp_task);
 
     void SwapWalFile(TxnTimeStamp max_commit_ts);
 
@@ -71,19 +71,15 @@ public:
 
     void ReplayWalEntry(const WalEntry &entry);
 
-    void RecycleWalFile(TxnTimeStamp full_ckp_ts);
-
-    // Should only call in `Flush` thread
-    i64 WalSize() const;
-
-    i64 GetLastCkpWalSize();
 
     TxnTimeStamp GetCheckpointedTS();
 
 private:
     // Checkpoint Helper
-    void CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp max_commit_ts, i64 wal_size);
-
+    void CheckpointInner(bool is_full_checkpoint, Txn *txn);
+    void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
+    Tuple<TxnTimeStamp, i64> GetCommitState();
+    i64 GetLastCkpWalSize();
     void SetLastCkpWalSize(i64 wal_size);
 
     void WalCmdCreateDatabaseReplay(const WalCmdCreateDatabase &cmd, TransactionID txn_id, TxnTimeStamp commit_ts);
@@ -127,12 +123,12 @@ private:
 
     // Only Flush thread access following members
     std::ofstream ofs_{};
-    TxnTimeStamp max_commit_ts_{};
-    i64 wal_size_{};
     FlushOptionType flush_option_{FlushOptionType::kOnlyWrite};
 
     // Flush and Checkpoint threads access following members
     mutable std::mutex mutex2_{};
+    TxnTimeStamp max_commit_ts_{};
+    i64 wal_size_{};
     i64 last_ckp_wal_size_{};
     Atomic<bool> checkpoint_in_progress_{false};
 
