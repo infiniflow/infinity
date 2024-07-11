@@ -96,8 +96,7 @@ public:
 
     void CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<ChunkIndexEntry *> &old_chunks, TxnTimeStamp commit_ts);
 
-    SharedPtr<ChunkIndexEntry>
-    OptIndex(IndexBase *index_base, TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
+    void OptIndex(IndexBase *index_base, TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
@@ -123,6 +122,8 @@ public:
 
     // Dump or spill the memory indexer
     SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false);
+
+    void AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn);
 
     // Init the mem index from previously spilled one.
     void MemIndexLoad(const String &base_name, RowID base_row_id);
@@ -177,12 +178,12 @@ public:
 
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<ChunkIndexEntry>> GetHnswIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
-        return {chunk_index_entries_, memory_hnsw_indexer_};
+        return {chunk_index_entries_, memory_chunk_indexer_};
     }
 
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<ChunkIndexEntry>> GetBMPIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
-        return {chunk_index_entries_, memory_hnsw_indexer_};
+        return {chunk_index_entries_, memory_chunk_indexer_};
     }
 
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<SecondaryIndexInMem>> GetSecondaryIndexSnapshot() {
@@ -266,7 +267,7 @@ private:
     ChunkID next_chunk_id_{0};
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
-    SharedPtr<ChunkIndexEntry> memory_hnsw_indexer_{};
+    SharedPtr<ChunkIndexEntry> memory_chunk_indexer_{};
     SharedPtr<MemoryIndexer> memory_indexer_{};
     SharedPtr<SecondaryIndexInMem> memory_secondary_index_{};
     SharedPtr<EMVBIndexInMem> memory_emvb_index_{};
