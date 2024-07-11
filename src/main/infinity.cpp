@@ -311,7 +311,6 @@ QueryResult Infinity::ShowVariable(const String &variable_name, SetScope scope) 
         }
         default: {
             String error_message = "Invalid set scope.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -340,7 +339,6 @@ QueryResult Infinity::ShowVariables(SetScope scope) {
         }
         default: {
             String error_message = "Invalid set scope.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -966,18 +964,6 @@ Infinity::Search(const String &db_name, const String &table_name, SearchExpr *se
     select_statement->select_list_ = output_columns;
     select_statement->where_expr_ = filter;
     select_statement->search_expr_ = search_expr;
-    fmt::print("in search, table name : {}\n", table_name);
-    if (search_expr != nullptr) {
-        fmt::print("in search, search expr : {}\n", search_expr->ToString());
-    }
-
-    if (filter != nullptr) {
-        fmt::print("in search, filter : {}\n", filter->ToString());
-    }
-
-    for (auto& output_column : *output_columns) {
-        fmt::print("in search, output column : {}\n", output_column->ToString());
-    }
 
     QueryResult result = query_context_ptr->QueryStatement(select_statement.get());
     return result;

@@ -644,10 +644,11 @@ class TestKnn(HttpTest):
             {"name": "num", "type": "integer"},
             {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
         ])
-        httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
-        httputils.copy_data("enwiki_embedding_99_commas.csv")
+        generate_file_name = "http_enwiki_embedding_99_commas.csv"
+        httputils.generate_commas_enwiki("enwiki_99.csv", generate_file_name, 1)
+        httputils.copy_data(generate_file_name)
 
-        test_csv_dir = TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        test_csv_dir = TEST_TMP_DIR + generate_file_name
         self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
             "file_type": "csv",
@@ -689,10 +690,11 @@ class TestKnn(HttpTest):
             {"name": "num", "type": "integer"},
             {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
         ])
-        httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
-        httputils.copy_data("enwiki_embedding_99_commas.csv")
+        generate_file_name = "http_enwiki_embedding_99_commas.csv"
+        httputils.generate_commas_enwiki("enwiki_99.csv", generate_file_name, 1)
+        httputils.copy_data(generate_file_name)
 
-        test_csv_dir = TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        test_csv_dir = TEST_TMP_DIR + generate_file_name
         self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
             "file_type": "csv",
@@ -736,10 +738,11 @@ class TestKnn(HttpTest):
             {"name": "num", "type": "integer"},
             {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
         ])
-        httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
-        httputils.copy_data("enwiki_embedding_99_commas.csv")
+        generate_file_name = "http_enwiki_embedding_99_commas.csv"
+        httputils.generate_commas_enwiki("enwiki_99.csv", generate_file_name, 1)
+        httputils.copy_data(generate_file_name)
 
-        test_csv_dir = TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        test_csv_dir = TEST_TMP_DIR + generate_file_name
         self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
             "file_type": "csv",
@@ -783,10 +786,11 @@ class TestKnn(HttpTest):
             {"name": "num", "type": "integer"},
             {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
         ])
-        httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
-        httputils.copy_data("enwiki_embedding_99_commas.csv")
+        generate_file_name = "http_enwiki_embedding_99_commas.csv"
+        httputils.generate_commas_enwiki("enwiki_99.csv", generate_file_name, 1)
+        httputils.copy_data(generate_file_name)
 
-        test_csv_dir = TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        test_csv_dir = TEST_TMP_DIR + generate_file_name
         self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
             "file_type": "csv",
@@ -830,10 +834,11 @@ class TestKnn(HttpTest):
             {"name": "num", "type": "integer"},
             {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
         ])
-        httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
-        httputils.copy_data("enwiki_embedding_99_commas.csv")
+        generate_file_name = "http_enwiki_embedding_99_commas.csv"
+        httputils.generate_commas_enwiki("enwiki_99.csv", generate_file_name, 1)
+        httputils.copy_data(generate_file_name)
 
-        test_csv_dir = TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        test_csv_dir = TEST_TMP_DIR + generate_file_name
         self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
             "file_type": "csv",
@@ -877,10 +882,11 @@ class TestKnn(HttpTest):
             {"name": "num", "type": "integer"},
             {"name": "vec", "type": "vector", "dimension": 4, "element_type": "integer"}
         ])
-        httputils.generate_commas_enwiki("enwiki_99.csv", "enwiki_embedding_99_commas.csv", 1)
-        httputils.copy_data("enwiki_embedding_99_commas.csv")
+        generate_file_name = "http_enwiki_embedding_99_commas.csv"
+        httputils.generate_commas_enwiki("enwiki_99.csv", generate_file_name, 1)
+        httputils.copy_data(generate_file_name)
 
-        test_csv_dir = TEST_TMP_DIR + "enwiki_embedding_99_commas.csv"
+        test_csv_dir = TEST_TMP_DIR + generate_file_name
         self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
             "file_type": "csv",

@@ -31,8 +31,6 @@ class TestImport(TestSdk):
     # def _test_version(self):
     #     print(infinity.__version__)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_import(self, check_data):
         """
         target: test import data to remote server
@@ -64,12 +62,6 @@ class TestImport(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # import different file format data
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.fvecs",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    @pytest.mark.parametrize("file_format", ["csv",
-                                             "json",
-                                             "jsonl",
-                                             "fvecs"])
     def _test_import_different_file_format_data(self, file_format, check_data):
         db_obj = self.infinity_obj.get_database("default_db")
 
@@ -78,13 +70,14 @@ class TestImport(TestSdk):
                                         {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
 
         if file_format == "fvecs":
+            file_name = "pysdk_test.fvecs"
             if not check_data:
-                generate_fvecs(100, 128, "pysdk_test.fvecs")
-                copy_data("pysdk_test.fvecs")
+                generate_fvecs(100, 128, file_name)
+                copy_data(file_name)
             db_obj.drop_table("test_import_different_file_format_data")
             table_obj = db_obj.create_table("test_import_different_file_format_data",
                                             {"c1": {"type": "vector,128,float"}}, ConflictType.Error)
-            table_obj.import_data(common_values.TEST_TMP_DIR + "pysdk_test.fvecs", {"file_type": file_format})
+            table_obj.import_data(common_values.TEST_TMP_DIR + file_name, {"file_type": file_format})
             res = table_obj.output(["*"]).to_df()
             print(res)
         else:
@@ -99,7 +92,6 @@ class TestImport(TestSdk):
         assert res.error_code == ErrorCode.OK
 
     # import empty FVECS file
-    @pytest.mark.parametrize("file_format", ["fvecs", "fvecs", "fvecs"])
     def _test_import_empty_file_fvecs(self, file_format):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_empty_file_fvecs", ConflictType.Ignore)
@@ -112,7 +104,6 @@ class TestImport(TestSdk):
         db_obj.drop_table("test_import_empty_file_fvecs", ConflictType.Error)
 
     # import empty CSV file
-    @pytest.mark.parametrize("file_format", ["csv", "csv", "csv"])
     def _test_import_empty_file_csv(self, file_format):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_empty_file_csv", ConflictType.Ignore)
@@ -125,7 +116,6 @@ class TestImport(TestSdk):
         db_obj.drop_table("test_import_empty_file_csv", ConflictType.Error)
 
     # import empty JSONL file
-    @pytest.mark.parametrize("file_format", ["jsonl", "jsonl", "jsonl"])
     def _test_import_empty_file_jsonl(self, file_format):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_empty_file_jsonl", ConflictType.Ignore)
@@ -139,7 +129,6 @@ class TestImport(TestSdk):
 
 
     # import format unrecognized data
-    @pytest.mark.parametrize("file_format", [pytest.param("txt")])
     def _test_import_format_unrecognized_data(self, file_format):
         db_obj = self.infinity_obj.get_database("default_db")
 
@@ -158,25 +147,6 @@ class TestImport(TestSdk):
         db_obj.drop_table("test_import_format_unrecognized_data", ConflictType.Error)
 
     # import csv with different delimiter
-    @pytest.mark.parametrize("delimiter", [["blankspace", " "],
-                                           ["commas", ","],
-                                           ["semicolons", ";"],
-                                           pytest.param(["tabular", "\t"])
-                                           ])
-    @pytest.mark.parametrize("types", [
-        "int", "int8", "int16", "int32", "int64", "integer",
-        "float", "float32", "double", "float64",
-        "varchar",
-        ("bool", ErrorCode.PARSER_ERROR)
-    ])
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_blankspace.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR},
-                                            {"file_name": "pysdk_test_commas.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR},
-                                            {"file_name": "pysdk_test_semicolons.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR},
-                                            {"file_name": "pysdk_test_tabular.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_csv_with_different_delimiter(self, check_data, delimiter, types):
         if not check_data:
             copy_data("pysdk_test_" + delimiter[0] + ".csv")
@@ -207,9 +177,6 @@ class TestImport(TestSdk):
             db_obj.drop_table("test_csv_with_different_delimiter", ConflictType.Error)
 
     # import csv with delimiter more than one character
-    @pytest.mark.parametrize("delimiter", ["blankspace"])
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_blankspace.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_csv_with_different_delimiter_more_than_one_character(self, check_data, delimiter):
         if not check_data:
             copy_data("pysdk_test_" + delimiter + ".csv")
@@ -224,9 +191,6 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_csv_with_different_delimiter_more_than_one_character", ConflictType.Error)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_commas.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    @pytest.mark.parametrize("has_header", [True, False])
     def _test_import_csv_with_headers(self, check_data, has_header):
         if not check_data:
             copy_data("pysdk_test_commas.csv")
@@ -241,12 +205,11 @@ class TestImport(TestSdk):
         db_obj.drop_table("test_import_csv_with_headers", ConflictType.Error)
 
     # import fvecs, when table with more columns
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test.fvecs",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_import_fvecs_table_with_more_columns(self, check_data):
+        file_name = "pysdk_test.fvecs"
         if not check_data:
-            generate_fvecs(100, 128, "pysdk_test.fvecs")
-            copy_data("pysdk_test.fvecs")
+            generate_fvecs(100, 128, file_name)
+            copy_data(file_name)
 
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_fvecs_table_with_more_columns", ConflictType.Ignore)
@@ -254,7 +217,7 @@ class TestImport(TestSdk):
                                         {"c1": {"type": "int"}, "c2": {"type": "vector,128,float"}})
 
         with pytest.raises(InfinityException) as e:
-            test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test.fvecs"
+            test_csv_dir = common_values.TEST_TMP_DIR + file_name
             table_obj.import_data(test_csv_dir, import_options={"file_type": "fvecs"})
 
         assert e.type == InfinityException
@@ -267,13 +230,6 @@ class TestImport(TestSdk):
     # TODO import json, json has nested structure
 
     # import table with embedding not match with the table definition.
-    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    @pytest.mark.parametrize("types", ["vector, 3, int",
-                                       "vector, 128, int",
-                                       "vector, 3, float",
-                                       "vector, 128, float",
-                                       "vector, 3, double"])
     def _test_import_embedding_with_not_match_definition(self, check_data, types):
         if not check_data:
             copy_data("embedding_int_dim3.csv")
@@ -290,9 +246,6 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_import_embedding_with_not_match_definition", ConflictType.Error)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    @pytest.mark.parametrize("types", [pytest.param("vector, 2, int")])
     def _test_import_embedding_with_dimension_unmatch(self, check_data, types):
         if not check_data:
             copy_data("embedding_int_dim3.csv")
@@ -313,11 +266,6 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_import_embedding_with_not_match_definition", ConflictType.Error)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    @pytest.mark.parametrize("types", [pytest.param("vector, 3, bool"),
-                                       pytest.param("vector, 3, varchar")
-                                       ])
     def _test_import_embedding_with_unmatched_elem_type(self, check_data, types):
         if not check_data:
             copy_data("embedding_int_dim3.csv")
@@ -334,8 +282,6 @@ class TestImport(TestSdk):
         db_obj.drop_table("test_import_embedding_with_not_match_definition", ConflictType.Error)
 
     # import table with varchar not match with the table definition.
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_varchar.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_import_varchar_with_not_match_definition(self, check_data):
         if not check_data:
             copy_data("pysdk_test_varchar.csv")
@@ -353,18 +299,17 @@ class TestImport(TestSdk):
         db_obj.drop_table("test_import_varchar_with_not_match_definition", ConflictType.Error)
 
     # import table with 10000 columns.
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_int.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_import_10000_columns(self, check_data):
+        file_name = "pysdk_test_big_int.csv"
         if not check_data:
-            generate_big_int_csv(10000, "pysdk_test_big_int.csv")
-            copy_data("pysdk_test_big_int.csv")
+            generate_big_int_csv(10000, file_name)
+            copy_data(file_name)
 
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_10000_columns", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_import_10000_columns", {"c1": {"type": "int"}, "c2": {"type": "int"}})
 
-        test_csv_dir = common_values.TEST_TMP_DIR + "pysdk_test_big_int.csv"
+        test_csv_dir = common_values.TEST_TMP_DIR + file_name
         res = table_obj.import_data(test_csv_dir)
         assert res.error_code == ErrorCode.OK
 
@@ -373,12 +318,6 @@ class TestImport(TestSdk):
         db_obj.drop_table("test_import_10000_columns", ConflictType.Error)
 
     # import table with columns isn't matched (more and less)
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_commas.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    @pytest.mark.parametrize("columns", [
-        pytest.param({"c1": {"type": "int"}}),
-        pytest.param({"c1": {"type": "int"}, "c2": {"type": "int"}, "c3": {"type": "int"}})
-    ])
     def _test_table_with_not_matched_columns(self, columns, check_data):
         if not check_data:
             copy_data("pysdk_test_commas.csv")
@@ -397,9 +336,6 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_table_with_not_matched_columns", ConflictType.Error)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_import_with_different_size.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    @pytest.mark.parametrize("data_size", [1, 8191, 8192, 8193, 16 * 8192])
     def _test_import_with_different_size(self, check_data, data_size):
         generate_big_rows_csv(data_size, "pysdk_test_import_with_different_size.csv")
         copy_data("pysdk_test_import_with_different_size.csv")
@@ -418,8 +354,6 @@ class TestImport(TestSdk):
         db_obj.drop_table("test_import_with_different_size", ConflictType.Ignore)
 
     # import table with column value exceeding invalid value range
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_varchar_rows.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_import_exceeding_rows(self, check_data):
         if not check_data:
             generate_big_rows_csv(1024 * 8192, "pysdk_test_big_varchar_rows.csv")
@@ -438,8 +372,6 @@ class TestImport(TestSdk):
         assert res.height == 1 and res.width == 1 and res.item(0, 0) == 1024 * 8192
         db_obj.drop_table("test_import_exceeding_rows", ConflictType.Error)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_big_columns.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_import_exceeding_columns(self, check_data):
         generate_big_columns_csv(1024, "pysdk_test_big_columns.csv")
         if not check_data:
@@ -458,8 +390,6 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_import_exceeding_columns", ConflictType.Error)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "test_default.jsonl",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_import_jsonl_file_with_default(self, check_data):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_jsonl_file_with_default", ConflictType.Ignore)
@@ -494,8 +424,6 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_import_jsonl_file_with_default", ConflictType.Error)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_import_default.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_import_csv_file_with_default(self, check_data):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_csv_file_with_default", ConflictType.Ignore)
@@ -526,8 +454,6 @@ class TestImport(TestSdk):
         print(res)
         db_obj.drop_table("test_import_csv_file_with_default", ConflictType.Error)
 
-    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_default.json",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def _test_import_json_file_with_default(self, check_data):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_import_json_file_with_default", ConflictType.Ignore)
