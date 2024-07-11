@@ -150,7 +150,6 @@ public:
     void SaveIndex(FileHandler &file_handler) const final {
         if (!initialized_) {
             String error_message = "Not initialized yet.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         pgm_index_->Save(file_handler);
@@ -159,7 +158,6 @@ public:
     void LoadIndex(FileHandler &file_handler) final {
         if (initialized_) {
             String error_message = "Already initialized.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         pgm_index_ = MakeUnique<PGMWithExtraFunction<IndexValueType>>();
@@ -170,7 +168,6 @@ public:
     void BuildIndex(SizeT data_cnt, const void *data_ptr) final {
         if (initialized_) {
             String error_message = "Already initialized.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         auto typed_data_ptr = static_cast<const IndexValueType *>(data_ptr);
@@ -181,7 +178,6 @@ public:
     SecondaryIndexApproxPos SearchIndex(const void *val_ptr) const final {
         if (!initialized_) {
             String error_message = "Not initialized yet.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         auto val = *(static_cast<const IndexValueType *>(val_ptr));

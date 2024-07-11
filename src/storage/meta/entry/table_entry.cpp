@@ -62,7 +62,6 @@ Vector<std::string_view> TableEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
         String error_message = fmt::format("Invalid table entry encode: {}", encode);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto decodes = DBEntry::DecodeIndex(encode.substr(0, delimiter_i));
@@ -168,7 +167,6 @@ Tuple<TableIndexEntry *, Status> TableEntry::CreateIndex(const SharedPtr<IndexBa
     if (index_base->index_name_->empty()) {
         // Index name shouldn't be empty
         String error_message = "Attempt to create no name index.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     LOG_TRACE(fmt::format("Creating new index: {}", *index_base->index_name_));
@@ -209,7 +207,6 @@ Tuple<SharedPtr<TableIndexInfo>, Status> TableEntry::GetTableIndexInfo(const Str
 void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     LOG_TRACE(fmt::format("Remove index entry: {}", index_name));
@@ -238,7 +235,6 @@ TableIndexEntry *TableEntry::CreateIndexReplay(const SharedPtr<String> &index_na
 void TableEntry::UpdateIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     index_meta->UpdateEntryReplay(txn_id, begin_ts, commit_ts);
@@ -250,7 +246,6 @@ void TableEntry::DropIndexReplay(const String &index_name,
                                  TxnTimeStamp begin_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     index_meta->DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
@@ -259,7 +254,6 @@ void TableEntry::DropIndexReplay(const String &index_name,
 TableIndexEntry *TableEntry::GetIndexReplay(const String &index_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [index_meta, status] = index_meta_map_.GetExistMetaNoLock(index_name, ConflictType::kError);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return index_meta->GetEntryReplay(txn_id, begin_ts);
@@ -287,7 +281,6 @@ void TableEntry::AddSegmentReplay(SharedPtr<SegmentEntry> new_segment) {
     auto [iter, insert_ok] = segment_map_.emplace(segment_id, new_segment);
     if (!insert_ok) {
         String error_message = fmt::format("Segment {} already exists.", segment_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (compaction_alg_.get() != nullptr) {
@@ -304,7 +297,6 @@ void TableEntry::UpdateSegmentReplay(SharedPtr<SegmentEntry> new_segment, String
     auto iter = segment_map_.find(segment_id);
     if (iter == segment_map_.end()) {
         String error_message = fmt::format("Segment {} not found.", segment_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     iter->second->UpdateSegmentReplay(new_segment, std::move(segment_filter_binary_data));
@@ -334,7 +326,6 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         auto [_, insert_ok] = this->segment_map_.emplace(segment_id, segment_entry);
         if (!insert_ok) {
             String error_message = fmt::format("Insert segment {} failed.", segment_id);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -384,7 +375,6 @@ void TableEntry::AddCompactNew(SharedPtr<SegmentEntry> segment_entry) {
     auto [_, insert_ok] = this->segment_map_.emplace(segment_id, std::move(segment_entry));
     if (!insert_ok) {
         String error_message = fmt::format("Insert segment {} failed.", segment_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -395,7 +385,6 @@ void TableEntry::AppendData(TransactionID txn_id, void *txn_store, TxnTimeStamp 
     // Read-only no lock needed.
     if (this->Deleted()) {
         String error_message = "Table is deleted";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return;
     }
@@ -472,13 +461,11 @@ void TableEntry::RollbackAppend(TransactionID txn_id, TxnTimeStamp commit_ts, vo
     //    auto *txn_store_ptr = (TxnTableStore *)txn_store;
     //    AppendState *append_state_ptr = txn_store_ptr->append_state_.get();
     String error_message = "TableEntry::RollbackAppend";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
 Status TableEntry::RollbackDelete(TransactionID txn_id, DeleteState &, BufferManager *) {
     String error_message = "TableEntry::RollbackDelete";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return Status::OK();
 }
@@ -549,7 +536,6 @@ Status TableEntry::CommitCompact(TransactionID txn_id, TxnTimeStamp commit_ts, T
         }
         default: {
             String error_message = "Invalid compact task type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -568,7 +554,6 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
             segment_entry->RollbackBlocks(commit_ts, segment_store.block_entries_);
             if (segment_entry->Committed()) {
                 String error_message = fmt::format("RollbackCompact: segment {} is committed", segment_entry->segment_id());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             {
@@ -578,7 +563,6 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
                     segment_map_.erase(iter);
                 } else {
                     String error_message = fmt::format("RollbackCompact: segment {} not found", segment_entry->segment_id());
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
 
@@ -605,7 +589,6 @@ Status TableEntry::RollbackCompact(TransactionID txn_id, TxnTimeStamp commit_ts,
             }
             default: {
                 String error_message = "Invalid compact task type";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -639,7 +622,6 @@ Status TableEntry::RollbackWrite(TxnTimeStamp commit_ts, const Vector<TxnSegment
                     segment_map_.erase(iter);
                 } else {
                     String error_message = fmt::format("RollbackWrite: segment {} not found", segment_entry->segment_id());
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -951,7 +933,6 @@ Pair<SizeT, Status> TableEntry::GetSegmentRowCountBySegmentID(u32 seg_id) {
         return {iter->second->row_count(), Status::OK()};
     } else {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("No segment id: {}.", seg_id));
-        LOG_ERROR(*err_msg);
         UnrecoverableError(*err_msg);
         return {0, Status(ErrorCode::kUnexpectedError, std::move(err_msg))};
     }
@@ -1127,7 +1108,6 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     if (table_entry->deleted_) {
         if (!table_entry->segment_map_.empty()) {
             String error_message = "deleted table should have no segment";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -1148,7 +1128,6 @@ u64 TableEntry::GetColumnIdByName(const String &column_name) const {
     auto it = column_name2column_id_.find(column_name);
     if (it == column_name2column_id_.end()) {
         Status status = Status::ColumnNotExist(column_name);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     return it->second;

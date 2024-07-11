@@ -52,7 +52,6 @@ public:
         };
         if (!check_vector_type_valid(left_vector_type) || !check_vector_type_valid(right_vector_type)) {
             String error_message = "Invalid input ColumnVectorType. Support only kFlat and kConstant.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         const SharedPtr<Bitmask> &left_null = left->nulls_ptr_;
@@ -357,7 +356,6 @@ public:
             result->Finalize(count);
         } else {
             String error_message = "Wrong boolean operation.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -537,7 +535,6 @@ public:
                                void *state_ptr,
                                bool nullable) {
         String error_message = "MixedType needs to be specialized.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -563,12 +560,10 @@ public:
         switch (left->vector_type()) {
             case ColumnVectorType::kInvalid: {
                 String error_message = "Invalid column vector type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             case ColumnVectorType::kCompactBit: {
                 String error_message = "kCompactBit should not be in this branch.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             case ColumnVectorType::kFlat: {
@@ -596,7 +591,6 @@ private:
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid:{
                 String error_message = "Invalid column vector type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             case ColumnVectorType::kFlat: {
@@ -610,7 +604,6 @@ private:
             }
             case ColumnVectorType::kCompactBit: {
                 String error_message = "CompactBit isn't implemented.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -627,7 +620,6 @@ private:
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid: {
                 String error_message = "Invalid column vector type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             case ColumnVectorType::kFlat: {
@@ -641,7 +633,6 @@ private:
             }
             case ColumnVectorType::kCompactBit: {
                 String error_message = "CompactBit isn't implemented.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 return ;
             }
@@ -659,7 +650,6 @@ private:
         switch (right->vector_type()) {
             case ColumnVectorType::kInvalid: {
                 String error_message = "Invalid column vector type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 break;
             }
@@ -674,7 +664,6 @@ private:
             }
             case ColumnVectorType::kCompactBit: {
                 String error_message = "CompactBit isn't implemented.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 break;
             }
@@ -918,7 +907,6 @@ private:
                                                 void *,
                                                 bool) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -1078,7 +1066,6 @@ private:
                                                     void *,
                                                     bool) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -1090,7 +1077,6 @@ private:
                                                 void *,
                                                 bool) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -1102,7 +1088,6 @@ private:
                                                     void *,
                                                     bool) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -1114,7 +1099,6 @@ private:
                                                          void *,
                                                          bool) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 };

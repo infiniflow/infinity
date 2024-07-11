@@ -70,7 +70,6 @@ protected:
             time_t end = time(nullptr);
             if (end - start > 10) {
                 String error_message = "WaitFlushDeltaOp timeout";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }

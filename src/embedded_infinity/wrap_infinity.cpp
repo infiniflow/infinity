@@ -1032,7 +1032,6 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
         }
         default: {
             String error_message = fmt::format("Invalid logical data type: {}", data_type->ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

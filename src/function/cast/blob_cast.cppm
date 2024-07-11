@@ -37,7 +37,6 @@ export inline BoundCastFunc BindBlobCast(DataType &target) {
         }
         default: {
             String error_message = fmt::format("Can't cast from Blob type to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -67,7 +66,6 @@ inline bool BlobTryCastToVarlen::Run(const BlobT &source, VarcharT &target, cons
     } else {
         if(vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
             String error_message = "Simple Aggregate without aggregate expression.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 

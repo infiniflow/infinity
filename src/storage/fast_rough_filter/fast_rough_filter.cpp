@@ -44,13 +44,11 @@ String FastRoughFilter::SerializeToString() const {
         min_max_data_filter_->SerializeToStringStream(os, min_max_data_filter_binary_bytes);
         if (os.view().size() != total_binary_bytes) {
             String error_message = "FastRoughFilter::SerializeToString(): save size error";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         return std::move(os).str();
     } else {
         String error_message = "FastRoughFilter::SerializeToString(): No FastRoughFilter data.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return {};
     }
@@ -63,7 +61,6 @@ void FastRoughFilter::DeserializeFromString(const String &str) {
     is.read(reinterpret_cast<char *>(&total_binary_bytes), sizeof(total_binary_bytes));
     if (total_binary_bytes != is.view().size()) {
         String error_message = "FastRoughFilter::DeserializeToString(): load size error";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     is.read(reinterpret_cast<char *>(&build_time_), sizeof(build_time_));
@@ -78,7 +75,6 @@ void FastRoughFilter::DeserializeFromString(const String &str) {
     // check position
     if (!is or u32(is.tellg()) != is.view().size()) {
         String error_message = "FastRoughFilter::DeserializeToString(): load size error";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     FinishBuildMinMaxFilterTask();
@@ -100,7 +96,6 @@ void FastRoughFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
 bool FastRoughFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
     if (HaveMinMaxFilter()) [[unlikely]] {
         String error_message = "FastRoughFilter::LoadFromJsonFile(): Already have data.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): try to load filter data from json.");
@@ -139,7 +134,6 @@ bool FastRoughFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
         // LOG_TRACE("FastRoughFilter::LoadFromJsonFile(): successfully load FastRoughFilter data from json.");
     } else {
         String error_message = "FastRoughFilter::LoadFromJsonFile(): partially failed to load FastRoughFilter data from json.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return load_success;

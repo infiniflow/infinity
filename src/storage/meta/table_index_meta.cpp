@@ -83,7 +83,6 @@ TableIndexMeta::CreateEntryReplay(std::function<SharedPtr<TableIndexEntry>(Table
                                          txn_id,
                                          begin_ts);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return entry;
@@ -92,7 +91,6 @@ TableIndexMeta::CreateEntryReplay(std::function<SharedPtr<TableIndexEntry>(Table
 void TableIndexMeta::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts) {
     auto [entry, status] = index_entry_list_.GetEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     entry->UpdateEntryReplay(txn_id, begin_ts, commit_ts);
@@ -106,7 +104,6 @@ void TableIndexMeta::DropEntryReplay(std::function<SharedPtr<TableIndexEntry>(Ta
                                           txn_id,
                                           begin_ts);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 }
@@ -114,7 +111,6 @@ void TableIndexMeta::DropEntryReplay(std::function<SharedPtr<TableIndexEntry>(Ta
 TableIndexEntry *TableIndexMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [entry, status] = index_entry_list_.GetEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return entry;
@@ -159,7 +155,6 @@ TableIndexMeta::GetTableIndexInfo(std::shared_lock<std::shared_mutex> &&r_lock, 
 
 SharedPtr<String> TableIndexMeta::ToString() {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return nullptr;
 }
@@ -176,7 +171,6 @@ nlohmann::json TableIndexMeta::Serialize(TxnTimeStamp max_commit_ts) {
         for (const auto &base_entry : this->index_entry_list()) {
             if (base_entry->entry_type_ != EntryType::kTableIndex) {
                 String error_message = "Unexpected entry type during serialize table index meta";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             if (base_entry->commit_ts_ <= max_commit_ts) {

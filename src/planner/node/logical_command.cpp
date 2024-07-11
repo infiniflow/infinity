@@ -94,7 +94,6 @@ String LogicalCommand::ToString(i64 &space) const {
                 }
                 case SetVarType::kInvalid: {
                     String error_message = "Invalid variable type.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -107,7 +106,6 @@ String LogicalCommand::ToString(i64 &space) const {
         }
         case CommandType::kInvalid: {
             String error_message = "Invalid command type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

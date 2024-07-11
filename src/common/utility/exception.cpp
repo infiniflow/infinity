@@ -45,6 +45,7 @@ void PrintStacktrace(const String &err_msg) {
 
 void RecoverableError(Status status, const char *file_name, u32 line) {
     status.AppendMessage(fmt::format("@{}:{}", infinity::TrimPath(file_name), line));
+    LOG_ERROR(status.message());
     throw RecoverableException(status);
 }
 
@@ -54,16 +55,19 @@ std::string_view GetErrorMsg(const String &message) {
 }
 
 void UnrecoverableError(const String &message, const char *file_name, u32 line) {
+    PrintStacktrace(message);
     throw UnrecoverableException(fmt::format("{}@{}:{}", message, infinity::TrimPath(file_name), line));
 }
 
 #else
 
 void RecoverableError(Status status) {
+    LOG_ERROR(status.message());
     throw RecoverableException(status);
 }
 
 void UnrecoverableError(const String &message) {
+    LOG_CRITICAL(message);
     throw UnrecoverableException(message);
 }
 

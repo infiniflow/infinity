@@ -156,7 +156,6 @@ String PhysicalOperatorToString(PhysicalOperatorType type) {
     }
 
     Status status = Status::NotSupport("Unknown physical operator type");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 } // namespace infinity

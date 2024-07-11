@@ -39,20 +39,17 @@ IndexBMP::Make(SharedPtr<String> index_name, const String &file_name, Vector<Str
             block_size = std::stoi(para->param_value_);
             if (block_size <= 0 || block_size > std::numeric_limits<u8>::max() + 1) {
                 Status status = Status::InvalidIndexParam("Block size");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
         } else if (para->param_name_ == "compress_type") {
             compress_type = BMPCompressTypeFromString(para->param_value_);
         } else {
             Status status = Status::InvalidIndexParam(para->param_name_);
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
     if (compress_type == BMPCompressType::kInvalid) {
         Status status = Status::InvalidIndexParam("Compress type");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     return MakeShared<IndexBMP>(index_name, file_name, column_names, block_size, compress_type);
@@ -64,7 +61,6 @@ void IndexBMP::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_
     SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         Status status = Status::ColumnNotExist(column_name);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     bool error_type = false;
@@ -83,7 +79,6 @@ void IndexBMP::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_
     if (error_type) {
         Status status = Status::InvalidIndexDefinition(
             fmt::format("Attempt to create BMP index on column: {}, data type: {}.", column_name, data_type->ToString()));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 }

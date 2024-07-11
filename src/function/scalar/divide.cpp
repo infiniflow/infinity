@@ -64,7 +64,6 @@ inline bool DivFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 template <>
 inline bool DivFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     Status status = Status::NotSupport("Not implement huge int divide operator.");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return false;
 }
@@ -72,7 +71,6 @@ inline bool DivFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
 template <>
 inline bool DivFunction::Run(HugeIntT, HugeIntT, DoubleT &) {
     Status status = Status::NotSupport("Not implement huge int divide operator.");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return false;
 }

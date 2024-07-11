@@ -55,7 +55,6 @@ bool BlockMaxTermDocIterator::InitPostingIterator(SharedPtr<Vector<SegmentPostin
     }
 
     String error_message = "Unexpected case: Init PostingIterator failed";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }

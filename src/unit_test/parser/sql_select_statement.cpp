@@ -1489,7 +1489,6 @@ TEST_F(SelectStatementParsingTest, good_search_test) {
                 // no-op
             } else {
                 String error_message = "bit value should be 0 or 1";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }

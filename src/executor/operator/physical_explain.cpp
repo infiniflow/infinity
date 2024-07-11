@@ -56,7 +56,6 @@ void PhysicalExplain::Init() {
         case ExplainType::kAnalyze: {
             output_names_->emplace_back("Query Analyze");
             Status status = Status::NotSupport("Not implement: Query analyze");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         case ExplainType::kAst: {
@@ -86,7 +85,6 @@ void PhysicalExplain::Init() {
         }
         case ExplainType::kInvalid: {
             String error_message = "Invalid explain type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -108,7 +106,6 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
     switch (explain_type_) {
         case ExplainType::kAnalyze: {
             Status status = Status::NotSupport("Not implement: Query analyze");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         case ExplainType::kAst: {
@@ -137,7 +134,6 @@ bool PhysicalExplain::Execute(QueryContext *, OperatorState *operator_state) {
         }
         case ExplainType::kInvalid: {
             String error_message = "Invalid explain type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

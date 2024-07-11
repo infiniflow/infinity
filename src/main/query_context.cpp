@@ -97,7 +97,6 @@ QueryResult QueryContext::Query(const String &query) {
 
     if (parsed_result->statements_ptr_->size() != 1) {
         String error_message = "Only support single statement.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     StopProfile(QueryPhase::kParser);
@@ -107,7 +106,6 @@ QueryResult QueryContext::Query(const String &query) {
     }
 
     String error_message = "Not reachable";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return QueryResult::UnusedResult();
 }
@@ -159,7 +157,6 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         auto status = logical_planner_->Build(statement, bind_context);
         // FIXME
         if (!status.ok()) {
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
 
@@ -261,7 +258,6 @@ bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &st
         SharedPtr<BindContext> bind_context;
         auto status = logical_planner_->Build(statement, bind_context);
         if (!status.ok()) {
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();

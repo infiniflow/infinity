@@ -43,14 +43,12 @@ public:
         switch (input->vector_type()) {
             case ColumnVectorType::kInvalid: {
                 String error_message = "Invalid column vector type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 break;
             }
             case ColumnVectorType::kFlat: {
                 if (result->vector_type() != ColumnVectorType::kFlat) {
                     String error_message = "Target vector type isn't flat.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     break;
                 }
@@ -72,7 +70,6 @@ public:
             case ColumnVectorType::kConstant: {
                 if (count != 1) {
                     String error_message = "Attempting to execute more than one row of the constant column vector.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
                 if (nullable) {
@@ -86,13 +83,11 @@ public:
             }
             case ColumnVectorType::kHeterogeneous: {
                 String error_message = "Heterogeneous embedding is not implemented yet.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
             }
             case ColumnVectorType::kCompactBit: {
                 String error_message = "Compact Bit embedding is not implemented yet.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 // return ExecuteHeterogeneous<InputElemType, OutputElemType, Operator>(input, result, count, state_ptr, nullable);
             }

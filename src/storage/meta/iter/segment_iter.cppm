@@ -54,7 +54,6 @@ public:
         auto *block_entry = block_entry_iter_.Next();
         if (block_entry->block_id() != 0) {
             String error_message = "First block id is not 0";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (block_entry == nullptr) {
@@ -81,7 +80,6 @@ public:
         }
         if (block_entry->block_id() != block_idx_) {
             String error_message = "Block id is not continuous";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         block_iter_ = BlockIter<CheckTS>(block_entry, buffer_mgr_, column_ids_, iterate_ts_);

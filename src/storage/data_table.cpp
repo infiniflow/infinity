@@ -35,7 +35,6 @@ static String TableTypeToString(TableType type) {
     switch (type) {
         case TableType::kInvalid: {
             String error_message = "Unexpected table type: Invalid";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -55,7 +54,6 @@ static String TableTypeToString(TableType type) {
             return "CrossProduct";
     }
     String error_message = "Unexpected error.";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 
     return "";
@@ -88,12 +86,10 @@ SharedPtr<Vector<RowID>> DataTable::GetRowIDVector() const {
 void DataTable::UnionWith(const SharedPtr<DataTable> &other) {
     if (this->row_count_ != other->row_count_) {
         String error_message = fmt::format("Can't union two table with different row count {}:{}.", this->row_count_, other->row_count_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (this->data_blocks_.size() != other->data_blocks_.size()) {
         String error_message = fmt::format("Can't union two table with different block count {}:{}.", this->data_blocks_.size(), other->data_blocks_.size());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     SizeT block_count = this->data_blocks_.size();

@@ -68,7 +68,6 @@ void DBMeta::CreateEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, T
                                TxnTimeStamp begin_ts) {
     auto [entry, status] = db_entry_list_.AddEntryReplay(std::move(init_entry), txn_id, begin_ts);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 }
@@ -78,7 +77,6 @@ void DBMeta::DropEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, Txn
                              TxnTimeStamp begin_ts) {
     auto [dropped_entry, status] = db_entry_list_.DropEntryReplay(std::move(init_entry), txn_id, begin_ts);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 }
@@ -86,7 +84,6 @@ void DBMeta::DropEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, Txn
 DBEntry *DBMeta::GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto [entry, status] = db_entry_list_.GetEntryReplay(txn_id, begin_ts);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     return entry;

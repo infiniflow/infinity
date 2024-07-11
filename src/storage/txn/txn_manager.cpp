@@ -49,7 +49,6 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "TxnManager is not running, cannot create txn";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -151,12 +150,10 @@ void TxnManager::SendToWAL(Txn *txn) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "TxnManager is not running, cannot put wal entry";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (wal_mgr_ == nullptr) {
         String error_message = "TxnManager is null";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -166,14 +163,12 @@ void TxnManager::SendToWAL(Txn *txn) {
     std::lock_guard guard(locker_);
     if (wait_conflict_ck_.empty()) {
         String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
-        LOG_ERROR(error_message);
         UnrecoverableError(error_message);
     }
     if (wait_conflict_ck_.begin()->first > commit_ts) {
         String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
                                            wait_conflict_ck_.begin()->first,
                                            txn->CommitTS());
-        LOG_ERROR(error_message);
         UnrecoverableError(error_message);
     }
     if (wal_entry) {
@@ -195,7 +190,6 @@ void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "TxnManager is not running, cannot add delta entry";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     i64 wal_size = wal_mgr_->WalSize();
@@ -300,7 +294,6 @@ void TxnManager::FinishTxn(Txn *txn) {
 
     if (txn->GetTxnType() == TxnType::kInvalid) {
         String error_message = "Txn type is invalid";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     } else if (txn->GetTxnType() == TxnType::kRead) {
         txn_map_.erase(txn->TxnID());
@@ -316,7 +309,6 @@ void TxnManager::FinishTxn(Txn *txn) {
         txn->SetTxnRollbacked();
     } else {
         String error_message = fmt::format("Invalid transaction status: {}", ToString(state));
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     SizeT remove_n = finishing_txns_.erase(txn);
@@ -352,7 +344,6 @@ void TxnManager::FinishTxn(Txn *txn) {
         SizeT remove_n = txn_map_.erase(finished_txn_id);
         if (remove_n == 0) {
             String error_message = fmt::format("Txn: {} not found in txn map", finished_txn_id);
-            LOG_ERROR(error_message);
             UnrecoverableError(error_message);
         }
     }

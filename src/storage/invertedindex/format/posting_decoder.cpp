@@ -67,7 +67,6 @@ u32 PostingDecoder::DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpay
         auto tf_len = tf_list_encoder_->Decode((u32 *)tf_list_buf, len, *posting_list_reader_);
         if (doc_len != tf_len) {
             String error_message = "doc/tf-list collapsed";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -76,7 +75,6 @@ u32 PostingDecoder::DecodeDocList(docid_t *doc_id_buf, tf_t *tf_list_buf, docpay
         auto payload_len = doc_payload_encoder_->Decode(doc_payload_buf, len, *posting_list_reader_);
         if (payload_len != doc_len) {
             String error_message = "doc/docpayload-list collapsed";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

@@ -162,7 +162,6 @@ void Txn::CheckTxnStatus() {
     TxnState txn_state = txn_context_.GetTxnState();
     if (txn_state != TxnState::kStarted) {
         String error_message = "Transaction isn't started.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -173,7 +172,6 @@ void Txn::CheckTxn(const String &db_name) {
         db_name_ = db_name;
     } else if (!IsEqual(db_name_, db_name)) {
         UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Attempt to get table from another database {}", db_name));
-        LOG_ERROR(*err_msg);
         RecoverableError(Status::InvalidIdentifierName(db_name));
     }
 }
@@ -525,7 +523,6 @@ void Txn::Rollback() {
         abort_ts = txn_context_.GetCommitTS();
     } else {
         String error_message = fmt::format("Transaction {} state is {}.", txn_id_, ToString(state));
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     txn_context_.SetTxnRollbacking(abort_ts);

@@ -41,13 +41,11 @@ SizeT WriteBuffer::WriteTo(char *to, SizeT n) {
 
 void WriteBuffer::Write(const char *from, SizeT n) {
     String error_message = "Cannot write to finalized buffer";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     SizeT bytes_copied = 0;
 
     if (working_buffer_.Empty()) {
         String error_message = "working_buffer empty";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 

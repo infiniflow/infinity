@@ -62,7 +62,6 @@ public:
     T &Get() {
         if (type_ != T::TYPE) {
             String error_message = "ExtraValueInfo type mismatch";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         return (T &)*this;
@@ -302,7 +301,6 @@ public:
     template <class T>
     T GetValue() const {
         String error_message = "Not implemented value getter.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return T();
     }

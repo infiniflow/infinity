@@ -60,7 +60,6 @@ bool PhysicalExport::Execute(QueryContext *query_context, OperatorState *operato
         }
         default: {
             String error_message = "Not supported file type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -170,7 +169,6 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                         column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(buffer_manager));
                         if(column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
-                            LOG_CRITICAL(error_message);
                             UnrecoverableError(error_message);
                         }
                     }
@@ -293,7 +291,6 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                         column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(buffer_manager));
                         if(column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
-                            LOG_CRITICAL(error_message);
                             UnrecoverableError(error_message);
                         }
                     }
@@ -361,7 +358,6 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
     if(column_idx_array_.size() != 1) {
         String error_message = "Only one column with embedding data type can be exported as FVECS file";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -370,14 +366,12 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     DataType* data_type = column_defs[exported_column_idx]->type().get();
     if(data_type->type() != LogicalType::kEmbedding) {
         String error_message = fmt::format("Only embedding column can be exported as FVECS file, but it is {}", data_type->ToString());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     EmbeddingInfo* embedding_type_info = static_cast<EmbeddingInfo*>(data_type->type_info().get());
     if(embedding_type_info->Type() != EmbeddingDataType::kElemFloat) {
         Status status = Status::NotSupport("Only float element type embedding is supported now.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -408,7 +402,6 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
             ColumnVector exported_column_vector = block_entry->GetColumnBlockEntry(exported_column_idx)->GetColumnVector(buffer_manager);
             if(exported_column_vector.Size() != block_row_count) {
                 String error_message = "Unmatched row_count between block and block_column";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
 

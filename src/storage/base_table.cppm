@@ -39,7 +39,6 @@ inline String ToString(BaseTableType type) {
         }
         default: {
             String error_message = "Invalid base table type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

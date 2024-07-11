@@ -32,7 +32,6 @@ String KnnExpression::KnnDistanceType2Str(KnnDistanceType type) {
     switch (type) {
         case KnnDistanceType::kInvalid: {
             String error_message = "Invalid KNN distance type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case KnnDistanceType::kL2: {

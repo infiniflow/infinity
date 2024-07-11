@@ -66,7 +66,6 @@ ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<Ba
         }
         LOG_ERROR(ss.str());
         Status status = Status::FunctionNotFound(function_str);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -78,7 +77,6 @@ ScalarFunction ScalarFunctionSet::GetMostMatchFunction(const Vector<SharedPtr<Ba
             ss << functions_[index].ToString() << std::endl;
         }
         String candicates = ss.str();
-        LOG_ERROR(fmt::format("Multiple matched functions of {} Matched candidate functions: \n {}", function, candicates));
         RecoverableError(Status::MultipleFunctionMatched(function, candicates));
     }
 

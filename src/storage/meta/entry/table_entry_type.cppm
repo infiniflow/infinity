@@ -37,7 +37,6 @@ export inline String ToString(TableEntryType type) {
         }
         default: {
             String error_message = "Invalid base table type";
-            LOG_ERROR(error_message);
             UnrecoverableError(error_message);
         }
     }

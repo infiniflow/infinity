@@ -50,7 +50,6 @@ Vector<std::string_view> ChunkIndexEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
         String error_message = fmt::format("Invalid chunk index entry encode: {}", encode);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto decodes = SegmentIndexEntry::DecodeIndex(encode.substr(0, delimiter_i));

@@ -124,7 +124,6 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, c
                                                                  iter_cnt);
         if (centroid_cnt_result != subspace_centroid_num_) {
             const auto error_info = fmt::format("KMeans failed to find {} centroids for subspace", subspace_centroid_num_);
-            LOG_ERROR(error_info);
             UnrecoverableError(error_info);
         }
         {
@@ -132,7 +131,6 @@ void PQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Train(const f32 *embedding_data, c
             if (subspace_centroids_[i].size() != subspace_centroid_data_size) {
                 const auto error_info =
                     fmt::format("centroids size {} not equal to expected size {}", subspace_centroids_[i].size(), subspace_centroid_data_size);
-                LOG_ERROR(error_info);
                 UnrecoverableError(error_info);
             }
         }
@@ -364,7 +362,6 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Save(FileHandler &file_handler) {
     for (const auto &centroids_v : this->subspace_centroids_) {
         if (centroids_v.size() != subspace_centroid_data_size) {
             const auto error_info = fmt::format("centroids size {} not equal to expected size {}", centroids_v.size(), subspace_centroid_data_size);
-            LOG_ERROR(error_info);
             UnrecoverableError(error_info);
         }
         file_handler.Write(centroids_v.data(), subspace_centroid_data_size * sizeof(typename std::decay_t<decltype(centroids_v)>::value_type));
@@ -376,7 +373,6 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Save(FileHandler &file_handler) {
     if (encoded_embedding_data_size != this->next_embedding_id_) {
         const auto error_info =
             fmt::format("encoded_embedding_data size {} not equal to expected size {}", encoded_embedding_data_size, this->next_embedding_id_);
-        LOG_ERROR(error_info);
         UnrecoverableError(error_info);
     }
     file_handler.Write(&encoded_embedding_data_size, sizeof(encoded_embedding_data_size));
@@ -411,7 +407,6 @@ void OPQ<SUBSPACE_CENTROID_TAG, SUBSPACE_NUM>::Load(FileHandler &file_handler) {
     if (encoded_embedding_data_size != this->next_embedding_id_) {
         const auto error_info =
             fmt::format("encoded_embedding_data size {} not equal to expected size {}", encoded_embedding_data_size, this->next_embedding_id_);
-        LOG_ERROR(error_info);
         UnrecoverableError(error_info);
     }
     // load matrix R
@@ -436,7 +431,6 @@ UniquePtr<EMVBProductQuantizer> GetEMVBOPQT_Helper(const u32 pq_subspace_num, co
     if (pq_subspace_num < I) {
         auto error_info = fmt::format("unsupported pq subspace num: {}", pq_subspace_num);
         error_info += " Please Add instantiation of OPQ with your SUBSPACE_NUM value.";
-        LOG_ERROR(error_info);
         UnrecoverableError(error_info);
         return nullptr;
     }
@@ -451,7 +445,6 @@ UniquePtr<EMVBProductQuantizer> GetEMVBOPQT(const u32 pq_subspace_num, const u32
 UniquePtr<EMVBProductQuantizer> GetEMVBOPQ(const u32 pq_subspace_num, const u32 pq_subspace_bits, const u32 embedding_dimension) {
     if (embedding_dimension % pq_subspace_num != 0) {
         const auto error_info = fmt::format("embedding dimension {} is not a multiple of subspace number {}", embedding_dimension, pq_subspace_num);
-        LOG_ERROR(error_info);
         UnrecoverableError(error_info);
     }
     const u32 subspace_dimension = embedding_dimension / pq_subspace_num;
@@ -463,7 +456,6 @@ UniquePtr<EMVBProductQuantizer> GetEMVBOPQ(const u32 pq_subspace_num, const u32 
     }
     {
         const auto error_info = fmt::format("unsupported pq subspace bits num: {}, now support: 8, 16.", pq_subspace_bits);
-        LOG_ERROR(error_info);
         UnrecoverableError(error_info);
         return nullptr;
     }

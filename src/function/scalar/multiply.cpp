@@ -34,7 +34,6 @@ struct MulFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
         String error_message = "Not implement: MulFunction::Run";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -100,7 +99,6 @@ inline bool MulFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 template <>
 inline bool MulFunction::Run(DecimalT, DecimalT, DecimalT &) {
     String error_message = "Not implement: MulFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -109,7 +107,6 @@ inline bool MulFunction::Run(DecimalT, DecimalT, DecimalT &) {
 template <>
 inline bool MulFunction::Run(MixedT, BigIntT, MixedT &) {
     String error_message = "Not implement: MulFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -124,7 +121,6 @@ inline bool MulFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 template <>
 inline bool MulFunction::Run(MixedT, DoubleT, MixedT &) {
     String error_message = "Not implement: MulFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -139,7 +135,6 @@ inline bool MulFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 template <>
 inline bool MulFunction::Run(MixedT, MixedT, MixedT &) {
     String error_message = "Not implement: MulFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }

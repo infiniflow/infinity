@@ -27,7 +27,6 @@ namespace infinity {
 ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
         String error_message = "Attempt to allocate zero size memory.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (current_chunk_idx_ == std::numeric_limits<u64>::max()) {
@@ -48,7 +47,6 @@ ptr_t StringHeapMgr::Allocate(SizeT nbytes) {
         }
         if (chunks_[current_chunk_idx_]->current_offset_ + nbytes > current_chunk_size_) {
             String error_message = "Unexpected string chunk error";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

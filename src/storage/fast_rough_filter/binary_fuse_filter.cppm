@@ -55,7 +55,6 @@ public:
             std::lock_guard<std::mutex> lock(mutex_check_task_start_);
             if (build_time_ != UNCOMMIT_TS) {
                 String error_message = "Already have data, cannot allocate.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             build_time_ = begin_ts;
@@ -63,25 +62,21 @@ public:
         // check old data
         if (filter.Fingerprints) {
             String error_message = "Already have data, cannot allocate.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         bool alloc_ret = binary_fuse8_allocate(size, &filter);
         if (!alloc_ret) {
             String error_message = "Out of memory.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         // check data
         if (!filter.Fingerprints) {
             String error_message = "Need to allocate first.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         bool populate_ret = binary_fuse8_populate(data, size, &filter);
         if (!populate_ret) {
             String error_message = "Failed to populate data.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         // set finished_build_filter_ to true
@@ -141,7 +136,6 @@ public:
         filter.Fingerprints = (uint8_t *)malloc(filter.ArrayLength * sizeof(uint8_t));
         if (!filter.Fingerprints) {
             String error_message = "Out of memory.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return false;
         }

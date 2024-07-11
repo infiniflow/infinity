@@ -129,7 +129,6 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
             String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         ofs.write(buf.data(), ptr - buf.data());
@@ -152,7 +151,6 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
             String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         ofs.write(buf.data(), ptr - buf.data());
@@ -173,7 +171,6 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
             String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         ofs.write(buf.data(), ptr - buf.data());
@@ -194,7 +191,6 @@ void MockWalFile(const String &wal_file_path, const String &ckp_file_path, const
         auto ofs = std::ofstream(wal_file_path, std::ios::app | std::ios::binary);
         if (!ofs.is_open()) {
             String error_message = fmt::format("Failed to open wal file: {}", wal_file_path);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         ofs.write(buf.data(), ptr - buf.data());

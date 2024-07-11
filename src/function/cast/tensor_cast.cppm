@@ -87,7 +87,6 @@ void TensorTryCastToTensorImplInner(const u32 basic_embedding_dim,
             String error_message = fmt::format("Failed to cast from tensor with type {} to tensor with type {}",
                                                DataType::TypeToString<SourceValueType>(),
                                                DataType::TypeToString<TargetValueType>());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         std::tie(target.chunk_id_, target.chunk_offset_) =
@@ -146,7 +145,6 @@ void TensorTryCastToTensorImpl(const u32 basic_embedding_dim,
         }
         default: {
             String error_message = "Unreachable code";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -190,7 +188,6 @@ void TensorTryCastToTensorFun(const u32 basic_embedding_dim,
         }
         default: {
             String error_message = fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(dst_type));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -205,7 +202,6 @@ struct TensorTryCastToTensor {
                     const DataType &target_type,
                     ColumnVector *target_vector_ptr) {
         String error_message = "Unreachable case";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -227,7 +223,6 @@ bool TensorTryCastToTensor::Run<TensorT, TensorT>(const TensorT &source,
     }
     if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kTensorHeap) {
         String error_message = fmt::format("Tensor column vector should use kTensorHeap VectorBuffer.");
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     TensorTryCastToTensorFun(source_embedding_dim,

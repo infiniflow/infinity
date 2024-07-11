@@ -88,7 +88,6 @@ public:
         if (first->vector_type() == ColumnVectorType::kFlat && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kConstant) {
             String error_message = "Not support";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -96,7 +95,6 @@ public:
         if (first->vector_type() == ColumnVectorType::kFlat && second->vector_type() == ColumnVectorType::kConstant &&
             third->vector_type() == ColumnVectorType::kFlat) {
             String error_message = "Not support";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -130,7 +128,6 @@ public:
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kFlat) {
             String error_message = "Not support";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -138,7 +135,6 @@ public:
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kFlat &&
             third->vector_type() == ColumnVectorType::kConstant) {
             String error_message = "Not support";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -146,7 +142,6 @@ public:
         if (first->vector_type() == ColumnVectorType::kConstant && second->vector_type() == ColumnVectorType::kConstant &&
             third->vector_type() == ColumnVectorType::kFlat) {
             String error_message = "Not support";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 

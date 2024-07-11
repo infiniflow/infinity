@@ -97,7 +97,6 @@ public:
                 return 0;
             }
             String error_message = "Not finalized data block";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         return row_count_;

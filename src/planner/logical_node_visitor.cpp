@@ -194,7 +194,6 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             auto case_expression = static_pointer_cast<CaseExpression>(expression);
             if (!case_expression->arguments().empty()) {
                 String error_message = "Case expression shouldn't have arguments";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             for (auto &case_expr : case_expression->CaseExpr()) {
@@ -226,14 +225,12 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             auto column_expression = static_pointer_cast<ColumnExpression>(expression);
             if (!column_expression->arguments().empty()) {
                 String error_message = "Case expression shouldn't have arguments";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
 
             result = VisitReplace(column_expression);
             if (result.get() == nullptr) {
                 String error_message = "Visit column expression will always rewrite the expression";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             expression = result;
@@ -256,7 +253,6 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
 
             if (!value_expression->arguments().empty()) {
                 String error_message = "Case expression shouldn't have arguments";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
 
@@ -286,7 +282,6 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
             result = VisitReplace(subquery_expression);
             if (result.get() != nullptr) {
                 String error_message = "Visit subquery expression will always rewrite the expression";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             break;
@@ -306,7 +301,6 @@ void LogicalNodeVisitor::VisitExpression(SharedPtr<BaseExpression> &expression) 
         }
         default: {
             String error_message = fmt::format("Unexpected expression type: {}", expression->Name());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

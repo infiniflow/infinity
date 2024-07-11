@@ -65,7 +65,6 @@ TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
                 time_t now = time(nullptr);
                 if (now - start > 20) {
                     String error_message = "Timeout";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
                 // create and drop db to fill wal log
@@ -162,7 +161,6 @@ TEST_F(RecycleLogTest, recycle_wal_after_full_checkpoint) {
                 time_t now = time(nullptr);
                 if (now - start > 20) {
                     String error_message = "Timeout";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
                 // create and drop db to fill wal log

@@ -130,7 +130,6 @@ FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, TxnTimeStamp begin_
         } else {
             if (txn_mgr == nullptr) {
                 String error_message = "Txn manager is null";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             TxnState txn_state = txn_mgr->GetTxnState(entry->txn_id_);
@@ -159,7 +158,6 @@ FindResult EntryList<Entry>::FindEntry(TransactionID txn_id, TxnTimeStamp begin_
                 }
                 default: {
                     String error_message = "Invalid entry txn state";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -225,7 +223,6 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_m
                         return {nullptr, Status(ErrorCode::kDuplicateIndexName, std::move(err_msg))};
                     } else {
                         String error_message = "Unimplemented";
-                        LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                     }
                 }
@@ -239,7 +236,6 @@ Tuple<Entry *, Status> EntryList<Entry>::AddEntry(std::shared_lock<std::shared_m
         }
         default: {
             String error_message = "Invalid find result";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -274,7 +270,6 @@ Tuple<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntry(std::shared_lock<std
                         return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
                     } else {
                         String error_message = "Unimplemented";
-                        LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                     }
                 }
@@ -299,7 +294,6 @@ Tuple<SharedPtr<Entry>, Status> EntryList<Entry>::DropEntry(std::shared_lock<std
         }
         default: {
             String error_message = "Invalid find result";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -347,7 +341,6 @@ Pair<Entry *, Status> EntryList<Entry>::GetEntryInner2(Entry *entry_ptr, FindRes
                 return {nullptr, Status(ErrorCode::kIndexNotExist, std::move(err_msg))};
             } else {
                 String error_message = "Unimplemented";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -356,7 +349,6 @@ Pair<Entry *, Status> EntryList<Entry>::GetEntryInner2(Entry *entry_ptr, FindRes
         }
         default: {
             String error_message = "Invalid find result";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

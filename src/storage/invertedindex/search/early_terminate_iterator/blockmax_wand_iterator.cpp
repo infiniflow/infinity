@@ -263,7 +263,6 @@ bool BlockMaxWandIterator::Next(RowID doc_id){
     }
 
     String error_message = "Should not reach here!";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }

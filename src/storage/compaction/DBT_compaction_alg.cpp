@@ -35,7 +35,6 @@ void SegmentLayer::AddSegment(SegmentEntry *segment_entry) {
     auto [iter, insert_ok] = segments_.emplace(segment_id, segment_entry);
     if (!insert_ok) {
         String error_message = fmt::format("SegmentID conflict: {}", segment_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -45,7 +44,6 @@ void SegmentLayer::RemoveSegment(SegmentEntry *shrink_segment) {
     SizeT remove_n = segments_.erase(shrink_id);
     if (remove_n != 1) {
         String error_message = fmt::format("Segment not found in layer: {}", shrink_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -61,7 +59,6 @@ Vector<SegmentEntry *> SegmentLayer::PickCompacting(TransactionID txn_id, SizeT 
     auto [iter, insert_ok] = compacting_segments_map_.emplace(txn_id, ret); // copy here
     if (!insert_ok) {
         String error_message = fmt::format("TransactionID conflict: {}", txn_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return ret;
@@ -71,7 +68,6 @@ void SegmentLayer::CommitCompact(TransactionID txn_id) {
     SizeT remove_n = compacting_segments_map_.erase(txn_id);
     if (remove_n != 1) {
         String error_message = fmt::format("TransactionID not found in layer: {}", txn_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -84,7 +80,6 @@ void SegmentLayer::RollbackCompact(TransactionID txn_id) {
         compacting_segments_map_.erase(iter);
     } else {
         String error_message = fmt::format("TransactionID not found in layer: {}", txn_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -138,7 +133,6 @@ void DBTCompactionAlg::DeleteInSegment(SegmentID segment_id) {
     }
     if (new_layer > old_layer) {
         String error_message = "Shrink segment should has less rows than before";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     segment_layers_[old_layer].RemoveSegment(shrink_segment);
@@ -151,7 +145,6 @@ void DBTCompactionAlg::CommitCompact(TransactionID commit_txn_id) {
     std::unique_lock lock(mtx_);
     if (status_ != CompactionStatus::kRunning) {
         String error_message = fmt::format("Wrong status of compaction alg: {}", (u8)status_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -160,7 +153,6 @@ void DBTCompactionAlg::CommitCompact(TransactionID commit_txn_id) {
         txn_2_layer_.erase(iter);
     } else {
         String error_message = fmt::format("TransactionID not found in layer: {}", commit_txn_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -174,7 +166,6 @@ void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
     std::unique_lock lock(mtx_);
     if (status_ != CompactionStatus::kRunning) {
         String error_message = fmt::format("Rollback compact when compaction not running, {}", (u8)status_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -183,7 +174,6 @@ void DBTCompactionAlg::RollbackCompact(TransactionID rollback_txn_id) {
         txn_2_layer_.erase(iter);
     } else {
         String error_message = fmt::format("TransactionID not found in layer: {}", rollback_txn_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (--running_task_n_ == 0) {
@@ -196,7 +186,6 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
     std::unique_lock lock(mtx_);
     if (status_ != CompactionStatus::kDisable) {
         String error_message = fmt::format("Enable compaction when compaction not disable, {}", (u8)status_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     for (auto *segment_entry : segment_entries) {
@@ -206,7 +195,6 @@ void DBTCompactionAlg::Enable(const Vector<SegmentEntry *> &segment_entries) {
         String error_message = fmt::format("Running task is not 0 when enable compaction, table dir: {}, table_ptr: {}",
                                            *(table_entry_->TableEntryDir()),
                                            (u64)table_entry_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     status_ = CompactionStatus::kEnable;

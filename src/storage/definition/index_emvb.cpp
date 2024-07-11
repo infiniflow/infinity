@@ -43,12 +43,10 @@ void IndexEMVB::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table
     SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         Status status = Status::ColumnNotExist(column_name);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kTensor) {
         Status status =
             Status::InvalidIndexDefinition(fmt::format("Attempt to create index on column: {}, data type: {}.", column_name, data_type->ToString()));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     } else if (const auto embedding_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
                embedding_info->Type() != EmbeddingDataType::kElemFloat) {
@@ -56,7 +54,6 @@ void IndexEMVB::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table
                                                                    column_name,
                                                                    data_type->ToString(),
                                                                    embedding_info->ToString()));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 }
@@ -77,7 +74,6 @@ IndexEMVB::Make(SharedPtr<String> index_name, const String &file_name, Vector<St
             const int val = std::stoi(para->param_value_);
             if (val <= 0) {
                 Status status = Status::InvalidIndexParam("pq_subspace_num");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
             residual_pq_subspace_num = u32(val);
@@ -85,26 +81,22 @@ IndexEMVB::Make(SharedPtr<String> index_name, const String &file_name, Vector<St
             const int val = std::stoi(para->param_value_);
             if (val <= 0) {
                 Status status = Status::InvalidIndexParam("pq_subspace_bits");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
             residual_pq_subspace_bits = u32(val);
         } else {
             Status status = Status::InvalidIndexParam(para->param_name_);
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
     if (std::find(accepable_residual_pq_subspace_num.begin(), accepable_residual_pq_subspace_num.end(), residual_pq_subspace_num) ==
         accepable_residual_pq_subspace_num.end()) {
         Status status = Status::InvalidIndexParam("pq_subspace_num");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     if (std::find(accepable_residual_pq_subspace_bits.begin(), accepable_residual_pq_subspace_bits.end(), residual_pq_subspace_bits) ==
         accepable_residual_pq_subspace_bits.end()) {
         Status status = Status::InvalidIndexParam("pq_subspace_bits");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     return MakeShared<IndexEMVB>(index_name, file_name, std::move(column_names), residual_pq_subspace_num, residual_pq_subspace_bits);

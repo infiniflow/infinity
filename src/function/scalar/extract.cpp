@@ -35,7 +35,6 @@ struct ExtractYearFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
         Status status = Status::NotSupport("ExtractYear function isn't implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 };
@@ -59,7 +58,6 @@ struct ExtractMonthFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
         Status status = Status::NotSupport("ExtractMonth function isn't implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 };
@@ -83,7 +81,6 @@ struct ExtractDayFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
         Status status = Status::NotSupport("ExtractDay function isn't implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 };
@@ -107,7 +104,6 @@ struct ExtractHourFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
         Status status = Status::NotSupport("ExtractHour function isn't implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 };
@@ -131,7 +127,6 @@ struct ExtractMinuteFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
         Status status = Status::NotSupport("ExtractMinute function isn't implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 };
@@ -155,7 +150,6 @@ struct ExtractSecondFunction {
     template <typename TA, typename TB>
     static inline void Run(TA, TB &) {
         Status status = Status::NotSupport("ExtractSecond function isn't implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 };

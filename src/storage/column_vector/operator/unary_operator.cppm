@@ -43,18 +43,15 @@ public:
         switch (input->vector_type()) {
             case ColumnVectorType::kInvalid: {
                 String error_message = "Invalid column vector type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             case ColumnVectorType::kCompactBit: {
                 if (result->vector_type() != ColumnVectorType::kCompactBit) {
                     String error_message = "Target vector type isn't kCompactBit.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
                 if constexpr (!std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || !std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
                     String error_message = "kCompactBit should match with BooleanT.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
                 if (nullable && !(input_null->IsAllTrue())) {
@@ -69,12 +66,10 @@ public:
             case ColumnVectorType::kFlat: {
                 if (result->vector_type() != ColumnVectorType::kFlat) {
                     String error_message = "Target vector type isn't flat.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
                 if constexpr (std::is_same_v<std::remove_cv_t<InputType>, BooleanT> || std::is_same_v<std::remove_cv_t<ResultType>, BooleanT>) {
                     String error_message = "BooleanT type should not be kFlat.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
                 if (nullable) {
@@ -90,7 +85,6 @@ public:
             case ColumnVectorType::kConstant: {
                 if (count != 1) {
                     String error_message = "Attempting to execute more than one row of the constant column vector.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
                 if (nullable && !(input_null->IsAllTrue())) {
@@ -117,7 +111,6 @@ public:
             }
         }
         String error_message = "Unexpected error.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 

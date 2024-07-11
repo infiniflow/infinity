@@ -48,7 +48,6 @@ Vector<std::string_view> TableIndexEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
         String error_message = fmt::format("Invalid table index entry encode: {}", encode);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto decodes = TableEntry::DecodeIndex(encode.substr(0, delimiter_i));
@@ -101,7 +100,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     // Get column info
     if (index_base->column_names_.size() != 1) {
         Status status = Status::SyntaxError("Currently, composite index doesn't supported.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     return table_index_entry;
@@ -329,7 +327,6 @@ Status TableIndexEntry::CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID
     if (this->index_base_->column_names_.size() != 1) {
         // TODO
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     auto &index_index = table_ref->index_index_;

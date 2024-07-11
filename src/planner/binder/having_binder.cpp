@@ -71,7 +71,6 @@ SharedPtr<BaseExpression> HavingBinder::BuildExpression(const ParsedExpr &expr, 
         } else {
             // in an aggregate function, which means aggregate function nested, which is error.
             Status status = Status::SyntaxError("Aggregate function is called in another aggregate function.");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
@@ -107,7 +106,6 @@ SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, 
     if (function_set_ptr->type_ == FunctionType::kAggregate) {
         if (this->binding_agg_func_) {
             Status status = Status::SyntaxError("Aggregate function is called in another aggregate function.");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         } else {
             this->binding_agg_func_ = true;
@@ -140,7 +138,6 @@ SharedPtr<BaseExpression> HavingBinder::BuildFuncExpr(const FunctionExpr &expr, 
 
 SharedPtr<BaseExpression> HavingBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64, bool) {
     Status status = Status::SyntaxError("KNN expression isn't supported in having clause");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return nullptr;
 }

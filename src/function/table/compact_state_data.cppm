@@ -56,7 +56,6 @@ public:
             );
         if (iter == block_vec.begin()) {
             String error_message = "RowID not found";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         --iter;

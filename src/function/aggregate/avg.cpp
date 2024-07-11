@@ -36,31 +36,26 @@ struct AvgState {
 public:
     inline void Initialize() {
         Status status = Status::NotSupport("Initialize average state.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline void Update(const ValueType *__restrict, SizeT) {
         Status status = Status::NotSupport("Update average state.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
         Status status = Status::NotSupport("Constant update average state.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline ptr_t Finalize() {
         Status status = Status::NotSupport("Finalize average state.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline static SizeT Size(const DataType &data_type) {
         Status status = Status::NotSupport(fmt::format("Average state type size: {}", data_type.ToString()));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 };
@@ -80,7 +75,6 @@ public:
     inline void Update(const TinyIntT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
             String error_message = fmt::format("Data count exceeds: {}", count_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         this->count_++;
@@ -115,7 +109,6 @@ public:
     inline void Update(const SmallIntT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
             String error_message = fmt::format("Data count exceeds: {}", count_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         this->count_++;
@@ -151,7 +144,6 @@ public:
     inline void Update(const IntegerT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
             String error_message = fmt::format("Data count exceeds: {}", count_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         this->count_++;
@@ -187,7 +179,6 @@ public:
     inline void Update(const BigIntT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
             String error_message = fmt::format("Data count exceeds: {}", count_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         this->count_++;
@@ -223,7 +214,6 @@ public:
     inline void Update(const FloatT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
             String error_message = fmt::format("Data count exceeds: {}", count_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         this->count_++;
@@ -259,7 +249,6 @@ public:
     inline void Update(const DoubleT *__restrict input, SizeT idx) {
         if (count_ == std::numeric_limits<i64>::max()) {
             String error_message = fmt::format("Data count exceeds: {}", count_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         this->count_++;

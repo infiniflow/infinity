@@ -126,7 +126,6 @@ private:
 SharedPtr<SecondaryIndexInMem> SecondaryIndexInMem::NewSecondaryIndexInMem(const SharedPtr<ColumnDef> &column_def, RowID begin_row_id, u32 max_size) {
     if (!column_def->type()->CanBuildSecondaryIndex()) {
         String error_message = "Column type can't build secondary index";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     switch (column_def->type()->type()) {

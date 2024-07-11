@@ -34,7 +34,6 @@ struct AddFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 };
@@ -79,7 +78,6 @@ inline bool AddFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 template <>
 inline bool AddFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return false;
 }
@@ -108,7 +106,6 @@ inline bool AddFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 template <>
 inline bool AddFunction::Run(DecimalT, DecimalT, DecimalT &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return false;
 }
@@ -165,7 +162,6 @@ inline bool AddFunction::Run(IntervalT left, TimestampT right, TimestampT &resul
 template <>
 inline bool AddFunction::Run(MixedT, BigIntT, MixedT &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return false;
 }
@@ -180,7 +176,6 @@ inline bool AddFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 template <>
 inline bool AddFunction::Run(MixedT, DoubleT, MixedT &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return false;
 }
@@ -195,7 +190,6 @@ inline bool AddFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 template <>
 inline bool AddFunction::Run(MixedT, MixedT, MixedT &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return false;
 }

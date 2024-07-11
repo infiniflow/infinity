@@ -110,7 +110,6 @@ private:
             }
             default: {
                 String error_message = "InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 // cannot decide, return true
                 return true;
@@ -132,7 +131,6 @@ private:
             }
             default: {
                 String error_message = "InnerMinMaxDataFilterDerived::MayInRange(): Unexpected compare type!";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 // cannot decide, return true
                 return true;
@@ -176,7 +174,6 @@ public:
         return std::visit(Overload{[column_id](const std::monostate &empty) -> bool {
 
                                        String error_message = fmt::format("No InnerMinMaxDataFilter for column_id: {}", column_id);
-                                       LOG_CRITICAL(error_message);
                                        UnrecoverableError(error_message);
 
                                        // Should always have minmax filter for sealed segment
@@ -196,7 +193,6 @@ public:
             CreateInnerMinMaxDataFilter<OriginalValueType>(filter, std::forward<MinMaxInnerValT>(min), std::forward<MinMaxInnerValT>(max));
         } else {
             String error_message = fmt::format("In MinMaxDataFilter::Build(), InnerMinMaxDataFilter already exist for column_id: {}", column_id);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

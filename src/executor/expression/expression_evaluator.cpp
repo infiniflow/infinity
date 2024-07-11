@@ -61,7 +61,6 @@ void ExpressionEvaluator::Execute(const SharedPtr<BaseExpression> &expr, SharedP
             return Execute(std::static_pointer_cast<InExpression>(expr), state, output_column);
         default: {
             String error_message = fmt::format("Unknown expression type: {}", expr->Name());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -72,7 +71,6 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
                                   SharedPtr<ColumnVector> &output_column_vector) {
     if (in_aggregate_) {
         Status status = Status::RecursiveAggregate(expr->ToString());
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     in_aggregate_ = true;
@@ -86,7 +84,6 @@ void ExpressionEvaluator::Execute(const SharedPtr<AggregateExpression> &expr,
 
     if (expr->aggregate_function_.return_type_ != *output_column_vector->data_type()) {
         Status status = Status::DataTypeMismatch(expr->aggregate_function_.return_type_.ToString(), output_column_vector->data_type()->ToString());
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -137,13 +134,11 @@ void ExpressionEvaluator::Execute(const SharedPtr<CastExpression> &expr,
 
 void ExpressionEvaluator::Execute(const SharedPtr<CaseExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
     String error_message = "Case execution";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
 void ExpressionEvaluator::Execute(const SharedPtr<ColumnExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
     String error_message = "Column expression";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
@@ -185,12 +180,10 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
 
     if (input_data_block_ == nullptr) {
         String error_message = "Input data block is NULL";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (column_index >= input_data_block_->column_count()) {
         String error_message = "Invalid column index";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -199,7 +192,6 @@ void ExpressionEvaluator::Execute(const SharedPtr<ReferenceExpression> &expr,
 
 void ExpressionEvaluator::Execute(const SharedPtr<InExpression> &, SharedPtr<ExpressionState> &, SharedPtr<ColumnVector> &) {
     Status status = Status::NotSupport("IN execution isn't implemented yet.");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 

@@ -142,7 +142,6 @@ public:
     [[nodiscard]] inline auto SearchPGM(const void *val_ptr) const {
         if (!pgm_index_) {
             String error_message = "Not initialized yet.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         return pgm_index_->SearchIndex(val_ptr);

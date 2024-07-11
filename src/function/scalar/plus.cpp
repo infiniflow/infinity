@@ -34,7 +34,6 @@ struct PlusFunction {
     template <typename TA, typename TB>
     static inline bool Run(TA, TB &) {
         String error_message = "Not implement: PlusFunction::Run";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }

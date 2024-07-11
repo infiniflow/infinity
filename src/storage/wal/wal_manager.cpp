@@ -99,7 +99,6 @@ void WalManager::Start() {
     ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
     if (!ofs_.is_open()) {
         String error_message = fmt::format("Failed to open wal file: {}", wal_path_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     LOG_INFO(fmt::format("Open wal file: {}", wal_path_));
@@ -199,7 +198,6 @@ void WalManager::Flush() {
             i32 act_size = ptr - buf.data();
             if (exp_size != act_size) {
                 String error_message = fmt::format("WalManager::Flush WalEntry estimated size {} differ with the actual one {}", exp_size, act_size);
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             ofs_.write(buf.data(), ptr - buf.data());
@@ -306,13 +304,11 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
         if (last_full_ckp_ts != UNCOMMIT_TS && last_full_ckp_ts >= max_commit_ts) {
             String error_message =
                 fmt::format("WalManager::UpdateLastFullMaxCommitTS last_full_ckp_ts {} >= max_commit_ts {}", last_full_ckp_ts, max_commit_ts);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (last_ckp_ts != UNCOMMIT_TS && last_ckp_ts > max_commit_ts) {
             String error_message =
                 fmt::format("WalManager::UpdateLastFullMaxCommitTS last_ckp_ts {} >= max_commit_ts {}", last_ckp_ts, max_commit_ts);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     } else {
@@ -322,7 +318,6 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn, TxnTimeStamp
         }
         if (last_ckp_ts >= max_commit_ts) {
             String error_message = fmt::format("WalManager::UpdateLastMaxCommitTS last_ckp_ts {} >= max_commit_ts {}", last_ckp_ts, max_commit_ts);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -379,7 +374,6 @@ void WalManager::SwapWalFile(const TxnTimeStamp max_commit_ts) {
     ofs_ = std::ofstream(wal_path_, std::ios::app | std::ios::binary);
     if (!ofs_.is_open()) {
         String error_message = fmt::format("Failed to open wal file: {}", wal_path_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     LOG_INFO(fmt::format("Open new wal file {}", wal_path_));
@@ -469,7 +463,6 @@ i64 WalManager::ReplayWalFile() {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
                 String error_message = "Found unexpected bad wal entry";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             LOG_TRACE(wal_entry->ToString());
@@ -492,7 +485,6 @@ i64 WalManager::ReplayWalFile() {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
                 String error_message = "Found unexpected bad wal entry";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 // TODO: clean the wal entries, disk break will reach this place.
                 // replay_entries.clear();
@@ -511,14 +503,12 @@ i64 WalManager::ReplayWalFile() {
     if (system_start_ts == 0) {
         // once wal is not empty, a checkpoint should always be found.
         String error_message = "No checkpoint found in wal";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
     auto catalog_fileinfo = CatalogFile::ParseValidCheckpointFilenames(catalog_dir, max_commit_ts);
     if (!catalog_fileinfo.has_value()) {
         String error_message = fmt::format("Wal Replay: Parse catalog file failed, catalog_dir: {}", catalog_dir);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto &[full_catalog_fileinfo, delta_catalog_fileinfos] = catalog_fileinfo.value();
@@ -534,7 +524,6 @@ i64 WalManager::ReplayWalFile() {
             String error_message = fmt::format("Wal Replay: Commit ts should be greater than max commit ts, commit_ts: {}, max_commit: {}",
                                                replay_entries[replay_count]->commit_ts_,
                                                max_commit_ts);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         system_start_ts = replay_entries[replay_count]->commit_ts_;
@@ -579,7 +568,6 @@ Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::Ge
 
     if (wal_list.empty()) {
         String error_message = "No WAL file found";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return None;
     }
@@ -593,7 +581,6 @@ Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::Ge
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
                 String error_message = "Found unexpected bad wal entry";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             LOG_TRACE(wal_entry->ToString());
@@ -613,7 +600,6 @@ Optional<Pair<FullCatalogFileInfo, Vector<DeltaCatalogFileInfo>>> WalManager::Ge
     if (system_start_ts == 0) {
         // once wal is not empty, a checkpoint should always be found.
         String error_message = "No checkpoint found in wal";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     LOG_INFO(fmt::format("Checkpoint found, replay the catalog"));
@@ -646,7 +632,6 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
 
     if (wal_list.empty()) {
         String error_message = "No WAL file found";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -662,7 +647,6 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
                 String error_message = "Found unexpected bad wal entry";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
 
@@ -680,7 +664,6 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
         if (system_start_ts == 0) {
             // once wal is not empty, a checkpoint should always be found.
             String error_message = "No checkpoint found in WAL";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -690,7 +673,6 @@ Vector<SharedPtr<WalEntry>> WalManager::CollectWalEntries() const {
             auto wal_entry = iterator.Next();
             if (wal_entry.get() == nullptr) {
                 String error_message = "Found unexpected bad wal entry";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
 
@@ -730,7 +712,6 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
             }
             case WalCommandType::ALTER_INFO: {
                 Status status = Status::NotSupport("WalCmdAlterInfo Replay Not implemented");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
                 break;
             }
@@ -780,7 +761,6 @@ void WalManager::ReplayWalEntry(const WalEntry &entry) {
             }
             default: {
                 String error_message = "WalManager::ReplayWalEntry unknown wal command type";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -953,7 +933,6 @@ void WalManager::WalCmdImportReplay(const WalCmdImport &cmd, TransactionID txn_i
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -965,7 +944,6 @@ void WalManager::WalCmdDeleteReplay(const WalCmdDelete &cmd, TransactionID txn_i
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -980,7 +958,6 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -993,12 +970,10 @@ void WalManager::WalCmdCompactReplay(const WalCmdCompact &cmd, TransactionID txn
         auto segment_entry = table_entry->GetSegmentByID(segment_id, commit_ts);
         if (!segment_entry->TrySetCompacting(nullptr)) { // fake set because check
             String error_message = "Assert: Replay segment should be compactable.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!segment_entry->SetNoDelete()) {
             String error_message = "Assert: Replay segment should be compactable.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         segment_entry->SetDeprecated(commit_ts);
@@ -1009,7 +984,6 @@ void WalManager::WalCmdOptimizeReplay(WalCmdOptimize &cmd, TransactionID txn_id,
     auto [table_index_entry, status] = storage_->catalog()->GetIndexByName(cmd.db_name_, cmd.table_name_, cmd.index_name_, txn_id, commit_ts);
     if (!status.ok()) {
         String error_message = fmt::format("Wal Replay: Get index failed {}", status.message());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
@@ -1025,7 +999,6 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
     auto *buffer_mgr = storage_->buffer_manager();
     if (!status.ok()) {
         String error_message = fmt::format("Wal Replay: Get index failed {}", status.message());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     SegmentIndexEntry *segment_index_entry = nullptr;
@@ -1060,7 +1033,6 @@ void WalManager::WalCmdAppendReplay(const WalCmdAppend &cmd, TransactionID txn_i
     auto [table_entry, table_status] = storage_->catalog()->GetTableByName(cmd.db_name_, cmd.table_name_, txn_id, commit_ts);
     if (!table_status.ok()) {
         String error_message = fmt::format("Wal Replay: Get table failed {}", table_status.message());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 

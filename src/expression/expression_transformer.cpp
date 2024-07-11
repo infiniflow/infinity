@@ -147,7 +147,6 @@ void VisitExpression(const SharedPtr<BaseExpression> &expression, const std::fun
             break;
         default: {
             String error_message = fmt::format("Unsupported expression type: {}", expression->Name());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

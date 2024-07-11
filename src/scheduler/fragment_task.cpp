@@ -167,7 +167,6 @@ bool FragmentTask::CompleteTask() {
         status_ = FragmentTaskStatus::kFinished;
     } else {
         String error_message = "Status should be an error status";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     FragmentContext *fragment_context = (FragmentContext *)fragment_context_;

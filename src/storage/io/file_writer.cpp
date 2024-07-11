@@ -29,7 +29,6 @@ FileWriter::FileWriter(FileSystem &fs, const String &path, SizeT buffer_size, u8
     // Fixme: Open file out of constructor
     auto [file_handler, status] = fs.OpenFile(path, file_flags, FileLockType::kWriteLock);
     if(!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     file_handler_ = std::move(file_handler);

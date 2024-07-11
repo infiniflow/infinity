@@ -48,7 +48,6 @@ export inline BoundCastFunc BindTimestampCast(DataType &target) {
         }
         default: {
             String error_message = fmt::format("Can't cast from Timestamp type to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -59,7 +58,6 @@ struct TimestampTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
         String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -69,7 +67,6 @@ struct TimestampTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector*) {
         String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -78,7 +75,6 @@ struct TimestampTryCastToVarlen {
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , DateT &) {
     String error_message = "Not implement: TimestampTryCastToFixlen::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -86,7 +82,6 @@ inline bool TimestampTryCastToFixlen::Run(TimestampT , DateT &) {
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , TimeT &) {
     String error_message = "Not implement: TimestampTryCastToFixlen::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -94,7 +89,6 @@ inline bool TimestampTryCastToFixlen::Run(TimestampT , TimeT &) {
 template <>
 inline bool TimestampTryCastToFixlen::Run(TimestampT , DateTimeT &) {
     String error_message = "Not implement: TimestampTryCastToFixlen::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -102,7 +96,6 @@ inline bool TimestampTryCastToFixlen::Run(TimestampT , DateTimeT &) {
 template <>
 inline bool TimestampTryCastToVarlen::Run(TimestampT , VarcharT &, ColumnVector*) {
     String error_message = "Not implement: TimestampTryCastToFixlen::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }

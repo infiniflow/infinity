@@ -61,12 +61,10 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
             return CreateState(static_pointer_cast<InExpression>(expression));
         case ExpressionType::kKnn: {
             String error_message = "Unexpected expression type: KNN";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         default: {
             String error_message = fmt::format("Unknown expression type: {}", expression->Name());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -76,7 +74,6 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<BaseExpr
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<AggregateExpression> &agg_expr, char *agg_state, const AggregateFlag agg_flag) {
     if (agg_expr->arguments().size() != 1) {
         Status status = Status::FunctionArgsError(agg_expr->ToString());
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -120,7 +117,6 @@ SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CaseExpr
 SharedPtr<ExpressionState> ExpressionState::CreateState(const SharedPtr<CastExpression> &cast_expr) {
     if (cast_expr->arguments().size() != 1) {
         Status status = Status::FunctionArgsError(cast_expr->ToString());
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
