@@ -26,6 +26,7 @@ def setup_class(request, local_infinity):
 class TestInfinity:
     @pytest.mark.parametrize("column_name", common_values.invalid_name_array)
     def test_create_table_with_invalid_column_name_python(self, column_name):
+        print("test test_create_table_with_invalid_column_name_python begin")
         self.test_infinity_obj._test_create_table_with_invalid_column_name_python(column_name)
 
     # create/drop table with different invalid options
