@@ -510,6 +510,7 @@ bool EntryList<Entry>::PickCleanup(CleanupScanner *scanner) {
         SharedPtr<Entry> &entry = *iter;
         if (entry->commit_ts_ < visible_ts) {
             if (entry->deleted_) {
+                LOG_DEBUG(fmt::format("PickCleanup entry: {}, commit_ts: {}", entry->encode(), entry->commit_ts_));
                 iter = entry_list_.erase(iter);
             } else {
                 lock.unlock();
