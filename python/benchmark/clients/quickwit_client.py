@@ -7,6 +7,7 @@ import uuid
 import logging
 import requests
 import sys
+import re
 
 from .base_client import BaseClient
 
@@ -187,18 +188,32 @@ class QuickwitClient(BaseClient):
             }
         else:
             is_phrase = False
+            is_slop_phrase = False
+            slop = 0
             query = query.lstrip()
             if query.startswith('"'):
                 is_phrase = True
-
+                match = re.search(r'~(\d+)$', query)
+                if match:
+                    is_slop_phrase = True
+                    slop = int(match.group(1))
             if is_phrase:
-                ret = {
-                    "query": {
-                        "match_phrase": {"body": query}
-                    },
-                    "sort": ["_score"],
-                    "size": self.data["topK"]
-                }
+                if is_slop_phrase:
+                    ret = {
+                        "query": {
+                            "match_phrase": {"body": {"query": query, "slop": slop}}
+                        },
+                        "sort": ["_score"],
+                        "size": self.data["topK"]
+                    }
+                else:
+                    ret = {
+                        "query": {
+                            "match_phrase": {"body": query}
+                        },
+                        "sort": ["_score"],
+                        "size": self.data["topK"]
+                    }
             else:
                 ret = {
                     "query": {
