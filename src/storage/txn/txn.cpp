@@ -525,6 +525,7 @@ void Txn::Rollback() {
 
 void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
 
+// those whose commit_ts is <= max_commit_ts will be checkpointed
 bool Txn::Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint) {
     if (is_full_checkpoint) {
         FullCheckpoint(max_commit_ts);

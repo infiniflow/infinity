@@ -79,13 +79,12 @@ export struct StopProcessorTask final : public BGTask {
 };
 
 export struct AddDeltaEntryTask final : public BGTask {
-    AddDeltaEntryTask(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size)
-        : BGTask(BGTaskType::kAddDeltaEntry, false), delta_entry_(std::move(delta_entry)), wal_size_(wal_size) {}
+    AddDeltaEntryTask(UniquePtr<CatalogDeltaEntry> delta_entry)
+        : BGTask(BGTaskType::kAddDeltaEntry, false), delta_entry_(std::move(delta_entry)) {}
 
     String ToString() const final { return fmt::format("DeltaLog: {}", delta_entry_->ToString()); }
 
     UniquePtr<CatalogDeltaEntry> delta_entry_{};
-    i64 wal_size_{};
 };
 
 export struct CheckpointTaskBase : public BGTask {

@@ -226,7 +226,7 @@ public:
 
     bool SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_path, String &delta_name);
 
-    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
+    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
@@ -305,12 +305,6 @@ public:
     void MemIndexRecover(BufferManager *buffer_manager);
 
     void PickCleanup(CleanupScanner *scanner);
-
-    // delta checkpoint info
-public:
-    Tuple<TxnTimeStamp, i64> GetCheckpointState() const;
-
-    void InitDeltaEntry(TxnTimeStamp max_commit_ts);
 
 private:
     UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};
