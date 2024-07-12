@@ -105,6 +105,8 @@ public:
     u64 cfg_wal_size_threshold_{};
     u64 cfg_delta_checkpoint_interval_wal_bytes_{};
 
+    const String &wal_dir() const { return wal_dir_; }
+
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue
     // and do serial writing.

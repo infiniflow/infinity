@@ -60,11 +60,13 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     // Record the start ts of the txn
     TxnTimeStamp ts = ++start_ts_;
     if (ckp_txn) {
-        if (ckp_begin_ts_ != 0) {
-            UnrecoverableError(fmt::format("Checkpoint txn is already started in {}", ckp_begin_ts_));
+        if (ckp_begin_ts_ != UNCOMMIT_TS) {
+            // not set ckp_begin_ts_ may not truncate the wal file.
+            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing", ckp_begin_ts_, ts));
+        } else {
+            LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", ts));
+            ckp_begin_ts_ = ts;
         }
-        LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", ts));
-        ckp_begin_ts_ = ts;
     }
 
     // Create txn instance
