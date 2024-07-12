@@ -74,26 +74,28 @@ jobs:
 
       - name: benchmark test
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "rm -fr /var/infinity && cd /infinity/ && python3 tools/run_benchmark.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "rm -fr /var/infinity && cd /infinity/ && python3 tools/run_benchmark.py" && sleep 1s
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
-          sudo docker exec infinity_build bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity > release.log 2>&1" &
 
       - name: pysdk test release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "export RUNSLOWTEST=1 && cd /infinity/ && python3 tools/run_slow_test.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "export RUNSLOWTEST=1 && cd /infinity/ && python3 tools/run_slow_test.py" && sleep 1s
 
       - name: parallel test release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec infinity_build bash -c "cd /infinity/ && python3 tools/run_parallel_test_continuous.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_parallel_test_continuous.py" && sleep 1s
 
       - name: Stop infinity release
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         run: |
-          sudo bash ${GITHUB_WORKSPACE}/scripts/timeout_kill.sh 10 $(pidof cmake-build-release/src/infinity)
+          pids=$(sudo docker exec ${BUILDER_CONTAINER} pgrep -f cmake-build-release/src/infinity | xargs echo)
+          sudo chmod +x scripts/timeout_kill.sh
+          sudo docker exec ${BUILDER_CONTAINER} bash -c "/infinity/scripts/timeout_kill.sh 10 ${pids}"
           if [ $? -ne 0 ]; then
             echo "Failed to kill infinity debug version"
             exit 1
