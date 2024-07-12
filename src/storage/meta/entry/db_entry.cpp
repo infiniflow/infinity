@@ -63,16 +63,16 @@ DBEntry::DBEntry(DBMeta *db_meta,
 
 SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
                                        bool is_delete,
-                                       const SharedPtr<String> &data_dir,
+                                       const SharedPtr<String> &base_dir,
                                        const SharedPtr<String> &db_name,
                                        TransactionID txn_id,
                                        TxnTimeStamp begin_ts) {
-    String delete_str = fmt::format("{}/", *data_dir);
-    SharedPtr<String> temp_dir = DetermineDBDir(*data_dir, *db_name);
+    String delete_str = fmt::format("{}/", *base_dir);
+    SharedPtr<String> temp_dir = DetermineDBDir(*base_dir, *db_name);
     auto pos = temp_dir->find(delete_str);
     temp_dir->erase(pos, delete_str.size());
     SharedPtr<String> db_entry_dir = is_delete ? MakeShared<String>("deleted") : temp_dir;
-    return MakeShared<DBEntry>(db_meta, is_delete, data_dir, db_entry_dir, db_name, txn_id, begin_ts);
+    return MakeShared<DBEntry>(db_meta, is_delete, base_dir, db_entry_dir, db_name, txn_id, begin_ts);
 }
 
 SharedPtr<DBEntry> DBEntry::ReplayDBEntry(DBMeta *db_meta,
@@ -307,9 +307,10 @@ void DBEntry::Cleanup() {
     }
     table_meta_map_.Cleanup();
 
-    LOG_TRACE(fmt::format("Cleaning up dir: {}", *db_entry_dir_));
-    CleanupScanner::CleanupDir(*db_entry_dir_);
-    LOG_TRACE(fmt::format("Cleaned dir: {}", *db_entry_dir_));
+    String full_db_dir = fmt::format("{}/{}", *base_dir_, *db_entry_dir_);
+    LOG_TRACE(fmt::format("Cleaning up dir: {}", full_db_dir));
+    CleanupScanner::CleanupDir(full_db_dir);
+    LOG_TRACE(fmt::format("Cleaned dir: {}", full_db_dir));
 }
 
 void DBEntry::MemIndexCommit() {

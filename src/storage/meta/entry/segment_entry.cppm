@@ -148,6 +148,7 @@ public:
 public:
     // Const getter
     const TableEntry *GetTableEntry() const { return table_entry_; }
+    SharedPtr<String> base_dir() const;
     const SharedPtr<String> &segment_dir() const { return segment_dir_; }
     SegmentID segment_id() const { return segment_id_; }
     SizeT row_capacity() const { return row_capacity_; }

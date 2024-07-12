@@ -756,8 +756,7 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
 
         ++column_id;
         {
-            const String *table_dir = table_info->table_entry_dir_.get();
-            Value value = Value::MakeVarchar(*table_dir);
+            Value value = Value::MakeVarchar(*table_info->table_full_dir_);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1792,7 +1791,8 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
 
         ++column_id;
         {
-            const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*segment_entry->segment_dir()));
+            String full_segment_dir = fmt::format("{}/{}", *segment_entry->base_dir(), *segment_entry->segment_dir());
+            const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_segment_dir));
             Value value = Value::MakeVarchar(seg_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);

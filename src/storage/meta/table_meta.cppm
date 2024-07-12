@@ -45,11 +45,11 @@ export struct TableMeta : public MetaInterface {
     friend struct Catalog;
 
 public:
-    inline explicit TableMeta(const SharedPtr<String> &data_dir,
+    inline explicit TableMeta(const SharedPtr<String> &base_dir,
                               const SharedPtr<String> &db_entry_dir,
                               const SharedPtr<String> table_name,
                               DBEntry *db_entry)
-        : data_dir_(data_dir), db_entry_dir_(db_entry_dir), table_name_(table_name), db_entry_(db_entry) {}
+        : base_dir_(base_dir), db_entry_dir_(db_entry_dir), table_name_(table_name), db_entry_(db_entry) {}
 
     static UniquePtr<TableMeta> NewTableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> &name, DBEntry *db_entry);
 
@@ -65,10 +65,8 @@ public:
     [[nodiscard]] const SharedPtr<String> &table_name_ptr() const { return table_name_; }
     [[nodiscard]] const String &table_name() const { return *table_name_; }
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const;
-    [[nodiscard]] const SharedPtr<String> &data_dir_ptr() const { return data_dir_; }
-    [[nodiscard]] const String &data_dir() const { return *data_dir_; }
-    [[nodiscard]] const SharedPtr<String> &db_entry_dir_ptr() const { return db_entry_dir_; }
-    [[nodiscard]] const String &db_entry_dir() const { return *db_entry_dir_; }
+    [[nodiscard]] const SharedPtr<String> &base_dir() const { return base_dir_; }
+    [[nodiscard]] const SharedPtr<String> &db_entry_dir() const { return db_entry_dir_; }
 
     DBEntry *db_entry() { return db_entry_; }
 
@@ -117,7 +115,7 @@ private:
 
     void Sort();
 private:
-    SharedPtr<String> data_dir_{};
+    SharedPtr<String> base_dir_{};
     SharedPtr<String> db_entry_dir_{};
     SharedPtr<String> table_name_{};
 

@@ -67,6 +67,7 @@ public:
 
 public:
     explicit TableEntry(bool is_delete,
+                        const SharedPtr<String> &base_dir,
                         const SharedPtr<String> &table_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
@@ -89,6 +90,7 @@ public:
 
     static SharedPtr<TableEntry> ReplayTableEntry(bool is_delete,
                                                   TableMeta *table_meta,
+                                                  SharedPtr<String> base_dir,
                                                   SharedPtr<String> table_entry_dir,
                                                   SharedPtr<String> table_name,
                                                   const Vector<SharedPtr<ColumnDef>> &column_defs,

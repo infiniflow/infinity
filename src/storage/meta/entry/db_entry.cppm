@@ -57,7 +57,7 @@ public:
 
     static SharedPtr<DBEntry> NewDBEntry(DBMeta *db_meta,
                                          bool is_delete,
-                                         const SharedPtr<String> &data_dir,
+                                         const SharedPtr<String> &base_dir,
                                          const SharedPtr<String> &db_name,
                                          TransactionID txn_id,
                                          TxnTimeStamp begin_ts);

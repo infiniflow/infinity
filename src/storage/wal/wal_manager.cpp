@@ -791,6 +791,7 @@ void WalManager::WalCmdCreateTableReplay(const WalCmdCreateTable &cmd, Transacti
         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
             return TableEntry::ReplayTableEntry(false,
                                                 table_meta,
+                                                table_meta->base_dir(),
                                                 table_dir,
                                                 table_name,
                                                 cmd.table_def_->columns(),
@@ -824,6 +825,7 @@ void WalManager::WalCmdDropTableReplay(const WalCmdDropTable &cmd, TransactionID
         [&](TableMeta *table_meta, const SharedPtr<String> &table_name, TransactionID txn_id, TxnTimeStamp begin_ts) {
             return TableEntry::ReplayTableEntry(true,
                                                 table_meta,
+                                                table_meta->base_dir(),
                                                 nullptr,
                                                 table_name,
                                                 Vector<SharedPtr<ColumnDef>>{},

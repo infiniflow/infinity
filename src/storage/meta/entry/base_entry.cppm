@@ -105,9 +105,7 @@ public:
 
     bool Deleted() const { return deleted_; }
 
-    const String &base_dir() const { return *base_dir_; }
-
-    SharedPtr<String> base_dir_ptr() const { return base_dir_; }
+    SharedPtr<String> base_dir() const { return base_dir_; }
 
     const String &encode() const { return *encode_; }
 

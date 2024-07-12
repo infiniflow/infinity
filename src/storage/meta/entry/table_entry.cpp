@@ -77,6 +77,7 @@ String TableEntry::EncodeIndex(const String &table_name, TableMeta *table_meta) 
 }
 
 TableEntry::TableEntry(bool is_delete,
+                       const SharedPtr<String> &base_dir,
                        const SharedPtr<String> &table_entry_dir,
                        SharedPtr<String> table_name,
                        const Vector<SharedPtr<ColumnDef>> &columns,
@@ -88,7 +89,7 @@ TableEntry::TableEntry(bool is_delete,
                        SegmentID next_segment_id)
     : BaseEntry(EntryType::kTable,
                 is_delete,
-                table_meta ? table_meta->data_dir_ptr() : MakeShared<String>(),
+                table_meta ? base_dir : MakeShared<String>(),
                 TableEntry::EncodeIndex(*table_name, table_meta)),
       table_meta_(table_meta), table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns),
       table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id) {
@@ -119,6 +120,7 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
     SharedPtr<String> temp_dir = TableEntry::DetermineTableDir(*base_dir, *db_entry_dir, *table_name);
     SharedPtr<String> table_entry_dir = is_delete ? MakeShared<String>("deleted") : temp_dir;
     return MakeShared<TableEntry>(is_delete,
+                                  std::move(base_dir),
                                   std::move(table_entry_dir),
                                   std::move(table_name),
                                   columns,
@@ -132,6 +134,7 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
 
 SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
                                                    TableMeta *table_meta,
+                                                   SharedPtr<String> base_dir,
                                                    SharedPtr<String> table_entry_dir,
                                                    SharedPtr<String> table_name,
                                                    const Vector<SharedPtr<ColumnDef>> &column_defs,
@@ -143,6 +146,7 @@ SharedPtr<TableEntry> TableEntry::ReplayTableEntry(bool is_delete,
                                                    SegmentID unsealed_id,
                                                    SegmentID next_segment_id) noexcept {
     auto table_entry = MakeShared<TableEntry>(is_delete,
+                                              std::move(base_dir),
                                               std::move(table_entry_dir),
                                               std::move(table_name),
                                               column_defs,
@@ -859,7 +863,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                     String dst_base_name = fmt::format("ft_{:016x}_{:x}", base_rowid.ToUint64(), total_row_count);
                     msg += " -> " + dst_base_name;
                     LOG_INFO(msg);
-                    Path full_path = Path(base_dir()) / *table_index_entry->index_dir_;
+                    Path full_path = Path(*base_dir()) / *table_index_entry->index_dir_;
                     ColumnIndexMerger column_index_merger(std::move(full_path), index_fulltext->flag_);
                     column_index_merger.Merge(base_names, base_rowids, dst_base_name);
 
@@ -1059,7 +1063,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     u64 row_count = 0;
     SharedPtr<String> table_entry_dir;
     if (!deleted) {
-        table_entry_dir = MakeShared<String>(fmt::format("{}/{}", *table_meta->data_dir_ptr(), table_entry_json["table_entry_dir"]));
+        table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
         for (const auto &column_def_json : table_entry_json["column_definition"]) {
             SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
             i64 column_id = column_def_json["column_id"];
@@ -1089,8 +1093,8 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     SegmentID unsealed_id = table_entry_json["unsealed_id"];
     SegmentID next_segment_id = table_entry_json["next_segment_id"];
 
-    UniquePtr<TableEntry> table_entry = MakeUnique<
-        TableEntry>(deleted, table_entry_dir, table_name, columns, table_entry_type, table_meta, txn_id, begin_ts, unsealed_id, next_segment_id);
+    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(deleted, table_meta->base_dir(), table_entry_dir, table_name, columns, table_entry_type,
+                                                               table_meta, txn_id, begin_ts, unsealed_id, next_segment_id);
     table_entry->row_count_ = row_count;
 
     if (table_entry_json.contains("segments")) {
@@ -1216,6 +1220,7 @@ void TableEntry::Cleanup() {
     }
     index_meta_map_.Cleanup();
 
+    String full_table_dir = fmt::format("{}/{}", *base_dir_, *table_entry_dir_);
     LOG_TRACE(fmt::format("Cleaning up dir: {}", *table_entry_dir_));
     CleanupScanner::CleanupDir(*table_entry_dir_);
     LOG_TRACE(fmt::format("Cleaned dir: {}", *table_entry_dir_));
