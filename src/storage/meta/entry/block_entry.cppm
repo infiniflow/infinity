@@ -131,7 +131,9 @@ public:
 
     RowID base_row_id() const { return RowID(segment_id(), segment_offset()); }
 
-    const SharedPtr<String> &base_dir() const { return block_dir_; }
+    const SharedPtr<String> &block_dir() const { return block_dir_; }
+
+    SharedPtr<String> base_dir() const { return this->base_dir_; }
 
     BlockColumnEntry *GetColumnBlockEntry(SizeT column_id) const { return columns_[column_id].get(); }
 

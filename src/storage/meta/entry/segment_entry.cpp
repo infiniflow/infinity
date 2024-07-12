@@ -508,7 +508,7 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
 SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
     std::underlying_type_t<SegmentStatus> saved_status = segment_entry_json["status"];
     SegmentStatus segment_status = static_cast<SegmentStatus>(saved_status);
-    SharedPtr<String> segment_dir = MakeShared<String>(fmt::format("{}/{}", *table_entry->TableEntryDir(), segment_entry_json["segment_dir"]));
+    SharedPtr<String> segment_dir = MakeShared<String>(segment_entry_json["segment_dir"]);
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
                                                                      segment_dir,
                                                                      segment_entry_json["segment_id"],
@@ -564,7 +564,9 @@ void SegmentEntry::Cleanup() {
     for (auto &block_entry : block_entries_) {
         block_entry->Cleanup();
     }
-    CleanupScanner::CleanupDir(*segment_dir_);
+
+    String full_segment_dir = fmt::format("{}/{}", *base_dir(), *segment_dir_);
+    CleanupScanner::CleanupDir(full_segment_dir);
 }
 
 void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}

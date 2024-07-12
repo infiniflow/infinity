@@ -92,7 +92,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                                         const u64 last_chunk_offset_0,
                                                                         const u64 last_chunk_offset_1,
                                                                         const TxnTimeStamp commit_ts) {
-    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->base_dir()));
+    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->block_dir()));
     UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, full_path);
     column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
     column_entry->column_type_ = block_entry->GetColumnType(column_id);

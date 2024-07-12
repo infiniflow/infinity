@@ -1048,6 +1048,8 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
         }
     }
 
+
+    String full_segment_index_dir = fmt::format("{}/{}", *segment_index_entry->base_dir(), *segment_index_entry->index_dir());
     {
         SizeT column_id = 0;
         {
@@ -1058,7 +1060,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(*segment_index_entry->index_dir());
+            Value value = Value::MakeVarchar(full_segment_index_dir);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -1074,7 +1076,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
         ++column_id;
         {
-            const auto &index_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*segment_index_entry->index_dir()));
+            const auto &index_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_segment_index_dir));
             Value value = Value::MakeVarchar(index_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1863,7 +1865,8 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
         ++column_id;
         {
-            const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*segment_entry->segment_dir()));
+            String full_segment_dir = fmt::format("{}/{}", *segment_entry->base_dir(), *segment_entry->segment_dir());
+            const auto &seg_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_segment_dir));
             Value value = Value::MakeVarchar(seg_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -1965,7 +1968,8 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
 
         ++column_id;
         {
-            const auto &blk_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*block_entry->base_dir()));
+            String full_block_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
+            const auto &blk_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_block_dir));
             Value value = Value::MakeVarchar(blk_size);
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
@@ -2031,16 +2035,17 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
         value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
     }
 
+    String full_block_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
     ++column_id;
     {
-        Value value = Value::MakeVarchar(*block_entry->base_dir());
+        Value value = Value::MakeVarchar(full_block_dir);
         ValueExpression value_expr(value);
         value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
     }
 
     ++column_id;
     {
-        const auto &blk_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(*block_entry->base_dir()));
+        const auto &blk_size = Utility::FormatByteSize(LocalFileSystem::GetFolderSizeByPath(full_block_dir));
         Value value = Value::MakeVarchar(blk_size);
         ValueExpression value_expr(value);
         value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);

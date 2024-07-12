@@ -92,7 +92,8 @@ QueryResult QueryContext::Query(const String &query) {
 
     if (parsed_result->IsError()) {
         StopProfile(QueryPhase::kParser);
-        UnrecoverableError(parsed_result->error_message_);
+        Status status = Status::InvalidCommand(parsed_result->error_message_);
+        RecoverableError(status);
     }
 
     if (parsed_result->statements_ptr_->size() != 1) {
