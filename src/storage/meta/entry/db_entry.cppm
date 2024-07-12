@@ -49,13 +49,6 @@ public:
 public:
     explicit DBEntry(DBMeta *db_meta,
                      bool is_delete,
-                     const SharedPtr<String> &db_entry_dir,
-                     const SharedPtr<String> &db_name,
-                     TransactionID txn_id,
-                     TxnTimeStamp begin_ts);
-
-    explicit DBEntry(DBMeta *db_meta,
-                     bool is_delete,
                      const SharedPtr<String> &base_dir,
                      const SharedPtr<String> &db_entry_dir,
                      const SharedPtr<String> &db_name,
@@ -88,6 +81,8 @@ public:
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
 
     [[nodiscard]] const SharedPtr<String> &db_entry_dir() const { return db_entry_dir_; }
+
+    SharedPtr<String> AbsoluteDir() const;
 
     String GetPathNameTail() const;
 
@@ -125,7 +120,6 @@ public:
                          TxnTimeStamp begin_ts);
 
     TableEntry *GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
-    //
 
     Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 

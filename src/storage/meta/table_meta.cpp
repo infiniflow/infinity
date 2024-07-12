@@ -37,12 +37,6 @@ import block_index;
 
 namespace infinity {
 
-UniquePtr<TableMeta> TableMeta::NewTableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> &table_name, DBEntry *db_entry) {
-    auto table_meta = MakeUnique<TableMeta>(db_entry_dir, table_name, db_entry);
-
-    return table_meta;
-}
-
 UniquePtr<TableMeta> TableMeta::NewTableMeta(const SharedPtr<String> &data_dir,
                                              const SharedPtr<String> &db_entry_dir,
                                              const SharedPtr<String> &table_name,

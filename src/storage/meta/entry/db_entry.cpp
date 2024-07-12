@@ -51,17 +51,6 @@ String DBEntry::EncodeIndex(const String &db_name) { return fmt::format("#{}", d
 
 DBEntry::DBEntry(DBMeta *db_meta,
                  bool is_delete,
-                 const SharedPtr<String> &db_entry_dir,
-                 const SharedPtr<String> &db_name,
-                 TransactionID txn_id,
-                 TxnTimeStamp begin_ts)
-    : BaseEntry(EntryType::kDatabase, is_delete, DBEntry::EncodeIndex(*db_name)), db_meta_(db_meta), db_entry_dir_(db_entry_dir), db_name_(db_name) {
-    begin_ts_ = begin_ts;
-    txn_id_ = txn_id;
-}
-
-DBEntry::DBEntry(DBMeta *db_meta,
-                 bool is_delete,
                  const SharedPtr<String> &base_dir,
                  const SharedPtr<String> &db_entry_dir,
                  const SharedPtr<String> &db_name,
@@ -99,6 +88,8 @@ SharedPtr<DBEntry> DBEntry::ReplayDBEntry(DBMeta *db_meta,
     db_entry->commit_ts_ = commit_ts;
     return db_entry;
 }
+
+SharedPtr<String> DBEntry::AbsoluteDir() const { return MakeShared<String>(fmt::format("{}/{}", *db_meta_->data_dir(), *db_entry_dir_)); }
 
 Tuple<TableEntry *, Status> DBEntry::CreateTable(TableEntryType table_entry_type,
                                                  const SharedPtr<String> &table_name,
@@ -250,8 +241,8 @@ Status DBEntry::GetTablesDetail(Txn *txn, Vector<TableDetail> &output_table_arra
 }
 
 SharedPtr<String> DBEntry::ToString() {
-    SharedPtr<String> res = MakeShared<String>(
-        fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *db_entry_dir_, txn_id_, table_meta_map_.Size()));
+    SharedPtr<String> res =
+        MakeShared<String>(fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *AbsoluteDir(), txn_id_, table_meta_map_.Size()));
     return res;
 }
 
@@ -290,19 +281,19 @@ UniquePtr<DBEntry> DBEntry::Deserialize(const nlohmann::json &db_entry_json, DBM
     if (!deleted) {
         db_entry_dir = MakeShared<String>(db_entry_json["db_entry_dir"]);
     }
-    UniquePtr<DBEntry> res = MakeUnique<DBEntry>(db_meta, deleted, db_meta->data_dir(), db_entry_dir, db_name, txn_id, begin_ts);
+    UniquePtr<DBEntry> db_entry = MakeUnique<DBEntry>(db_meta, deleted, db_meta->data_dir(), db_entry_dir, db_name, txn_id, begin_ts);
 
     u64 commit_ts = db_entry_json["commit_ts"];
-    res->commit_ts_.store(commit_ts);
+    db_entry->commit_ts_.store(commit_ts);
 
     if (db_entry_json.contains("tables")) {
         for (const auto &table_meta_json : db_entry_json["tables"]) {
-            UniquePtr<TableMeta> table_meta = TableMeta::Deserialize(table_meta_json, res.get(), buffer_mgr);
-            res->table_meta_map_.AddNewMetaNoLock(*table_meta->table_name_, std::move(table_meta));
+            UniquePtr<TableMeta> table_meta = TableMeta::Deserialize(table_meta_json, db_entry.get(), buffer_mgr);
+            db_entry->table_meta_map_.AddNewMetaNoLock(*table_meta->table_name_, std::move(table_meta));
         }
     }
 
-    return res;
+    return db_entry;
 }
 
 String DBEntry::GetPathNameTail() const {

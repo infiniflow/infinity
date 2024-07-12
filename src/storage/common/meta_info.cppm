@@ -24,6 +24,7 @@ namespace infinity {
 export struct DatabaseInfo {
     SharedPtr<String> db_name_{};
     SharedPtr<String> db_entry_dir_{};
+    SharedPtr<String> absolute_db_path_{};
     i64 table_count_{};
 };
 

@@ -45,9 +45,6 @@ export struct TableMeta : public MetaInterface {
     friend struct Catalog;
 
 public:
-    inline explicit TableMeta(const SharedPtr<String> &db_entry_dir, const SharedPtr<String> table_name, DBEntry *db_entry)
-        : db_entry_dir_(db_entry_dir), table_name_(table_name), db_entry_(db_entry) {}
-
     inline explicit TableMeta(const SharedPtr<String> &data_dir,
                               const SharedPtr<String> &db_entry_dir,
                               const SharedPtr<String> table_name,

@@ -1076,7 +1076,7 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     u64 row_count = 0;
     SharedPtr<String> table_entry_dir;
     if (!deleted) {
-        table_entry_dir = MakeShared<String>(table_entry_json["table_entry_dir"]);
+        table_entry_dir = MakeShared<String>(fmt::format("{}/{}", *table_meta->data_dir_ptr(), table_entry_json["table_entry_dir"]));
         for (const auto &column_def_json : table_entry_json["column_definition"]) {
             SharedPtr<DataType> data_type = DataType::Deserialize(column_def_json["column_type"]);
             i64 column_id = column_def_json["column_id"];
