@@ -90,7 +90,6 @@ String ToString(ShowType type) {
             return "Show catalogs";
         case ShowType::kInvalid: {
             String error_message = "Invalid chunk scan type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

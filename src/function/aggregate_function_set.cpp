@@ -62,7 +62,6 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
         }
         LOG_ERROR(ss.str());
         Status status = Status::FunctionNotFound(function_str);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -77,7 +76,6 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
         }
         LOG_ERROR(ss.str());
         Status status = Status::FunctionNotFound(function_str);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -87,7 +85,6 @@ AggregateFunction AggregateFunctionSet::GetMostMatchFunction(const SharedPtr<Bas
 i64 AggregateFunctionSet::MatchFunctionCost(const AggregateFunction &func, const SharedPtr<BaseExpression> &argument) {
     if (argument.get() == nullptr) {
         Status status = Status::AggregateFunctionWithEmptyArgs();
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 

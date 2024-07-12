@@ -53,7 +53,6 @@ void LogicalMatchTensorScan::InitExtraOptions() {
         const int top_n_option = std::stoi(top_n_it->second);
         if (top_n_option <= 0) {
             Status status = Status::SyntaxError("topn must be a positive integer");
-            LOG_ERROR(status.message());
             RecoverableError(std::move(status));
         }
         topn_ = top_n_option;
@@ -65,7 +64,6 @@ void LogicalMatchTensorScan::InitExtraOptions() {
         const auto emvb_centroid_nprobe_candidate = std::stoi(emvb_centroid_nprobe_it->second);
         if (emvb_centroid_nprobe_candidate <= 0) {
             Status status = Status::SyntaxError("emvb_centroid_nprobe must be a positive integer");
-            LOG_ERROR(status.message());
             RecoverableError(std::move(status));
         }
         index_options_->emvb_centroid_nprobe_ = emvb_centroid_nprobe_candidate;
@@ -77,14 +75,12 @@ void LogicalMatchTensorScan::InitExtraOptions() {
         const auto emvb_n_doc_to_score_candidate = std::stoi(emvb_n_doc_to_score_it->second);
         if (emvb_n_doc_to_score_candidate <= 0) {
             Status status = Status::SyntaxError("emvb_n_doc_to_score must be a positive integer");
-            LOG_ERROR(status.message());
             RecoverableError(std::move(status));
         }
         index_options_->emvb_n_doc_to_score_ = emvb_n_doc_to_score_candidate;
     }
     if (index_options_->emvb_n_doc_to_score_ < topn_) {
         Status status = Status::SyntaxError("emvb_n_doc_to_score must be at least topn");
-        LOG_ERROR(status.message());
         RecoverableError(std::move(status));
     }
     if (const auto emvb_n_doc_out_second_stage_it = options.options_.find("emvb_n_doc_out_second_stage");
@@ -92,19 +88,16 @@ void LogicalMatchTensorScan::InitExtraOptions() {
         const auto emvb_n_doc_out_second_stage_candidate = std::stoi(emvb_n_doc_out_second_stage_it->second);
         if (emvb_n_doc_out_second_stage_candidate <= 0) {
             Status status = Status::SyntaxError("emvb_n_doc_out_second_stage must be a positive integer");
-            LOG_ERROR(status.message());
             RecoverableError(std::move(status));
         }
         index_options_->emvb_n_doc_out_second_stage_ = emvb_n_doc_out_second_stage_candidate;
     }
     if (index_options_->emvb_n_doc_out_second_stage_ > index_options_->emvb_n_doc_to_score_) {
         Status status = Status::SyntaxError("emvb_n_doc_out_second_stage must be no more than emvb_n_doc_to_score");
-        LOG_ERROR(status.message());
         RecoverableError(std::move(status));
     }
     if (index_options_->emvb_n_doc_out_second_stage_ < topn_) {
         Status status = Status::SyntaxError("emvb_n_doc_out_second_stage must be no less than topn");
-        LOG_ERROR(status.message());
         RecoverableError(std::move(status));
     }
     if (const auto emvb_threshold_final_it = options.options_.find("emvb_threshold_final"); emvb_threshold_final_it != options.options_.end()) {

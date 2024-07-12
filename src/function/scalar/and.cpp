@@ -44,7 +44,6 @@ struct AndFunction {
             result = left and right;
         } else {
             String error_message = "AND function accepts only u8 and BooleanT.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

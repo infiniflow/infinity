@@ -53,7 +53,6 @@ struct SparseTryCastToSparse {
                     const DataType &target_type,
                     ColumnVector *target_vector_ptr) {
         String error_message = "Unexpected case";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -105,7 +104,6 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
                                                reinterpret_cast<TargetIndiceType *>(target_indice_tmp_ptr.get()),
                                                source_nnz)) {
                 String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}", DataType::TypeToString<SourceIndiceType>(), DataType::TypeToString<TargetIndiceType>());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
@@ -131,7 +129,6 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
                                                reinterpret_cast<TargetIndiceType *>(target_indice_tmp_ptr.get()),
                                                source_nnz)) {
                 String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}", DataType::TypeToString<SourceIndiceType>(), DataType::TypeToString<TargetIndiceType>());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             data_ptrs.emplace_back(reinterpret_cast<const char *>(target_indice_tmp_ptr.get()), target_indice_size);
@@ -144,7 +141,6 @@ void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
                                             reinterpret_cast<TargetValueType *>(target_value_tmp_ptr.get()),
                                             source_nnz)) {
                 String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}", DataType::TypeToString<SourceIndiceType>(), DataType::TypeToString<TargetIndiceType>());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             data_ptrs.emplace_back(reinterpret_cast<const char *>(target_value_tmp_ptr.get()), target_data_size);
@@ -215,7 +211,6 @@ void SparseTryCastToSparseFunT3(const SparseInfo *source_info,
         }
         default: {
             String error_message = "Invalid source index type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -231,7 +226,6 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
     switch (source_info->DataType()) {
         case kElemBit: {
             String error_message = "Unimplemented";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case kElemInt8: {
@@ -290,7 +284,6 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
         }
         default: {
             String error_message = "Unreachable code";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -322,7 +315,6 @@ void SparseTryCastToSparseFunT1(const SparseInfo *source_info,
         }
         default: {
             String error_message = "Invalid target index type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -365,7 +357,6 @@ void SparseTryCastToSparseFun(const SparseInfo *source_info,
         }
         default: {
             String error_message = "Unreachable code";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -387,7 +378,6 @@ bool SparseTryCastToSparse::Run(const SparseT &source,
     }
     if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kSparseHeap) {
         String error_message = fmt::format("Sparse column vector should use kHeap VectorBuffer.");
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     SparseTryCastToSparseFun(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);

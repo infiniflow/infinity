@@ -35,7 +35,6 @@ void MultiQueryDocIterator::PrintTree(std::ostream &os, const String &prefix, bo
         os << "OrIterator";
     } else {
         String error_message = "Unknown query type";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     os << " (children count: " << children_.size() << ")";

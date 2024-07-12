@@ -48,7 +48,6 @@ SharedPtr<LogicalNode> BoundUpdateStatement::BuildPlan(QueryContext *query_conte
     SharedPtr<LogicalNode> current_node;
     if (where_conditions_.empty()) {
         Status status = Status::SyntaxError("where_conditions_ shall not be empty");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     SharedPtr<LogicalNode> from = BuildFrom(table_ref_ptr_, query_context, bind_context);
@@ -69,7 +68,6 @@ SharedPtr<LogicalNode>
 BoundUpdateStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr || table_ref->type_ != TableRefType::kTable) {
         String error_message = "Unsupported";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return BuildBaseTable(table_ref, query_context, bind_context);
@@ -120,7 +118,6 @@ void BoundUpdateStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
         if (building_subquery_) {
             // nested subquery
             Status status = Status::SyntaxError("Nested subquery detected");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);

@@ -67,14 +67,12 @@ void PhysicalFlush::FlushData(QueryContext *query_context, OperatorState *operat
 void PhysicalFlush::FlushLog(QueryContext *query_context, OperatorState *operator_state) {
     // Generate the result
     Status status = Status::NotSupport("Flush log");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 
 void PhysicalFlush::FlushBuffer(QueryContext *query_context, OperatorState *operator_state) {
     // Generate the result
     Status status = Status::NotSupport("Flush buffer");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 

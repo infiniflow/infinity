@@ -191,7 +191,6 @@ protected:
                 }
                 default: {
                     String error_message = "Error variant status!";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     break;
                 }
@@ -275,7 +274,6 @@ protected:
             }
             default: {
                 String error_message = "Error variant status!";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 break;
             }
@@ -355,7 +353,6 @@ public:
 
     u32 GetDF() const override {
         String error_message = "Unreachable code!";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return 0;
     }
@@ -468,7 +465,6 @@ public:
     float BM25Score() override { return query_iterator_->BM25Score(); }
     Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override {
         String error_message = "Unreachable code!";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return {false, INVALID_ROWID};
     }
@@ -497,13 +493,11 @@ public:
     }
     Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override {
         String error_message = "Unreachable code!";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return {false, INVALID_ROWID};
     }
     bool NotPartCheckExist(RowID doc_id) override {
         String error_message = "Unreachable code!";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -563,7 +557,6 @@ void ASSERT_FLOAT_EQ(float bar, u32 i, float a, float b) {
         OStringStream oss;
         oss << "result mismatch at " << i << " : a: " << a << ", b: " << b << ", diff_percent: " << diff_percent << std::endl;
         Status status = Status::SyntaxError("Debug Info: " + std::move(oss).str());
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 }
@@ -835,7 +828,6 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
         if (blockmax_result_count != blockmax_result_count_2 or ordinary_result_count != blockmax_result_count or
             blockmax_loop_cnt != blockmax_loop_cnt_2) {
             Status status = Status::SyntaxError("Debug Info: result count mismatch!");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         for (u32 i = 0; i < result_count; ++i) {

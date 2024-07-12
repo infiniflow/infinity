@@ -50,7 +50,6 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
     assert(rc == 0);
     if (rc != 0) {
         Status status = Status::MmapFileError(posting_file_);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 }
@@ -60,7 +59,6 @@ DiskIndexSegmentReader::~DiskIndexSegmentReader() {
     assert(rc == 0);
     if (rc != 0) {
         Status status = Status::MunmapFileError(posting_file_);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 }

@@ -53,7 +53,6 @@ void PhysicalMergeMatchSparse::Init() { left_->Init(); }
 
 SizeT PhysicalMergeMatchSparse::TaskletCount() {
     String error_message = "Not Expected: TaskletCount of PhysicalMergeMatchSparse?";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return 0;
 }

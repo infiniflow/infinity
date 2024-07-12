@@ -72,7 +72,6 @@ Vector<std::string_view> SegmentIndexEntry::DecodeIndex(std::string_view encode)
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
         String error_message = fmt::format("Invalid segment index entry encode: {}", encode);
-        LOG_ERROR(error_message);
         UnrecoverableError(error_message);
     }
     auto decodes = TableIndexEntry::DecodeIndex(encode.substr(0, delimiter_i));
@@ -137,7 +136,6 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
                                                                            TxnTimeStamp commit_ts) {
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     String column_name = table_index_entry->index_base()->column_name();
@@ -152,7 +150,6 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     auto segment_index_entry = SharedPtr<SegmentIndexEntry>(new SegmentIndexEntry(table_index_entry, segment_id, std::move(vector_buffer)));
     if (segment_index_entry.get() == nullptr) {
         String error_message = "Failed to load index entry";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     segment_index_entry->min_ts_ = min_ts;
@@ -208,7 +205,6 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
                 }
                 default: {
                     String error_message = "Create IVF Flat index: Unsupported element type.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -217,14 +213,12 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("File worker isn't implemented: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
             UnrecoverableError(*err_msg);
         }
     }
     // cannot use invalid file_worker
     if (vector_file_worker[0].get() == nullptr) {
         UniquePtr<String> err_msg = MakeUnique<String>("Failed to create index file worker");
-        LOG_ERROR(*err_msg);
         UnrecoverableError(*err_msg);
     }
     return vector_file_worker;
@@ -298,7 +292,6 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
 
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 String error_message = "HNSW supports embedding type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
@@ -316,7 +309,6 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 }
                 default: {
                     Status status = Status::NotSupport("Not support data type for index hnsw.");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
             }
@@ -382,7 +374,6 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
             UnrecoverableError(*err_msg);
         }
     }
@@ -530,7 +521,6 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             auto index_hnsw = static_cast<const IndexHnsw *>(index_base);
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 String error_message = "HNSW supports embedding type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
@@ -572,7 +562,6 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                 }
                 default: {
                     Status status = Status::NotSupport("Not support data type for index hnsw.");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
             }
@@ -642,7 +631,6 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
             UnrecoverableError(*err_msg);
         }
     }
@@ -663,7 +651,6 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
         case IndexType::kIVFFlat: {
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 String error_message = "AnnIVFFlat only supports embedding type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
@@ -687,7 +674,6 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
                 }
                 default: {
                     Status status = Status::NotSupport("Not support data type for index ivf.");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
             }
@@ -716,7 +702,6 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
             UnrecoverableError(*err_msg);
         }
     }
@@ -731,7 +716,6 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
             auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 String error_message = "HNSW supports embedding type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
@@ -759,7 +743,6 @@ Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
                     }
                     default: {
                         Status status = Status::NotSupport("Not implemented");
-                        LOG_ERROR(status.message());
                         RecoverableError(status);
                     }
                 }
@@ -909,7 +892,6 @@ void SegmentIndexEntry::Cleanup() {
     for (auto *buffer_obj : vector_buffer_) {
         if (buffer_obj == nullptr) {
             String error_message = "vector_buffer should not has nullptr.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         buffer_obj->PickForCleanup();
@@ -959,7 +941,6 @@ SegmentIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT se
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
-            LOG_ERROR(*err_msg);
             UnrecoverableError(*err_msg);
         }
     }
@@ -1002,7 +983,6 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
             auto index_hnsw = static_cast<const IndexHnsw *>(index_base);
             if (column_def->type()->type() != LogicalType::kEmbedding) {
                 String error_message = "HNSW supports embedding type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             TypeInfo *type_info = column_def->type()->type_info().get();
@@ -1020,14 +1000,12 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                     auto [start_i, end_i] = abstract_hnsw.InsertVecs(std::move(iter), insert_config);
                     if (end_i - start_i != row_count) {
                         String error_message = "Rebuild HNSW index failed.";
-                        LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                     }
                     break;
                 }
                 default: {
                     String error_message = "Rebuild HNSW index failed.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -1074,7 +1052,6 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
         }
         default: {
             String error_message = "RebuildChunkIndexEntries is not supported for this index type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return nullptr;
         }
@@ -1164,7 +1141,6 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
 nlohmann::json SegmentIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {
     if (this->deleted_) {
         String error_message = "Segment Column index entry can't be deleted.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -1198,7 +1174,6 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     auto [segment_row_count, status] = table_entry->GetSegmentRowCountBySegmentID(segment_id);
 
     if (!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
         return nullptr;
     }
@@ -1210,7 +1185,6 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
     auto segment_index_entry = LoadIndexEntry(table_index_entry, segment_id, buffer_mgr, create_index_param.get());
     if (segment_index_entry.get() == nullptr) {
         String error_message = "Failed to load index entry";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     segment_index_entry->min_ts_ = index_entry_json["min_ts"];

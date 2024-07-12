@@ -48,7 +48,6 @@ SharedPtr<IndexBase> IndexIVFFlat::Make(SharedPtr<String> index_name,
     }
     if (metric_type == MetricType::kInvalid) {
         Status status = Status::LackIndexParam();
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     return MakeShared<IndexIVFFlat>(index_name, file_name, std::move(column_names), centroids_count, metric_type);
@@ -78,7 +77,6 @@ void IndexIVFFlat::WriteAdv(char *&ptr) const {
 
 SharedPtr<IndexBase> IndexIVFFlat::ReadAdv(char *&, int32_t) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return nullptr;
 }
@@ -104,7 +102,6 @@ nlohmann::json IndexIVFFlat::Serialize() const {
 
 SharedPtr<IndexIVFFlat> IndexIVFFlat::Deserialize(const nlohmann::json &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return nullptr;
 }
@@ -115,12 +112,10 @@ void IndexIVFFlat::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_ta
     SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         Status status = Status::ColumnNotExist(column_name);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kEmbedding) {
         Status status = Status::InvalidIndexDefinition(
             fmt::format("Attempt to create IVFFLAT index on column: {}, data type: {}.", column_name, data_type->ToString()));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 }

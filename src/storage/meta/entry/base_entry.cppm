@@ -126,7 +126,6 @@ public:
                                                commit_ts_,
                                                txn->TxnID(),
                                                txn_id_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         // Check if the entry is in committing process, because commit_ts of the base_entry is set in the Txn::CommitBottom

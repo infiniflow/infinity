@@ -108,7 +108,6 @@ void PhysicalFusion::Init() {
     if (output_names_->size() != output_types_->size()) {
         String error_message =
             fmt::format("output_names_ size {} is not equal to output_types_ size {}.", output_names_->size(), output_types_->size());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -174,7 +173,6 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                 String error_message = fmt::format("input_data_block column count {} is incorrect, expect {}.",
                                                    input_data_block->column_count(),
                                                    GetOutputTypes()->size());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
@@ -253,7 +251,6 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                 }
                 default: {
                     String error_message = fmt::format("Cannot determine heap type of operator {}", int(child_op->operator_type()));
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -325,7 +322,6 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
             const auto error_info = fmt::format("Fusion MatchTensor column_name {} is not a Tensor or TensorArray column. column type is : {}.",
                                                 fusion_expr_->match_tensor_expr_->column_expr_->column_name(),
                                                 column_data_type->ToString());
-            LOG_ERROR(error_info);
             RecoverableError(Status::NotSupport(error_info));
             break;
         }
@@ -337,7 +333,6 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
     // validate match_method
     if (fusion_expr_->match_tensor_expr_->search_method_ == MatchTensorSearchMethod::kInvalid) {
         const auto error_info = "Fusion MatchTensor match_method option is invalid.";
-        LOG_ERROR(error_info);
         RecoverableError(Status::NotSupport(error_info));
     }
     // prepare topn
@@ -375,7 +370,6 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
                 String error_message = fmt::format("input_data_block column count {} is incorrect, expect {}.",
                                                    input_data_block->column_count(),
                                                    GetOutputTypes()->size());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             auto &row_id_column = *input_data_block->column_vectors[input_data_block->column_count() - 1];
@@ -459,7 +453,6 @@ bool PhysicalFusion::ExecuteFirstOp(QueryContext *query_context, FusionOperatorS
         return true;
     }
     Status status = Status::NotSupport(fmt::format("Fusion method {} is not implemented.", fusion_expr_->method_));
-    LOG_ERROR(status.message());
     RecoverableError(std::move(status));
     return false;
 }
@@ -468,7 +461,6 @@ bool PhysicalFusion::ExecuteNotFirstOp(QueryContext *query_context, OperatorStat
     // this op has prev fusion op
     if (!operator_state->prev_op_state_->Complete()) {
         String error_message = "Fusion with previous fusion op, but prev_op_state_ is not complete.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -481,7 +473,6 @@ bool PhysicalFusion::ExecuteNotFirstOp(QueryContext *query_context, OperatorStat
         return true;
     }
     Status status = Status::NotSupport(fmt::format("Fusion method {} is not implemented.", fusion_expr_->method_));
-    LOG_ERROR(status.message());
     RecoverableError(std::move(status));
     return false;
 }

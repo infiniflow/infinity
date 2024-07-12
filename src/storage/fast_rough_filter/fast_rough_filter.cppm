@@ -78,7 +78,6 @@ private:
         std::lock_guard lock(mutex_check_task_start_);
         if (build_time_ != UNCOMMIT_TS) {
             String error_message = "FastRoughFilter::SetHaveStartedBuildTask(): Job already started.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         build_time_ = begin_ts;

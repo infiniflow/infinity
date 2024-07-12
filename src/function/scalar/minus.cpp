@@ -43,7 +43,6 @@ struct MinusFunction {
 template <>
 inline bool MinusFunction::Run(HugeIntT, HugeIntT &) {
     String error_message = "Not implement: MinusFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -51,7 +50,6 @@ inline bool MinusFunction::Run(HugeIntT, HugeIntT &) {
 template <>
 inline bool MinusFunction::Run(DecimalT, DecimalT &) {
     String error_message = "Not implement: MinusFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }

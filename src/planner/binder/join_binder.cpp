@@ -33,7 +33,6 @@ SharedPtr<BaseExpression> JoinBinder::BuildExpression(const ParsedExpr &expr, Bi
     switch (expr.type_) {
         case ParsedExprType::kSubquery: {
             Status status = Status::SyntaxError("Subquery isn't allowed in JOIN condition.");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         default: {
@@ -46,7 +45,6 @@ SharedPtr<BaseExpression> JoinBinder::BuildExpression(const ParsedExpr &expr, Bi
 SharedPtr<BaseExpression> JoinBinder::BuildKnnExpr(const KnnExpr &, BindContext *, i64 , bool ) {
 
     Status status = Status::SyntaxError("KNN expression isn't supported in join clause.");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return nullptr;
 }

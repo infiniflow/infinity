@@ -54,7 +54,6 @@ void ColumnInverter::InitAnalyzer(const String &analyzer_name) {
     auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
     if(!status.ok()) {
         Status status = Status::UnexpectedError(fmt::format("Invalid analyzer: {}", analyzer_name));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     analyzer_ = std::move(analyzer);

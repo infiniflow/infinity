@@ -21,6 +21,10 @@ std::string FusionExpr::ToString() const {
     oss << method_;
     oss << "', '";
     oss << options_->ToString();
+    if (match_tensor_expr_ != nullptr) {
+        oss << "', '";
+        oss << match_tensor_expr_->ToString();
+    }
     oss << "')";
     return oss.str();
 }

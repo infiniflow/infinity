@@ -13,14 +13,6 @@ class TestSdk():
     def disconnect(self):
         res = self.infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
-    # def setup(self):
-    #     print("test sdk setup")
-    #     self.infinity_obj = infinity.connect(self.uri)
-    #     assert self.infinity_obj
-    #     # assert self.infinity_obj.disconnect()
-    # def teardown(self):
-    #     print("test sdk teardown")
-    #     res = self.infinity_obj.disconnect()
-    #     assert res.error_code == ErrorCode.OK
+
     def test_version(self):
         print("test_sdk")

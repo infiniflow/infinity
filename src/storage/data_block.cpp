@@ -36,18 +36,15 @@ namespace infinity {
 void DataBlock::Init(const DataBlock *input, const SharedPtr<Selection> &input_select) {
     if (initialized) {
         String error_message = "Data block was initialized before.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (input == nullptr || input_select.get() == nullptr) {
         String error_message = "Invalid input data block or select";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     column_count_ = input->column_count();
     if (column_count_ == 0) {
         String error_message = "Empty column vectors.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     column_vectors.reserve(column_count_);
@@ -65,18 +62,15 @@ void DataBlock::Init(const SharedPtr<DataBlock> &input, const SharedPtr<Selectio
 void DataBlock::Init(const SharedPtr<DataBlock> &input, SizeT start_idx, SizeT end_idx) {
     if (initialized) {
         String error_message = "Data block was initialized before.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (input.get() == nullptr) {
         String error_message = "Invalid input data block";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     column_count_ = input->column_count();
     if (column_count_ == 0) {
         String error_message = "Empty column vectors.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     column_vectors.reserve(column_count_);
@@ -92,7 +86,6 @@ void DataBlock::Init(const SharedPtr<DataBlock> &input, SizeT start_idx, SizeT e
 SharedPtr<DataBlock> DataBlock::MoveFrom(SharedPtr<DataBlock> &input) {
     if (!input->Finalized()) {
         String error_message = "Input data block is not finalized.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto data_block = DataBlock::Make();
@@ -113,12 +106,10 @@ SharedPtr<DataBlock> DataBlock::MoveFrom(SharedPtr<DataBlock> &input) {
 void DataBlock::Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity) {
     if (initialized) {
         String error_message = "Data block was initialized before.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (types.empty()) {
         String error_message = "Empty data types collection.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     column_count_ = types.size();
@@ -135,7 +126,6 @@ void DataBlock::Init(const Vector<SharedPtr<DataType>> &types, SizeT capacity) {
 void DataBlock::Init(const Vector<SharedPtr<ColumnVector>> &input_vectors) {
     if (input_vectors.empty()) {
         String error_message = "Empty column vectors.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     column_count_ = input_vectors.size();
@@ -161,7 +151,6 @@ void DataBlock::UnInit() {
 void DataBlock::Reset() {
     if (!initialized) {
         String error_message = "Should not reset an uninitialized block.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -184,7 +173,6 @@ void DataBlock::Reset() {
 void DataBlock::Reset(SizeT capacity) {
     if (!initialized) {
         String error_message = "Should not reset an uninitialized block.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     // Reset behavior:
@@ -205,7 +193,6 @@ Value DataBlock::GetValue(SizeT column_index, SizeT row_index) const { return co
 void DataBlock::SetValue(SizeT column_index, SizeT row_index, const Value &val) {
     if (column_index >= column_count_) {
         String error_message = fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     column_vectors[column_index]->SetValue(row_index, val);
@@ -214,7 +201,6 @@ void DataBlock::SetValue(SizeT column_index, SizeT row_index, const Value &val) 
 void DataBlock::AppendValue(SizeT column_index, const Value &value) {
     if (column_index >= column_count_) {
         String error_message = fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     column_vectors[column_index]->AppendValue(value);
@@ -224,7 +210,6 @@ void DataBlock::AppendValue(SizeT column_index, const Value &value) {
 void DataBlock::AppendValueByPtr(SizeT column_index, const_ptr_t value_ptr) {
     if (column_index >= column_count_) {
         String error_message = fmt::format("Attempt to access invalid column index: {} in column count: {}", column_index, column_count_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     column_vectors[column_index]->AppendByPtr(value_ptr);
@@ -244,7 +229,6 @@ void DataBlock::Finalize() {
             if (first_flat_column_vector) {
                 if (row_count != column_vectors[idx]->Size()) {
                     String error_message = "Column vectors in same data block have different size.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             } else {
@@ -280,7 +264,6 @@ String DataBlock::ToBriefString() const {
 void DataBlock::FillRowIDVector(SharedPtr<Vector<RowID>> &row_ids, u32 block_id) const {
     if (!finalized) {
         String error_message = "DataBlock isn't finalized.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
@@ -292,22 +275,18 @@ void DataBlock::FillRowIDVector(SharedPtr<Vector<RowID>> &row_ids, u32 block_id)
 void DataBlock::UnionWith(const SharedPtr<DataBlock> &other) {
     if (this->row_count_ != other->row_count_) {
         String error_message = "Attempt to union two block with different row count";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (this->capacity_ != other->capacity_) {
         String error_message = "Attempt to union two block with different row count";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (!this->initialized || !other->initialized) {
         String error_message = "Attempt to union two block with different row count";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (this->finalized != other->finalized) {
         String error_message = "Attempt to union two block with different row count";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     column_count_ += other->column_count_;
@@ -328,7 +307,6 @@ void DataBlock::AppendWith(const DataBlock *other) {
                                            other->row_count(),
                                            this->row_count(),
                                            this->capacity());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -349,7 +327,6 @@ void DataBlock::AppendWith(const DataBlock *other, SizeT from, SizeT count) {
                                            count,
                                            this->row_count(),
                                            this->capacity());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     SizeT column_count = this->column_count();
@@ -380,7 +357,6 @@ bool DataBlock::operator==(const DataBlock &other) const {
 i32 DataBlock::GetSizeInBytes() const {
     if (!finalized) {
         String error_message = "Data block is not finalized.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     i32 size = sizeof(i32);
@@ -393,7 +369,6 @@ i32 DataBlock::GetSizeInBytes() const {
 void DataBlock::WriteAdv(char *&ptr) const {
     if (!finalized) {
         String error_message = "Data block is not finalized.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     WriteBufAdv<i32>(ptr, column_count_);
@@ -410,7 +385,6 @@ SharedPtr<DataBlock> DataBlock::ReadAdv(char *&ptr, i32 maxbytes) {
         maxbytes = ptr_end - ptr;
         if (maxbytes <= 0) {
             String error_message = "ptr goes out of range when reading DataBlock";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         SharedPtr<ColumnVector> column_vector = ColumnVector::ReadAdv(ptr, maxbytes);
@@ -422,7 +396,6 @@ SharedPtr<DataBlock> DataBlock::ReadAdv(char *&ptr, i32 maxbytes) {
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
         String error_message = "ptr goes out of range when reading DataBlock";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return block;

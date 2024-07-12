@@ -110,7 +110,6 @@ void BufferWriter::send_value_u32(u32 host_value) {
 void BufferWriter::flush(SizeT bytes) {
     if (bytes > size()) {
         String error_message = "Can't flush more bytes than available";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const auto bytes_to_send = bytes ? bytes : size();
@@ -133,7 +132,6 @@ void BufferWriter::flush(SizeT bytes) {
 
     if (boost_error == boost::asio::error::broken_pipe || boost_error == boost::asio::error::connection_reset || bytes_sent == 0) {
         String error_message = fmt::format("Can't flush more bytes than available: {}", boost_error.message());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 

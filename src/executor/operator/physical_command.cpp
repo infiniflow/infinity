@@ -58,7 +58,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         case SessionVariable::kEnableProfile: {
                             if (set_command->value_type() != SetVarType::kBool) {
                                 Status status = Status::DataTypeMismatch("Boolean", set_command->value_type_str());
-                                LOG_ERROR(status.message());
                                 RecoverableError(status);
                             }
                             query_context->current_session()->SetProfile(set_command->value_bool());
@@ -66,12 +65,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case SessionVariable::kInvalid: {
                             Status status = Status::InvalidCommand(fmt::format("Unknown session variable: {}", set_command->var_name()));
-                            LOG_ERROR(status.message());
                             RecoverableError(status);
                         }
                         default: {
                             Status status = Status::InvalidCommand(fmt::format("Session variable: {} is read-only", set_command->var_name()));
-                            LOG_ERROR(status.message());
                             RecoverableError(status);
                         }
                     }
@@ -83,7 +80,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         case GlobalVariable::kProfileRecordCapacity: {
                             if (set_command->value_type() != SetVarType::kInteger) {
                                 Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
-                                LOG_ERROR(status.message());
                                 RecoverableError(status);
                             }
                             query_context->storage()->catalog()->ResizeProfileHistory(set_command->value_int());
@@ -91,12 +87,10 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case GlobalVariable::kInvalid: {
                             Status status = Status::InvalidCommand(fmt::format("unknown global variable {}", set_command->var_name()));
-                            LOG_ERROR(status.message());
                             RecoverableError(status);
                         }
                         default: {
                             Status status = Status::InvalidCommand(fmt::format("Global variable: {} is read-only", set_command->var_name()));
-                            LOG_ERROR(status.message());
                             RecoverableError(status);
                         }
                     }
@@ -144,7 +138,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             }
 
                             Status status = Status::SetInvalidVarValue("log level", "trace, debug, info, warning, error, critical");
-                            LOG_ERROR(status.message());
                             RecoverableError(status);
                             break;
                         }
@@ -159,13 +152,11 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                         }
                         case GlobalOptionIndex::kInvalid: {
                             Status status = Status::InvalidCommand(fmt::format("Unknown config: {}", set_command->var_name()));
-                            LOG_ERROR(status.message());
                             RecoverableError(status);
                             break;
                         }
                         default: {
                             Status status = Status::InvalidCommand(fmt::format("Config {} is read-only", set_command->var_name()));
-                            LOG_ERROR(status.message());
                             RecoverableError(status);
                             break;
                         }
@@ -174,7 +165,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                 }
                 default: {
                     Status status = Status::InvalidCommand("Invalid set command scope, neither session nor global");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
             }
@@ -185,7 +175,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
             auto profiler_record = query_context->current_session()->GetProfileRecord(export_command->file_no());
             if (profiler_record == nullptr) {
                 Status status = Status::DataNotExist(fmt::format("The record does not exist: {}", export_command->file_no()));
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
             LocalFileSystem fs;
@@ -201,7 +190,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
         }
         default: {
             String error_message = fmt::format("Invalid command type: {}", command_info_->ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -210,7 +198,6 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
 
 SizeT PhysicalCommand::TaskletCount() {
     String error_message = "Not implement: TaskletCount not Implement";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return 0;
 }

@@ -136,7 +136,6 @@ void TaskProfiler::StartOperator(const PhysicalOperator *op) {
     }
     if (active_operator_ != nullptr) {
         String error_message = "Attempting to call StartOperator while another operator is active.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     active_operator_ = op;
@@ -148,7 +147,6 @@ void TaskProfiler::StopOperator(const OperatorState *operator_state) {
     }
     if (active_operator_ == nullptr) {
         String error_message = "Attempting to call StartOperator while another operator is active.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     profiler_.End();
@@ -208,7 +206,6 @@ String QueryProfiler::QueryPhaseToString(QueryPhase phase) {
         }
         default: {
             String error_message = "Invalid query phase in query profiler";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -226,7 +223,6 @@ void QueryProfiler::StartPhase(QueryPhase phase) {
         current_phase_ = phase;
     } else {
         String error_message = fmt::format("Can't start new query phase before current phase({}) is finished", QueryPhaseToString(current_phase_));
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -243,7 +239,6 @@ void QueryProfiler::StopPhase(QueryPhase phase) {
     // Validate current query phase.
     if (current_phase_ == QueryPhase::kInvalid) {
         String error_message = "Query phase isn't started, yet";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 

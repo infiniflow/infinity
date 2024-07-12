@@ -40,13 +40,11 @@ void StreamIO::Init(const String& file_name, u8 flags) {
         file_.open(file_name, std::ios::out);
     } else {
         Status status = Status::InvalidCommand("Not reachable");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     if (!file_.is_open()) {
         Status status = Status::IOError(fmt::format("{} can't open", file_name));
-        LOG_ERROR(file_name);
         RecoverableError(status);
     }
 }

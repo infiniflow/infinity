@@ -391,8 +391,15 @@ class LocalTable(Table, ABC):
         return self
 
     @params_type_check
-    def fusion(self, method: str, options_text: str = ''):
-        self.query_builder.fusion(method, options_text)
+    def match_tensor(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, method_type: str,
+                     extra_option: str):
+        self.query_builder.match_tensor(vector_column_name, embedding_data, embedding_data_type, method_type,
+                                        extra_option)
+        return self
+
+    @params_type_check
+    def fusion(self, method: str, options_text: str = '', match_tensor_expr=None):
+        self.query_builder.fusion(method, options_text, match_tensor_expr)
         return self
 
     def output(self, columns: Optional[List[str]]):

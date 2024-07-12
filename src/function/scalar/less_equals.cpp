@@ -56,7 +56,6 @@ struct ColumnValueReaderTypeLessEqualsFunction {
 template <>
 inline void LessEqualsFunction::Run(MixedT, BigIntT, bool &) {
     String error_message = "Not implement: LessEqualsFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
@@ -68,7 +67,6 @@ inline void LessEqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 template <>
 inline void LessEqualsFunction::Run(MixedT, DoubleT, bool &) {
     String error_message = "Not implement: LessEqualsFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
@@ -80,7 +78,6 @@ inline void LessEqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 template <>
 inline void LessEqualsFunction::Run(MixedT, VarcharT, bool &) {
     String error_message = "Not implement: LessEqualsFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 

@@ -33,7 +33,6 @@ struct SubFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
         String error_message = "Not implement: SubFunction::Run";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 };
@@ -74,7 +73,6 @@ inline bool SubFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 template <>
 inline bool SubFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -103,7 +101,6 @@ inline bool SubFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 template <>
 inline bool SubFunction::Run(DecimalT, DecimalT, DecimalT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -136,7 +133,6 @@ inline bool SubFunction::Run(TimestampT left, IntervalT right, TimestampT &resul
 template <>
 inline bool SubFunction::Run(MixedT, BigIntT, MixedT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -145,7 +141,6 @@ inline bool SubFunction::Run(MixedT, BigIntT, MixedT &) {
 template <>
 inline bool SubFunction::Run(BigIntT, MixedT, MixedT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -154,7 +149,6 @@ inline bool SubFunction::Run(BigIntT, MixedT, MixedT &) {
 template <>
 inline bool SubFunction::Run(MixedT, DoubleT, MixedT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -163,7 +157,6 @@ inline bool SubFunction::Run(MixedT, DoubleT, MixedT &) {
 template <>
 inline bool SubFunction::Run(DoubleT, MixedT, MixedT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -172,7 +165,6 @@ inline bool SubFunction::Run(DoubleT, MixedT, MixedT &) {
 template <>
 inline bool SubFunction::Run(MixedT, MixedT, MixedT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }

@@ -59,7 +59,6 @@ private:
                 for (auto &arg : function_expression->arguments()) {
                     if (not BuildFilterEvaluator(arg)) {
                         String error_message = fmt::format("BuildFilterEvaluator(): subexpression error in \"{}\".", expression->Name());
-                        LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                         return false;
                     }
@@ -70,7 +69,6 @@ private:
                     return true;
                 } else {
                     String error_message = fmt::format("BuildFilterEvaluator(): function name error in: {}.", expression->Name());
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     return false;
                 }
@@ -106,7 +104,6 @@ private:
                             }
                             default: {
                                 String error_message = fmt::format("BuildFilterEvaluator(): compare type error in: {}.", expression->Name());
-                                LOG_CRITICAL(error_message);
                                 UnrecoverableError(error_message);
                                 return false;
                             }
@@ -114,20 +111,17 @@ private:
                         return true;
                     } else {
                         String error_message = fmt::format("BuildFilterEvaluator(): unwind cast error in: {}.", expression->Name());
-                        LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                         return false;
                     }
                 } else {
                     String error_message = fmt::format("BuildFilterEvaluator(): function name error: {}.", expression->Name());
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     return false;
                 }
             }
         } else {
             String error_message = fmt::format("BuildFilterEvaluator(): expression type error: {}.", expression->Name());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return false;
         }
@@ -140,7 +134,6 @@ private:
             return BooleanCombineType::kOr;
         } else {
             String error_message = fmt::format("GetBooleanCombineType(): function name error: {}.", function_name);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return BooleanCombineType::kInvalid;
         }
@@ -159,7 +152,6 @@ Vector<FilterEvaluatorElem> BuildSecondaryIndexScanMiddleCommand(SharedPtr<BaseE
         filter_evaluator = std::move(filter_builder.GetResult());
     } else {
         String error_message = "PhysicalIndexScan::Init(): filter solver error.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return filter_evaluator;

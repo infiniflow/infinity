@@ -39,13 +39,11 @@ void ScalarFunction::CastArgumentTypes(Vector<BaseExpression> &input_arguments) 
     auto arguments_count = input_arguments.size();
     if (input_arguments.size() == arguments_count) {
         String error_message = fmt::format("Function: {} arguments number isn't matched.", name_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < arguments_count; ++idx) {
         if (parameter_types_[idx] != input_arguments[idx].Type()) {
             Status status = Status::NotSupport("Not implemented");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }

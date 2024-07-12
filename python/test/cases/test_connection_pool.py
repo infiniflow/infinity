@@ -20,4 +20,6 @@ class TestInfinity:
 
     def test_connection_pool(self):
         self.test_infinity_obj._test_basic()
-        # self.test_infinity_obj._test_time_out()
+
+    def test_time_out(self):
+        self.test_infinity_obj._test_time_out()

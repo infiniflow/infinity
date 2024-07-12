@@ -57,7 +57,6 @@ SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, Bind
 
     if (result.get() == nullptr) {
         Status status = Status::ColumnNotExist(expr.GetName());
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     return result;
@@ -66,7 +65,6 @@ SharedPtr<BaseExpression> WhereBinder::BuildColExpr(const ColumnExpr &expr, Bind
 void WhereBinder::CheckFuncType(FunctionType func_type) const {
     if (func_type != FunctionType::kScalar) {
         String error_message = "Only scalar function are allowed in where clause";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 

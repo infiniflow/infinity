@@ -100,7 +100,6 @@ void PhysicalMergeAggregate::SimpleMergeAggregateExecute(MergeAggregateOperatorS
                 }
                 default: {
                     String error_message = "Input value type not Implement";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -124,7 +123,6 @@ void PhysicalMergeAggregate::HandleAggregateFunction(const String &function_name
         // no action for "COUNT_STAR"
     } else {
         String error_message = fmt::format("Function type {} not Implement.", function_name);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }

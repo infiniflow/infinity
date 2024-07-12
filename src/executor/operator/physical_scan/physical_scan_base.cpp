@@ -107,7 +107,6 @@ void PhysicalScanBase::SetOutput(const Vector<char *> &raw_result_dists_list,
             BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
             if (block_entry == nullptr) {
                 String error_message = fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id);
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
 

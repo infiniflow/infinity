@@ -118,7 +118,6 @@ float ColumnIndexReader::GetAvgColumnLength() const {
     }
     if (column_len_cnt == 0) {
         String error_message = "column_len_cnt is 0";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return static_cast<float>(column_len_sum) / column_len_cnt;

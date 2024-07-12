@@ -171,7 +171,6 @@ class TestDatabase(TestSdk):
             db = self.infinity_obj.drop_database('test_pysdk_db_name' + str(i))
 
 
-    @pytest.mark.slow
     def _test_create_drop_show_1M_databases(self):
 
         """
@@ -459,13 +458,6 @@ class TestDatabase(TestSdk):
 
         self.infinity_obj.drop_database("test_create_option")
 
-
-    @pytest.mark.parametrize("conflict_type", [pytest.param(1.1),
-                                               pytest.param("#@$@!%string"),
-                                               pytest.param([]),
-                                               pytest.param({}),
-                                               pytest.param(()),
-                                               ])
     def _test_create_with_invalid_option(self, conflict_type):
         self.infinity_obj.drop_database("test_create_invalid_option", ConflictType.Ignore)
 
@@ -477,12 +469,6 @@ class TestDatabase(TestSdk):
 
         # self.infinity_obj.drop_database("test_create_option")
 
-    @pytest.mark.parametrize("conflict_type", [
-        ConflictType.Error,
-        ConflictType.Ignore,
-        0,
-        1,
-    ])
     def _test_drop_option_with_valid_option(self, conflict_type):
         # create db
         self.infinity_obj.drop_database("test_drop_option", ConflictType.Ignore)
@@ -491,15 +477,6 @@ class TestDatabase(TestSdk):
 
         self.infinity_obj.drop_database("test_drop_option", ConflictType.Ignore)
 
-    @pytest.mark.parametrize("conflict_type", [
-        pytest.param(ConflictType.Replace),
-        pytest.param(2),
-        pytest.param(1.1),
-        pytest.param("#@$@!%string"),
-        pytest.param([]),
-        pytest.param({}),
-        pytest.param(()),
-    ])
     def _test_drop_option(self, conflict_type):
         # create db
         self.infinity_obj.drop_database("test_drop_option", ConflictType.Ignore)
@@ -513,7 +490,6 @@ class TestDatabase(TestSdk):
         self.infinity_obj.drop_database("test_drop_option", ConflictType.Error)
 
 
-    @pytest.mark.parametrize("table_name", ["test_show_table"])
     def _test_show_valid_table(self, table_name):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
@@ -524,14 +500,6 @@ class TestDatabase(TestSdk):
         db_obj.drop_table("test_show_table", ConflictType.Error)
         print(res)
 
-    @pytest.mark.parametrize("table_name", [pytest.param("Invalid name"),
-                                            pytest.param(1),
-                                            pytest.param(1.1),
-                                            pytest.param(True),
-                                            pytest.param([]),
-                                            pytest.param(()),
-                                            pytest.param({}),
-                                            ])
     def _test_show_invalid_table(self, table_name):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
@@ -549,7 +517,6 @@ class TestDatabase(TestSdk):
 
         db_obj.drop_table("test_show_table", ConflictType.Error)
 
-    @pytest.mark.parametrize("table_name", [pytest.param("not_exist_name")])
     def _test_show_not_exist_table(self, table_name):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
@@ -564,7 +531,6 @@ class TestDatabase(TestSdk):
 
         db_obj.drop_table("test_show_table", ConflictType.Error)
 
-    @pytest.mark.parametrize("column_name", ["test_show_table_columns"])
     def _test_show_table_columns_with_valid_name(self, column_name):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)
@@ -576,15 +542,6 @@ class TestDatabase(TestSdk):
         db_obj.drop_table("test_show_table_columns", ConflictType.Error)
         print(res)
 
-    @pytest.mark.parametrize("column_name", [pytest.param("Invalid name"),
-                                             pytest.param("not_exist_name"),
-                                             pytest.param(1),
-                                             pytest.param(1.1),
-                                             pytest.param(True),
-                                             pytest.param([]),
-                                             pytest.param(()),
-                                             pytest.param({}),
-                                             ])
     def _test_show_table_columns_with_invalid_name(self, column_name):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table_columns", ConflictType.Ignore)

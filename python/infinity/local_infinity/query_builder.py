@@ -12,7 +12,7 @@ from sqlglot import condition, maybe_parse
 
 from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.embedded_infinity_ext import *
-from infinity.local_infinity.types import logic_type_to_dtype
+from infinity.local_infinity.types import logic_type_to_dtype, make_match_tensor_expr
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
 from infinity.table import ExplainType as BaseExplainType
 
@@ -236,14 +236,43 @@ class InfinityLocalQueryBuilder(ABC):
         self._search.match_exprs += [generic_match_expr]
         return self
 
-    def fusion(self, method: str, options_text: str = "") -> InfinityLocalQueryBuilder:
+    def match_tensor(
+        self,
+        vector_column_name: str,
+        embedding_data: VEC,
+        embedding_data_type: str,
+        method_type: str,
+        extra_option: str,
+    ) -> InfinityLocalQueryBuilder:
+        if self._search is None:
+            self._search = WrapSearchExpr()
+            self._search.match_exprs = list()
+        match_tensor_expr = WrapParsedExpr(ParsedExprType.kMatchTensor)
+        match_tensor_expr.match_tensor_expr = make_match_tensor_expr(
+            vector_column_name,
+            embedding_data,
+            embedding_data_type,
+            method_type,
+            extra_option
+        )
+
+        self._search.match_exprs += [match_tensor_expr]
+        return self
+
+    def fusion(self, method: str, options_text: str = None, match_tensor_expr=None) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
         fusion_expr = WrapFusionExpr()
         fusion_expr.method = method
-        fusion_expr.options_text = options_text
-        fusion_exprs = [fusion_expr]
-        self._search.fusion_exprs = self._search.fusion_exprs + fusion_exprs
+        if (options_text is not None) and (options_text != ""):
+            fusion_expr.options_text = options_text
+        if match_tensor_expr is not None:
+            fusion_expr.has_match_tensor_expr = True
+            fusion_expr.match_tensor_expr = match_tensor_expr
+        else:
+            fusion_expr.has_match_tensor_expr = False
+
+        self._search.fusion_exprs += [fusion_expr]
         # *WARN*: A list in nanobind wrapped object is odd that append() does nothing!
         # However `list add list` still works.
         # self._search.fusion_exprs.append(fusion_expr)

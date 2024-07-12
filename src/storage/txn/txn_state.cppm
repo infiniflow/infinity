@@ -57,7 +57,6 @@ export inline String ToString(TxnState txn_state) {
         }
     }
     String error_message = "Invalid transaction state.";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return String();
 }

@@ -154,7 +154,6 @@ void PhysicalSort::Init() {
     auto sort_expr_count = order_by_types_.size();
     if (sort_expr_count != expressions_.size()) {
         String error_message = "order_by_types_.size() != expressions_.size()";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;

@@ -37,7 +37,6 @@ void OrderBinder::PushExtraExprToSelectList(ParsedExpr *expr, const SharedPtr<Bi
         ConstantExpr *order_by_index = (ConstantExpr *)expr;
         if (order_by_index->literal_type_ != LiteralType::kInteger) {
             Status status = Status::SyntaxError("Order by non-integer constant value.");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         // Order by 1, means order by 1st select list item.
@@ -82,7 +81,6 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
             column_id = const_expr.integer_value_;
             if (column_id <= 0 or column_id > (i64)bind_context_ptr->project_exprs_.size()) {
                 Status status = Status::SyntaxError("Order by are going to use nonexistent column from select list.");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
             --column_id;
@@ -91,13 +89,11 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
             return bind_context_ptr->project_exprs_[column_id];
         } else {
             Status status = Status::SyntaxError("Order by non-integer constant value.");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     } else {
         String expr_name = expr.GetName();
         String error_message = fmt::format("Need to add support for {} in order_binder.", expr_name);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
 
         if (bind_context_ptr->binding_names_by_column_.contains(expr_name)) {
@@ -118,7 +114,6 @@ SharedPtr<BaseExpression> OrderBinder::BuildExpression(const ParsedExpr &expr, B
 
         if (column_id == -1) {
             String error_message = fmt::format("{} isn't found in project list.", expr_name);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

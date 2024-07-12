@@ -137,7 +137,6 @@ std::unique_ptr<QueryNode>
 SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text, bool from_quoted, unsigned long slop) const {
     if (text.empty()) {
         Status status = Status::SyntaxError("Empty query text");
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return nullptr;
     }
@@ -154,7 +153,6 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&t
     }
     auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer(analyzer_name);
     if (!status.ok()) {
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     TermList temp_output_terms;

@@ -36,31 +36,26 @@ struct SumState {
 public:
     inline void Initialize() {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline void Update(const ValueType *__restrict, SizeT) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline ptr_t Finalize() {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline static SizeT Size(const DataType &) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 };

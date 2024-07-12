@@ -74,7 +74,6 @@ struct ColumnValueReaderTypeEqualsFunction {
 template <>
 inline void EqualsFunction::Run(MixedT, BigIntT, bool &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 
@@ -86,7 +85,6 @@ inline void EqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 template <>
 inline void EqualsFunction::Run(MixedT, DoubleT, bool &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 
@@ -98,7 +96,6 @@ inline void EqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 template <>
 inline void EqualsFunction::Run(MixedT, VarcharT, bool &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 

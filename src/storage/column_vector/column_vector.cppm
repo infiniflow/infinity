@@ -159,20 +159,17 @@ public:
     void AppendValue(const Value &value) {
         if (!initialized) {
             String error_message = "Column vector isn't initialized.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (vector_type_ == ColumnVectorType::kConstant) {
             if (tail_index_ >= 1) {
                 String error_message = "Constant column vector will only have 1 value.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
 
         if (tail_index_ >= capacity_) {
             String error_message = fmt::format("Exceed the column vector capacity.({}/{})", tail_index_, capacity_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         SetValue(tail_index_++, value);
@@ -181,12 +178,10 @@ public:
     void SetVectorType(ColumnVectorType vector_type) {
         if (initialized) {
             String error_message = "Column vector isn't initialized.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (vector_type == ColumnVectorType::kInvalid) {
             String error_message = "Invalid column vector type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (vector_type_ == vector_type) {
@@ -335,7 +330,6 @@ private:
             }
             default: {
                 String error_message = "Unsupported sparse index type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -450,7 +444,6 @@ void WriteToTensor(TensorT &target_tensor,
     const auto input_bytes = total_element_count * sizeof(T);
     if (input_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
         Status status = Status::SyntaxError("Tensor size exceeds the limit.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     auto tmp_data = MakeUniqueForOverwrite<T[]>(total_element_count);
@@ -471,7 +464,6 @@ void WriteToTensor<bool>(TensorT &target_tensor,
     const auto bit_bytes = (total_element_count + 7) / 8;
     if (bit_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
         Status status = Status::SyntaxError("Tensor size exceeds the limit.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     auto tmp_data = MakeUnique<u8[]>(bit_bytes);

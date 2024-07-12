@@ -93,7 +93,6 @@ void ExplainAST::Explain(const BaseStatement *statement, SharedPtr<Vector<Shared
         }
         default: {
             String error_message = "Unexpected statement type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -105,7 +104,6 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
     switch (create_statement->ddl_type()) {
         case DDLType::kInvalid: {
             String error_message = "Invalid DDL type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case DDLType::kDatabase: {
@@ -135,7 +133,6 @@ void ExplainAST::BuildCreate(const CreateStatement *create_statement, SharedPtr<
             SizeT column_count = table_info->column_defs_.size();
             if (column_count == 0) {
                 String error_message = "Table definition without any columns";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
 
@@ -190,7 +187,6 @@ void ExplainAST::BuildInsert(const InsertStatement *insert_statement, SharedPtr<
     SizeT value_count = insert_statement->values_->size();
     if (value_count == 0) {
         String error_message = "Insert value list is empty";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < value_count - 1; ++idx) {
@@ -215,7 +211,6 @@ void ExplainAST::BuildDrop(const DropStatement *drop_statement, SharedPtr<Vector
     switch (drop_statement->ddl_type()) {
         case DDLType::kInvalid: {
             String error_message = "Invalid DDL type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case DDLType::kDatabase: {
@@ -299,7 +294,6 @@ void ExplainAST::BuildSelect(const SelectStatement *select_statement,
         SizeT select_count = select_statement->select_list_->size();
         if (select_count == 0) {
             String error_message = "No select list";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         for (SizeT idx = 0; idx < select_count - 1; ++idx) {
@@ -403,7 +397,6 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
                 from_str += " AS " + String(cross_product_ref->alias_->alias_);
                 if (cross_product_ref->alias_->column_alias_array_ != nullptr) {
                     Status status = Status::SyntaxError("Table reference has columns alias");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
             } else {
@@ -425,7 +418,6 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
                 from_str += " AS " + String(join_reference->alias_->alias_);
                 if (join_reference->alias_->column_alias_array_ != nullptr) {
                     Status status = Status::SyntaxError("Table reference has columns alias");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
             }
@@ -447,7 +439,6 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
                 from_str += " AS " + String(table_reference->alias_->alias_);
                 if (table_reference->alias_->column_alias_array_ != nullptr) {
                     Status status = Status::SyntaxError("Table reference has columns alias");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
             }
@@ -461,7 +452,6 @@ void ExplainAST::BuildBaseTableRef(const BaseTableReference *base_table_ref, Sha
                 from_str += " AS " + String(subquery_reference->alias_->alias_);
                 if (subquery_reference->alias_->column_alias_array_ != nullptr) {
                     Status status = Status::SyntaxError("Table reference has columns alias");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
             } else {
@@ -808,7 +798,6 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
         }
         case CopyFileType::kInvalid: {
             String error_message = "Invalid file type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

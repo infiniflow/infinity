@@ -57,7 +57,6 @@ struct ColumnValueReaderTypeGreaterFunction {
 template <>
 inline void GreaterFunction::Run(MixedT, BigIntT, bool &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 
@@ -69,7 +68,6 @@ inline void GreaterFunction::Run(BigIntT left, MixedT right, bool &result) {
 template <>
 inline void GreaterFunction::Run(MixedT, DoubleT, bool &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 
@@ -81,7 +79,6 @@ inline void GreaterFunction::Run(DoubleT left, MixedT right, bool &result) {
 template <>
 inline void GreaterFunction::Run(MixedT, VarcharT, bool &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 

@@ -70,12 +70,10 @@ export String FileWorkerType2Str(FileWorkerType type) {
         }
         case FileWorkerType::kInvalid: {
             String error_message = "Invalid file worker type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
     String error_message = "Unreachable";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return error_message;
 }

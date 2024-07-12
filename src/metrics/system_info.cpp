@@ -132,7 +132,6 @@ i64 SystemInfo::MemoryUsage() {
         }
     } catch (std::exception& e) {
         Status status = Status::FailToGetSysInfo(fmt::format("Can't get VmRSS: {}", e.what()));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     return vm_rss_in_kb * KB;
@@ -172,7 +171,6 @@ i64 SystemInfo::OpenFileCount() {
     dir = opendir(dir_path.c_str());
     if (dir == NULL) {
         Status status = Status::FailToGetSysInfo(fmt::format("Can't open dir: {}", dir_path));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 

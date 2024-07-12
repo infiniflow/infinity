@@ -45,7 +45,6 @@ String InExpression::ToString() const {
         }
         default: {
             String error_message = "Unknown IN operator type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }

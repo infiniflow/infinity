@@ -37,7 +37,6 @@ namespace infinity {
 //    "and_not": first child can be term, "and", "or", other children form a list of "not"
 void QueryNode::FilterOptimizeQueryTree() {
     String error_message = "Should not reach here!";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
@@ -52,7 +51,6 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
     std::unique_ptr<QueryNode> optimized_root;
     if (!root) {
         Status status = Status::SyntaxError("Invalid query statement: Empty query tree");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     // push down the weight to the leaf term node
@@ -71,7 +69,6 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
         }
         case QueryNodeType::NOT: {
             Status status = Status::SyntaxError("Invalid query statement: NotQueryNode should not be on the top level");
-            LOG_ERROR(status.message());
             RecoverableError(status);
             break;
         }
@@ -80,20 +77,17 @@ std::unique_ptr<QueryNode> QueryNode::GetOptimizedQueryTree(std::unique_ptr<Quer
             optimized_root = static_cast<MultiQueryNode *>(root.get())->GetNewOptimizedQueryTree();
             if (optimized_root->GetType() == QueryNodeType::NOT) {
                 Status status = Status::SyntaxError("Invalid query statement: NotQueryNode should not be on the top level");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
             break;
         }
         case QueryNodeType::AND_NOT: {
             String error_message = "Unexpected AndNotQueryNode from parser output";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         default: {
             String error_message = "GetOptimizedQueryTree: Unexpected case!";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -128,7 +122,6 @@ std::unique_ptr<QueryNode> MultiQueryNode::GetNewOptimizedQueryTree() {
             }
             case QueryNodeType::AND_NOT: {
                 String error_message = "GetNewOptimizedQueryTree: Unexpected case! AndNotQueryNode should not exist in parser output";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 break;
             }
@@ -141,7 +134,6 @@ std::unique_ptr<QueryNode> MultiQueryNode::GetNewOptimizedQueryTree() {
             }
             default: {
                 String error_message = "GetNewOptimizedQueryTree: Unexpected case!";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 break;
             }
@@ -167,7 +159,6 @@ std::unique_ptr<QueryNode> MultiQueryNode::GetNewOptimizedQueryTree() {
 std::unique_ptr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
     if (children_.empty()) {
         String error_message = "Invalid query statement: NotQueryNode should have at least 1 children";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto new_not_node = std::make_unique<NotQueryNode>(); // new node, weight is reset to 1.0
@@ -176,7 +167,6 @@ std::unique_ptr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
         switch (child->GetType()) {
             case QueryNodeType::NOT: {
                 Status status = Status::SyntaxError("Invalid query statement: NotQueryNode should not have not child");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
                 break;
             }
@@ -196,7 +186,6 @@ std::unique_ptr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
             }
             default: {
                 String error_message = "OptimizeInPlaceInner: Unexpected case!";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 break;
             }
@@ -221,7 +210,6 @@ std::unique_ptr<QueryNode> NotQueryNode::InnerGetNewOptimizedQueryTree() {
 std::unique_ptr<QueryNode> AndQueryNode::InnerGetNewOptimizedQueryTree() {
     if (children_.size() < 2) {
         String error_message = "Invalid query statement: AndQueryNode should have at least 2 children";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     std::vector<std::unique_ptr<QueryNode>> and_list;
@@ -266,7 +254,6 @@ std::unique_ptr<QueryNode> AndQueryNode::InnerGetNewOptimizedQueryTree() {
             }
             default: {
                 String error_message = "OptimizeInPlaceInner: Unexpected case!";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 break;
             }
@@ -316,7 +303,6 @@ std::unique_ptr<QueryNode> AndQueryNode::InnerGetNewOptimizedQueryTree() {
 std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
     if (children_.size() < 2) {
         String error_message = "OptimizeInPlaceInner: Unexpected case! AndNotQueryNode should not exist in parser output";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     std::vector<std::unique_ptr<QueryNode>> or_list;
@@ -342,7 +328,6 @@ std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
             }
             default: {
                 String error_message = "OptimizeInPlaceInner: Unexpected case!";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 break;
             }
@@ -409,7 +394,6 @@ std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
         return or_node;
     } else {
         Status status = Status::SyntaxError("Invalid query statement: OrQueryNode should not have both not child and non-not child");
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return nullptr;
     }
@@ -420,7 +404,6 @@ std::unique_ptr<QueryNode> OrQueryNode::InnerGetNewOptimizedQueryTree() {
 
 std::unique_ptr<QueryNode> AndNotQueryNode::InnerGetNewOptimizedQueryTree() {
     String error_message = "OptimizeInPlaceInner: Unexpected case! AndNotQueryNode should not exist in parser output";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return nullptr;
 }
@@ -681,7 +664,6 @@ OrQueryNode::CreateEarlyTerminateSearch(const TableEntry *table_entry, IndexRead
 
 std::unique_ptr<DocIterator> NotQueryNode::CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, Scorer *scorer) const {
     String error_message = "NOT query node should be optimized into AND_NOT query node";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return nullptr;
 }
@@ -691,7 +673,6 @@ std::unique_ptr<EarlyTerminateIterator> NotQueryNode::CreateEarlyTerminateSearch
                                                                                  Scorer *scorer,
                                                                                  EarlyTermAlgo early_term_algo) const {
     String error_message = "NOT query node should be optimized into AND_NOT query node";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return nullptr;
 }

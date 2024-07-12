@@ -35,12 +35,10 @@ void IndexSecondary::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_
     SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         Status status = Status::ColumnNotExist(column_name);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     } else if (auto &data_type = column_types_vector[column_id]; !(data_type->CanBuildSecondaryIndex())) {
         Status status = Status::InvalidIndexDefinition(
             fmt::format("Attempt to create index on column: {}, data type: {}.", column_name, data_type->ToString()));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 }
