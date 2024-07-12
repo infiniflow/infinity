@@ -133,22 +133,9 @@ Status Txn::OptIndex(TableIndexEntry *table_index_entry, Vector<UniquePtr<InitPa
     TableEntry *table_entry = table_index_entry->table_index_meta()->table_entry();
     TxnTableStore *txn_table_store = this->GetTxnTableStore(table_entry);
 
-    Vector<SharedPtr<ChunkIndexEntry>> dumped_chunks = table_index_entry->OptIndex(txn_table_store, init_params, false /*replay*/);
-
-    String index_name = *table_index_entry->GetIndexName();
-    String table_name = *table_entry->GetTableName();
-
-    if (!dumped_chunks.empty()) {
-        Vector<WalChunkIndexInfo> chunk_infos;
-        SegmentID segment_id = dumped_chunks[0]->segment_index_entry_->segment_id();
-        for (const auto &dumped_chunk : dumped_chunks) {
-            if (segment_id != dumped_chunk->segment_index_entry_->segment_id()) {
-                UnrecoverableError("Not implemented");
-            }
-            chunk_infos.emplace_back(dumped_chunk.get());
-        }
-        wal_entry_->cmds_.push_back(MakeShared<WalCmdDumpIndex>(db_name_, table_name, index_name, segment_id, std::move(chunk_infos)));
-    }
+    const String &index_name = *table_index_entry->GetIndexName();
+    const String &table_name = *table_entry->GetTableName();
+    table_index_entry->OptIndex(txn_table_store, init_params, false /*replay*/);
 
     wal_entry_->cmds_.push_back(MakeShared<WalCmdOptimize>(db_name_, table_name, index_name, std::move(init_params)));
     return Status::OK();
@@ -288,6 +275,10 @@ Tuple<TableIndexEntry *, Status> Txn::CreateIndexDef(TableEntry *table_entry, co
     }
     auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
     txn_table_store->AddIndexStore(table_index_entry);
+
+    String index_dir_tail = table_index_entry->GetPathNameTail();
+    wal_entry_->cmds_.push_back(
+        MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(index_dir_tail), index_base));
     return {table_index_entry, index_status};
 }
 
@@ -340,22 +331,22 @@ Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, Has
 }
 
 Status Txn::CreateIndexFinish(const TableEntry *table_entry, const TableIndexEntry *table_index_entry) {
-    String index_dir_tail = table_index_entry->GetPathNameTail();
-    auto index_base = table_index_entry->table_index_def();
-    wal_entry_->cmds_.push_back(
-        MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(index_dir_tail), index_base));
+    // String index_dir_tail = table_index_entry->GetPathNameTail();
+    // auto index_base = table_index_entry->table_index_def();
+    // wal_entry_->cmds_.push_back(
+    //     MakeShared<WalCmdCreateIndex>(*table_entry->GetDBName(), *table_entry->GetTableName(), std::move(index_dir_tail), index_base));
     return Status::OK();
 }
 
 Status Txn::CreateIndexFinish(const String &db_name, const String &table_name, const SharedPtr<IndexBase> &index_base) {
-    this->CheckTxn(db_name);
+    // this->CheckTxn(db_name);
 
-    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, *index_base->index_name_);
-    if (!status.ok()) {
-        return status;
-    }
-    String index_dir_tail = table_index_entry->GetPathNameTail();
-    this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, std::move(index_dir_tail), index_base));
+    // auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, *index_base->index_name_);
+    // if (!status.ok()) {
+    //     return status;
+    // }
+    // String index_dir_tail = table_index_entry->GetPathNameTail();
+    // this->AddWalCmd(MakeShared<WalCmdCreateIndex>(db_name, table_name, std::move(index_dir_tail), index_base));
     return Status::OK();
 }
 

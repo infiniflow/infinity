@@ -711,6 +711,8 @@ void TableEntry::MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *tx
                 chunk_index_entry->Commit(txn->CommitTS());
                 txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
 
+                segment_index_entry->AddWalIndexDump(chunk_index_entry.get(), txn);
+
                 if (index_base->index_type_ == IndexType::kFullText) {
                     table_index_entry->UpdateFulltextSegmentTs(txn->CommitTS());
                 }

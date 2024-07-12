@@ -97,7 +97,7 @@ BufferManager::~BufferManager() { RemoveClean(); }
 
 BufferObj *BufferManager::AllocateBufferObject(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
-    auto buffer_obj = MakeUnique<BufferObj>(this, true, std::move(file_worker));
+    auto buffer_obj = MakeUnique<BufferObj>(this, true, std::move(file_worker), buffer_id_++);
 
     BufferObj *res = buffer_obj.get();
     {
@@ -121,7 +121,7 @@ BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker) {
         return iter1->second.get();
     }
 
-    auto buffer_obj = MakeUnique<BufferObj>(this, false, std::move(file_worker));
+    auto buffer_obj = MakeUnique<BufferObj>(this, false, std::move(file_worker), buffer_id_++);
 
     BufferObj *res = buffer_obj.get();
     buffer_map_.emplace(std::move(file_path), std::move(buffer_obj));
@@ -273,8 +273,8 @@ void BufferManager::MoveTemp(BufferObj *buffer_obj) {
 }
 
 SizeT BufferManager::LRUIdx(BufferObj *buffer_obj) const {
-    auto p = reinterpret_cast<u64>(buffer_obj);
-    return p % lru_caches_.size();
+    auto id = buffer_obj->id();
+    return id % lru_caches_.size();
 }
 
 } // namespace infinity
