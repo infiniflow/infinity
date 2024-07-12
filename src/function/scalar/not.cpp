@@ -41,7 +41,6 @@ struct NotFunction {
             result = !input;
         } else {
             String error_message = "NOT function accepts only u8 and BooleanT.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

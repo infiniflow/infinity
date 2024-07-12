@@ -44,7 +44,6 @@ struct OrFunction {
             result = left or right;
         } else {
             String error_message = "OR function accepts only u8 and BooleanT.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

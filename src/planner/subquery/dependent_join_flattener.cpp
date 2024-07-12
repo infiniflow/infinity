@@ -80,7 +80,6 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
     // 1. Validates if the logical node was checked in operator2correlated_expression_map_ before.
     if (!operator2correlated_expression_map_.contains(subquery_plan->node_id())) {
         Status status = Status::SyntaxError(fmt::format("Logical node {} wasn't detected before.", subquery_plan->node_id()));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -125,14 +124,12 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
         case LogicalNodeType::kUnion:
         case LogicalNodeType::kIntersect: {
             Status status = Status::SyntaxError("Can't push down through set operation node");
-            LOG_ERROR(status.message());
             RecoverableError(status);
 
             break;
         }
         case LogicalNodeType::kJoin: {
             Status status = Status::SyntaxError("Can't push down through join node");
-            LOG_ERROR(status.message());
             RecoverableError(status);
 
             break;
@@ -210,7 +207,6 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
         }
         case LogicalNodeType::kLimit: {
             Status status = Status::SyntaxError("Can't push down through limit node");
-            LOG_ERROR(status.message());
             RecoverableError(status);
             break;
         }
@@ -258,13 +254,11 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
         }
         case LogicalNodeType::kSort: {
             Status status = Status::SyntaxError("Can't push down through order by node");
-            LOG_ERROR(status.message());
             RecoverableError(status);
             break;
         }
         case LogicalNodeType::kTableScan: {
             Status status = Status::SyntaxError("Can't push down through table scan node");
-            LOG_ERROR(status.message());
             RecoverableError(status);
             break;
         }
@@ -289,22 +283,18 @@ SharedPtr<LogicalNode> DependentJoinFlattener::PushDependentJoinInternal(const S
         case LogicalNodeType::kExplain:
         case LogicalNodeType::kPrepare: {
             Status status = Status::SyntaxError(fmt::format("Logical node {} should be involved in subquery.", subquery_plan->name()));
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         case LogicalNodeType::kInvalid: {
             String error_message = "Invalid logical operator node";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         default: {
             String error_message = "Unsupported logical operator node";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
     String error_message = "Unreachable";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return nullptr;
 }
@@ -329,7 +319,6 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
     for (SizeT idx = 1; idx < column_count; ++idx) {
         if (correlated_columns[idx]->binding().table_idx != table_index) {
             Status status = Status::SyntaxError(fmt::format("Correlated column are from different table."));
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         column_names->emplace_back(correlated_columns[idx]->column_name());
@@ -340,7 +329,6 @@ SharedPtr<LogicalNode> DependentJoinFlattener::BuildNoCorrelatedInternal(const S
     const Binding *table_binding_ptr = bind_context_ptr_->GetBindingFromCurrentOrParentByName(correlated_columns[0]->table_name());
     if (table_binding_ptr == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Can't find table: {} in binding context.", correlated_columns[0]->table_name()));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 

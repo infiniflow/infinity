@@ -376,14 +376,12 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
         }
         default: {
             String error_message = fmt::format("UNIMPLEMENTED ReadAdv for WAL command {}", int(cmd_type));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
         String error_message = "ptr goes out of range when reading WalCmd";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return cmd;
@@ -1072,7 +1070,6 @@ String WalCmd::WalCommandTypeToString(WalCommandType type) {
             break;
         default: {
             String error_message = "Unknown command type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -1083,7 +1080,6 @@ UniquePtr<WalEntryIterator> WalEntryIterator::Make(const String &wal_path, bool 
     std::ifstream ifs(wal_path.c_str(), std::ios::binary | std::ios::ate);
     if (!ifs.is_open()) {
         String error_message = "WAL open failed";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto wal_size = ifs.tellg();

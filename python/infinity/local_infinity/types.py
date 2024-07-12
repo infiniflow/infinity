@@ -16,8 +16,9 @@ import struct
 from collections import defaultdict
 from typing import Any, Tuple, Dict, List
 import polars as pl
+import numpy as np
 from numpy import dtype
-
+from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.embedded_infinity_ext import *
 
 def logic_type_to_dtype(ttype: WrapDataType):
@@ -54,11 +55,62 @@ def logic_type_to_dtype(ttype: WrapDataType):
                     case EmbeddingDataType.kElemBit:
                         return object
                     case _:
-                        raise NotImplementedError(f"Unsupported type {ttype}")
+                        raise NotImplementedError(f"Unsupported type {ttype.embedding_type}")
+        case LogicalType.kTensor:
+            return object
         case LogicalType.kSparse:
             return object
         case _:
             raise NotImplementedError(f"Unsupported type {ttype}")
+
+def tensor_to_list(column_data_type, binary_data) -> list[list[Any]]:
+    dimension = column_data_type.embedding_type.dimension
+    if column_data_type.embedding_type.element_type == EmbeddingDataType.kElemBit:
+        all_list = list(struct.unpack('<{}B'.format(len(binary_data)), binary_data))
+        result = []
+        if dimension % 8 != 0:
+            raise ValueError(f"Unsupported dimension {dimension}")
+        sub_dim: int = dimension // 8
+        for i in range(0, len(all_list), sub_dim):
+            mid_res = all_list[i:i + sub_dim]
+            mid_res_int: int = 0
+            for j in reversed(mid_res):
+                mid_res_int = mid_res_int * 256 + j
+            result.append([f"\u007b0:0{dimension}b\u007d".format(mid_res_int)[::-1]])
+        return result
+    elif column_data_type.embedding_type.element_type == EmbeddingDataType.kElemInt8:
+        all_list = list(struct.unpack('<{}b'.format(len(binary_data)), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.embedding_type.element_type == EmbeddingDataType.kElemInt16:
+        all_list = list(struct.unpack('<{}h'.format(len(binary_data) // 2), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.embedding_type.element_type == EmbeddingDataType.kElemInt32:
+        all_list = list(struct.unpack('<{}i'.format(len(binary_data) // 4), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.embedding_type.element_type == EmbeddingDataType.kElemInt64:
+        all_list = list(struct.unpack('<{}q'.format(len(binary_data) // 8), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.embedding_type.element_type == EmbeddingDataType.kElemFloat:
+        all_list = list(struct.unpack('<{}f'.format(len(binary_data) // 4), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.embedding_type.element_type == EmbeddingDataType.kElemDouble:
+        all_list = list(struct.unpack('<{}d'.format(len(binary_data) // 8), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    else:
+        raise NotImplementedError(
+            f"Unsupported type {column_data_type.embedding_type.element_type}")
+
+
+def parse_tensor_bytes(column_data_type, bytes_data):
+    results = []
+    offset = 0
+    while offset < len(bytes_data):
+        length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+        offset += 4
+        tensor_data = tensor_to_list(column_data_type, bytes_data[offset:offset + length])
+        results.append(tensor_data)
+        offset += length
+    return results
 
 def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
         list[Any, ...]:
@@ -119,6 +171,8 @@ def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
                     f"Unsupported type {element_type}")
         case LogicalType.kSparse:
             return parse_sparse_bytes(column_data_type, column_vector)
+        case LogicalType.kTensor:
+            return parse_tensor_bytes(column_data_type, column_vector)
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
 
@@ -128,11 +182,9 @@ def parse_sparse_bytes(column_data_type, column_vector):
     index_type = column_data_type.sparse_type.index_type
     res = []
     offset = 0
-    # print(len(column_vector))
     while offset < len(column_vector):
         nnz = struct.unpack('I', column_vector[offset:offset + 4])[0]
         offset += 4
-        # print(nnz)
         indices = []
         values = []
         match index_type:
@@ -173,7 +225,6 @@ def parse_sparse_bytes(column_data_type, column_vector):
                 pass
             case _:
                 raise NotImplementedError(f"Unsupported type {element_type}")
-        # print("indices: {}, values: {}".format(indices, values))
         res.append({"indices": indices, "values": values})
     return res
 
@@ -188,6 +239,46 @@ def parse_bytes(bytes_data):
         results.append(string_data)
         offset += length
     return results
+
+def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embedding_data_type: str,
+                           method_type: str, extra_option: str = None) -> WrapMatchTensorExpr:
+    match_tensor_expr = WrapMatchTensorExpr()
+
+    match_tensor_expr.column_expr = WrapColumnExpr()
+    match_tensor_expr.column_expr.names = [vector_column_name]
+    match_tensor_expr.column_expr.star = False
+
+    match_tensor_expr.search_method = method_type
+    if (extra_option is not None) and (extra_option != ''):
+        match_tensor_expr.options_text = extra_option
+    data = EmbeddingData()
+    elem_type = EmbeddingDataType.kElemFloat
+    if embedding_data_type == 'bit':
+        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+    elif embedding_data_type == 'tinyint' or embedding_data_type == 'int8' or embedding_data_type == 'i8':
+        elem_type = EmbeddingDataType.kElemInt8
+        data.i8_array_value = np.asarray(embedding_data, dtype=np.int8).flatten()
+    elif embedding_data_type == 'smallint' or embedding_data_type == 'int16' or embedding_data_type == 'i16':
+        elem_type = EmbeddingDataType.kElemInt16
+        data.i16_array_value = np.asarray(embedding_data, dtype=np.int16).flatten()
+    elif embedding_data_type == 'int' or embedding_data_type == 'int32' or embedding_data_type == 'i32':
+        elem_type = EmbeddingDataType.kElemInt32
+        data.i32_array_value = np.asarray(embedding_data, dtype=np.int32).flatten()
+    elif embedding_data_type == 'bigint' or embedding_data_type == 'int64' or embedding_data_type == 'i64':
+        elem_type = EmbeddingDataType.kElemInt64
+        data.i64_array_value = np.asarray(embedding_data, dtype=np.int64).flatten()
+    elif embedding_data_type == 'float' or embedding_data_type == 'float32' or embedding_data_type == 'f32':
+        elem_type = EmbeddingDataType.kElemFloat
+        data.f32_array_value = np.asarray(embedding_data, dtype=np.float32).flatten()
+    elif embedding_data_type == 'double' or embedding_data_type == 'float64' or embedding_data_type == 'f64':
+        elem_type = EmbeddingDataType.kElemDouble
+        data.f64_array_value = np.asarray(embedding_data, dtype=np.float64).flatten()
+    else:
+        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+
+    match_tensor_expr.embedding_data_type = elem_type
+    match_tensor_expr.embedding_data = data
+    return match_tensor_expr
 
 def build_result(res: WrapQueryResult) -> tuple[dict[str | Any, list[Any, Any]], dict[str | Any, Any]]:
     data_dict = {}

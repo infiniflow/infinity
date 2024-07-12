@@ -139,7 +139,7 @@ public:
     // replay
     void UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts, TxnTimeStamp commit_ts);
 
-    Vector<SharedPtr<ChunkIndexEntry>> OptIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
+    void OptIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
 
 private:
     static SharedPtr<String> DetermineIndexDir(const String &base_dir, const String &parent_dir, const String &index_name) {

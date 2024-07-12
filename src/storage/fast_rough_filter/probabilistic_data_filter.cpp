@@ -30,7 +30,6 @@ void ProbabilisticDataFilter::Build(TxnTimeStamp begin_ts, ColumnID column_id, u
     auto &binary_fuse_filter = binary_fuse_filters_[column_id];
     if (!binary_fuse_filter) {
         String error_message = fmt::format("BUG: ProbabilisticDataFilter for column_id: {} is nullptr.", column_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     binary_fuse_filter->Build(begin_ts, data, count);
@@ -73,7 +72,6 @@ void ProbabilisticDataFilter::SerializeToStringStream(OStringStream &os, u32 tot
     auto end_pos = os.tellp();
     if (end_pos - begin_pos != total_binary_bytes) {
         String error_message = "ProbabilisticDataFilter::SerializeToStringStream(): save size error";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -93,7 +91,6 @@ void ProbabilisticDataFilter::DeserializeFromStringStream(IStringStream &is) {
         LOG_TRACE("ProbabilisticDataFilter::DeserializeFromStringStream(): begin with existing filter array");
     } else {
         String error_message = "ProbabilisticDataFilter::DeserializeFromStringStream(): column_count mismatch";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     for (char binary_fuse_filter_exist; auto &filter : binary_fuse_filters_) {
@@ -112,7 +109,6 @@ void ProbabilisticDataFilter::DeserializeFromStringStream(IStringStream &is) {
     auto end_pos = is.tellg();
     if (end_pos - begin_pos != expected_total_binary_bytes) {
         String error_message = "ProbabilisticDataFilter::DeserializeFromStringStream(): position error";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -129,7 +125,6 @@ void ProbabilisticDataFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
     auto result_view = os.view();
     if (result_view.size() != total_binary_bytes) {
         String error_message = "BUG: ProbabilisticDataFilter::SaveToJsonFile(): save size error";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     entry_json[JsonTag] = base64::to_base64(result_view);
@@ -146,7 +141,6 @@ bool ProbabilisticDataFilter::LoadFromJsonFile(const nlohmann::json &entry_json)
     DeserializeFromStringStream(is);
     if (!is or u32(is.tellg()) != is.view().size()) {
         String error_message = "ProbabilisticDataFilter::LoadFromJsonFile(): load size error";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -203,7 +197,6 @@ u64 ConvertValueToU64(const Value &value) {
         }
         default: {
             String error_message = fmt::format("ConvertValueToU64() not implemented for type {}", value.type_.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return 0;
         }

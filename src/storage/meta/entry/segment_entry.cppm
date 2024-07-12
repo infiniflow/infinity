@@ -222,7 +222,6 @@ protected: // protected for unit test
     void DecreaseRemainRow(SizeT decrease_row_count) {
         if (decrease_row_count > actual_row_count_) {
             String error_message = "Decrease row count exceed actual row count";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         actual_row_count_ -= decrease_row_count;

@@ -63,7 +63,9 @@ namespace infinity {
 
 u64 Infinity::GetSessionId() { return session_->session_id(); }
 
-void Infinity::Hello() { std::cout << "hello infinity" << std::endl; }
+void Infinity::Hello() {
+    fmt::print("hello infinity\n");
+}
 
 void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
@@ -309,7 +311,6 @@ QueryResult Infinity::ShowVariable(const String &variable_name, SetScope scope) 
         }
         default: {
             String error_message = "Invalid set scope.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -338,7 +339,6 @@ QueryResult Infinity::ShowVariables(SetScope scope) {
         }
         default: {
             String error_message = "Invalid set scope.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

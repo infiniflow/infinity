@@ -177,7 +177,6 @@ bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operat
                 }
                 default: {
                     Status status = Status::NotSupport("Not implemented KNN distance");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
             }
@@ -185,7 +184,6 @@ bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operat
         }
         default: {
             Status status = Status::NotSupport("Not implemented embedding data type");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
@@ -324,7 +322,6 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
         const auto &segment_index_hashmap = base_table_ref_->block_index_->segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
             String error_message = fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         } else {
             segment_entry = iter->second.segment_entry_;
@@ -390,7 +387,6 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                             }
                             default: {
                                 Status status = Status::NotSupport("Not implemented KNN distance");
-                                LOG_ERROR(status.message());
                                 RecoverableError(status);
                             }
                         }
@@ -472,7 +468,6 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 result_n = result_n1;
                             } else if (result_n != (i64)result_n1) {
                                 String error_message = "KnnScan: result_n mismatch";
-                                LOG_CRITICAL(error_message);
                                 UnrecoverableError(error_message);
                             }
 
@@ -500,7 +495,6 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 switch (knn_scan_shared_data->knn_distance_type_) {
                                     case KnnDistanceType::kInvalid: {
                                         String error_message = "Invalid distance type";
-                                        LOG_CRITICAL(error_message);
                                         UnrecoverableError(error_message);
                                     }
                                     case KnnDistanceType::kL2:
@@ -544,7 +538,6 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 }
                 default: {
                     Status status = Status::NotSupport("Not implemented index type");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
             }

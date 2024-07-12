@@ -78,7 +78,6 @@ struct LikeFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA, TB, TC &) {
         String error_message = "Not implement: LikeFunction";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 };
@@ -86,7 +85,6 @@ struct LikeFunction {
 template <>
 inline void LikeFunction::Run(VarcharT &, VarcharT &, bool &) {
     String error_message = "Not implement";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 
 //    ptr_t left_ptr = left.GetDataPtr();
@@ -101,7 +99,6 @@ struct NotLikeFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA, TB, TC &) {
         String error_message = "Not implement";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
 
     }
@@ -110,7 +107,6 @@ struct NotLikeFunction {
 template <>
 inline void NotLikeFunction::Run(VarcharT &, VarcharT &, bool &) {
     String error_message = "Not implement";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 
 

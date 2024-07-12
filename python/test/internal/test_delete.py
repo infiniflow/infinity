@@ -125,8 +125,6 @@ class TestDelete(TestSdk):
 
     # delete table, all rows are met the condition
     @trace_expected_exceptions
-    @pytest.mark.parametrize('column_types', common_values.types_array)
-    @pytest.mark.parametrize('column_types_example', common_values.types_example_array)
     def _test_delete_table_all_row_met_the_condition(self, column_types, column_types_example):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_delete_table_all_row_met_the_condition", ConflictType.Ignore)

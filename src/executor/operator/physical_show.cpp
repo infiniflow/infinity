@@ -478,7 +478,6 @@ void PhysicalShow::Init() {
         }
         default: {
             Status status = Status::NotSupport("Not implemented show type");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
@@ -611,7 +610,6 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         default: {
             String error_message = "Invalid chunk scan type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -629,7 +627,6 @@ void PhysicalShow::ExecuteShowDatabase(QueryContext *query_context, ShowOperator
     auto [database_info, status] = txn->GetDatabaseInfo(db_name_);
 
     if (!status.ok()) {
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -706,7 +703,6 @@ void PhysicalShow::ExecuteShowTable(QueryContext *query_context, ShowOperatorSta
     auto [table_info, status] = txn->GetTableInfo(db_name_, object_name_);
 
     if (!status.ok()) {
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -829,7 +825,6 @@ void PhysicalShow::ExecuteShowIndex(QueryContext *query_context, ShowOperatorSta
     auto [table_index_info, status] = txn->GetTableIndexInfo(db_name_, object_name_, index_name_.value());
 
     if (!status.ok()) {
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -1014,14 +1009,12 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
     auto [table_entry, status1] = txn->GetTableByName(db_name_, object_name_);
     if (!status1.ok()) {
-        LOG_ERROR(status1.message());
         RecoverableError(status1);
         return;
     }
 
     auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, object_name_, index_name_.value());
     if (!status2.ok()) {
-        LOG_ERROR(status2.message());
         RecoverableError(status2);
         return;
     }
@@ -1030,7 +1023,6 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
     auto iter = segment_map.find(segment_id_.value());
     if(iter == segment_map.end()) {
         show_operator_state->status_ = Status::SegmentNotExist(segment_id_.value());
-        LOG_ERROR(show_operator_state->status_.message());
         RecoverableError(show_operator_state->status_);
     }
 
@@ -1108,7 +1100,6 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
                 case IndexType::kIVFFlat: {
                     Status status3 = Status::InvalidIndexName(index_type_name);
                     show_operator_state->status_ = status3;
-                    LOG_ERROR(fmt::format("{} isn't implemented.", index_type_name));
                     RecoverableError(status3);
                     break;
                 }
@@ -1134,7 +1125,6 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
                 }
                 case IndexType::kInvalid: {
                     Status status3 = Status::InvalidIndexName(index_type_name);
-                    LOG_ERROR(fmt::format("{} is invalid.", index_type_name));
                     RecoverableError(status3);
                     break;
                 }
@@ -1158,14 +1148,12 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
 
     auto [table_entry, status1] = txn->GetTableByName(db_name_, object_name_);
     if (!status1.ok()) {
-        LOG_ERROR(status1.message());
         RecoverableError(status1);
         return;
     }
 
     auto [table_index_entry, status2] = txn->GetIndexByName(db_name_, object_name_, index_name_.value());
     if (!status2.ok()) {
-        LOG_ERROR(status2.message());
         RecoverableError(status2);
         return;
     }
@@ -1174,7 +1162,6 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
     auto iter = segment_map.find(segment_id_.value());
     if(iter == segment_map.end()) {
         show_operator_state->status_ = Status::SegmentNotExist(segment_id_.value());
-        LOG_ERROR(show_operator_state->status_.message());
         RecoverableError(show_operator_state->status_);
     }
 
@@ -1187,7 +1174,6 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
         case IndexType::kIVFFlat: {
             Status status3 = Status::InvalidIndexName(index_type_name);
             show_operator_state->status_ = status3;
-            LOG_ERROR(fmt::format("{} isn't implemented.", index_type_name));
             RecoverableError(status3);
             break;
         }
@@ -1218,7 +1204,6 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
         }
         case IndexType::kInvalid: {
             Status status3 = Status::InvalidIndexName(index_type_name);
-            LOG_ERROR(fmt::format("{} is invalid.", index_type_name));
             RecoverableError(status3);
             break;
         }
@@ -1227,7 +1212,6 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
     ChunkID chunk_id = chunk_id_.value();
     if(chunk_id >= chunk_indexes.size()) {
         show_operator_state->status_ = Status::ChunkNotExist(chunk_id);
-        LOG_ERROR(show_operator_state->status_.message());
         RecoverableError(show_operator_state->status_);
     }
 
@@ -1375,7 +1359,6 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
     Status status = txn->GetTables(db_name_, table_collections_detail);
 
     if (!status.ok()) {
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -1455,7 +1438,6 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
                 }
                 default: {
                     String error_message = "Invalid table type";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -1474,7 +1456,6 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
                 }
                 default: {
                     String error_message = "Invalid table type";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -1493,7 +1474,6 @@ void PhysicalShow::ExecuteShowTables(QueryContext *query_context, ShowOperatorSt
                 }
                 default: {
                     String error_message = "Invalid table type";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -1534,7 +1514,6 @@ void PhysicalShow::ExecuteShowViews(QueryContext *query_context, ShowOperatorSta
     Status status = txn->GetViews(db_name_, views_detail);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -1682,7 +1661,6 @@ void PhysicalShow::ExecuteShowColumns(QueryContext *query_context, ShowOperatorS
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -1777,7 +1755,6 @@ void PhysicalShow::ExecuteShowSegments(QueryContext *query_context, ShowOperator
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -1842,7 +1819,6 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -1937,7 +1913,6 @@ void PhysicalShow::ExecuteShowSegmentDetail(QueryContext *query_context, ShowOpe
 
     } else {
         Status status = Status::SegmentNotExist(*segment_id_);
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -1971,7 +1946,6 @@ void PhysicalShow::ExecuteShowBlocks(QueryContext *query_context, ShowOperatorSt
     auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
     if (!segment_entry) {
         Status status = Status::SegmentNotExist(*segment_id_);
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -2039,7 +2013,6 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
     if (!segment_entry) {
         Status status = Status::SegmentNotExist(*segment_id_);
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -2047,7 +2020,6 @@ void PhysicalShow::ExecuteShowBlockDetail(QueryContext *query_context, ShowOpera
     auto block_entry = segment_entry->GetBlockEntryByID(*block_id_);
     if (!block_entry) {
         Status status = Status::BlockNotExist(*block_id_);
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -2120,7 +2092,6 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     auto [table_entry, status] = txn->GetTableByName(db_name_, object_name_);
     if (!status.ok()) {
         show_operator_state->status_ = status.clone();
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -2130,7 +2101,6 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
 
     if (table_column_id >= column_count) {
         Status status = Status::ColumnNotExist(fmt::format("index {}", table_column_id));
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -2138,7 +2108,6 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     auto segment_entry = table_entry->GetSegmentByID(*segment_id_, begin_ts);
     if (!segment_entry) {
         Status status = Status::SegmentNotExist(*segment_id_);
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -2146,7 +2115,6 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     auto block_entry = segment_entry->GetBlockEntryByID(*block_id_);
     if (!block_entry) {
         Status status = Status::BlockNotExist(*block_id_);
-        LOG_ERROR(status.message());
         RecoverableError(status);
         return;
     }
@@ -2154,7 +2122,6 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     auto column_block_entry = block_entry->GetColumnBlockEntry(table_column_id);
     if (!column_block_entry) {
         String error_message = fmt::format("Attempt to get column {} from block {}", table_column_id, *block_id_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return;
     }
@@ -3194,7 +3161,6 @@ void PhysicalShow::ExecuteShowSessionVariable(QueryContext *query_context, ShowO
         }
         default: {
             operator_state->status_ = Status::NoSysVar(object_name_);
-            LOG_ERROR(operator_state->status_.message());
             RecoverableError(operator_state->status_);
             return;
         }
@@ -3340,7 +3306,6 @@ void PhysicalShow::ExecuteShowSessionVariables(QueryContext *query_context, Show
             }
             default: {
                 operator_state->status_ = Status::NoSysVar(var_name);
-                LOG_ERROR(operator_state->status_.message());
                 RecoverableError(operator_state->status_);
                 return;
             }
@@ -3765,7 +3730,6 @@ void PhysicalShow::ExecuteShowGlobalVariable(QueryContext *query_context, ShowOp
         }
         default: {
             operator_state->status_ = Status::NoSysVar(object_name_);
-            LOG_ERROR(operator_state->status_.message());
             RecoverableError(operator_state->status_);
             return;
         }
@@ -4247,7 +4211,6 @@ void PhysicalShow::ExecuteShowGlobalVariables(QueryContext *query_context, ShowO
             }
             default: {
                 operator_state->status_ = Status::NoSysVar(var_name);
-                LOG_ERROR(operator_state->status_.message());
                 RecoverableError(operator_state->status_);
                 return;
             }
@@ -4364,7 +4327,6 @@ void PhysicalShow::ExecuteShowConfig(QueryContext *query_context, ShowOperatorSt
         }
         default: {
             String error_message = "Invalid option data type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -4545,7 +4507,6 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
     QueryInfo* query_info_ptr = query_context->session_manager()->GetQueryRecord(*session_id_);
     if(query_info_ptr == nullptr) {
         Status status = Status::SessionNotFound(*session_id_);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -4709,7 +4670,6 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
     UniquePtr<TxnInfo> txn_info = txn_manager->GetTxnInfoByID(*txn_id_);
     if(txn_info.get() == nullptr) {
         Status status = Status::TransactionNotFound(*txn_id_);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -4953,7 +4913,6 @@ void PhysicalShow::ExecuteShowCatalogs(QueryContext *query_context, ShowOperator
     auto catalog_fileinfo = wal_manager->GetCatalogFiles();
     if (!catalog_fileinfo.has_value()) {
         String error_message = fmt::format("Can't get catalog files");
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto &[full_catalog_file_info, delta_catalog_file_infos] = catalog_fileinfo.value();

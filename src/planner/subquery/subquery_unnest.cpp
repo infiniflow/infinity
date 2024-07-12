@@ -153,13 +153,11 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
             //         |-> Limit (1)
             //             |-> right plan tree
             Status status = Status::SyntaxError("Plan EXISTS uncorrelated subquery");
-            LOG_ERROR(status.message());
             RecoverableError(status);
             break;
         }
         case SubqueryType::kNotExists: {
             Status status = Status::SyntaxError("Plan not EXISTS uncorrelated subquery");
-            LOG_ERROR(status.message());
             RecoverableError(status);
             break;
         }
@@ -212,18 +210,15 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestUncorrelated(SubqueryExpression 
         }
         case SubqueryType::kAny: {
             Status status = Status::SyntaxError("Plan ANY uncorrelated subquery");
-            LOG_ERROR(status.message());
             RecoverableError(status);
             break;
         }
         default: {
             String error_message = "Unknown subquery type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
     String error_message = "Not implement to unnest uncorrelated subquery.";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return nullptr;
 }
@@ -237,7 +232,6 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
 
     if (correlated_columns.empty()) {
         Status status = Status::SyntaxError("No correlated column");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -247,7 +241,6 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
     for (SizeT idx = 1; idx < column_count; ++idx) {
         if (table_index != correlated_columns[idx]->binding().table_idx) {
             Status status = Status::SyntaxError("Correlated columns can be only from one table, now.");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
@@ -407,12 +400,10 @@ SharedPtr<BaseExpression> SubqueryUnnest::UnnestCorrelated(SubqueryExpression *e
         }
         case SubqueryType::kAny: {
             Status status = Status::SyntaxError("Unnest correlated any subquery.");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
     String error_message = "Unreachable";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return nullptr;
 }
@@ -431,7 +422,6 @@ void SubqueryUnnest::GenerateJoinConditions(QueryContext *query_context,
         SizeT correlated_column_index = correlated_base_index + idx;
         if (correlated_column_index >= subplan_column_bindings.size()) {
             Status status = Status::SyntaxError(fmt::format("Column index is out of range.{}/{}", correlated_column_index, subplan_column_bindings.size()));
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
 

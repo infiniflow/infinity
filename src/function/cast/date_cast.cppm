@@ -46,7 +46,6 @@ export inline BoundCastFunc BindDateCast(DataType &target) {
         }
         default: {
             String error_message = fmt::format("Can't cast from Date type to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -57,7 +56,6 @@ struct DateTryCastToFixlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType , TargetType &) {
         String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -67,7 +65,6 @@ struct DateTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType , TargetType &, ColumnVector*) {
         String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -76,7 +73,6 @@ struct DateTryCastToVarlen {
 template <>
 inline bool DateTryCastToFixlen::Run(DateT , DateTimeT &) {
     String error_message = "Not implemented";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -84,7 +80,6 @@ inline bool DateTryCastToFixlen::Run(DateT , DateTimeT &) {
 template <>
 inline bool DateTryCastToFixlen::Run(DateT , TimestampT &) {
     String error_message = "Not implemented";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -92,7 +87,6 @@ inline bool DateTryCastToFixlen::Run(DateT , TimestampT &) {
 template <>
 inline bool DateTryCastToVarlen::Run(DateT , VarcharT &, ColumnVector*) {
     String error_message = "Not implemented";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }

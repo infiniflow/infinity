@@ -56,7 +56,6 @@ struct ColumnValueReaderTypeGreaterEqualsFunction {
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, BigIntT, bool &) {
     String error_message = "Not implement: GreaterEqualsFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
@@ -68,7 +67,6 @@ inline void GreaterEqualsFunction::Run(BigIntT left, MixedT right, bool &result)
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, DoubleT, bool &) {
     String error_message = "Not implement: GreaterEqualsFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
@@ -80,7 +78,6 @@ inline void GreaterEqualsFunction::Run(DoubleT left, MixedT right, bool &result)
 template <>
 inline void GreaterEqualsFunction::Run(MixedT, VarcharT, bool &) {
     String error_message = "Not implement: GreaterEqualsFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 

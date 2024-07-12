@@ -78,7 +78,6 @@ void CatalogFile::RecycleCatalogFile(TxnTimeStamp max_commit_ts, const String &c
     }
     if (!found) {
         String error_message = fmt::format("Full catalog file {} not found in the catalog directory: {}", max_commit_ts, catalog_dir);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     for (const auto &delta_info : delta_infos) {
@@ -169,7 +168,6 @@ Pair<Optional<TempWalFileInfo>, Vector<WalFileInfo>> WalFile::ParseWalFilenames(
         if (IsEqual(filename, WalFile::TempWalFilename())) {
             if (cur_wal_info.has_value()) {
                 String error_message = fmt::format("Multiple current wal files found in the wal directory: {}", wal_dir);
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             cur_wal_info = TempWalFileInfo{entry->path().string()};

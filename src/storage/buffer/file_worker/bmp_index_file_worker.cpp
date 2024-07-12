@@ -101,7 +101,6 @@ ConstAbstractBMP BMPIndexFileWorker::GetConstAbstractIndex() const {
 void BMPIndexFileWorker::AllocateInMemory() {
     if (data_) {
         const auto error_message = "Data is already allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto index = GetAbstractIndex();
@@ -129,7 +128,6 @@ void BMPIndexFileWorker::AllocateInMemory() {
 void BMPIndexFileWorker::FreeInMemory() {
     if (!data_) {
         const auto error_message = "Data is not allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 

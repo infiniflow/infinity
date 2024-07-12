@@ -34,7 +34,7 @@ public:
 public:
     std::string method_;
     std::shared_ptr<SearchOptions> options_;
-    std::unique_ptr<MatchTensorExpr> match_tensor_expr_;
+    std::unique_ptr<MatchTensorExpr> match_tensor_expr_{nullptr};
 };
 
 } // namespace infinity

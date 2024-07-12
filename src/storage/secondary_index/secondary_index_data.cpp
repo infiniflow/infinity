@@ -129,7 +129,6 @@ public:
     void SaveIndexInner(FileHandler &file_handler) const override {
         if (!need_save_) {
             String error_message = "SaveIndexInner(): error: SecondaryIndexDataT is not allocated.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         pgm_index_->SaveIndex(file_handler);
@@ -140,18 +139,15 @@ public:
     void InsertData(void *ptr, SharedPtr<ChunkIndexEntry> &chunk_index) override {
         if (!need_save_) {
             String error_message = "InsertData(): error: SecondaryIndexDataT is not allocated.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         auto map_ptr = static_cast<MultiMap<OrderedKeyType, u32> *>(ptr);
         if (!map_ptr) {
             String error_message = "InsertData(): error: map_ptr type error.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (map_ptr->size() != chunk_row_count_) {
             String error_message = fmt::format("InsertData(): error: map size: {} != chunk_row_count_: {}", map_ptr->size(), chunk_row_count_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         u32 i = 0;
@@ -162,7 +158,6 @@ public:
         }
         if (i != chunk_row_count_) {
             String error_message = fmt::format("InsertData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         OutputAndBuild(chunk_index);
@@ -171,7 +166,6 @@ public:
     void InsertMergeData(Vector<ChunkIndexEntry *> &old_chunks, SharedPtr<ChunkIndexEntry> &merged_chunk_index_entry) override {
         if (!need_save_) {
             String error_message = "InsertMergeData(): error: SecondaryIndexDataT is not allocated.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         SecondaryIndexChunkMerger<RawValueType> merger(old_chunks);
@@ -185,7 +179,6 @@ public:
         }
         if (i != chunk_row_count_) {
             String error_message = fmt::format("InsertMergeData(): error: i: {} != chunk_row_count_: {}", i, chunk_row_count_);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         OutputAndBuild(merged_chunk_index_entry);
@@ -211,7 +204,6 @@ public:
 SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, const u32 chunk_row_count, const bool allocate) {
     if (!(data_type->CanBuildSecondaryIndex())) {
         String error_message = fmt::format("Cannot build secondary index on data type: {}", data_type->ToString());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return nullptr;
     }
@@ -251,7 +243,6 @@ SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, 
         }
         default: {
             String error_message = fmt::format("Need to add secondary index support for data type: {}", data_type->ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return nullptr;
         }
@@ -261,7 +252,6 @@ SecondaryIndexData *GetSecondaryIndexData(const SharedPtr<DataType> &data_type, 
 u32 GetSecondaryIndexDataPairSize(const SharedPtr<DataType> &data_type) {
     if (!(data_type->CanBuildSecondaryIndex())) {
         String error_message = fmt::format("Cannot build secondary index on data type: {}", data_type->ToString());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return 0;
     }
@@ -301,7 +291,6 @@ u32 GetSecondaryIndexDataPairSize(const SharedPtr<DataType> &data_type) {
         }
         default: {
             String error_message = fmt::format("Need to add secondary index support for data type: {}", data_type->ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return 0;
         }

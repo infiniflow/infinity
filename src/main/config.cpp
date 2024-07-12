@@ -1616,7 +1616,6 @@ void Config::SetRecordRunningQuery(bool flag) {
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kRecordRunningQuery);
     if (base_option->data_type_ != BaseOptionDataType::kBoolean) {
         String error_message = "Attempt to fetch bool value from record running query data type option";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     BooleanOption *record_running_query_option = static_cast<BooleanOption *>(base_option);
@@ -1685,7 +1684,6 @@ void Config::SetLogLevel(LogLevel level) {
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
     if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
         String error_message = "Attempt to fetch log level value from log level data type option";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     LogLevelOption *log_level_option = static_cast<LogLevelOption *>(base_option);
@@ -1698,7 +1696,6 @@ LogLevel Config::GetLogLevel() {
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
     if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
         String error_message = "Attempt to fetch log level value from log level data type option";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     LogLevelOption *log_level_option = static_cast<LogLevelOption *>(base_option);
@@ -1778,7 +1775,6 @@ FlushOptionType Config::FlushMethodAtCommit() {
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kFlushMethodAtCommit);
     if (base_option->data_type_ != BaseOptionDataType::kFlush) {
         String error_message = "Attempt to fetch flush option value from flush option data type option";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     FlushOption *flush_option = static_cast<FlushOption *>(base_option);

@@ -36,7 +36,6 @@ SharedPtr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const Share
 
     if (expression->depth() > 1) {
         Status status = Status::SyntaxError("Correlated depth > 1 is not supported now.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -44,7 +43,6 @@ SharedPtr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const Share
     if (entry == bind_context_ptr_->correlated_column_map_.end()) {
         // This column expression wasn't stored in correlated column map before
         String error_message = "Correlated expression isn't found.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -61,7 +59,6 @@ SharedPtr<BaseExpression> RewriteCorrelatedExpressions::VisitReplace(const Share
     }
 
     Status status = Status::SyntaxError("Not support rewrite nested correlated subquery in the subquery plan");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return nullptr;
 }

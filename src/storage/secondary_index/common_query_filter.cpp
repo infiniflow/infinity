@@ -186,7 +186,6 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
                                                segment_id,
                                                segment_row_count_real,
                                                segment_row_count);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         // merge

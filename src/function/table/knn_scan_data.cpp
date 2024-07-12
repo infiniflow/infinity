@@ -79,7 +79,6 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 cur
         default: {
             Status status = Status::NotSupport(
                 fmt::format("EmbeddingDataType: {} is not support.", EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data_->elem_type_)));
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
@@ -90,7 +89,6 @@ void KnnScanFunctionData::Init() {
     switch (knn_scan_shared_data_->knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
             String error_message = "Invalid Knn distance type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case KnnDistanceType::kL2:

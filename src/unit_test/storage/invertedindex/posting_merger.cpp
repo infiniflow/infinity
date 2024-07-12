@@ -145,7 +145,6 @@ TEST_F(PostingMergerTest, Basic) {
             auto [file_handler, status] = fs.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
             if(!status.ok()) {
                 String error_message = status.message();
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             const u32 file_size = fs.GetFileSize(*file_handler);
@@ -155,7 +154,6 @@ TEST_F(PostingMergerTest, Basic) {
             file_handler->Close();
             if (read_count != file_size) {
                 String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }

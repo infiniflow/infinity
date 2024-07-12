@@ -112,7 +112,6 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchTensorScan::GetOutputTypes()
 ColumnID PhysicalMatchTensorScan::SearchColumnID() const {
     if (search_column_id_ == std::numeric_limits<ColumnID>::max()) {
         String error_message = "Search column id is not set. Init() error.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return search_column_id_;
@@ -124,20 +123,17 @@ void PhysicalMatchTensorScan::CheckColumn() {
     const auto &column_type_ptr = column_def->type();
     if (const auto l_type = column_type_ptr->type(); l_type != LogicalType::kTensor and l_type != LogicalType::kTensorArray) {
         String error_message = fmt::format("Column {} is not a tensor or tensorarray column", column_def->name());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const auto &type_info = column_type_ptr->type_info();
     if (type_info->type() != TypeInfoType::kEmbedding) {
         String error_message = fmt::format("Column {} is not a tensor column", column_def->name());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
     if (embedding_info->Dimension() != match_tensor_expr_->tensor_basic_embedding_dimension_) {
         String error_message =
             fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), match_tensor_expr_->ToString());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -214,7 +210,6 @@ void CalculateScoreOnColumnVector(ColumnVector &column_vector,
 void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTensorScanOperatorState *operator_state) const {
     if (!operator_state->data_block_array_.empty()) {
         String error_message = "TensorScan output data block array should be empty";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     Txn *txn = query_context->GetTxn();
@@ -227,7 +222,6 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
     MatchTensorScanFunctionData &function_data = *(operator_state->match_tensor_scan_function_data_);
     if (function_data.finished_) [[unlikely]] {
         String error_message = "MatchTensorScanFunctionData is finished";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const BlockIndex *block_index = base_table_ref_->block_index_.get();
@@ -239,7 +233,6 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         const auto &segment_index_hashmap = base_table_ref_->block_index_->segment_block_index_;
         if (auto iter = segment_index_hashmap.find(segment_id); iter == segment_index_hashmap.end()) {
             String error_message = fmt::format("Cannot find SegmentEntry for segment id: {}", segment_id);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         } else {
             segment_entry = iter->second.segment_entry_;
@@ -381,7 +374,6 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
             if (block_entry == nullptr) {
                 String error_message = fmt::format("Cannot find segment id: {}, block id: {}", segment_id, block_id);
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             if (output_block_row_id == DEFAULT_BLOCK_CAPACITY) {
@@ -661,7 +653,6 @@ void CalculateScoreOnColumnVectorT(TensorScanParameterPack &parameter_pack) {
         }
         case MatchTensorSearchMethod::kInvalid: {
             const auto error_message = "Invalid search method!";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -680,7 +671,6 @@ struct ExecuteMatchTensorScanTypes {
             }
             default: {
                 const auto error_message = "Invalid column type! target column is not Tensor or TensorArray type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -729,7 +719,6 @@ void ElemTypeDispatch(Params &parameter_pack, EmbeddingDataType type_enum, Args.
         }
         case EmbeddingDataType::kElemInvalid: {
             const auto error_message = "Invalid embedding data type!";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -804,7 +793,6 @@ void RerankerScoreT(RerankerParameterPack &parameter_pack) {
         }
         case MatchTensorSearchMethod::kInvalid: {
             const auto error_message = "Invalid search method!";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -823,7 +811,6 @@ struct ExecuteMatchTensorRerankerTypes {
             }
             default: {
                 const auto error_message = "Invalid column type! target column is not Tensor or TensorArray type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }

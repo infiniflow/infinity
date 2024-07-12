@@ -35,7 +35,6 @@ struct SubstrFunction {
     template <typename TA, typename TB, typename TC, typename TD>
     static inline bool Run(TA, TB, TC, TD &, ColumnVector *) {
         String error_message = "Not implement: SubstrFunction::Run";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 };
@@ -44,7 +43,6 @@ template <>
 inline bool SubstrFunction::Run(VarcharT, BigIntT, BigIntT, VarcharT &, ColumnVector *) {
     // Validate the input before slice the string
     String error_message = "Not implement: SubstrFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 
 

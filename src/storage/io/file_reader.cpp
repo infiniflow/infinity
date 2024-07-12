@@ -35,7 +35,6 @@ FileReader::FileReader(FileSystem &fs, const String &path, SizeT buffer_size)
     }
     auto [file_handler, status] = fs_.OpenFile(path, flags, FileLockType::kReadLock);
     if(!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
 
@@ -48,7 +47,6 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
         already_read_size_ = fs_.Read(*file_handler_, buffer, read_size);
         if (already_read_size_ != read_size) {
             Status status = Status::DataIOError(fmt::format("No enough data reading from {}", file_handler_->path_.string()));
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     } else {
@@ -66,7 +64,6 @@ void FileReader::Read(char_t *buffer, SizeT read_size) {
             already_read_size_ = fs_.Read(*file_handler_, buffer + start, read_size - start);
             if (already_read_size_ == 0) {
                 Status status = Status::DataIOError(fmt::format("No enough data reading from {}", file_handler_->path_.string()));
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
 
@@ -80,7 +77,6 @@ void FileReader::ReadAt(i64 file_offset, char_t *buffer, SizeT read_size) {
     already_read_size_ = fs_.ReadAt(*file_handler_, file_offset, buffer, read_size);
     if (already_read_size_ != read_size) {
         Status status = Status::DataIOError(fmt::format("No enough data from file: {}", file_handler_->path_.string()));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 }

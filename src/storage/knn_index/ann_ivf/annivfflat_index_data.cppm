@@ -56,22 +56,18 @@ struct AnnIVFFlatIndexData {
                     const u32 max_points_per_centroid = 256) {
         if (loaded_) {
             String error_message = "AnnIVFFlatIndexData::BuildIndex(): Index data already exists.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (dimension != dimension_) {
             String error_message = "Dimension not match";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
                 Status status = Status::NotSupport("Metric type not implemented");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             } else {
                 Status status = Status::NotSupport("Metric type not supported");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
             return;
@@ -103,22 +99,18 @@ struct AnnIVFFlatIndexData {
                     const u32 max_points_per_centroid = 256) {
         if (loaded_) {
             String error_message = "AnnIVFFlatIndexData::BuildIndex(): Index data already exists.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (dimension != dimension_) {
             String error_message = "Dimension not match";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (metric_ != MetricType::kMetricL2 && metric_ != MetricType::kMetricInnerProduct) {
             if (metric_ != MetricType::kInvalid) {
                 Status status = Status::NotSupport("Metric type not implemented");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             } else {
                 Status status = Status::NotSupport("Metric type not supported");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
             return;
@@ -142,7 +134,6 @@ struct AnnIVFFlatIndexData {
             }
             if (cnt >= full_row_count) {
                 String error_message = "AnnIVFFlatIndexData::BuildIndex(): segment row count more than expected.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             auto &[val_ptr, offset] = pair_opt.value(); // val_ptr is const VectorDataType * type, offset is SegmentOffset type
@@ -238,7 +229,6 @@ struct AnnIVFFlatIndexData {
     void SaveIndexInner(FileHandler &file_handler) {
         if (!loaded_) {
             String error_message = "AnnIVFFlatIndexData::SaveIndexInner(): Index data not loaded.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         file_handler.Write(&metric_, sizeof(metric_));
@@ -261,7 +251,6 @@ struct AnnIVFFlatIndexData {
         u8 file_flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
         auto [file_handler, status] = fs->OpenFile(file_path, file_flags, FileLockType::kWriteLock);
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
             UnrecoverableError(status.message());
         }
         SaveIndexInner(*file_handler);
@@ -298,7 +287,6 @@ struct AnnIVFFlatIndexData {
         u8 file_flags = FileFlags::READ_FLAG;
         auto [file_handler, status] = fs->OpenFile(file_path, file_flags, FileLockType::kReadLock);
         if(!status.ok()) {
-            LOG_CRITICAL(status.message());
             UnrecoverableError(status.message());
         }
         auto index_data = LoadIndexInner(*file_handler);

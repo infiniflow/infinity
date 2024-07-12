@@ -84,7 +84,6 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
         const SegmentID expected_segment_id = base_rowid.segment_id_;
         if (const SegmentID segment_id = segment_entry->segment_id(); segment_id != expected_segment_id) {
             const auto error_msg = fmt::format("EMVBIndex::BuildEMVBIndex: segment_id mismatch: expect {}, got {}.", expected_segment_id, segment_id);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
     }
@@ -137,7 +136,6 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
     if (embedding_count < least_training_data_num) {
         const auto error_msg =
             fmt::format("EMVBIndex::BuildEMVBIndex: embedding_count must be at least {}, got {} instead.", least_training_data_num, embedding_count);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     // train the index
@@ -153,7 +151,6 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
             std::ranges::sample(all_embedding_pos, std::back_inserter(sample_result), training_embedding_num, gen);
             if (sample_result.size() != training_embedding_num) {
                 const auto error_msg = fmt::format("EMVBIndex::BuildEMVBIndex: sample failed to get {} samples.", training_embedding_num);
-                LOG_ERROR(error_msg);
                 UnrecoverableError(error_msg);
             }
             for (u32 i = 0; i < training_embedding_num; ++i) {
@@ -231,7 +228,6 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
     // check n_centroids_
     if (((n_centroids_ % 8) != 0) || (n_centroids_ == 0)) {
         const auto error_msg = fmt::format("EMVBIndex::Train: n_centroids_ must be a multiple of 8, got {} instead.", n_centroids_);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     // allocate space for centroids
@@ -241,7 +237,6 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
     // check training data num
     if (const u32 least_num = ExpectLeastTrainingDataNum(); embedding_num < least_num) {
         const auto error_msg = fmt::format("EMVBIndex::Train: embedding_num must be at least {}, got {} instead.", least_num, embedding_num);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     // train both centroids and residual product quantizer
@@ -258,7 +253,6 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
         if (result_centroid_num != n_centroids_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::Train: KMeans failed to get {} centroids, got {} instead.", n_centroids_, result_centroid_num);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
         LOG_TRACE(fmt::format("EMVBIndex::Train: KMeans got {} centroids.", result_centroid_num));
@@ -329,7 +323,6 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
 void EMVBIndex::AddOneDocEmbeddings(const f32 *embedding_data, const u32 embedding_num) {
     if (embedding_num == 0) {
         const auto error_msg = "EMVBIndex::AddOneDocEmbeddings: embedding_num must be greater than 0.";
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     std::unique_lock lock(rw_mutex_);
@@ -510,7 +503,6 @@ void Serialize(FileHandler &file_handler, const EMVBSharedVec<u32> &val, const u
     const auto [shared_u32_ptr, size] = val.GetData();
     if (size != expect_element_num) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect {}, got {}.", expect_element_num, size);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     file_handler.Write(&expect_element_num, sizeof(expect_element_num));
@@ -520,14 +512,12 @@ void Serialize(FileHandler &file_handler, const EMVBSharedVec<u32> &val, const u
 void DeSerialize(FileHandler &file_handler, EMVBSharedVec<u32> &val, const u32 expect_element_num) {
     if (const auto [_, old_size] = val.GetData(); old_size > 0) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect 0, got {}.", old_size);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     u32 size = 0;
     file_handler.Read(&size, sizeof(size));
     if (size != expect_element_num) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect {}, got {}.", expect_element_num, size);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     const auto tmp_buffer = MakeUniqueForOverwrite<u32[]>(expect_element_num);
@@ -545,7 +535,6 @@ void Serialize(FileHandler &file_handler, const EMVBSharedVec<u32> &val) {
 void DeSerialize(FileHandler &file_handler, EMVBSharedVec<u32> &val) {
     if (const auto [_, old_size] = val.GetData(); old_size > 0) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect 0, got {}.", old_size);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     u32 element_num = 0;
@@ -588,21 +577,18 @@ void EMVBIndex::ReadIndexInner(FileHandler &file_handler) {
         if (tmp_u32 != start_segment_offset_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::ReadIndexInner: start_segment_offset_ mismatch: expect {}, got {}.", start_segment_offset_, tmp_u32);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
         file_handler.Read(&tmp_u32, sizeof(tmp_u32));
         if (tmp_u32 != embedding_dimension_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::ReadIndexInner: embedding_dimension_ mismatch: expect {}, got {}.", embedding_dimension_, tmp_u32);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
         file_handler.Read(&tmp_u32, sizeof(tmp_u32));
         if (tmp_u32 != residual_pq_subspace_num_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::ReadIndexInner: residual_pq_subspace_num_ mismatch: expect {}, got {}.", residual_pq_subspace_num_, tmp_u32);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
         file_handler.Read(&tmp_u32, sizeof(tmp_u32));
@@ -610,7 +596,6 @@ void EMVBIndex::ReadIndexInner(FileHandler &file_handler) {
             const auto error_msg = fmt::format("EMVBIndex::ReadIndexInner: residual_pq_subspace_bits_ mismatch: expect {}, got {}.",
                                                residual_pq_subspace_bits_,
                                                tmp_u32);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
     }
@@ -638,7 +623,6 @@ EMVBIndex &EMVBIndex::operator=(EMVBIndex &&other) {
     if (start_segment_offset_ != other.start_segment_offset_ || embedding_dimension_ != other.embedding_dimension_ ||
         residual_pq_subspace_num_ != other.residual_pq_subspace_num_ || residual_pq_subspace_bits_ != other.residual_pq_subspace_bits_) {
         const auto error_msg = "EMVBIndex::move assignment: const vals mismatch.";
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     // move data

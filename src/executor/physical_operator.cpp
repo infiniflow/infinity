@@ -49,7 +49,6 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
     auto table_ref = table_refs[load_metas[0].binding_.table_idx];
     if (table_ref.get() == nullptr) {
         String error_message = "TableRef not found";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 

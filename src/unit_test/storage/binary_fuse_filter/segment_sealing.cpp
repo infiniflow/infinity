@@ -138,7 +138,6 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
                         break;
                     default: {
                         String error_message = "Invalid segment status";
-                        LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                     }
                 }

@@ -28,8 +28,8 @@ module buffer_obj;
 
 namespace infinity {
 
-BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<FileWorker> file_worker)
-    : buffer_mgr_(buffer_mgr), file_worker_(std::move(file_worker)) {
+BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<FileWorker> file_worker, u32 id)
+    : buffer_mgr_(buffer_mgr), file_worker_(std::move(file_worker)), id_(id) {
     // Init other info
     file_worker_->SetBaseTempDir(buffer_mgr->GetDataDir(), buffer_mgr->GetTempDir());
 
@@ -53,7 +53,6 @@ BufferHandle BufferObj::Load() {
         case BufferStatus::kUnloaded: {
             if (!buffer_mgr_->RemoveFromGCQueue(this)) {
                 String error_message = fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", GetFilename());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             break;
@@ -62,7 +61,6 @@ BufferHandle BufferObj::Load() {
             buffer_mgr_->RequestSpace(GetBufferSize());
             if (type_ == BufferType::kEphemeral) {
                 String error_message = "Invalid status";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             bool from_spill = type_ != BufferType::kPersistent;
@@ -78,7 +76,6 @@ BufferHandle BufferObj::Load() {
         }
         default: {
             String error_message = fmt::format("Invalid status: {}", BufferStatusToString(status_));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -95,7 +92,6 @@ bool BufferObj::Free() {
     }
     if (status_ != BufferStatus::kUnloaded) {
         String error_message = fmt::format("attempt to free {} buffer object", BufferStatusToString(status_));
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     switch (type_) {
@@ -135,7 +131,6 @@ bool BufferObj::Save() {
             }
             default: {
                 UniquePtr<String> err_msg = MakeUnique<String>(fmt::format("Invalid buffer status: {}.", BufferStatusToString(status_)));
-                LOG_ERROR(*err_msg);
                 UnrecoverableError(*err_msg);
             }
         }
@@ -168,7 +163,6 @@ void BufferObj::PickForCleanup() {
         }
         default: {
             String error_message = fmt::format("Invalid status: {}", BufferStatusToString(status_));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -181,12 +175,10 @@ void BufferObj::PickForCleanup() {
 void BufferObj::CleanupFile() const {
     if (status_ != BufferStatus::kClean) {
         String error_message = "Invalid status";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (file_worker_->GetData() != nullptr) {
         String error_message = "Buffer is not freed.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     file_worker_->CleanupFile();
@@ -204,7 +196,6 @@ void BufferObj::LoadInner() {
     std::unique_lock<std::mutex> locker(w_locker_);
     if (status_ != BufferStatus::kLoaded) {
         String error_message = fmt::format("Invalid status: {}", BufferStatusToString(status_));
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     ++rc_;
@@ -231,7 +222,6 @@ void BufferObj::UnloadInner() {
         }
         default: {
             String error_message = fmt::format("Calling with invalid buffer status: {}", BufferStatusToString(status_));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -243,7 +233,6 @@ void BufferObj::CheckState() const {
         case BufferStatus::kLoaded: {
             if (rc_ == 0) {
                 String error_message = "Invalid status";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             break;
@@ -251,7 +240,6 @@ void BufferObj::CheckState() const {
         case BufferStatus::kUnloaded: {
             if (rc_ > 0) {
                 String error_message = "Invalid status";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             break;
@@ -259,7 +247,6 @@ void BufferObj::CheckState() const {
         case BufferStatus::kFreed: {
             if (rc_ > 0) {
                 String error_message = "Invalid status";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             break;
@@ -267,7 +254,6 @@ void BufferObj::CheckState() const {
         case BufferStatus::kNew: {
             if (type_ != BufferType::kEphemeral || rc_ > 0) {
                 String error_message = "Invalid status";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             break;
@@ -275,7 +261,6 @@ void BufferObj::CheckState() const {
         case BufferStatus::kClean: {
             if (rc_ > 0) {
                 String error_message = "Invalid status";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }

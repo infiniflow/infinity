@@ -76,7 +76,6 @@ void TaskScheduler::Init(Config *config_ptr) {
 
     if (worker_array_.empty()) {
         String error_message = "No cpu is used in scheduler";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -109,7 +108,6 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
 void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *base_statement) {
     if (!initialized_) {
         String error_message = "Scheduler isn't initialized";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     // DumpPlanFragment(plan_fragment);
@@ -144,12 +142,10 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
                 return ;
             } else {
                 String error_message = "Oops! None select and create idnex statement has multiple fragments.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         } else {
             String error_message = "None select statement has multiple fragments.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -163,7 +159,6 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
             // set the status to running
             if (!task->TryIntoWorkerLoop()) {
                 String error_message = "Task can't be scheduled";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             u64 worker_id = FindLeastWorkloadWorker();

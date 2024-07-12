@@ -48,7 +48,6 @@ Vector<std::string_view> TableIndexEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
         String error_message = fmt::format("Invalid table index entry encode: {}", encode);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto decodes = TableEntry::DecodeIndex(encode.substr(0, delimiter_i));
@@ -101,7 +100,6 @@ SharedPtr<TableIndexEntry> TableIndexEntry::NewTableIndexEntry(const SharedPtr<I
     // Get column info
     if (index_base->column_names_.size() != 1) {
         Status status = Status::SyntaxError("Currently, composite index doesn't supported.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     return table_index_entry;
@@ -329,7 +327,6 @@ Status TableIndexEntry::CreateIndexDo(BaseTableRef *table_ref, HashMap<SegmentID
     if (this->index_base_->column_names_.size() != 1) {
         // TODO
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     auto &index_index = table_ref->index_index_;
@@ -398,9 +395,7 @@ void TableIndexEntry::UpdateEntryReplay(TransactionID txn_id, TxnTimeStamp begin
     txn_id_ = txn_id;
 }
 
-Vector<SharedPtr<ChunkIndexEntry>>
-TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay) {
-    Vector<SharedPtr<ChunkIndexEntry>> res;
+void TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay) {
     switch (index_base_->index_type_) {
         case IndexType::kBMP: {
             if (replay) {
@@ -408,10 +403,7 @@ TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr
             }
             std::unique_lock w_lock(rw_locker_);
             for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-                auto p = segment_index_entry->OptIndex(index_base_.get(), txn_table_store, opt_params, false /*replay*/);
-                if (p.get() != nullptr) {
-                    res.push_back(p);
-                }
+                segment_index_entry->OptIndex(index_base_.get(), txn_table_store, opt_params, false /*replay*/);
             }
             break;
         }
@@ -433,11 +425,7 @@ TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr
                 txn_table_store->AddIndexStore(this);
                 if (!replay) {
                     for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-                        auto p =
-                            segment_index_entry->OptIndex(static_cast<IndexBase *>(&old_index_hnsw), txn_table_store, opt_params, false /*replay*/);
-                        if (p.get() != nullptr) {
-                            res.push_back(p);
-                        }
+                        segment_index_entry->OptIndex(static_cast<IndexBase *>(&old_index_hnsw), txn_table_store, opt_params, false /*replay*/);
                     }
                 }
             }
@@ -447,7 +435,6 @@ TableIndexEntry::OptIndex(TxnTableStore *txn_table_store, const Vector<UniquePtr
             LOG_WARN("Not implemented");
         }
     }
-    return res;
 }
 
 } // namespace infinity

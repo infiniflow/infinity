@@ -71,7 +71,6 @@ protected:
             }
             if (end - start > 10) {
                 String error_message = "WaitFlushDeltaOp timeout";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             LOG_INFO(fmt::format("Before usleep. Wait flush delta op for {} seconds", end - start));

@@ -36,7 +36,6 @@ void QueueSourceState::MarkCompletedTask(u64 fragment_id) {
         }
     } else {
         String error_message = "Get unexpected data from child fragment";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -48,7 +47,6 @@ bool QueueSourceState::GetData() {
     SharedPtr<FragmentDataBase> fragment_data_base = nullptr;
     if (!source_queue_.TryDequeue(fragment_data_base)) {
         String error_message = "This task should not be scheduled if the source queue is empty";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -79,7 +77,6 @@ bool QueueSourceState::GetData() {
         }
         default: {
             String error_message = "Not support fragment data type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -169,7 +166,6 @@ bool QueueSourceState::GetData() {
         }
         default: {
             String error_message = "Not support operator type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }

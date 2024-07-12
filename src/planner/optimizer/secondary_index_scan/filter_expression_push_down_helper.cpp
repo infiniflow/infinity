@@ -99,7 +99,6 @@ inline bool IntegralContinueUnwind(BigIntT right_val_bigint, FilterCompareType &
         }
         default: {
             String error_message = "IntegralContinueUnwind(): compare type error.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             compare_type = FilterCompareType::kInvalid;
             return false;
@@ -151,7 +150,6 @@ inline bool IntegralContinueUnwind(DoubleT right_val_double, FilterCompareType &
         }
         default: {
             String error_message = "IntegralContinueUnwind(): compare type error.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             compare_type = FilterCompareType::kInvalid;
             return false;
@@ -184,7 +182,6 @@ inline void RewriteCompareT(T &right_val, FilterCompareType &compare_type) {
         }
         default: {
             String error_message = "RewriteCompareT(): compare type error.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -217,7 +214,6 @@ inline void RewriteCompareT(TIME &right_val_time, FilterCompareType &compare_typ
         }
         default: {
             String error_message = "RewriteCompareT(): compare type error.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -253,7 +249,6 @@ inline void RewriteCompareT(Varchar &right_val, FilterCompareType &compare_type)
         }
         default: {
             String error_message = "RewriteCompareT(): compare type error.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -329,7 +324,6 @@ inline void RewriteCompare(Value &right_val, FilterCompareType &compare_type) {
         }
         default: {
             String error_message = fmt::format("FindPrev(): type error: {}.", right_val.type().ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -355,7 +349,6 @@ inline void SimplifyCompareTypeAndValue(Value &right_val, FilterCompareType &com
         }
         case FilterCompareType::kInvalid: {
             String error_message = "SimplifyCompareTypeAndValue(): compare type error.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -380,7 +373,6 @@ FilterExpressionPushDownHelper::UnwindCast(SharedPtr<BaseExpression> &cast_expr,
         auto target_logical_type = target_type.type();
         if (target_logical_type != right_val.type().type()) {
             String error_message = fmt::format("UnwindCast(): type mismatch: {} vs {}.", target_type.ToString(), right_val.type().ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return {0, Value::MakeNull(), FilterCompareType::kInvalid};
         }
@@ -480,7 +472,6 @@ FilterExpressionPushDownHelper::UnwindCast(SharedPtr<BaseExpression> &cast_expr,
         return {0, Value::MakeNull(), FilterCompareType::kInvalid};
     } else {
         String error_message = fmt::format("UnwindCast(): expression type error: {}.", cast_expr->Name());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return {0, Value::MakeNull(), FilterCompareType::kInvalid};
     }

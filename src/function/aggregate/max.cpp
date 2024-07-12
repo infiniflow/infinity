@@ -38,31 +38,26 @@ public:
 
     void Initialize() {
         String error_message = "Not implement: Max::Initialize";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     void Update(const ValueType *__restrict, SizeT) {
         String error_message = "Not implement: Max::Update";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
         String error_message = "Not implement: Max::ConstantUpdate";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     [[nodiscard]] ptr_t Finalize() const {
         String error_message = "Not implement: Max::Finalize";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     inline static SizeT Size(const DataType &) {
         String error_message = "Not implement: Max::Size";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 };

@@ -39,12 +39,10 @@ RawFileWorker::~RawFileWorker() {
 void RawFileWorker::AllocateInMemory() {
     if (data_ != nullptr) {
         String error_message = "Data is already allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (buffer_size_ == 0) {
         String error_message = "Buffer size is 0.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     data_ = static_cast<void *>(new char[buffer_size_]);
@@ -53,7 +51,6 @@ void RawFileWorker::AllocateInMemory() {
 void RawFileWorker::FreeInMemory() {
     if (data_ == nullptr) {
         String error_message = "Data is already freed.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     delete[] static_cast<char *>(data_);
@@ -66,7 +63,6 @@ void RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     i64 nbytes = fs.Write(*file_handler_, data_, buffer_size_);
     if (nbytes != (i64)buffer_size_) {
         Status status = Status::DataIOError(fmt::format("Expect to write buffer with size: {}, but {} bytes is written", buffer_size_, nbytes));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     prepare_success = true; // Not run defer_fn
@@ -79,7 +75,6 @@ void RawFileWorker::ReadFromFileImpl() {
     i64 nbytes = fs.Read(*file_handler_, data_, buffer_size_);
     if (nbytes != (i64)buffer_size_) {
         Status status = Status::DataIOError(fmt::format("Expect to read buffer with size: {}, but {} bytes is read", buffer_size_, nbytes));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 }

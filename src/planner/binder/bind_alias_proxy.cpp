@@ -42,7 +42,6 @@ BindAliasProxy::BindAlias(ExpressionBinder &expression_binder, const ParsedExpr 
 
     if (binding_alias_) {
         Status status = Status::SyntaxError(fmt::format("Trying to bind an alias table_name: {} in another alias", expr_name));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 

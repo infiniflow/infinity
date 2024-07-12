@@ -67,7 +67,6 @@ void PhysicalMergeMatchTensor::Init() { left()->Init(); }
 
 SizeT PhysicalMergeMatchTensor::TaskletCount() {
     String error_message = "Not Expected: TaskletCount of PhysicalMergeMatchTensor?";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return 0;
 }
@@ -85,14 +84,12 @@ void PhysicalMergeMatchTensor::ExecuteInner(QueryContext *query_context, MergeMa
     auto &output_data_block_array = operator_state->data_block_array_;
     if (!output_data_block_array.empty()) {
         String error_message = "output data_block_array_ is not empty";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto &input_data_block_array = operator_state->input_data_blocks_;
     if (input_data_block_array.empty()) {
 
         String error_message = "PhysicalMergeMatchTensor: empty input";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return;
     }

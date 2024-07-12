@@ -27,6 +27,7 @@ class TestInfinity:
     def test_repeat_connect(self):
         self.test_infinity_obj._test_repeat_connect()
 
+    @pytest.mark.slow
     def test_multiple_connect(self):
         self.test_infinity_obj._test_multiple_connect()
 

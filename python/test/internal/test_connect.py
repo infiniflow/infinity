@@ -90,7 +90,6 @@ class TestConnection(TestSdk):
         infinity_instance = infinity.connect(self.uri)
         infinity_instance = infinity.connect(self.uri)
 
-    @pytest.mark.slow
     def _test_multiple_connect(self):
         """
         target: disconnect the infinity which is already disconnected.

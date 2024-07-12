@@ -47,7 +47,6 @@ struct ModuloFunction {
 template <>
 inline bool ModuloFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     String error_message = "Not implement: MinusFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }

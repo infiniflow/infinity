@@ -43,7 +43,6 @@ Vector<std::string_view> BlockColumnEntry::DecodeIndex(std::string_view encode) 
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
         String error_message = fmt::format("Invalid block column entry encode: {}", encode);
-        LOG_ERROR(error_message);
         UnrecoverableError(error_message);
     }
     auto decodes = BlockEntry::DecodeIndex(encode.substr(0, delimiter_i));
@@ -128,7 +127,6 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
             buffer_size = DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE;
         } else {
             String error_message = "unexpected data type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         auto outline_buffer_file_worker =
@@ -161,7 +159,6 @@ SharedPtr<String> BlockColumnEntry::OutlineFilename(const u32 buffer_group_id, c
         return MakeShared<String>(fmt::format("col_{}_out1_{}", column_id_, file_idx));
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return nullptr;
     }
@@ -175,7 +172,6 @@ void BlockColumnEntry::AppendOutlineBuffer(const u32 buffer_group_id, BufferObj 
         outline_buffers_group_1_.push_back(buffer);
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -188,7 +184,6 @@ BufferObj *BlockColumnEntry::GetOutlineBuffer(const u32 buffer_group_id, const S
         return outline_buffers_group_1_[idx];
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return nullptr;
     }
@@ -202,7 +197,6 @@ SizeT BlockColumnEntry::OutlineBufferCount(const u32 buffer_group_id) const {
         return outline_buffers_group_1_.size();
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return 0;
     }
@@ -215,7 +209,6 @@ u64 BlockColumnEntry::LastChunkOff(const u32 buffer_group_id) const {
         return last_chunk_offset_1_;
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return 0;
     }
@@ -228,7 +221,6 @@ void BlockColumnEntry::SetLastChunkOff(const u32 buffer_group_id, const u64 offs
         last_chunk_offset_1_ = offset;
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -236,7 +228,6 @@ void BlockColumnEntry::SetLastChunkOff(const u32 buffer_group_id, const u64 offs
 void BlockColumnEntry::Append(const ColumnVector *input_column_vector, u16 input_column_vector_offset, SizeT append_rows, BufferManager *buffer_mgr) {
     if (buffer_ == nullptr) {
         String error_message = "Not initialize buffer handle";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     ColumnVector &&column_vector = GetColumnVector(buffer_mgr);
@@ -310,14 +301,12 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
         case kNull: {
             LOG_ERROR(fmt::format("{} isn't supported", column_type->ToString()));
             String error_message = "Not implement: Invalid data type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case kMissing:
         case kInvalid: {
             LOG_ERROR(fmt::format("Invalid data type {}", column_type->ToString()));
             String error_message = "Invalid data type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -387,7 +376,6 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
 void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts) {
     if (this->Committed()) {
         String error_message = "Column already committed";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     this->txn_id_ = txn_id;

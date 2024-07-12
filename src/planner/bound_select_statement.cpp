@@ -120,7 +120,6 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         if (!order_by_expressions_.empty()) {
             if (order_by_expressions_.size() != order_by_types_.size()) {
                 String error_message = "Unknown error on order by expression";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
 
@@ -150,7 +149,6 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         if (!pruned_expression_.empty()) {
             String error_message = "Projection method changed!";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             auto pruned_project = MakeShared<LogicalProject>(bind_context->GetNewLogicalNodeId(), pruned_expression_, result_index_);
             pruned_project->set_left_node(root);
@@ -163,12 +161,10 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
         const SizeT num_children = search_expr_->match_exprs_.size();
         if (num_children <= 0) {
             String error_message = "SEARCH shall have at least one MATCH TEXT or MATCH VECTOR or MATCH TENSOR or MATCH SPARSE expression";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (table_ref_ptr_->type() != TableRefType::kTable) {
             String error_message = "Not base table reference";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
@@ -213,7 +209,6 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                         match_node->early_term_algo_ = EarlyTermAlgo::kCompare;
                     } else {
                         Status status = Status::SyntaxError("block_max option must be empty, true, false or compare");
-                        LOG_ERROR(status.message());
                         RecoverableError(status);
                     }
 
@@ -223,7 +218,6 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                         i32 top_n_option = std::strtol(iter->second.c_str(), nullptr, 0);
                         if (top_n_option <= 0) {
                             Status status = Status::SyntaxError("top n must be a positive integer");
-                            LOG_ERROR(status.message());
                             RecoverableError(status);
                         }
                         match_node->top_n_ = top_n_option;
@@ -236,7 +230,6 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                         search_driver.ParseSingleWithFields(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
                     if (query_tree.get() == nullptr) {
                         Status status = Status::ParseMatchExprFailed(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
-                        LOG_ERROR(status.message());
                         RecoverableError(status);
                     }
 
@@ -273,7 +266,6 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                 }
                 default: {
                     String error_message = "Unsupported match expression type";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
@@ -315,19 +307,16 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
                                                                     const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr) {
         String error_message = "Attempt to do KNN scan without table";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     switch (table_ref->type_) {
         case TableRefType::kCrossProduct: {
             String error_message = "KNN is not supported on CROSS PRODUCT relation, now.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case TableRefType::kJoin: {
             String error_message = "KNN is not supported on JOIN relation, now.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case TableRefType::kTable: {
@@ -340,13 +329,11 @@ SharedPtr<LogicalKnnScan> BoundSelectStatement::BuildInitialKnnScan(SharedPtr<Ta
         }
         case TableRefType::kSubquery: {
             String error_message = "KNN is not supported on a SUBQUERY, now.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         default: {
             String error_message = "Unexpected table type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -375,7 +362,6 @@ BoundSelectStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *qu
             }
             default: {
                 String error_message = "Unknown table reference type.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -478,7 +464,6 @@ void BoundSelectStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
         if (building_subquery_) {
             // nested subquery
             String error_message = "Nested subquery detected";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);

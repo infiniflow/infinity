@@ -34,7 +34,6 @@ export struct TryCastBoolean {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
         String error_message = fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -60,7 +59,6 @@ export struct TryCastBoolean {
 export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kBoolean) {
         String error_message = fmt::format("Expect boolean type, but it is {}", source.ToString());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -70,7 +68,6 @@ export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType 
         }
         default: {
             String error_message = fmt::format("Can't cast from Boolean to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

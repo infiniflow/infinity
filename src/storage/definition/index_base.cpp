@@ -104,7 +104,6 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
     char *const ptr_end = ptr + maxbytes;
     if (maxbytes <= 0) {
         String error_message = "ptr goes out of range when reading IndexBase";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     IndexType index_type = ReadBufAdv<IndexType>(ptr);
@@ -156,18 +155,15 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
         }
         case IndexType::kInvalid: {
             String error_message = "Error index method while reading";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         default: {
             Status status = Status::NotSupport("Not implemented");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
     if (ptr_end < ptr) {
         String error_message = "ptr goes out of range when reading IndexBase";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return res;
@@ -245,12 +241,10 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
         }
         case IndexType::kInvalid: {
             String error_message = "Error index method while deserializing";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         default: {
             Status status = Status::NotSupport("Not implemented");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }

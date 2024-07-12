@@ -228,7 +228,6 @@ void ExplainLogicalPlan::Explain(const LogicalNode *statement, SharedPtr<Vector<
             break;
         default: {
             String error_message = "Unexpected logical node type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -302,7 +301,6 @@ void ExplainLogicalPlan::Explain(const LogicalCreateTable *create_node, SharedPt
         SizeT column_count = create_node->table_definitions()->column_count();
         if (column_count == 0) {
             String error_message = "No columns in the table";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         const Vector<SharedPtr<ColumnDef>> &columns = create_node->table_definitions()->columns();
@@ -436,7 +434,6 @@ void ExplainLogicalPlan::Explain(const LogicalCreateView *create_node, SharedPtr
         SizeT column_count = create_node->names_ptr()->size();
         if (column_count == 0) {
             String error_message = "No columns in the table";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         String columns_str;
@@ -649,7 +646,6 @@ void ExplainLogicalPlan::Explain(const LogicalInsert *insert_node, SharedPtr<Vec
         SizeT value_count = insert_node->value_list().size();
         if (value_count == 0) {
             String error_message = "No value list in insert statement";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         for (SizeT idx = 0; idx < value_count; ++idx) {
@@ -709,7 +705,6 @@ void ExplainLogicalPlan::Explain(const LogicalProject *project_node, SharedPtr<V
         SizeT expr_count = project_node->expressions_.size();
         if (expr_count == 0) {
             String error_message = "No expression list in projection node.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         for (SizeT idx = 0; idx < expr_count - 1; ++idx) {
@@ -792,7 +787,6 @@ void ExplainLogicalPlan::Explain(const LogicalTableScan *table_scan_node, Shared
     SizeT column_count = table_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
         String error_message = fmt::format("No column in table: {}.", table_scan_node->TableAlias());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
@@ -846,7 +840,6 @@ void ExplainLogicalPlan::Explain(const LogicalIndexScan *index_scan_node, Shared
     SizeT column_count = index_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
         String error_message = fmt::format("No column in table: {}.", index_scan_node->TableAlias());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
@@ -932,7 +925,6 @@ void ExplainLogicalPlan::Explain(const LogicalKnnScan *knn_scan_node, SharedPtr<
     SizeT column_count = knn_scan_node->GetOutputNames()->size();
     if (column_count == 0) {
         String error_message = fmt::format("No column in table: {}.", knn_scan_node->TableAlias());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     for (SizeT idx = 0; idx < column_count - 1; ++idx) {
@@ -949,7 +941,6 @@ void ExplainLogicalPlan::Explain(const LogicalAggregate *aggregate_node, SharedP
     SizeT aggregates_count = aggregate_node->aggregates_.size();
     if (groups_count == 0 && aggregate_node == 0) {
         String error_message = "Both groups and aggregates are empty.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -1033,7 +1024,6 @@ void ExplainLogicalPlan::Explain(const LogicalSort *sort_node, SharedPtr<Vector<
         SizeT order_by_count = sort_node->expressions_.size();
         if (order_by_count == 0) {
             String error_message = "ORDER BY without any expression.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -1131,7 +1121,6 @@ void ExplainLogicalPlan::Explain(const LogicalTop *top_node, SharedPtr<Vector<Sh
         SizeT order_by_count = sort_expressions.size();
         if (order_by_count == 0) {
             String error_message = "TOP without any sort expression.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -1223,7 +1212,6 @@ void ExplainLogicalPlan::Explain(const LogicalJoin *join_node, SharedPtr<Vector<
         SizeT conditions_count = join_node->conditions_.size();
         if (conditions_count == 0) {
             String error_message = "JOIN without any condition.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -1825,7 +1813,6 @@ void ExplainLogicalPlan::Explain(const LogicalShow *show_node, SharedPtr<Vector<
         }
         case ShowType::kInvalid: {
             String error_message = "Invalid show type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -1837,7 +1824,6 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
             AggregateExpression *aggregate_expression = (AggregateExpression *)base_expression;
             if (aggregate_expression->arguments().size() != 1) {
                 String error_message = "More than one argument in aggregate function";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             expr_str += aggregate_expression->aggregate_function_.name();
@@ -1850,7 +1836,6 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
             CastExpression *cast_expression = (CastExpression *)base_expression;
             if (cast_expression->arguments().size() != 1) {
                 String error_message = "More than one argument in cast function";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             expr_str += "CAST(";
@@ -1940,7 +1925,6 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
             BetweenExpression *between_expression = (BetweenExpression *)base_expression;
             if (between_expression->arguments().size() != 3) {
                 String error_message = "Between expression should have three arguments.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             Explain(between_expression->arguments()[0].get(), expr_str);
@@ -1979,7 +1963,6 @@ void ExplainLogicalPlan::Explain(const BaseExpression *base_expression, String &
         case ExpressionType::kCorrelatedColumn:
         default: {
             String error_message = "Unsupported expression type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -2059,14 +2042,12 @@ void ExplainLogicalPlan::Explain(const LogicalImport *import_node, SharedPtr<Vec
         }
         case CopyFileType::kInvalid: {
             String error_message = "Invalid file type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
 
     if (import_node->left_node().get() != nullptr or import_node->right_node().get() != nullptr) {
         String error_message = "Import node have children nodes.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -2143,14 +2124,12 @@ void ExplainLogicalPlan::Explain(const LogicalExport *export_node, SharedPtr<Vec
         }
         case CopyFileType::kInvalid: {
             String error_message = "Invalid file type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
 
     if (export_node->left_node().get() != nullptr or export_node->right_node().get() != nullptr) {
         String error_message = "EXPORT node have children nodes.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }

@@ -212,12 +212,10 @@ public:
     static inline void UnaryFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 1) {
             String error_message = "Unary function: input column count isn't one.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         UnaryOperator::Execute<InputType, OutputType, UnaryOpDirectWrapper<Operation>>(input.column_vectors[0],
@@ -232,12 +230,10 @@ public:
     static inline void UnaryFunctionWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 1) {
             String error_message = "Unary function: input column count isn't one.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         UnaryOperator::Execute<InputType, OutputType, UnaryTryOpWrapper<Operation>>(input.column_vectors[0],
@@ -252,12 +248,10 @@ public:
     static inline void UnaryFunctionToVarlen(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 1) {
             String error_message = "Unary function: input column count isn't one.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         ScalarFunctionData function_data(output.get());
@@ -273,12 +267,10 @@ public:
     static inline void UnaryFunctionToVarlenWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 1) {
             String error_message = "Unary function: input column count isn't one.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         ScalarFunctionData function_data(output.get());
@@ -294,12 +286,10 @@ public:
     static inline void BinaryFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 2) {
             String error_message = "Binary function: input column count isn't two.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryOpDirectWrapper<Operation>>(input.column_vectors[0],
@@ -315,12 +305,10 @@ public:
     static inline void BinaryFunctionWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 2) {
             String error_message = "Binary function: input column count isn't two.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         BinaryOperator::Execute<LeftType, RightType, OutputType, BinaryTryOpWrapper<Operation>>(input.column_vectors[0],
@@ -336,12 +324,10 @@ public:
     static inline void BinaryFunctionToVarlen(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 2) {
             String error_message = "Binary function: input column count isn't two.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         ScalarFunctionData function_data(output.get());
@@ -358,12 +344,10 @@ public:
     static inline void BinaryFunctionToVarlenWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 2) {
             String error_message = "Binary function: input column count isn't two.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         ScalarFunctionData function_data(output.get());
@@ -380,12 +364,10 @@ public:
     static inline void TernaryFunction(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 3) {
             String error_message = "Ternary function: input column count isn't three.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryOpDirectWrapper<Operation>>(input.column_vectors[0],
@@ -402,12 +384,10 @@ public:
     static inline void TernaryFunctionWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 3) {
             String error_message = "Ternary function: input column count isn't three.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         TernaryOperator::Execute<FirstType, SecondType, ThirdType, ResultType, TernaryTryOpWrapper<Operation>>(input.column_vectors[0],
@@ -424,12 +404,10 @@ public:
     static inline void TernaryFunctionToVarlen(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 3) {
             String error_message = "Ternary function: input column count isn't three.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         ScalarFunctionData function_data(output.get());
@@ -447,12 +425,10 @@ public:
     static inline void TernaryFunctionToVarlenWithFailure(const DataBlock &input, SharedPtr<ColumnVector> &output) {
         if (input.column_count() != 3) {
             String error_message = "Ternary function: input column count isn't three.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!input.Finalized()) {
             String error_message = "Input data block is finalized";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         ScalarFunctionData function_data(output.get());

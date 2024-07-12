@@ -110,6 +110,7 @@ private:
 
     std::mutex w_locker_{};
     HashMap<String, UniquePtr<BufferObj>> buffer_map_{};
+    u32 buffer_id_{};
 
     std::mutex gc_locker_{};
     Vector<LRUCache> lru_caches_{};

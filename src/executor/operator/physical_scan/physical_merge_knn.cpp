@@ -52,7 +52,6 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
     switch (merge_knn_data.elem_type_) {
         case kElemInvalid: {
             String error_message = "Invalid elem type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -60,7 +59,6 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
             switch (merge_knn_data.heap_type_) {
                 case MergeKnnHeapType::kInvalid: {
                     String error_message = "Invalid heap type";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     break;
                 }
@@ -77,7 +75,6 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
         }
         default: {
             Status status = Status::NotSupport("Not implemented");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
@@ -91,7 +88,6 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
     auto &input_data = *merge_knn_state->input_data_block_;
     if (!input_data.Finalized()) {
         String error_message = "Input data block is not finalized";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -100,7 +96,6 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
     int column_n = input_data.column_count() - 2;
     if (column_n < 0) {
         String error_message = "Input data block is invalid";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 

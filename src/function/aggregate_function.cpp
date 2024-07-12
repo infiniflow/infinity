@@ -28,7 +28,6 @@ namespace infinity {
 void AggregateFunction::CastArgumentTypes(BaseExpression &) {
     // Check and add a cast function to cast the input arguments expression type to target type
     Status status = Status::NotSupport("Not implemented: need to cast the argument types");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 

@@ -57,7 +57,6 @@ public:
 
     SizeT TaskletCount() override {
         String error_message = "Not implement: TaskletCount not Implement";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return 0;
     }
@@ -97,7 +96,6 @@ public:
     template <typename T>
     Value CreateValue(T value) {
         String error_message = "Unhandled type for makeValue";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 

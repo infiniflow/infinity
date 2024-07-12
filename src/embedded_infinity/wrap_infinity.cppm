@@ -195,20 +195,23 @@ export struct WrapMatchExpr {
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
-export struct WrapFusionExpr {
-    String method{};
-    String options_text{};
-
-    ParsedExpr *GetParsedExpr(Status &status);
-};
-
 export struct WrapMatchTensorExpr {
     bool own_memory;
     String search_method{};
     WrapColumnExpr column_expr;
-    WrapConstantExpr tensor_expr;
-    String embedding_data_type;
+    EmbeddingData embedding_data;
+    EmbeddingDataType embedding_data_type;
     String options_text;
+
+    ParsedExpr *GetParsedExpr(Status &status);
+};
+
+export struct WrapFusionExpr {
+    String method{};
+    String options_text{};
+    WrapMatchTensorExpr match_tensor_expr;
+    bool has_match_tensor_expr{false};
+
     ParsedExpr *GetParsedExpr(Status &status);
 };
 

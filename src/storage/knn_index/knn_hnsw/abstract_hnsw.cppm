@@ -62,7 +62,6 @@ public:
                     }
                     default: {
                         String error_message = "HNSW supports inner product and L2 distance.";
-                        LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                     }
                 }
@@ -84,7 +83,6 @@ public:
                     }
                     default: {
                         String error_message = "HNSW supports inner product and L2 distance.";
-                        LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                     }
                 }
@@ -92,7 +90,6 @@ public:
             }
             default: {
                 String error_message = "Invalid metric type";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }

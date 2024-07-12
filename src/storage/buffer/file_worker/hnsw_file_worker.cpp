@@ -43,19 +43,16 @@ HnswFileWorker::~HnswFileWorker() {
 void HnswFileWorker::AllocateInMemory() {
     if (data_) {
         String error_message = "Data is already allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (index_base_->index_type_ != IndexType::kHnsw) {
         String error_message = "Index type isn't HNSW";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     auto data_type = column_def_->type();
     if (data_type->type() != LogicalType::kEmbedding) {
         String error_message = "Index should be created on embedding column now.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -73,7 +70,6 @@ void HnswFileWorker::AllocateInMemory() {
         }
         default: {
             String error_message = "Index should be created on float embedding column now.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -82,7 +78,6 @@ void HnswFileWorker::AllocateInMemory() {
 void HnswFileWorker::FreeInMemory() {
     if (!data_) {
         String error_message = "FreeInMemory: Data is not allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
@@ -96,7 +91,6 @@ void HnswFileWorker::FreeInMemory() {
         default: {
             String error_message = fmt::format("Index should be created on float embedding column now, type: {}",
                                                EmbeddingType::EmbeddingDataType2String(embedding_type));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -106,7 +100,6 @@ void HnswFileWorker::FreeInMemory() {
 void HnswFileWorker::CompressToLVQ(IndexHnsw *index_hnsw) {
     if (!data_) {
         String error_message = "CompressToLVQ: Data is not allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     EmbeddingDataType embedding_type = GetType();
@@ -119,7 +112,6 @@ void HnswFileWorker::CompressToLVQ(IndexHnsw *index_hnsw) {
         }
         default: {
             String error_message = "Index should be created on float embedding column now.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -128,7 +120,6 @@ void HnswFileWorker::CompressToLVQ(IndexHnsw *index_hnsw) {
 void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     if (!data_) {
         String error_message = "WriteToFileImpl: Data is not allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
@@ -141,7 +132,6 @@ void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         }
         default: {
             String error_message = "Index should be created on float embedding column now.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -161,7 +151,6 @@ void HnswFileWorker::ReadFromFileImpl() {
         }
         default: {
             String error_message = "Index should be created on float embedding column now.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

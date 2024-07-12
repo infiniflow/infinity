@@ -75,20 +75,17 @@ IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<St
             encode_type = StringToHnswEncodeType(para->param_value_);
         } else {
             Status status = Status::InvalidIndexParam(para->param_name_);
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
 
     if (metric_type == MetricType::kInvalid) {
         Status status = Status::InvalidIndexParam("Metric type");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     if (encode_type == HnswEncodeType::kInvalid) {
         Status status = Status::InvalidIndexParam("Encode type");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -153,12 +150,10 @@ void IndexHnsw::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table
     SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         Status status = Status::ColumnNotExist(column_name);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kEmbedding) {
         Status status = Status::InvalidIndexDefinition(
             fmt::format("Attempt to create HNSW index on column: {}, data type: {}.", column_name, data_type->ToString()));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 }

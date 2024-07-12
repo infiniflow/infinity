@@ -48,3 +48,12 @@ TEST_F(LoggerTest, test1) {
     LOG_ERROR("This is a error log");
     LOG_CRITICAL("This is a error log");
 }
+
+TEST_F(BaseTest, logger_without_init) {
+    using namespace infinity;
+    LOG_TRACE("This is a trace log");
+    LOG_INFO("This is a info log");
+    LOG_WARN("This is a warn log");
+    LOG_ERROR("This is a error log");
+    LOG_CRITICAL("This is a error log");
+}

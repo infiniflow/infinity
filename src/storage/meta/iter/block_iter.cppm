@@ -49,7 +49,6 @@ public:
                     return None;
                 }
                 String error_message = "ColumnIter return None, but other columns have data";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             auto [ret, cur_offset] = *ret_opt;
@@ -58,7 +57,6 @@ public:
                     offset = cur_offset;
                 } else {
                     String error_message = "ColumnIter return different offset";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
             }
