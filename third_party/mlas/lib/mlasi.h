@@ -25,6 +25,7 @@ Abstract:
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <cstring>
 
 #ifdef MLAS_NO_EXCEPTION
 #if defined(__ANDROID__)
