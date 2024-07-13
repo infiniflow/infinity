@@ -41,7 +41,7 @@ class CountFunctionTest : public BaseTest {};
 TEST_F(CountFunctionTest, count_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
 
     RegisterCountFunction(catalog_ptr);
 

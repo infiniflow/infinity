@@ -24,12 +24,13 @@ namespace infinity {
 export struct DatabaseInfo {
     SharedPtr<String> db_name_{};
     SharedPtr<String> db_entry_dir_{};
+    SharedPtr<String> absolute_db_path_{};
     i64 table_count_{};
 };
 
 export struct TableInfo {
     SharedPtr<String> table_name_{};
-    SharedPtr<String> table_entry_dir_{};
+    SharedPtr<String> table_full_dir_{};
     i64 column_count_{};
     i64 segment_count_{};
     i64 row_count_{};

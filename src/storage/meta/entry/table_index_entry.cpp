@@ -354,7 +354,7 @@ void TableIndexEntry::Cleanup() {
         segment_index_entry->Cleanup();
     }
 
-    LOG_TRACE(fmt::format("Cleaning up dir: {}", *index_dir_));
+    LOG_DEBUG(fmt::format("Cleaning up dir: {}", *index_dir_));
 
     // FIXME(sys): delete full text index by whole directory tmply, should call CleanupScanner::CleanupDir
     LocalFileSystem fs;
@@ -362,7 +362,7 @@ void TableIndexEntry::Cleanup() {
         return;
     }
     fs.DeleteDirectory(*index_dir_);
-    LOG_TRACE(fmt::format("Cleaned dir: {}", *index_dir_));
+    LOG_DEBUG(fmt::format("Cleaned dir: {}", *index_dir_));
 }
 
 void TableIndexEntry::PickCleanup(CleanupScanner *scanner) {

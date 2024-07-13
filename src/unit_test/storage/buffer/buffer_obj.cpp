@@ -117,9 +117,9 @@ public:
 // ?? status transfer in all
 TEST_F(BufferObjTest, test1) {
     SizeT memory_limit = 1024;
-    String data_dir(GetDataDir());
+    String data_dir(GetFullDataDir());
     auto temp_dir = MakeShared<String>(data_dir + "/spill");
-    auto base_dir = MakeShared<String>(GetDataDir());
+    auto base_dir = MakeShared<String>(GetFullDataDir());
 
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 
@@ -299,7 +299,7 @@ TEST_F(BufferObjTest, test1) {
 // unit test for BufferStatus::kClean transformation
 // TEST_F(BufferObjTest, test_status_clean) {
 //     SizeT memory_limit = 1024;
-//     String data_dir(GetDataDir());
+//     String data_dir(GetFullDataDir());
 //     auto temp_dir = MakeShared<String>(data_dir + "/spill");
 //     auto base_dir = MakeShared<String>(data_dir);
 

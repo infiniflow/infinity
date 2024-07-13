@@ -61,7 +61,7 @@ public:
     // Get an existing BufferHandle from memory or disk.
     BufferObj *GetBufferObject(UniquePtr<FileWorker> file_worker);
 
-    SharedPtr<String> GetDataDir() const { return data_dir_; }
+    SharedPtr<String> GetFullDataDir() const { return data_dir_; }
 
     SharedPtr<String> GetTempDir() const { return temp_dir_; }
 

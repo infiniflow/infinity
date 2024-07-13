@@ -49,9 +49,9 @@ TEST_F(BufferHandleTest, test1) {
     using namespace infinity;
 
     SizeT memory_limit = 1024;
-    String data_dir(GetDataDir());
+    String data_dir(GetFullDataDir());
     auto temp_dir = MakeShared<String>(data_dir + "/spill");
-    auto base_dir = MakeShared<String>(GetDataDir());
+    auto base_dir = MakeShared<String>(GetFullDataDir());
 
     BufferManager buffer_manager(memory_limit, base_dir, temp_dir);
 

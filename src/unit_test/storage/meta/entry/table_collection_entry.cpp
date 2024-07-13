@@ -68,6 +68,7 @@ class TableEntryTest : public BaseTest {
 TEST_F(TableEntryTest, test1) {
     using namespace infinity;
 
+    SharedPtr<String> base_dir = MakeShared<String>(GetHomeDir());
     SharedPtr<String> table_dir = MakeShared<String>(GetTmpDir());
     SharedPtr<TableDef> table_def{};
 
@@ -100,6 +101,7 @@ TEST_F(TableEntryTest, test1) {
     }
 
     SharedPtr<TableEntry> table_entry = MakeShared<TableEntry>(false,
+                                                               base_dir,
                                                                table_dir,
                                                                table_def->table_name(),
                                                                table_def->columns(),

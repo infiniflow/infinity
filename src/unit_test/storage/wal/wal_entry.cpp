@@ -239,7 +239,7 @@ TEST_F(WalEntryTest, ReadWrite) {
         Vector<RowID> row_ids = {RowID(1, 3)};
         entry->cmds_.push_back(MakeShared<WalCmdDelete>("db1", "tbl1", row_ids));
     }
-    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, String(GetDataDir()) + "/catalog", String("META_123.full.json")));
+    entry->cmds_.push_back(MakeShared<WalCmdCheckpoint>(int64_t(123), true, String(GetFullDataDir()) + "/catalog", String("META_123.full.json")));
     {
         Vector<WalSegmentInfo> new_segment_infos(3, MakeSegmentInfo(1, 0, 2));
         entry->cmds_.push_back(MakeShared<WalCmdCompact>("db1", "tbl1", std::move(new_segment_infos), Vector<SegmentID>{0, 1, 2}));
@@ -264,9 +264,9 @@ void Println(const String &message1, const String &message2) { std::cout << mess
 TEST_F(WalEntryTest, WalEntryIterator) {
     using namespace infinity;
     RemoveDbDirs();
-    std::filesystem::create_directories(GetWalDir());
-    String wal_file_path = String(GetWalDir()) + "/wal.log";
-    String ckp_file_path = String(GetDataDir()) + "/catalog";
+    std::filesystem::create_directories(GetFullWalDir());
+    String wal_file_path = String(GetFullWalDir()) + "/wal.log";
+    String ckp_file_path = String(GetFullDataDir()) + "/catalog";
     String ckp_file_name = String("META_123.full.json");
     MockWalFile(wal_file_path, ckp_file_path, ckp_file_name);
     {
@@ -330,17 +330,17 @@ TEST_F(WalEntryTest, WalEntryIterator) {
         }
     }
     EXPECT_EQ(max_commit_ts, 123ul);
-    EXPECT_EQ(catalog_path, String(GetDataDir()) + "/catalog");
+    EXPECT_EQ(catalog_path, String(GetFullDataDir()) + "/catalog");
     EXPECT_EQ(replay_entries.size(), 1u);
 }
 
 TEST_F(WalEntryTest, WalListIterator) {
     using namespace infinity;
     RemoveDbDirs();
-    std::filesystem::create_directories(GetWalDir());
-    String wal_file_path1 = String(GetWalDir()) + "/wal.log";
-    String wal_file_path2 = String(GetWalDir()) + "/wal2.log";
-    String ckp_file_path = String(GetDataDir()) + "/catalog";
+    std::filesystem::create_directories(GetFullWalDir());
+    String wal_file_path1 = String(GetFullWalDir()) + "/wal.log";
+    String wal_file_path2 = String(GetFullWalDir()) + "/wal2.log";
+    String ckp_file_path = String(GetFullDataDir()) + "/catalog";
     String ckp_file_name = String("META_123.full.json");
     MockWalFile(wal_file_path1, ckp_file_path, ckp_file_name);
     MockWalFile(wal_file_path2, ckp_file_path, ckp_file_name);

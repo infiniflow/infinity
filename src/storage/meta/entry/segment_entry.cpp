@@ -508,8 +508,9 @@ nlohmann::json SegmentEntry::Serialize(TxnTimeStamp max_commit_ts) {
 SharedPtr<SegmentEntry> SegmentEntry::Deserialize(const nlohmann::json &segment_entry_json, TableEntry *table_entry, BufferManager *buffer_mgr) {
     std::underlying_type_t<SegmentStatus> saved_status = segment_entry_json["status"];
     SegmentStatus segment_status = static_cast<SegmentStatus>(saved_status);
+    SharedPtr<String> segment_dir = MakeShared<String>(segment_entry_json["segment_dir"]);
     SharedPtr<SegmentEntry> segment_entry = MakeShared<SegmentEntry>(table_entry,
-                                                                     MakeShared<String>(segment_entry_json["segment_dir"]),
+                                                                     segment_dir,
                                                                      segment_entry_json["segment_id"],
                                                                      segment_entry_json["row_capacity"],
                                                                      segment_entry_json["column_count"],
@@ -563,7 +564,11 @@ void SegmentEntry::Cleanup() {
     for (auto &block_entry : block_entries_) {
         block_entry->Cleanup();
     }
-    CleanupScanner::CleanupDir(*segment_dir_);
+
+    String full_segment_dir = fmt::format("{}/{}", *base_dir(), *segment_dir_);
+    LOG_DEBUG(fmt::format("Cleaning up segment dir: {}", full_segment_dir));
+    CleanupScanner::CleanupDir(full_segment_dir);
+    LOG_DEBUG(fmt::format("Cleaned segment dir: {}", full_segment_dir));
 }
 
 void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}
@@ -579,6 +584,7 @@ void SegmentEntry::LoadFilterBinaryData(const String &segment_filter_data) {
     }
     fast_rough_filter_.DeserializeFromString(segment_filter_data);
 }
+
 String SegmentEntry::SegmentStatusToString(const SegmentStatus &type) {
     switch (type) {
         case SegmentStatus::kUnsealed:
@@ -595,5 +601,7 @@ String SegmentEntry::SegmentStatusToString(const SegmentStatus &type) {
             return "Invalid Status";
     }
 }
+
+SharedPtr<String> SegmentEntry::base_dir() const { return table_entry_->base_dir(); }
 
 } // namespace infinity

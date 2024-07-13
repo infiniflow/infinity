@@ -42,7 +42,7 @@ class HnswAlgTest : public BaseTest {
 public:
     using LabelT = u64;
 
-    const std::string save_dir_ = GetTmpDir();
+    const std::string save_dir_ = GetFullTmpDir();
 
     template <typename Hnsw>
     void TestSimple() {

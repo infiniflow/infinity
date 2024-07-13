@@ -226,8 +226,8 @@ export struct WrapMatchSparseExpr {
 };
 
 export struct WrapSearchExpr {
-    Vector<WrapParsedExpr> match_exprs{};
-    Vector<WrapFusionExpr> fusion_exprs{};
+    Vector<WrapParsedExpr> match_exprs;
+    Vector<WrapFusionExpr> fusion_exprs;
 
     ParsedExpr *GetParsedExpr(Status &status);
 };

@@ -44,7 +44,7 @@ TEST_F(BlockVersionTest, SaveAndLoad) {
     block_version.created_.emplace_back(20, 6);
     block_version.deleted_[2] = 30;
     block_version.deleted_[5] = 40;
-    String version_path = String(GetTmpDir()) + "/block_version_test";
+    String version_path = String(GetFullTmpDir()) + "/block_version_test";
     LocalFileSystem fs;
 
     {
@@ -66,8 +66,8 @@ TEST_F(BlockVersionTest, SaveAndLoad) {
 }
 
 TEST_F(BlockVersionTest, SaveAndLoad2) {
-    auto data_dir = MakeShared<String>(String(GetTmpDir()) + "/block_version_test");
-    auto temp_dir = MakeShared<String>(String(GetTmpDir()) + "/temp/block_version_test");
+    auto data_dir = MakeShared<String>(String(GetFullTmpDir()) + "/block_version_test");
+    auto temp_dir = MakeShared<String>(String(GetFullTmpDir()) + "/temp/block_version_test");
     auto block_dir = MakeShared<String>(*data_dir + "/block");
     auto version_file_name = MakeShared<String>("block_version_test");
 

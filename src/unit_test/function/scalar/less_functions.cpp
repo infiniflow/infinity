@@ -43,7 +43,7 @@ class LessFunctionsTest : public BaseTest {};
 TEST_F(LessFunctionsTest, less_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
 
     RegisterLessFunction(catalog_ptr);
 

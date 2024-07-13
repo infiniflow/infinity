@@ -66,13 +66,13 @@ void PostingMergerTest::CreateIndex() {
         column->AppendValue(v);
     }
 
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
-    MemoryIndexer indexer1(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
+    MemoryIndexer indexer1(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column, 0, 1);
     indexer1.Dump();
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
 
-    auto indexer2 = MakeUnique<MemoryIndexer>(GetTmpDir(), "chunk2", RowID(0U, 1U), flag_, "standard");
+    auto indexer2 = MakeUnique<MemoryIndexer>(GetFullTmpDir(), "chunk2", RowID(0U, 1U), flag_, "standard");
     indexer2->Insert(column, 1, 1);
     indexer2->Dump();
 }
@@ -81,7 +81,7 @@ TEST_F(PostingMergerTest, Basic) {
     using namespace infinity;
     CreateIndex();
 
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
 
     String dst_base_name = "merged_index";
     Path path = Path(index_dir) / dst_base_name;

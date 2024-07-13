@@ -62,7 +62,7 @@ class MaxFunctionTest : public BaseTest {
 TEST_F(MaxFunctionTest, max_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
 
     RegisterMaxFunction(catalog_ptr);
 
