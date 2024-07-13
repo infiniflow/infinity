@@ -88,7 +88,7 @@ public:
 
     inline u64 GetNextNodeID() { return ++current_max_node_id_; }
 
-    void BeginTxn();
+    void BeginTxn(const BaseStatement *statement = nullptr);
 
     TxnTimeStamp CommitTxn();
 

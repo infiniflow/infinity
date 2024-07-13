@@ -45,7 +45,7 @@ TxnManager::TxnManager(Catalog *catalog,
     : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false),
       enable_compaction_(enable_compaction) {}
 
-Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
+Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "TxnManager is not running, cannot create txn";
@@ -59,6 +59,15 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
 
     // Record the start ts of the txn
     TxnTimeStamp ts = ++start_ts_;
+    if (ckp_txn) {
+        if (ckp_begin_ts_ != UNCOMMIT_TS) {
+            // not set ckp_begin_ts_ may not truncate the wal file.
+            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing", ckp_begin_ts_, ts));
+        } else {
+            LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", ts));
+            ckp_begin_ts_ = ts;
+        }
+    }
 
     // Create txn instance
     auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts, std::move(txn_text)));
@@ -192,8 +201,7 @@ void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
         String error_message = "TxnManager is not running, cannot add delta entry";
         UnrecoverableError(error_message);
     }
-    i64 wal_size = wal_mgr_->WalSize();
-    bg_task_processor_->Submit(MakeShared<AddDeltaEntryTask>(std::move(delta_entry), wal_size));
+    bg_task_processor_->Submit(MakeShared<AddDeltaEntryTask>(std::move(delta_entry)));
 }
 
 void TxnManager::Start() {
@@ -347,6 +355,16 @@ void TxnManager::FinishTxn(Txn *txn) {
             UnrecoverableError(error_message);
         }
     }
+}
+
+bool TxnManager::InCheckpointProcess(TxnTimeStamp commit_ts) {
+    std::lock_guard guard(locker_);
+    if (commit_ts > ckp_begin_ts_) {
+        LOG_TRACE(fmt::format("Full checkpoint begin in {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
+        ckp_begin_ts_ = UNCOMMIT_TS;
+        return true;
+    }
+    return false;
 }
 
 } // namespace infinity

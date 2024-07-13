@@ -375,19 +375,14 @@ export class GlobalCatalogDeltaEntry {
 public:
     GlobalCatalogDeltaEntry() = default;
 
-    // Must be called before any checkpoint.
-    void InitMaxCommitTS(TxnTimeStamp max_commit_ts) { max_commit_ts_ = max_commit_ts; }
-
     void InitFullCheckpointTs(TxnTimeStamp last_full_ckp_ts);
 
-    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
+    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     // Pick and remove all operations that are committed before `max_commit_ts`, after `full_ckp_ts`
     UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp max_commit_ts);
-
-    Tuple<TxnTimeStamp, i64> GetCheckpointState() const { return {max_commit_ts_, wal_size_}; }
 
     Vector<CatalogDeltaOpBrief> GetOperationBriefs() const;
 
@@ -406,9 +401,7 @@ private:
     Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
     HashSet<TransactionID> txn_ids_;
     // update by add delta entry, read by bg_process::checkpoint
-    TxnTimeStamp max_commit_ts_{0};
     TxnTimeStamp last_full_ckp_ts_{0};
-    i64 wal_size_{};
 
     mutable std::mutex catalog_delta_locker_{};
 };

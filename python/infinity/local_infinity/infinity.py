@@ -1,3 +1,4 @@
+import os
 from infinity import InfinityConnection
 from abc import ABC
 from infinity.common import ConflictType, LOCAL_INFINITY_PATH, InfinityException
@@ -6,12 +7,28 @@ from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.errors import ErrorCode
 from infinity.local_infinity.db import LocalDatabase
 from infinity.remote_thrift.utils import name_validity_check
+import logging
+
 
 class LocalInfinityConnection(InfinityConnection, ABC):
     def __init__(self, uri=LOCAL_INFINITY_PATH):
+        if not os.path.exists(uri):
+            try:
+                logging.warning(f"Directory {uri} not found, try to create it")
+                os.makedirs(uri)
+            except OSError as e:
+                raise InfinityException(ErrorCode.DIR_NOT_FOUND, f"Directory {uri} not found and create failed: {e}")
+        if os.path.isdir(uri):
+            if os.access(uri, os.R_OK | os.W_OK):
+                self._client = LocalInfinityClient(uri)
+                self._is_connected = True
+            else:
+                raise InfinityException(ErrorCode.UNEXPECTED_ERROR,
+                                        f"Directory {uri} does not have read or write permissions")
+        else:
+            raise InfinityException(ErrorCode.DIR_NOT_FOUND, f"Directory {uri} not found")
+
         self.db_name = "default_db"
-        self._client = LocalInfinityClient(uri)
-        self._is_connected = True
 
     def __del__(self):
         if self._is_connected is True:
@@ -90,7 +107,6 @@ class LocalInfinityConnection(InfinityConnection, ABC):
             return res
         else:
             raise InfinityException(res.error_code, res.error_msg)
-
 
     def client(self):
         return self._client

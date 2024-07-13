@@ -195,7 +195,7 @@ void MetaMap<Meta>::PickCleanup(CleanupScanner *scanner) {
         std::unique_lock w_lock(rw_locker_);
         for (auto iter = meta_map_.begin(); iter != meta_map_.end();) {
             if (iter->second->Empty()) {
-                LOG_DEBUG(fmt::format("PickCleanup: all_delete: {}", iter->first));
+                LOG_DEBUG(fmt::format("PickCleanup meta: {}", iter->first));
                 iter = meta_map_.erase(iter);
             } else {
                 ++iter;

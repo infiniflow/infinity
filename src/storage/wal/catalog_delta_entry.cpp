@@ -1021,7 +1021,7 @@ void CatalogDeltaEntry::AddOperation(UniquePtr<CatalogDeltaOperation> operation)
 
 void GlobalCatalogDeltaEntry::InitFullCheckpointTs(TxnTimeStamp last_full_ckp_ts) { last_full_ckp_ts_ = last_full_ckp_ts; }
 
-void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size) {
+void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
     // {
     //     for (auto &delta_entry : delta_entries) {
     //         LOG_INFO(fmt::format("Add delta entry: {}", delta_entry->ToString()));
@@ -1037,7 +1037,6 @@ void GlobalCatalogDeltaEntry::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_e
     } else {
         // Continuous
         do {
-            wal_size_ = std::max(wal_size_, wal_size);
             // LOG_INFO(fmt::format("Add delta entry: {} in to delta_ops_", entry_sequence));
             this->AddDeltaEntryInner(delta_entry.get());
 
@@ -1106,11 +1105,6 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
         String error_message = "max_commit_ts == UNCOMMIT_TS";
         UnrecoverableError(error_message);
     }
-    if (max_commit_ts_ > max_commit_ts) {
-        String error_message = fmt::format("max_commit_ts_ {} > max_commit_ts {}", max_commit_ts_, max_commit_ts);
-        UnrecoverableError(error_message);
-    }
-    max_commit_ts_ = max_commit_ts;
 
     for (auto &new_op : delta_entry->operations()) {
         if (new_op->type_ == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {

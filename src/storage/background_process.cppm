@@ -41,7 +41,6 @@ public:
 
 private:
     void Process();
-    void CompactProcess();
 
 private:
     BlockingQueue<SharedPtr<BGTask>> task_queue_;
