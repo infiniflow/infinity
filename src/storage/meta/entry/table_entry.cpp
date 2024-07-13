@@ -1221,9 +1221,9 @@ void TableEntry::Cleanup() {
     index_meta_map_.Cleanup();
 
     String full_table_dir = fmt::format("{}/{}", *base_dir_, *table_entry_dir_);
-    LOG_TRACE(fmt::format("Cleaning up dir: {}", *table_entry_dir_));
+    LOG_DEBUG(fmt::format("Cleaning up dir: {}", full_table_dir));
     CleanupScanner::CleanupDir(*table_entry_dir_);
-    LOG_TRACE(fmt::format("Cleaned dir: {}", *table_entry_dir_));
+    LOG_DEBUG(fmt::format("Cleaned dir: {}", full_table_dir));
 }
 
 IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn, this); }

@@ -566,7 +566,9 @@ void SegmentEntry::Cleanup() {
     }
 
     String full_segment_dir = fmt::format("{}/{}", *base_dir(), *segment_dir_);
+    LOG_DEBUG(fmt::format("Cleaning up segment dir: {}", full_segment_dir));
     CleanupScanner::CleanupDir(full_segment_dir);
+    LOG_DEBUG(fmt::format("Cleaned segment dir: {}", full_segment_dir));
 }
 
 void SegmentEntry::PickCleanup(CleanupScanner *scanner) {}

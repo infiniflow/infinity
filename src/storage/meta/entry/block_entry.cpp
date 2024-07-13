@@ -393,7 +393,10 @@ void BlockEntry::Cleanup() {
     }
     block_version_->PickForCleanup();
 
+    String full_block_dir = fmt::format("{}/{}", *base_dir(), *block_dir_);
+    LOG_DEBUG(fmt::format("Cleaning up block dir: {}", full_block_dir));
     CleanupScanner::CleanupDir(*block_dir_);
+    LOG_DEBUG(fmt::format("Cleaned block dir: {}", full_block_dir));
 }
 
 // TODO: introduce BlockColumnMeta

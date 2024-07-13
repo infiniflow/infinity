@@ -308,9 +308,9 @@ void DBEntry::Cleanup() {
     table_meta_map_.Cleanup();
 
     String full_db_dir = fmt::format("{}/{}", *base_dir_, *db_entry_dir_);
-    LOG_TRACE(fmt::format("Cleaning up dir: {}", full_db_dir));
+    LOG_DEBUG(fmt::format("Cleaning up db dir: {}", full_db_dir));
     CleanupScanner::CleanupDir(full_db_dir);
-    LOG_TRACE(fmt::format("Cleaned dir: {}", full_db_dir));
+    LOG_DEBUG(fmt::format("Cleaned db dir: {}", full_db_dir));
 }
 
 void DBEntry::MemIndexCommit() {
