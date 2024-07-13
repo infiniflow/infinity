@@ -1385,6 +1385,7 @@ Status LogicalPlanner::BuildShowBlockColumn(const ShowStatement *statement, Shar
                                                                   bind_context_ptr->GenerateTableIndex(),
                                                                   statement->segment_id_,
                                                                   statement->block_id_,
+                                                                  statement->chunk_id_,
                                                                   statement->column_id_);
 
     this->logical_plan_ = logical_show;
