@@ -59,7 +59,7 @@ BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID colum
       block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
 
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
-    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->base_dir()));
+    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->block_dir()));
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, full_path);
 
     auto begin_ts = txn->BeginTS();
