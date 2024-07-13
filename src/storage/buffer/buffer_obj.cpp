@@ -31,7 +31,7 @@ namespace infinity {
 BufferObj::BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<FileWorker> file_worker, u32 id)
     : buffer_mgr_(buffer_mgr), file_worker_(std::move(file_worker)), id_(id) {
     // Init other info
-    file_worker_->SetBaseTempDir(buffer_mgr->GetDataDir(), buffer_mgr->GetTempDir());
+    file_worker_->SetBaseTempDir(buffer_mgr->GetFullDataDir(), buffer_mgr->GetTempDir());
 
     if (is_ephemeral) {
         type_ = BufferType::kEphemeral;

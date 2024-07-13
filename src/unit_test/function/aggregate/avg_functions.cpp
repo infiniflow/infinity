@@ -62,7 +62,7 @@ class AvgFunctionTest : public BaseTest {
 TEST_F(AvgFunctionTest, avg_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
 
     RegisterAvgFunction(catalog_ptr);
 

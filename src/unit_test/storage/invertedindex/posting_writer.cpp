@@ -34,7 +34,7 @@ class PostingWriterTest : public BaseTest {
 public:
     PostingWriterTest() {}
 
-    void SetUp() override { file_ = String(GetTmpDir()) + "/posting_writer"; }
+    void SetUp() override { file_ = String(GetFullTmpDir()) + "/posting_writer"; }
     void TearDown() override {}
 
 protected:

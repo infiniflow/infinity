@@ -43,7 +43,7 @@ class GreaterFunctionsTest : public BaseTest {};
 TEST_F(GreaterFunctionsTest, greater_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
 
     RegisterGreaterFunction(catalog_ptr);
 

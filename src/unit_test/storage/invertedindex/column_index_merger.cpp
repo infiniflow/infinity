@@ -265,7 +265,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest) {
         R"#(A A A)#"
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -285,7 +285,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest1) {
         R"#(A B A)#",
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -309,7 +309,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest2) {
         R"#(The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.)#",
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -333,7 +333,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest3) {
         R"#(The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.)#",
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2", "chunk3"};
@@ -357,7 +357,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest4) {
         R"#(The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.)#",
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -381,7 +381,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest5) {
         R"#(The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.)#",
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -405,7 +405,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest) {
     u32 word_num_pre_row = 5;
 
     GenerateParagraphs(term_num, row_num, word_num_pre_row, paragraphs, expected_postings);
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -427,7 +427,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest1) {
     u32 word_num_pre_row = 40;
 
     GenerateParagraphs(term_num, row_num, word_num_pre_row, paragraphs, expected_postings);
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -451,7 +451,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest2) {
     u32 word_num_pre_row = 100;
 
     GenerateParagraphs(term_num, row_num, word_num_pre_row, paragraphs, expected_postings);
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
     const String dst_base_name = "merged_index";
 
     u32 base_num = 10;
@@ -486,7 +486,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest3) {
     u32 word_num_pre_row = 100;
 
     GenerateParagraphs(term_num, row_num, word_num_pre_row, paragraphs, expected_postings);
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
     const String dst_base_name = "merged_index";
 
     u32 base_num = 10;
