@@ -82,7 +82,12 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                                 Status status = Status::DataTypeMismatch("Integer", set_command->value_type_str());
                                 RecoverableError(status);
                             }
-                            query_context->storage()->catalog()->ResizeProfileHistory(set_command->value_int());
+                            i32 value_int = set_command->value_int();
+                            if(value_int < 0) {
+                                Status status = Status::InvalidCommand(fmt::format("Try to set profile record capacity with invalid value {}", value_int));
+                                RecoverableError(status);
+                            }
+                            query_context->storage()->catalog()->ResizeProfileHistory(value_int);
                             return true;
                         }
                         case GlobalVariable::kInvalid: {

@@ -2102,6 +2102,11 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     }
 
     SizeT column_count = table_entry->ColumnCount();
+    if(!column_id_.has_value()) {
+        String error_message = "No column id is given.";
+        UnrecoverableError(error_message);
+        return;
+    }
     SizeT table_column_id = *column_id_;
 
     if (table_column_id >= column_count) {
@@ -4691,6 +4696,22 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
         SizeT column_id = 0;
         {
             Value value = Value::MakeVarchar("transaction_id");
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+
+        ++column_id;
+        {
+            Value value = Value::MakeVarchar(std::to_string(*txn_id_));
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        }
+    }
+
+    {
+        SizeT column_id = 0;
+        {
+            Value value = Value::MakeVarchar("session_id");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
