@@ -346,6 +346,8 @@ Tuple<CopyFileType, Status> InfinityThriftService::GetCopyFileType(infinity_thri
             return {CopyFileType::kJSONL, Status::OK()};
         case infinity_thrift_rpc::CopyFileType::FVECS:
             return {CopyFileType::kFVECS, Status::OK()};
+        case infinity_thrift_rpc::CopyFileType::CSR:
+            return {CopyFileType::kCSR, Status::OK()};
         default: {
             return {CopyFileType::kInvalid, Status::ImportFileFormatError("Not implemented yet")};
         }

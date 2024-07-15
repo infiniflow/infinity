@@ -287,6 +287,8 @@ class RemoteTable(Table, ABC):
                         options.copy_file_type = ttypes.CopyFileType.JSONL
                     elif file_type == 'fvecs':
                         options.copy_file_type = ttypes.CopyFileType.FVECS
+                    elif file_type == 'csr':
+                        options.copy_file_type = ttypes.CopyFileType.CSR
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
