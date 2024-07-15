@@ -32,8 +32,7 @@ public:
                                 SharedPtr<String> file_name,
                                 SharedPtr<IndexBase> index_base,
                                 SharedPtr<ColumnDef> column_def,
-                                SizeT index_size)
-        : IndexFileWorker(std::move(file_dir), std::move(file_name), std::move(index_base), std::move(column_def)), index_size_(index_size) {}
+                                SizeT index_size = 0);
 
     ~BMPIndexFileWorker() override;
 

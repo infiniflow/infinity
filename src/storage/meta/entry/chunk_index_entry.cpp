@@ -236,7 +236,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
             const auto &index_base = param->index_base_;
             SegmentID segment_id = segment_index_entry->segment_id();
 
-            auto file_worker = ChunkIndexEntry::CreateFileWorker(index_base, column_def, full_dir, param, segment_id, chunk_id);
+            auto index_file_name = MakeShared<String>(ChunkIndexEntry::IndexFileName(segment_id, chunk_id));
+            auto file_worker = MakeUnique<BMPIndexFileWorker>(full_dir, index_file_name, index_base, column_def);
             chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             break;
         }

@@ -24,8 +24,29 @@ import internal_types;
 import bmp_util;
 import bmp_alg;
 import abstract_bmp;
+import local_file_system;
+import file_system_type;
 
 namespace infinity {
+
+BMPIndexFileWorker::BMPIndexFileWorker(SharedPtr<String> file_dir,
+                                       SharedPtr<String> file_name,
+                                       SharedPtr<IndexBase> index_base,
+                                       SharedPtr<ColumnDef> column_def,
+                                       SizeT index_size)
+    : IndexFileWorker(file_dir, file_name, index_base, column_def) {
+    if (index_size == 0) {
+        LocalFileSystem fs;
+
+        String index_path = GetFilePath();
+        auto [file_handler, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        index_size = fs.GetFileSize(*file_handler);
+    }
+    index_size_ = index_size;
+}
 
 BMPIndexFileWorker::~BMPIndexFileWorker() {
     if (data_ != nullptr) {
@@ -73,6 +94,7 @@ void BMPIndexFileWorker::ReadFromFileImpl() {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }
+    data_ = static_cast<void *>(new AbstractBMP(BMPIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get())));
     auto *bmp_index = reinterpret_cast<AbstractBMP *>(data_);
     std::visit(
         [&](auto &&index) {

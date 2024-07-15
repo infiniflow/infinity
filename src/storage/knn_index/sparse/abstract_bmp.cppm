@@ -108,6 +108,7 @@ private:
         }
     }
 
+public:
     static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
         const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
         const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
@@ -126,7 +127,6 @@ private:
         }
     }
 
-public:
     const AbstractBMP &get() const { return bmp_; }
 
     AbstractBMP &get_ref() { return bmp_; }
