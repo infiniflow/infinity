@@ -24,6 +24,7 @@ import index_base;
 import annivfflat_index_data;
 import kmeans_partition;
 import vector_distance;
+import search_top_1;
 import search_top_k;
 import knn_result_handler;
 import bitmask;
