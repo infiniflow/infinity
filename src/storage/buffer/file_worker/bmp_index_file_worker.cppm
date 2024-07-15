@@ -23,52 +23,19 @@ import index_base;
 import column_def;
 import file_worker_type;
 import sparse_info;
-import bmp_alg;
-import bmp_util;
 
 namespace infinity {
-
-export using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompressed> *,
-                                        BMPAlg<f32, i32, BMPCompressType::kRaw> *,
-                                        BMPAlg<f32, i16, BMPCompressType::kCompressed> *,
-                                        BMPAlg<f32, i16, BMPCompressType::kRaw> *,
-                                        BMPAlg<f32, i8, BMPCompressType::kCompressed> *,
-                                        BMPAlg<f32, i8, BMPCompressType::kRaw> *,
-                                        BMPAlg<f64, i32, BMPCompressType::kCompressed> *,
-                                        BMPAlg<f64, i32, BMPCompressType::kRaw> *,
-                                        BMPAlg<f64, i16, BMPCompressType::kCompressed> *,
-                                        BMPAlg<f64, i16, BMPCompressType::kRaw> *,
-                                        BMPAlg<f64, i8, BMPCompressType::kCompressed> *,
-                                        BMPAlg<f64, i8, BMPCompressType::kRaw> *,
-                                        std::nullptr_t>;
-
-export using ConstAbstractBMP = std::variant<const BMPAlg<f32, i32, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f32, i32, BMPCompressType::kRaw> *,
-                                             const BMPAlg<f32, i16, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f32, i16, BMPCompressType::kRaw> *,
-                                             const BMPAlg<f32, i8, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f32, i8, BMPCompressType::kRaw> *,
-                                             const BMPAlg<f64, i32, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f64, i32, BMPCompressType::kRaw> *,
-                                             const BMPAlg<f64, i16, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f64, i16, BMPCompressType::kRaw> *,
-                                             const BMPAlg<f64, i8, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f64, i8, BMPCompressType::kRaw> *,
-                                             std::nullptr_t>;
 
 export class BMPIndexFileWorker final : public IndexFileWorker {
 public:
     explicit BMPIndexFileWorker(SharedPtr<String> file_dir,
                                 SharedPtr<String> file_name,
                                 SharedPtr<IndexBase> index_base,
-                                SharedPtr<ColumnDef> column_def)
-        : IndexFileWorker(std::move(file_dir), std::move(file_name), std::move(index_base), std::move(column_def)) {}
+                                SharedPtr<ColumnDef> column_def,
+                                SizeT index_size)
+        : IndexFileWorker(std::move(file_dir), std::move(file_name), std::move(index_base), std::move(column_def)), index_size_(index_size) {}
 
     ~BMPIndexFileWorker() override;
-
-    AbstractBMP GetAbstractIndex();
-
-    ConstAbstractBMP GetConstAbstractIndex() const;
 
 public:
     void AllocateInMemory() override;
@@ -77,13 +44,17 @@ public:
 
     FileWorkerType Type() const override { return FileWorkerType::kBMPIndexFile; }
 
+    SizeT GetMemoryCost() const override { return index_size_; }
+
+    void SetMemoryCost(SizeT index_size) { index_size_ = index_size; }
+
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
 
     void ReadFromFileImpl() override;
 
 private:
-    const SparseInfo *GetSparseInfo() const;
+    SizeT index_size_{};
 };
 
 } // namespace infinity

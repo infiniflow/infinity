@@ -166,9 +166,9 @@ export {
     constexpr u32 DEFAULT_MATCH_TENSOR_OPTION_TOP_N = 10;
     constexpr u32 DEFAULT_FUSION_OPTION_TOP_N = 100;
 
-    constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
+    constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 8 * 1024lu * 1024lu * 1024lu; // 8Gib
     constexpr SizeT DEFAULT_BUFFER_MANAGER_LRU_COUNT = 7;
-    constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "4GB"; // 4Gib
+    constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "8GB"; // 8Gib
 
     constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
     constexpr std::string_view DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB

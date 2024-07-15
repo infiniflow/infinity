@@ -77,10 +77,6 @@ UniquePtr<IndexFileWorker> ChunkIndexEntry::CreateFileWorker(const SharedPtr<Ind
             auto index_file_name = MakeShared<String>(ChunkIndexEntry::IndexFileName(segment_id, chunk_id));
             return MakeUnique<HnswFileWorker>(index_dir, index_file_name, create_hnsw_param);
         }
-        case IndexType::kBMP: {
-            auto index_file_name = MakeShared<String>(ChunkIndexEntry::IndexFileName(segment_id, chunk_id));
-            return MakeUnique<BMPIndexFileWorker>(index_dir, index_file_name, index_base, column_def);
-        }
         default: {
             LOG_TRACE(fmt::format("index {} not store in index chunk entry by buffer obj", (u8)index_base->index_type_));
             return nullptr;
@@ -170,6 +166,28 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewEMVBIndexChunkIndexEntry(ChunkID 
         const auto segment_start_offset = base_rowid.segment_offset_;
         SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", *chunk_index_entry->base_dir_, *index_dir));
         auto file_worker = MakeUnique<EMVBIndexFileWorker>(full_dir, emvb_index_file_name, index_base, column_def, segment_start_offset);
+        chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
+    }
+    return chunk_index_entry;
+}
+
+SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewBMPIndexChunkIndexEntry(ChunkID chunk_id,
+                                                                       SegmentIndexEntry *segment_index_entry,
+                                                                       const String &base_name,
+                                                                       RowID base_rowid,
+                                                                       u32 row_count,
+                                                                       BufferManager *buffer_mgr,
+                                                                       SizeT index_size) {
+    auto chunk_index_entry = MakeShared<ChunkIndexEntry>(chunk_id, segment_index_entry, base_name, base_rowid, row_count);
+    const auto &index_dir = segment_index_entry->index_dir();
+    assert(index_dir.get() != nullptr);
+    if (buffer_mgr != nullptr) {
+        SegmentID segment_id = segment_index_entry->segment_id();
+        auto bmp_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
+        const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
+        const auto &column_def = segment_index_entry->table_index_entry()->column_def();
+        SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", *chunk_index_entry->base_dir_, *index_dir));
+        auto file_worker = MakeUnique<BMPIndexFileWorker>(full_dir, bmp_index_file_name, index_base, column_def, index_size);
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
     }
     return chunk_index_entry;

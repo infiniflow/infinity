@@ -81,6 +81,14 @@ public:
                                                                   u32 row_count,
                                                                   BufferManager *buffer_mgr);
 
+    static SharedPtr<ChunkIndexEntry> NewBMPIndexChunkIndexEntry(ChunkID chunk_id,
+                                                                 SegmentIndexEntry *segment_index_entry,
+                                                                 const String &base_name,
+                                                                 RowID base_rowid,
+                                                                 u32 row_count,
+                                                                 BufferManager *buffer_mgr,
+                                                                 SizeT index_size);
+
     static SharedPtr<ChunkIndexEntry> NewReplayChunkIndexEntry(ChunkID chunk_id,
                                                                SegmentIndexEntry *segment_index_entry,
                                                                CreateIndexParam *param,

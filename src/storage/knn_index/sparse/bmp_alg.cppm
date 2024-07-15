@@ -145,13 +145,13 @@ public:
     Pair<Vector<BMPDocID>, Vector<DataType>>
     SearchKnn(const SparseVecRef<DataType, IdxType> &query, i32 topk, const BmpSearchOptions &options, const Filter &filter) const;
 
-    void Save(FileHandler &file_handler) const;
+    void Save(FileHandler &file_handler, SizeT size = 0) const;
 
     static BMPAlg<DataType, IdxType, CompressType> Load(FileHandler &file_handler);
 
-private:
     SizeT GetSizeInBytes() const;
 
+private:
     void WriteAdv(char *&p) const;
 
     static BMPAlg<DataType, IdxType, CompressType> ReadAdv(const char *&p);
