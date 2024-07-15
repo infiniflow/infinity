@@ -165,7 +165,7 @@ def process_pool(threads, rounds, query_path, ef: int, remote: bool, table_name)
         results.append(f"Round {i + 1}:")
         results.append(f"Total Dur: {dur:.2f} s")
         results.append(f"Query Count: {total_queries_count}")
-        results.append(f"QPS: {(len(total_queries) / dur):.2f}")
+        results.append(f"QPS: {(total_queries_count / dur):.2f}")
 
     for result in results:
         print(result)
