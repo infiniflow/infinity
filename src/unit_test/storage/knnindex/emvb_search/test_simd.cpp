@@ -21,6 +21,7 @@
 
 import stl;
 import emvb_simd_funcs;
+import simd_common_tools;
 
 using namespace infinity;
 
@@ -154,9 +155,13 @@ TEST_F(SIMDTest, testleftpackf) {
         }
     }
     auto out_ptr = std::make_unique_for_overwrite<u32[]>(1008);
-    auto out_ptr_end = filter_scores_output_ids(out_ptr.get(), 1.0f, test_input.get(), 1000);
+    auto out_ptr_compare = std::make_unique_for_overwrite<u32[]>(1008);
+    auto out_ptr_end = filter_scores_output_ids_avx2(out_ptr.get(), 1.0f, test_input.get(), 1000);
+    auto out_ptr_compare_end = filter_scores_output_ids_common(out_ptr_compare.get(), 1.0f, test_input.get(), 1000);
     EXPECT_EQ(out_ptr_end, out_ptr.get() + expect_out_ids.size());
+    EXPECT_EQ(out_ptr_compare_end, out_ptr_compare.get() + expect_out_ids.size());
     for (u32 i = 0; i < expect_out_ids.size(); ++i) {
         EXPECT_EQ(out_ptr[i], expect_out_ids[i]);
+        EXPECT_EQ(out_ptr_compare[i], out_ptr[i]);
     }
 }

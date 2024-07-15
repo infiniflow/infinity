@@ -15,7 +15,7 @@
 module;
 
 #include <cmath>
-#include "../header.h"
+#include <immintrin.h>
 
 import stl;
 
@@ -48,10 +48,10 @@ export float F32CosBF(const float *pv1, const float *pv2, size_t dim) {
         norm1 += pv1[i] * pv1[i];
         norm2 += pv2[i] * pv2[i];
     }
-    return 1 - dot_product / sqrt(norm1 * norm2);
+    return dot_product ? dot_product / sqrt(norm1 * norm2) : 0.0f;
 }
 
-#if defined(USE_AVX512)
+#if defined(__AVX512F__)
 
 export float F32CosAVX512(const float *pv1, const float *pv2, size_t dim) {
     size_t dim16 = dim >> 4;
@@ -97,12 +97,12 @@ export float F32CosAVX512Residual(const float *pv1, const float *pv2, size_t dim
 
 #endif
 
-#if defined(USE_AVX)
+#if defined(__AVX2__)
 
 export float F32CosAVX(const float *pv1, const float *pv2, size_t dim) {
-    float PORTABLE_ALIGN32 MulTmpRes[8];
-    float PORTABLE_ALIGN32 V1TmpRes[8];
-    float PORTABLE_ALIGN32 V2TmpRes[8];
+    alignas(64) float MulTmpRes[8];
+    alignas(64) float V1TmpRes[8];
+    alignas(64) float V2TmpRes[8];
     size_t dim16 = dim >> 4;
 
     const float *pEnd1 = pv1 + (dim16 << 4);
@@ -157,7 +157,7 @@ export float F32CosAVXResidual(const float *pv1, const float *pv2, size_t dim) {
 
 #endif
 
-#if defined(USE_SSE)
+#if defined(__SSE2__)
 
 export float F32CosSSE(const float *pv1, const float *pv2, size_t dim) {
     alignas(16) float MulTmpRes[4];
@@ -243,7 +243,7 @@ export int32_t I8IPBF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     return res;
 }
 
-#if defined(USE_AVX512)
+#if defined(__AVX512F__)
 
 export int32_t I8IPAVX512(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     size_t dim64 = dim >> 6;
@@ -276,7 +276,7 @@ export int32_t I8IPAVX512Residual(const int8_t *pv1, const int8_t *pv2, size_t d
 }
 #endif
 
-#if defined(USE_AVX)
+#if defined(__AVX2__)
 
 export int32_t I8IPAVX(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     size_t dim32 = dim >> 5;
@@ -314,7 +314,7 @@ export int32_t I8IPAVXResidual(const int8_t *pv1, const int8_t *pv2, size_t dim)
 
 #endif
 
-#if defined(USE_SSE)
+#if defined(__SSE2__)
 
 export int32_t I8IPSSE(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     size_t dim16 = dim >> 4;
@@ -363,10 +363,10 @@ export float F32L2BF(const float *pv1, const float *pv2, size_t dim) {
     return res;
 }
 
-#if defined(USE_AVX512)
+#if defined(__AVX512F__)
 
 export float F32L2AVX512(const float *pv1, const float *pv2, size_t dim) {
-    float PORTABLE_ALIGN64 TmpRes[16];
+    alignas(64) float TmpRes[16];
     size_t dim16 = dim >> 4;
 
     const float *pEnd1 = pv1 + (dim16 << 4);
@@ -397,10 +397,10 @@ export float F32L2AVX512Residual(const float *pv1, const float *pv2, size_t dim)
 
 #endif
 
-#if defined(USE_AVX)
+#if defined(__AVX2__)
 
 export float F32L2AVX(const float *pv1, const float *pv2, size_t dim) {
-    float PORTABLE_ALIGN32 TmpRes[8];
+    alignas(32) float TmpRes[8];
     size_t dim16 = dim >> 4;
 
     const float *pEnd1 = pv1 + (dim16 << 4);
@@ -434,7 +434,7 @@ export float F32L2AVXResidual(const float *pv1, const float *pv2, size_t dim) {
 
 #endif
 
-#if defined(USE_SSE)
+#if defined(__SSE2__)
 
 export float F32L2SSE(const float *pv1, const float *pv2, size_t dim) {
     alignas(16) float TmpRes[4];
@@ -495,10 +495,10 @@ export float F32IPBF(const float *pv1, const float *pv2, size_t dim) {
     return res;
 }
 
-#if defined(USE_AVX512)
+#if defined(__AVX512F__)
 
 export float F32IPAVX512(const float *pVect1, const float *pVect2, SizeT qty) {
-    float PORTABLE_ALIGN64 TmpRes[16];
+    alignas(64) float TmpRes[16];
 
     size_t qty16 = qty / 16;
 
@@ -529,10 +529,10 @@ export float F32IPAVX512Residual(const float *pVect1, const float *pVect2, SizeT
 
 #endif
 
-#if defined(USE_AVX)
+#if defined(__AVX2__)
 
 export float F32IPAVX(const float *pVect1, const float *pVect2, SizeT qty) {
-    float PORTABLE_ALIGN32 TmpRes[8];
+    alignas(32) float TmpRes[8];
 
     size_t qty16 = qty / 16;
 
@@ -568,7 +568,7 @@ export float F32IPAVXResidual(const float *pVect1, const float *pVect2, SizeT qt
 
 #endif
 
-#if defined(USE_SSE)
+#if defined(__SSE2__)
 
 export float F32IPSSE(const float *pVect1, const float *pVect2, SizeT qty) {
     alignas(16) float TmpRes[4];

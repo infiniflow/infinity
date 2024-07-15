@@ -14,14 +14,13 @@
 
 module;
 
-#include "../header.h"
 #include <ostream>
 
 import stl;
 import hnsw_common;
-import hnsw_simd_func;
 import plain_vec_store;
 import lvq_vec_store;
+import simd_functions;
 
 export module dist_func_l2;
 
@@ -39,7 +38,7 @@ public:
 private:
     using SIMDFuncType = DataType (*)(const DataType *, const DataType *, SizeT);
 
-    SIMDFuncType SIMDFunc;
+    SIMDFuncType SIMDFunc = nullptr;
 
 public:
     PlainL2Dist() : SIMDFunc(nullptr) {}
@@ -54,27 +53,11 @@ public:
 
     PlainL2Dist(SizeT dim) {
         if constexpr (std::is_same<DataType, float>()) {
-#if defined(USE_AVX512)
             if (dim % 16 == 0) {
-                SIMDFunc = F32L2AVX512;
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_F32L2_16_ptr_;
             } else {
-                SIMDFunc = F32L2AVX512Residual;
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_;
             }
-#elif defined(USE_AVX)
-            if (dim % 16 == 0) {
-                SIMDFunc = F32L2AVX;
-            } else {
-                SIMDFunc = F32L2AVXResidual;
-            }
-#elif defined(USE_SSE)
-            if (dim % 16 == 0) {
-                SIMDFunc = F32L2SSE;
-            } else {
-                SIMDFunc = F32L2SSEResidual;
-            }
-#else
-            SIMDFunc = F32IPBF;
-#endif
         }
     }
 
@@ -122,7 +105,7 @@ public:
 private:
     using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, SizeT);
 
-    SIMDFuncType SIMDFunc;
+    SIMDFuncType SIMDFunc = nullptr;
 
 public:
     LVQL2Dist() : SIMDFunc(nullptr) {}
@@ -136,27 +119,15 @@ public:
     ~LVQL2Dist() = default;
     LVQL2Dist(SizeT dim) {
         if constexpr (std::is_same<CompressType, i8>()) {
-#if defined(USE_AVX512)
             if (dim % 64 == 0) {
-                SIMDFunc = I8IPAVX512;
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8IP_64_ptr_;
+            } else if (dim % 32 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8IP_32_ptr_;
+            } else if (dim % 16 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8IP_16_ptr_;
             } else {
-                SIMDFunc = I8IPAVX512Residual;
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8IP_ptr_;
             }
-#elif defined(USE_AVX)
-            if (dim % 32 == 0) {
-                SIMDFunc = I8IPAVX;
-            } else {
-                SIMDFunc = I8IPAVXResidual;
-            }
-#elif defined(USE_SSE)
-            if (dim % 16 == 0) {
-                SIMDFunc = I8IPSSE;
-            } else {
-                SIMDFunc = I8IPSSEResidual;
-            }
-#else
-            SIMDFunc = I8IPBF;
-#endif
         }
     }
 

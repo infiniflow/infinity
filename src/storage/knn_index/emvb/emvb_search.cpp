@@ -20,13 +20,12 @@ module;
 #include <cassert>
 #include <cstdlib>
 #include <map>
-#include <memory>
-#include <utility>
 #include <vector>
 
 module emvb_search;
 import stl;
 import emvb_result_handler;
+import simd_init;
 import emvb_simd_funcs;
 import mlas_matrix_multiply;
 import emvb_product_quantization;
@@ -63,7 +62,7 @@ auto EMVBSearch<FIXED_QUERY_TOKEN_NUM>::find_candidate_docs(const f32 *centroids
     closest_centroids_ids.reserve(FIXED_QUERY_TOKEN_NUM * nprobe);
     for (u32 i = 0; i < FIXED_QUERY_TOKEN_NUM; ++i) {
         const auto score_start_ptr = centroids_scores + i * n_centroids_;
-        const auto filtered_end = filter_scores_output_ids(filtered_centroid_ids.get(), th, score_start_ptr, n_centroids_);
+        const auto filtered_end = filter_scores_output_ids_func_ptr(filtered_centroid_ids.get(), th, score_start_ptr, n_centroids_);
         const u32 result_id_n = filtered_end - filtered_centroid_ids.get();
         for (u32 j = 0; j < result_id_n; ++j) {
             centroid_q_token_sim[filtered_centroid_ids[j]].set(i);
@@ -156,6 +155,7 @@ auto EMVBSearch<FIXED_QUERY_TOKEN_NUM>::compute_ip_of_vectors_in_doc_with_centro
     return centroid_distances;
 }
 
+#if defined(__AVX2__)
 template <u32 FIXED_QUERY_TOKEN_NUM, typename IndexSequence>
 struct GetMaxSimSumUp;
 
@@ -173,6 +173,20 @@ struct GetMaxSimScoreOfDoc {
         return GetMaxSimSumUp<FIXED_QUERY_TOKEN_NUM, std::make_index_sequence<FIXED_QUERY_TOKEN_NUM / 32>>::Get(centroid_distances, doclen);
     }
 };
+#endif
+
+template <u32 FIXED_QUERY_TOKEN_NUM>
+inline f32 SimpleGetMaxSimScoreOfDoc(const f32 *centroid_distances, const u32 doclen) {
+    std::array<f32, FIXED_QUERY_TOKEN_NUM> maxs;
+    std::copy_n(centroid_distances, FIXED_QUERY_TOKEN_NUM, maxs.begin());
+    for (u32 i = 1; i < doclen; ++i) {
+        centroid_distances += FIXED_QUERY_TOKEN_NUM;
+        for (u32 j = 0; j < FIXED_QUERY_TOKEN_NUM; ++j) {
+            maxs[j] = std::max(maxs[j], centroid_distances[j]);
+        }
+    }
+    return std::reduce(maxs.begin(), maxs.end());
+}
 
 template <u32 FIXED_QUERY_TOKEN_NUM>
 auto EMVBSearch<FIXED_QUERY_TOKEN_NUM>::second_stage_filtering(auto selected_cnt_and_docs,
@@ -186,11 +200,23 @@ auto EMVBSearch<FIXED_QUERY_TOKEN_NUM>::second_stage_filtering(auto selected_cnt
     query_token_centroids_scores.reset();
     using ResultHandler = EMVBReservoirResultHandler<f32, std::pair<u32, UniquePtrF32Aligned>>;
     ResultHandler result_handler(out_second_stage);
-    for (u32 i = 0; i < selected_cnt; ++i) {
-        const auto doc_id = selected_docs[i];
-        auto centroid_scores = compute_ip_of_vectors_in_doc_with_centroids(doc_id, centroids_scores_transposed.get());
-        const auto score = GetMaxSimScoreOfDoc<FIXED_QUERY_TOKEN_NUM>::Get(centroid_scores.get(), doc_lens_[doc_id]);
-        result_handler.Add(score, std::make_pair(doc_id, std::move(centroid_scores)));
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        for (u32 i = 0; i < selected_cnt; ++i) {
+            const auto doc_id = selected_docs[i];
+            auto centroid_scores = compute_ip_of_vectors_in_doc_with_centroids(doc_id, centroids_scores_transposed.get());
+            const auto score = GetMaxSimScoreOfDoc<FIXED_QUERY_TOKEN_NUM>::Get(centroid_scores.get(), doc_lens_[doc_id]);
+            result_handler.Add(score, std::make_pair(doc_id, std::move(centroid_scores)));
+        }
+    } else
+#endif
+    {
+        for (u32 i = 0; i < selected_cnt; ++i) {
+            const auto doc_id = selected_docs[i];
+            auto centroid_scores = compute_ip_of_vectors_in_doc_with_centroids(doc_id, centroids_scores_transposed.get());
+            const auto score = SimpleGetMaxSimScoreOfDoc<FIXED_QUERY_TOKEN_NUM>(centroid_scores.get(), doc_lens_[doc_id]);
+            result_handler.Add(score, std::make_pair(doc_id, std::move(centroid_scores)));
+        }
     }
     result_handler.EndWithoutSort();
     return std::make_pair(result_handler.GetSize(), result_handler.GetIdPtr());
@@ -264,7 +290,7 @@ auto EMVBSearch<FIXED_QUERY_TOKEN_NUM>::compute_topk_documents_selected(const f3
             for (u32 j = 0; j < doclen; ++j) {
                 distances_ptr[j] = centroid_distances[j * FIXED_QUERY_TOKEN_NUM + query_token_id];
             }
-            const auto embedding_id_ptr_end = filter_scores_output_ids(embedding_id_ptr, th, distances_ptr, doclen);
+            const auto embedding_id_ptr_end = filter_scores_output_ids_func_ptr(embedding_id_ptr, th, distances_ptr, doclen);
             if (embedding_id_ptr_end > embedding_id_ptr) [[likely]] {
                 auto distances_ptr_end = distances_ptr;
                 for (auto copy_embedding_id_ptr = embedding_id_ptr; copy_embedding_id_ptr < embedding_id_ptr_end; ++copy_embedding_id_ptr) {

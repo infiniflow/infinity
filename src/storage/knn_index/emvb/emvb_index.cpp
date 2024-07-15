@@ -94,7 +94,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
     }
     const SegmentOffset start_segment_offset = base_rowid.segment_offset_;
     const ColumnID column_id = column_def->id();
-    u32 embedding_count = 0;
+    u64 embedding_count = 0;
     Deque<Pair<u32, u32>> all_embedding_pos;
     {
         // read the segment to get total embedding count
@@ -127,12 +127,17 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
         LOG_INFO(std::move(oss).str());
     }
     // prepare centroid count
-    const u32 sqrt_embedding_num = std::sqrt(embedding_count);
-    const u32 centroid_count_before_8 = std::min<u32>(sqrt_embedding_num, embedding_count / 32);
-    const u32 centroid_count = (centroid_count_before_8 + 7) & (~(7u));
+    const u64 sqrt_embedding_num = std::sqrt(embedding_count);
+    const u64 centroid_count_before_8 = std::min<u64>(sqrt_embedding_num, embedding_count / 32ul);
+    const u64 centroid_count = (centroid_count_before_8 + 7ul) & (~(7ul));
     // prepare training data
-    n_centroids_ = centroid_count;
-    const u32 least_training_data_num = ExpectLeastTrainingDataNum();
+    if (centroid_count > std::numeric_limits<u32>::max()) {
+        const auto error_msg = "EMVBIndex::BuildEMVBIndex: centroid_count exceeds u32 limit!";
+        LOG_ERROR(error_msg);
+        UnrecoverableError(error_msg);
+    }
+    n_centroids_ = static_cast<u32>(centroid_count);
+    const auto least_training_data_num = ExpectLeastTrainingDataNum();
     if (embedding_count < least_training_data_num) {
         const auto error_msg =
             fmt::format("EMVBIndex::BuildEMVBIndex: embedding_count must be at least {}, got {} instead.", least_training_data_num, embedding_count);
@@ -140,7 +145,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
     }
     // train the index
     {
-        const auto training_embedding_num = std::min<u32>(embedding_count, 8 * least_training_data_num);
+        const auto training_embedding_num = std::min<u64>(embedding_count, 8ul * least_training_data_num);
         const auto training_data = MakeUniqueForOverwrite<f32[]>(training_embedding_num * embedding_dimension_);
         // prepare training data
         {
@@ -153,7 +158,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                 const auto error_msg = fmt::format("EMVBIndex::BuildEMVBIndex: sample failed to get {} samples.", training_embedding_num);
                 UnrecoverableError(error_msg);
             }
-            for (u32 i = 0; i < training_embedding_num; ++i) {
+            for (u64 i = 0; i < training_embedding_num; ++i) {
                 const auto [sample_row, sample_id] = sample_result[i];
                 const SegmentOffset new_segment_offset = start_segment_offset + sample_row;
                 const BlockID block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY;
@@ -220,9 +225,9 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
 // need embedding num:
 // 1. (32 ~ 256) * n_centroids_ for centroids
 // 2. (32 ~ 256) * (1 << residual_pq_subspace_bits) for residual product quantizer
-u32 EMVBIndex::ExpectLeastTrainingDataNum() const { return std::max<u32>(32 * n_centroids_, 32 * (1 << residual_pq_subspace_bits_)); }
+u64 EMVBIndex::ExpectLeastTrainingDataNum() const { return std::max<u64>(32ul * n_centroids_, 32ul * (1ul << residual_pq_subspace_bits_)); }
 
-void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const u32 embedding_num, const u32 iter_cnt) {
+void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const u64 embedding_num, const u32 iter_cnt) {
     // set n_centroids_
     n_centroids_ = centroids_num;
     // check n_centroids_
@@ -231,11 +236,11 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
         UnrecoverableError(error_msg);
     }
     // allocate space for centroids
-    centroids_data_.resize(n_centroids_ * embedding_dimension_);
+    centroids_data_.resize(static_cast<u64>(n_centroids_) * embedding_dimension_);
     centroid_norms_neg_half_.resize(n_centroids_);
     centroids_to_docid_ = MakeUnique<EMVBSharedVec<u32>[]>(n_centroids_);
     // check training data num
-    if (const u32 least_num = ExpectLeastTrainingDataNum(); embedding_num < least_num) {
+    if (const auto least_num = ExpectLeastTrainingDataNum(); embedding_num < least_num) {
         const auto error_msg = fmt::format("EMVBIndex::Train: embedding_num must be at least {}, got {} instead.", least_num, embedding_num);
         UnrecoverableError(error_msg);
     }
@@ -282,11 +287,11 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
                                                        n_centroids_,
                                                        embedding_dimension_,
                                                        dist_table.get());
-        for (u32 i = 0; i < embedding_num; ++i) {
+        for (u64 i = 0; i < embedding_num; ++i) {
             const f32 *embedding_data_ptr = embedding_data + i * embedding_dimension_;
             f32 *output_ptr = residuals.get() + i * embedding_dimension_;
             f32 max_neg_distance = std::numeric_limits<f32>::lowest();
-            u32 max_id = 0;
+            u64 max_id = 0;
             const f32 *dist_ptr = dist_table.get() + i * n_centroids_;
             for (u32 k = 0; k < n_centroids_; ++k) {
                 if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {

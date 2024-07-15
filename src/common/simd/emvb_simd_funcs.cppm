@@ -17,8 +17,11 @@ module;
 #include <immintrin.h>
 export module emvb_simd_funcs;
 import stl;
+import simd_common_tools;
 
 namespace infinity {
+
+#if defined(__AVX2__)
 
 // https://stackoverflow.com/questions/36932240/avx2-what-is-the-most-efficient-way-to-pack-left-based-on-a-mask/36951611#36951611
 // Uses 64bit pdep / pext to save a step in unpacking.
@@ -38,7 +41,7 @@ export inline __m256i compress256i(__m256i src, u32 mask /* from movmskps */) {
 
 // output_id_ptr should have extra 8 bytes for storeu
 // input_scores must be aligned to 32 bytes
-export inline u32 *filter_scores_output_ids(u32 *output_id_ptr, const f32 threshold, const f32 *input_scores, const u32 scores_len) {
+export u32 *filter_scores_output_ids_avx2(u32 *output_id_ptr, const f32 threshold, const f32 *input_scores, const u32 scores_len) {
     __m256i ids = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
     const __m256i SHIFT = _mm256_set1_epi32(8);
     const __m256 broad_threshold = _mm256_set1_ps(threshold);
@@ -57,24 +60,6 @@ export inline u32 *filter_scores_output_ids(u32 *output_id_ptr, const f32 thresh
         output_id_ptr += static_cast<int>(input_scores[j] > threshold);
     }
     return output_id_ptr;
-}
-
-// https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
-inline float hsum_ps_sse3(__m128 &v) {
-    __m128 shuf = _mm_movehdup_ps(v); // broadcast elements 3,1 to 2,0
-    __m128 sums = _mm_add_ps(v, shuf);
-    shuf = _mm_movehl_ps(shuf, sums); // high half -> low half
-    sums = _mm_add_ss(sums, shuf);
-    return _mm_cvtss_f32(sums);
-}
-
-// https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
-export inline float hsum256_ps_avx(__m256 &v) {
-    __m128 vlow = _mm256_castps256_ps128(v);
-    __m128 vhigh = _mm256_extractf128_ps(v, 1); // high 128
-    vlow = _mm_add_ps(vlow, vhigh);             // add the low 128
-    return hsum_ps_sse3(vlow);                  // and inline the sse3 version, which is optimal for AVX
-    // (no wasted instructions, and all of them are the 4B minimum)
 }
 
 export template <u32 FIXED_QUERY_TOKEN_NUM, u32 BEGIN_OFFSET>
@@ -106,6 +91,18 @@ inline f32 GetMaxSim32Width(const f32 *centroid_distances, const u32 doclen) {
     __m256 half_sum_2 = _mm256_add_ps(max2, max3);
     __m256 half_sum = _mm256_add_ps(half_sum_1, half_sum_2);
     return hsum256_ps_avx(half_sum);
+}
+
+#endif
+
+// output_id_ptr should have extra 8 bytes for storeu
+// input_scores must be aligned to 32 bytes
+export u32 *filter_scores_output_ids_common(u32 *output_id_ptr, const f32 threshold, const f32 *input_scores, const u32 scores_len) {
+    for (u32 j = 0; j < scores_len; ++j) {
+        *output_id_ptr = j;
+        output_id_ptr += static_cast<int>(input_scores[j] > threshold);
+    }
+    return output_id_ptr;
 }
 
 } // namespace infinity
