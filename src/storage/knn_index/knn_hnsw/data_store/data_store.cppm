@@ -122,6 +122,23 @@ public:
         }
     }
 
+    SizeT GetSizeInBytes() const {
+        SizeT cur_vec_num = this->cur_vec_num();
+        auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
+
+        SizeT size = 0;
+        size += sizeof(chunk_size_);
+        size += sizeof(max_chunk_n_);
+        size += sizeof(cur_vec_num_);
+        size += vec_store_meta_.GetSizeInBytes();
+        size += graph_store_meta_.GetSizeInBytes();
+        for (SizeT i = 0; i < chunk_num; ++i) {
+            SizeT chunk_size = (i < chunk_num - 1) ? chunk_size_ : last_chunk_size;
+            size += inners_[i].GetSizeInBytes(chunk_size, vec_store_meta_, graph_store_meta_);
+        }
+        return size;
+    }
+
     void Save(FileHandler &file_handler) const {
         SizeT cur_vec_num = this->cur_vec_num();
         auto [chunk_num, last_chunk_size] = ChunkInfo(cur_vec_num);
@@ -368,6 +385,14 @@ public:
     }
 
     void Free(SizeT cur_vec_num, const GraphStoreMeta &graph_store_meta) { graph_store_inner_.Free(cur_vec_num, graph_store_meta); }
+
+    SizeT GetSizeInBytes(SizeT chunk_size, const VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) const {
+        SizeT size = 0;
+        size += vec_store_inner_.GetSizeInBytes(chunk_size, vec_store_meta);
+        size += graph_store_inner_.GetSizeInBytes(chunk_size, graph_store_meta);
+        size += sizeof(LabelType) * chunk_size;
+        return size;
+    }
 
     void Save(FileHandler &file_handler, SizeT cur_vec_num, const VecStoreMeta &vec_store_meta, const GraphStoreMeta &graph_store_meta) const {
         vec_store_inner_.Save(file_handler, cur_vec_num, vec_store_meta);

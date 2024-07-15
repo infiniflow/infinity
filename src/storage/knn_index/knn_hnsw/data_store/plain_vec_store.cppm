@@ -53,6 +53,8 @@ public:
     static This Make(SizeT dim) { return This(dim); }
     static This Make(SizeT dim, bool) { return This(dim); }
 
+    SizeT GetSizeInBytes() const { return sizeof(SizeT); }
+
     void Save(FileHandler &file_handler) const { file_handler.Write(&dim_, sizeof(dim_)); }
 
     static This Load(FileHandler &file_handler) {
@@ -85,6 +87,8 @@ public:
     PlainVecStoreInner() = default;
 
     static This Make(SizeT max_vec_num, const Meta &meta) { return This(max_vec_num, meta); }
+
+    SizeT GetSizeInBytes(SizeT cur_vec_num, const Meta &meta) const { return sizeof(DataType) * cur_vec_num * meta.dim(); }
 
     void Save(FileHandler &file_handler, SizeT cur_vec_num, const Meta &meta) const {
         file_handler.Write(ptr_.get(), sizeof(DataType) * cur_vec_num * meta.dim());
