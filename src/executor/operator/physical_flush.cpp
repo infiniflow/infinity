@@ -19,7 +19,7 @@ module physical_flush;
 import stl;
 import txn;
 import query_context;
-import table_def;
+import table_def;\
 import data_table;
 
 import physical_operator_type;
