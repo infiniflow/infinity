@@ -4,7 +4,7 @@
 
 
 <p align="center">
-    <b>The AI-native database built for LLM applications, providing incredibly fast full-text and vector search</b>
+    <b>The AI-native database built for LLM applications, providing incredibly fast hybrid search of dense embedding, sparse embedding, tensor and full-text</b>
 </p>
 
 <h4 align="center">
@@ -15,7 +15,7 @@
 </h4>
 
 
-Infinity is a cutting-edge AI-native database that provides a wide range of search capabilities for rich data types such as vectors, full-text, and structured data. It provides robust support for various LLM applications, including search, recommenders, question-answering, conversational AI, copilot, content generation, and many more **RAG** (Retrieval-augmented Generation) applications.
+Infinity is a cutting-edge AI-native database that provides a wide range of search capabilities for rich data types such as dense vector, sparse vector, tensor, full-text, and structured data. It provides robust support for various LLM applications, including search, recommenders, question-answering, conversational AI, copilot, content generation, and many more **RAG** (Retrieval-augmented Generation) applications.
 
 - [Key Features](#-key-features)
 - [Get Started](#-get-started)
@@ -23,22 +23,27 @@ Infinity is a cutting-edge AI-native database that provides a wide range of sear
 - [Roadmap](#-roadmap)
 - [Community](#-community)
 
+## ⚡️ Performance
+
+<div class="column" align="middle">
+  <img src="https://github.com/user-attachments/assets/c12af824-6f92-4146-b887-be024133a2c1"/>
+</div>
 
 ## 🌟 Key Features
 
 Infinity comes with high performance, flexibility, ease-of-use, and many features designed to address the challenges facing the next-generation AI applications:
 
-### ⚡️ Incredibly fast
+### 🚀 Incredibly fast
 
 - Achieves 0.1 milliseconds query latency and 15K+ QPS on million-scale vector datasets.
 - Achieves 1 millisecond latency and 12K+ QPS in full-text search on 33M documents.
 
 > See the [Benchmark report](https://infiniflow.org/docs/dev/benchmark) for more information.
 
+### 🔮 Powerful search
 
-### 🔮 Fused search
-
-Supports a fused search of multiple embeddings and full text, in addition to filtering.
+- Supports a hybrid search of dense embedding, sparse embedding, tensor and full text, in addition to filtering.
+- Support several types of rerankers including RRF, weighted sum and **ColBERT**.
 
 ### 🍔 Rich data types
 
