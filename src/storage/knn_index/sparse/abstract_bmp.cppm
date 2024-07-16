@@ -46,25 +46,6 @@ export using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompr
                                         BMPAlg<f64, i8, BMPCompressType::kRaw> *,
                                         std::nullptr_t>;
 
-export using ConstAbstractBMP = std::variant<const BMPAlg<f32, i32, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f32, i32, BMPCompressType::kRaw> *,
-                                             const BMPAlg<f32, i16, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f32, i16, BMPCompressType::kRaw> *,
-                                             const BMPAlg<f32, i8, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f32, i8, BMPCompressType::kRaw> *,
-                                             const BMPAlg<f64, i32, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f64, i32, BMPCompressType::kRaw> *,
-                                             const BMPAlg<f64, i16, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f64, i16, BMPCompressType::kRaw> *,
-                                             const BMPAlg<f64, i8, BMPCompressType::kCompressed> *,
-                                             const BMPAlg<f64, i8, BMPCompressType::kRaw> *,
-                                             std::nullptr_t>;
-
-struct BMPCreateOption {
-    SizeT term_num_;
-    SizeT block_size_;
-};
-
 export struct BMPIndexInMem {
 public:
     BMPIndexInMem() : bmp_(nullptr) {}
@@ -74,15 +55,17 @@ public:
 
 private:
     template <typename DataType, typename IndexType>
-    static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse_info, const BMPCreateOption &options) {
+    static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse_info) {
+        SizeT term_num = sparse_info->Dimension();
+        SizeT block_size = index_bmp->block_size_;
         switch (index_bmp->compress_type_) {
             case BMPCompressType::kCompressed: {
                 using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kCompressed>;
-                return new BMPIndex(options.term_num_, index_bmp->block_size_);
+                return new BMPIndex(term_num, block_size);
             }
             case BMPCompressType::kRaw: {
                 using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kRaw>;
-                return new BMPIndex(options.term_num_, index_bmp->block_size_);
+                return new BMPIndex(term_num, block_size);
             }
             default: {
                 return nullptr;
@@ -91,16 +74,16 @@ private:
     }
 
     template <typename DataType>
-    static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse_info, const BMPCreateOption &options) {
+    static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse_info) {
         switch (sparse_info->IndexType()) {
             case EmbeddingDataType::kElemInt8: {
-                return InitAbstractIndex<DataType, i8>(index_bmp, sparse_info, options);
+                return InitAbstractIndex<DataType, i8>(index_bmp, sparse_info);
             }
             case EmbeddingDataType::kElemInt16: {
-                return InitAbstractIndex<DataType, i16>(index_bmp, sparse_info, options);
+                return InitAbstractIndex<DataType, i16>(index_bmp, sparse_info);
             }
             case EmbeddingDataType::kElemInt32: {
-                return InitAbstractIndex<DataType, i32>(index_bmp, sparse_info, options);
+                return InitAbstractIndex<DataType, i32>(index_bmp, sparse_info);
             }
             default: {
                 return nullptr;
@@ -113,13 +96,12 @@ public:
         const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
         const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
 
-        BMPCreateOption options{.term_num_ = sparse_info->Dimension(), .block_size_ = index_bmp->block_size_};
         switch (sparse_info->DataType()) {
             case EmbeddingDataType::kElemFloat: {
-                return InitAbstractIndex<f32>(index_bmp, sparse_info, options);
+                return InitAbstractIndex<f32>(index_bmp, sparse_info);
             }
             case EmbeddingDataType::kElemDouble: {
-                return InitAbstractIndex<f64>(index_bmp, sparse_info, options);
+                return InitAbstractIndex<f64>(index_bmp, sparse_info);
             }
             default: {
                 return nullptr;
@@ -133,11 +115,24 @@ public:
 
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
 
+    SizeT GetRowCount() const {
+        return std::visit(
+            [](auto &&index) {
+                using T = std::decay_t<decltype(index)>;
+                if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                    return SizeT(0);
+                } else {
+                    return index->DocNum();
+                }
+            },
+            bmp_);
+    }
+
     ~BMPIndexInMem() {
         std::visit(
             [](auto &&index) {
-                using IndexType = std::decay_t<decltype(index)>;
-                if constexpr (std::is_same_v<IndexType, std::nullptr_t>) {
+                using T = std::decay_t<decltype(index)>;
+                if constexpr (std::is_same_v<T, std::nullptr_t>) {
                     return;
                 } else {
                     if (index != nullptr) {

@@ -59,7 +59,7 @@ public:
 
     using CompressVecStoreType = decltype(VecStoreType::template ToLVQ<i8>());
 
-// private:
+    // private:
     KnnHnsw(SizeT M, SizeT ef_construction, DataStore data_store, Distance distance, SizeT ef, SizeT random_seed)
         : M_(M), ef_construction_(std::max(M_, ef_construction)), mult_(1 / std::log(1.0 * M_)), data_store_(std::move(data_store)),
           distance_(std::move(distance)) {
@@ -92,12 +92,14 @@ public:
     }
     ~KnnHnsw() = default;
 
-    static This Make(SizeT chunk_size, SizeT max_chunk_n, SizeT dim, SizeT M, SizeT ef_construction) {
+    static UniquePtr<This> Make(SizeT chunk_size, SizeT max_chunk_n, SizeT dim, SizeT M, SizeT ef_construction) {
         auto [Mmax0, Mmax] = This::GetMmax(M);
         auto data_store = DataStore::Make(chunk_size, max_chunk_n, dim, Mmax0, Mmax);
         Distance distance(data_store.dim());
-        return This(M, ef_construction, std::move(data_store), std::move(distance), 0, 0);
+        return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance), 0, 0);
     }
+
+    SizeT GetSizeInBytes() const { return sizeof(M_) + sizeof(ef_construction_) + data_store_.GetSizeInBytes(); }
 
     void Save(FileHandler &file_handler) {
         file_handler.Write(&M_, sizeof(M_));
@@ -105,7 +107,7 @@ public:
         data_store_.Save(file_handler);
     }
 
-    static This Load(FileHandler &file_handler) {
+    static UniquePtr<This> Load(FileHandler &file_handler) {
         SizeT M;
         file_handler.Read(&M, sizeof(M));
         SizeT ef_construction;
@@ -114,7 +116,7 @@ public:
         auto data_store = DataStore::Load(file_handler);
         Distance distance(data_store.dim());
 
-        return This(M, ef_construction, std::move(data_store), std::move(distance), 0, 0);
+        return MakeUnique<This>(M, ef_construction, std::move(data_store), std::move(distance), 0, 0);
     }
 
 private:
@@ -347,16 +349,19 @@ public:
         }
     }
 
-    KnnHnsw<CompressVecStoreType, LabelType> CompressToLVQ() && {
+    UniquePtr<KnnHnsw<CompressVecStoreType, LabelType>> CompressToLVQ() && {
         if constexpr (std::is_same_v<VecStoreType, CompressVecStoreType>) {
-            return std::move(*this);
+            return MakeUnique<This>(std::move(*this));
         } else {
             using CompressedDistance = typename CompressVecStoreType::Distance;
             CompressedDistance distance = std::move(distance_).ToLVQDistance(data_store_.dim());
             auto compressed_datastore = std::move(data_store_).template CompressToLVQ<CompressVecStoreType>();
-            auto ret = KnnHnsw<CompressVecStoreType, LabelType>(M_, ef_construction_, std::move(compressed_datastore), std::move(distance), ef_, 0);
-            *this = This();
-            return ret;
+            return MakeUnique<KnnHnsw<CompressVecStoreType, LabelType>>(M_,
+                                                                        ef_construction_,
+                                                                        std::move(compressed_datastore),
+                                                                        std::move(distance),
+                                                                        ef_,
+                                                                        0);
         }
     }
 
@@ -392,7 +397,7 @@ public:
 
     void SetEf(SizeT ef) { ef_ = ef; }
 
-    SizeT GetVertexNum() const { return data_store_.cur_vec_num(); }
+    SizeT GetVecNum() const { return data_store_.cur_vec_num(); }
 
 private:
     SizeT M_;

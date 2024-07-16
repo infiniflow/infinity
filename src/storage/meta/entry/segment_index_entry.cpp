@@ -282,38 +282,24 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             break;
         }
         case IndexType::kHnsw: {
-            const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base.get());
-            if (memory_chunk_indexer_.get() == nullptr) {
-                SharedPtr<ChunkIndexEntry> memory_hnsw_indexer = CreateChunkIndexEntry(column_def, begin_row_id, buffer_manager);
-
+            if (memory_hnsw_index_.get() == nullptr) {
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                memory_chunk_indexer_ = std::move(memory_hnsw_indexer);
+                memory_hnsw_index_ = MakeShared<HnswIndexInMem>(begin_row_id, index_base.get(), column_def.get());
             }
-            BufferHandle buffer_handle = memory_chunk_indexer_->GetIndex();
-
-            if (column_def->type()->type() != LogicalType::kEmbedding) {
-                String error_message = "HNSW supports embedding type.";
-                UnrecoverableError(error_message);
-            }
-            TypeInfo *type_info = column_def->type()->type_info().get();
-            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
-
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-            SizeT row_cnt = 0;
-            switch (embedding_info->Type()) {
-                case kElemFloat: {
-                    AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
-                    MemIndexInserterIter<f32> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
-                    auto [start_i, end_i] = abstract_hnsw.InsertVecs(std::move(iter));
-                    row_cnt = end_i;
-                    break;
-                }
-                default: {
-                    Status status = Status::NotSupport("Not support data type for index hnsw.");
-                    RecoverableError(status);
-                }
-            }
-            memory_chunk_indexer_->SetRowCount(row_cnt);
+            AbstractHnsw abstract_hnsw = memory_hnsw_index_->get();
+
+            std::visit(
+                [&](auto &index) {
+                    using T = std::decay_t<decltype(index)>;
+                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                        UnrecoverableError("Invalid index type.");
+                    } else {
+                        MemIndexInserterIter<f32> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+                        index->InsertVecs(std::move(iter));
+                    }
+                },
+                abstract_hnsw);
             break;
         }
         case IndexType::kSecondary: {
@@ -388,13 +374,14 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
     const IndexBase *index_base = table_index_entry_->index_base();
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
-            if (memory_chunk_indexer_.get() == nullptr) {
+            if (memory_hnsw_index_.get() == nullptr) {
                 break;
             }
             std::unique_lock lck(rw_locker_);
-            chunk_index_entry = std::exchange(memory_chunk_indexer_, nullptr);
+            chunk_index_entry = memory_hnsw_index_->Dump(this, buffer_manager_);
             chunk_index_entry->SaveIndexFile();
             chunk_index_entries_.push_back(chunk_index_entry);
+            memory_hnsw_index_.reset();
             break;
         }
         case IndexType::kFullText: {
@@ -480,15 +467,17 @@ u32 SegmentIndexEntry::MemIndexRowCount() {
         case IndexType::kFullText: {
             return memory_indexer_.get() ? memory_indexer_->GetDocCount() : 0;
         }
-        case IndexType::kBMP:
         case IndexType::kHnsw: {
-            return memory_chunk_indexer_.get() ? memory_chunk_indexer_->GetRowCount() : 0;
+            return memory_hnsw_index_.get() ? memory_hnsw_index_->GetRowCount() : 0;
         }
         case IndexType::kSecondary: {
             return memory_secondary_index_.get() ? memory_secondary_index_->GetRowCount() : 0;
         }
         case IndexType::kEMVB: {
             return memory_emvb_index_.get() ? memory_emvb_index_->GetRowCount() : 0;
+        }
+        case IndexType::kBMP: {
+            return memory_bmp_index_.get() ? memory_bmp_index_->GetRowCount() : 0;
         }
         default: {
             return 0;
@@ -503,11 +492,12 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
     SharedPtr<ColumnDef> column_def = table_index_entry_->column_def();
 
     SharedPtr<ChunkIndexEntry> dumped_memindex_entry = nullptr;
+
+    u32 seg_id = segment_entry->segment_id();
+    RowID base_row_id(seg_id, 0);
     switch (index_base->index_type_) {
         case IndexType::kFullText: {
             const IndexFullText *index_fulltext = static_cast<const IndexFullText *>(index_base);
-            u32 seg_id = segment_entry->segment_id();
-            RowID base_row_id(seg_id, 0);
             String base_name = fmt::format("ft_{:016x}", base_row_id.ToUint64());
             String full_path = fmt::format("{}/{}", *table_index_entry_->base_dir_, *table_index_entry_->index_dir());
             memory_indexer_ = MakeUnique<MemoryIndexer>(full_path, base_name, base_row_id, index_fulltext->flag_, index_fulltext->analyzer_);
@@ -538,58 +528,41 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kHnsw: {
-            auto index_hnsw = static_cast<const IndexHnsw *>(index_base);
-            if (column_def->type()->type() != LogicalType::kEmbedding) {
-                String error_message = "HNSW supports embedding type.";
-                UnrecoverableError(error_message);
-            }
-            TypeInfo *type_info = column_def->type()->type_info().get();
-            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
-
-            RowID base_rowid(segment_entry->segment_id(), 0);
-            memory_chunk_indexer_ = CreateChunkIndexEntry(column_def, base_rowid, buffer_mgr);
-            BufferHandle buffer_handle = memory_chunk_indexer_->GetIndex();
-
-            switch (embedding_info->Type()) {
-                case kElemFloat: {
-                    AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
-                    auto InsertHnswInner = [&](auto &iter) {
-                        HnswInsertConfig insert_config;
-                        insert_config.optimize_ = true;
-                        SegmentOffset start_i, end_i;
-                        if (!config.prepare_) {
-                            // Single thread insert
-                            std::tie(start_i, end_i) = abstract_hnsw.InsertVecs(std::move(iter), insert_config);
-                        } else {
-                            // Multi thread insert data, write file in the physical create index finish stage.
-                            std::tie(start_i, end_i) = abstract_hnsw.StoreData(std::move(iter), insert_config);
-                        }
-                        LOG_TRACE(fmt::format("Insert index: {} - {}", start_i, end_i));
-                        return end_i - start_i;
-                    };
-                    SegmentOffset row_count = 0;
-                    if (config.check_ts_) {
-                        OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
-                        row_count = InsertHnswInner(iter);
+            memory_hnsw_index_ = MakeShared<HnswIndexInMem>(base_row_id, index_base, column_def.get());
+            AbstractHnsw abstract_hnsw = memory_hnsw_index_->get();
+            std::visit(
+                [&](auto &index) {
+                    using T = std::decay_t<decltype(index)>;
+                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                        UnrecoverableError("Invalid index type.");
                     } else {
-                        // Not check ts in uncommitted segment when compact segment
-                        OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
-                        row_count = InsertHnswInner(iter);
+                        auto InsertHnswInner = [&](auto &iter) {
+                            HnswInsertConfig insert_config;
+                            insert_config.optimize_ = true;
+                            index->InsertVecs(std::move(iter), insert_config);
+                            // if (!config.prepare_) {
+                            //     // Single thread insert
+                            //     index->InsertVecs(std::move(iter), insert_config);
+                            // } else {
+                            //     // Multi thread insert data, write file in the physical create index finish stage.
+                            //     index->StoreData(std::move(iter), insert_config);
+                            // }
+                        };
+                        if (config.check_ts_) {
+                            OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
+                            InsertHnswInner(iter);
+                        } else {
+                            // Not check ts in uncommitted segment when compact segment
+                            OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
+                            InsertHnswInner(iter);
+                        }
                     }
-                    memory_chunk_indexer_->SetRowCount(row_count);
-                    break;
-                }
-                default: {
-                    Status status = Status::NotSupport("Not support data type for index hnsw.");
-                    RecoverableError(status);
-                }
-            }
+                },
+                abstract_hnsw);
             dumped_memindex_entry = MemIndexDump();
             break;
         }
         case IndexType::kSecondary: {
-            u32 seg_id = segment_entry->segment_id();
-            RowID base_row_id(seg_id, 0);
             memory_secondary_index_ = SecondaryIndexInMem::NewSecondaryIndexInMem(column_def, base_row_id);
             u64 column_id = column_def->id();
             auto block_entry_iter = BlockEntryIter(segment_entry);
@@ -602,8 +575,6 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kEMVB: {
-            u32 seg_id = segment_entry->segment_id();
-            RowID base_row_id(seg_id, 0);
             const u32 row_count = segment_entry->row_count();
             SharedPtr<ChunkIndexEntry> emvb_chunk_index_entry = CreateEMVBIndexChunkIndexEntry(base_row_id, row_count, buffer_mgr);
             this->AddChunkIndexEntry(emvb_chunk_index_entry);
@@ -622,8 +593,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kBMP: {
-            RowID base_rowid(segment_entry->segment_id(), 0);
-            memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_rowid, index_base, column_def.get());
+            memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base, column_def.get());
             AbstractBMP abstract_bmp = memory_bmp_index_->get();
             std::visit(
                 [&](auto &index) {
@@ -732,50 +702,41 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
 }
 
 Status SegmentIndexEntry::CreateIndexDo(atomic_u64 &create_index_idx) {
-    const IndexBase *index_base = table_index_entry_->index_base();
-    const ColumnDef *column_def = table_index_entry_->column_def().get();
-    switch (index_base->index_type_) {
-        case IndexType::kHnsw: {
-            auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
-            if (column_def->type()->type() != LogicalType::kEmbedding) {
-                String error_message = "HNSW supports embedding type.";
-                UnrecoverableError(error_message);
-            }
-            TypeInfo *type_info = column_def->type()->type_info().get();
-            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
+    // const IndexBase *index_base = table_index_entry_->index_base();
+    // switch (index_base->index_type_) {
+    //     case IndexType::kHnsw: {
+    //         Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
+    //         GetChunkIndexEntries(chunk_index_entries);
+    //         for (const auto &chunk_index_entry : chunk_index_entries) {
+    //             RowID base_rowid = chunk_index_entry->base_rowid_;
+    //             SegmentOffset offset = base_rowid.segment_offset_;
+    //             SegmentOffset row_count = chunk_index_entry->row_count_;
+    //             BufferHandle buffer_handle = chunk_index_entry->GetIndex();
 
-            Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-            GetChunkIndexEntries(chunk_index_entries);
-            for (const auto &chunk_index_entry : chunk_index_entries) {
-                RowID base_rowid = chunk_index_entry->base_rowid_;
-                SegmentOffset offset = base_rowid.segment_offset_;
-                SegmentOffset row_count = chunk_index_entry->row_count_;
-                BufferHandle buffer_handle = chunk_index_entry->GetIndex();
-
-                switch (embedding_info->Type()) {
-                    case kElemFloat: {
-                        AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
-                        while (true) {
-                            SizeT idx = create_index_idx.fetch_add(1);
-                            if (idx >= row_count) {
-                                break;
-                            }
-                            abstract_hnsw.Build(offset + idx);
-                        }
-                        break;
-                    }
-                    default: {
-                        Status status = Status::NotSupport("Not implemented");
-                        RecoverableError(status);
-                    }
-                }
-            }
-            break;
-        }
-        default: {
-            break;
-        }
-    }
+    //             auto *abstract_hnsw = reinterpret_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
+    //             std::visit(
+    //                 [&](auto &&index) {
+    //                     using T = std::decay_t<decltype(index)>;
+    //                     if constexpr (std::is_same_v<T, std::nullptr_t>) {
+    //                         UnrecoverableError("Invalid index type.");
+    //                     } else {
+    //                         while (true) {
+    //                             SizeT idx = create_index_idx.fetch_add(1);
+    //                             if (idx >= row_count) {
+    //                                 break;
+    //                             }
+    //                             index->Build(offset + idx);
+    //                         }
+    //                     }
+    //                 },
+    //                 *abstract_hnsw);
+    //         }
+    //         break;
+    //     }
+    //     default: {
+    //         break;
+    //     }
+    // }
     return Status::OK();
 }
 
@@ -873,21 +834,28 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
             if (!params) {
                 break;
             }
-            auto optimize_index = [&](ChunkIndexEntry *chunk_index_entry) {
-                BufferHandle buffer_handle = chunk_index_entry->GetIndex();
-                auto *file_worker = static_cast<HnswFileWorker *>(buffer_handle.GetFileWorkerMut());
-                if (params->compress_to_lvq) {
-                    file_worker->CompressToLVQ(static_cast<IndexHnsw *>(index_base));
-                }
+            auto optimize_index = [&](AbstractHnsw &abstract_hnsw) {
+                std::visit(
+                    [&](auto &&index) {
+                        using T = std::decay_t<decltype(index)>;
+                        if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                            UnrecoverableError("Invalid index type.");
+                        } else {
+                            abstract_hnsw = std::move(*index).CompressToLVQ().release();
+                        }
+                    },
+                    abstract_hnsw);
             };
 
             const auto [chunk_index_entries, memory_index_entry] = this->GetHnswIndexSnapshot();
             for (const auto &chunk_index_entry : chunk_index_entries) {
-                optimize_index(chunk_index_entry.get());
+                BufferHandle buffer_handle = chunk_index_entry->GetIndex();
+                auto *abstract_hnsw = reinterpret_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
+                optimize_index(*abstract_hnsw);
                 chunk_index_entry->SaveIndexFile();
             }
             if (memory_index_entry.get() != nullptr) {
-                optimize_index(memory_index_entry.get());
+                optimize_index(memory_index_entry->get_ref());
                 dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
             }
             break;
@@ -1016,36 +984,25 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = nullptr;
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
-            auto index_hnsw = static_cast<const IndexHnsw *>(index_base);
-            if (column_def->type()->type() != LogicalType::kEmbedding) {
-                String error_message = "HNSW supports embedding type.";
-                UnrecoverableError(error_message);
-            }
-            TypeInfo *type_info = column_def->type()->type_info().get();
-            auto embedding_info = static_cast<EmbeddingInfo *>(type_info);
+            auto memory_hnsw_index = MakeShared<HnswIndexInMem>(base_rowid, index_base, column_def.get());
+            const AbstractHnsw &abstract_hnsw = memory_hnsw_index->get();
 
-            merged_chunk_index_entry = CreateChunkIndexEntry(column_def, base_rowid, buffer_mgr);
-            BufferHandle buffer_handle = merged_chunk_index_entry->GetIndex();
-
-            switch (embedding_info->Type()) {
-                case kElemFloat: {
-                    AbstractHnsw<f32, SegmentOffset> abstract_hnsw(buffer_handle.GetDataMut(), index_hnsw);
-                    OneColumnIterator<float, true /*check ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
-                    HnswInsertConfig insert_config;
-                    insert_config.optimize_ = true;
-                    auto [start_i, end_i] = abstract_hnsw.InsertVecs(std::move(iter), insert_config);
-                    if (end_i - start_i != row_count) {
-                        String error_message = "Rebuild HNSW index failed.";
-                        UnrecoverableError(error_message);
+            std::visit(
+                [&](auto &index) {
+                    using T = std::decay_t<decltype(index)>;
+                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                        return;
+                    } else {
+                        using IndexT = std::decay_t<decltype(*index)>;
+                        using DataType = typename IndexT::DataType;
+                        OneColumnIterator<DataType, true /*check ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
+                        HnswInsertConfig insert_config;
+                        insert_config.optimize_ = true;
+                        index->InsertVecs(std::move(iter), insert_config);
                     }
-                    break;
-                }
-                default: {
-                    String error_message = "Rebuild HNSW index failed.";
-                    UnrecoverableError(error_message);
-                }
-            }
-            merged_chunk_index_entry->SetRowCount(row_count);
+                },
+                abstract_hnsw);
+            merged_chunk_index_entry = memory_hnsw_index_->Dump(this, buffer_mgr);
             break;
         }
         case IndexType::kBMP: {
@@ -1107,11 +1064,10 @@ void SegmentIndexEntry::SaveIndexFile() {
     }
 }
 
-SharedPtr<ChunkIndexEntry> SegmentIndexEntry::CreateChunkIndexEntry(SharedPtr<ColumnDef> column_def, RowID base_rowid, BufferManager *buffer_mgr) {
-    const auto &index_base = table_index_entry_->table_index_def();
-    auto param = SegmentIndexEntry::GetCreateIndexParam(index_base, 0 /*segment row cnt*/, column_def);
+SharedPtr<ChunkIndexEntry>
+SegmentIndexEntry::CreateHnswIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr, SizeT index_size) {
     ChunkID chunk_id = this->GetNextChunkID();
-    return ChunkIndexEntry::NewChunkIndexEntry(chunk_id, this, param.get(), base_rowid, buffer_mgr);
+    return ChunkIndexEntry::NewHnswIndexChunkIndexEntry(chunk_id, this, "", base_rowid, row_count, buffer_mgr, index_size);
 }
 
 SharedPtr<ChunkIndexEntry> SegmentIndexEntry::CreateSecondaryIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr) {

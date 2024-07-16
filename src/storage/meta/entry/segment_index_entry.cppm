@@ -45,6 +45,7 @@ struct TableEntry;
 class BufferManager;
 struct SegmentEntry;
 struct TableEntry;
+class HnswIndexInMem;
 class SecondaryIndexInMem;
 class EMVBIndexInMem;
 class BMPIndexInMem;
@@ -177,9 +178,9 @@ public:
         return {chunk_index_entries_, memory_indexer_};
     }
 
-    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<ChunkIndexEntry>> GetHnswIndexSnapshot() {
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<HnswIndexInMem>> GetHnswIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
-        return {chunk_index_entries_, memory_chunk_indexer_};
+        return {chunk_index_entries_, memory_hnsw_index_};
     }
 
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<BMPIndexInMem>> GetBMPIndexSnapshot() {
@@ -211,7 +212,7 @@ public:
     }
 
 public:
-    SharedPtr<ChunkIndexEntry> CreateChunkIndexEntry(SharedPtr<ColumnDef> column_def, RowID base_rowid, BufferManager *buffer_mgr);
+    SharedPtr<ChunkIndexEntry> CreateHnswIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr, SizeT index_size);
 
     SharedPtr<ChunkIndexEntry> CreateSecondaryIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
 
@@ -270,7 +271,7 @@ private:
     ChunkID next_chunk_id_{0};
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
-    SharedPtr<ChunkIndexEntry> memory_chunk_indexer_{};
+    SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
     SharedPtr<MemoryIndexer> memory_indexer_{};
     SharedPtr<SecondaryIndexInMem> memory_secondary_index_{};
     SharedPtr<EMVBIndexInMem> memory_emvb_index_{};
