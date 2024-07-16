@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "hnsw_benchmark_util.h"
+#include <cassert>
 
 import stl;
 import third_party;
@@ -164,21 +165,28 @@ void Build(const BenchmarkOption &option) {
     data.reset();
 
     Vector<std::thread> build_threads;
-    Atomic<i32> cur_i = 0;
-    for (SizeT i = 0; i < option.thread_n_; ++i) {
-        build_threads.emplace_back([&] {
-            SizeT i;
-            while ((i = cur_i.fetch_add(1)) < vec_num) {
-                if (i % 10000 == 0) {
-                    std::cout << fmt::format("Build {} / {}", i, vec_num) << std::endl;
+    const SizeT kBuildBucketSize = 1024;
+    SizeT bucket_size = std::max(kBuildBucketSize, vec_num / option.thread_n_);
+    SizeT bucket_num = (vec_num - 1) / bucket_size + 1;
+    assert(bucket_num <= option.thread_n_);
+
+    for (SizeT i = 0; i < bucket_num; ++i) {
+        SizeT i1 = i * bucket_size;
+        SizeT i2 = std::min(i1 + bucket_size, vec_num);
+        build_threads.emplace_back([&, i1, i2] {
+            for (SizeT j = i1; j < i2; ++j) {
+                if (j % 10000 == 0) {
+                    std::cout << fmt::format("Build {} / {}", j, vec_num) << std::endl;
                 }
-                hnsw->Build(i);
+                hnsw->Build(j);
             }
         });
     }
     for (auto &thread : build_threads) {
         thread.join();
     }
+    build_threads.clear();
+
     profiler.End();
     std::cout << "Build time: " << profiler.ElapsedToString(1000) << std::endl;
 

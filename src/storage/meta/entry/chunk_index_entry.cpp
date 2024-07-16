@@ -82,7 +82,8 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewHnswIndexChunkIndexEntry(ChunkID 
         auto hnsw_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
         const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
         const auto &column_def = segment_index_entry->table_index_entry()->column_def();
-        auto file_worker = MakeUnique<HnswFileWorker>(index_dir, hnsw_index_file_name, index_base, column_def, index_size);
+        SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", *chunk_index_entry->base_dir_, *index_dir));
+        auto file_worker = MakeUnique<HnswFileWorker>(full_dir, hnsw_index_file_name, index_base, column_def, index_size);
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
     }
     return chunk_index_entry;
@@ -191,6 +192,14 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
     const auto &index_dir = segment_index_entry->index_dir();
     SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", *chunk_index_entry->base_dir_, *index_dir));
     switch (param->index_base_->index_type_) {
+        case IndexType::kHnsw: {
+            SegmentID segment_id = segment_index_entry->segment_id();
+
+            auto index_file_name = MakeShared<String>(ChunkIndexEntry::IndexFileName(segment_id, chunk_id));
+            auto file_worker = MakeUnique<HnswFileWorker>(full_dir, index_file_name, param->index_base_, column_def);
+            chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
+            break;
+        }
         case IndexType::kFullText: {
             auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
             auto file_worker = MakeUnique<RawFileWorker>(full_dir, column_length_file_name, row_count * sizeof(u32));
@@ -215,7 +224,6 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
             chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             break;
         }
-        case IndexType::kHnsw:
         case IndexType::kBMP: {
             const auto &index_base = param->index_base_;
             SegmentID segment_id = segment_index_entry->segment_id();

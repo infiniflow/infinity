@@ -14,6 +14,10 @@
 
 module;
 
+namespace infinity {
+struct SegmentEntry;
+}
+
 export module abstract_bmp;
 
 import stl;
@@ -31,6 +35,7 @@ namespace infinity {
 class BufferManager;
 class ChunkIndexEntry;
 class SegmentIndexEntry;
+class BlockColumnEntry;
 
 export using AbstractBMP = std::variant<BMPAlg<f32, i32, BMPCompressType::kCompressed> *,
                                         BMPAlg<f32, i32, BMPCompressType::kRaw> *,
@@ -92,56 +97,21 @@ private:
     }
 
 public:
-    static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
-        const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
-        const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
+    static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def);
 
-        switch (sparse_info->DataType()) {
-            case EmbeddingDataType::kElemFloat: {
-                return InitAbstractIndex<f32>(index_bmp, sparse_info);
-            }
-            case EmbeddingDataType::kElemDouble: {
-                return InitAbstractIndex<f64>(index_bmp, sparse_info);
-            }
-            default: {
-                return nullptr;
-            }
-        }
-    }
+    ~BMPIndexInMem();
+
+    SizeT GetRowCount() const;
+
+    void AddDocs(SizeT block_offset, BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr, SizeT row_offset, SizeT row_count);
+
+    void AddDocs(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts);
 
     const AbstractBMP &get() const { return bmp_; }
 
     AbstractBMP &get_ref() { return bmp_; }
 
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
-
-    SizeT GetRowCount() const {
-        return std::visit(
-            [](auto &&index) {
-                using T = std::decay_t<decltype(index)>;
-                if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                    return SizeT(0);
-                } else {
-                    return index->DocNum();
-                }
-            },
-            bmp_);
-    }
-
-    ~BMPIndexInMem() {
-        std::visit(
-            [](auto &&index) {
-                using T = std::decay_t<decltype(index)>;
-                if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                    return;
-                } else {
-                    if (index != nullptr) {
-                        delete index;
-                    }
-                }
-            },
-            bmp_);
-    }
 
 private:
     RowID begin_row_id_ = {};

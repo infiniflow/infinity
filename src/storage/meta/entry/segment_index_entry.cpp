@@ -287,19 +287,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 memory_hnsw_index_ = MakeShared<HnswIndexInMem>(begin_row_id, index_base.get(), column_def.get());
             }
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-            AbstractHnsw abstract_hnsw = memory_hnsw_index_->get();
-
-            std::visit(
-                [&](auto &index) {
-                    using T = std::decay_t<decltype(index)>;
-                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                        UnrecoverableError("Invalid index type.");
-                    } else {
-                        MemIndexInserterIter<f32> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
-                        index->InsertVecs(std::move(iter));
-                    }
-                },
-                abstract_hnsw);
+            memory_hnsw_index_->InsertVecs(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
             break;
         }
         case IndexType::kSecondary: {
@@ -334,22 +322,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
                 memory_bmp_index_ = MakeShared<BMPIndexInMem>(begin_row_id, index_base.get(), column_def.get());
             }
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-            AbstractBMP abstract_bmp = memory_bmp_index_->get();
-
-            std::visit(
-                [&](auto &index) {
-                    using T = std::decay_t<decltype(index)>;
-                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                        UnrecoverableError("Invalid index type.");
-                    } else {
-                        using IndexT = std::decay_t<decltype(*index)>;
-                        using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
-
-                        MemIndexInserterIter<SparseRefT> iter(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
-                        index->AddDocs(std::move(iter));
-                    }
-                },
-                abstract_bmp);
+            memory_bmp_index_->AddDocs(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
             break;
         }
         default: {
@@ -529,36 +502,11 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
         }
         case IndexType::kHnsw: {
             memory_hnsw_index_ = MakeShared<HnswIndexInMem>(base_row_id, index_base, column_def.get());
-            AbstractHnsw abstract_hnsw = memory_hnsw_index_->get();
-            std::visit(
-                [&](auto &index) {
-                    using T = std::decay_t<decltype(index)>;
-                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                        UnrecoverableError("Invalid index type.");
-                    } else {
-                        auto InsertHnswInner = [&](auto &iter) {
-                            HnswInsertConfig insert_config;
-                            insert_config.optimize_ = true;
-                            index->InsertVecs(std::move(iter), insert_config);
-                            // if (!config.prepare_) {
-                            //     // Single thread insert
-                            //     index->InsertVecs(std::move(iter), insert_config);
-                            // } else {
-                            //     // Multi thread insert data, write file in the physical create index finish stage.
-                            //     index->StoreData(std::move(iter), insert_config);
-                            // }
-                        };
-                        if (config.check_ts_) {
-                            OneColumnIterator<float> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
-                            InsertHnswInner(iter);
-                        } else {
-                            // Not check ts in uncommitted segment when compact segment
-                            OneColumnIterator<float, false> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
-                            InsertHnswInner(iter);
-                        }
-                    }
-                },
-                abstract_hnsw);
+
+            HnswInsertConfig insert_config;
+            insert_config.optimize_ = true;
+            memory_hnsw_index_->InsertVecs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_, insert_config);
+
             dumped_memindex_entry = MemIndexDump();
             break;
         }
@@ -594,26 +542,8 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
         }
         case IndexType::kBMP: {
             memory_bmp_index_ = MakeShared<BMPIndexInMem>(base_row_id, index_base, column_def.get());
-            AbstractBMP abstract_bmp = memory_bmp_index_->get();
-            std::visit(
-                [&](auto &index) {
-                    using T = std::decay_t<decltype(index)>;
-                    if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                        UnrecoverableError("Invalid index type.");
-                    } else {
-                        using IndexT = std::decay_t<decltype(*index)>;
-                        using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
 
-                        if (config.check_ts_) {
-                            OneColumnIterator<SparseRefT> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
-                            index->AddDocs(std::move(iter));
-                        } else {
-                            OneColumnIterator<SparseRefT, false> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
-                            index->AddDocs(std::move(iter));
-                        }
-                    }
-                },
-                abstract_bmp);
+            memory_bmp_index_->AddDocs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_);
             dumped_memindex_entry = MemIndexDump();
             break;
         }

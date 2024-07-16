@@ -14,6 +14,12 @@
 
 module;
 
+#include <future>
+
+namespace infinity {
+struct SegmentEntry;
+}
+
 export module abstract_hnsw;
 
 import stl;
@@ -31,12 +37,15 @@ import index_base;
 import logger;
 import internal_types;
 import embedding_info;
+import infinity_context;
+import logger;
 
 namespace infinity {
 
 class BufferManager;
 class ChunkIndexEntry;
 class SegmentIndexEntry;
+class BlockColumnEntry;
 
 export using AbstractHnsw = std::variant<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset> *,
                                          KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset> *,
@@ -106,46 +115,52 @@ private:
         }
     }
 
-public:
-    static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
-        const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
-        const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
+    template <typename Iter, typename Index>
+    static void InsertVecs(Index &index, Iter iter, const HnswInsertConfig &config) {
+        auto &thread_pool = InfinityContext::instance().GetHnswBuildThreadPool();
+        using T = std::decay_t<decltype(index)>;
+        if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+            auto [start, end] = index->StoreData(std::move(iter), config);
+            SizeT bucket_size = std::max(kBuildBucketSize, SizeT(end - start - 1) / thread_pool.size() + 1);
+            SizeT bucket_n = (end - start - 1) / bucket_size + 1;
 
-        switch (embedding_info->Type()) {
-            case EmbeddingDataType::kElemFloat: {
-                return InitAbstractIndex<float>(index_hnsw, embedding_info);
+            Vector<std::future<void>> futs;
+            futs.reserve(bucket_n);
+            for (SizeT i = 0; i < bucket_n; ++i) {
+                SizeT i1 = start + i * bucket_size;
+                SizeT i2 = std::min(i1 + bucket_size, SizeT(end));
+                futs.emplace_back(thread_pool.push([&, i1, i2](int id) {
+                    for (SizeT j = i1; j < i2; ++j) {
+                        index->Build(j);
+                    }
+                }));
             }
-            default: {
-                return nullptr;
+            for (auto &fut : futs) {
+                fut.wait();
             }
         }
     }
 
-    ~HnswIndexInMem() {
-        std::visit(
-            [](auto &&arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (!std::is_same_v<T, std::nullptr_t>) {
-                    if (arg != nullptr) {
-                        delete arg;
-                    }
-                }
-            },
-            hnsw_);
-    }
+public:
+    static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def);
 
-    SizeT GetRowCount() const {
-        return std::visit(
-            [](auto &&index) {
-                using IndexType = std::decay_t<decltype(index)>;
-                if constexpr (std::is_same_v<IndexType, std::nullptr_t>) {
-                    return SizeT(0);
-                } else {
-                    return index->GetVecNum();
-                }
-            },
-            hnsw_);
-    }
+    ~HnswIndexInMem();
+
+    SizeT GetRowCount() const;
+
+    void InsertVecs(SizeT block_offset,
+                    BlockColumnEntry *block_column_entry,
+                    BufferManager *buffer_manager,
+                    SizeT row_offset,
+                    SizeT row_count,
+                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
+
+    void InsertVecs(const SegmentEntry *segment_entry,
+                    BufferManager *buffer_mgr,
+                    SizeT column_id,
+                    TxnTimeStamp begin_ts,
+                    bool check_ts,
+                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
     SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
 
@@ -154,6 +169,8 @@ public:
     AbstractHnsw &get_ref() { return hnsw_; }
 
 private:
+    static constexpr SizeT kBuildBucketSize = 1024;
+
     RowID begin_row_id_ = {};
     AbstractHnsw hnsw_ = nullptr;
 };

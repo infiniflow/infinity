@@ -20,8 +20,96 @@ import segment_index_entry;
 import chunk_index_entry;
 import buffer_manager;
 import buffer_handle;
+import block_column_iter;
+import sparse_util;
+import segment_iter;
+import segment_entry;
 
 namespace infinity {
+
+AbstractBMP BMPIndexInMem::InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
+    const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
+    const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
+
+    switch (sparse_info->DataType()) {
+        case EmbeddingDataType::kElemFloat: {
+            return InitAbstractIndex<f32>(index_bmp, sparse_info);
+        }
+        case EmbeddingDataType::kElemDouble: {
+            return InitAbstractIndex<f64>(index_bmp, sparse_info);
+        }
+        default: {
+            return nullptr;
+        }
+    }
+}
+
+BMPIndexInMem::~BMPIndexInMem() {
+    std::visit(
+        [](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return;
+            } else {
+                if (index != nullptr) {
+                    delete index;
+                }
+            }
+        },
+        bmp_);
+}
+
+SizeT BMPIndexInMem::GetRowCount() const {
+    return std::visit(
+        [](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return SizeT(0);
+            } else {
+                return index->DocNum();
+            }
+        },
+        bmp_);
+}
+
+void BMPIndexInMem::AddDocs(SizeT block_offset, BlockColumnEntry *block_column_entry, BufferManager *buffer_mgr, SizeT row_offset, SizeT row_count) {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return;
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
+
+                MemIndexInserterIter<SparseRefT> iter(block_offset, block_column_entry, buffer_mgr, row_offset, row_count);
+                index->AddDocs(std::move(iter));
+            }
+        },
+        bmp_);
+}
+
+void BMPIndexInMem::AddDocs(const SegmentEntry *segment_entry, BufferManager *buffer_mgr, SizeT column_id, TxnTimeStamp begin_ts, bool check_ts) {
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return;
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                using SparseRefT = SparseVecRef<typename IndexT::DataT, typename IndexT::IdxT>;
+
+                if (check_ts) {
+                    OneColumnIterator<SparseRefT> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                    index->AddDocs(std::move(iter));
+                } else {
+                    OneColumnIterator<SparseRefT, false> iter(segment_entry, buffer_mgr, column_id, begin_ts);
+                    index->AddDocs(std::move(iter));
+                }
+            }
+        },
+        bmp_);
+}
 
 SharedPtr<ChunkIndexEntry> BMPIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) {
     SizeT row_count = 0;

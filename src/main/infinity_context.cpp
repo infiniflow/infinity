@@ -64,6 +64,7 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, DefaultConfig* 
 
         inverting_thread_pool_.resize(config_->CPULimit());
         commiting_thread_pool_.resize(config_->CPULimit());
+        hnsw_build_thread_pool_.resize(config_->CPULimit());
         initialized_ = true;
     }
 }
