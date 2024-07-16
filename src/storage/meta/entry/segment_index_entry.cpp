@@ -932,7 +932,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                     }
                 },
                 abstract_hnsw);
-            merged_chunk_index_entry = memory_hnsw_index_->Dump(this, buffer_mgr);
+            merged_chunk_index_entry = memory_hnsw_index->Dump(this, buffer_mgr);
             break;
         }
         case IndexType::kBMP: {
