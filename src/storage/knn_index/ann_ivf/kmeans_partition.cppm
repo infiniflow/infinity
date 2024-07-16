@@ -20,10 +20,10 @@ export module kmeans_partition;
 
 import stl;
 import infinity_exception;
-import search_top_k;
 import index_base;
 import vector_distance;
 import logger;
+import simd_functions;
 
 namespace infinity {
 
@@ -186,6 +186,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
         // First : assign each training vector to a partition
         {
             // search top 1
+            auto search_top_1_with_dis = GetSIMD_FUNCTIONS().SearchTop1WithDisF32U32_func_ptr_;
             search_top_1_with_dis(dimension,
                                   training_data_num,
                                   training_data,

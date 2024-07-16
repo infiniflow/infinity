@@ -13,6 +13,8 @@
 // limitations under the License.
 
 module;
+
+#include "simd_common_intrin_include.h"
 export module distance_simd_functions;
 import stl;
 

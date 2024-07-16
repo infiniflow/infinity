@@ -14,8 +14,7 @@
 
 module;
 
-#include <immintrin.h>
-
+#include "simd_common_intrin_include.h"
 export module bmp_simd_func;
 
 namespace infinity {

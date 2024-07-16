@@ -14,7 +14,7 @@
 
 module;
 
-#include <immintrin.h>
+#include "simd_common_intrin_include.h"
 export module simd_common_tools;
 import stl;
 

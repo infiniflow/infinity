@@ -13,13 +13,15 @@
 // limitations under the License.
 
 module;
-#include "NGT/Common.h"
+#include "simd_common_intrin_include.h"
+#include "NGT_CpuInfo_SimdType.h"
 
 module simd_init;
 import stl;
 import distance_simd_functions;
 import hnsw_simd_func;
 import emvb_simd_funcs;
+import search_top_1_sgemm;
 
 namespace infinity {
 
@@ -282,6 +284,20 @@ FilterScoresOutputIdsFuncType GetFilterScoresOutputIdsFuncPtr() {
     }
 #endif
     return &filter_scores_output_ids_common;
+}
+
+SearchTop1WithDisF32U32FuncType GetSearchTop1WithDisF32U32FuncPtr() {
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &search_top_1_with_dis_avx2<u32>;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &search_top_1_with_dis_sse2<u32>;
+    }
+#endif
+    return &search_top_1_simple_with_dis<f32, f32, u32, f32>;
 }
 
 } // namespace infinity
