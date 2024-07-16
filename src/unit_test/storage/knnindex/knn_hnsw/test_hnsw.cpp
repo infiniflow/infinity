@@ -65,15 +65,15 @@ public:
 
         auto test_func = [&](auto &hnsw_index) {
             // std::fstream os("./tmp/dump.txt");
-            // hnsw_index.Dump(os);
+            // hnsw_index->Dump(os);
             // os.flush();
-            hnsw_index.Check();
+            hnsw_index->Check();
 
-            hnsw_index.SetEf(10);
+            hnsw_index->SetEf(10);
             int correct = 0;
             for (int i = 0; i < element_size; ++i) {
                 const float *query = data.get() + i * dim;
-                auto result = hnsw_index.KnnSearchSorted(query, 1);
+                auto result = hnsw_index->KnnSearchSorted(query, 1);
                 if (result[0].second == (LabelT)i) {
                     ++correct;
                 }
@@ -85,9 +85,9 @@ public:
 
         LocalFileSystem fs;
         {
-            Hnsw hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
+            auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-            hnsw_index.InsertVecs(std::move(iter));
+            hnsw_index->InsertVecs(std::move(iter));
 
             test_func(hnsw_index);
 
@@ -96,7 +96,7 @@ public:
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            hnsw_index.Save(*file_handler);
+            hnsw_index->Save(*file_handler);
         }
 
         {
@@ -131,13 +131,13 @@ public:
         }
 
         auto test_func = [&](auto &hnsw_index) {
-            hnsw_index.Check();
+            hnsw_index->Check();
 
-            hnsw_index.SetEf(10);
+            hnsw_index->SetEf(10);
             int correct = 0;
             for (int i = 0; i < element_size; ++i) {
                 const float *query = data.get() + i * dim;
-                auto result = hnsw_index.KnnSearchSorted(query, 1);
+                auto result = hnsw_index->KnnSearchSorted(query, 1);
                 if (result[0].second == (LabelT)i) {
                     ++correct;
                 }
@@ -149,18 +149,18 @@ public:
 
         LocalFileSystem fs;
         {
-            auto hnsw = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
+            auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, dim, M, ef_construction);
 
             auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size);
-            hnsw.InsertVecs(std::move(iter));
+            hnsw_index->InsertVecs(std::move(iter));
             {
                 // std::fstream os("./tmp/dump_1.txt", std::fstream::out);
-                // hnsw.Dump(os);
+                // hnsw_index->Dump(os);
             }
-            auto compress_hnsw = std::move(hnsw).CompressToLVQ();
+            auto compress_hnsw = std::move(*hnsw_index).CompressToLVQ();
             {
                 // std::fstream os("./tmp/dump_2.txt", std::fstream::out);
-                // compress_hnsw.Dump(os);
+                // compress_hnsw->Dump(os);
             }
             test_func(compress_hnsw);
 
@@ -169,7 +169,7 @@ public:
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            compress_hnsw.Save(*file_handler);
+            compress_hnsw->Save(*file_handler);
         }
         {
             u8 file_flags = FileFlags::READ_FLAG;
@@ -237,17 +237,17 @@ public:
                 HnswInsertConfig config;
                 config.optimize_ = true;
                 auto iter = DenseVectorIter<float, LabelT>(data.get(), dim, element_size / 2);
-                std::tie(start_i, end_i) = hnsw_index.StoreData(std::move(iter));
+                std::tie(start_i, end_i) = hnsw_index->StoreData(std::move(iter));
             }
             {
                 auto write_thread2 = std::thread([&] {
                     int insert_n = element_size - element_size / 2;
                     for (int i = element_size / 2; i < element_size; ++i) {
                         DenseVectorIter<float, LabelT> iter(data.get(), dim, 1 /*insert_n*/);
-                        hnsw_index.InsertVecs(std::move(iter));
+                        hnsw_index->InsertVecs(std::move(iter));
                         if ((i + 1) % (insert_n / 4) == 0) {
                             auto w_lck = UniqueOptLck();
-                            hnsw_index.Optimize();
+                            hnsw_index->Optimize();
                         }
                     }
                 });
@@ -264,7 +264,7 @@ public:
                                 break;
                             }
                             auto r_lck = SharedOptLck();
-                            hnsw_index.Build(i);
+                            hnsw_index->Build(i);
                         }
                     });
                 }
@@ -281,7 +281,7 @@ public:
                     for (int i = 0; i < element_size; ++i) {
                         const float *query = data.get() + i * dim;
                         auto r_lck = SharedOptLck();
-                        auto result = hnsw_index.KnnSearchSorted(query, 1);
+                        auto result = hnsw_index->KnnSearchSorted(query, 1);
                         // if (!result.empty()) {
                         //     EXPECT_EQ(result[0].second, (LabelT)i);
                         // }

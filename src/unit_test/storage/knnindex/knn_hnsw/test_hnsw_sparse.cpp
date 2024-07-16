@@ -52,9 +52,9 @@ protected:
 
         LocalFileSystem fs;
         {
-            Hnsw hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, max_dim, M, ef_construction);
+            auto hnsw_index = Hnsw::Make(chunk_size, max_chunk_n, max_dim, M, ef_construction);
             auto iter = SparseVectorIter<float, IdxT, LabelT>(dataset.indptr_.get(), dataset.indices_.get(), dataset.data_.get(), dataset.nrow_);
-            hnsw_index.InsertVecs(std::move(iter));
+            hnsw_index->InsertVecs(std::move(iter));
 
             {
                 Path dump_path = Path(tmp_data_path()) / "dump.txt";
@@ -62,17 +62,17 @@ protected:
                 if (!ss.is_open()) {
                     UnrecoverableError("Failed to open file");
                 }
-                hnsw_index.Dump(ss);
-                hnsw_index.Check();
+                hnsw_index->Dump(ss);
+                hnsw_index->Check();
             }
 
-            hnsw_index.SetEf(50);
+            hnsw_index->SetEf(50);
             for (SizeT i = 0; i < element_size; ++i) {
                 SparseVecRef<f32, IdxT> query = dataset.at(i);
                 if (gt_score[i] == 0.0 || query.nnz_ == 0) {
                     continue;
                 }
-                Vector<Pair<f32, LabelT>> res = hnsw_index.KnnSearchSorted(query, 1);
+                Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1);
                 if (int(res[0].second) != gt_idx[i]) {
                     std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
                     std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
@@ -86,7 +86,7 @@ protected:
             if (!status.ok()) {
                 UnrecoverableError(status.message());
             }
-            hnsw_index.Save(*file_handler);
+            hnsw_index->Save(*file_handler);
             file_handler->Close();
         }
         {
@@ -96,13 +96,13 @@ protected:
             }
 
             auto hnsw_index = Hnsw::Load(*file_handler);
-            hnsw_index.SetEf(50);
+            hnsw_index->SetEf(50);
             for (SizeT i = 0; i < element_size; ++i) {
                 SparseVecRef<f32, IdxT> query = dataset.at(i);
                 if (gt_score[i] == 0.0 || query.nnz_ == 0) {
                     continue;
                 }
-                Vector<Pair<f32, LabelT>> res = hnsw_index.KnnSearchSorted(query, 1);
+                Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1);
                 if (int(res[0].second) != gt_idx[i]) {
                     std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
                     std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
