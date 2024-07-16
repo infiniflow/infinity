@@ -24,14 +24,9 @@ import third_party;
 import infinity_exception;
 
 namespace fs = std::filesystem;
-constexpr std::size_t OBJECT_CAPACITY = 100 * 1024 * 1024; // 100 MB
 constexpr std::size_t BUFFER_SIZE = 1024 * 1024;           // 1 MB
 
 namespace infinity {
-
-// TODO: build cache from existing files under workspace
-PersistenceManager::PersistenceManager(const String &workspace, SizeT coupled_capacity, SizeT alone_capacity)
-    : workspace_(workspace), coupled_capacity_(coupled_capacity), alone_capacity_(alone_capacity) {}
 
 ObjAddr PersistenceManager::Persist(const String &file_path) {
     std::error_code ec;
@@ -41,7 +36,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
         String error_message = fmt::format("Failed to get file size of {}.", file_path);
         UnrecoverableError(error_message);
     }
-    if (src_size >= OBJECT_CAPACITY) {
+    if (src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
         fs::path dst_fp = workspace_;
         dst_fp.append(obj_key);
@@ -52,7 +47,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, src_size);
+        objects_.emplace(obj_key, ObjStat(src_size, 0));
         return obj_addr;
     } else {
         ObjAddr obj_addr(current_object_key_, current_object_size_, src_size);
@@ -63,7 +58,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path) {
 
 ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size) {
     fs::path dst_fp = workspace_;
-    if (src_size >= OBJECT_CAPACITY) {
+    if (src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
         dst_fp.append(obj_key);
         std::ofstream outFile(dst_fp, std::ios::app);
@@ -75,7 +70,7 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size) {
         outFile.close();
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, src_size);
+        objects_.emplace(obj_key, ObjStat(src_size, 0));
         return obj_addr;
     } else {
         dst_fp.append(current_object_key_);
@@ -89,8 +84,8 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size) {
         outFile.write(data, src_size);
         outFile.close();
         current_object_size_ += src_size;
-        if (current_object_size_ >= OBJECT_CAPACITY) {
-            objects_.emplace(current_object_key_, current_object_size_);
+        if (current_object_size_ >= object_size_limit_) {
+            objects_.emplace(current_object_key_, ObjStat(src_size, 0));
             current_object_key_ = ObjCreate();
             current_object_size_ = 0;
         }
@@ -105,7 +100,18 @@ String PersistenceManager::GetObjCache(const ObjAddr &object_addr) {
         String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
         UnrecoverableError(error_message);
     }
+    it->second.ref_count_++;
     return workspace_.append(object_addr.obj_key_);
+}
+
+void PersistenceManager::PutObjCache(const ObjAddr &object_addr) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = objects_.find(object_addr.obj_key_);
+    if (it == objects_.end()) {
+        String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
+        UnrecoverableError(error_message);
+    }
+    it->second.ref_count_--;
 }
 
 String PersistenceManager::ObjCreate() {
@@ -113,7 +119,7 @@ String PersistenceManager::ObjCreate() {
     return boost::uuids::to_string(uuid);
 }
 
-int PersistenceManager::CurrentObjRoom() { return int(OBJECT_CAPACITY) - int(current_object_size_); }
+int PersistenceManager::CurrentObjRoom() { return int(object_size_limit_) - int(current_object_size_); }
 
 void PersistenceManager::CurrentObjAppend(const String &file_path, SizeT file_size) {
     std::lock_guard<std::mutex> lock(mtx_);
@@ -140,8 +146,8 @@ void PersistenceManager::CurrentObjAppend(const String &file_path, SizeT file_si
     srcFile.close();
     dstFile.close();
     current_object_size_ += file_size;
-    if (current_object_size_ >= OBJECT_CAPACITY) {
-        objects_.emplace(current_object_key_, current_object_size_);
+    if (current_object_size_ >= object_size_limit_) {
+        objects_.emplace(current_object_key_, ObjStat(current_object_size_, 0));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
     }

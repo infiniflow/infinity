@@ -22,16 +22,22 @@ import stl;
 namespace infinity {
 
 export struct ObjAddr {
-    String obj_key_;
-    SizeT part_offset_;
-    SizeT part_size_;
+    String obj_key_{};
+    SizeT part_offset_{};
+    SizeT part_size_{};
+    bool Valid() const { return !obj_key_.empty() && part_size_ > 0; }
+};
+
+export struct ObjStat {
+    SizeT obj_size_{};
+    int ref_count_{};
 };
 
 export class PersistenceManager {
 public:
-    // coupled_capacity applies to the cache of coupled files(each object maps to one or more original file). alone_capacity applies to the cache of
-    // alone files(each object maps to exact one original file). Each cache use LRU kick-out mechanism regarding the capacity.
-    explicit PersistenceManager(const String &workspace, SizeT coupled_capacity, SizeT alone_capacity);
+    // TODO: build cache from existing files under workspace
+    PersistenceManager(const String workspace, SizeT object_size_limit) : workspace_(workspace), object_size_limit_(object_size_limit) {}
+    ~PersistenceManager() {}
 
     // Create new object or append to current object, and returns the location.
     ObjAddr Persist(const String &file_path);
@@ -39,8 +45,11 @@ public:
     // Create new object or append to current object, and returns the location.
     ObjAddr Persist(const char *data, SizeT len);
 
-    // Download the whole object from object store if it's not in cache, open the cached object.
+    // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
     String GetObjCache(const ObjAddr &object_addr);
+
+    // Decrease refcount
+    void PutObjCache(const ObjAddr &object_addr);
 
 private:
     String ObjCreate();
@@ -56,11 +65,10 @@ private:
     void CurrentObjAppend(const String &file_path, SizeT file_size);
 
     String workspace_;
-    SizeT coupled_capacity_;
-    SizeT alone_capacity_;
+    SizeT object_size_limit_;
 
     std::mutex mtx_;
-    HashMap<String, SizeT> objects_;
+    HashMap<String, ObjStat> objects_; // obj_key -> ObjStat
     // Current unsealed object key
     String current_object_key_;
     SizeT current_object_size_;

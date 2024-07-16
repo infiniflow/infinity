@@ -173,6 +173,11 @@ export {
     constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
     constexpr std::string_view DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
 
+    // default persistence parameter
+    constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "";                        // Empty means disabled
+    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "100MB"; // 100MB
+    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 100 * 1024lu * 1024lu;  // 100MB
+
     // config name
     constexpr std::string_view VERSION_OPTION_NAME = "version";
     constexpr std::string_view TIME_ZONE_OPTION_NAME = "time_zone";
@@ -197,6 +202,9 @@ export {
     constexpr std::string_view COMPACT_INTERVAL_OPTION_NAME = "compact_interval";
     constexpr std::string_view OPTIMIZE_INTERVAL_OPTION_NAME = "optimize_interval";
     constexpr std::string_view MEM_INDEX_CAPACITY_OPTION_NAME = "mem_index_capacity";
+
+    constexpr std::string_view PERSISTENCE_DIR_OPTION_NAME = "persistence_dir";
+    constexpr std::string_view PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME = "persistence_object_size_limit";
 
     constexpr std::string_view BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
     constexpr std::string_view LRU_NUM_OPTION_NAME = "lru_num";
