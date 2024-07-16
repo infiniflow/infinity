@@ -40,10 +40,13 @@ public:
     ~PersistenceManager() {}
 
     // Create new object or append to current object, and returns the location.
-    ObjAddr Persist(const String &file_path);
+    ObjAddr Persist(const String &file_path, bool allow_compose = true);
 
     // Create new object or append to current object, and returns the location.
-    ObjAddr Persist(const char *data, SizeT len);
+    ObjAddr Persist(const char *data, SizeT len, bool allow_compose = true);
+
+    // Force finalize current object. Subsequent append on the finalized object is forbidden.
+    void CurrentObjFinalize();
 
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
     String GetObjCache(const ObjAddr &object_addr);
@@ -54,15 +57,15 @@ public:
 private:
     String ObjCreate();
 
-    // Returns the room (capacity - sum_of_parts_size) of current object. User should check before each ObjAppend operation.
-    // capacity is const, for example 100MB.
-    int CurrentObjRoom();
+    // Returns the room (size limit - sum_of_parts_size) of current object. User should check before each ObjAppend operation.
+    int CurrentObjRoomNoLock();
 
-    // Append body to the current object. User should have body compressed before each ObjAppend operation.
-    // It finalize current object if new size exceeds the capacity. Subsequent ObjAppend on the finalized object is forbidden.
-    // There's a 4-byte pad CRC32 checksum of the whole object to detect Silent Data Corruption.
-    // PersistenceManager shall upload the finalized object to object store in background.
-    void CurrentObjAppend(const String &file_path, SizeT file_size);
+    // Append file to the current object.
+    // It finalize current object if new size exceeds the size limit.
+    void CurrentObjAppendNoLock(const String &file_path, SizeT file_size);
+
+    // Finalize current object.
+    void CurrentObjFinalizeNoLock();
 
     String workspace_;
     SizeT object_size_limit_;
