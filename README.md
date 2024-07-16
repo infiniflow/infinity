@@ -26,14 +26,7 @@ Infinity is a cutting-edge AI-native database that provides a wide range of sear
 ## ⚡️ Performance
 
 <div class="column" align="middle">
-  <img src="https://github.com/user-attachments/assets/57b4100a-f3bc-44a2-bae5-217683262b5e"/>
-</div>
-<div class="column" align="middle">
-  <img src="https://github.com/user-attachments/assets/dbd50ec7-95ab-41e6-8bed-d5a914a5626b"/>
-</div>
-
-<div class="column" align="middle">
-  <img src="https://github.com/user-attachments/assets/4db52ab6-6952-4286-9720-789bca0019f3"/>
+  <img src="https://github.com/user-attachments/assets/75480e6a-359b-4e5f-8f8e-fb3880ae0bd8"/>
 </div>
 
 ## 🌟 Key Features
