@@ -27,22 +27,27 @@ export bool IsAVX512Supported();
 export using F32DistanceFuncType = f32(*)(const f32 *, const f32 *, SizeT);
 export using I8DistanceFuncType = i32(*)(const i8 *, const i8 *, SizeT);
 export using FilterScoresOutputIdsFuncType = u32 * (*)(u32 *, f32, const f32 *, u32);
+export using SearchTop1WithDisF32U32FuncType = void(*)(u32, u32, const f32 *, u32, const f32 *, u32 *, f32 *);
 
+// F32 distance functions
 export F32DistanceFuncType GetL2DistanceFuncPtr();
 export F32DistanceFuncType GetIPDistanceFuncPtr();
 export F32DistanceFuncType GetCosineDistanceFuncPtr();
+// HNSW F32
 export F32DistanceFuncType Get_HNSW_F32L2_ptr();
 export F32DistanceFuncType Get_HNSW_F32L2_16_ptr();
 export F32DistanceFuncType Get_HNSW_F32IP_ptr();
 export F32DistanceFuncType Get_HNSW_F32IP_16_ptr();
 export F32DistanceFuncType Get_HNSW_F32Cos_ptr();
 export F32DistanceFuncType Get_HNSW_F32Cos_16_ptr();
-
+// HNSW I8
 export I8DistanceFuncType Get_HNSW_I8IP_ptr();
 export I8DistanceFuncType Get_HNSW_I8IP_16_ptr();
 export I8DistanceFuncType Get_HNSW_I8IP_32_ptr();
 export I8DistanceFuncType Get_HNSW_I8IP_64_ptr();
-
+// EMVB
 export FilterScoresOutputIdsFuncType GetFilterScoresOutputIdsFuncPtr();
+// K-means
+export SearchTop1WithDisF32U32FuncType GetSearchTop1WithDisF32U32FuncPtr();
 
 } // namespace infinity

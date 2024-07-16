@@ -21,7 +21,7 @@ import simd_init;
 namespace infinity {
 
 export struct SIMD_FUNCTIONS {
-    // F32
+    // F32 distance functions
     F32DistanceFuncType L2Distance_func_ptr_ = GetL2DistanceFuncPtr();
     F32DistanceFuncType IPDistance_func_ptr_ = GetIPDistanceFuncPtr();
     F32DistanceFuncType CosineDistance_func_ptr_ = GetCosineDistanceFuncPtr();
@@ -42,6 +42,9 @@ export struct SIMD_FUNCTIONS {
 
     // EMVB
     FilterScoresOutputIdsFuncType FilterScoresOutputIds_func_ptr_ = GetFilterScoresOutputIdsFuncPtr();
+
+    // K-means
+    SearchTop1WithDisF32U32FuncType SearchTop1WithDisF32U32_func_ptr_ = GetSearchTop1WithDisF32U32FuncPtr();
 };
 
 export const SIMD_FUNCTIONS &GetSIMD_FUNCTIONS() {

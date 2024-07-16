@@ -14,6 +14,9 @@
 // limitations under the License.
 //
 
+// NOTOCE: This file includes codes modified from NGT v2.2.2, which is licensed under the Apache License, Version 2.0.
+// NOTICE: For more information go to https://github.com/yahoojapan/NGT
+
 #pragma once
 #include <vector>
 
@@ -40,6 +43,7 @@ public:
         SimdTypeAVX512VNNI,
     };
     static bool is(SimdType type) {
+#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
         __builtin_cpu_init();
         switch (type) {
 #if defined(__SSE2__)
@@ -131,6 +135,19 @@ public:
                 break;
         }
         return false;
+#elif defined(__GNUC__) && defined(__aarch64__)
+        // use simde SSE2
+        // ref: simd_common_intrin_include.h
+        switch (type) {
+            case SimdTypeSSE2:
+                return true;
+            default:
+                return false;
+        }
+#else
+        static_assert(false, "Unsupported platform.");
+        return false;
+#endif
     }
     static bool isSSE2() { return is(SimdTypeSSE2); }
     static bool isAVX2() { return is(SimdTypeAVX2); }
