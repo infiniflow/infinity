@@ -690,7 +690,7 @@ Build a KNN search expression. Find the top n closet records to the given vector
 - **distance_type : str**
   -  `'l2'` 
   - `'ip'`
-  - `'cosine'`(not available) 
+  - `'cosine'`
   - `'hamming'`(not available)
 
 - **topn : int**
