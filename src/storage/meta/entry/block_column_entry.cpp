@@ -141,6 +141,14 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
 }
 
 ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
+    return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadWrite);
+}
+
+ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr) {
+    return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadOnly);
+}
+
+ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
         auto file_worker = MakeUnique<DataFileWorker>(this->base_dir_, this->file_name_, 0);
@@ -148,7 +156,7 @@ ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
     }
 
     ColumnVector column_vector(column_type_);
-    column_vector.Initialize(buffer_mgr, this, block_entry_->row_count());
+    column_vector.Initialize(buffer_mgr, this, block_entry_->row_count(), tipe);
     return column_vector;
 }
 

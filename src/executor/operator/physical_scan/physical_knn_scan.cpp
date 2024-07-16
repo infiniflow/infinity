@@ -75,7 +75,7 @@ void ReadDataBlock(DataBlock *output,
             u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
             output->column_vectors[output_column_id++]->AppendWith(RowID(segment_id, segment_offset), row_count);
         } else {
-            ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
+            ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr);
             output->column_vectors[output_column_id++]->AppendWith(column_vector, 0, row_count);
         }
     }
@@ -306,7 +306,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                 //                       block_column_idx + 1,
                 //                       brute_task_n));
                 block_entry->SetDeleteBitmask(begin_ts, bitmask);
-                ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                ColumnVector column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
                 auto data = reinterpret_cast<const DataType *>(column_vector.data());
                 merge_heap->Search(query, data, knn_scan_shared_data->dimension_, dist_func->dist_func_, row_count, segment_id, block_id, bitmask);
             }
@@ -501,7 +501,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                         prev_block_id = block_id;
                                         BlockEntry *block_entry = block_index->GetBlockEntry(segment_id, block_id);
                                         BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(knn_column_id);
-                                        column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                                        column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
                                     }
                                     const auto *data = reinterpret_cast<const DataType *>(column_vector.data());
                                     data += block_offset * knn_scan_shared_data->dimension_;

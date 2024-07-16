@@ -394,7 +394,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         block_entry->SetDeleteBitmask(begin_ts, bitmask);
 
         auto *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id_);
-        ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+        ColumnVector column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
 
         for (SizeT query_id = 0; query_id < query_n; ++query_id) {
             auto query_sparse = get_ele(query_vector, query_id);

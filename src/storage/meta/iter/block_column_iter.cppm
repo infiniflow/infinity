@@ -36,7 +36,7 @@ export template <bool CheckTS = true>
 class BlockColumnIter {
 public:
     BlockColumnIter(BlockColumnEntry *entry, BufferManager *buffer_mgr, TxnTimeStamp iterate_ts)
-        : block_entry_(entry->GetBlockEntry()), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+        : block_entry_(entry->GetBlockEntry()), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr))),
           ele_size_(entry->column_type()->Size()), iterate_ts_(iterate_ts), offset_(0), read_end_(0) {}
     // TODO: Does `ColumnVector` implements the move constructor?
 
@@ -72,7 +72,7 @@ export template <>
 class BlockColumnIter<false> {
 public:
     BlockColumnIter(BlockColumnEntry *entry, BufferManager *buffer_mgr, TxnTimeStamp)
-        : block_entry_(entry->GetBlockEntry()), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+        : block_entry_(entry->GetBlockEntry()), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr))),
           ele_size_(entry->column_type()->Size()), size_(block_entry_->row_count()), offset_(0) {}
 
     Optional<Pair<const void *, BlockOffset>> Next() {
@@ -100,7 +100,7 @@ export template <typename DataType>
 class MemIndexInserterIter {
 public:
     MemIndexInserterIter(SegmentOffset block_offset, BlockColumnEntry *entry, BufferManager *buffer_mgr, SizeT offset, SizeT size)
-        : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+        : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr))),
           ele_size_(entry->column_type()->Size()), cur_(offset), end_(offset + size) {}
 
     Optional<Pair<const DataType *, SegmentOffset>> Next() {
@@ -126,7 +126,7 @@ export template <typename DataType, typename IdxType>
 class MemIndexInserterIter<SparseVecRef<DataType, IdxType>> {
 public:
     MemIndexInserterIter(SegmentOffset block_offset, BlockColumnEntry *entry, BufferManager *buffer_mgr, SizeT offset, SizeT size)
-        : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+        : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr))),
           ele_size_(entry->column_type()->Size()), cur_(offset), end_(offset + size) {}
 
     Optional<Pair<SparseVecRef<DataType, IdxType>, SegmentOffset>> Next() {
