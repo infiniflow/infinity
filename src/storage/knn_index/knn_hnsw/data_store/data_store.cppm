@@ -576,6 +576,7 @@ DataStore<CompressVecStoreType, LabelType> DataStore<VecStoreT, LabelType>::Comp
         auto ret = DataStore<CompressVecStoreType, LabelType>::Make(chunk_size_, max_chunk_n_, vec_store_meta_.dim(), Mmax0(), Mmax());
         ret.OptAddVec(DataStoreIter<VecStoreT, LabelType>(this));
         ret.SetGraph(std::move(graph_store_meta_), std::move(graph_inners));
+        this->inners_ = nullptr;
         return ret;
     }
 }
