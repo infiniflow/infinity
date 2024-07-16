@@ -13,7 +13,8 @@
 // limitations under the License.
 
 module;
-#include "NGT/Common.h"
+#include "simd_common_intrin_include.h"
+#include "NGT_CpuInfo_SimdType.h"
 
 module simd_init;
 import stl;

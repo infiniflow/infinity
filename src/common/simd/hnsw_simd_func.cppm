@@ -15,7 +15,7 @@
 module;
 
 #include <cmath>
-#include <immintrin.h>
+#include "simd_common_intrin_include.h"
 
 import stl;
 

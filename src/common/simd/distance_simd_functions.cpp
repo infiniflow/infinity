@@ -15,7 +15,7 @@
 module;
 
 #include <cmath>
-#include <immintrin.h>
+#include "simd_common_intrin_include.h"
 
 /*
 #if defined(__x86_64__) && (defined(__clang_major__) && (__clang_major__ > 10))

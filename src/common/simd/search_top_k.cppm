@@ -14,6 +14,7 @@
 
 module;
 
+#include "simd_common_intrin_include.h"
 export module search_top_k;
 
 import stl;
