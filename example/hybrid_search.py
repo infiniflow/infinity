@@ -1,4 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ try:
         ]
     )
 
+    # TODO: dense vector + sparse vector + full-text + structured data filter + tensor reranker
     result = table_instance.output(["num", "body"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).match("body",
                                                                                                              "blooms",
                                                                                                              "topn=1").fusion(
