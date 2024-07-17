@@ -20,6 +20,7 @@ import stl;
 import file_system;
 import third_party;
 import file_worker_type;
+import persistence_manager;
 
 namespace infinity {
 
@@ -73,6 +74,7 @@ private:
 public:
     const SharedPtr<String> file_dir_{};
     const SharedPtr<String> file_name_{};
+    ObjAddr obj_addr_{};
 
 protected:
     void *data_{nullptr};

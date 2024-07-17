@@ -14,3 +14,4 @@ compact_interval = "0s"
 [wal]
 [buffer]
 [resource]
+[persistence]

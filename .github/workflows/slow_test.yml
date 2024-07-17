@@ -56,15 +56,15 @@ jobs:
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && mkdir -p /var/infinity && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && mkdir -p /var/infinity && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
       - name: Test embedded infinity for Python 3.11
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && mkdir -p /var/infinity && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && mkdir -p /var/infinity && source /usr/local/venv311/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
       - name: Test embedded infinity for Python 3.12
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && mkdir -p /var/infinity && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && mkdir -p /var/infinity && source /usr/local/venv312/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
       - name: Prepare sift dataset
         if: ${{ !cancelled() && !failure() }}
