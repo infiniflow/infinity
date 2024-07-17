@@ -182,7 +182,8 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
         case IndexType::kFullText:
         case IndexType::kEMVB:
         case IndexType::kSecondary:
-        case IndexType::kBMP: {
+        case IndexType::kBMP: 
+        case IndexType::kDiskAnn: {
             // these indexes don't use BufferManager
             return vector_file_worker;
         }
@@ -323,6 +324,12 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             }
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
             memory_bmp_index_->AddDocs(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
+            break;
+        }
+        case IndexType::kDiskAnn: {
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("{} realtime index is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_WARN(*err_msg);
             break;
         }
         default: {
@@ -547,6 +554,12 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             dumped_memindex_entry = MemIndexDump();
             break;
         }
+        case IndexType::kDiskAnn: { // TODO
+            UniquePtr<String> err_msg =
+                MakeUnique<String>(fmt::format("{} PopulateEntirely is not supported yet", IndexInfo::IndexTypeToString(index_base->index_type_)));
+            LOG_WARN(*err_msg);
+            break;
+        }
         default: {
             UniquePtr<String> err_msg =
                 MakeUnique<String>(fmt::format("Invalid index type: {}", IndexInfo::IndexTypeToString(index_base->index_type_)));
@@ -607,6 +620,10 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
         case IndexType::kSecondary:
         case IndexType::kEMVB:
         case IndexType::kBMP: {
+            PopulateEntirely(segment_entry, txn, populate_entire_config);
+            break;
+        }
+        case IndexType::kDiskAnn: {
             PopulateEntirely(segment_entry, txn, populate_entire_config);
             break;
         }
@@ -865,6 +882,9 @@ SegmentIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT se
             return MakeUnique<CreateIndexParam>(index_base, column_def);
         }
         case IndexType::kBMP: {
+            return MakeUnique<CreateIndexParam>(index_base, column_def);
+        }
+        case IndexType::kDiskAnn: {
             return MakeUnique<CreateIndexParam>(index_base, column_def);
         }
         default: {

@@ -173,6 +173,38 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table("test_index_secondary", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def _test_create_index_DiskAnn(self):
+        # CREATE INDEX idx1 ON sqllogic_test_diskann (col1) USING DiskAnn WITH (R = 16, L = 50, num_pq_chunks = 4, num_parts = 10, metric = l2);
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_index_diskann", ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table(
+            "test_index_diskann", {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
+        assert table_obj is not None
+
+        res = table_obj.create_index("my_index",
+                                     [index.IndexInfo("c1",
+                                                      index.IndexType.DiskAnn,
+                                                      [
+                                                          index.InitParameter(
+                                                              "R", "16"),
+                                                          index.InitParameter(
+                                                              "L", "50"),
+                                                          index.InitParameter(
+                                                              "num_pq_chunks", "4"),
+                                                          index.InitParameter(
+                                                              "num_parts", "10"),
+                                                          index.InitParameter(
+                                                              "metric", "l2")
+                                                      ])], ConflictType.Error)
+
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.drop_index("my_index")
+        assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_index_diskann", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
         # drop non-existent index
 
     def _test_drop_non_existent_index(self):

@@ -147,6 +147,12 @@ export {
     constexpr u32 EMVB_N_DOC_OUT_SECOND_STAGE_FACTOR = 20;
     constexpr f32 EMVB_THRESHOLD_FINAL = 0.0f;
 
+    // default diskann parameter
+    constexpr SizeT DISKANN_R = 16;
+    constexpr SizeT DISKANN_L = 200;
+    constexpr SizeT DISKANN_NUM_PQ_CHUNKS = 4;
+    constexpr SizeT DISKANN_NUM_PARTS = 1;
+
     // default hnsw parameter
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;

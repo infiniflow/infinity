@@ -23,6 +23,7 @@ import stl;
 import serialize;
 import index_ivfflat;
 import index_hnsw;
+import index_diskann;
 import index_full_text;
 import index_secondary;
 import index_emvb;
@@ -131,6 +132,16 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             res = MakeShared<IndexHnsw>(index_name, file_name, column_names, metric_type, encode_type, M, ef_construction, ef);
             break;
         }
+        case IndexType::kDiskAnn: {
+            MetricType metric_type = ReadBufAdv<MetricType>(ptr);
+            DiskAnnEncodeType encode_type = ReadBufAdv<DiskAnnEncodeType>(ptr);
+            SizeT R = ReadBufAdv<SizeT>(ptr);
+            SizeT L = ReadBufAdv<SizeT>(ptr);
+            SizeT num_pq_chunks = ReadBufAdv<SizeT>(ptr);
+            SizeT num_parts = ReadBufAdv<SizeT>(ptr);
+            res = MakeShared<IndexDiskAnn>(index_name, file_name, column_names, metric_type, encode_type, R, L, num_pq_chunks, num_parts);
+            break;
+        }
         case IndexType::kFullText: {
             String analyzer = ReadBufAdv<String>(ptr);
             u8 flag = ReadBufAdv<u8>(ptr);
@@ -213,6 +224,17 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             HnswEncodeType encode_type = StringToHnswEncodeType(index_def_json["encode_type"]);
             auto ptr = MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef);
+            res = std::static_pointer_cast<IndexBase>(ptr);
+            break;
+        }
+        case IndexType::kDiskAnn: {
+            SizeT R = index_def_json["R"];
+            SizeT L = index_def_json["L"];
+            SizeT num_pq_chunks = index_def_json["num_pq_chunks"];
+            SizeT num_parts = index_def_json["num_parts"];
+            MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
+            DiskAnnEncodeType encode_type = StringToDiskAnnEncodeType(index_def_json["encode_type"]);
+            auto ptr = MakeShared<IndexDiskAnn>(index_name, file_name, std::move(column_names), metric_type, encode_type, R, L, num_pq_chunks, num_parts);
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }

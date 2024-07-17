@@ -39,6 +39,9 @@ std::string IndexInfo::IndexTypeToString(IndexType index_type) {
         case IndexType::kBMP: {
             return "BMP";
         }
+        case IndexType::kDiskAnn: {
+            return "DISKANN";
+        }
         case IndexType::kInvalid: {
             ParserError("Invalid conflict type.");
         }
@@ -59,6 +62,8 @@ IndexType IndexInfo::StringToIndexType(const std::string &index_type_str) {
         return IndexType::kEMVB;
     } else if (index_type_str == "BMP") {
         return IndexType::kBMP;
+    } else if (index_type_str == "DISKANN") {
+        return IndexType::kDiskAnn;
     } else {
         return IndexType::kInvalid;
     }
