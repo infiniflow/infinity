@@ -121,7 +121,6 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     const Vector<SegmentEntry *> &candidate_segments = compact_operator_state->segment_groups_[group_idx];
     Vector<SegmentEntry *> compactible_segments;
     {
-        
         for (auto *candidate_segment : candidate_segments) {
             if (candidate_segment->TrySetCompacting(compact_state_data)) {
                 compactible_segments.push_back(candidate_segment);
@@ -130,8 +129,10 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     }
 
     auto *txn = query_context->GetTxn();
+    auto *txn_mgr = txn->txn_mgr();
     auto *buffer_mgr = query_context->storage()->buffer_manager();
-    TxnTimeStamp begin_ts = txn->BeginTS();
+    TxnTimeStamp scan_ts = txn_mgr->GetNewTimeStamp();
+    LOG_INFO(fmt::format("PhysicalCompact::Execute: scan_ts: {}", scan_ts));
 
     TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     BlockIndex *block_index = base_table_ref_->block_index_.get();
@@ -141,7 +142,8 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     auto new_segment = SegmentEntry::NewSegmentEntry(table_entry, Catalog::GetNextSegmentID(table_entry), txn);
     SegmentID new_segment_id = new_segment->segment_id();
 
-    UniquePtr<BlockEntry> new_block = BlockEntry::NewBlockEntry(new_segment.get(), new_segment->GetNextBlockID(), 0 /*checkpoint_ts*/, column_count, txn);
+    UniquePtr<BlockEntry> new_block =
+        BlockEntry::NewBlockEntry(new_segment.get(), new_segment->GetNextBlockID(), 0 /*checkpoint_ts*/, column_count, txn);
     const SizeT block_capacity = new_block->row_capacity();
 
     for (SegmentEntry *segment : compactible_segments) {
@@ -156,7 +158,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
             }
             SizeT read_offset = 0;
             while (true) {
-                auto [row_begin, row_end] = block_entry->GetVisibleRange(begin_ts, read_offset);
+                auto [row_begin, row_end] = block_entry->GetVisibleRange(scan_ts, read_offset);
                 SizeT read_size = row_end - row_begin;
                 if (read_size == 0) {
                     break;
@@ -166,8 +168,8 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
                     if (read_size1 == 0) {
                         return;
                     }
-                    new_block->AppendBlock(input_column_vectors, row_begin, read_size1, buffer_mgr);
                     RowID new_row_id(new_segment_id, new_block->block_id() * block_capacity + new_block->row_count());
+                    new_block->AppendBlock(input_column_vectors, row_begin, read_size1, buffer_mgr);
                     remapper.AddMap(segment_id, block_id, row_begin, new_row_id);
                     read_offset = row_begin + read_size1;
                 };
