@@ -276,6 +276,8 @@ UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
 
 TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
 
+TxnTimeStamp TxnManager::GetNewTimeStamp() { return start_ts_++; }
+
 TxnTimeStamp TxnManager::GetCleanupScanTS() {
     std::lock_guard guard(locker_);
     TxnTimeStamp first_uncommitted_begin_ts = start_ts_;

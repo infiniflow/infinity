@@ -94,3 +94,10 @@ struct RowID {
 };
 
 } // namespace infinity
+
+namespace std {
+template <>
+struct std::hash<infinity::RowID> {
+    std::size_t operator()(const infinity::RowID &row_id) const noexcept { return std::hash<uint64_t>{}(row_id.ToUint64()); }
+};
+} // namespace std

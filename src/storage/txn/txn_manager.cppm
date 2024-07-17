@@ -93,6 +93,8 @@ public:
 
     TxnTimeStamp CurrentTS() const;
 
+    TxnTimeStamp GetNewTimeStamp();
+
     TxnTimeStamp GetCleanupScanTS();
 
     void IncreaseCommittedTxnCount() { ++total_committed_txn_count_; }
