@@ -50,7 +50,7 @@ See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
 - [Delete or update data](https://github.com/infiniflow/infinity/blob/main/example/delete_update_data.py)
 - [Conduct a vector search](https://github.com/infiniflow/infinity/blob/main/example/vector_search.py)
 - [Conduct a full-text search](https://github.com/infiniflow/infinity/blob/main/example/fulltext_search.py)
-- [Conduct a fused search](https://github.com/infiniflow/infinity/blob/main/example/fusion_search.py)
+- [Conduct a hybrid search](https://github.com/infiniflow/infinity/blob/main/example/hybrid_search.py)
 
 ## Python API reference
 
