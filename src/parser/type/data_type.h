@@ -73,6 +73,8 @@ public:
             case kHugeInt:
             case kFloat:
             case kDouble:
+            case kFloat16:
+            case kBFloat16:
             case kDecimal: {
                 return true;
             }
@@ -90,6 +92,8 @@ public:
             case kBigInt:
             case kFloat:
             case kDouble:
+            case kFloat16: // need to be converted to float and keep order
+            case kBFloat16: // need to be converted to float and keep order
             case kDate:
             case kTime:
             case kDateTime:  // need to be converted to int64 and keep order
@@ -113,6 +117,8 @@ public:
             case kHugeInt:
             case kFloat:
             case kDouble:
+            case kFloat16:
+            case kBFloat16:
             case kVarchar:
             case kDate:
             case kTime:
@@ -240,6 +246,12 @@ template <>
 std::string DataType::TypeToString<DoubleT>();
 
 template <>
+std::string DataType::TypeToString<Float16T>();
+
+template <>
+std::string DataType::TypeToString<BFloat16T>();
+
+template <>
 std::string DataType::TypeToString<DecimalT>();
 
 template <>
@@ -329,4 +341,11 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str_view);
 
 template <>
 DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str_view);
+
+template <>
+Float16T DataType::StringToValue<Float16T>(const std::string_view &str_view);
+
+template <>
+BFloat16T DataType::StringToValue<BFloat16T>(const std::string_view &str_view);
+
 } // namespace infinity

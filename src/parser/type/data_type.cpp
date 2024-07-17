@@ -43,6 +43,8 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
         case kDecimal:
         case kFloat:
         case kDouble:
+        case kFloat16:
+        case kBFloat16:
         case kDate:
         case kTime:
         case kDateTime:
@@ -418,6 +420,16 @@ std::string DataType::TypeToString<DoubleT>() {
 }
 
 template <>
+std::string DataType::TypeToString<Float16T>() {
+    return "Float16";
+}
+
+template <>
+std::string DataType::TypeToString<BFloat16T>() {
+    return "BFloat16";
+}
+
+template <>
 std::string DataType::TypeToString<DecimalT>() {
     return "Decimal";
 }
@@ -661,4 +673,17 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
 #endif
     return value;
 }
+
+template <>
+Float16T DataType::StringToValue<Float16T>(const std::string_view &str) {
+    FloatT float_value = StringToValue<FloatT>(str);
+    return static_cast<Float16T>(float_value);
+}
+
+template <>
+BFloat16T DataType::StringToValue<BFloat16T>(const std::string_view &str) {
+    FloatT float_value = StringToValue<FloatT>(str);
+    return static_cast<BFloat16T>(float_value);
+}
+
 } // namespace infinity

@@ -207,6 +207,10 @@ public:
 
     static Value MakeDouble(DoubleT input);
 
+    static Value MakeFloat16(Float16T input);
+
+    static Value MakeBFloat16(BFloat16T input);
+
     static Value MakeDecimal(DecimalT input, SharedPtr<TypeInfo> type_info_ptr);
 
     static Value MakeDate(DateT input);
@@ -350,6 +354,8 @@ public:
         HugeIntT huge_int;
         FloatT float32;
         DoubleT float64;
+        Float16T float16;
+        BFloat16T bfloat16;
         DecimalT decimal;
         DateT date;
         TimeT time;
@@ -391,6 +397,12 @@ FloatT Value::GetValue() const;
 
 template <>
 DoubleT Value::GetValue() const;
+
+template <>
+Float16T Value::GetValue() const;
+
+template <>
+BFloat16T Value::GetValue() const;
 
 template <>
 DecimalT Value::GetValue() const;
