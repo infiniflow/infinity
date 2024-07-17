@@ -20,3 +20,5 @@ buffer_manager_size = "32mb"
 temp_dir         = "/var/infinity/tmp"
 
 [resource]
+
+[persistence]

@@ -430,6 +430,16 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
             UnrecoverableError(status.message());
         }
 
+        // Persistence Dir
+        String persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
+        UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
+        global_options_.AddOption(std::move(persistence_dir_option));
+
+        // Persistence Object Size Limit
+        i64 persistence_object_size_limit = DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT;
+        UniquePtr<IntegerOption> persistence_object_size_limit_option =
+            MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME, persistence_object_size_limit, std::numeric_limits<i64>::max(), 0);
+        global_options_.AddOption(std::move(persistence_object_size_limit_option));
     } else {
         config_toml = toml::parse_file(*config_path);
 
@@ -1236,6 +1246,22 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                         }
                     }
                 }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPersistenceDir) == nullptr) {
+                    String persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
+                    UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
+                    global_options_.AddOption(std::move(persistence_dir_option));
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPersistenceObjectSizeLimit) == nullptr) {
+                    i64 persistence_object_size_limit = DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT;
+                    UniquePtr<IntegerOption> persistence_object_size_limit_option =
+                        MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME,
+                                                  persistence_object_size_limit,
+                                                  std::numeric_limits<i64>::max(),
+                                                  0);
+                    global_options_.AddOption(std::move(persistence_object_size_limit_option));
+                }
+            } else {
+                return Status::InvalidConfig("No 'persistence' section in configure file.");
             }
         }
 

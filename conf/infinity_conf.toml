@@ -52,3 +52,5 @@ wal_flush                   = "only_write"
 
 [resource]
 resource_dir          = "/var/infinity/resource"
+
+[persistence]
