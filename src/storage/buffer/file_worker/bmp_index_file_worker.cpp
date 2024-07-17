@@ -68,7 +68,17 @@ void BMPIndexFileWorker::FreeInMemory() {
         const auto error_message = "Data is not allocated.";
         UnrecoverableError(error_message);
     }
-    delete reinterpret_cast<AbstractBMP *>(data_);
+    auto *p = reinterpret_cast<AbstractBMP *>(data_);
+    std::visit(
+        [](auto &&arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                if (arg != nullptr) {
+                    delete arg;
+                }
+            }
+        },
+        *p);
     data_ = nullptr;
 }
 

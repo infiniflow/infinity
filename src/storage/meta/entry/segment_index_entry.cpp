@@ -764,28 +764,30 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
             if (!params) {
                 break;
             }
-            auto optimize_index = [&](AbstractHnsw &abstract_hnsw) {
+            auto optimize_index = [&](AbstractHnsw *abstract_hnsw) {
                 std::visit(
                     [&](auto &&index) {
                         using T = std::decay_t<decltype(index)>;
                         if constexpr (std::is_same_v<T, std::nullptr_t>) {
                             UnrecoverableError("Invalid index type.");
                         } else {
-                            abstract_hnsw = std::move(*index).CompressToLVQ().release();
+                            auto *p = std::move(*index).CompressToLVQ().release();
+                            delete index;
+                            *abstract_hnsw = p;
                         }
                     },
-                    abstract_hnsw);
+                    *abstract_hnsw);
             };
 
             const auto [chunk_index_entries, memory_index_entry] = this->GetHnswIndexSnapshot();
             for (const auto &chunk_index_entry : chunk_index_entries) {
                 BufferHandle buffer_handle = chunk_index_entry->GetIndex();
                 auto *abstract_hnsw = reinterpret_cast<AbstractHnsw *>(buffer_handle.GetDataMut());
-                optimize_index(*abstract_hnsw);
+                optimize_index(abstract_hnsw);
                 chunk_index_entry->SaveIndexFile();
             }
             if (memory_index_entry.get() != nullptr) {
-                optimize_index(memory_index_entry->get_ref());
+                optimize_index(memory_index_entry->get_ptr());
                 dumped_memindex_entry = this->MemIndexDump(false /*spill*/);
             }
             break;

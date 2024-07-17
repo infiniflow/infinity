@@ -75,7 +75,18 @@ void HnswFileWorker::FreeInMemory() {
         String error_message = "FreeInMemory: Data is not allocated.";
         UnrecoverableError(error_message);
     }
-    delete reinterpret_cast<AbstractHnsw *>(data_);
+    auto *p = reinterpret_cast<AbstractHnsw *>(data_);
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                if (index != nullptr) {
+                    delete index;
+                }
+            }
+        },
+        *p);
+    delete p;
     data_ = nullptr;
 }
 

@@ -166,7 +166,7 @@ public:
 
     const AbstractHnsw &get() const { return hnsw_; }
 
-    AbstractHnsw &get_ref() { return hnsw_; }
+    AbstractHnsw *get_ptr() { return &hnsw_; }
 
 private:
     static constexpr SizeT kBuildBucketSize = 1024;
