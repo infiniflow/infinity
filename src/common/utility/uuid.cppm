@@ -20,6 +20,9 @@ struct UUID {
         u64 ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
         u64 ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now).count();
         data64[0] = (ms << 16) | (ns & 0xffff);
+        if constexpr (std::endian::native == std::endian::little) {
+            data64[0] = __builtin_bswap64(data64[0]);
+        }
         std::mt19937 rng(std::random_device{}());
         std::uniform_int_distribution<u64> dist;
         data64[1] = dist(rng);

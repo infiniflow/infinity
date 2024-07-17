@@ -202,6 +202,8 @@ export namespace std {
     using std::fstream;
     using std::ios;
 
+    using std::endian;
+
     using std::align;
 
     using std::ptrdiff_t;
