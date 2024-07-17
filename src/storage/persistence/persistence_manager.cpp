@@ -14,19 +14,16 @@
 
 module;
 
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
-
 module persistence_manager;
 import stl;
+import uuid;
 import third_party;
 import infinity_exception;
 
 namespace fs = std::filesystem;
-constexpr std::size_t BUFFER_SIZE = 1024 * 1024;           // 1 MB
 
 namespace infinity {
+constexpr SizeT BUFFER_SIZE = 1024 * 1024; // 1 MB
 
 ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose) {
     std::error_code ec;
@@ -137,10 +134,7 @@ void PersistenceManager::PutObjCache(const ObjAddr &object_addr) {
     it->second.ref_count_--;
 }
 
-String PersistenceManager::ObjCreate() {
-    boost::uuids::uuid uuid = boost::uuids::random_generator()();
-    return boost::uuids::to_string(uuid);
-}
+String PersistenceManager::ObjCreate() { return UUID().to_string(); }
 
 int PersistenceManager::CurrentObjRoomNoLock() { return int(object_size_limit_) - int(current_object_size_); }
 

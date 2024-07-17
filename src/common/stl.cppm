@@ -92,8 +92,10 @@ export namespace std {
     using std::memcmp;
     using std::strlen;
 
-    using std::time;
+    using std::fprintf;
     using std::printf;
+    using std::sprintf;
+    using std::time;
 
     using std::is_same;
     using std::fill;
@@ -226,6 +228,7 @@ export namespace std {
     using std::iota;
     using std::mt19937;
     using std::random_device;
+    using std::uniform_int_distribution;
     using std::uniform_real_distribution;
 
     using std::exception;
