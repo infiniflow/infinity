@@ -467,6 +467,8 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             case LogicalType::kBigInt:
             case LogicalType::kFloat:
             case LogicalType::kDouble:
+            case LogicalType::kFloat16:
+            case LogicalType::kBFloat16:
             case LogicalType::kVarchar:
             case LogicalType::kDate:
             case LogicalType::kTime:

@@ -62,6 +62,12 @@ inline BoundCastFunc BindFloatCast(const DataType &source, const DataType &targe
         case LogicalType::kDouble: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, DoubleT, FloatTryCastToFixlen>);
         }
+        case LogicalType::kFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, Float16T, FloatTryCastToFixlen>);
+        }
+        case LogicalType::kBFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, BFloat16T, FloatTryCastToFixlen>);
+        }
         case LogicalType::kDecimal: {
             String error_message = fmt::format("Not implement cast from numeric to decimal128 type.", source.ToString(), target.ToString());
             UnrecoverableError(error_message);
@@ -154,6 +160,18 @@ inline bool FloatTryCastToFixlen::Run(FloatT source, DoubleT &target) {
     return true;
 }
 
+template <>
+inline bool FloatTryCastToFixlen::Run(FloatT source, Float16T &target) {
+    target = source;
+    return true;
+}
+
+template <>
+inline bool FloatTryCastToFixlen::Run(FloatT source, BFloat16T &target) {
+    target = source;
+    return true;
+}
+
 // TODO
 template <>
 inline bool FloatTryCastToFixlen::Run(FloatT, DecimalT &) {
@@ -236,6 +254,18 @@ inline bool FloatTryCastToFixlen::Run(DoubleT, HugeIntT &) {
 template <>
 inline bool FloatTryCastToFixlen::Run(DoubleT source, FloatT &target) {
     target = source;
+    return true;
+}
+
+template <>
+inline bool FloatTryCastToFixlen::Run(DoubleT source, Float16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
+template <>
+inline bool FloatTryCastToFixlen::Run(DoubleT source, BFloat16T &target) {
+    target = static_cast<float>(source);
     return true;
 }
 
