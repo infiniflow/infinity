@@ -1,4 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
+# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,6 +41,7 @@ try:
         "doc": {"type": "varchar"},
     })
 
+    # TODO also show how to import other type of file
     table_instance.import_data(project_directory + "/../test/data/csv/fulltext_delete.csv",
                                {"file_type": "csv", "delimiter": "\t"})
 
