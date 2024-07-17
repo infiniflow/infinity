@@ -149,6 +149,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
 void ColumnVector::Initialize(BufferManager *buffer_mgr,
                               BlockColumnEntry *block_column_entry,
                               SizeT current_row_count,
+                              ColumnVectorTipe vector_tipe,
                               ColumnVectorType vector_type,
                               SizeT capacity) {
     Pair<VectorBufferType, VectorBufferType> vector_buffer_types = InitializeHelper(vector_type, capacity);
@@ -165,7 +166,16 @@ void ColumnVector::Initialize(BufferManager *buffer_mgr,
         buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_types);
         nulls_ptr_ = Bitmask::Make(capacity_);
     }
-    data_ptr_ = buffer_->GetDataMut();
+    switch (vector_tipe) {
+        case ColumnVectorTipe::kReadWrite: {
+            data_ptr_ = buffer_->GetDataMut();
+            break;
+        }
+        case ColumnVectorTipe::kReadOnly: {
+            data_ptr_ = const_cast<ptr_t>(buffer_->GetData());
+            break;
+        }
+    }
     tail_index_ = current_row_count;
 }
 

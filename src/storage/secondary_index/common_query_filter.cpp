@@ -61,7 +61,7 @@ void ReadDataBlock(DataBlock *output,
             u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
             output->column_vectors[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
         } else {
-            ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
+            ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr);
             output->column_vectors[i]->AppendWith(column_vector, 0, row_count);
         }
     }

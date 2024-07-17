@@ -77,6 +77,12 @@ public:
 
     ColumnVector GetColumnVector(BufferManager *buffer_mgr);
 
+    ColumnVector GetConstColumnVector(BufferManager *buffer_mgr);
+
+private:
+    ColumnVector GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe);
+
+public:
     void AppendOutlineBuffer(u32 buffer_group_id, BufferObj *buffer);
 
     BufferObj *GetOutlineBuffer(u32 buffer_group_id, SizeT idx) const;

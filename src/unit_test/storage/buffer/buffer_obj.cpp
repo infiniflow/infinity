@@ -659,7 +659,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
                 auto block_entry = segment_entry->GetBlockEntryByID(i);
                 EXPECT_EQ(block_entry->row_count(), kImportSize);
                 auto *col = block_entry->GetColumnBlockEntry(0);
-                auto column_vector = col->GetColumnVector(buffer_mgr);
+                auto column_vector = col->GetConstColumnVector(buffer_mgr);
                 for (u64 j = 0; j < kImportSize; ++j) {
                     Value v1 = column_vector.GetValue(j);
                 }
@@ -746,7 +746,7 @@ TEST_F(BufferObjTest, test_big_with_gc_and_cleanup) {
                 auto block_entry = segment_entry->GetBlockEntryByID(i);
                 EXPECT_EQ(block_entry->row_count(), kImportSize);
                 auto *col = block_entry->GetColumnBlockEntry(0);
-                auto column_vector = col->GetColumnVector(buffer_mgr);
+                auto column_vector = col->GetConstColumnVector(buffer_mgr);
                 for (u64 j = 0; j < kImportSize; ++j) {
                     Value v1 = column_vector.GetValue(j);
                     Value v2 = Value::MakeBigInt(i * 1000 + j);
@@ -829,7 +829,7 @@ TEST_F(BufferObjTest, test_multiple_threads_read) {
                     auto block_entry = segment_entry->GetBlockEntryByID(i);
                     EXPECT_EQ(block_entry->row_count(), kImportSize);
                     auto *col = block_entry->GetColumnBlockEntry(0);
-                    auto column_vector = col->GetColumnVector(buffer_mgr);
+                    auto column_vector = col->GetConstColumnVector(buffer_mgr);
                     for (u64 j = 0; j < kImportSize; ++j) {
                         Value v1 = column_vector.GetValue(j);
                         Value v2 = Value::MakeBigInt(i * 1000 + j);
