@@ -36,6 +36,7 @@ AS              { return AS; }
 AST             { return AST; }
 ASC             { return ASC; }
 BETWEEN         { return BETWEEN; }
+BFLOAT16        { return BFLOAT16; }
 BIGINT          { return BIGINT; }
 BIT             { return BIT; }
 BITMAP          { return BITMAP; }
@@ -87,6 +88,7 @@ EXPLAIN         { return EXPLAIN; }
 EXPORT          { return EXPORT; }
 FALSE           { return FALSE; }
 FLOAT           { return FLOAT; }
+FLOAT16         { return FLOAT16; }
 FLUSH           { return FLUSH; }
 FORMAT          { return FORMAT; }
 FRAGMENT        { return FRAGMENT; }
