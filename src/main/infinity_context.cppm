@@ -23,6 +23,7 @@ import task_scheduler;
 import storage;
 import singleton;
 import session_manager;
+import persistence_manager;
 import third_party;
 
 namespace infinity {
@@ -34,6 +35,8 @@ public:
     [[nodiscard]] inline Config *config() noexcept { return config_.get(); }
 
     [[nodiscard]] inline Storage *storage() noexcept { return storage_.get(); }
+
+    [[nodiscard]] inline PersistenceManager *persistence_manager() noexcept { return persistence_manager_.get(); }
 
     [[nodiscard]] inline ResourceManager *resource_manager() noexcept { return resource_manager_.get(); }
 
@@ -55,6 +58,7 @@ private:
     UniquePtr<ResourceManager> resource_manager_{};
     UniquePtr<TaskScheduler> task_scheduler_{};
     UniquePtr<Storage> storage_{};
+    UniquePtr<PersistenceManager> persistence_manager_{};
     UniquePtr<SessionManager> session_mgr_{};
     // For fulltext index
     ThreadPool inverting_thread_pool_{4};

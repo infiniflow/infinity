@@ -16,3 +16,4 @@ delta_checkpoint_interval = "5s"
 
 [buffer]
 [resource]
+[persistence]

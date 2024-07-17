@@ -80,6 +80,10 @@ public:
 
     i64 MemIndexCapacity();
 
+    // Persistence
+    String PersistenceDir();
+    i64 PersistenceObjectSizeLimit();
+
     // Buffer
     i64 BufferManagerSize();
     SizeT LRUNum();
