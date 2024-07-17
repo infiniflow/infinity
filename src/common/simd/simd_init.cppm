@@ -14,15 +14,17 @@
 
 module;
 
+#include "simd_init_h.h"
 export module simd_init;
 import stl;
 
 namespace infinity {
 
-export const Vector<char const *> &GetSupportedSimdTypesList();
-export bool IsSSE2Supported();
-export bool IsAVX2Supported();
-export bool IsAVX512Supported();
+export using infinity::GetSupportedSimdTypesList;
+export using infinity::IsF16CSupported;
+export using infinity::IsSSE2Supported;
+export using infinity::IsAVX2Supported;
+export using infinity::IsAVX512Supported;
 
 export using F32DistanceFuncType = f32(*)(const f32 *, const f32 *, SizeT);
 export using I8DistanceFuncType = i32(*)(const i8 *, const i8 *, SizeT);

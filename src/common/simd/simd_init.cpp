@@ -14,8 +14,6 @@
 
 module;
 #include "simd_common_intrin_include.h"
-#include "NGT_CpuInfo_SimdType.h"
-
 module simd_init;
 import stl;
 import distance_simd_functions;
@@ -24,26 +22,6 @@ import emvb_simd_funcs;
 import search_top_1_sgemm;
 
 namespace infinity {
-
-struct SupportedSimdTypes {
-    Vector<char const *> types_strs_ = NGT::CpuInfo::getSupportedSimdTypes();
-    bool is_sse2_ = NGT::CpuInfo::isSSE2();
-    bool is_avx2_ = NGT::CpuInfo::isAVX2();
-    bool is_avx512_ = NGT::CpuInfo::isAVX512();
-};
-
-const SupportedSimdTypes &GetSupportedSimdTypes() {
-    static SupportedSimdTypes supported_simd_types;
-    return supported_simd_types;
-}
-
-const Vector<char const *> &GetSupportedSimdTypesList() { return GetSupportedSimdTypes().types_strs_; }
-
-bool IsSSE2Supported() { return GetSupportedSimdTypes().is_sse2_; }
-
-bool IsAVX2Supported() { return GetSupportedSimdTypes().is_avx2_; }
-
-bool IsAVX512Supported() { return GetSupportedSimdTypes().is_avx512_; }
 
 F32DistanceFuncType GetL2DistanceFuncPtr() {
 #ifdef __AVX2__
