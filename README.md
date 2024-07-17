@@ -42,8 +42,8 @@ Infinity comes with high performance, flexibility, ease-of-use, and many feature
 
 ### 🔮 Powerful search
 
-- Supports a hybrid search of dense embedding, sparse embedding, tensor and full text, in addition to filtering.
-- Support several types of rerankers including RRF, weighted sum and **ColBERT**.
+- Supports a hybrid search of dense embedding, sparse embedding, tensor, and full text, in addition to filtering.
+- Supports several types of rerankers including RRF, weighted sum and **ColBERT**.
 
 ### 🍔 Rich data types
 
