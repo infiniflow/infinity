@@ -181,6 +181,32 @@ class LocalTable(Table, ABC):
                     elif isinstance(value[0], float):
                         constant_expression.literal_type = LiteralType.kDoubleArray
                         constant_expression.f64_array_value = value
+                    elif isinstance(value[0], list) or isinstance(value[0], np.ndarray):
+                        if isinstance(value[0], np.ndarray):
+                            value = [x.tolist() for x in value]
+                        if isinstance(value[0][0], int):
+                            constant_expression.literal_type = LiteralType.kIntegerArray
+                            constant_expression.i64_array_value = [x for xs in value for x in xs]
+                        elif isinstance(value[0][0], float):
+                            constant_expression.literal_type = LiteralType.kDoubleArray
+                            constant_expression.f64_array_value = [x for xs in value for x in xs]
+                        elif isinstance(value[0][0], list):
+                            if isinstance(value[0][0][0], int):
+                                constant_expression.literal_type = LiteralType.kSubArrayArray
+                                constant_expression.i64_tensor_array_value = value
+                            elif isinstance(value[0][0][0], float):
+                                constant_expression.literal_type = LiteralType.kSubArrayArray
+                                constant_expression.f64_tensor_array_value = value
+                elif isinstance(value, np.ndarray) and value.ndim <= 2:
+                    float_list = value.flatten().tolist()
+                    if isinstance(float_list[0], int):
+                        constant_expression.literal_type = LiteralType.kIntegerArray
+                        constant_expression.i64_array_value = float_list
+                    elif isinstance(float_list[0], float):
+                        constant_expression.literal_type = LiteralType.kDoubleArray
+                        constant_expression.f64_array_value = float_list
+                    else:
+                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid list type: {type(value)}")
                 elif isinstance(value, dict):
                     if isinstance(value["values"][0], int):
                         constant_expression.literal_type = LiteralType.kLongSparseArray

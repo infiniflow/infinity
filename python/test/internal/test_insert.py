@@ -17,6 +17,7 @@ import time
 
 import pandas as pd
 import pytest
+import numpy as np
 from numpy import dtype
 
 from common import common_values

@@ -79,6 +79,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("str_value", &WrapConstantExpr::str_value)
         .def_rw("i64_array_value", &WrapConstantExpr::i64_array_value)
         .def_rw("f64_array_value", &WrapConstantExpr::f64_array_value)
+        .def_rw("i64_tensor_array_value", &WrapConstantExpr::i64_tensor_array_value)
+        .def_rw("f64_tensor_array_value", &WrapConstantExpr::f64_tensor_array_value)
         .def_rw("i64_array_idx", &WrapConstantExpr::i64_array_idx);
 
     nb::class_<WrapColumnDef>(m, "WrapColumnDef")
