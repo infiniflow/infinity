@@ -71,6 +71,12 @@ void RegisterPlusFunction(const UniquePtr<Catalog> &catalog_ptr) {
     ScalarFunction plus_int128(func_name, {DataType(LogicalType::kHugeInt)}, DataType(LogicalType::kHugeInt), &ScalarFunction::NoOpFunction);
     function_set_ptr->AddFunction(plus_int128);
 
+    ScalarFunction plus_float16(func_name, {DataType(LogicalType::kFloat16)}, DataType(LogicalType::kFloat16), &ScalarFunction::NoOpFunction);
+    function_set_ptr->AddFunction(plus_float16);
+
+    ScalarFunction plus_bfloat16(func_name, {DataType(LogicalType::kBFloat16)}, DataType(LogicalType::kBFloat16), &ScalarFunction::NoOpFunction);
+    function_set_ptr->AddFunction(plus_bfloat16);
+
     ScalarFunction plus_float(func_name, {DataType(LogicalType::kFloat)}, DataType(LogicalType::kFloat), &ScalarFunction::NoOpFunction);
     function_set_ptr->AddFunction(plus_float);
 

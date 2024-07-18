@@ -127,6 +127,8 @@ void RegisterInEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateInEqualsFunction<IntegerT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kInteger));
     GenerateInEqualsFunction<BigIntT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
     GenerateInEqualsFunction<HugeIntT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateInEqualsFunction<FloatT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kFloat16));
+    GenerateInEqualsFunction<FloatT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kBFloat16));
     GenerateInEqualsFunction<FloatT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kFloat));
     GenerateInEqualsFunction<DoubleT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 

@@ -106,6 +106,8 @@ void RegisterGreaterFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateGreaterFunction<IntegerT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kInteger));
     GenerateGreaterFunction<BigIntT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
     GenerateGreaterFunction<HugeIntT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateGreaterFunction<FloatT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kFloat16));
+    GenerateGreaterFunction<FloatT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kBFloat16));
     GenerateGreaterFunction<FloatT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kFloat));
     GenerateGreaterFunction<DoubleT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 
