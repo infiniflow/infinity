@@ -214,6 +214,8 @@ public:
 
     static void AddFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &function_set);
 
+    static void AppendToScalarFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &function_set);
+
     static void AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFunction> &special_function);
 
     static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(Catalog *catalog, String function_name);

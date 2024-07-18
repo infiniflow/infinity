@@ -29,6 +29,7 @@ import third_party;
 import status;
 import infinity_exception;
 import function_set;
+import scalar_function_set;
 import table_function;
 import special_function;
 import buffer_manager;
@@ -427,10 +428,32 @@ void Catalog::AddFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &fun
     String name = function_set->name();
     StringToLower(name);
     if (catalog->function_sets_.contains(name)) {
-        String error_message = fmt::format("Trying to add duplicated function table_name into catalog: {}", name);
+        String error_message = fmt::format("Trying to add duplicated function {} into catalog", name);
         UnrecoverableError(error_message);
     }
     catalog->function_sets_.emplace(name, function_set);
+}
+
+void Catalog::AppendToScalarFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &function_set) {
+    String name = function_set->name();
+    StringToLower(name);
+    if (!catalog->function_sets_.contains(name)) {
+        String error_message = fmt::format("Trying to append to non-existent function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    auto target_scalar_function_set = std::dynamic_pointer_cast<ScalarFunctionSet>(catalog->function_sets_[name]);
+    if (!target_scalar_function_set) {
+        String error_message = fmt::format("Trying to append to non-scalar function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    auto source_function_set = std::dynamic_pointer_cast<ScalarFunctionSet>(function_set);
+    if (!source_function_set) {
+        String error_message = fmt::format("Trying to append non-scalar function to scalar function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    for (const auto &function : source_function_set->GetAllScalarFunctions()) {
+        target_scalar_function_set->AddFunction(function);
+    }
 }
 
 void Catalog::AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFunction> &special_function) {

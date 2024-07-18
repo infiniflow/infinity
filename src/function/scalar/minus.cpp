@@ -110,7 +110,7 @@ inline bool MinusFunction::Run(MixedT value, MixedT &result) {
     return false;
 }
 
-void RegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr) {
+SharedPtr<ScalarFunctionSet> GetMinusFunctionSet() {
     String func_name = "-";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -182,6 +182,17 @@ void RegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                &ScalarFunction::UnaryFunctionWithFailure<MixedT, MixedT, MinusFunction>);
     function_set_ptr->AddFunction(minus_mixed);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    return function_set_ptr;
 }
+
+void RegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    auto function_set_ptr = GetMinusFunctionSet();
+    Catalog::AddFunctionSet(catalog_ptr.get(), std::move(function_set_ptr));
+}
+
+void AppendRegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    auto function_set_ptr = GetMinusFunctionSet();
+    Catalog::AppendToScalarFunctionSet(catalog_ptr.get(), std::move(function_set_ptr));
+}
+
 } // namespace infinity

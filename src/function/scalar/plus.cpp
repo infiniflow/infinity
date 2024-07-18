@@ -50,7 +50,7 @@ inline bool PlusFunction::Run(MixedT value, MixedT &result) {
     }
 }
 
-void RegisterPlusFunction(const UniquePtr<Catalog> &catalog_ptr) {
+SharedPtr<ScalarFunctionSet> GetPlusFunctionSet() {
     String func_name = "+";
 
     SharedPtr<ScalarFunctionSet> function_set_ptr = MakeShared<ScalarFunctionSet>(func_name);
@@ -92,7 +92,17 @@ void RegisterPlusFunction(const UniquePtr<Catalog> &catalog_ptr) {
                               &ScalarFunction::UnaryFunctionWithFailure<MixedT, MixedT, PlusFunction>);
     function_set_ptr->AddFunction(plus_mixed);
 
-    Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
+    return function_set_ptr;
+}
+
+void RegisterPlusFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    auto function_set_ptr = GetPlusFunctionSet();
+    Catalog::AddFunctionSet(catalog_ptr.get(), std::move(function_set_ptr));
+}
+
+void AppendRegisterPlusFunction(const UniquePtr<Catalog> &catalog_ptr) {
+    auto function_set_ptr = GetPlusFunctionSet();
+    Catalog::AppendToScalarFunctionSet(catalog_ptr.get(), std::move(function_set_ptr));
 }
 
 } // namespace infinity
