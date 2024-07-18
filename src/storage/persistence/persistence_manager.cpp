@@ -92,7 +92,7 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size, bool allow
         if (current_object_size_ >= object_size_limit_) {
             objects_.emplace(current_object_key_, ObjStat(src_size, 0));
             current_object_key_ = ObjCreate();
-            current_object_size_ = src_size;
+            current_object_size_ = 0;
         }
         return obj_addr;
     }
@@ -148,7 +148,6 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
     fs::path src_fp = workspace_;
     fs::path dst_fp = file_path;
     src_fp.append(obj_key);
-    fmt::print("src_fp: {}, dst_fp: {}\n", src_fp.string(), dst_fp.string());
     try {
         if (fs::exists(dst_fp)) {
             fs::remove(dst_fp);
