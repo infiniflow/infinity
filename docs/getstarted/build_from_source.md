@@ -135,6 +135,20 @@ sudo ln -s /usr/bin/clang-format-18 /usr/bin/clang-format
 sudo ln -s /usr/bin/clang-tidy-18 /usr/bin/clang-tidy
 sudo ln -s /usr/bin/llvm-symbolizer-18 /usr/bin/llvm-symbolizer
 sudo ln -s /usr/lib/llvm-18/include/x86_64-pc-linux-gnu/c++/v1/__config_site /usr/lib/llvm-18/include/c++/v1/__config_site
+sudo apt install -y -V ca-certificates lsb-release
+wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
+sudo apt update
+sudo apt install -y -V libarrow-dev libparquet-dev
+wget https://github.com/infiniflow/arrow/archive/refs/heads/main.zip -O arrow.zip
+unzip arrow.zip
+cd arrow-main && cd cpp && mkdir build && cd build
+export CC=/usr/bin/clang-18
+export CXX=/usr/bin/clang++-18
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DARROW_BUILD_SHARED=OFF -DARROW_ENABLE_TIMING_TESTS=OFF -DARROW_GGDB_DEBUG=OFF -DARROW_PARQUET=ON ..
+ninja -j 0 arrow_static parquet_static
+sudo cp ./release/libarrow.a /usr/lib/x86_64-linux-gnu/libarrow.a
+sudo cp ./release/libparquet.a /usr/lib/x86_64-linux-gnu/libparquet.a
+cd ../../../ && rm -rf arrow-main
 ```
 
 ### Step2 Download Source Code
