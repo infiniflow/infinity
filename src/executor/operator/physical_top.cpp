@@ -267,6 +267,12 @@ GenerateSortFunctionTemplate(SharedPtr<BaseExpression> &sort_expression) {
         case LogicalType::kHugeInt: {
             return PhysicalTopCompareSingleValue<compare_order, HugeIntT>::Compare;
         }
+        case LogicalType::kFloat16: {
+            return PhysicalTopCompareSingleValue<compare_order, Float16T>::Compare;
+        }
+        case LogicalType::kBFloat16: {
+            return PhysicalTopCompareSingleValue<compare_order, BFloat16T>::Compare;
+        }
         case LogicalType::kFloat: {
             return PhysicalTopCompareSingleValue<compare_order, FloatT>::Compare;
         }

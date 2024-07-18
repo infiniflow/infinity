@@ -66,6 +66,16 @@ inline HugeIntT NullValue() {
 }
 
 template <>
+inline Float16T NullValue() {
+    return std::numeric_limits<Float16T>::infinity();
+}
+
+template <>
+inline BFloat16T NullValue() {
+    return std::numeric_limits<BFloat16T>::infinity();
+}
+
+template <>
 inline FloatT NullValue() {
     return std::numeric_limits<f32>::infinity();
 }
