@@ -36,7 +36,10 @@ export struct ObjStat {
 export class PersistenceManager {
 public:
     // TODO: build cache from existing files under workspace
-    PersistenceManager(const String workspace, SizeT object_size_limit) : workspace_(workspace), object_size_limit_(object_size_limit) {}
+    PersistenceManager(const String workspace, SizeT object_size_limit) : workspace_(workspace), object_size_limit_(object_size_limit) {
+        current_object_key_ = ObjCreate();
+        current_object_size_ = 0;
+    }
     ~PersistenceManager() {}
 
     // Create new object or append to current object, and returns the location.
@@ -54,6 +57,7 @@ public:
     // Decrease refcount
     void PutObjCache(const ObjAddr &object_addr);
 
+    ObjAddr ObjCreateRefCount(const String &file_path);
 private:
     String ObjCreate();
 

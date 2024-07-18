@@ -13,6 +13,7 @@
 // limitations under the License.
 
 module;
+#include <filesystem>
 
 module persistence_manager;
 import stl;
@@ -135,6 +136,30 @@ void PersistenceManager::PutObjCache(const ObjAddr &object_addr) {
 }
 
 String PersistenceManager::ObjCreate() { return UUID().to_string(); }
+
+ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
+    String obj_key = ObjCreate();
+    ObjAddr obj_addr = ObjAddr(obj_key, 0, 0);
+    {
+        std::lock_guard<std::mutex> lock(mtx_);
+        objects_.emplace(obj_key, ObjStat(0, 1));
+    }
+
+    fs::path src_fp = workspace_;
+    fs::path dst_fp = file_path;
+    src_fp.append(obj_key);
+    try {
+        if (fs::exists(dst_fp)) {
+            fs::remove(dst_fp);
+        }
+        std::error_code ec;
+        fs::create_symlink(src_fp, dst_fp);
+    } catch (const fs::filesystem_error& e) {
+        String error_message = fmt::format("Failed to link file {}.", file_path);
+        UnrecoverableError(error_message);
+    }
+    return obj_addr;
+}
 
 int PersistenceManager::CurrentObjRoomNoLock() { return int(object_size_limit_) - int(current_object_size_); }
 
