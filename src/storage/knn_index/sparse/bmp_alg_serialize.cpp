@@ -158,8 +158,10 @@ template class BlockFwd<f64, i8>;
 // --------------------------BMPAlg--------------------------
 
 template <typename DataType, typename IdxType, BMPCompressType CompressType>
-void BMPAlg<DataType, IdxType, CompressType>::Save(FileHandler &file_handler) const {
-    SizeT size = GetSizeInBytes();
+void BMPAlg<DataType, IdxType, CompressType>::Save(FileHandler &file_handler, SizeT size) const {
+    if (size == 0) {
+        size = GetSizeInBytes();
+    }
     auto buffer = MakeUnique<char[]>(sizeof(size) + size);
     char *p = buffer.get();
     WriteBufAdv<SizeT>(p, size);

@@ -45,6 +45,11 @@ namespace infinity {
 class BufferManager;
 class BlockColumnEntry;
 
+export enum class ColumnVectorTipe: i8 {
+    kReadWrite,
+    kReadOnly,
+};
+
 export enum class ColumnVectorType : i8 {
     kInvalid,
     kFlat,          // Stand without any encode
@@ -200,6 +205,7 @@ public:
     void Initialize(BufferManager *buffer_mgr,
                     BlockColumnEntry *block_column_entry,
                     SizeT current_row_count,
+                    ColumnVectorTipe vector_tipe = ColumnVectorTipe::kReadWrite,
                     ColumnVectorType vector_type = ColumnVectorType::kFlat,
                     SizeT capacity = DEFAULT_VECTOR_SIZE);
 

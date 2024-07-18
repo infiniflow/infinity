@@ -60,6 +60,7 @@ import sparse_util;
 import bmp_util;
 import knn_filter;
 import segment_entry;
+import abstract_bmp;
 
 namespace infinity {
 
@@ -393,7 +394,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         block_entry->SetDeleteBitmask(begin_ts, bitmask);
 
         auto *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id_);
-        ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+        ColumnVector column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
 
         for (SizeT query_id = 0; query_id < query_n; ++query_id) {
             auto query_sparse = get_ele(query_vector, query_id);
@@ -492,13 +493,11 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             for (SizeT query_id = 0; query_id < query_n; ++query_id) {
                 for (auto chunk_index_entry : chunk_index_entries) {
                     BufferHandle buffer_handle = chunk_index_entry->GetIndex();
-                    auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
-                    bmp_search(abstract_bmp, query_id, false, filter);
+                    const auto *bmp_index = reinterpret_cast<const AbstractBMP *>(buffer_handle.GetData());
+                    bmp_search(*bmp_index, query_id, false, filter);
                 }
                 if (memory_index_entry.get() != nullptr) {
-                    BufferHandle buffer_handle = memory_index_entry->GetIndex();
-                    auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
-                    bmp_search(abstract_bmp, query_id, true, filter);
+                    bmp_search(memory_index_entry->get(), query_id, true, filter);
                 }
             }
         };

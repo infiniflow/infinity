@@ -875,7 +875,7 @@ bool PhysicalMatch::ExecuteInnerHomebrewed(QueryContext *query_context, Operator
             SizeT column_id = 0;
             for (; column_id < column_n; ++column_id) {
                 BlockColumnEntry *block_column_ptr = block_entry->GetColumnBlockEntry(column_ids[column_id]);
-                ColumnVector column_vector = block_column_ptr->GetColumnVector(query_context->storage()->buffer_manager());
+                ColumnVector column_vector = block_column_ptr->GetConstColumnVector(query_context->storage()->buffer_manager());
                 output_block_ptr->column_vectors[column_id]->AppendWith(column_vector, block_offset, 1);
             }
             Value v = Value::MakeFloat(score_result[output_id]);

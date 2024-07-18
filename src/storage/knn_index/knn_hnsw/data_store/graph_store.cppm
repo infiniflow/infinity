@@ -66,6 +66,8 @@ public:
         return meta;
     }
 
+    SizeT GetSizeInBytes() const { return sizeof(Mmax0_) + sizeof(Mmax_) + sizeof(max_layer_) + sizeof(enterpoint_); }
+
     void Save(FileHandler &file_handler) const {
         file_handler.Write(&Mmax0_, sizeof(Mmax0_));
         file_handler.Write(&Mmax_, sizeof(Mmax_));
@@ -149,6 +151,19 @@ public:
         GraphStoreInner graph_store(max_vertex, meta, 0);
         std::fill(graph_store.graph_.get(), graph_store.graph_.get() + max_vertex * meta.level0_size(), 0);
         return graph_store;
+    }
+
+    SizeT GetSizeInBytes(SizeT cur_vertex_n, const GraphStoreMeta &meta) const {
+        SizeT size = 0;
+        for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
+            const VertexL0 *v = GetLevel0(vertex_i, meta);
+            size += sizeof(v->layer_n_) + sizeof(v->neighbor_n_) + sizeof(VertexType) * v->neighbor_n_;
+            for (i32 layer_i = 1; layer_i <= v->layer_n_; ++layer_i) {
+                const VertexLX *vx = GetLevelX(v->layers_p_, layer_i, meta);
+                size += sizeof(vx->neighbor_n_) + sizeof(VertexType) * vx->neighbor_n_;
+            }
+        }
+        return size;
     }
 
     void Save(FileHandler &file_handler, SizeT cur_vertex_n, const GraphStoreMeta &meta) const {

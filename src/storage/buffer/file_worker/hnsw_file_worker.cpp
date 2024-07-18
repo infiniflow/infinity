@@ -31,8 +31,30 @@ import embedding_info;
 import create_index_info;
 import internal_types;
 import abstract_hnsw;
+import local_file_system;
+import file_system_type;
 
 namespace infinity {
+
+HnswFileWorker::HnswFileWorker(SharedPtr<String> file_dir,
+                               SharedPtr<String> file_name,
+                               SharedPtr<IndexBase> index_base,
+                               SharedPtr<ColumnDef> column_def,
+                               SizeT index_size)
+    : IndexFileWorker(file_dir, file_name, index_base, column_def) {
+    if (index_size == 0) {
+        LocalFileSystem fs;
+
+        String index_path = GetFilePath();
+        auto [file_handler, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
+        if (!status.ok()) {
+            UnrecoverableError(status.message());
+        }
+        index_size = fs.GetFileSize(*file_handler);
+    }
+    index_size_ = index_size;
+}
+
 HnswFileWorker::~HnswFileWorker() {
     if (data_ != nullptr) {
         FreeInMemory();
@@ -45,34 +67,7 @@ void HnswFileWorker::AllocateInMemory() {
         String error_message = "Data is already allocated.";
         UnrecoverableError(error_message);
     }
-    if (index_base_->index_type_ != IndexType::kHnsw) {
-        String error_message = "Index type isn't HNSW";
-        UnrecoverableError(error_message);
-    }
-
-    auto data_type = column_def_->type();
-    if (data_type->type() != LogicalType::kEmbedding) {
-        String error_message = "Index should be created on embedding column now.";
-        UnrecoverableError(error_message);
-    }
-
-    SizeT dimension = GetDimension();
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
-    SizeT M = index_hnsw->M_;
-    SizeT ef_c = index_hnsw->ef_construction_;
-    EmbeddingDataType embedding_type = GetType();
-    switch (embedding_type) {
-        case kElemFloat: {
-            AbstractHnsw<f32, SegmentOffset> abstract_hnsw(nullptr, index_hnsw);
-            abstract_hnsw.Make(chunk_size_, max_chunk_num_, dimension, M, ef_c);
-            data_ = abstract_hnsw.RawPtr();
-            break;
-        }
-        default: {
-            String error_message = "Index should be created on float embedding column now.";
-            UnrecoverableError(error_message);
-        }
-    }
+    data_ = static_cast<void *>(new AbstractHnsw());
 }
 
 void HnswFileWorker::FreeInMemory() {
@@ -80,41 +75,19 @@ void HnswFileWorker::FreeInMemory() {
         String error_message = "FreeInMemory: Data is not allocated.";
         UnrecoverableError(error_message);
     }
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
-    EmbeddingDataType embedding_type = GetType();
-    switch (embedding_type) {
-        case kElemFloat: {
-            AbstractHnsw<f32, SegmentOffset> abstract_hnsw(data_, index_hnsw);
-            abstract_hnsw.Free();
-            break;
-        }
-        default: {
-            String error_message = fmt::format("Index should be created on float embedding column now, type: {}",
-                                               EmbeddingType::EmbeddingDataType2String(embedding_type));
-            UnrecoverableError(error_message);
-        }
-    }
+    auto *p = reinterpret_cast<AbstractHnsw *>(data_);
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                if (index != nullptr) {
+                    delete index;
+                }
+            }
+        },
+        *p);
+    delete p;
     data_ = nullptr;
-}
-
-void HnswFileWorker::CompressToLVQ(IndexHnsw *index_hnsw) {
-    if (!data_) {
-        String error_message = "CompressToLVQ: Data is not allocated.";
-        UnrecoverableError(error_message);
-    }
-    EmbeddingDataType embedding_type = GetType();
-    switch (embedding_type) {
-        case kElemFloat: {
-            AbstractHnsw<f32, SegmentOffset> abstract_hnsw(data_, index_hnsw);
-            abstract_hnsw.CompressToLVQ();
-            data_ = abstract_hnsw.RawPtr();
-            break;
-        }
-        default: {
-            String error_message = "Index should be created on float embedding column now.";
-            UnrecoverableError(error_message);
-        }
-    }
 }
 
 void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
@@ -122,51 +95,37 @@ void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         String error_message = "WriteToFileImpl: Data is not allocated.";
         UnrecoverableError(error_message);
     }
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
-    EmbeddingDataType embedding_type = GetType();
-    switch (embedding_type) {
-        case kElemFloat: {
-            AbstractHnsw<f32, SegmentOffset> abstract_hnsw(data_, index_hnsw);
-            abstract_hnsw.Save(*file_handler_);
-            break;
-        }
-        default: {
-            String error_message = "Index should be created on float embedding column now.";
-            UnrecoverableError(error_message);
-        }
-    }
+    auto *hnsw_index = reinterpret_cast<AbstractHnsw *>(data_);
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                UnrecoverableError("Invalid index type.");
+            } else {
+                index->Save(*file_handler_);
+            }
+        },
+        *hnsw_index);
     prepare_success = true;
 }
 
 void HnswFileWorker::ReadFromFileImpl() {
-    // TODO!! not save index parameter in index file.
-    const IndexHnsw *index_hnsw = static_cast<const IndexHnsw *>(index_base_.get());
-    EmbeddingDataType embedding_type = GetType();
-    switch (embedding_type) {
-        case kElemFloat: {
-            AbstractHnsw<f32, SegmentOffset> abstract_hnsw(nullptr, index_hnsw);
-            abstract_hnsw.Load(*file_handler_);
-            data_ = abstract_hnsw.RawPtr();
-            break;
-        }
-        default: {
-            String error_message = "Index should be created on float embedding column now.";
-            UnrecoverableError(error_message);
-        }
+    if (data_ != nullptr) {
+        UnrecoverableError("Data is already allocated.");
     }
+    data_ = static_cast<void *>(new AbstractHnsw(HnswIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get())));
+    auto *bmp_index = reinterpret_cast<AbstractHnsw *>(data_);
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                UnrecoverableError("Invalid index type.");
+            } else {
+                using IndexT = std::decay_t<decltype(*index)>;
+                index = IndexT::Load(*file_handler_).release();
+            }
+        },
+        *bmp_index);
 }
 
-EmbeddingDataType HnswFileWorker::GetType() const {
-    auto data_type = column_def_->type();
-    auto type_info = data_type->type_info().get();
-    auto embedding_info = (EmbeddingInfo *)type_info;
-    return embedding_info->Type();
-}
-
-SizeT HnswFileWorker::GetDimension() const {
-    auto data_type = column_def_->type();
-    auto type_info = data_type->type_info().get();
-    auto embedding_info = (EmbeddingInfo *)type_info;
-    return embedding_info->Dimension();
-}
 } // namespace infinity

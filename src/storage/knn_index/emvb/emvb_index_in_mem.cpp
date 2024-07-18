@@ -68,7 +68,7 @@ u32 EMVBIndexInMem::GetRowCount() const {
 }
 
 void EMVBIndexInMem::Insert(u16 block_id, BlockColumnEntry *block_column_entry, BufferManager *buffer_manager, u32 row_offset, u32 row_count) {
-    const ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_manager);
+    const ColumnVector column_vector = block_column_entry->GetConstColumnVector(buffer_manager);
     const auto tensor_ptr_start = reinterpret_cast<const TensorT *>(column_vector.data()) + row_offset;
     std::unique_lock lock(rw_mutex_);
     const auto income_segment_entry = block_column_entry->GetBlockEntry()->GetSegmentEntry();

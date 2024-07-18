@@ -288,7 +288,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                 const BlockEntry *block_entry = block_guard.block_entries_[block_id].get();
                                                 block_entry->SetDeleteBitmask(begin_ts, block_bitmask);
                                                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(this->search_column_id_);
-                                                auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                                                auto column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
                                                 // output score will always be float type
                                                 CalculateScoreOnColumnVector(column_vector,
                                                                              segment_id,
@@ -342,7 +342,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         Bitmask bitmask;
         if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
             block_entry->SetDeleteBitmask(begin_ts, bitmask);
-            auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+            auto column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
             // output score will always be float type
             CalculateScoreOnColumnVector(column_vector, segment_id, block_id, 0, row_count, bitmask, *match_tensor_expr_, function_data);
         }
@@ -386,7 +386,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             for (SizeT i = 0; i < column_n; ++i) {
                 const auto column_id = base_table_ref_->column_ids_[i];
                 auto *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                auto column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
                 output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
             }
             output_block_ptr->AppendValueByPtr(column_n, (ptr_t)&result_scores[top_idx]);
@@ -771,7 +771,7 @@ void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
         const BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
         BlockColumnEntry *block_column_entry =
             block_index->segment_block_index_.at(segment_id).block_map_.at(block_id)->GetColumnBlockEntry(column_id);
-        auto column_vec = block_column_entry->GetColumnVector(buffer_mgr);
+        auto column_vec = block_column_entry->GetConstColumnVector(buffer_mgr);
         doc.score_ = CalcutateScoreOfRowOp::Execute(column_vec, block_offset, query_tensor_ptr, query_embedding_num, basic_embedding_dimension);
     }
 }

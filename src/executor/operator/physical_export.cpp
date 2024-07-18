@@ -166,7 +166,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                         break;
                     }
                     default: {
-                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(buffer_manager));
+                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetConstColumnVector(buffer_manager));
                         if(column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
                             UnrecoverableError(error_message);
@@ -288,7 +288,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                         break;
                     }
                     default: {
-                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetColumnVector(buffer_manager));
+                        column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetConstColumnVector(buffer_manager));
                         if(column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
                             UnrecoverableError(error_message);
@@ -399,7 +399,7 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
             BlockEntry *block_entry = segment_snapshot.block_map_[block_idx];
             SizeT block_row_count = block_entry->row_count();
 
-            ColumnVector exported_column_vector = block_entry->GetColumnBlockEntry(exported_column_idx)->GetColumnVector(buffer_manager);
+            ColumnVector exported_column_vector = block_entry->GetColumnBlockEntry(exported_column_idx)->GetConstColumnVector(buffer_manager);
             if(exported_column_vector.Size() != block_row_count) {
                 String error_message = "Unmatched row_count between block and block_column";
                 UnrecoverableError(error_message);

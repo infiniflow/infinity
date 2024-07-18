@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "hnsw_benchmark_util.h"
+#include <cassert>
 
 import stl;
 import third_party;
@@ -83,9 +84,7 @@ public:
         app_.add_option("--benchmark_type", benchmark_type_, "benchmark type")
             ->required()
             ->transform(CLI::CheckedTransformer(benchmark_type_map, CLI::ignore_case));
-        app_.add_option("--build_type", build_type_, "build type")
-            ->required()
-            ->transform(CLI::CheckedTransformer(build_type_map, CLI::ignore_case));
+        app_.add_option("--build_type", build_type_, "build type")->required()->transform(CLI::CheckedTransformer(build_type_map, CLI::ignore_case));
         app_.add_option("--thread_n", thread_n_, "thread number")->required(false);
 
         app_.add_option("--chunk_size", chunk_size_, "chunk size")->required(false);
@@ -162,39 +161,47 @@ void Build(const BenchmarkOption &option) {
     profiler.Begin();
     auto hnsw = HnswT::Make(option.chunk_size_, option.max_chunk_num_, dim, option.M_, option.ef_construction_);
     DenseVectorIter<float, LabelT> iter(data.get(), dim, vec_num);
-    hnsw.StoreData(iter);
+    hnsw->StoreData(iter);
     data.reset();
 
     Vector<std::thread> build_threads;
-    Atomic<i32> cur_i = 0;
-    for (SizeT i = 0; i < option.thread_n_; ++i) {
-        build_threads.emplace_back([&] {
-            SizeT i;
-            while ((i = cur_i.fetch_add(1)) < vec_num) {
-                if (i % 10000 == 0) {
-                    std::cout << fmt::format("Build {} / {}", i, vec_num) << std::endl;
+    const SizeT kBuildBucketSize = 1024;
+    SizeT bucket_size = std::max(kBuildBucketSize, vec_num / option.thread_n_);
+    SizeT bucket_num = (vec_num - 1) / bucket_size + 1;
+    assert(bucket_num <= option.thread_n_);
+
+    for (SizeT i = 0; i < bucket_num; ++i) {
+        SizeT i1 = i * bucket_size;
+        SizeT i2 = std::min(i1 + bucket_size, vec_num);
+        build_threads.emplace_back([&, i1, i2] {
+            for (SizeT j = i1; j < i2; ++j) {
+                if (j % 10000 == 0) {
+                    std::cout << fmt::format("Build {} / {}", j, vec_num) << std::endl;
                 }
-                hnsw.Build(i);
+                hnsw->Build(j);
             }
         });
     }
     for (auto &thread : build_threads) {
         thread.join();
     }
+    build_threads.clear();
+
     profiler.End();
     std::cout << "Build time: " << profiler.ElapsedToString(1000) << std::endl;
 
-    auto save = [&] (auto &hnsw) {
-        auto [index_file, index_status] = fs.OpenFile(option.index_save_path_.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+    auto save = [&](auto &hnsw) {
+        auto [index_file, index_status] =
+            fs.OpenFile(option.index_save_path_.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
         if (!index_status.ok()) {
             UnrecoverableError(index_status.message());
         }
-        hnsw.Save(*index_file);
+        hnsw->Save(*index_file);
     };
     if constexpr (std::is_same_v<HnswT, HnswT2>) {
         save(hnsw);
     } else {
-        HnswT2 hnsw_lvq = std::move(hnsw).CompressToLVQ();
+        auto hnsw_lvq = std::move(*hnsw).CompressToLVQ();
         save(hnsw_lvq);
     }
 }
@@ -216,7 +223,7 @@ void Query(const BenchmarkOption &option) {
     if (gt_num != query_num) {
         UnrecoverableError("gt_num != query_num");
     }
-    hnsw.SetEf(option.ef_);
+    hnsw->SetEf(option.ef_);
 
     Vector<Vector<LabelT>> results(query_num, Vector<LabelT>(topk));
 
@@ -230,7 +237,7 @@ void Query(const BenchmarkOption &option) {
                 SizeT i;
                 while ((i = cur_i.fetch_add(1)) < query_num) {
                     const float *query = query_data.get() + i * query_dim;
-                    Vector<Pair<float, LabelT>> pairs = hnsw.KnnSearchSorted(query, topk);
+                    Vector<Pair<float, LabelT>> pairs = hnsw->KnnSearchSorted(query, topk);
                     if (pairs.size() < SizeT(topk)) {
                         UnrecoverableError("result_n != topk");
                     }
@@ -265,7 +272,7 @@ void Query(const BenchmarkOption &option) {
 template <typename HnswT, typename HnswT2>
 void Compress(const BenchmarkOption &option) {
     LocalFileSystem fs;
-    
+
     if (option.build_type_ != BuildType::PLAIN) {
         UnrecoverableError("Compress only support plain build type");
     }
@@ -279,12 +286,13 @@ void Compress(const BenchmarkOption &option) {
     String new_index_name = BenchmarkOption::IndexName(option.benchmark_type_, BuildType::CompressToLVQ, option.M_, option.ef_construction_);
     Path new_index_save_path = option.index_dir_ / fmt::format("{}.bin", new_index_name);
 
-    auto hnsw_lvq = std::move(hnsw).CompressToLVQ();
-    auto [index_file_lvq, index_status_lvq] = fs.OpenFile(new_index_save_path.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
+    auto hnsw_lvq = std::move(*hnsw).CompressToLVQ();
+    auto [index_file_lvq, index_status_lvq] =
+        fs.OpenFile(new_index_save_path.string(), FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
     if (!index_status_lvq.ok()) {
         UnrecoverableError(index_status_lvq.message());
     }
-    hnsw_lvq.Save(*index_file_lvq);
+    hnsw_lvq->Save(*index_file_lvq);
 }
 
 int main(int argc, char *argv[]) {
