@@ -40,10 +40,7 @@ public:
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
     }
-    ~PersistenceManager() {
-        current_object_key_ = ObjCreate();
-        current_object_size_ = 0;
-    }
+    ~PersistenceManager() {}
 
     // Create new object or append to current object, and returns the location.
     ObjAddr Persist(const String &file_path, bool allow_compose = true);
