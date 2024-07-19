@@ -405,9 +405,17 @@ class BaseClient:
                 topk, gt = gt_read_all(ground_truth_path)
                 assert topk == self.data["topK"]
                 query_results = [[] for _ in range(len(self.queries))]
-                for query_id, result in enumerate(results):
-                    for res in result[1:]:
-                        query_results[query_id].append(res.id)
+                if self.data["app"] == "qdrant":
+                    for query_id, result in enumerate(results):
+                        for res in result[1:]:
+                            query_results[query_id].append(res.id)
+                elif self.data["app"] == "infinity":
+                    for query_id, result in enumerate(results):
+                        for res in result[1:]:
+                            query_results[query_id].append(res)
+                else:
+                    raise TypeError("Unsupport engine!")
+
                 recall = calculate_recall(gt, query_results)
                 precisions.append(recall)
             else:
