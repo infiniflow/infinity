@@ -8,6 +8,7 @@ import requests
 import infinity
 import infinity.index as index
 from infinity import NetworkAddress
+from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from .base_client import BaseClient
 
 
@@ -63,6 +64,11 @@ class InfinityClient(BaseClient):
                 for param, v in value["params"].items():
                     params.append(index.InitParameter(param, str(v)))
                 indexs.append(index.IndexInfo(key, index.IndexType.Hnsw, params))
+            elif value["type"] == "BMP":
+                params = []
+                for param, v in value["params"].items():
+                    params.append(index.InitParameter(param, str(v)))
+                indexs.append(index.IndexInfo(key, index.IndexType.BMP, params))
         return indexs
 
     def upload(self):
@@ -83,7 +89,8 @@ class InfinityClient(BaseClient):
         dataset_path = os.path.join(self.path_prefix, self.data["data_path"])
         if not os.path.exists(dataset_path):
             self.download_data(self.data["data_link"], dataset_path)
-        batch_size = self.data["insert_batch_size"]
+        if "insert_batch_size" in self.data:
+            batch_size = self.data["insert_batch_size"]
         features = list(self.data["schema"].keys())
         _, ext = os.path.splitext(dataset_path)
         if ext == ".json":
@@ -146,6 +153,11 @@ class InfinityClient(BaseClient):
                     if current_batch:
                         # table_obj.insert(current_batch)
                         inf_http_client.insert(current_batch)
+        elif ext == ".csr":
+            if self.data["use_import"]:
+                table_obj.import_data(dataset_path, {"file_type": "csr"})
+        else:
+            raise TypeError("Unsupport file type!")
 
     def setup_clients(self, num_threads=1):
         host, port = self.data["host"].split(":")
@@ -185,4 +197,17 @@ class InfinityClient(BaseClient):
                 .to_result()
             )
             result = list(zip(res["ROW_ID"], res["SCORE"]))
+        elif self.data_mode == "sparse_vector":
+            indices, values = self.queries[query_id]
+            query_builder = InfinityThriftQueryBuilder(table_obj)
+            query_builder.output(["_row_id"])
+            query_builder.match_sparse(
+                list(self.data["schema"].keys())[0],#vector column name:col1
+                {"indices": indices, "values": values},
+                self.data["metric_type"],#ip
+                self.data["topK"],
+                {"alpha": str(self.data["alpha"]), "beta": str(self.data["beta"])},
+            )
+            res, _ = query_builder.to_result()
+            result = res["ROW_ID"]
         return result
