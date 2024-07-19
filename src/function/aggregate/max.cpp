@@ -162,6 +162,38 @@ public:
 };
 
 template <>
+struct MaxState<Float16T, Float16T> {
+public:
+    Float16T value_;
+
+    void Initialize() { this->value_ = std::numeric_limits<Float16T>::min(); }
+
+    void Update(const Float16T *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+
+    inline void ConstantUpdate(const Float16T *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+
+    inline ptr_t Finalize() { return (ptr_t)&value_; }
+
+    inline static SizeT Size(const DataType &) { return sizeof(Float16T); }
+};
+
+template <>
+struct MaxState<BFloat16T, BFloat16T> {
+public:
+    BFloat16T value_;
+
+    void Initialize() { this->value_ = std::numeric_limits<BFloat16T>::min(); }
+
+    void Update(const BFloat16T *__restrict input, SizeT idx) { value_ = value_ < input[idx] ? input[idx] : value_; }
+
+    inline void ConstantUpdate(const BFloat16T *__restrict input, SizeT idx, SizeT) { value_ = value_ < input[idx] ? input[idx] : value_; }
+
+    inline ptr_t Finalize() { return (ptr_t)&value_; }
+
+    inline static SizeT Size(const DataType &) { return sizeof(BFloat16T); }
+};
+
+template <>
 struct MaxState<FloatT, FloatT> {
 public:
     FloatT value_;
@@ -241,6 +273,18 @@ void RegisterMaxFunction(const UniquePtr<Catalog> &catalog_ptr) {
     {
         AggregateFunction max_function =
             UnaryAggregate<MaxState<DoubleT, DoubleT>, DoubleT, DoubleT>(func_name, DataType(LogicalType::kDouble), DataType(LogicalType::kDouble));
+        function_set_ptr->AddFunction(max_function);
+    }
+    {
+        AggregateFunction max_function = UnaryAggregate<MaxState<Float16T, Float16T>, Float16T, Float16T>(func_name,
+                                                                                                          DataType(LogicalType::kFloat16),
+                                                                                                          DataType(LogicalType::kFloat16));
+        function_set_ptr->AddFunction(max_function);
+    }
+    {
+        AggregateFunction max_function = UnaryAggregate<MaxState<BFloat16T, BFloat16T>, BFloat16T, BFloat16T>(func_name,
+                                                                                                              DataType(LogicalType::kBFloat16),
+                                                                                                              DataType(LogicalType::kBFloat16));
         function_set_ptr->AddFunction(max_function);
     }
 #if 0

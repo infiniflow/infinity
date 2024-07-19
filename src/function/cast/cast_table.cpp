@@ -83,6 +83,18 @@ CastTable::CastTable() {
     matrix_[kDecimal][kDouble] = 2;
     matrix_[kDecimal][kVarchar] = 104;
 
+    // From float16 to other type
+    matrix_[kFloat16][kFloat16] = 0;
+    matrix_[kFloat16][kFloat] = 1;
+    matrix_[kFloat16][kDouble] = 2;
+    matrix_[kFloat16][kVarchar] = 103;
+
+    // From bfloat16 to other type
+    matrix_[kBFloat16][kBFloat16] = 0;
+    matrix_[kBFloat16][kFloat] = 1;
+    matrix_[kBFloat16][kDouble] = 2;
+    matrix_[kBFloat16][kVarchar] = 103;
+
     // From float to other type
     matrix_[kFloat][kFloat] = 0;
     matrix_[kFloat][kDouble] = 1;

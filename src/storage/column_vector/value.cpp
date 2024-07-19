@@ -165,6 +165,18 @@ Value Value::MakeDouble(DoubleT input) {
     return value;
 }
 
+Value Value::MakeFloat16(Float16T input) {
+    Value value(LogicalType::kFloat16);
+    value.value_.float16 = input;
+    return value;
+}
+
+Value Value::MakeBFloat16(BFloat16T input) {
+    Value value(LogicalType::kBFloat16);
+    value.value_.bfloat16 = input;
+    return value;
+}
+
 Value Value::MakeDecimal(DecimalT input, SharedPtr<TypeInfo> type_info_ptr) {
     Value value(LogicalType::kDecimal, type_info_ptr);
     value.value_.decimal = input;
@@ -427,6 +439,24 @@ DoubleT Value::GetValue() const {
 }
 
 template <>
+Float16T Value::GetValue() const {
+    if (type_.type() != LogicalType::kFloat16) {
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        UnrecoverableError(error_message);
+    }
+    return value_.float16;
+}
+
+template <>
+BFloat16T Value::GetValue() const {
+    if (type_.type() != LogicalType::kBFloat16) {
+        String error_message = fmt::format("Not matched type: {}", type_.ToString());
+        UnrecoverableError(error_message);
+    }
+    return value_.bfloat16;
+}
+
+template <>
 DecimalT Value::GetValue() const {
     if (type_.type() != LogicalType::kDecimal) {
         String error_message = fmt::format("Not matched type: {}", type_.ToString());
@@ -619,6 +649,12 @@ bool Value::operator==(const Value &other) const {
         case kDouble: {
             return value_.float64 == other.value_.float64;
         }
+        case kFloat16: {
+            return value_.float16 == other.value_.float16;
+        }
+        case kBFloat16: {
+            return value_.bfloat16 == other.value_.bfloat16;
+        }
         case kDecimal: {
             return value_.decimal == other.value_.decimal;
         }
@@ -729,6 +765,14 @@ void Value::CopyUnionValue(const Value &other) {
         }
         case kDouble: {
             value_.float64 = other.value_.float64;
+            break;
+        }
+        case kFloat16: {
+            value_.float16 = other.value_.float16;
+            break;
+        }
+        case kBFloat16: {
+            value_.bfloat16 = other.value_.bfloat16;
             break;
         }
         case kDecimal: {
@@ -843,6 +887,14 @@ void Value::MoveUnionValue(Value &&other) noexcept {
             this->value_.float64 = other.value_.float64;
             break;
         }
+        case kFloat16: {
+            this->value_.float16 = other.value_.float16;
+            break;
+        }
+        case kBFloat16: {
+            this->value_.bfloat16 = other.value_.bfloat16;
+            break;
+        }
         case kDecimal: {
             this->value_.decimal = other.value_.decimal;
             break;
@@ -951,6 +1003,12 @@ String Value::ToString() const {
         case LogicalType::kDouble: {
             return fmt::format("{}", value_.float64);
         }
+        case LogicalType::kFloat16: {
+            return fmt::format("{}", static_cast<float>(value_.float16));
+        }
+        case LogicalType::kBFloat16: {
+            return fmt::format("{}", static_cast<float>(value_.bfloat16));
+        }
         case LogicalType::kDate: {
             return value_.date.ToString();
         }
@@ -1057,6 +1115,14 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
         }
         case LogicalType::kDouble: {
             json[name] = value_.float64;
+            return;
+        }
+        case LogicalType::kFloat16: {
+            json[name] = static_cast<float>(value_.float16);
+            return;
+        }
+        case LogicalType::kBFloat16: {
+            json[name] = static_cast<float>(value_.bfloat16);
             return;
         }
         case LogicalType::kDate: {

@@ -225,6 +225,14 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
                 CopyFrom<DoubleT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
+            case kFloat16: {
+                CopyFrom<Float16T>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                break;
+            }
+            case kBFloat16: {
+                CopyFrom<BFloat16T>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                break;
+            }
             case kDecimal: {
                 CopyFrom<DecimalT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
@@ -377,6 +385,14 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
             }
             case kDouble: {
                 CopyFrom<DoubleT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kFloat16: {
+                CopyFrom<Float16T>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kBFloat16: {
+                CopyFrom<BFloat16T>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
             case kDecimal: {
@@ -561,6 +577,14 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             CopyRowFrom<DoubleT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
+        case kFloat16: {
+            CopyRowFrom<Float16T>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
+        case kBFloat16: {
+            CopyRowFrom<BFloat16T>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
         case kDecimal: {
             CopyRowFrom<DecimalT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
@@ -705,6 +729,12 @@ String ColumnVector::ToString(SizeT row_index) const {
         }
         case kDouble: {
             return std::to_string(((DoubleT *)data_ptr_)[row_index]);
+        }
+        case kFloat16: {
+            return std::to_string(static_cast<float>(((Float16T *)data_ptr_)[row_index]));
+        }
+        case kBFloat16: {
+            return std::to_string(static_cast<float>(((BFloat16T *)data_ptr_)[row_index]));
         }
         case kDecimal: {
             Status status = Status::NotSupport("Not implemented");
@@ -907,6 +937,12 @@ Value ColumnVector::GetValue(SizeT index) const {
         case kDouble: {
             return Value::MakeDouble(((DoubleT *)data_ptr_)[index]);
         }
+        case kFloat16: {
+            return Value::MakeFloat16(((Float16T *)data_ptr_)[index]);
+        }
+        case kBFloat16: {
+            return Value::MakeBFloat16(((BFloat16T *)data_ptr_)[index]);
+        }
         case kDecimal: {
             return Value::MakeDecimal(((DecimalT *)data_ptr_)[index], data_type_->type_info());
         }
@@ -1067,6 +1103,14 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         }
         case kDouble: {
             ((DoubleT *)data_ptr_)[index] = value.GetValue<DoubleT>();
+            break;
+        }
+        case kFloat16: {
+            ((Float16T *)data_ptr_)[index] = value.GetValue<Float16T>();
+            break;
+        }
+        case kBFloat16: {
+            ((BFloat16T *)data_ptr_)[index] = value.GetValue<BFloat16T>();
             break;
         }
         case kDecimal: {
@@ -1293,6 +1337,14 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
             ((FloatT *)data_ptr_)[index] = *(FloatT *)(raw_ptr);
             break;
         }
+        case kFloat16: {
+            ((Float16T *)data_ptr_)[index] = *(Float16T *)(raw_ptr);
+            break;
+        }
+        case kBFloat16: {
+            ((BFloat16T *)data_ptr_)[index] = *(BFloat16T *)(raw_ptr);
+            break;
+        }
         case kDouble: {
             ((DoubleT *)data_ptr_)[index] = *(DoubleT *)(raw_ptr);
             break;
@@ -1514,6 +1566,14 @@ void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *colu
         }
         case kDouble: {
             ((DoubleT *)data_ptr_)[index] = DataType::StringToValue<DoubleT>(sv);
+            break;
+        }
+        case kFloat16: {
+            ((Float16T *)data_ptr_)[index] = DataType::StringToValue<Float16T>(sv);
+            break;
+        }
+        case kBFloat16: {
+            ((BFloat16T *)data_ptr_)[index] = DataType::StringToValue<BFloat16T>(sv);
             break;
         }
         case kDate: {
@@ -1799,6 +1859,14 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         }
         case kDouble: {
             CopyValue<DoubleT>(*this, other, from, count);
+            break;
+        }
+        case kFloat16: {
+            CopyValue<Float16T>(*this, other, from, count);
+            break;
+        }
+        case kBFloat16: {
+            CopyValue<BFloat16T>(*this, other, from, count);
             break;
         }
         case kDecimal: {

@@ -63,6 +63,12 @@ inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &tar
         case LogicalType::kDouble: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, DoubleT, IntegerTryCastToFixlen>);
         }
+        case LogicalType::kFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, Float16T, IntegerTryCastToFixlen>);
+        }
+        case LogicalType::kBFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, BFloat16T, IntegerTryCastToFixlen>);
+        }
         case LogicalType::kDecimal: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, DecimalT, IntegerTryCastToFixlen>);
         }
@@ -129,6 +135,18 @@ inline bool IntegerTryCastToFixlen::Run(TinyIntT source, FloatT &target) {
 template <>
 inline bool IntegerTryCastToFixlen::Run(TinyIntT source, DoubleT &target) {
     target = source;
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(TinyIntT source, Float16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(TinyIntT source, BFloat16T &target) {
+    target = static_cast<float>(source);
     return true;
 }
 
@@ -201,6 +219,18 @@ inline bool IntegerTryCastToFixlen::Run(SmallIntT source, DoubleT &target) {
     return true;
 }
 
+template <>
+inline bool IntegerTryCastToFixlen::Run(SmallIntT source, Float16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(SmallIntT source, BFloat16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(SmallIntT, DecimalT &) {
@@ -270,6 +300,18 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT source, FloatT &target) {
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT source, DoubleT &target) {
     target = source;
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(IntegerT source, Float16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(IntegerT source, BFloat16T &target) {
+    target = static_cast<float>(source);
     return true;
 }
 
@@ -348,6 +390,18 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, DoubleT &target) {
     return true;
 }
 
+template <>
+inline bool IntegerTryCastToFixlen::Run(BigIntT source, Float16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(BigIntT source, BFloat16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT, DecimalT &) {
@@ -422,6 +476,20 @@ inline bool IntegerTryCastToFixlen::Run(HugeIntT, FloatT &) {
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, DoubleT &) {
+    String error_message = "Not implemented";
+    UnrecoverableError(error_message);
+    return false;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(HugeIntT, Float16T &) {
+    String error_message = "Not implemented";
+    UnrecoverableError(error_message);
+    return false;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(HugeIntT, BFloat16T &) {
     String error_message = "Not implemented";
     UnrecoverableError(error_message);
     return false;

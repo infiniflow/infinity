@@ -59,6 +59,8 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
         case LogicalType::kSmallInt:
         case LogicalType::kInteger:
         case LogicalType::kBigInt:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
         case LogicalType::kFloat:
         case LogicalType::kDouble:
         case LogicalType::kDecimal: {
@@ -68,6 +70,8 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 case LogicalType::kSmallInt:
                 case LogicalType::kInteger:
                 case LogicalType::kBigInt:
+                case LogicalType::kFloat16:
+                case LogicalType::kBFloat16:
                 case LogicalType::kFloat:
                 case LogicalType::kDouble:
                 case LogicalType::kDecimal:
@@ -122,6 +126,8 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 case LogicalType::kSmallInt:
                 case LogicalType::kInteger:
                 case LogicalType::kBigInt:
+                case LogicalType::kFloat16:
+                case LogicalType::kBFloat16:
                 case LogicalType::kFloat:
                 case LogicalType::kDouble:
                 case LogicalType::kDecimal:

@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module;
-
-export module minus;
-
-import stl;
+#pragma once
+#include <vector>
 
 namespace infinity {
 
-class Catalog;
+const std::vector<char const *> &GetSupportedSimdTypesList();
+bool IsF16CSupported();
+bool IsSSE2Supported();
+bool IsAVX2Supported();
+bool IsAVX512Supported();
 
-export void RegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr);
-export void AppendRegisterMinusFunction(const UniquePtr<Catalog> &catalog_ptr);
-
-}
+} // namespace infinity

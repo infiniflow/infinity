@@ -96,6 +96,18 @@ void RegisterCountFunction(const UniquePtr<Catalog> &catalog_ptr) {
         function_set_ptr->AddFunction(count_function);
     }
     {
+        AggregateFunction count_function = UnaryAggregate<CountState<Float16T, BigIntT>, Float16T, BigIntT>(func_name,
+                                                                                                            DataType(LogicalType::kFloat16),
+                                                                                                            DataType(LogicalType::kBigInt));
+        function_set_ptr->AddFunction(count_function);
+    }
+    {
+        AggregateFunction count_function = UnaryAggregate<CountState<BFloat16T, BigIntT>, BFloat16T, BigIntT>(func_name,
+                                                                                                              DataType(LogicalType::kBFloat16),
+                                                                                                              DataType(LogicalType::kBigInt));
+        function_set_ptr->AddFunction(count_function);
+    }
+    {
         AggregateFunction count_function = UnaryAggregate<CountState<DecimalT, BigIntT>, DecimalT, BigIntT>(func_name,
                                                                                                             DataType(LogicalType::kDecimal),
                                                                                                             DataType(LogicalType::kBigInt));

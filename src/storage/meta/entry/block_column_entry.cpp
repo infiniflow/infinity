@@ -255,6 +255,8 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
         case kDecimal:
         case kFloat:
         case kDouble:
+        case kFloat16:
+        case kBFloat16:
         case kDate:
         case kTime:
         case kDateTime:

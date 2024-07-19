@@ -77,6 +77,26 @@ inline bool SubFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     return false;
 }
 
+// Float16T - Float16T = Float16T, and check overflow
+template <>
+inline bool SubFunction::Run(Float16T left, Float16T right, Float16T &result) {
+    result = left - right;
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return true;
+}
+
+// BFloat16T - BFloat16T = BFloat16T, and check overflow
+template <>
+inline bool SubFunction::Run(BFloat16T left, BFloat16T right, BFloat16T &result) {
+    result = left - right;
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return true;
+}
+
 // FloatT - FloatT = FloatT, and check overflow
 template <>
 inline bool SubFunction::Run(FloatT left, FloatT right, FloatT &result) {
@@ -216,6 +236,18 @@ void RegisterSubtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                        {DataType(LogicalType::kDouble)},
                                        &ScalarFunction::BinaryFunctionWithFailure<double, double, double, SubFunction>);
     function_set_ptr->AddFunction(sub_function_double);
+
+    ScalarFunction sub_function_float16(func_name,
+                                        {DataType(LogicalType::kFloat16), DataType(LogicalType::kFloat16)},
+                                        {DataType(LogicalType::kFloat16)},
+                                        &ScalarFunction::BinaryFunctionWithFailure<Float16T, Float16T, Float16T, SubFunction>);
+    function_set_ptr->AddFunction(sub_function_float16);
+
+    ScalarFunction sub_function_bfloat16(func_name,
+                                         {DataType(LogicalType::kBFloat16), DataType(LogicalType::kBFloat16)},
+                                         {DataType(LogicalType::kBFloat16)},
+                                         &ScalarFunction::BinaryFunctionWithFailure<BFloat16T, BFloat16T, BFloat16T, SubFunction>);
+    function_set_ptr->AddFunction(sub_function_bfloat16);
 
     ScalarFunction sub_function_decimal(func_name,
                                         {DataType(LogicalType::kDecimal), DataType(LogicalType::kDecimal)},

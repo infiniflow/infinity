@@ -212,6 +212,8 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 object_width = 8;
                 break;
             }
+            case LogicalType::kFloat16:
+            case LogicalType::kBFloat16:
             case LogicalType::kFloat: {
                 object_id = 700;
                 object_width = 4;
@@ -356,6 +358,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
             }
             default: {
                 String error_message = "Unexpected type";
+                LOG_ERROR(error_message);
                 UnrecoverableError(error_message);
             }
         }
