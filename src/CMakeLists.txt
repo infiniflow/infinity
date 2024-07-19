@@ -304,7 +304,7 @@ endif ()
 
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
-target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/release/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
@@ -358,7 +358,7 @@ set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hid
 
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
-target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/release/")
+target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 nanobind_disable_stack_protector(embedded_infinity_ext)
 nanobind_opt_size(embedded_infinity_ext)
 nanobind_strip(embedded_infinity_ext)
@@ -485,7 +485,7 @@ target_link_libraries(unit_test
 )
 
 target_link_directories(unit_test BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/release/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 target_sources(unit_test
         PRIVATE

@@ -11,7 +11,7 @@ target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/sr
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/release/")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 target_link_libraries(
         remote_query_benchmark

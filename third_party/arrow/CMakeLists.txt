@@ -472,23 +472,7 @@ endif()
 # set compile output directory
 string(TOLOWER ${CMAKE_BUILD_TYPE} BUILD_SUBDIR_NAME)
 
-# If build in-source, create the latest symlink. If build out-of-source, which is
-# preferred, simply output the binaries in the build folder
-if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_BINARY_DIR})
-  set(BUILD_OUTPUT_ROOT_DIRECTORY
-      "${CMAKE_CURRENT_BINARY_DIR}/build/${BUILD_SUBDIR_NAME}/")
-  # Link build/latest to the current build directory, to avoid developers
-  # accidentally running the latest debug build when in fact they're building
-  # release builds.
-  file(MAKE_DIRECTORY ${BUILD_OUTPUT_ROOT_DIRECTORY})
-  if(NOT APPLE)
-    set(MORE_ARGS "-T")
-  endif()
-  execute_process(COMMAND ln ${MORE_ARGS} -sf ${BUILD_OUTPUT_ROOT_DIRECTORY}
-                          ${CMAKE_CURRENT_BINARY_DIR}/build/latest)
-else()
-  set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${BUILD_SUBDIR_NAME}/")
-endif()
+set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/")
 
 # where to put generated archives (.a files)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${BUILD_OUTPUT_ROOT_DIRECTORY}")

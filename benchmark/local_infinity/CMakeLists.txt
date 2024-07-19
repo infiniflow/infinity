@@ -28,7 +28,7 @@ target_link_libraries(
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/release/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 # ########################################
 # knn
@@ -62,7 +62,7 @@ target_link_libraries(
 )
 
 target_link_directories(knn_import_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/release/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 # query benchmark
 add_executable(knn_query_benchmark
@@ -92,7 +92,7 @@ target_link_libraries(
 )
 
 target_link_directories(knn_query_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/release/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 # ########################################
 # fulltext
@@ -124,7 +124,7 @@ target_link_libraries(
 )
 
 target_link_directories(fulltext_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/release/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 # ########################################
 add_executable(sparse_benchmark
@@ -154,7 +154,7 @@ target_link_libraries(
 )
 
 target_link_directories(sparse_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/release/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 add_executable(bmp_benchmark
     ./sparse/bmp_benchmark.cpp
@@ -183,7 +183,7 @@ target_link_libraries(
 )
 
 target_link_directories(bmp_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/release/")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 add_executable(hnsw_benchmark
     ./knn/hnsw_benchmark.cpp
@@ -212,7 +212,7 @@ target_link_libraries(
 )
 
 target_link_directories(hnsw_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
-target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/release/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 if(ENABLE_JEMALLOC)
     target_link_libraries(infinity_benchmark jemalloc.a)
