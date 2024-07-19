@@ -12,6 +12,7 @@ import numpy as np
 import threading
 import multiprocessing
 
+from .utils import csr_read_all, gt_read_all, calculate_recall
 
 class BaseClient:
     """
@@ -97,8 +98,7 @@ class BaseClient:
             for line in open(query_path, "r"):
                 line = line.strip()
                 self.queries.append(line)
-        else:
-            self.data["mode"] == "vector"
+        elif self.data["mode"] == "vector":
             if ext == ".hdf5":
                 with h5py.File(query_path, "r") as f:
                     self.queries = list(f["test"])
@@ -107,6 +107,14 @@ class BaseClient:
                 for line in open(query_path, "r"):
                     query = json.loads(line)["vector"]
                     self.queries.append(query)
+        elif self.data["mode"] == "sparse_vector":
+            assert ext == ".csr"
+            query_mat = csr_read_all(query_path)
+            for query_id in range(query_mat.nrow):
+                indices, values = query_mat.at(query_id)
+                self.queries.append((indices, values))
+        else:
+            raise TypeError("Unsupported type")
 
         self.mt_active_workers = num_workers
         threads = []
@@ -224,16 +232,18 @@ class BaseClient:
             for line in open(query_path, "r"):
                 line = line.strip()
                 self.queries.append(line)
-        else:
-            self.data["mode"] == "vector"
+        elif self.data["mode"] == "vector":
             if ext == ".hdf5":
                 with h5py.File(query_path, "r") as f:
                     self.queries = list(f["test"])
-            else:
-                assert ext == "jsonl"
-                for line in open(query_path, "r"):
-                    query = json.loads(line)["vector"]
-                    self.queries.append(query)
+        elif self.data["mode"] == "sparse_vector":
+            assert ext == ".csr"
+            query_mat = csr_read_all(query_path)
+            for query_id in range(query_mat.nrow):
+                indices, values = query_mat.at(query_id)
+                self.queries.append((indices, values))
+        else:
+            raise TypeError("Unsupported type")
 
         self.mp_active_workers.value = num_workers
         workers = []
@@ -390,6 +400,16 @@ class BaseClient:
                             / self.data["topK"]
                         )
                         precisions.append(precision)
+            elif self.data["mode"] == "sparse_vector":
+                assert ext == ".gt"
+                topk, gt = gt_read_all(ground_truth_path)
+                assert topk == self.data["topK"]
+                query_results = [[] for _ in range(len(self.queries))]
+                for query_id, result in enumerate(results):
+                    for res in result[1:]:
+                        query_results[query_id].append(res.id)
+                recall = calculate_recall(gt, query_results)
+                precisions.append(recall)
             else:
                 assert ext == ".json" or ext == ".jsonl"
                 with open(ground_truth_path, "r") as f:

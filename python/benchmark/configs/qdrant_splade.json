@@ -1,0 +1,14 @@
+{
+    "name": "qdrant_splade",
+    "app": "qdrant",
+    "app_path": "servers/qdrant/",
+    "connection_url": "http://localhost:6333",
+    "mode": "sparse_vector",
+    "data_path": "datasets/SPLADE/base_1M.csr",
+    "vector_name": "embeddings",
+    "topK": 10,
+    "query_type": "csr",
+    "query_path": "datasets/SPLADE/queries.dev.csr",
+    "insert_batch_size": 1024,
+    "ground_truth_path": "datasets/SPLADE/base_1M.dev.gt"
+}
