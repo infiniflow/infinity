@@ -6,23 +6,28 @@ add_executable(infinity_benchmark
 target_include_directories(infinity_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(
     infinity_benchmark
-    infinity_core
     benchmark_profiler
+    infinity_core
     sql_parser
     onnxruntime_mlas
     zsv_parser
     newpfor
     fastpfor
-    lz4.a
-    atomic.a
-    c++.a
-    c++abi.a
+    #        profiler
     jma
     opencc
-    protobuf::libprotobuf
-    Arrow::arrow_static
-    Parquet::parquet_static
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
+    lz4.a
+    atomic.a
+    event.a
+    c++.a
+    c++abi.a
 )
+
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
 # ########################################
 # knn
@@ -43,14 +48,19 @@ target_link_libraries(
     fastpfor
     lz4.a
     atomic.a
+    event.a
     c++.a
     c++abi.a
+    #        profiler
     jma
     opencc
-    protobuf::libprotobuf
-    Arrow::arrow_static
-    Parquet::parquet_static
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(knn_import_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
 # query benchmark
 add_executable(knn_query_benchmark
@@ -73,10 +83,13 @@ target_link_libraries(
     c++abi.a
     jma
     opencc
-    protobuf::libprotobuf
-    Arrow::arrow_static
-    Parquet::parquet_static
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(knn_query_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
 # ########################################
 # fulltext
@@ -101,10 +114,13 @@ target_link_libraries(
     c++abi.a
     jma
     opencc
-    protobuf::libprotobuf
-    Arrow::arrow_static
-    Parquet::parquet_static
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(fulltext_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
 # ########################################
 add_executable(sparse_benchmark
@@ -127,10 +143,13 @@ target_link_libraries(
     c++.a
     c++abi.a
     opencc
-    protobuf::libprotobuf
-    Arrow::arrow_static
-    Parquet::parquet_static
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(sparse_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
 add_executable(bmp_benchmark
     ./sparse/bmp_benchmark.cpp
@@ -152,7 +171,13 @@ target_link_libraries(
     c++.a
     c++abi.a
     opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(bmp_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
 add_executable(hnsw_benchmark
     ./knn/hnsw_benchmark.cpp
@@ -174,10 +199,13 @@ target_link_libraries(
     c++.a
     c++abi.a
     opencc
-    protobuf::libprotobuf
-    Arrow::arrow_static
-    Parquet::parquet_static
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(hnsw_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
 if(ENABLE_JEMALLOC)
     target_link_libraries(infinity_benchmark jemalloc.a)

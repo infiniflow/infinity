@@ -11,7 +11,7 @@ connection_pool_size        = 128
 
 [log]
 log_filename            = "infinity.log"
-log_dir                 = "/var/infinity/log"
+log_dir                 = "/home/infiniflow/var/infinity/log"
 log_to_stdout           = false
 log_file_max_size           = "10GB"
 log_file_rotate_count   = 10
@@ -20,7 +20,7 @@ log_file_rotate_count   = 10
 log_level               = "info"
 
 [storage]
-data_dir                = "/var/infinity/data"
+data_dir                = "/home/infiniflow/var/infinity/data"
 
 # periodically activates garbage collection:
 # 0 means real-time,
@@ -36,10 +36,10 @@ mem_index_capacity       = 1048576
 [buffer]
 buffer_manager_size        = "4GB"
 lru_num                 = 7
-temp_dir                = "/var/infinity/tmp"
+temp_dir                = "/home/infiniflow/var/infinity/tmp"
 
 [wal]
-wal_dir                 = "/var/infinity/wal"
+wal_dir                 = "/home/infiniflow/var/infinity/wal"
 full_checkpoint_interval      = "86400s"
 delta_checkpoint_interval     = "60s"
 # delta_checkpoint_threshold = 1000000000
@@ -51,4 +51,4 @@ wal_compact_threshold            = "1GB"
 wal_flush                   = "only_write"
 
 [resource]
-resource_dir          = "/var/infinity/resource"
+resource_dir          = "/home/infiniflow/var/infinity/resource"

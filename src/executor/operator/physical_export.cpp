@@ -543,14 +543,14 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
             }
 
 
-            SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_row_count, block_arrays);
-            auto status = file_writer->WriteRecordBatch(*block_batch);
-            if (!status.ok()) {
-                String error_message = fmt::format("Failed to write record batch to parquet file: {}", status.message());
-                LOG_CRITICAL(error_message);
-                UnrecoverableError(error_message);
-            }
-            row_count += block_row_count;
+//            SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_row_count, block_arrays);
+//            auto status = file_writer->WriteRecordBatch(*block_batch);
+//            if (!status.ok()) {
+//                String error_message = fmt::format("Failed to write record batch to parquet file: {}", status.message());
+//                LOG_CRITICAL(error_message);
+//                UnrecoverableError(error_message);
+//            }
+//            row_count += block_row_count;
         }
     }
 
@@ -595,32 +595,32 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
         case LogicalType::kVarchar:
             return arrow::utf8();
         case LogicalType::kEmbedding: {
-            auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-            switch (embedding_info->Type()) {
-                case kElemInt8: {
-                    return ::arrow::list(::arrow::int8());
-                }
-                case kElemInt16: {
-                    return ::arrow::list(::arrow::int16());
-                }
-                case kElemInt32: {
-                    return ::arrow::list(::arrow::int32());
-                }
-                case kElemInt64: {
-                    return ::arrow::list(::arrow::int64());
-                }
-                case kElemFloat: {
-                    return ::arrow::list(::arrow::float32());
-                }
-                case kElemDouble: {
-                    return ::arrow::list(::arrow::float64());
-                }
-                default: {
-                    String error_message = "Invalid embedding data type";
-                    LOG_CRITICAL(error_message);
-                    UnrecoverableError(error_message);
-                }
-            }
+//            auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+//            switch (embedding_info->Type()) {
+//                case kElemInt8: {
+//                    return ::arrow::list(::arrow::int8());
+//                }
+//                case kElemInt16: {
+//                    return ::arrow::list(::arrow::int16());
+//                }
+//                case kElemInt32: {
+//                    return ::arrow::list(::arrow::int32());
+//                }
+//                case kElemInt64: {
+//                    return ::arrow::list(::arrow::int64());
+//                }
+//                case kElemFloat: {
+//                    return ::arrow::list(::arrow::float32());
+//                }
+//                case kElemDouble: {
+//                    return ::arrow::list(::arrow::float64());
+//                }
+//                default: {
+//                    String error_message = "Invalid embedding data type";
+//                    LOG_CRITICAL(error_message);
+//                    UnrecoverableError(error_message);
+//                }
+//            }
         }
         default: {
             String error_message = "Invalid data type";

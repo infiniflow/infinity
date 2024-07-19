@@ -1260,12 +1260,12 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
             break;
         }
-        case kVarchar: {
-            String value_str = std::dynamic_pointer_cast<arrow::BinaryArray>(array)->GetString(value_idx);
-            std::string_view value(value_str);
-            column_vector.AppendByStringView(value, ',');
-            break;
-        }
+//        case kVarchar: {
+//            String value_str = std::dynamic_pointer_cast<arrow::BinaryArray>(array)->GetString(value_idx);
+//            std::string_view value(value_str);
+//            column_vector.AppendByStringView(value, ',');
+//            break;
+//        }
         case kEmbedding: {
             auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
             auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());

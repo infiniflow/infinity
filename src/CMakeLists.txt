@@ -292,9 +292,8 @@ target_link_libraries(infinity
         oatpp.a
         jma
         opencc
-        protobuf::libprotobuf
-        Arrow::arrow_static
-        Parquet::parquet_static
+        parquet.a
+        arrow.a
 )
 
 if (ENABLE_JEMALLOC)
@@ -346,9 +345,8 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         c++abi.a
         jma
         opencc
-        protobuf::libprotobuf
-        Arrow::arrow_static
-        Parquet::parquet_static
+        parquet.a
+        arrow.a
 )
 
 # WARN: python modules shall not link to static libstdc++!!!
@@ -470,17 +468,18 @@ target_link_libraries(unit_test
         fastpfor
         lz4.a
         atomic.a
-        thrift.a
         c++.a
         c++abi.a
         jma
         opencc
-        protobuf::libprotobuf
-        Arrow::arrow_static
-        Parquet::parquet_static
+        parquet.a
+        arrow.a
+        thrift.a
+        thriftnb.a
+        jemalloc.a
 )
 
-target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(unit_test BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
 
 target_sources(unit_test
         PRIVATE
