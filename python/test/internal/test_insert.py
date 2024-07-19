@@ -195,7 +195,7 @@ class TestInsert(TestSdk):
         assert table_obj
         res = table_obj.insert([{"c1": [1, 2, 3]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [4, 5, 6]}])
+        res = table_obj.insert([{"c1": [[4, 5, 6]]}])
         assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": np.array([[7, 8, 9], [-7, -8, -9]])}])
         assert res.error_code == ErrorCode.OK
@@ -218,9 +218,9 @@ class TestInsert(TestSdk):
         assert table_obj
         res = table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [4.4, 5.5, 6.6]}])
+        res = table_obj.insert([{"c1": [[4.4, 5.5, 6.6]]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [7.7, 8.8, 9.9, -7.7, -8.8, -9.9]}])
+        res = table_obj.insert([{"c1": [[7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]]}])
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
