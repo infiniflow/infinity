@@ -835,6 +835,14 @@ Build a fusion expression.
 
 ### Examples
 
+:::alert IMPORTANT
+Ensure that you import the following when using `make_match_tensor_expr`:
+
+```python
+from infinity.remote_thrift.types import make_match_tensor_expr
+```
+:::
+
 ```python
 table_obj.fusion('rrf')
 table_obj.fusion('rrf', 'topn=10')

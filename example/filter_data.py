@@ -13,3 +13,88 @@
 # limitations under the License.
 
 
+import infinity
+from infinity.common import ConflictType, LOCAL_HOST
+
+try:
+    # Open a local directory to store the data
+    infinity_instance = infinity.connect("/var/infinity")
+
+    # connect to server with 127.0.0.1
+    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+
+    # 'default_db' is the default database
+    db_instance = infinity_instance.get_database("default_db")
+
+    # Drop my_table if it already exists
+    db_instance.drop_table("my_table", infinity.common.ConflictType.Ignore)
+
+    # Create a table named "my_table"
+    table_instance = db_instance.create_table("my_table", {
+        "num": {"type": "integer"},
+        "name": {"type": "varchar"},
+        "score": {"type": "float"},
+    })
+
+    # Insert 10 rows of data into the 'my_table'
+    table_instance.insert(
+        [
+            {
+                "num": 1,
+                "name": "Tom",
+                "score": 90.5,
+            },
+            {
+                "num": 2,
+                "name": "Henry",
+                "score": 70.0,
+            },
+            {
+                "num": 3,
+                "name": "James",
+                "score": 75.0,
+            },
+            {
+                "num": 4,
+                "name": "Toby",
+                "score": 92.0,
+            },
+            {
+                "num": 5,
+                "name": "Thomas",
+                "score": 72.5,
+            },
+            {
+                "num": 6,
+                "name": "Charlie",
+                "score": 69.0,
+            },
+            {
+                "num": 7,
+                "body": "Chris",
+                "score": 88.0,
+            },
+            {
+                "num": 8,
+                "name": "Bill",
+                "score": 90.0,
+            },
+            {
+                "num": 9,
+                "name": "Stefan",
+                "score": 86.5,
+            },
+            {
+                "num": 10,
+                "name": "Steven",
+                "score": 86.0,
+            },
+        ]
+    )
+
+    result = table_instance.output(["num", "name", "score"]).filter("(score > 80.0) and (score <= 90.0)").to_pl()
+    print(result)
+    infinity_instance.disconnect()
+
+except Exception as e:
+    print(str(e))
