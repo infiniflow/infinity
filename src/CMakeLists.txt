@@ -209,7 +209,7 @@ target_sources(infinity_core
         ${metrics_cppm}
 )
 
-add_dependencies(infinity_core thrift thriftnb)
+add_dependencies(infinity_core thrift thriftnb parquet_static)
 
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
@@ -273,7 +273,6 @@ target_sources(infinity
 )
 
 add_dependencies(infinity oatpp)
-add_dependencies(infinity parquet_static)
 
 message("Python3_LIBRARIES = ${Python3_LIBRARIES}")
 target_link_libraries(infinity
