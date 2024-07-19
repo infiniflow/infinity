@@ -57,7 +57,7 @@ struct ClientVersions {
 export class InfinityThriftService final : public infinity_thrift_rpc::InfinityServiceIf {
 private:
     static constexpr std::string_view ErrorMsgHeader = "[THRIFT ERROR]";
-    static constexpr i64 current_version_index_{9}; // 0.2.1.dev4
+    static constexpr i64 current_version_index_{10}; // 0.2.1
 
     static std::mutex infinity_session_map_mutex_;
     static HashMap<u64, SharedPtr<Infinity>> infinity_session_map_;
@@ -152,13 +152,15 @@ private:
 
     static FunctionExpr *GetFunctionExprFromProto(Status &status, const infinity_thrift_rpc::FunctionExpr &function_expr);
 
-    static Tuple<KnnExpr *, Status> GetKnnExprFromProto(const infinity_thrift_rpc::KnnExpr &expr);
+    static KnnExpr *GetKnnExprFromProto(Status &status, const infinity_thrift_rpc::KnnExpr &expr);
 
-    static Tuple<MatchSparseExpr *, Status> GetMatchSparseExprFromProto(const infinity_thrift_rpc::MatchSparseExpr &expr);
+    static MatchSparseExpr *GetMatchSparseExprFromProto(Status &status, const infinity_thrift_rpc::MatchSparseExpr &expr);
 
-    static Pair<MatchTensorExpr *, Status> GetMatchTensorExprFromProto(const infinity_thrift_rpc::MatchTensorExpr &expr);
+    static MatchTensorExpr *GetMatchTensorExprFromProto(Status &status, const infinity_thrift_rpc::MatchTensorExpr &expr);
 
     static MatchExpr *GetMatchExprFromProto(const infinity_thrift_rpc::MatchExpr &expr);
+
+    static ParsedExpr *GetGenericMatchExprFromProto(Status &status, const infinity_thrift_rpc::GenericMatchExpr &expr);
 
     static FusionExpr *GetFusionExprFromProto(const infinity_thrift_rpc::FusionExpr &expr);
 

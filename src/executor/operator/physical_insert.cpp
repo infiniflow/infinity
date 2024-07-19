@@ -48,13 +48,11 @@ bool PhysicalInsert::Execute(QueryContext *query_context, OperatorState *operato
     SizeT table_collection_column_count = table_entry_->ColumnCount();
     if (column_count != table_collection_column_count) {
         String error_message = fmt::format("Insert values count{} isn't matched with table column count{}.", column_count, table_collection_column_count);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (row_count > DEFAULT_BLOCK_CAPACITY) {
         // Fixme: insert batch can larger than 8192, but currently we limit it.
         Status status = Status::UnexpectedError(fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY));
-        LOG_ERROR(status.message());
         RecoverableError(status);
         //        UnrecoverableError(
         //            fmt::format("Insert values row count {} is larger than default block capacity {}.", row_count, DEFAULT_BLOCK_CAPACITY));

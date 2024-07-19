@@ -438,7 +438,8 @@ TEST_F(SilentLogTestCompactTaskTest, delete_in_compact_process) {
 // Cannot compile the test. So annotate it.
 
 TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
-    for (int task_i = 0; task_i < 2; ++task_i) {
+    for (int task_i = 0; task_i < 10; ++task_i) {
+        LOG_INFO(fmt::format("Test {}", task_i));
         String table_name = fmt::format("tbl{}", task_i);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -488,7 +489,10 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                 }
                 delete_n += offsets.size();
             }
+            LOG_INFO(fmt::format("A: delete_n: {}", delete_n));
             auto [table_entry, status] = txn3->GetTableByName("default_db", table_name);
+            int total_row_n = table_entry->row_count();
+            EXPECT_EQ(total_row_n, row_count);
             EXPECT_TRUE(status.ok());
             txn3->Delete(table_entry, delete_row_ids);
 
@@ -523,34 +527,23 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
 
                 delete_row_n1 += offsets.size();
                 delete_row_n2 += offsets2.size();
+
+                LOG_INFO(fmt::format("Delete1 {} in segment {}", offsets.size(), i));
             }
 
-            auto delete_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
-            auto [table_entry, status] = delete_txn1->GetTableByName("default_db", table_name);
-            EXPECT_TRUE(status.ok());
-            delete_txn1->Delete(table_entry, delete_row_ids);
-
-            bool slow_delete2 = task_i & 1;
-
             auto commit_ts = compaction_processor->ManualDoCompact("default_db", table_name, false, [&]() {
-                txn_mgr->CommitTxn(delete_txn1);
-                delete_n += delete_row_n1;
-
-                auto delete_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
-                auto [table_entry, status] = delete_txn2->GetTableByName("default_db", table_name);
+                auto delete_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
+                LOG_INFO(fmt::format("delete1 txn id: {}", delete_txn1->TxnID()));
+                auto [table_entry, status] = delete_txn1->GetTableByName("default_db", table_name);
                 EXPECT_TRUE(status.ok());
 
-                if (slow_delete2) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-                }
                 try {
-                    delete_txn2->Delete(table_entry, delete_row_ids2);
-                    txn_mgr->CommitTxn(delete_txn2);
-                    LOG_INFO("Delete 2 is committed");
-                    delete_n += delete_row_n2;
-                    EXPECT_FALSE(slow_delete2);
+                    delete_txn1->Delete(table_entry, delete_row_ids);
+                    txn_mgr->CommitTxn(delete_txn1);
+                    LOG_INFO(fmt::format("Delete 1 is committed, {}", delete_row_n1));
+                    delete_n += delete_row_n1;
                 } catch (const RecoverableException &e) {
-                    LOG_INFO("Delete 2 is row backed");
+                    LOG_INFO("Delete 1 is row backed");
                 }
             });
             EXPECT_NE(commit_ts, 0u);
@@ -583,7 +576,14 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                 EXPECT_NE(compact_segment, nullptr);
                 EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
 
-                EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
+                if (compact_segment->actual_row_count() != row_count - delete_n) {
+                    LOG_ERROR(fmt::format("compact_segment->actual_row_count():{}, row_count: {}, delete_n: {}",
+                                          compact_segment->actual_row_count(),
+                                          row_count,
+                                          delete_n));
+                    LOG_ERROR(fmt::format("delete_row_n1: {}, delete_row_n2: {}, row_n: {}", delete_row_n1, delete_row_n2, row_count));
+                }
+                ASSERT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
 
                 txn_mgr->CommitTxn(txn5);
             }

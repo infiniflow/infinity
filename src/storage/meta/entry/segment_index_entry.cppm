@@ -45,8 +45,10 @@ struct TableEntry;
 class BufferManager;
 struct SegmentEntry;
 struct TableEntry;
+class HnswIndexInMem;
 class SecondaryIndexInMem;
 class EMVBIndexInMem;
+class BMPIndexInMem;
 
 export struct PopulateEntireConfig {
     bool prepare_;
@@ -96,8 +98,7 @@ public:
 
     void CommitOptimize(ChunkIndexEntry *new_chunk, const Vector<ChunkIndexEntry *> &old_chunks, TxnTimeStamp commit_ts);
 
-    SharedPtr<ChunkIndexEntry>
-    OptIndex(IndexBase *index_base, TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
+    void OptIndex(IndexBase *index_base, TxnTableStore *txn_table_store, const Vector<UniquePtr<InitParameter>> &opt_params, bool replay);
 
     bool Flush(TxnTimeStamp checkpoint_ts);
 
@@ -123,6 +124,8 @@ public:
 
     // Dump or spill the memory indexer
     SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false);
+
+    void AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn);
 
     // Init the mem index from previously spilled one.
     void MemIndexLoad(const String &base_name, RowID base_row_id);
@@ -175,14 +178,14 @@ public:
         return {chunk_index_entries_, memory_indexer_};
     }
 
-    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<ChunkIndexEntry>> GetHnswIndexSnapshot() {
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<HnswIndexInMem>> GetHnswIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
-        return {chunk_index_entries_, memory_hnsw_indexer_};
+        return {chunk_index_entries_, memory_hnsw_index_};
     }
 
-    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<ChunkIndexEntry>> GetBMPIndexSnapshot() {
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<BMPIndexInMem>> GetBMPIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
-        return {chunk_index_entries_, memory_hnsw_indexer_};
+        return {chunk_index_entries_, memory_bmp_index_};
     }
 
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<SecondaryIndexInMem>> GetSecondaryIndexSnapshot() {
@@ -209,11 +212,13 @@ public:
     }
 
 public:
-    SharedPtr<ChunkIndexEntry> CreateChunkIndexEntry(SharedPtr<ColumnDef> column_def, RowID base_rowid, BufferManager *buffer_mgr);
+    SharedPtr<ChunkIndexEntry> CreateHnswIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr, SizeT index_size);
 
     SharedPtr<ChunkIndexEntry> CreateSecondaryIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
 
     SharedPtr<ChunkIndexEntry> CreateEMVBIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
+
+    SharedPtr<ChunkIndexEntry> CreateBMPIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr, SizeT index_size);
 
     void AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry);
 
@@ -266,10 +271,11 @@ private:
     ChunkID next_chunk_id_{0};
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
-    SharedPtr<ChunkIndexEntry> memory_hnsw_indexer_{};
+    SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
     SharedPtr<MemoryIndexer> memory_indexer_{};
     SharedPtr<SecondaryIndexInMem> memory_secondary_index_{};
     SharedPtr<EMVBIndexInMem> memory_emvb_index_{};
+    SharedPtr<BMPIndexInMem> memory_bmp_index_{};
 
     u64 ft_column_len_sum_{}; // increase only
     u32 ft_column_len_cnt_{}; // increase only

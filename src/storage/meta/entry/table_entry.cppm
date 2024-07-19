@@ -67,6 +67,7 @@ public:
 
 public:
     explicit TableEntry(bool is_delete,
+                        const SharedPtr<String> &base_dir,
                         const SharedPtr<String> &table_entry_dir,
                         SharedPtr<String> table_collection_name,
                         const Vector<SharedPtr<ColumnDef>> &columns,
@@ -89,6 +90,7 @@ public:
 
     static SharedPtr<TableEntry> ReplayTableEntry(bool is_delete,
                                                   TableMeta *table_meta,
+                                                  SharedPtr<String> base_dir,
                                                   SharedPtr<String> table_entry_dir,
                                                   SharedPtr<String> table_name,
                                                   const Vector<SharedPtr<ColumnDef>> &column_defs,
@@ -114,6 +116,8 @@ public:
     void RemoveIndexEntry(const String &index_name, TransactionID txn_id);
 
     MetaMap<TableIndexMeta>::MapGuard IndexMetaMap() { return index_meta_map_.GetMetaMap(); }
+
+    void AddIndexMetaNoLock(const String& table_meta_name, UniquePtr<TableIndexMeta> table_index_meta);
 
     // replay
     void UpdateEntryReplay(const SharedPtr<TableEntry> &table_entry);
@@ -227,6 +231,10 @@ public:
 
     void GetFulltextAnalyzers(TransactionID txn_id, TxnTimeStamp begin_ts, Map<String, String> &column2analyzer);
 
+    Tuple<Vector<String>, Vector<TableIndexMeta*>, std::shared_lock<std::shared_mutex>> GetAllIndexMapGuard() const;
+
+    TableIndexMeta* GetIndexMetaPtrByName(const String& name) const;
+
 public:
     nlohmann::json Serialize(TxnTimeStamp max_commit_ts);
 
@@ -294,7 +302,7 @@ private: // TODO: remove it
     void MemIndexInsertInner(TableIndexEntry *table_index_entry, Txn *txn, SegmentID seg_id, Vector<AppendRange> &append_ranges);
 
 public: // TODO: remove it?
-    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
+//    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
 
 public:
     void PickCleanup(CleanupScanner *scanner) override;

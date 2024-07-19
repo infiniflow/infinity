@@ -57,7 +57,6 @@ struct ColumnValueReaderTypeGreaterFunction {
 template <>
 inline void GreaterFunction::Run(MixedT, BigIntT, bool &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 
@@ -69,7 +68,6 @@ inline void GreaterFunction::Run(BigIntT left, MixedT right, bool &result) {
 template <>
 inline void GreaterFunction::Run(MixedT, DoubleT, bool &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 
@@ -81,7 +79,6 @@ inline void GreaterFunction::Run(DoubleT left, MixedT right, bool &result) {
 template <>
 inline void GreaterFunction::Run(MixedT, VarcharT, bool &) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 
@@ -109,6 +106,8 @@ void RegisterGreaterFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateGreaterFunction<IntegerT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kInteger));
     GenerateGreaterFunction<BigIntT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
     GenerateGreaterFunction<HugeIntT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateGreaterFunction<FloatT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kFloat16));
+    GenerateGreaterFunction<FloatT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kBFloat16));
     GenerateGreaterFunction<FloatT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kFloat));
     GenerateGreaterFunction<DoubleT, PODTypeGreaterFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 

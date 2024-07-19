@@ -84,7 +84,6 @@ public:
     static inline bool HaveLeftColumnAndRightValue(const SharedPtr<FunctionExpression> &expression, u32 sub_expr_depth, auto &is_valid_column) {
         if (expression->arguments().size() != 2) {
             String error_message = "HaveLeftColumnAndRightValue: argument size != 2";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         return IsValidColumnExpression(expression->arguments()[0], sub_expr_depth + 1, is_valid_column) and
@@ -94,7 +93,6 @@ public:
     static inline bool HaveRightColumnAndLeftValue(const SharedPtr<FunctionExpression> &expression, u32 sub_expr_depth, auto &is_valid_column) {
         if (expression->arguments().size() != 2) {
             String error_message = "HaveRightColumnAndRightValue: argument size != 2";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         return IsValidColumnExpression(expression->arguments()[1], sub_expr_depth + 1, is_valid_column) and
@@ -192,7 +190,6 @@ public:
                                                        "expression {} has more than 1 argument.",
                                                        sub_expr_depth,
                                                        expression->Name());
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     return false;
                 }
@@ -367,7 +364,6 @@ private:
                                                            "expression {} argument size != 2.",
                                                            sub_expr_depth,
                                                            expression->Name());
-                        LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                         return nullptr;
                     }
@@ -447,7 +443,6 @@ private:
             if (!AddIndexForBooleanExpression(expression)) {
                 // cannot apply index scan
                 String error_message = fmt::format("Error when trying to apply index scan on expression {}.", expression->Name());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -494,7 +489,6 @@ private:
             } else if (f_name == "NOT") {
                 // recursive check
                 String error_message = "Error when trying to apply index scan on \"NOT\" expression: need to be excluded early.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 return false;
             } else {
@@ -672,7 +666,6 @@ public:
                             default: {
                                 // error
                                 String error_message = "Wrong compare type!";
-                                LOG_CRITICAL(error_message);
                                 UnrecoverableError(error_message);
                                 return ReturnAlwaysTrue();
                             }
@@ -751,7 +744,6 @@ public:
                             default: {
                                 // error
                                 String error_message = "Wrong compare type!";
-                                LOG_CRITICAL(error_message);
                                 UnrecoverableError(error_message);
                                 return ReturnAlwaysTrue();
                             }

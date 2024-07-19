@@ -84,7 +84,12 @@ private:
     void DropEntryReplay(std::function<SharedPtr<DBEntry>(TransactionID, TxnTimeStamp)> &&init_entry, TransactionID txn_id, TxnTimeStamp begin_ts);
 
     DBEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
-    //
+
+    void PushBackEntry(const SharedPtr<DBEntry>& new_db_entry);
+
+    void PushFrontEntry(const SharedPtr<DBEntry>& new_db_entry);
+
+    void Sort();
 
 private:
     SharedPtr<String> db_name_{};
@@ -99,13 +104,6 @@ public:
 
 private:
     EntryList<DBEntry> db_entry_list_{};
-
-    // TODO: remove
-    std::shared_mutex &rw_locker() { return db_entry_list_.rw_locker_; }
-
-public:
-    // TODO: remove
-    List<SharedPtr<DBEntry>> &db_entry_list() { return db_entry_list_.entry_list_; }
 };
 
 } // namespace infinity

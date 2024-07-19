@@ -25,6 +25,8 @@ import file_system_type;
 import defer_op;
 import status;
 import local_file_system;
+import persistence_manager;
+import infinity_context;
 import logger;
 
 namespace infinity {
@@ -34,7 +36,6 @@ FileWorker::~FileWorker() = default;
 void FileWorker::WriteToFile(bool to_spill) {
     if (data_ == nullptr) {
         String error_message = "No data will be written.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     LocalFileSystem fs;
@@ -48,7 +49,6 @@ void FileWorker::WriteToFile(bool to_spill) {
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
     auto [file_handler, status] = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
     if(!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
     }
     file_handler_ = std::move(file_handler);
@@ -71,27 +71,49 @@ void FileWorker::WriteToFile(bool to_spill) {
         }
         fs.SyncFile(*file_handler_);
     }
+
+    bool use_object_cache = !to_spill && InfinityContext::instance().persistence_manager() != nullptr;
+    if (use_object_cache) {
+        fs.SyncFile(*file_handler_);
+        obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(write_path);
+        fs.DeleteFile(write_path);
+    }
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {
     LocalFileSystem fs;
+    String read_path;
+    bool use_object_cache = !from_spill && obj_addr_.Valid();
+    if (use_object_cache) {
+        read_path = InfinityContext::instance().persistence_manager()->GetObjCache(obj_addr_);
+    } else {
+        read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+    }
 
-    String read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     u8 flags = FileFlags::READ_FLAG;
     auto [file_handler, status] = fs.OpenFile(read_path, flags, FileLockType::kReadLock);
     if(!status.ok()) {
-        LOG_CRITICAL(status.message());
         UnrecoverableError(status.message());
+    }
+    if (use_object_cache) {
+        fs.Seek(*file_handler, obj_addr_.part_offset_);
     }
     file_handler_ = std::move(file_handler);
     DeferFn defer_fn([&]() {
         file_handler_->Close();
         file_handler_ = nullptr;
+        if (use_object_cache) {
+            InfinityContext::instance().persistence_manager()->PutObjCache(obj_addr_);
+        }
     });
     ReadFromFileImpl();
 }
 
 void FileWorker::MoveFile() {
+    if (InfinityContext::instance().persistence_manager() != nullptr) {
+        LOG_DEBUG(fmt::format("Skipped MoveFile file since persistence manager is enabled: {}", *file_name_));
+        return;
+    }
     LocalFileSystem fs;
 
     String src_path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
@@ -99,7 +121,6 @@ void FileWorker::MoveFile() {
     String dest_path = fmt::format("{}/{}", dest_dir, *file_name_);
     if (!fs.Exists(src_path)) {
         Status status = Status::FileNotFound(src_path);
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     if (!fs.Exists(dest_dir)) {
@@ -132,7 +153,6 @@ void FileWorker::CleanupTempFile() const {
         LOG_INFO(fmt::format("Cleaned file: {}", path));
     } else {
         String error_message = fmt::format("Cleanup: File {} not found for deletion", path);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }

@@ -19,7 +19,7 @@ class PositionListEncoderTest : public BaseTest {
 public:
     PositionListEncoderTest() {}
 
-    void SetUp() override { file_ = String(GetTmpDir()) + "/position"; }
+    void SetUp() override { file_ = String(GetFullTmpDir()) + "/position"; }
     void TearDown() override {}
 
 protected:

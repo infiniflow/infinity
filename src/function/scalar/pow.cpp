@@ -39,9 +39,26 @@ struct PowFunction {
 };
 
 template <>
+inline bool PowFunction::Run(Float16T base, Float16T exponent, Float16T &result) {
+    result = std::pow(static_cast<float>(base), static_cast<float>(exponent));
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return true;
+}
+
+template <>
+inline bool PowFunction::Run(BFloat16T base, BFloat16T exponent, BFloat16T &result) {
+    result = std::pow(static_cast<float>(base), static_cast<float>(exponent));
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return true;
+}
+
+template <>
 inline bool PowFunction::Run(MixedT, DoubleT, DoubleT &) {
     String error_message = "Not implement: PowFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -62,6 +79,18 @@ void RegisterPowFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                        {DataType(LogicalType::kDouble)},
                                        &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, PowFunction>);
     function_set_ptr->AddFunction(pow_function_double);
+
+    ScalarFunction pow_function_float16(func_name,
+                                        {DataType(LogicalType::kFloat16), DataType(LogicalType::kFloat16)},
+                                        {DataType(LogicalType::kFloat16)},
+                                        &ScalarFunction::BinaryFunctionWithFailure<Float16T, Float16T, Float16T, PowFunction>);
+    function_set_ptr->AddFunction(pow_function_float16);
+
+    ScalarFunction pow_function_bfloat16(func_name,
+                                         {DataType(LogicalType::kBFloat16), DataType(LogicalType::kBFloat16)},
+                                         {DataType(LogicalType::kBFloat16)},
+                                         &ScalarFunction::BinaryFunctionWithFailure<BFloat16T, BFloat16T, BFloat16T, PowFunction>);
+    function_set_ptr->AddFunction(pow_function_bfloat16);
 
     ScalarFunction pow_function_mixed_double(func_name,
                                              {DataType(LogicalType::kMixed), DataType(LogicalType::kDouble)},

@@ -21,6 +21,7 @@ import txn;
 import buffer_manager;
 import txn_state;
 import wal_entry;
+import default_values;
 
 namespace infinity {
 
@@ -46,7 +47,7 @@ public:
 
     ~TxnManager() = default;
 
-    Txn *BeginTxn(UniquePtr<String> txn_text);
+    Txn *BeginTxn(UniquePtr<String> txn_text, bool ckp_txn = false);
 
     Txn *GetTxn(TransactionID txn_id);
 
@@ -92,6 +93,8 @@ public:
 
     TxnTimeStamp CurrentTS() const;
 
+    TxnTimeStamp GetNewTimeStamp();
+
     TxnTimeStamp GetCleanupScanTS();
 
     void IncreaseCommittedTxnCount() { ++total_committed_txn_count_; }
@@ -110,6 +113,8 @@ public:
 
     u64 NextSequence() { return ++sequence_; }
 
+    bool InCheckpointProcess(TxnTimeStamp commit_ts);
+
 private:
     Catalog *catalog_{};
     mutable std::mutex locker_{};
@@ -125,6 +130,7 @@ private:
     Map<TxnTimeStamp, WalEntry *> wait_conflict_ck_{}; // sorted by commit ts
 
     Atomic<TxnTimeStamp> start_ts_{}; // The next txn ts
+    TxnTimeStamp ckp_begin_ts_ = UNCOMMIT_TS;     // cur ckp begin ts, 0 if no ckp is happening
 
     // For stop the txn manager
     atomic_bool is_running_{false};

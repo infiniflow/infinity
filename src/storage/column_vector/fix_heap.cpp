@@ -81,8 +81,7 @@ VectorHeapChunk FixHeapManager::AllocateChunk() {
 
 Pair<ChunkId, u64> FixHeapManager::Allocate(SizeT nbytes) {
     if (nbytes == 0) {
-        String error_message = fmt::format("Attempt to allocate memory with size: {} as the string heap", nbytes);
-        LOG_CRITICAL(error_message);
+        String error_message = fmt::format("Attempt to allocate memory with size: {} as the chunk heap", nbytes);
         UnrecoverableError(error_message);
     }
 
@@ -94,8 +93,7 @@ Pair<ChunkId, u64> FixHeapManager::Allocate(SizeT nbytes) {
     }
     if (!allow_storage_across_chunks_) {
         if (nbytes > current_chunk_size_) {
-            String error_message = fmt::format("Attempt to allocate memory with size: {} as the tensor heap", nbytes);
-            LOG_CRITICAL(error_message);
+            String error_message = fmt::format("Attempt to allocate memory with size: {}, but current chunk size: {}", nbytes, current_chunk_size_);
             UnrecoverableError(error_message);
         }
         if (current_chunk_offset_ + nbytes <= current_chunk_size_) {
@@ -137,7 +135,6 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
     }
     if (buffer_mgr_ == nullptr || chunk_id >= (ChunkId)block_column_entry_->OutlineBufferCount(heap_id_)) {
         String error_message = "No such chunk in heap";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto *outline_buffer = block_column_entry_->GetOutlineBuffer(heap_id_, chunk_id);
@@ -149,7 +146,6 @@ VectorHeapChunk &FixHeapManager::ReadChunk(ChunkId chunk_id) {
 
         if (outline_buffer == nullptr) {
             String error_message = "No such chunk in heap";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

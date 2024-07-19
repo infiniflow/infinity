@@ -87,14 +87,12 @@ private:
                     result.SetIntervalRange<VarcharT>(value, compare_type);
                 } else {
                     String error_message = "SaveToResult(): VarcharT only support kEqual compare type.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 }
                 break;
             }
             default: {
                 String error_message = fmt::format("SaveToResult(): type error: {}.", value.type().ToString());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -119,7 +117,6 @@ private:
             }
             default: {
                 String error_message = "SaveToResult(): compare type error.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 return;
             }
@@ -132,7 +129,6 @@ private:
     inline bool TryCompactNearbyFilterAnd() {
         if (result_.size() < 2) {
             String error_message = "FilterCommandBuilder::TryCompactNearbyFilter(): result size < 2.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return false;
         }
@@ -167,7 +163,6 @@ private:
                 requires IncompatibleFilterIntervalRangePair<T1, T2>
             (T1 & x, T2 & y) -> bool {
                 String error_message = "FilterCommandBuilder::TryCompactNearbyFilterAnd(): Unreachable branch! Type mismatch.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 return false;
             }},
@@ -186,7 +181,6 @@ private:
     inline bool TryCompactNearbyFilterOr() {
         if (result_.size() < 2) {
             String error_message = "FilterCommandBuilder::TryCompactNearbyFilter(): result size < 2.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return false;
         }
@@ -231,7 +225,6 @@ public:
             if (std::holds_alternative<ColumnID>(elem)) {
                 if (progress != Progress::kSavedToResult) {
                     String error_message = "FilterCommandBuilder::Build(): progress error.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     return false;
                 }
@@ -240,7 +233,6 @@ public:
             } else if (std::holds_alternative<Value>(elem)) {
                 if (progress != Progress::kColumnID) {
                     String error_message = "FilterCommandBuilder::Build(): progress error.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     return false;
                 }
@@ -249,7 +241,6 @@ public:
             } else if (std::holds_alternative<FilterCompareType>(elem)) {
                 if (progress != Progress::kValuePtr) {
                     String error_message = "FilterCommandBuilder::Build(): progress error.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     return false;
                 }
@@ -260,7 +251,6 @@ public:
             } else if (std::holds_alternative<BooleanCombineType>(elem)) {
                 if (progress != Progress::kSavedToResult) {
                     String error_message = "FilterCommandBuilder::Build(): progress error.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     return false;
                 }
@@ -285,14 +275,12 @@ public:
                     }
                     default: {
                         String error_message = "FilterCommandBuilder::Build(): combine type error.";
-                        LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                         return false;
                     }
                 }
             } else {
                 String error_message = "FilterCommandBuilder::Build(): filter evaluator elem error.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
                 return false;
             }
@@ -301,7 +289,6 @@ public:
             return true;
         } else {
             String error_message = "FilterCommandBuilder::Build(): progress error.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return false;
         }
@@ -324,7 +311,6 @@ Vector<FilterExecuteElem> BuildSecondaryIndexScanCommand(SharedPtr<BaseExpressio
         filter_execute_command = std::move(filter_command_builder.GetResult());
     } else {
         String error_message = "PhysicalIndexScan::Init(): filter command builder error.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return filter_execute_command;

@@ -25,6 +25,8 @@ class TestConnection(TestSdk):
         method: connect server
         expected: ok
         """
+        self.infinity_obj.disconnect()
+
         infinity_obj = infinity.connect(self.uri)
         assert infinity_obj
         assert infinity_obj.disconnect()
@@ -35,6 +37,7 @@ class TestConnection(TestSdk):
         method: connect server with (invalid/wrong address and invalid/wrong port)
         expected: failed
         """
+        self.infinity_obj.disconnect()
 
         INVALID_IP_HOST = NetworkAddress("127.0.0.1111", 23817)
         WRONG_IP_HOST = NetworkAddress("192.168.1.255", 23817)
@@ -82,17 +85,20 @@ class TestConnection(TestSdk):
         method: connect server -> connect server
         expected: success
         """
+        self.infinity_obj.disconnect()
+
         infinity_instance = infinity.connect(self.uri)
         infinity_instance = infinity.connect(self.uri)
 
-    @pytest.mark.slow
     def _test_multiple_connect(self):
         """
         target: disconnect the infinity which is already disconnected.
         method: multiple connection to server
         expected: success
         """
-        connection_limit = 128
+        self.infinity_obj.disconnect()
+
+        connection_limit = 128 # should read from infinity_conf.toml
         infinity_instances = []
         for i in range(0, connection_limit):
             infinity_instances.append(infinity.connect(self.uri))
@@ -106,6 +112,8 @@ class TestConnection(TestSdk):
         method: connect server -> disconnect server -> disconnect server
         expected: failed
         """
+        self.infinity_obj.disconnect()
+
         infinity_instance = infinity.connect(self.uri)
         infinity_instance.disconnect()
 

@@ -37,7 +37,6 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 query_count,
     switch (elem_type) {
         case kElemInvalid: {
             String error_message = "Invalid element type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case kElemFloat: {
@@ -46,7 +45,6 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 query_count,
         }
         default: {
             Status status = Status::NotSupport("Not implemented");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
@@ -57,7 +55,6 @@ void MergeKnnFunctionData::InitMergeKnn(KnnDistanceType knn_distance_type) {
     switch (knn_distance_type) {
         case KnnDistanceType::kInvalid: {
             String error_message = "Invalid knn distance type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case KnnDistanceType::kL2:

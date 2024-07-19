@@ -72,7 +72,6 @@ public:
     [[nodiscard]] SharedPtr<DataBlock> &GetDataBlockById(SizeT idx) {
         if (idx >= data_blocks_.size()) {
             String error_message = fmt::format("Attempt to access invalid index: {}/{}", idx, DataBlockCount());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         return data_blocks_[idx];

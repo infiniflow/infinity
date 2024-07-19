@@ -57,7 +57,6 @@ struct ColumnValueReaderTypeLessFunction {
 template <>
 inline void LessFunction::Run(MixedT, BigIntT, bool &) {
     String error_message = "Not implement: LessFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
@@ -69,7 +68,6 @@ inline void LessFunction::Run(BigIntT left, MixedT right, bool &result) {
 template <>
 inline void LessFunction::Run(MixedT, DoubleT, bool &) {
     String error_message = "Not implement: LessFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
@@ -81,7 +79,6 @@ inline void LessFunction::Run(DoubleT left, MixedT right, bool &result) {
 template <>
 inline void LessFunction::Run(MixedT, VarcharT, bool &) {
     String error_message = "Not implement: LessFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
@@ -111,6 +108,8 @@ void RegisterLessFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateLessFunction<IntegerT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kInteger));
     GenerateLessFunction<BigIntT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
     GenerateLessFunction<HugeIntT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateLessFunction<FloatT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kFloat16));
+    GenerateLessFunction<FloatT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kBFloat16));
     GenerateLessFunction<FloatT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kFloat));
     GenerateLessFunction<DoubleT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 

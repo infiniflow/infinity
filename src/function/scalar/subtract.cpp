@@ -33,7 +33,6 @@ struct SubFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
         String error_message = "Not implement: SubFunction::Run";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 };
@@ -74,9 +73,28 @@ inline bool SubFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
 template <>
 inline bool SubFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
+}
+
+// Float16T - Float16T = Float16T, and check overflow
+template <>
+inline bool SubFunction::Run(Float16T left, Float16T right, Float16T &result) {
+    result = left - right;
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return true;
+}
+
+// BFloat16T - BFloat16T = BFloat16T, and check overflow
+template <>
+inline bool SubFunction::Run(BFloat16T left, BFloat16T right, BFloat16T &result) {
+    result = left - right;
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return true;
 }
 
 // FloatT - FloatT = FloatT, and check overflow
@@ -103,7 +121,6 @@ inline bool SubFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 template <>
 inline bool SubFunction::Run(DecimalT, DecimalT, DecimalT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -136,7 +153,6 @@ inline bool SubFunction::Run(TimestampT left, IntervalT right, TimestampT &resul
 template <>
 inline bool SubFunction::Run(MixedT, BigIntT, MixedT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -145,7 +161,6 @@ inline bool SubFunction::Run(MixedT, BigIntT, MixedT &) {
 template <>
 inline bool SubFunction::Run(BigIntT, MixedT, MixedT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -154,7 +169,6 @@ inline bool SubFunction::Run(BigIntT, MixedT, MixedT &) {
 template <>
 inline bool SubFunction::Run(MixedT, DoubleT, MixedT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -163,7 +177,6 @@ inline bool SubFunction::Run(MixedT, DoubleT, MixedT &) {
 template <>
 inline bool SubFunction::Run(DoubleT, MixedT, MixedT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -172,7 +185,6 @@ inline bool SubFunction::Run(DoubleT, MixedT, MixedT &) {
 template <>
 inline bool SubFunction::Run(MixedT, MixedT, MixedT &) {
     String error_message = "Not implement: SubFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -224,6 +236,18 @@ void RegisterSubtractFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                        {DataType(LogicalType::kDouble)},
                                        &ScalarFunction::BinaryFunctionWithFailure<double, double, double, SubFunction>);
     function_set_ptr->AddFunction(sub_function_double);
+
+    ScalarFunction sub_function_float16(func_name,
+                                        {DataType(LogicalType::kFloat16), DataType(LogicalType::kFloat16)},
+                                        {DataType(LogicalType::kFloat16)},
+                                        &ScalarFunction::BinaryFunctionWithFailure<Float16T, Float16T, Float16T, SubFunction>);
+    function_set_ptr->AddFunction(sub_function_float16);
+
+    ScalarFunction sub_function_bfloat16(func_name,
+                                         {DataType(LogicalType::kBFloat16), DataType(LogicalType::kBFloat16)},
+                                         {DataType(LogicalType::kBFloat16)},
+                                         &ScalarFunction::BinaryFunctionWithFailure<BFloat16T, BFloat16T, BFloat16T, SubFunction>);
+    function_set_ptr->AddFunction(sub_function_bfloat16);
 
     ScalarFunction sub_function_decimal(func_name,
                                         {DataType(LogicalType::kDecimal), DataType(LogicalType::kDecimal)},

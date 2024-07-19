@@ -62,7 +62,7 @@ class SumFunctionTest : public BaseTest {
 TEST_F(SumFunctionTest, avg_func) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
 
     RegisterSumFunction(catalog_ptr);
 

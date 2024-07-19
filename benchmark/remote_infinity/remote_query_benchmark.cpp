@@ -51,7 +51,7 @@ struct InfinityClient {
         transport->open();
         CommonResponse response;
         ConnectRequest request;
-        request.__set_client_version(9); // 0.2.1.dev4
+        request.__set_client_version(10); // 0.2.1
         client->Connect(response, request);
         session_id = response.session_id;
     }
@@ -206,25 +206,25 @@ int main() {
                 }
                 req.select_list.push_back(std::move(expr));
                 req.__isset.select_list = true;
-                KnnExpr knn_expr;
+                auto knn_expr = std::make_shared<KnnExpr>();
                 {
-                    knn_expr.column_expr.column_name.emplace_back("col1");
-                    knn_expr.column_expr.__isset.column_name = true;
-                    knn_expr.__isset.column_expr = true;
-                    auto &q = knn_expr.embedding_data.f32_array_value;
+                    knn_expr->column_expr.column_name.emplace_back("col1");
+                    knn_expr->column_expr.__isset.column_name = true;
+                    knn_expr->__isset.column_expr = true;
+                    auto &q = knn_expr->embedding_data.f32_array_value;
                     q.reserve(dimension);
                     auto src_ptr = queries + query_idx * dimension;
                     for (int64_t i = 0; i < dimension; ++i) {
                         q.push_back(src_ptr[i]);
                     }
-                    knn_expr.embedding_data.__isset.f32_array_value = true;
-                    knn_expr.__isset.embedding_data = true;
-                    knn_expr.embedding_data_type = ElementType::type::ElementFloat32;
-                    knn_expr.__isset.embedding_data_type = true;
-                    knn_expr.distance_type = KnnDistanceType::type::L2;
-                    knn_expr.__isset.distance_type = true;
-                    knn_expr.topn = topk;
-                    knn_expr.__isset.topn = true;
+                    knn_expr->embedding_data.__isset.f32_array_value = true;
+                    knn_expr->__isset.embedding_data = true;
+                    knn_expr->embedding_data_type = ElementType::type::ElementFloat32;
+                    knn_expr->__isset.embedding_data_type = true;
+                    knn_expr->distance_type = KnnDistanceType::type::L2;
+                    knn_expr->__isset.distance_type = true;
+                    knn_expr->topn = topk;
+                    knn_expr->__isset.topn = true;
                     InitParameter init_param;
                     {
                         init_param.param_name = "ef";
@@ -232,11 +232,13 @@ int main() {
                         init_param.param_value = std::to_string(ef);
                         init_param.__isset.param_value = true;
                     }
-                    knn_expr.opt_params.push_back(std::move(init_param));
-                    knn_expr.__isset.opt_params = true;
+                    knn_expr->opt_params.push_back(std::move(init_param));
+                    knn_expr->__isset.opt_params = true;
                 }
-                req.search_expr.knn_exprs.push_back(std::move(knn_expr));
-                req.search_expr.__isset.knn_exprs = true;
+                GenericMatchExpr generic_match_expr;
+                generic_match_expr.__set_match_vector_expr(knn_expr);
+                req.search_expr.match_exprs.push_back(generic_match_expr);
+                req.search_expr.__isset.match_exprs = true;
                 req.__isset.search_expr = true;
             }
             client.client->Select(ret, req);

@@ -95,6 +95,8 @@ public:
         return ret;
     }
 
+    SizeT GetSizeInBytes() const { return sizeof(dim_) + sizeof(MeanType) * dim_ + sizeof(GlobalCacheType); }
+
     void Save(FileHandler &file_handler) const {
         file_handler.Write(&dim_, sizeof(dim_));
         file_handler.Write(mean_.get(), sizeof(MeanType) * dim_);
@@ -255,6 +257,8 @@ public:
     LVQVecStoreInner() = default;
 
     static This Make(SizeT max_vec_num, const Meta &meta) { return This(max_vec_num, meta); }
+
+    SizeT GetSizeInBytes(SizeT cur_vec_num, const Meta &meta) const { return cur_vec_num * meta.compress_data_size(); }
 
     void Save(FileHandler &file_handler, SizeT cur_vec_num, const Meta &meta) const {
         file_handler.Write(ptr_.get(), cur_vec_num * meta.compress_data_size());

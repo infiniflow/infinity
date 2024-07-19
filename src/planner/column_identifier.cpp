@@ -30,7 +30,6 @@ namespace infinity {
 ColumnIdentifier ColumnIdentifier::MakeColumnIdentifier(QueryContext *, const ColumnExpr &expr) {
     if (expr.star_ && expr.names_.empty()) {
         Status status = Status::SyntaxError("Star expression should be unfolded before.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -42,7 +41,6 @@ ColumnIdentifier ColumnIdentifier::MakeColumnIdentifier(QueryContext *, const Co
     i64 name_count = expr.names_.size();
     if (name_count > 4 || name_count <= 0) {
         Status status = Status::SyntaxError("Star expression should be unfolded before.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     --name_count;

@@ -94,7 +94,6 @@ Vector<SizeT> &PhysicalTableScan::ColumnIDs() const {
 void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOperatorState *table_scan_operator_state) {
     if (!table_scan_operator_state->data_block_array_.empty()) {
         String error_message = "Table scan output data block array should be empty";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -181,7 +180,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                     break;
                 }
                 default: {
-                    ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
+                    ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr);
                     output_ptr->column_vectors[output_column_id++]->AppendWith(column_vector, read_offset, write_size);
                 }
             }

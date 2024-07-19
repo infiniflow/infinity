@@ -67,7 +67,6 @@ public:
 
     SizeT TaskletCount() override {
         String error_message = "Not implement: TaskletCount not Implement";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return 0;
     }

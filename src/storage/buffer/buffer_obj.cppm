@@ -78,7 +78,7 @@ export String BufferTypeToString(BufferType buffer_type) {
 export class BufferObj {
 public:
     // called by BufferMgr::Get or BufferMgr::Allocate
-    explicit BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<FileWorker> file_worker);
+    explicit BufferObj(BufferManager *buffer_mgr, bool is_ephemeral, UniquePtr<FileWorker> file_worker, u32 id);
 
     virtual ~BufferObj();
 
@@ -129,6 +129,7 @@ public:
     }
     BufferType type() const { return type_; }
     u64 rc() const { return rc_; }
+    u32 id() const { return id_; }
 
     // check the invalid state, only used in tests.
     void CheckState() const;
@@ -142,6 +143,9 @@ protected:
     BufferType type_{BufferType::kTemp};
     u64 rc_{0};
     const UniquePtr<FileWorker> file_worker_;
+
+private:
+    u32 id_;
 };
 
 } // namespace infinity

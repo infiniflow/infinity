@@ -267,6 +267,12 @@ ParsedExpr *WrapFusionExpr::GetParsedExpr(Status &status) {
     auto fusion_expr = new FusionExpr();
     fusion_expr->method_ = method;
     fusion_expr->options_ = MakeShared<SearchOptions>(options_text);
+    if (has_match_tensor_expr) {
+        fusion_expr->match_tensor_expr_.reset(dynamic_cast<MatchTensorExpr*>(match_tensor_expr.GetParsedExpr(status)));
+    } else {
+        fusion_expr->match_tensor_expr_ = nullptr;
+    }
+
     return fusion_expr;
 }
 
@@ -274,6 +280,26 @@ ParsedExpr *WrapMatchTensorExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
     auto match_tensor_expr = new MatchTensorExpr(own_memory);
+    match_tensor_expr->SetSearchMethodStr(search_method);
+    match_tensor_expr->column_expr_.reset(column_expr.GetParsedExpr(status));
+    match_tensor_expr->options_text_ = options_text;
+    match_tensor_expr->embedding_data_type_ = embedding_data_type;
+
+    if (status.code_ != ErrorCode::kOk) {
+        delete match_tensor_expr;
+        return nullptr;
+    }
+
+    auto [embedding_data_ptr, dimension] = GetEmbeddingDataTypeDataPtrFromProto(embedding_data, status);
+    if (status.code_ != ErrorCode::kOk) {
+        delete match_tensor_expr;
+        return nullptr;
+    }
+    match_tensor_expr->dimension_ = dimension;
+    const auto copy_bytes = EmbeddingT::EmbeddingSize(match_tensor_expr->embedding_data_type_, match_tensor_expr->dimension_);
+    match_tensor_expr->query_tensor_data_ptr_ = MakeUniqueForOverwrite<char[]>(copy_bytes);
+    std::memcpy(match_tensor_expr->query_tensor_data_ptr_.get(), embedding_data_ptr, copy_bytes);
+
     return match_tensor_expr;
 }
 
@@ -316,34 +342,7 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
     auto search_expr = new SearchExpr();
     search_expr->match_exprs_.reserve(match_exprs.size());
     for (SizeT i = 0; i < match_exprs.size(); ++i) {
-        search_expr->match_exprs_.emplace_back(dynamic_cast<MatchExpr *>(match_exprs[i].GetParsedExpr(status)));
-        if (status.code_ != ErrorCode::kOk) {
-            delete search_expr;
-            search_expr = nullptr;
-            return nullptr;
-        }
-    }
-    search_expr->knn_exprs_.reserve(knn_exprs.size());
-    for (SizeT i = 0; i < knn_exprs.size(); ++i) {
-        search_expr->knn_exprs_.emplace_back(dynamic_cast<KnnExpr *>(knn_exprs[i].GetParsedExpr(status)));
-        if (status.code_ != ErrorCode::kOk) {
-            delete search_expr;
-            search_expr = nullptr;
-            return nullptr;
-        }
-    }
-    search_expr->match_tensor_exprs_.reserve(match_tensor_exprs.size());
-    for (SizeT i = 0; i < match_tensor_exprs.size(); ++i) {
-        search_expr->match_tensor_exprs_.emplace_back(dynamic_cast<MatchTensorExpr *>(match_tensor_exprs[i].GetParsedExpr(status)));
-        if (status.code_ != ErrorCode::kOk) {
-            delete search_expr;
-            search_expr = nullptr;
-            return nullptr;
-        }
-    }
-    search_expr->match_sparse_exprs_.reserve(match_sparse_exprs.size());
-    for (SizeT i = 0; i < match_sparse_exprs.size(); ++i) {
-        search_expr->match_sparse_exprs_.emplace_back(dynamic_cast<MatchSparseExpr *>(match_sparse_exprs[i].GetParsedExpr(status)));
+        search_expr->match_exprs_.emplace_back(match_exprs[i].GetParsedExpr(status));
         if (status.code_ != ErrorCode::kOk) {
             delete search_expr;
             search_expr = nullptr;
@@ -364,25 +363,29 @@ ParsedExpr *WrapSearchExpr::GetParsedExpr(Status &status) {
 
 ParsedExpr *WrapParsedExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
-
-    if (type == ParsedExprType::kConstant) {
-        return constant_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kColumn) {
-        return column_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kFunction) {
-        return function_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kBetween) {
-        return between_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kKnn) {
-        return knn_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kMatch) {
-        return match_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kFusion) {
-        return fusion_expr.GetParsedExpr(status);
-    } else if (type == ParsedExprType::kSearch) {
-        return search_expr.GetParsedExpr(status);
-    } else {
-        status = Status::InvalidParsedExprType();
+    switch (type) {
+        case ParsedExprType::kConstant:
+            return constant_expr.GetParsedExpr(status);
+        case ParsedExprType::kColumn:
+            return column_expr.GetParsedExpr(status);
+        case ParsedExprType::kFunction:
+            return function_expr.GetParsedExpr(status);
+        case ParsedExprType::kBetween:
+            return between_expr.GetParsedExpr(status);
+        case ParsedExprType::kKnn:
+            return knn_expr.GetParsedExpr(status);
+        case ParsedExprType::kMatch:
+            return match_expr.GetParsedExpr(status);
+        case ParsedExprType::kMatchSparse:
+            return match_sparse_expr.GetParsedExpr(status);
+        case ParsedExprType::kMatchTensor:
+            return match_tensor_expr.GetParsedExpr(status);
+        case ParsedExprType::kFusion:
+            return fusion_expr.GetParsedExpr(status);
+        case ParsedExprType::kSearch:
+            return search_expr.GetParsedExpr(status);
+        default:
+            status = Status::InvalidParsedExprType();
     }
     return nullptr;
 }
@@ -510,7 +513,7 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
                                 const String &db_name,
                                 const String &table_name,
                                 Vector<WrapColumnDef> column_defs,
-                                const CreateTableOptions &create_table_options) {
+                                WrapCreateTableOptions create_table_options) {
     Vector<TableConstraint *> constraints;
     Vector<ColumnDef *> column_defs_ptr;
     for (SizeT i = 0; i < column_defs.size(); ++i) {
@@ -539,7 +542,12 @@ WrapQueryResult WrapCreateTable(Infinity &instance,
         auto column_def = new ColumnDef(wrap_column_def.id, column_type, wrap_column_def.column_name, wrap_column_def.constraints, default_expr);
         column_defs_ptr.push_back(column_def);
     }
-    auto query_result = instance.CreateTable(db_name, table_name, std::move(column_defs_ptr), constraints, create_table_options);
+    CreateTableOptions options;
+    options.conflict_type_ = create_table_options.conflict_type_;
+    for (auto &property : create_table_options.properties_) {
+        options.properties_.emplace_back(new InitParameter(std::move(property.param_name_), std::move(property.param_value_)));
+    }
+    auto query_result = instance.CreateTable(db_name, table_name, std::move(column_defs_ptr), constraints, std::move(options));
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
@@ -1029,7 +1037,6 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
         }
         default: {
             String error_message = fmt::format("Invalid logical data type: {}", data_type->ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -1250,8 +1257,13 @@ WrapQueryResult WrapShowTables(Infinity &instance, const String &db_name) {
     return wrap_query_result;
 }
 
-WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, OptimizeOptions optimize_options) {
-    auto query_result = instance.Optimize(db_name, table_name, std::move(optimize_options));
+WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, WrapOptimizeOptions optimize_options) {
+    OptimizeOptions options;
+    options.index_name_ = std::move(optimize_options.index_name_);
+    for (auto &param : optimize_options.opt_params_) {
+        options.opt_params_.emplace_back(new InitParameter(std::move(param.param_name_), std::move(param.param_value_)));
+    }
+    auto query_result = instance.Optimize(db_name, table_name, std::move(options));
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 

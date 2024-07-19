@@ -85,12 +85,10 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
 
     if (statement.select_list_ == nullptr) {
         String error_message = "SELECT list is needed";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (statement.select_list_->empty()) {
         String error_message = "SELECT list can't be empty";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -109,13 +107,11 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
             String name = with_expr->alias_;
             if (bind_context_ptr_->CTE_map_.contains(name)) {
                 Status status = Status::SyntaxError(fmt::format("WITH query table_name: {} occurs more than once.", name));
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
 
             if (with_expr->select_->type_ != StatementType::kSelect) {
                 Status status = Status::SyntaxError("Non-select statement in WITH clause.");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
 
@@ -153,7 +149,6 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
                 i64 bound_column_index = bind_context_ptr_->select_alias2index_[select_expr->alias_];
                 Status status = Status::SyntaxError(bind_context_ptr_->select_expression_[bound_column_index]->ToString() + " and " +
                                                     select_expr->ToString() + " have same alias: " + select_expr->alias_);
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             } else {
                 // Store the alias to column index mapping, the mapping will be used in
@@ -166,7 +161,6 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
             // KNN expression without alias, isn't allowed
             if (select_expr->type_ == ParsedExprType::kKnn) {
                 Status status = Status::SyntaxError("KNN expression in select list must have an alias.");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
 
@@ -203,7 +197,6 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
         if (where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         bound_select_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
@@ -241,7 +234,6 @@ UniquePtr<BoundSelectStatement> QueryBinder::BindSelect(const SelectStatement &s
     // Trying to check if order by import new invisible column in project
     if (select_column_count < bound_select_statement->projection_expressions_.size()) {
         String error_message = "Projection expressions more than expected!";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         //        bind_context_ptr_->result_index_ = bind_context_ptr_->GenerateTableIndex();
         //        PruneOutput(query_context_ptr_, select_column_count, bound_select_statement);
@@ -293,7 +285,6 @@ SharedPtr<TableRef> QueryBinder::BuildFromClause(QueryContext *query_context, co
 
         case TableRefType::kDummy: {
             String error_message = "Unexpected table reference type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -341,7 +332,6 @@ SharedPtr<TableRef> QueryBinder::BuildTable(QueryContext *query_context, const T
     }
 
     Status status = Status::SyntaxError("Table or View: " + from_table->table_name_ + " is not found in catalog.");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return nullptr;
 }
@@ -392,7 +382,6 @@ SharedPtr<TableRef> QueryBinder::BuildCTE(QueryContext *, const String &name) {
     if (this->bind_context_ptr_->IsCTEBound(cte)) {
         // The CTE is bound before.
         Status status = Status::SyntaxError("CTE can only be bound only once");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -429,13 +418,11 @@ SharedPtr<BaseTableRef> QueryBinder::BuildBaseTable(QueryContext *query_context,
 
     auto [table_entry, status] = query_context->GetTxn()->GetTableByName(schema_name, from_table->table_name_);
     if (!status.ok()) {
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     if (table_entry->EntryType() == TableEntryType::kCollectionEntry) {
         Status status = Status::SyntaxError("Currently, collection isn't supported.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -480,7 +467,6 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
     BaseEntry *base_view_entry{nullptr};
     Status status = query_context->GetTxn()->GetViewByName(from_table->db_name_, from_table->table_name_, base_view_entry);
     if (!status.ok()) {
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -489,7 +475,6 @@ SharedPtr<TableRef> QueryBinder::BuildView(QueryContext *query_context, const Ta
     // Build view scan operator
     if (this->bind_context_ptr_->IsViewBound(from_table->table_name_)) {
         Status status = Status::SyntaxError(fmt::format("View: {} is bound before!", from_table->table_name_));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     this->bind_context_ptr_->BoundView(from_table->table_name_);
@@ -573,7 +558,6 @@ SharedPtr<TableRef> QueryBinder::BuildCrossProduct(QueryContext *query_context, 
     right_bind_context = bind_contexts[bind_context_idx];
     if (bind_context_idx != 0) {
         Status status = Status::SyntaxError("Mismatched bind context count.");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     right_query_binder = MakeUnique<QueryBinder>(query_context, right_bind_context);
@@ -661,7 +645,6 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
                 // Create left bound column expression
                 if (!result->left_bind_context_->binding_names_by_column_.contains(column_name)) {
                     Status status = Status::SyntaxError("Column: " + column_name + " doesn't exist in left table");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
 
@@ -669,7 +652,6 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
 
                 if (left_column_binding_names.size() != 1) {
                     Status status = Status::SyntaxError(fmt::format("Ambiguous column table_name: {} in left table", column_name));
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
 
@@ -687,7 +669,6 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
 
                 if (!result->right_bind_context_->binding_names_by_column_.contains(column_name)) {
                     Status status = Status::SyntaxError(fmt::format("Column: {} doesn't exist in right table", column_name));
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
 
@@ -695,7 +676,6 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
 
                 if (right_column_binding_names.size() != 1) {
                     Status status = Status::SyntaxError(fmt::format("Ambiguous column table_name: {} in right table", column_name));
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
 
@@ -703,7 +683,6 @@ SharedPtr<TableRef> QueryBinder::BuildJoin(QueryContext *query_context, const Jo
                 auto &right_binding_ptr = result->right_bind_context_->binding_by_name_[right_binding_name];
                 if (right_binding_ptr.get() == nullptr) {
                     Status status = Status::SyntaxError(fmt::format("Column: {} doesn't exist in right table", column_name));
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
                 auto right_column_index = right_binding_ptr->name2index_[column_name];
@@ -746,7 +725,6 @@ void QueryBinder::UnfoldStarExpression(QueryContext *, const Vector<ParsedExpr *
                     // select * from t1;
                     if (this->bind_context_ptr_->table_names_.empty()) {
                         Status status = Status::SyntaxError("No table was bound.");
-                        LOG_ERROR(status.message());
                         RecoverableError(status);
                     }
 
@@ -755,7 +733,6 @@ void QueryBinder::UnfoldStarExpression(QueryContext *, const Vector<ParsedExpr *
                         SharedPtr<Binding> binding = this->bind_context_ptr_->binding_by_name_[table_name];
                         if (binding.get() == nullptr) {
                             Status status = Status::SyntaxError(fmt::format("Table: {} wasn't bound before.", table_name));
-                            LOG_ERROR(status.message());
                             RecoverableError(status);
                         }
                         GenerateColumns(binding, table_name, output_select_list);
@@ -765,7 +742,6 @@ void QueryBinder::UnfoldStarExpression(QueryContext *, const Vector<ParsedExpr *
                     SharedPtr<Binding> binding = this->bind_context_ptr_->binding_by_name_[table_name];
                     if (binding.get() == nullptr) {
                         Status status = Status::SyntaxError(fmt::format("Table: {} wasn't bound before.", table_name));
-                        LOG_ERROR(status.message());
                         RecoverableError(status);
                     }
                     GenerateColumns(binding, table_name, output_select_list);
@@ -783,7 +759,6 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
 
         case BindingType::kInvalid: {
             String error_message = "Invalid binding type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -824,7 +799,6 @@ void QueryBinder::GenerateColumns(const SharedPtr<Binding> &binding, const Strin
         }
         case BindingType::kView: {
             Status status = Status::SyntaxError("Not implemented");
-            LOG_ERROR(status.message());
             RecoverableError(status);
             break;
         }
@@ -923,7 +897,6 @@ void QueryBinder::BuildSelectList(QueryContext *, UniquePtr<BoundSelectStatement
         !bind_context_ptr_->aggregate_exprs_.empty()) {
         if (!project_binder->BoundColumn().empty()) {
             Status status = Status::SyntaxError(fmt::format("Column: {} must appear in the GROUP BY clause or be used in an aggregate function", project_binder->BoundColumn()));
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
@@ -978,7 +951,6 @@ void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType or
         case KnnDistanceType::kHamming: {
             if (order_type != OrderType::kAsc) {
                 Status status = Status::SyntaxError("L2 and Hamming distance need ascending order");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
             break;
@@ -987,14 +959,12 @@ void QueryBinder::CheckKnnAndOrderBy(KnnDistanceType distance_type, OrderType or
         case KnnDistanceType::kCosine: {
             if (order_type != OrderType::kDesc) {
                 Status status = Status::SyntaxError("Inner product and cosine distance need descending order");
-                LOG_ERROR(status.message());
                 RecoverableError(status);
             }
             break;
         }
         default: {
             String error_message = "Invalid KNN distance type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -1015,7 +985,6 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     bound_delete_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -1025,7 +994,6 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
         if(where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         bound_delete_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
@@ -1041,7 +1009,6 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     bound_update_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -1051,14 +1018,12 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
         if(where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         bound_update_statement->where_conditions_ = SplitExpressionByDelimiter(where_expr, ConjunctionType::kAnd);
     }
     if (statement.update_expr_array_ == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Update expr array is empty"));
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -1073,7 +1038,6 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
         if (it == column_names.end()) {
             Status status = Status::SyntaxError(
                 fmt::format("Column {} doesn't exist in table {}.{}", column_name, statement.schema_name_, statement.table_name_));
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         SizeT column_id = std::distance(column_names.begin(), it);

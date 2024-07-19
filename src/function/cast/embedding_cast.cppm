@@ -60,14 +60,12 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
 
     if (source.type() != LogicalType::kEmbedding || target.type() != LogicalType::kEmbedding) {
         Status status = Status::NotSupportedTypeConversion(source.ToString(), target.ToString());
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     auto source_info = static_cast<const EmbeddingInfo *>(source.type_info().get());
     auto target_info = static_cast<const EmbeddingInfo *>(target.type_info().get());
     if (source_info->Dimension() != target_info->Dimension()) {
         Status status = Status::DataTypeMismatch(source.ToString(), target.ToString());
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     switch (source_info->Type()) {
@@ -91,7 +89,6 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
         }
         default: {
             String error_message = fmt::format("Can't cast from {} to Embedding type", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -124,7 +121,6 @@ inline BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target) {
         }
         default: {
             String error_message = fmt::format("Can't cast from Embedding type to {}", target->ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -139,7 +135,6 @@ struct EmbeddingTryCastToFixlen {
                             std::is_same_v<SourceElemType, IntegerT> || std::is_same_v<SourceElemType, BigIntT> ||
                             std::is_same_v<SourceElemType, FloatT> || std::is_same_v<SourceElemType, DoubleT>)) {
                 String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             auto *dst = reinterpret_cast<u8 *>(target);
@@ -155,7 +150,6 @@ struct EmbeddingTryCastToFixlen {
                             std::is_same_v<TargetElemType, IntegerT> || std::is_same_v<TargetElemType, BigIntT> ||
                             std::is_same_v<TargetElemType, FloatT> || std::is_same_v<TargetElemType, DoubleT>)) {
                 String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>());
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             const auto *src = reinterpret_cast<const u8 *>(source);
@@ -180,7 +174,6 @@ struct EmbeddingTryCastToFixlen {
             return true;
         } else {
             String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return false;
         }
@@ -204,7 +197,6 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           ColumnVector *vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
         String error_message = fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -221,7 +213,6 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
     } else {
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
             String error_message = fmt::format("Varchar column vector should use MemoryVectorBuffer.");
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -268,7 +259,6 @@ void EmbeddingTryCastToTensorImpl(const EmbeddingT &source, const SizeT source_e
             String error_message = fmt::format("Failed to cast from embedding with type {} to tensor with type {}",
                                                DataType::TypeToString<SourceValueType>(),
                                                DataType::TypeToString<TargetValueType>());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         const auto [chunk_id, chunk_offset] =
@@ -315,7 +305,6 @@ void EmbeddingTryCastToTensorImpl(const EmbeddingT &source,
         }
         default: {
             String error_message = fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(src_type));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -358,7 +347,6 @@ void EmbeddingTryCastToTensor(const EmbeddingT &source,
         }
         default: {
             String error_message = fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(dst_type));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -372,7 +360,6 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           ColumnVector *target_vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
         String error_message = fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const EmbeddingInfo *embedding_info = (EmbeddingInfo *)(source_type.type_info().get());
@@ -382,7 +369,6 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
     const auto target_embedding_dim = target_embedding_info->Dimension();
     if (source_embedding_dim % target_embedding_dim != 0) {
         Status status = Status::DataTypeMismatch(source_type.ToString(), target_type.ToString());
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     const auto target_tensor_num = source_embedding_dim / target_embedding_dim;
@@ -390,13 +376,11 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
     if (const auto target_tensor_bytes = target_tensor_num * target_embedding_info->Size(); target_tensor_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
         // TODO: better error message: tensor size overflow
         Status status = Status::DataTypeMismatch(source_type.ToString(), target_type.ToString());
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     target.embedding_num_ = target_tensor_num;
     if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kTensorHeap) {
         String error_message = fmt::format("Tensor column vector should use kTensorHeap VectorBuffer.");
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     EmbeddingTryCastToTensor(source, embedding_info->Type(), source_embedding_dim, target, target_embedding_info->Type(), target_vector_ptr);
@@ -439,7 +423,6 @@ void EmbeddingTryCastToSparseImpl(const EmbeddingT &source,
             String error_message = fmt::format("Failed to cast from embedding with type {} to sparse with type {}",
                                                DataType::TypeToString<SourceType>(),
                                                DataType::TypeToString<IdxT>());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         auto [chunk_id, chunk_offset] =
@@ -487,7 +470,6 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
                                           ColumnVector *target_vector_ptr) {
     if (source_type.type() != LogicalType::kEmbedding) {
         String error_message = fmt::format("Type here is expected as Embedding, but actually it is: {}", source_type.ToString());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const auto *source_info = static_cast<EmbeddingInfo *>(source_type.type_info().get());
@@ -495,7 +477,6 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
 
     if (target_info->DataType() != EmbeddingDataType::kElemBit) {
         String error_message = fmt::format("No support data type: {}", EmbeddingType::EmbeddingDataType2String(target_info->IndexType()));
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     switch (target_info->IndexType()) {
@@ -517,7 +498,6 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         }
         default: {
             String error_message = fmt::format("No support data type: {}", EmbeddingType::EmbeddingDataType2String(target_info->IndexType()));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

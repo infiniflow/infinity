@@ -179,7 +179,6 @@ std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const S
 InvalidPhysicalTopCompareType(const DataType &type_) {
     return [type_name = type_.ToString()](const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32) -> std::strong_ordering {
         String error_message = fmt::format("OrderBy LogicalType {} not implemented.", type_name);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return std::strong_ordering::equal;
     };
@@ -268,6 +267,12 @@ GenerateSortFunctionTemplate(SharedPtr<BaseExpression> &sort_expression) {
         case LogicalType::kHugeInt: {
             return PhysicalTopCompareSingleValue<compare_order, HugeIntT>::Compare;
         }
+        case LogicalType::kFloat16: {
+            return PhysicalTopCompareSingleValue<compare_order, Float16T>::Compare;
+        }
+        case LogicalType::kBFloat16: {
+            return PhysicalTopCompareSingleValue<compare_order, BFloat16T>::Compare;
+        }
         case LogicalType::kFloat: {
             return PhysicalTopCompareSingleValue<compare_order, FloatT>::Compare;
         }
@@ -315,7 +320,6 @@ void PhysicalTop::Init() {
     sort_expr_count_ = order_by_types_.size();
     if (sort_expr_count_ != sort_expressions_.size()) {
         String error_message = "order_by_types_.size() != sort_expressions_.size()";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     Vector<std::function<std::strong_ordering(const SharedPtr<ColumnVector> &, u32, const SharedPtr<ColumnVector> &, u32)>> sort_functions;
@@ -331,7 +335,6 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
     auto prev_op_state = operator_state->prev_op_state_;
     if ((offset_ != 0) and !(prev_op_state->Complete())) {
         String error_message = "Only 1 PhysicalTop job but !(prev_op_state->Complete())";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto &input_data_block_array = prev_op_state->data_block_array_;
@@ -347,7 +350,6 @@ bool PhysicalTop::Execute(QueryContext *, OperatorState *operator_state) {
     }
     if (!output_data_block_array.empty()) {
         String error_message = "output data_block_array_ is not empty";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto eval_columns = GetEvalColumns(sort_expressions_, (static_cast<TopOperatorState *>(operator_state))->expr_states_, input_data_block_array);

@@ -47,7 +47,6 @@ struct ModuloFunction {
 template <>
 inline bool ModuloFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     String error_message = "Not implement: MinusFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -68,6 +67,28 @@ inline bool ModuloFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
         return false;
     }
     return true;
+}
+
+template <>
+inline bool ModuloFunction::Run(Float16T left, Float16T right, Float16T &result) {
+    float mid = 0.0f;
+    const bool success = ModuloFunction::Run(static_cast<float>(left), static_cast<float>(right), mid);
+    result = mid;
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return success;
+}
+
+template <>
+inline bool ModuloFunction::Run(BFloat16T left, BFloat16T right, BFloat16T &result) {
+    float mid = 0.0f;
+    const bool success = ModuloFunction::Run(static_cast<float>(left), static_cast<float>(right), mid);
+    result = mid;
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return success;
 }
 
 void RegisterModuloFunction(const UniquePtr<Catalog> &catalog_ptr) {
@@ -116,6 +137,18 @@ void RegisterModuloFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                        {DataType(LogicalType::kDouble)},
                                        &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, ModuloFunction>);
     function_set_ptr->AddFunction(mod_function_double);
+
+    ScalarFunction mod_function_float16(func_name,
+                                        {DataType(LogicalType::kFloat16), DataType(LogicalType::kFloat16)},
+                                        {DataType(LogicalType::kFloat16)},
+                                        &ScalarFunction::BinaryFunctionWithFailure<Float16T, Float16T, Float16T, ModuloFunction>);
+    function_set_ptr->AddFunction(mod_function_float16);
+
+    ScalarFunction mod_function_bfloat16(func_name,
+                                         {DataType(LogicalType::kBFloat16), DataType(LogicalType::kBFloat16)},
+                                         {DataType(LogicalType::kBFloat16)},
+                                         &ScalarFunction::BinaryFunctionWithFailure<BFloat16T, BFloat16T, BFloat16T, ModuloFunction>);
+    function_set_ptr->AddFunction(mod_function_bfloat16);
 
     Catalog::AddFunctionSet(catalog_ptr.get(), function_set_ptr);
 }

@@ -58,7 +58,7 @@ export {
     constexpr u64 MAX_VECTOR_CHUNK_SIZE = 1024 * 1024UL;
     constexpr u64 MAX_VECTOR_CHUNK_COUNT = std::numeric_limits<u64>::max();
     // Each row has one chunk.
-    constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L;
+    constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 1024 * 1024; // 1MB
     constexpr u64 DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE = 8192UL * 128UL * 8UL;
 
     // segment related constants
@@ -166,12 +166,17 @@ export {
     constexpr u32 DEFAULT_MATCH_TENSOR_OPTION_TOP_N = 10;
     constexpr u32 DEFAULT_FUSION_OPTION_TOP_N = 100;
 
-    constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
+    constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 8 * 1024lu * 1024lu * 1024lu; // 8Gib
     constexpr SizeT DEFAULT_BUFFER_MANAGER_LRU_COUNT = 7;
-    constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "4GB"; // 4Gib
+    constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "8GB"; // 8Gib
 
     constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
     constexpr std::string_view DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
+
+    // default persistence parameter
+    constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "";                        // Empty means disabled
+    constexpr std::string_view DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR = "100MB"; // 100MB
+    constexpr SizeT DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT = 100 * 1024lu * 1024lu;  // 100MB
 
     // config name
     constexpr std::string_view VERSION_OPTION_NAME = "version";
@@ -197,6 +202,9 @@ export {
     constexpr std::string_view COMPACT_INTERVAL_OPTION_NAME = "compact_interval";
     constexpr std::string_view OPTIMIZE_INTERVAL_OPTION_NAME = "optimize_interval";
     constexpr std::string_view MEM_INDEX_CAPACITY_OPTION_NAME = "mem_index_capacity";
+
+    constexpr std::string_view PERSISTENCE_DIR_OPTION_NAME = "persistence_dir";
+    constexpr std::string_view PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME = "persistence_object_size_limit";
 
     constexpr std::string_view BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
     constexpr std::string_view LRU_NUM_OPTION_NAME = "lru_num";

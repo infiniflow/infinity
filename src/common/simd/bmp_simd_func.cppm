@@ -14,14 +14,13 @@
 
 module;
 
-#include "../header.h"
-
+#include "simd_common_intrin_include.h"
 export module bmp_simd_func;
 
 namespace infinity {
 
-#if defined(USE_AVX)
-void avx2_i32scatter_ps(float *base_addr, __m256i vindex, __m256 v8floats) {
+#if defined(__AVX2__)
+void avx2_i32scatter_ps_m256(float *base_addr, __m256i vindex, __m256 v8floats) {
     float *floats = (float *)&v8floats;
     int *indices = (int *)&vindex;
 
@@ -43,7 +42,7 @@ void MultiF32StoreI32AVX(const int32_t *idx, const float *data, float *dest, flo
         __m256 vdata = _mm256_loadu_ps(data);
         __m256 vdest = _mm256_i32gather_ps(dest, vindex, 4);
         vdest = _mm256_fmadd_ps(vdata, _mm256_set1_ps(x), vdest);
-        avx2_i32scatter_ps(dest, vindex, vdest);
+        avx2_i32scatter_ps_m256(dest, vindex, vdest);
         idx += 8;
         data += 8;
     }
@@ -51,8 +50,8 @@ void MultiF32StoreI32AVX(const int32_t *idx, const float *data, float *dest, flo
 
 #endif
 
-#if defined(USE_SSE)
-void avx2_i32scatter_ps(float *base_addr, __m128i vindex, __m128i v8floats) {
+#if defined(__SSE2__)
+void avx2_i32scatter_ps_m128(float *base_addr, __m128i vindex, __m128i v8floats) {
     float *floats = (float *)&v8floats;
     int *indices = (int *)&vindex;
 
@@ -69,7 +68,7 @@ void MultiF32StoreI32SSE(const int32_t *idx, const float *data, float *dest, flo
         __m128 vdata = _mm_loadu_ps(data);
         __m128 vdest = _mm_i32gather_ps(dest, vindex, 4);
         vdest = _mm_fmadd_ps(vdata, _mm_set1_ps(x), vdest);
-        avx2_i32scatter_ps(dest, vindex, vdest);
+        avx2_i32scatter_ps_m128(dest, vindex, vdest);
         idx += 4;
         data += 4;
     }
@@ -84,7 +83,7 @@ void MultiF32StoreI32BF(const int32_t *idx, const float *data, float *dest, floa
 }
 
 export void MultiF32StoreI32(const int32_t *idx, const float *data, float *dest, float x, size_t dim) {
-#if defined(USE_AVX)
+#if defined(__AVX2__)
     if (dim >= 8) {
         MultiF32StoreI32AVX(idx, data, dest, x, dim);
         size_t step = dim & ~7;
@@ -93,7 +92,7 @@ export void MultiF32StoreI32(const int32_t *idx, const float *data, float *dest,
         dim &= 7;
     }
 #endif
-#if defined(USE_SSE) || defined(USE_AVX)
+#if defined(__SSE2__)
     if (dim >= 4) {
         MultiF32StoreI32SSE(idx, data, dest, x, dim);
         size_t step = dim & ~3;
@@ -107,7 +106,7 @@ export void MultiF32StoreI32(const int32_t *idx, const float *data, float *dest,
     }
 }
 
-#if defined(USE_AVX)
+#if defined(__AVX2__)
 
 void MultiF32StoreI8AVX(const int8_t *idx, const float *data, float *dest, float x, size_t dim) {
     const float *data_end = data + (dim & ~31);
@@ -116,7 +115,7 @@ void MultiF32StoreI8AVX(const int8_t *idx, const float *data, float *dest, float
         __m256 vdata = _mm256_loadu_ps(data);
         __m256 vdest = _mm256_i32gather_ps(dest, vindex, 4);
         vdest = _mm256_fmadd_ps(vdata, _mm256_set1_ps(x), vdest);
-        avx2_i32scatter_ps(dest, vindex, vdest);
+        avx2_i32scatter_ps_m256(dest, vindex, vdest);
         idx += 32;
         data += 32;
     }

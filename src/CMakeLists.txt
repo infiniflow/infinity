@@ -351,6 +351,7 @@ target_link_libraries(embedded_infinity_ext PRIVATE
 
 # WARN: python modules shall not link to static libstdc++!!!
 target_link_options(embedded_infinity_ext PRIVATE -static-libgcc)
+set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hidden)
 
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")

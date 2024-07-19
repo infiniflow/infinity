@@ -28,7 +28,6 @@ module;
 #include <cstdlib>
 #include <cstring>
 #include <exception>
-#include <source_location>
 #include <filesystem>
 #include <forward_list>
 #include <functional>
@@ -41,9 +40,12 @@ module;
 #include <random>
 #include <set>
 #include <shared_mutex>
+#include <source_location>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <type_traits>
 #include <typeinfo>
@@ -52,7 +54,6 @@ module;
 #include <utility>
 #include <variant>
 #include <vector>
-#include <span>
 
 export module stl;
 
@@ -72,9 +73,10 @@ export namespace std {
     using std::max;
     using std::min;
 
-    using std::to_string;
-    using std::from_chars;
     using std::errc;
+    using std::error_code;
+    using std::from_chars;
+    using std::to_string;
 
     using std::stoi;
     using std::stol;
@@ -90,8 +92,10 @@ export namespace std {
     using std::memcmp;
     using std::strlen;
 
-    using std::time;
+    using std::fprintf;
     using std::printf;
+    using std::sprintf;
+    using std::time;
 
     using std::is_same;
     using std::fill;
@@ -198,6 +202,8 @@ export namespace std {
     using std::fstream;
     using std::ios;
 
+    using std::endian;
+
     using std::align;
 
     using std::ptrdiff_t;
@@ -208,6 +214,8 @@ export namespace std {
     namespace filesystem {
     using std::filesystem::canonical;
     using std::filesystem::copy;
+    using std::filesystem::copy_file;
+    using std::filesystem::copy_options;
     using std::filesystem::exists;
     using std::filesystem::file_size;
     using std::filesystem::path;
@@ -222,6 +230,7 @@ export namespace std {
     using std::iota;
     using std::mt19937;
     using std::random_device;
+    using std::uniform_int_distribution;
     using std::uniform_real_distribution;
 
     using std::exception;

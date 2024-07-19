@@ -48,21 +48,16 @@ public:
 
     ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
 
-    static UniquePtr<IndexFileWorker> CreateFileWorker(const SharedPtr<IndexBase> index_base,
-                                                       const SharedPtr<ColumnDef> column_def,
-                                                       const SharedPtr<String> &index_dir,
-                                                       CreateIndexParam *param,
-                                                       SegmentID segment_id,
-                                                       ChunkID chunk_id);
-
 public:
     static String IndexFileName(SegmentID segment_id, ChunkID chunk_id);
 
-    static SharedPtr<ChunkIndexEntry> NewChunkIndexEntry(ChunkID chunk_id,
-                                                         SegmentIndexEntry *segment_index_entry,
-                                                         CreateIndexParam *param,
-                                                         RowID base_rowid,
-                                                         BufferManager *buffer_mgr);
+    static SharedPtr<ChunkIndexEntry> NewHnswIndexChunkIndexEntry(ChunkID chunk_id,
+                                                                  SegmentIndexEntry *segment_index_entry,
+                                                                  const String &base_name,
+                                                                  RowID base_rowid,
+                                                                  u32 row_count,
+                                                                  BufferManager *buffer_mgr,
+                                                                  SizeT index_size);
 
     static SharedPtr<ChunkIndexEntry>
     NewFtChunkIndexEntry(SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
@@ -80,6 +75,14 @@ public:
                                                                   RowID base_rowid,
                                                                   u32 row_count,
                                                                   BufferManager *buffer_mgr);
+
+    static SharedPtr<ChunkIndexEntry> NewBMPIndexChunkIndexEntry(ChunkID chunk_id,
+                                                                 SegmentIndexEntry *segment_index_entry,
+                                                                 const String &base_name,
+                                                                 RowID base_rowid,
+                                                                 u32 row_count,
+                                                                 BufferManager *buffer_mgr,
+                                                                 SizeT index_size);
 
     static SharedPtr<ChunkIndexEntry> NewReplayChunkIndexEntry(ChunkID chunk_id,
                                                                SegmentIndexEntry *segment_index_entry,

@@ -34,7 +34,6 @@ struct MulFunction {
     template <typename TA, typename TB, typename TC>
     static inline bool Run(TA, TB, TC &) {
         String error_message = "Not implement: MulFunction::Run";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -76,6 +75,26 @@ inline bool MulFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
     return true;
 }
 
+// Float16T * Float16T = Float16T, and check overflow
+template <>
+inline bool MulFunction::Run(Float16T left, Float16T right, Float16T &result) {
+    result = left * right;
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return true;
+}
+
+// BFloat16T * BFloat16T = BFloat16T, and check overflow
+template <>
+inline bool MulFunction::Run(BFloat16T left, BFloat16T right, BFloat16T &result) {
+    result = left * right;
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return true;
+}
+
 // FloatT * FloatT = FloatT, and check overflow
 template <>
 inline bool MulFunction::Run(FloatT left, FloatT right, FloatT &result) {
@@ -100,7 +119,6 @@ inline bool MulFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 template <>
 inline bool MulFunction::Run(DecimalT, DecimalT, DecimalT &) {
     String error_message = "Not implement: MulFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -109,7 +127,6 @@ inline bool MulFunction::Run(DecimalT, DecimalT, DecimalT &) {
 template <>
 inline bool MulFunction::Run(MixedT, BigIntT, MixedT &) {
     String error_message = "Not implement: MulFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -124,7 +141,6 @@ inline bool MulFunction::Run(BigIntT left, MixedT right, MixedT &result) {
 template <>
 inline bool MulFunction::Run(MixedT, DoubleT, MixedT &) {
     String error_message = "Not implement: MulFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -139,7 +155,6 @@ inline bool MulFunction::Run(DoubleT left, MixedT right, MixedT &result) {
 template <>
 inline bool MulFunction::Run(MixedT, MixedT, MixedT &) {
     String error_message = "Not implement: MulFunction::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }
@@ -190,6 +205,18 @@ void RegisterMulFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                        {DataType(LogicalType::kDouble)},
                                        &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_double);
+
+    ScalarFunction mul_function_float16(func_name,
+                                        {DataType(LogicalType::kFloat16), DataType(LogicalType::kFloat16)},
+                                        {DataType(LogicalType::kFloat16)},
+                                        &ScalarFunction::BinaryFunctionWithFailure<Float16T, Float16T, Float16T, MulFunction>);
+    function_set_ptr->AddFunction(mul_function_float16);
+
+    ScalarFunction mul_function_bfloat16(func_name,
+                                         {DataType(LogicalType::kBFloat16), DataType(LogicalType::kBFloat16)},
+                                         {DataType(LogicalType::kBFloat16)},
+                                         &ScalarFunction::BinaryFunctionWithFailure<BFloat16T, BFloat16T, BFloat16T, MulFunction>);
+    function_set_ptr->AddFunction(mul_function_bfloat16);
 
     ScalarFunction mul_function_Decimal(func_name,
                                         {DataType(LogicalType::kDecimal), DataType(LogicalType::kDecimal)},

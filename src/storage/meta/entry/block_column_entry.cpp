@@ -43,7 +43,6 @@ Vector<std::string_view> BlockColumnEntry::DecodeIndex(std::string_view encode) 
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
         String error_message = fmt::format("Invalid block column entry encode: {}", encode);
-        LOG_ERROR(error_message);
         UnrecoverableError(error_message);
     }
     auto decodes = BlockEntry::DecodeIndex(encode.substr(0, delimiter_i));
@@ -60,7 +59,7 @@ BlockColumnEntry::BlockColumnEntry(const BlockEntry *block_entry, ColumnID colum
       block_entry_(block_entry), column_id_(column_id), base_dir_(base_dir_ref) {}
 
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEntry *block_entry, ColumnID column_id, Txn *txn) {
-    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->base_dir()));
+    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->block_dir()));
     UniquePtr<BlockColumnEntry> block_column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, full_path);
 
     auto begin_ts = txn->BeginTS();
@@ -93,7 +92,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
                                                                         const u64 last_chunk_offset_0,
                                                                         const u64 last_chunk_offset_1,
                                                                         const TxnTimeStamp commit_ts) {
-    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->base_dir()));
+    SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->block_dir()));
     UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, full_path);
     column_entry->file_name_ = MakeShared<String>(std::to_string(column_id) + ".col");
     column_entry->column_type_ = block_entry->GetColumnType(column_id);
@@ -128,7 +127,6 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
             buffer_size = DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE;
         } else {
             String error_message = "unexpected data type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         auto outline_buffer_file_worker =
@@ -143,6 +141,14 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
 }
 
 ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
+    return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadWrite);
+}
+
+ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr) {
+    return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadOnly);
+}
+
+ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
         auto file_worker = MakeUnique<DataFileWorker>(this->base_dir_, this->file_name_, 0);
@@ -150,7 +156,7 @@ ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
     }
 
     ColumnVector column_vector(column_type_);
-    column_vector.Initialize(buffer_mgr, this, block_entry_->row_count());
+    column_vector.Initialize(buffer_mgr, this, block_entry_->row_count(), tipe);
     return column_vector;
 }
 
@@ -161,7 +167,6 @@ SharedPtr<String> BlockColumnEntry::OutlineFilename(const u32 buffer_group_id, c
         return MakeShared<String>(fmt::format("col_{}_out1_{}", column_id_, file_idx));
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return nullptr;
     }
@@ -175,7 +180,6 @@ void BlockColumnEntry::AppendOutlineBuffer(const u32 buffer_group_id, BufferObj 
         outline_buffers_group_1_.push_back(buffer);
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -188,7 +192,6 @@ BufferObj *BlockColumnEntry::GetOutlineBuffer(const u32 buffer_group_id, const S
         return outline_buffers_group_1_[idx];
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return nullptr;
     }
@@ -202,7 +205,6 @@ SizeT BlockColumnEntry::OutlineBufferCount(const u32 buffer_group_id) const {
         return outline_buffers_group_1_.size();
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return 0;
     }
@@ -215,7 +217,6 @@ u64 BlockColumnEntry::LastChunkOff(const u32 buffer_group_id) const {
         return last_chunk_offset_1_;
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return 0;
     }
@@ -228,7 +229,6 @@ void BlockColumnEntry::SetLastChunkOff(const u32 buffer_group_id, const u64 offs
         last_chunk_offset_1_ = offset;
     } else {
         String error_message = "Invalid buffer group id";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -236,7 +236,6 @@ void BlockColumnEntry::SetLastChunkOff(const u32 buffer_group_id, const u64 offs
 void BlockColumnEntry::Append(const ColumnVector *input_column_vector, u16 input_column_vector_offset, SizeT append_rows, BufferManager *buffer_mgr) {
     if (buffer_ == nullptr) {
         String error_message = "Not initialize buffer handle";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     ColumnVector &&column_vector = GetColumnVector(buffer_mgr);
@@ -256,6 +255,8 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
         case kDecimal:
         case kFloat:
         case kDouble:
+        case kFloat16:
+        case kBFloat16:
         case kDate:
         case kTime:
         case kDateTime:
@@ -310,14 +311,12 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
         case kNull: {
             LOG_ERROR(fmt::format("{} isn't supported", column_type->ToString()));
             String error_message = "Not implement: Invalid data type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case kMissing:
         case kInvalid: {
             LOG_ERROR(fmt::format("Invalid data type {}", column_type->ToString()));
             String error_message = "Invalid data type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -387,7 +386,6 @@ BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry
 void BlockColumnEntry::CommitColumn(TransactionID txn_id, TxnTimeStamp commit_ts) {
     if (this->Committed()) {
         String error_message = "Column already committed";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     this->txn_id_ = txn_id;

@@ -71,12 +71,11 @@ void BGTaskProcessor::Process() {
                 case BGTaskType::kForceCheckpoint: {
                     LOG_DEBUG("Force checkpoint in background");
                     ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
-                    auto [max_commit_ts, wal_size] = catalog_->GetCheckpointState();
                     {
                         std::unique_lock<std::mutex> locker(task_mutex_);
                         task_text_ = force_ckp_task->ToString();
                     }
-                    wal_manager_->Checkpoint(force_ckp_task, max_commit_ts, wal_size);
+                    wal_manager_->Checkpoint(force_ckp_task);
                     LOG_DEBUG("Force checkpoint in background done");
                     break;
                 }
@@ -86,19 +85,18 @@ void BGTaskProcessor::Process() {
                         std::unique_lock<std::mutex> locker(task_mutex_);
                         task_text_ = task->ToString();
                     }
-                    catalog_->AddDeltaEntry(std::move(task->delta_entry_), task->wal_size_);
+                    catalog_->AddDeltaEntry(std::move(task->delta_entry_));
                     break;
                 }
                 case BGTaskType::kCheckpoint: {
                     LOG_DEBUG("Checkpoint in background");
                     auto *task = static_cast<CheckpointTask *>(bg_task.get());
                     bool is_full_checkpoint = task->is_full_checkpoint_;
-                    auto [max_commit_ts, wal_size] = catalog_->GetCheckpointState();
                     {
                         std::unique_lock<std::mutex> locker(task_mutex_);
                         task_text_ = task->ToString();
                     }
-                    wal_manager_->Checkpoint(is_full_checkpoint, max_commit_ts, wal_size);
+                    wal_manager_->Checkpoint(is_full_checkpoint);
                     LOG_DEBUG("Checkpoint in background done");
                     break;
                 }
@@ -126,7 +124,6 @@ void BGTaskProcessor::Process() {
                 }
                 default: {
                     String error_message = fmt::format("Invalid background task: {}", (u8)bg_task->type_);
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     break;
                 }

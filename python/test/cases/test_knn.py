@@ -233,7 +233,6 @@ class TestInfinity:
     def test_with_fulltext_match_with_invalid_options(self, check_data, match_param_3):
         self.test_infinity_obj._test_with_fulltext_match_with_invalid_options(check_data, match_param_3)
 
-    @pytest.mark.usefixtures("skip_if_local_infinity")
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_tensor_scan(self, check_data):
@@ -249,7 +248,6 @@ class TestInfinity:
     def test_sparse_knn_with_index(self, check_data):
         self.test_infinity_obj._test_sparse_knn_with_index(check_data)
 
-    @pytest.mark.usefixtures("skip_if_local_infinity")
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_multiple_fusion(self, check_data):

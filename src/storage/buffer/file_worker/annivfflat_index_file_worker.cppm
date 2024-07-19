@@ -87,18 +87,15 @@ template <typename DataType>
 void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
     if (data_) {
         String error_message = "Data is already allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (index_base_->index_type_ != IndexType::kIVFFlat) {
         String error_message = "Index type is mismatched";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto data_type = column_def_->type();
     if (data_type->type() != LogicalType::kEmbedding) {
         String error_message = "Index should be created on embedding column now.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     SizeT dimension = GetDimension();
@@ -115,7 +112,6 @@ void AnnIVFFlatIndexFileWorker<DataType>::AllocateInMemory() {
         }
         default: {
             String error_message = "Index should be created on float embedding column now.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -125,7 +121,6 @@ template <typename DataType>
 void AnnIVFFlatIndexFileWorker<DataType>::FreeInMemory() {
     if (!data_) {
         String error_message = "Data is not allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);

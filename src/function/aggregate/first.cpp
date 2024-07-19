@@ -167,6 +167,20 @@ void RegisterFirstFunction(const UniquePtr<Catalog> &catalog_ptr) {
     }
 
     {
+        AggregateFunction first_function = UnaryAggregate<FirstState<Float16T, Float16T>, Float16T, Float16T>(func_name,
+                                                                                                              DataType(LogicalType::kFloat16),
+                                                                                                              DataType(LogicalType::kFloat16));
+        function_set_ptr->AddFunction(first_function);
+    }
+
+    {
+        AggregateFunction first_function = UnaryAggregate<FirstState<BFloat16T, BFloat16T>, BFloat16T, BFloat16T>(func_name,
+                                                                                                                  DataType(LogicalType::kBFloat16),
+                                                                                                                  DataType(LogicalType::kBFloat16));
+        function_set_ptr->AddFunction(first_function);
+    }
+
+    {
         AggregateFunction first_function =
             UnaryAggregate<FirstState<FloatT, FloatT>, FloatT, FloatT>(func_name, DataType(LogicalType::kFloat), DataType(LogicalType::kFloat));
         function_set_ptr->AddFunction(first_function);

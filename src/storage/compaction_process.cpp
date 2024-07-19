@@ -90,6 +90,7 @@ TxnTimeStamp
 CompactionProcessor::ManualDoCompact(const String &schema_name, const String &table_name, bool rollback, Optional<std::function<void()>> mid_func) {
     auto statement = MakeUnique<ManualCompactStatement>(schema_name, table_name);
     Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("ManualCompact"));
+    LOG_INFO(fmt::format("Compact txn id {}.", txn->TxnID()));
     BGQueryContextWrapper wrapper(txn);
     BGQueryState state;
     bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
@@ -173,7 +174,6 @@ void CompactionProcessor::Process() {
                 }
                 default: {
                     String error_message = fmt::format("Invalid background task: {}", (u8)bg_task->type_);
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     break;
                 }

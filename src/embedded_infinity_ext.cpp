@@ -159,7 +159,9 @@ NB_MODULE(embedded_infinity_ext, m) {
     nb::class_<WrapFusionExpr>(m, "WrapFusionExpr")
         .def(nb::init<>())
         .def_rw("method", &WrapFusionExpr::method)
-        .def_rw("options_text", &WrapFusionExpr::options_text);
+        .def_rw("options_text", &WrapFusionExpr::options_text)
+        .def_rw("has_match_tensor_expr", &WrapFusionExpr::has_match_tensor_expr)
+        .def_rw("match_tensor_expr", &WrapFusionExpr::match_tensor_expr);
 
     // Bind WrapMatchTensorExpr
     nb::class_<WrapMatchTensorExpr>(m, "WrapMatchTensorExpr")
@@ -167,7 +169,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("own_memory", &WrapMatchTensorExpr::own_memory)
         .def_rw("search_method", &WrapMatchTensorExpr::search_method)
         .def_rw("column_expr", &WrapMatchTensorExpr::column_expr)
-        .def_rw("tensor_expr", &WrapMatchTensorExpr::tensor_expr)
+        .def_rw("embedding_data", &WrapMatchTensorExpr::embedding_data)
         .def_rw("embedding_data_type", &WrapMatchTensorExpr::embedding_data_type)
         .def_rw("options_text", &WrapMatchTensorExpr::options_text);
 
@@ -185,9 +187,6 @@ NB_MODULE(embedded_infinity_ext, m) {
     nb::class_<WrapSearchExpr>(m, "WrapSearchExpr")
         .def(nb::init<>())
         .def_rw("match_exprs", &WrapSearchExpr::match_exprs)
-        .def_rw("knn_exprs", &WrapSearchExpr::knn_exprs)
-        .def_rw("match_tensor_exprs", &WrapSearchExpr::match_tensor_exprs)
-        .def_rw("match_sparse_exprs", &WrapSearchExpr::match_sparse_exprs)
         .def_rw("fusion_exprs", &WrapSearchExpr::fusion_exprs);
 
     // Bind WrapParsedExpr
@@ -201,6 +200,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("between_expr", &WrapParsedExpr::between_expr)
         .def_rw("knn_expr", &WrapParsedExpr::knn_expr)
         .def_rw("match_expr", &WrapParsedExpr::match_expr)
+        .def_rw("match_sparse_expr", &WrapParsedExpr::match_sparse_expr)
+        .def_rw("match_tensor_expr", &WrapParsedExpr::match_tensor_expr)
         .def_rw("fusion_expr", &WrapParsedExpr::fusion_expr)
         .def_rw("search_expr", &WrapParsedExpr::search_expr);
 
@@ -333,10 +334,10 @@ NB_MODULE(embedded_infinity_ext, m) {
 
     nb::class_<DropDatabaseOptions>(m, "DropDatabaseOptions").def(nb::init<>()).def_rw("conflict_type", &DropDatabaseOptions::conflict_type_);
 
-    nb::class_<CreateTableOptions>(m, "CreateTableOptions")
+    nb::class_<WrapCreateTableOptions>(m, "WrapCreateTableOptions")
         .def(nb::init<>())
-        .def_rw("conflict_type", &CreateTableOptions::conflict_type_)
-        .def_rw("properties", &CreateTableOptions::properties_);
+        .def_rw("conflict_type", &WrapCreateTableOptions::conflict_type_)
+        .def_rw("properties", &WrapCreateTableOptions::properties_);
 
     nb::class_<DropTableOptions>(m, "DropTableOptions").def(nb::init<>()).def_rw("conflict_type", &DropTableOptions::conflict_type_);
 
@@ -359,10 +360,10 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("row_limit", &ExportOptions::row_limit_)
         .def_rw("copy_file_type", &ExportOptions::copy_file_type_);
 
-    nb::class_<OptimizeOptions>(m, "OptimizeOptions")
+    nb::class_<WrapOptimizeOptions>(m, "WrapOptimizeOptions")
         .def(nb::init<>())
-        .def_rw("index_name", &OptimizeOptions::index_name_)
-        .def_rw("opt_params", &OptimizeOptions::opt_params_);
+        .def_rw("index_name", &WrapOptimizeOptions::index_name_)
+        .def_rw("opt_params", &WrapOptimizeOptions::opt_params_);
 
     // parsed_expr
     nb::enum_<ParsedExprType>(m, "ParsedExprType")
@@ -378,6 +379,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kIn", ParsedExprType::kIn)
         .value("kKnn", ParsedExprType::kKnn)
         .value("kMatch", ParsedExprType::kMatch)
+        .value("kMatchSparse", ParsedExprType::kMatchSparse)
         .value("kMatchTensor", ParsedExprType::kMatchTensor)
         .value("kFusion", ParsedExprType::kFusion)
         .value("kSearch", ParsedExprType::kSearch)

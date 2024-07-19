@@ -52,11 +52,13 @@ void CleanupScanner::CleanupDir(const String &dir) {
         fs.DeleteDirectory(dir);
     } catch (const RecoverableException &e) {
         if (e.ErrorCode() == ErrorCode::kDirNotFound) {
-            // this happen when delta checkpoint records "drop table/db/...", and cleanup is called.
+            // this happens when delta checkpoint records "drop table/db/...", and cleanup is called.
             // then restart the system, table entry will be created but no directory will be found
-            LOG_INFO(fmt::format("Cleanup: Dir {} not found. Skip", dir));
+            LOG_WARN(fmt::format("Cleanup: Dir {} not found. Skip", dir));
         } else {
-            throw;
+            String error_message = fmt::format("Cleanup {} encounter unexpected error: {}", dir, e.what());
+            LOG_CRITICAL(error_message);
+            UnrecoverableError(error_message);
         }
     }
 }

@@ -45,11 +45,10 @@ TxnManager::TxnManager(Catalog *catalog,
     : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false),
       enable_compaction_(enable_compaction) {}
 
-Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
+Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "TxnManager is not running, cannot create txn";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -60,6 +59,15 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text) {
 
     // Record the start ts of the txn
     TxnTimeStamp ts = ++start_ts_;
+    if (ckp_txn) {
+        if (ckp_begin_ts_ != UNCOMMIT_TS) {
+            // not set ckp_begin_ts_ may not truncate the wal file.
+            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing", ckp_begin_ts_, ts));
+        } else {
+            LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", ts));
+            ckp_begin_ts_ = ts;
+        }
+    }
 
     // Create txn instance
     auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts, std::move(txn_text)));
@@ -151,12 +159,10 @@ void TxnManager::SendToWAL(Txn *txn) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "TxnManager is not running, cannot put wal entry";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (wal_mgr_ == nullptr) {
         String error_message = "TxnManager is null";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -166,14 +172,12 @@ void TxnManager::SendToWAL(Txn *txn) {
     std::lock_guard guard(locker_);
     if (wait_conflict_ck_.empty()) {
         String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_ is empty, txn->CommitTS() {}", txn->CommitTS());
-        LOG_ERROR(error_message);
         UnrecoverableError(error_message);
     }
     if (wait_conflict_ck_.begin()->first > commit_ts) {
         String error_message = fmt::format("WalManager::PutEntry wait_conflict_ck_.begin()->first {} > txn->CommitTS() {}",
                                            wait_conflict_ck_.begin()->first,
                                            txn->CommitTS());
-        LOG_ERROR(error_message);
         UnrecoverableError(error_message);
     }
     if (wal_entry) {
@@ -195,11 +199,9 @@ void TxnManager::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
     // Check if the is_running_ is true
     if (is_running_.load() == false) {
         String error_message = "TxnManager is not running, cannot add delta entry";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
-    i64 wal_size = wal_mgr_->WalSize();
-    bg_task_processor_->Submit(MakeShared<AddDeltaEntryTask>(std::move(delta_entry), wal_size));
+    bg_task_processor_->Submit(MakeShared<AddDeltaEntryTask>(std::move(delta_entry)));
 }
 
 void TxnManager::Start() {
@@ -274,6 +276,8 @@ UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
 
 TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
 
+TxnTimeStamp TxnManager::GetNewTimeStamp() { return start_ts_++; }
+
 TxnTimeStamp TxnManager::GetCleanupScanTS() {
     std::lock_guard guard(locker_);
     TxnTimeStamp first_uncommitted_begin_ts = start_ts_;
@@ -300,7 +304,6 @@ void TxnManager::FinishTxn(Txn *txn) {
 
     if (txn->GetTxnType() == TxnType::kInvalid) {
         String error_message = "Txn type is invalid";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     } else if (txn->GetTxnType() == TxnType::kRead) {
         txn_map_.erase(txn->TxnID());
@@ -316,7 +319,6 @@ void TxnManager::FinishTxn(Txn *txn) {
         txn->SetTxnRollbacked();
     } else {
         String error_message = fmt::format("Invalid transaction status: {}", ToString(state));
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     SizeT remove_n = finishing_txns_.erase(txn);
@@ -352,10 +354,19 @@ void TxnManager::FinishTxn(Txn *txn) {
         SizeT remove_n = txn_map_.erase(finished_txn_id);
         if (remove_n == 0) {
             String error_message = fmt::format("Txn: {} not found in txn map", finished_txn_id);
-            LOG_ERROR(error_message);
             UnrecoverableError(error_message);
         }
     }
+}
+
+bool TxnManager::InCheckpointProcess(TxnTimeStamp commit_ts) {
+    std::lock_guard guard(locker_);
+    if (commit_ts > ckp_begin_ts_) {
+        LOG_TRACE(fmt::format("Full checkpoint begin in {}, cur txn commit_ts: {}, swap to new wal file", ckp_begin_ts_, commit_ts));
+        ckp_begin_ts_ = UNCOMMIT_TS;
+        return true;
+    }
+    return false;
 }
 
 } // namespace infinity

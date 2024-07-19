@@ -37,7 +37,6 @@ SharedPtr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const Shar
 
     if (expression->depth() > 1) {
         Status status = Status::SyntaxError("Column expression with depth > 1 is detected");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
@@ -52,7 +51,6 @@ SharedPtr<BaseExpression> CorrelatedExpressionsDetector::VisitReplace(const Shar
     }
 
     Status status = Status::SyntaxError("Not support nested correlated subquery in the subquery plan");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return nullptr;
 }

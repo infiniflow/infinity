@@ -38,31 +38,26 @@ public:
 
     void Initialize() {
         String error_message = "Not implement: MinState::Initialize";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     void Update(const ValueType *__restrict, SizeT) {
         String error_message = "Not implement: MinState::Update";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
         String error_message = "Not implement: MinState::ConstantUpdate";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     [[nodiscard]] ptr_t Finalize() const {
         String error_message = "Not implement: MinState::Finalize";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     inline static SizeT Size(const DataType &) {
         String error_message = "Not implement: MinState::Size";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 };
@@ -167,6 +162,38 @@ public:
 };
 
 template <>
+struct MinState<Float16T, Float16T> {
+public:
+    Float16T value_;
+
+    void Initialize() { this->value_ = std::numeric_limits<Float16T>::max(); }
+
+    void Update(const Float16T *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
+
+    inline void ConstantUpdate(const Float16T *__restrict input, SizeT idx, SizeT) { value_ = input[idx] < value_ ? input[idx] : value_; }
+
+    inline ptr_t Finalize() { return (ptr_t)&value_; }
+
+    inline static SizeT Size(const DataType &) { return sizeof(Float16T); }
+};
+
+template <>
+struct MinState<BFloat16T, BFloat16T> {
+public:
+    BFloat16T value_;
+
+    void Initialize() { this->value_ = std::numeric_limits<BFloat16T>::max(); }
+
+    void Update(const BFloat16T *__restrict input, SizeT idx) { value_ = input[idx] < value_ ? input[idx] : value_; }
+
+    inline void ConstantUpdate(const BFloat16T *__restrict input, SizeT idx, SizeT) { value_ = input[idx] < value_ ? input[idx] : value_; }
+
+    inline ptr_t Finalize() { return (ptr_t)&value_; }
+
+    inline static SizeT Size(const DataType &) { return sizeof(BFloat16T); }
+};
+
+template <>
 struct MinState<FloatT, FloatT> {
 public:
     FloatT value_;
@@ -246,6 +273,18 @@ void RegisterMinFunction(const UniquePtr<Catalog> &catalog_ptr) {
     {
         AggregateFunction max_function =
             UnaryAggregate<MinState<DoubleT, DoubleT>, DoubleT, DoubleT>(func_name, DataType(LogicalType::kDouble), DataType(LogicalType::kDouble));
+        function_set_ptr->AddFunction(max_function);
+    }
+    {
+        AggregateFunction max_function = UnaryAggregate<MinState<Float16T, Float16T>, Float16T, Float16T>(func_name,
+                                                                                                          DataType(LogicalType::kFloat16),
+                                                                                                          DataType(LogicalType::kFloat16));
+        function_set_ptr->AddFunction(max_function);
+    }
+    {
+        AggregateFunction max_function = UnaryAggregate<MinState<BFloat16T, BFloat16T>, BFloat16T, BFloat16T>(func_name,
+                                                                                                              DataType(LogicalType::kBFloat16),
+                                                                                                              DataType(LogicalType::kBFloat16));
         function_set_ptr->AddFunction(max_function);
     }
 #if 0

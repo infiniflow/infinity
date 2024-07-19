@@ -430,6 +430,16 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
             UnrecoverableError(status.message());
         }
 
+        // Persistence Dir
+        String persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
+        UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
+        global_options_.AddOption(std::move(persistence_dir_option));
+
+        // Persistence Object Size Limit
+        i64 persistence_object_size_limit = DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT;
+        UniquePtr<IntegerOption> persistence_object_size_limit_option =
+            MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME, persistence_object_size_limit, std::numeric_limits<i64>::max(), 0);
+        global_options_.AddOption(std::move(persistence_object_size_limit_option));
     } else {
         config_toml = toml::parse_file(*config_path);
 
@@ -1188,6 +1198,73 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
             }
         }
 
+        // Persistence
+        {
+            if (config_toml.contains("persistence")) {
+                auto persistence_config = config_toml["persistence"];
+                auto persistence_config_table = persistence_config.as_table();
+                for (auto &elem : *persistence_config_table) {
+                    String var_name = String(elem.first);
+                    GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
+                    switch (option_index) {
+                        case GlobalOptionIndex::kPersistenceDir: {
+                            String persistence_dir;
+                            if (elem.second.is_string()) {
+                                persistence_dir = elem.second.value_or(DEFAULT_PERSISTENCE_DIR.data());
+                            } else {
+                                return Status::InvalidConfig("'persistence_dir' field isn't string, such as \"persistence\"");
+                            }
+                            UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
+                            global_options_.AddOption(std::move(persistence_dir_option));
+                            break;
+                        }
+                        case GlobalOptionIndex::kPersistenceObjectSizeLimit: {
+                            i64 persistence_object_size_limit;
+                            if (elem.second.is_string()) {
+                                String persistence_object_size_limit_str = elem.second.value_or(DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT_STR.data());
+                                auto res = ParseByteSize(persistence_object_size_limit_str, persistence_object_size_limit);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'persistence_object_size_limit' field isn't string, such as \"100MB\"");
+                            }
+                            UniquePtr<IntegerOption> persistence_object_size_limit_option =
+                                MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME,
+                                                          persistence_object_size_limit,
+                                                          std::numeric_limits<i64>::max(),
+                                                          0);
+                            if (!persistence_object_size_limit_option->Validate()) {
+                                return Status::InvalidConfig(fmt::format("Invalid persistence_object_size_limit: {}", persistence_object_size_limit));
+                            }
+                            global_options_.AddOption(std::move(persistence_object_size_limit_option));
+                            break;
+                        }
+                        case GlobalOptionIndex::kInvalid:
+                        default: {
+                            return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'persistence' field", var_name));
+                        }
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPersistenceDir) == nullptr) {
+                    String persistence_dir = DEFAULT_PERSISTENCE_DIR.data();
+                    UniquePtr<StringOption> persistence_dir_option = MakeUnique<StringOption>(PERSISTENCE_DIR_OPTION_NAME, persistence_dir);
+                    global_options_.AddOption(std::move(persistence_dir_option));
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kPersistenceObjectSizeLimit) == nullptr) {
+                    i64 persistence_object_size_limit = DEFAULT_PERSISTENCE_OBJECT_SIZE_LIMIT;
+                    UniquePtr<IntegerOption> persistence_object_size_limit_option =
+                        MakeUnique<IntegerOption>(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME,
+                                                  persistence_object_size_limit,
+                                                  std::numeric_limits<i64>::max(),
+                                                  0);
+                    global_options_.AddOption(std::move(persistence_object_size_limit_option));
+                }
+            } else {
+                return Status::InvalidConfig("No 'persistence' section in configure file.");
+            }
+        }
+
         // Buffer
         {
             if (config_toml.contains("buffer")) {
@@ -1616,7 +1693,6 @@ void Config::SetRecordRunningQuery(bool flag) {
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kRecordRunningQuery);
     if (base_option->data_type_ != BaseOptionDataType::kBoolean) {
         String error_message = "Attempt to fetch bool value from record running query data type option";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     BooleanOption *record_running_query_option = static_cast<BooleanOption *>(base_option);
@@ -1685,7 +1761,6 @@ void Config::SetLogLevel(LogLevel level) {
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
     if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
         String error_message = "Attempt to fetch log level value from log level data type option";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     LogLevelOption *log_level_option = static_cast<LogLevelOption *>(base_option);
@@ -1698,7 +1773,6 @@ LogLevel Config::GetLogLevel() {
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kLogLevel);
     if (base_option->data_type_ != BaseOptionDataType::kLogLevel) {
         String error_message = "Attempt to fetch log level value from log level data type option";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     LogLevelOption *log_level_option = static_cast<LogLevelOption *>(base_option);
@@ -1729,6 +1803,17 @@ i64 Config::OptimizeIndexInterval() {
 i64 Config::MemIndexCapacity() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexCapacity);
+}
+
+// Persistence
+String Config::PersistenceDir() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetStringValue(GlobalOptionIndex::kPersistenceDir);
+}
+
+i64 Config::PersistenceObjectSizeLimit() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kPersistenceObjectSizeLimit);
 }
 
 // Buffer
@@ -1778,7 +1863,6 @@ FlushOptionType Config::FlushMethodAtCommit() {
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kFlushMethodAtCommit);
     if (base_option->data_type_ != BaseOptionDataType::kFlush) {
         String error_message = "Attempt to fetch flush option value from flush option data type option";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     FlushOption *flush_option = static_cast<FlushOption *>(base_option);

@@ -14,8 +14,9 @@
 
 module;
 
-#include <sstream>
 #include <csignal>
+#include <cstdio>
+#include <sstream>
 //#include "gperftools/profiler.h"
 
 module query_context;
@@ -91,12 +92,14 @@ QueryResult QueryContext::Query(const String &query) {
 
     if (parsed_result->IsError()) {
         StopProfile(QueryPhase::kParser);
-        UnrecoverableError(parsed_result->error_message_);
+        QueryResult query_result;
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::InvalidCommand(parsed_result->error_message_);
+        return query_result;
     }
 
     if (parsed_result->statements_ptr_->size() != 1) {
         String error_message = "Only support single statement.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     StopProfile(QueryPhase::kParser);
@@ -106,7 +109,6 @@ QueryResult QueryContext::Query(const String &query) {
     }
 
     String error_message = "Not reachable";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return QueryResult::UnusedResult();
 }
@@ -145,7 +147,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
             }
         }
 
-        this->BeginTxn();
+        this->BeginTxn(statement);
 //        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
 //                        session_ptr_->GetTxn()->TxnID(),
 //                        session_ptr_->GetTxn()->BeginTS(),
@@ -158,7 +160,6 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         auto status = logical_planner_->Build(statement, bind_context);
         // FIXME
         if (!status.ok()) {
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
 
@@ -222,7 +223,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         query_result.status_.Init(ErrorCode::kParserError, e.what());
 
     } catch (UnrecoverableException &e) {
-
+        printf("UnrecoverableException %s\n", e.what());
         LOG_CRITICAL(e.what());
         raise(SIGUSR1);
 //        throw e;
@@ -260,7 +261,6 @@ bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &st
         SharedPtr<BindContext> bind_context;
         auto status = logical_planner_->Build(statement, bind_context);
         if (!status.ok()) {
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         current_max_node_id_ = bind_context->GetNewLogicalNodeId();
@@ -319,9 +319,10 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts,
     return true;
 }
 
-void QueryContext::BeginTxn() {
+void QueryContext::BeginTxn(const BaseStatement *statement) {
     if (session_ptr_->GetTxn() == nullptr) {
-        Txn* new_txn = storage_->txn_manager()->BeginTxn(nullptr);
+        bool is_checkpoint = statement != nullptr && statement->type_ == StatementType::kFlush;
+        Txn* new_txn = storage_->txn_manager()->BeginTxn(nullptr, is_checkpoint);
         session_ptr_->SetTxn(new_txn);
     }
 }

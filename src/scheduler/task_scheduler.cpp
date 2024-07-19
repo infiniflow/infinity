@@ -76,7 +76,6 @@ void TaskScheduler::Init(Config *config_ptr) {
 
     if (worker_array_.empty()) {
         String error_message = "No cpu is used in scheduler";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -109,7 +108,6 @@ u64 TaskScheduler::FindLeastWorkloadWorker() {
 void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *base_statement) {
     if (!initialized_) {
         String error_message = "Scheduler isn't initialized";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     // DumpPlanFragment(plan_fragment);
@@ -144,12 +142,10 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
                 return ;
             } else {
                 String error_message = "Oops! None select and create idnex statement has multiple fragments.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         } else {
             String error_message = "None select statement has multiple fragments.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -163,7 +159,6 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
             // set the status to running
             if (!task->TryIntoWorkerLoop()) {
                 String error_message = "Task can't be scheduled";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             u64 worker_id = FindLeastWorkloadWorker();
@@ -175,7 +170,6 @@ void TaskScheduler::Schedule(PlanFragment *plan_fragment, const BaseStatement *b
 void TaskScheduler::RunTask(FragmentTask *task) {
 
     bool finish = false;
-    bool error = false;
     task->fragment_context()->notifier()->SetTaskN(1);
     do {
         task->TryIntoWorkerLoop();
@@ -186,11 +180,11 @@ void TaskScheduler::RunTask(FragmentTask *task) {
                 finish = true;
             }
         } else {
-            error = true;
+            task->fragment_context()->notifier()->SetError(task->fragment_context());
             finish = true;
         }
     } while (!finish);
-    task->fragment_context()->notifier()->FinishTask(error, task->fragment_context());
+    task->fragment_context()->notifier()->FinishTask();
 }
 
 void TaskScheduler::ScheduleFragment(PlanFragment *plan_fragment) {
@@ -236,26 +230,25 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
         if (iter == task_lists.end()) {
             iter = task_lists.begin();
         }
-        auto &fragment_task = *iter;
+        auto *fragment_task = *iter;
         if (fragment_task->IsTerminator()) {
             break;
         }
         auto *fragment_ctx = fragment_task->fragment_context();
-        if (!fragment_ctx->notifier()->StartTask()) {
-            --worker_workloads_[worker_id];
-            iter = task_lists.erase(iter);
-            continue;
-        }
-
-        fragment_task->OnExecute();
-        fragment_task->SetLastWorkID(worker_id);
 
         bool error = false;
         bool finish = false;
-
-        if (fragment_task->status() != FragmentTaskStatus::kError) {
+        if (!fragment_ctx->notifier()->StartTask()) {
+            error = true;
+        } else {
+            fragment_task->OnExecute();
+            fragment_task->SetLastWorkID(worker_id);
+            if (fragment_task->status() == FragmentTaskStatus::kError) {
+                error = true;
+            }
+        }
+        if (!error) {
             if (fragment_task->IsComplete()) {
-                // auto *sink_op = fragment_ctx->GetSinkOperator();
                 --worker_workloads_[worker_id];
                 fragment_task->CompleteTask();
                 iter = task_lists.erase(iter);
@@ -267,15 +260,13 @@ void TaskScheduler::WorkerLoop(FragmentTaskBlockQueue *task_queue, i64 worker_id
                 ++iter;
             }
         } else {
-            error = true;
-            finish = true;
             --worker_workloads_[worker_id];
+            fragment_ctx->notifier()->SetError(fragment_ctx);
+            fragment_task->CompleteTask();
             iter = task_lists.erase(iter);
         }
         if (finish || error) {
-            fragment_ctx->notifier()->FinishTask(error, fragment_ctx);
-        } else {
-            fragment_ctx->notifier()->UnstartTask();
+            fragment_ctx->notifier()->FinishTask();
         }
     }
 }

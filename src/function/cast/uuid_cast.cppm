@@ -40,7 +40,6 @@ export inline BoundCastFunc BindUuidCast(DataType &target) {
         }
         default: {
             String error_message = fmt::format("Can't cast from Uuid type to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -59,7 +58,6 @@ struct UuidTryCastToVarlen {
 template <>
 inline bool UuidTryCastToVarlen::Run(const UuidT &, VarcharT &, ColumnVector*) {
     Status status = Status::NotSupport("Not implemented");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 //    target.length_ = UuidT::LENGTH;
 //    std::memcpy(target.prefix, source.body, VarcharT::PREFIX_LENGTH);

@@ -53,7 +53,6 @@ public:
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kCommitting && state_ != TxnState::kStarted) {
             String error_message = fmt::format("Transaction is in {} status, which can't rollback.", ToString(state_));
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         state_ = TxnState::kRollbacking;
@@ -72,7 +71,6 @@ public:
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kCommitting) {
             String error_message = "Transaction isn't in COMMITTING status.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         state_ = TxnState::kCommitted;
@@ -83,7 +81,6 @@ public:
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kStarted) {
             String error_message = "Transaction isn't in STARTED status.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         state_ = TxnState::kCommitting;

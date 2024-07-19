@@ -49,7 +49,6 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
     auto table_ref = table_refs[load_metas[0].binding_.table_idx];
     if (table_ref.get() == nullptr) {
         String error_message = "TableRef not found";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -85,7 +84,7 @@ void PhysicalOperator::InputLoad(QueryContext *query_context, OperatorState *ope
                 auto binding = load_metas[k].binding_;
                 BlockColumnEntry *block_column_ptr = block_entry->GetColumnBlockEntry(binding.column_idx);
 
-                ColumnVector column_vector = block_column_ptr->GetColumnVector(query_context->storage()->buffer_manager());
+                ColumnVector column_vector = block_column_ptr->GetConstColumnVector(query_context->storage()->buffer_manager());
                 input_block->column_vectors[load_metas[k].index_]->AppendWith(column_vector, block_offset, 1);
             }
         }

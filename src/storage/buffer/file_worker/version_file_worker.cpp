@@ -37,12 +37,10 @@ VersionFileWorker::~VersionFileWorker() {
 void VersionFileWorker::AllocateInMemory() {
     if (data_ != nullptr) {
         String error_message = "Data is already allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (capacity_ == 0) {
         String error_message = "Capacity is 0.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto *data = new BlockVersion(capacity_);
@@ -52,7 +50,6 @@ void VersionFileWorker::AllocateInMemory() {
 void VersionFileWorker::FreeInMemory() {
     if (data_ == nullptr) {
         String error_message = "Data is already freed.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto *data = static_cast<BlockVersion *>(data_);
@@ -66,7 +63,6 @@ SizeT VersionFileWorker::GetMemoryCost() const { return capacity_ * sizeof(TxnTi
 void VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     if (data_ == nullptr) {
         String error_message = "Data is not allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto *data = static_cast<BlockVersion *>(data_);
@@ -80,7 +76,6 @@ void VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
 void VersionFileWorker::ReadFromFileImpl() {
     if (data_ != nullptr) {
         String error_message = "Data is already allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto *data = BlockVersion::LoadFromFile(*file_handler_).release();

@@ -43,7 +43,6 @@ public:
     u32 End() {
         if (finished_) {
             String error_message = "End() is called twice!";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return 0;
         }

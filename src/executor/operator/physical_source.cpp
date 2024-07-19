@@ -40,7 +40,6 @@ bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
     switch (source_state->state_type_) {
         case SourceStateType::kInvalid: {
             String error_message = "Unsupported source state type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -62,7 +61,6 @@ bool PhysicalSource::Execute(QueryContext *, SourceState *source_state) {
         }
         default: {
             Status status = Status::NotSupport("Not support source state type");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }

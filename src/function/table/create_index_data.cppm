@@ -35,7 +35,6 @@ export struct CreateIndexSharedData {
             auto [iter, insert_ok] = create_index_idxes_.emplace(segment_id, 0);
             if (!insert_ok) {
                 String error_message = fmt::format("Duplicate segment id: %u", segment_id);
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }

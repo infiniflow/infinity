@@ -76,7 +76,6 @@ struct ColumnValueReaderTypeInEqualsFunction {
 template <>
 inline void InEqualsFunction::Run(MixedT, BigIntT, bool &) {
     Status status = Status::NotSupport("Not implement: mixed <> bigint");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 
@@ -88,7 +87,6 @@ inline void InEqualsFunction::Run(BigIntT left, MixedT right, bool &result) {
 template <>
 inline void InEqualsFunction::Run(MixedT, DoubleT, bool &) {
     Status status = Status::NotSupport("Not implement: mixed <> double");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 
@@ -100,7 +98,6 @@ inline void InEqualsFunction::Run(DoubleT left, MixedT right, bool &result) {
 template <>
 inline void InEqualsFunction::Run(MixedT, VarcharT, bool &) {
     Status status = Status::NotSupport("Not implement: mixed <> varchar");
-    LOG_ERROR(status.message());
     RecoverableError(status);
 }
 
@@ -130,6 +127,8 @@ void RegisterInEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateInEqualsFunction<IntegerT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kInteger));
     GenerateInEqualsFunction<BigIntT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
     GenerateInEqualsFunction<HugeIntT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateInEqualsFunction<FloatT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kFloat16));
+    GenerateInEqualsFunction<FloatT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kBFloat16));
     GenerateInEqualsFunction<FloatT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kFloat));
     GenerateInEqualsFunction<DoubleT, PODTypeInEqualsFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 

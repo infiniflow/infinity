@@ -95,8 +95,9 @@ class TestImport(HttpTest):
         file_format = ["csv", "fvecs"]
         for format in file_format:
             if format == "fvecs":
-                httputils.generate_fvecs(100, 128, "pysdk_test.fvecs")
-                httputils.copy_data("pysdk_test.fvecs")
+                file_name = "http_test.fvecs"
+                httputils.generate_fvecs(100, 128, file_name)
+                httputils.copy_data(file_name)
                 self.drop_table(db_name, table_name)
                 self.create_table(db_name, table_name, [
                     {
@@ -106,7 +107,7 @@ class TestImport(HttpTest):
                         "element_type": "float",
                     }
                 ])
-                file_path = TEST_TMP_DIR + "pysdk_test.fvecs"
+                file_path = TEST_TMP_DIR + file_name
                 assert os.path.exists(file_path)
                 self.import_data(db_name, table_name, {
                     "file_path": file_path,
@@ -528,8 +529,9 @@ class TestImport(HttpTest):
     # PASS
     def test_http_import_10000_columns(self):
         httputils.check_data(TEST_TMP_DIR)
-        httputils.generate_big_int_csv(10000, "pysdk_test_big_int.csv")
-        httputils.copy_data("pysdk_test_big_int.csv")
+        file_name = "http_test_big_int.csv"
+        httputils.generate_big_int_csv(10000, file_name)
+        httputils.copy_data(file_name)
         db_name = "default_db"
         table_name = "test_http_test_import_10000_columns"
         self.show_database(db_name)
@@ -538,7 +540,7 @@ class TestImport(HttpTest):
             {"name": "c1", "type": "integer"},
             {"name": "c2", "type": "integer"}
         ])
-        test_csv_dir = TEST_TMP_DIR + "pysdk_test_big_int.csv"
+        test_csv_dir = TEST_TMP_DIR + file_name
         assert os.path.exists(test_csv_dir)
         self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
@@ -581,7 +583,7 @@ class TestImport(HttpTest):
         httputils.check_data(TEST_TMP_DIR)
         db_name = "default_db"
         table_name = "test_http_test_import_with_different_size"
-        filename = "pysdk_test_import_with_different_size.csv"
+        filename = "http_test_import_with_different_size.csv"
         self.show_database(db_name)
         self.drop_table(db_name, table_name)
         self.create_table(db_name, table_name, [
@@ -605,8 +607,9 @@ class TestImport(HttpTest):
     # @pytest.mark.skip(reason="cost too much time")
     def test_http_import_exceeding_rows(self):
         httputils.check_data(TEST_TMP_DIR)
-        httputils.generate_big_rows_csv(1024 * 8192, "pysdk_test_big_varchar_rows.csv")
-        httputils.copy_data("pysdk_test_big_varchar_rows.csv")
+        file_name = "http_test_big_varchar_rows.csv"
+        httputils.generate_big_rows_csv(1024 * 8192, file_name)
+        httputils.copy_data(file_name)
         db_name = "default_db"
         table_name = "test_http_test_import_exceeding_rows"
         self.show_database(db_name)
@@ -615,7 +618,7 @@ class TestImport(HttpTest):
             {"name": "c1", "type": "integer"},
             {"name": "c2", "type": "varchar"}
         ])
-        test_csv_dir = TEST_TMP_DIR + "pysdk_test_big_varchar_rows.csv"
+        test_csv_dir = TEST_TMP_DIR + file_name
         res = self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
             "file_type": "csv",
@@ -628,8 +631,9 @@ class TestImport(HttpTest):
     # PASS
     def test_http_import_exceeding_columns(self):
         httputils.check_data(TEST_TMP_DIR)
-        httputils.generate_big_columns_csv(1024, "pysdk_test_big_columns.csv")
-        httputils.copy_data("pysdk_test_big_columns.csv")
+        file_name = "http_test_big_columns.csv"
+        httputils.generate_big_columns_csv(1024, file_name)
+        httputils.copy_data(file_name)
         db_name = "default_db"
         table_name = "test_http_test_import_exceeding_rows"
         self.show_database(db_name)
@@ -638,7 +642,7 @@ class TestImport(HttpTest):
         for i in range(1024):
             columns.append({"name": "c" + str(i), "type": "integer"})
         self.create_table(db_name, table_name, columns)
-        test_csv_dir = TEST_TMP_DIR + "pysdk_test_big_columns.csv"
+        test_csv_dir = TEST_TMP_DIR + file_name
         self.import_data(db_name, table_name, {
             "file_path": test_csv_dir,
             "file_type": "csv",

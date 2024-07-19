@@ -56,8 +56,15 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, DefaultConfig* 
         storage_ = MakeUnique<Storage>(config_.get());
         storage_->Init();
 
+        String persistence_dir = config_->PersistenceDir();
+        if (!persistence_dir.empty()) {
+            i64 persistence_object_size_limit = config_->PersistenceObjectSizeLimit();
+            persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, (SizeT)persistence_object_size_limit);
+        }
+
         inverting_thread_pool_.resize(config_->CPULimit());
         commiting_thread_pool_.resize(config_->CPULimit());
+        hnsw_build_thread_pool_.resize(config_->CPULimit());
         initialized_ = true;
     }
 }

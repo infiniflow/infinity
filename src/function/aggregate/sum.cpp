@@ -36,31 +36,26 @@ struct SumState {
 public:
     inline void Initialize() {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline void Update(const ValueType *__restrict, SizeT) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline void ConstantUpdate(const ValueType *__restrict, SizeT, SizeT) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline ptr_t Finalize() {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
     inline static SizeT Size(const DataType &) {
         Status status = Status::NotSupport("Not implemented");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
 };
@@ -127,6 +122,38 @@ public:
     inline ptr_t Finalize() { return (ptr_t)&sum_; }
 
     inline static SizeT Size(const DataType &) { return sizeof(i64); }
+};
+
+template <>
+struct SumState<Float16T, DoubleT> {
+public:
+    DoubleT sum_;
+
+    inline void Initialize() { this->sum_ = 0; }
+
+    inline void Update(const Float16T *__restrict input, SizeT idx) { sum_ += static_cast<float>(input[idx]); }
+
+    inline void ConstantUpdate(const Float16T *__restrict input, SizeT idx, SizeT count) { sum_ += static_cast<float>(input[idx]) * count; }
+
+    inline ptr_t Finalize() { return (ptr_t)&sum_; }
+
+    inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
+};
+
+template <>
+struct SumState<BFloat16T, DoubleT> {
+public:
+    DoubleT sum_;
+
+    inline void Initialize() { this->sum_ = 0; }
+
+    inline void Update(const BFloat16T *__restrict input, SizeT idx) { sum_ += static_cast<float>(input[idx]); }
+
+    inline void ConstantUpdate(const BFloat16T *__restrict input, SizeT idx, SizeT count) { sum_ += static_cast<float>(input[idx]) * count; }
+
+    inline ptr_t Finalize() { return (ptr_t)&sum_; }
+
+    inline static SizeT Size(const DataType &) { return sizeof(DoubleT); }
 };
 
 template <>
@@ -201,6 +228,20 @@ void RegisterSumFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                                                                   DataType(LogicalType::kHugeInt));
         function_set_ptr->AddFunction(sum_function);
 #endif
+    }
+
+    {
+        AggregateFunction sum_function = UnaryAggregate<SumState<Float16T, DoubleT>, Float16T, DoubleT>(func_name,
+                                                                                                        DataType(LogicalType::kFloat16),
+                                                                                                        DataType(LogicalType::kDouble));
+        function_set_ptr->AddFunction(sum_function);
+    }
+
+    {
+        AggregateFunction sum_function = UnaryAggregate<SumState<BFloat16T, DoubleT>, BFloat16T, DoubleT>(func_name,
+                                                                                                          DataType(LogicalType::kBFloat16),
+                                                                                                          DataType(LogicalType::kDouble));
+        function_set_ptr->AddFunction(sum_function);
     }
 
     {

@@ -40,7 +40,6 @@ export struct TryCastVarcharToVarchar;
 export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataType &target) {
     if (source.type() != LogicalType::kVarchar) {
         String error_message = fmt::format("Expect Varchar type, but it is {}", source.ToString());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     switch (target.type()) {
@@ -68,14 +67,18 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
         case kDouble: {
             return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, DoubleT, TryCastVarcharVector>);
         }
+        case kFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, Float16T, TryCastVarcharVector>);
+        }
+        case kBFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, BFloat16T, TryCastVarcharVector>);
+        }
         case kDecimal: {
             String error_message = fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case kVarchar: {
             String error_message = "Attempt to cast from varchar to varchar";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case kDate: {
@@ -95,32 +98,26 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
         }
         case kArray: {
             String error_message = "Cast from varchar to array";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case kTuple: {
             String error_message = "Cast from varchar to tuple";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case kPoint: {
             String error_message = "Cast from varchar to point";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case kLine: {
             String error_message = "Cast from varchar to line";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case kLineSeg: {
             String error_message = "Cast from varchar to line segment";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         case kBox: {
             String error_message = "Cast from varchar to box";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
             //        case kPath: {
@@ -131,7 +128,6 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             //        }
         case kCircle: {
             String error_message = "Cast from varchar to circle";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
             //        case kBitmap: {
@@ -139,7 +135,6 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
             //        }
         case kUuid: {
             String error_message = "Cast from varchar to uuid";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
             //        case kBlob: {
@@ -153,12 +148,10 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
         }
         case kMixed: {
             String error_message = "Cast from varchar to mix";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         default: {
             String error_message = "Can't convert varchar";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -169,7 +162,6 @@ struct TryCastVarchar {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, TargetType &) {
         String error_message = fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -254,7 +246,6 @@ inline bool TryCastVarchar::Run(const VarcharT &source, IntegerT &target) {
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, DateT &) {
     String error_message = "Cast from varchar to date";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 //    if (source.IsInlined()) {
 //        target.FromString(source.prefix, source.length);
@@ -268,7 +259,6 @@ inline bool TryCastVarchar::Run(const VarcharT &, DateT &) {
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, TimeT &) {
     String error_message = "Cast from varchar to time";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return true;
 }
@@ -277,7 +267,6 @@ inline bool TryCastVarchar::Run(const VarcharT &, TimeT &) {
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, DateTimeT &) {
     String error_message = "Cast from varchar to datetime";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return true;
 }
@@ -286,7 +275,6 @@ inline bool TryCastVarchar::Run(const VarcharT &, DateTimeT &) {
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, TimestampT &) {
     String error_message = "Cast from varchar to timestamp";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return true;
 }
@@ -295,7 +283,6 @@ inline bool TryCastVarchar::Run(const VarcharT &, TimestampT &) {
 template <>
 inline bool TryCastVarchar::Run(const VarcharT &, IntervalT &) {
     String error_message = "Cast from varchar to interval";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return true;
 }
@@ -304,7 +291,6 @@ struct TryCastVarcharVector {
     template <typename SourceType, typename TargetType>
     static inline bool Run(const SourceType &, ColumnVector* source_vector, TargetType &) {
         String error_message = fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -410,6 +396,93 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
             // Used in libc++
             try {
                 target = std::stod(varchar_ptr);
+            } catch(const std::exception &e) {
+                return false;
+            }
+            // Used in libstdc++
+            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
+            // if (ec != std::errc()) {
+            //    return false;
+            // }
+        }
+    }
+    return true;
+}
+
+
+// Cast VarcharT to Float16T type
+template <>
+inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, Float16T &target) {
+    if (source.IsInlined()) {
+        // Used in libc++
+        String substr(source.short_.data_, source.length_);
+        try {
+            target = std::stof(substr);
+        } catch(const std::exception &e) {
+            return false;
+        }
+
+        // Used in libstdc++
+        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        // if (ec != std::errc()) {
+        //     return false;
+        // }
+    } else {
+        {
+            // varchar is vector
+            SizeT varchar_len = source.length_;
+            u32 chunk_id = source.vector_.chunk_id_;
+            u32 chunk_offset = source.vector_.chunk_offset_;
+
+            String varchar_ptr(varchar_len, 0);
+            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.data(), chunk_id, chunk_offset, varchar_len);
+
+            // Used in libc++
+            try {
+                target = std::stof(varchar_ptr);
+            } catch(const std::exception &e) {
+                return false;
+            }
+            // Used in libstdc++
+            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
+            // if (ec != std::errc()) {
+            //    return false;
+            // }
+        }
+    }
+    return true;
+}
+
+// Cast VarcharT to BFloat16T type
+template <>
+inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, BFloat16T &target) {
+    if (source.IsInlined()) {
+        // Used in libc++
+        String substr(source.short_.data_, source.length_);
+        try {
+            target = std::stof(substr);
+        } catch(const std::exception &e) {
+            return false;
+        }
+
+        // Used in libstdc++
+        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        // if (ec != std::errc()) {
+        //     return false;
+        // }
+    } else {
+        {
+            // varchar is vector
+            SizeT varchar_len = source.length_;
+            u32 chunk_id = source.vector_.chunk_id_;
+            u32 chunk_offset = source.vector_.chunk_offset_;
+
+            String varchar_ptr(varchar_len, 0);
+            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.data(), chunk_id, chunk_offset, varchar_len);
+
+            // Used in libc++
+            try {
+                target = std::stof(varchar_ptr);
             } catch(const std::exception &e) {
                 return false;
             }

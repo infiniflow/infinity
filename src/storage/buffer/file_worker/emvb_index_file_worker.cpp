@@ -47,24 +47,20 @@ EMVBIndexFileWorker::~EMVBIndexFileWorker() {
 void EMVBIndexFileWorker::AllocateInMemory() {
     if (data_) {
         const auto error_message = "Data is already allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (index_base_->index_type_ != IndexType::kEMVB) {
         const auto error_message = "Index type is mismatched";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const auto &data_type = column_def_->type();
     if (data_type->type() != LogicalType::kTensor) {
         const auto error_message = "EMVB Index should be created on Tensor column now.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const EmbeddingInfo *column_embedding_info = GetEmbeddingInfo();
     if (column_embedding_info->Type() != EmbeddingDataType::kElemFloat) {
         const auto error_message = "EMVB Index should be created on Float column now.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const auto column_embedding_dim = column_embedding_info->Dimension();
@@ -75,7 +71,6 @@ void EMVBIndexFileWorker::AllocateInMemory() {
         const auto error_message = fmt::format("The dimension of the column embedding should be divisible by residual_pq_subspace_num: {} % {} != 0",
                                                column_embedding_dim,
                                                residual_pq_subspace_num);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     data_ = static_cast<void *>(new EMVBIndex(start_segment_offset_, column_embedding_dim, residual_pq_subspace_num, residual_pq_subspace_bits));
@@ -84,7 +79,6 @@ void EMVBIndexFileWorker::AllocateInMemory() {
 void EMVBIndexFileWorker::FreeInMemory() {
     if (!data_) {
         String error_message = "Data is not allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto index = static_cast<EMVBIndex *>(data_);
@@ -101,7 +95,6 @@ void EMVBIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) 
 void EMVBIndexFileWorker::ReadFromFileImpl() {
     if (data_) {
         const auto error_message = "Data is already allocated.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     const auto column_embedding_dim = GetEmbeddingInfo()->Dimension();

@@ -65,7 +65,6 @@ SharedPtr<LogicalNode>
 BoundDeleteStatement::BuildFrom(SharedPtr<TableRef> &table_ref, QueryContext *query_context, const SharedPtr<BindContext> &bind_context) {
     if (table_ref.get() == nullptr || table_ref->type_ != TableRefType::kTable) {
         String error_message = "Unsupported!";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     return BuildBaseTable(table_ref, query_context, bind_context);
@@ -116,7 +115,6 @@ void BoundDeleteStatement::BuildSubquery(SharedPtr<LogicalNode> &root,
         if (building_subquery_) {
             // nested subquery
             Status status = Status::SyntaxError("Nested subquery detected");
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         condition = UnnestSubquery(root, condition, query_context, bind_context);

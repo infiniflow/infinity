@@ -77,7 +77,6 @@ bool PhysicalUpdate::Execute(QueryContext *query_context, OperatorState *operato
                     // value_column only have one row;
                     if(value_column->Size() != 1) {
                         String error_message = "Expect the column vector has only one row";
-                        LOG_CRITICAL(error_message);
                         UnrecoverableError(error_message);
                         return 0;
                     }

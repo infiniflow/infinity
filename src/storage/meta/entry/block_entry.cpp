@@ -45,7 +45,6 @@ Vector<std::string_view> BlockEntry::DecodeIndex(std::string_view encode) {
     SizeT delimiter_i = encode.rfind('#');
     if (delimiter_i == String::npos) {
         String error_message = fmt::format("Invalid block entry encode: {}", encode);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     auto decodes = SegmentEntry::DecodeIndex(encode.substr(0, delimiter_i));
@@ -200,7 +199,6 @@ u16 BlockEntry::AppendData(TransactionID txn_id,
                                            this->block_id_,
                                            this->using_txn_id_,
                                            txn_id);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -254,7 +252,6 @@ SizeT BlockEntry::DeleteData(TransactionID txn_id, TxnTimeStamp commit_ts, const
                                                block_offset,
                                                block_version->deleted_[block_offset],
                                                commit_ts);
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         block_version->deleted_[block_offset] = commit_ts;
@@ -271,7 +268,6 @@ void BlockEntry::CommitFlushed(TxnTimeStamp commit_ts) {
     auto *block_version = reinterpret_cast<BlockVersion *>(block_version_handle.GetDataMut());
     if (!block_version->created_.empty()) {
         String error_message = "BlockEntry::CommitFlushed: block_version->created_ is not empty";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     block_version->created_.emplace_back(commit_ts, this->row_count_);
@@ -291,7 +287,6 @@ void BlockEntry::CommitBlock(TransactionID txn_id, TxnTimeStamp commit_ts) {
     min_row_ts_ = std::min(min_row_ts_, commit_ts);
     if (commit_ts < max_row_ts_) {
         String error_message = fmt::format("BlockEntry commit_ts {} is less than max_row_ts_ {}", commit_ts, max_row_ts_);
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     max_row_ts_ = commit_ts;
@@ -398,7 +393,10 @@ void BlockEntry::Cleanup() {
     }
     block_version_->PickForCleanup();
 
+    String full_block_dir = fmt::format("{}/{}", *base_dir(), *block_dir_);
+    LOG_DEBUG(fmt::format("Cleaning up block dir: {}", full_block_dir));
     CleanupScanner::CleanupDir(*block_dir_);
+    LOG_DEBUG(fmt::format("Cleaned block dir: {}", full_block_dir));
 }
 
 // TODO: introduce BlockColumnMeta
@@ -494,7 +492,6 @@ void BlockEntry::AddColumnReplay(UniquePtr<BlockColumnEntry> column_entry, Colum
 void BlockEntry::AppendBlock(const Vector<ColumnVector> &column_vectors, SizeT row_begin, SizeT read_size, BufferManager *buffer_mgr) {
     if (read_size + row_count_ > row_capacity_) {
         String error_message = "BlockEntry::AppendBlock: read_size + row_count_ > row_capacity_";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     for (ColumnID column_id = 0; column_id < columns_.size(); ++column_id) {

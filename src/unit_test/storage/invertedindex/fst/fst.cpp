@@ -53,7 +53,7 @@ TEST_F(FstTest, BuildMem) {
 }
 
 TEST_F(FstTest, BuildFile) {
-    String fst_path = String(GetTmpDir()) + "/months.fst";
+    String fst_path = String(GetFullTmpDir()) + "/months.fst";
     std::ofstream ofs(fst_path, std::ios::binary | std::ios::trunc);
     OstreamWriter wtr(ofs);
     FstBuilder builder(wtr);

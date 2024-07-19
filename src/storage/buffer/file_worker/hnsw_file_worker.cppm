@@ -38,9 +38,11 @@ export struct CreateHnswParam : public CreateIndexParam {
 
 export class HnswFileWorker : public IndexFileWorker {
 public:
-    explicit HnswFileWorker(SharedPtr<String> file_dir, SharedPtr<String> file_name, CreateHnswParam *create_hnsw_param)
-        : IndexFileWorker(file_dir, file_name, create_hnsw_param->index_base_, create_hnsw_param->column_def_),
-          chunk_size_(create_hnsw_param->chunk_size_), max_chunk_num_(create_hnsw_param->max_chunk_num_) {}
+    explicit HnswFileWorker(SharedPtr<String> file_dir,
+                            SharedPtr<String> file_name,
+                            SharedPtr<IndexBase> index_base,
+                            SharedPtr<ColumnDef> column_def,
+                            SizeT index_size = 0);
 
     virtual ~HnswFileWorker() override;
 
@@ -50,7 +52,9 @@ public:
 
     FileWorkerType Type() const override { return FileWorkerType::kHNSWIndexFile; }
 
-    void CompressToLVQ(IndexHnsw *index_hnsw);
+    SizeT GetMemoryCost() const override { return index_size_; }
+
+    void SetMemoryCost(SizeT index_size) { index_size_ = index_size; }
 
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
@@ -58,13 +62,7 @@ protected:
     void ReadFromFileImpl() override;
 
 private:
-    EmbeddingDataType GetType() const;
-
-    SizeT GetDimension() const;
-
-private:
-    SizeT chunk_size_{};
-    SizeT max_chunk_num_{};
+    SizeT index_size_{};
 };
 
 } // namespace infinity

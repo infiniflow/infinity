@@ -33,7 +33,7 @@ class LocalFileSystemTest : public BaseTest {};
 TEST_F(LocalFileSystemTest, file_write) {
     using namespace infinity;
     LocalFileSystem local_file_system;
-    String path = String(GetTmpDir()) + "/test_file2.abc";
+    String path = String(GetFullTmpDir()) + "/test_file2.abc";
 
     auto [file_handler, status] =
         local_file_system.OpenFile(path, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kWriteLock);
@@ -56,7 +56,7 @@ TEST_F(LocalFileSystemTest, file_write) {
 TEST_F(LocalFileSystemTest, dir_ops) {
     using namespace infinity;
     LocalFileSystem local_file_system;
-    String dir = String(GetTmpDir()) + "/unit_test";
+    String dir = String(GetFullTmpDir()) + "/unit_test";
     String path = dir + "/test_file.test";
 
     local_file_system.CreateDirectory(dir);

@@ -63,7 +63,9 @@ namespace infinity {
 
 u64 Infinity::GetSessionId() { return session_->session_id(); }
 
-void Infinity::Hello() { std::cout << "hello infinity" << std::endl; }
+void Infinity::Hello() {
+    fmt::print("hello infinity\n");
+}
 
 void Infinity::LocalInit(const String &path) {
     LocalFileSystem fs;
@@ -309,7 +311,6 @@ QueryResult Infinity::ShowVariable(const String &variable_name, SetScope scope) 
         }
         default: {
             String error_message = "Invalid set scope.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -338,7 +339,6 @@ QueryResult Infinity::ShowVariables(SetScope scope) {
         }
         default: {
             String error_message = "Invalid set scope.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -384,7 +384,7 @@ QueryResult Infinity::CreateTable(const String &db_name,
                                   const String &table_name,
                                   Vector<ColumnDef *> column_defs,
                                   Vector<TableConstraint *> constraints,
-                                  const CreateTableOptions &create_table_options) {
+                                  CreateTableOptions create_table_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
@@ -402,7 +402,7 @@ QueryResult Infinity::CreateTable(const String &db_name,
     create_table_info->column_defs_ = std::move(column_defs);
     create_table_info->constraints_ = std::move(constraints);
     create_table_info->conflict_type_ = create_table_options.conflict_type_;
-    create_table_info->properties_ = create_table_options.properties_;
+    create_table_info->properties_ = std::move(create_table_options.properties_);
     create_statement->create_info_ = std::move(create_table_info);
     QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
     return result;
@@ -990,6 +990,7 @@ QueryResult Infinity::Optimize(const String &db_name, const String &table_name, 
         for (auto *param_ptr : optimize_option.opt_params_) {
             auto param = MakeUnique<InitParameter>(std::move(param_ptr->param_name_), std::move(param_ptr->param_value_));
             optimize_statement->opt_params_.push_back(std::move(param));
+            delete param_ptr;
         }
     }
 

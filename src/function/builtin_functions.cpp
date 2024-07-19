@@ -78,7 +78,9 @@ void BuiltinFunctions::RegisterScalarFunction() {
 
     // Arithmetic functions
     RegisterAddFunction(catalog_ptr_);
+    AppendRegisterPlusFunction(catalog_ptr_);
     RegisterSubtractFunction(catalog_ptr_);
+    AppendRegisterMinusFunction(catalog_ptr_);
     RegisterMulFunction(catalog_ptr_);
     RegisterDivFunction(catalog_ptr_);
 

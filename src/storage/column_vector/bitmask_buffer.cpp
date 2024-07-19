@@ -50,7 +50,6 @@ BitmaskBuffer::~BitmaskBuffer() {
 void BitmaskBuffer::Initialize(SizeT count) {
     if ((count & (count - 1)) != 0) {
         String error_message = "Capacity need to be N power of 2.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     count_ = count;
@@ -64,7 +63,6 @@ void BitmaskBuffer::Initialize(SizeT count) {
 void BitmaskBuffer::Initialize(const u64 *input_ptr, SizeT count) {
     if ((count & (count - 1)) != 0) {
         String error_message = "Capacity need to be N power of 2.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     count_ = count;

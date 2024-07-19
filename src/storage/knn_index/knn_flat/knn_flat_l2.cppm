@@ -59,7 +59,6 @@ public:
     void Search(const DistType *base, u16 base_count, u32 segment_id, u16 block_id) final {
         if (!begin_) {
             String error_message = "KnnFlatL2 isn't begin";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -89,7 +88,6 @@ public:
         }
         if (!begin_) {
             String error_message = "KnnFlatL2 isn't begin";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
 
@@ -131,7 +129,6 @@ public:
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             String error_message = "Query index exceeds the limit";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         return distance_array_.get() + idx * this->top_k_;
@@ -140,7 +137,6 @@ public:
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             String error_message = "Query index exceeds the limit";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         return id_array_.get() + idx * this->top_k_;

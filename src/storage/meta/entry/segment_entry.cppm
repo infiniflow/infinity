@@ -53,6 +53,16 @@ export enum class SegmentStatus : u8 {
     kDeprecated,
 };
 
+export String ToString(SegmentStatus segment_status) {
+    switch(segment_status) {
+        case SegmentStatus::kUnsealed: return "Unsealed";
+        case SegmentStatus::kSealed: return "Sealed";
+        case SegmentStatus::kCompacting: return "Compacting";
+        case SegmentStatus::kNoDelete: return "NoDelete";
+        case SegmentStatus::kDeprecated: return "Deprecated";
+    }
+}
+
 export struct SegmentEntry : public BaseEntry, public EntryInterface {
 public:
     friend class BlockEntryIter;
@@ -138,6 +148,7 @@ public:
 public:
     // Const getter
     const TableEntry *GetTableEntry() const { return table_entry_; }
+    SharedPtr<String> base_dir() const;
     const SharedPtr<String> &segment_dir() const { return segment_dir_; }
     SegmentID segment_id() const { return segment_id_; }
     SizeT row_capacity() const { return row_capacity_; }
@@ -212,7 +223,6 @@ protected: // protected for unit test
     void DecreaseRemainRow(SizeT decrease_row_count) {
         if (decrease_row_count > actual_row_count_) {
             String error_message = "Decrease row count exceed actual row count";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         actual_row_count_ -= decrease_row_count;

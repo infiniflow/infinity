@@ -80,7 +80,6 @@ protected:
             // wait for at most 10s
             if (end - start > 10) {
                 String error_message = "WaitFlushDeltaOp timeout";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }
@@ -104,7 +103,6 @@ protected:
             // wait for at most 10s
             if (end - start > 10) {
                 String error_message = "WaitCleanup timeout";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             LOG_INFO(fmt::format("Before usleep. Wait cleanup for {} seconds", end - start));
@@ -146,6 +144,15 @@ protected:
             }
             PhysicalImport::SaveSegmentData(table_entry, txn, segment_entry);
             txn_mgr->CommitTxn(txn);
+        }
+    }
+
+    void RemoveOldWal(const String &wal_dir) {
+        for (const auto &entry : std::filesystem::directory_iterator(wal_dir)) {
+            if (entry.path().extension() == ".log") {
+                continue;
+            }
+            std::filesystem::remove(entry.path());
         }
     }
 };
@@ -437,6 +444,102 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
 
         infinity::InfinityContext::instance().UnInit();
     }
+#ifdef INFINITY_DEBUG
+    EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+    EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+    infinity::GlobalResourceUsage::UnInit();
+#endif
+}
+
+TEST_F(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
+#ifdef INFINITY_DEBUG
+    infinity::GlobalResourceUsage::Init();
+#endif
+
+    auto db_name = MakeShared<String>("default_db");
+    auto table_name = MakeShared<String>("tbl1");
+    Vector<SharedPtr<ColumnDef>> columns;
+    Vector<SharedPtr<DataType>> column_types;
+    {
+        std::set<ConstraintType> constraints;
+        auto column_def_ptr = MakeShared<ColumnDef>(0, MakeShared<DataType>(DataType(LogicalType::kInteger)), "col1", constraints);
+        columns.emplace_back(column_def_ptr);
+        column_types.emplace_back(column_def_ptr->type());
+    }
+
+    String wal_dir;
+    int insert_n = 100;
+    {
+        infinity::InfinityContext::instance().Init(nullptr /*config_path*/);
+        Storage *storage = infinity::InfinityContext::instance().storage();
+        TxnManager *txn_mgr = storage->txn_manager();
+
+        {
+
+            auto tbl_def = MakeUnique<TableDef>(db_name, table_name, columns);
+
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("create table"));
+            auto status = txn->CreateTable(*db_name, std::move(tbl_def), ConflictType::kIgnore);
+            EXPECT_TRUE(status.ok());
+            txn_mgr->CommitTxn(txn);
+        }
+
+        auto append = [&] {
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("insert table"));
+            auto [table_entry, get_status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(get_status.ok());
+
+            SharedPtr<DataBlock> input_block = MakeShared<DataBlock>();
+            input_block->Init(column_types);
+            for (int i = 0; i < insert_n; ++i) {
+                input_block->AppendValue(0 /*column_idx*/, Value::MakeInt(i));
+            }
+            input_block->Finalize();
+
+            auto append_status = txn->Append(table_entry, input_block);
+            EXPECT_TRUE(append_status.ok());
+            txn_mgr->CommitTxn(txn);
+        };
+        append();
+        {
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("full ckp"), true);
+            SharedPtr<ForceCheckpointTask> force_ckp_task = MakeShared<ForceCheckpointTask>(txn, true /*full_check_point*/);
+            storage->bg_processor()->Submit(force_ckp_task);
+            append();
+            force_ckp_task->Wait();
+
+            txn_mgr->CommitTxn(txn);
+        }
+        wal_dir = storage->wal_manager()->wal_dir();
+
+        infinity::InfinityContext::instance().UnInit();
+    }
+    RemoveOldWal(wal_dir);
+    {
+        infinity::InfinityContext::instance().Init(nullptr /*config_path*/);
+        Storage *storage = infinity::InfinityContext::instance().storage();
+        auto *txn_mgr = storage->txn_manager();
+
+        {
+            auto *txn = txn_mgr->BeginTxn(MakeUnique<String>("get table"));
+            auto [table_entry, status] = txn->GetTableByName(*db_name, *table_name);
+            EXPECT_TRUE(status.ok());
+
+            EXPECT_EQ(table_entry->segment_map().size(), 1);
+            auto segment_entry = table_entry->GetSegmentByID(0, txn->BeginTS());
+            EXPECT_NE(segment_entry, nullptr);
+
+            EXPECT_EQ(segment_entry->block_entries().size(), 1);
+            auto block_entry = segment_entry->GetBlockEntryByID(0);
+            EXPECT_NE(block_entry, nullptr);
+
+            auto [start, end] = block_entry->GetVisibleRange(txn->BeginTS(), 0);
+            EXPECT_EQ(int(end - start), insert_n * 2);
+        }
+
+        infinity::InfinityContext::instance().UnInit();
+    }
+
 #ifdef INFINITY_DEBUG
     EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
     EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);

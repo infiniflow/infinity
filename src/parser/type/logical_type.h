@@ -34,6 +34,8 @@
 #include "type/heterogenous/mixed_type.h"
 #include "type/number/decimal_type.h"
 #include "type/number/huge_int.h"
+#include "type/number/float16.h"
+#include "type/number/bfloat16.h"
 
 namespace infinity {
 
@@ -108,6 +110,12 @@ enum LogicalType : int8_t {
     kSparse,
 
     kEmptyArray,
+
+    // FP16
+    kFloat16,
+    // BF16
+    kBFloat16,
+
     kInvalid,
 };
 

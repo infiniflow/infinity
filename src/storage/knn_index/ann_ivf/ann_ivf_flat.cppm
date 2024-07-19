@@ -24,6 +24,7 @@ import index_base;
 import annivfflat_index_data;
 import kmeans_partition;
 import vector_distance;
+import search_top_1;
 import search_top_k;
 import knn_result_handler;
 import bitmask;
@@ -46,7 +47,6 @@ class AnnIVFFlat final : public KnnDistance<typename Compare::DistanceType> {
             return IPDistance<DistType>(x, y, dimension);
         } else {
             String error_message = "Metric type is invalid";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -88,13 +88,11 @@ public:
 
     void Search(const DistType *, u16, u32, u16) final {
         String error_message = "Unsupported search function";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
     void Search(const DistType *, u16, u32, u16, Bitmask &) final {
         String error_message = "Unsupported search function";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -102,12 +100,10 @@ public:
         // check metric type
         if (base_ivf->metric_ != metric) {
             String error_message = "Metric type is invalid";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!begin_) {
             String error_message = "IVFFlat isn't begin";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         n_probes = std::min(n_probes, base_ivf->partition_num_);
@@ -165,12 +161,10 @@ public:
         // check metric type
         if (base_ivf->metric_ != metric) {
             String error_message = "Metric type is invalid";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (!begin_) {
             String error_message = "IVFFlat isn't begin";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         n_probes = std::min(n_probes, base_ivf->partition_num_);
@@ -252,7 +246,6 @@ public:
     [[nodiscard]] inline DistType *GetDistanceByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             String error_message = "Query index exceeds the limit";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         return distance_array_.get() + idx * this->top_k_;
@@ -261,7 +254,6 @@ public:
     [[nodiscard]] inline RowID *GetIDByIdx(u64 idx) const final {
         if (idx >= this->query_count_) {
             String error_message = "Query index exceeds the limit";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         return id_array_.get() + idx * this->top_k_;

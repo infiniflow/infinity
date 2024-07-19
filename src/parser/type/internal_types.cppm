@@ -69,6 +69,11 @@ export using infinity::SparseT;
 
 export using infinity::EmptyArrayT;
 
+// FP16
+export using infinity::Float16T;
+// BF16
+export using infinity::BFloat16T;
+
 export using infinity::RowID;
 export using infinity::TimeUnit;
 

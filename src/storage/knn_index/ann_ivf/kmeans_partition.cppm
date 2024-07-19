@@ -20,10 +20,10 @@ export module kmeans_partition;
 
 import stl;
 import infinity_exception;
-import search_top_k;
 import index_base;
 import vector_distance;
 import logger;
+import simd_functions;
 
 namespace infinity {
 
@@ -78,22 +78,18 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
     constexpr int default_iteration_max = 10;
     if (metric != MetricType::kMetricL2 && metric != MetricType::kMetricInnerProduct) {
         String error_message = "Metric type not implemented";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (dimension <= 0 || vector_count <= 0) {
         String error_message = "Dimension and vector_count must be positive";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (vectors_ptr == nullptr) {
         String error_message = "vectors_ptr cannot be nullptr";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (partition_num > vector_count) {
         String error_message = "partition_num cannot be greater than vector_count";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (partition_num <= 0) {
@@ -190,6 +186,7 @@ export template <typename CentroidsType, typename ElemType, typename CentroidsOu
         // First : assign each training vector to a partition
         {
             // search top 1
+            auto search_top_1_with_dis = GetSIMD_FUNCTIONS().SearchTop1WithDisF32U32_func_ptr_;
             search_top_1_with_dis(dimension,
                                   training_data_num,
                                   training_data,

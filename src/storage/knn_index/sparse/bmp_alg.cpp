@@ -272,11 +272,12 @@ void BMPAlg<DataType, IdxType, CompressType>::Optimize(const BMPOptimizeOptions 
         TailFwd<DataType, IdxType> tail_fwd = block_fwd_.GetTailFwd();
         block_fwd_ = BlockFwd<DataType, IdxType>(block_size);
 
-        BPReordering<IdxType, BMPDocID> bp;
+        BPReordering<IdxType, BMPDocID> bp(term_num);
+        // add bp parameter here
         for (BMPDocID i = 0; i < doc_num; ++i) {
             bp.AddDoc(&fwd[i].first);
         }
-        Vector<BMPDocID> remap = bp(term_num);
+        Vector<BMPDocID> remap = bp();
 
         Vector<BMPDocID> doc_ids;
         std::swap(doc_ids, doc_ids_);

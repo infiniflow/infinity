@@ -61,7 +61,7 @@ public:
                         const SharedPtr<ColumnDef> &column_def,
                         BufferManager *buffer_mgr);
 
-    void Train(u32 centroids_num, const f32 *embedding_data, u32 embedding_num, u32 iter_cnt = 20);
+    void Train(u32 centroids_num, const f32 *embedding_data, u64 embedding_num, u32 iter_cnt = 20);
 
     void AddOneDocEmbeddings(const f32 *embedding_data, u32 embedding_num);
 
@@ -90,7 +90,7 @@ public:
     EMVBIndex &operator=(EMVBIndex &&other); // used only in memindex dump
 
 private:
-    [[nodiscard]] u32 ExpectLeastTrainingDataNum() const;
+    [[nodiscard]] u64 ExpectLeastTrainingDataNum() const;
 
     // return id: offset from start_segment_offset_
     // the two thresholds are for every (query embedding, candidate embedding) pair

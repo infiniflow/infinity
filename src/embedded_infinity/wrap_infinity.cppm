@@ -44,6 +44,7 @@ import between_expr;
 import parsed_expr;
 import search_expr;
 import internal_types;
+import extra_ddl_info;
 
 namespace nb = nanobind;
 
@@ -99,6 +100,16 @@ export struct WrapColumnDef {
     String column_name;
     Set<ConstraintType> constraints;
     WrapConstantExpr constant_expr;
+};
+
+export struct WrapCreateTableOptions {
+    ConflictType conflict_type_{ConflictType::kError};
+    Vector<InitParameter> properties_;
+};
+
+export struct WrapOptimizeOptions {
+    String index_name_;
+    Vector<InitParameter> opt_params_;
 };
 
 export struct WrapQueryResult {
@@ -184,20 +195,23 @@ export struct WrapMatchExpr {
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
-export struct WrapFusionExpr {
-    String method{};
-    String options_text{};
-
-    ParsedExpr *GetParsedExpr(Status &status);
-};
-
 export struct WrapMatchTensorExpr {
     bool own_memory;
     String search_method{};
     WrapColumnExpr column_expr;
-    WrapConstantExpr tensor_expr;
-    String embedding_data_type;
+    EmbeddingData embedding_data;
+    EmbeddingDataType embedding_data_type;
     String options_text;
+
+    ParsedExpr *GetParsedExpr(Status &status);
+};
+
+export struct WrapFusionExpr {
+    String method{};
+    String options_text{};
+    WrapMatchTensorExpr match_tensor_expr;
+    bool has_match_tensor_expr{false};
+
     ParsedExpr *GetParsedExpr(Status &status);
 };
 
@@ -212,11 +226,8 @@ export struct WrapMatchSparseExpr {
 };
 
 export struct WrapSearchExpr {
-    Vector<WrapMatchExpr> match_exprs{};
-    Vector<WrapKnnExpr> knn_exprs{};
-    Vector<WrapMatchTensorExpr> match_tensor_exprs{};
-    Vector<WrapMatchSparseExpr> match_sparse_exprs{};
-    Vector<WrapFusionExpr> fusion_exprs{};
+    Vector<WrapParsedExpr> match_exprs;
+    Vector<WrapFusionExpr> fusion_exprs;
 
     ParsedExpr *GetParsedExpr(Status &status);
 };
@@ -230,6 +241,8 @@ export struct WrapParsedExpr {
     WrapFunctionExpr function_expr;
     WrapBetweenExpr between_expr;
     WrapKnnExpr knn_expr;
+    WrapMatchSparseExpr match_sparse_expr;
+    WrapMatchTensorExpr match_tensor_expr;
     WrapMatchExpr match_expr;
     WrapFusionExpr fusion_expr;
     WrapSearchExpr search_expr;
@@ -279,7 +292,7 @@ export WrapQueryResult WrapCreateTable(Infinity &instance,
                                        const String &db_name,
                                        const String &table_name,
                                        Vector<WrapColumnDef> column_defs,
-                                       const CreateTableOptions &create_table_options);
+                                       WrapCreateTableOptions create_table_options);
 
 export WrapQueryResult WrapDropTable(Infinity &instance, const String &db_name, const String &table_name, const DropTableOptions &drop_table_options);
 
@@ -361,6 +374,6 @@ export WrapQueryResult WrapSearch(Infinity &instance,
                                   WrapParsedExpr *limit_expr = nullptr,
                                   WrapParsedExpr *offset_expr = nullptr);
 
-export WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, OptimizeOptions optimize_options);
+export WrapQueryResult WrapOptimize(Infinity &instance, const String &db_name, const String &table_name, WrapOptimizeOptions optimize_options);
 
 } // namespace infinity

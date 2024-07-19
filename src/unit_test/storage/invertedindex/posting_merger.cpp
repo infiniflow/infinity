@@ -66,13 +66,13 @@ void PostingMergerTest::CreateIndex() {
         column->AppendValue(v);
     }
 
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetTmpDir());
-    MemoryIndexer indexer1(GetTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
+    MemoryIndexer indexer1(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column, 0, 1);
     indexer1.Dump();
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
 
-    auto indexer2 = MakeUnique<MemoryIndexer>(GetTmpDir(), "chunk2", RowID(0U, 1U), flag_, "standard");
+    auto indexer2 = MakeUnique<MemoryIndexer>(GetFullTmpDir(), "chunk2", RowID(0U, 1U), flag_, "standard");
     indexer2->Insert(column, 1, 1);
     indexer2->Dump();
 }
@@ -81,7 +81,7 @@ TEST_F(PostingMergerTest, Basic) {
     using namespace infinity;
     CreateIndex();
 
-    const String index_dir = GetTmpDir();
+    const String index_dir = GetFullTmpDir();
 
     String dst_base_name = "merged_index";
     Path path = Path(index_dir) / dst_base_name;
@@ -145,7 +145,6 @@ TEST_F(PostingMergerTest, Basic) {
             auto [file_handler, status] = fs.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
             if(!status.ok()) {
                 String error_message = status.message();
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             const u32 file_size = fs.GetFileSize(*file_handler);
@@ -155,7 +154,6 @@ TEST_F(PostingMergerTest, Basic) {
             file_handler->Close();
             if (read_count != file_size) {
                 String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }

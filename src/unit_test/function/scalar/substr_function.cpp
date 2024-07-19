@@ -45,7 +45,7 @@ class SubstrFunctionTest : public BaseTest {};
 TEST_F(SubstrFunctionTest, varchar_substr) {
     using namespace infinity;
 
-    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetDataDir()));
+    UniquePtr<Catalog> catalog_ptr = MakeUnique<Catalog>(MakeShared<String>(GetFullDataDir()));
 
     RegisterSubstringFunction(catalog_ptr);
 

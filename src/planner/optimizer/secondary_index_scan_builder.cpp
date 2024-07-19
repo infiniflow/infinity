@@ -48,7 +48,6 @@ public:
             case LogicalNodeType::kFilter: {
                 if (op->right_node().get() != nullptr) {
                     String error_message = "BuildSecondaryIndexScan: Logical filter node shouldn't have right child.";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                 } else if (op->left_node()->operator_type() != LogicalNodeType::kTableScan) {
                     LOG_INFO("BuildSecondaryIndexScan: The left child of Logical filter is not table scan. Cannot push down filter. Need to fix.");

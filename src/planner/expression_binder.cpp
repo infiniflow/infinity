@@ -93,7 +93,6 @@ SharedPtr<BaseExpression> ExpressionBinder::Bind(const ParsedExpr &expr, BindCon
     if (result.get() == nullptr) {
         if (result.get() == nullptr) {
             Status status = Status::SyntaxError(fmt::format("Fail to bind the expression: {}", expr.GetName()));
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
         // Maybe the correlated expression, trying to bind it in the parent context.
@@ -144,7 +143,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildExpression(const ParsedExpr &ex
         }
         default: {
             String error_message = "Unexpected expression type.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -248,7 +246,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
             IntervalT interval_value(expr.integer_value_);
             if (expr.interval_type_ == TimeUnit::kInvalidUnit) {
                 String error_message = "Invalid time unit";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             interval_value.unit = expr.interval_type_;
@@ -278,7 +275,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
         case LiteralType::kSubArrayArray: {
             if (expr.sub_array_array_.size() == 0) {
                 String error_message = "Empty subarray array";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
             switch (expr.sub_array_array_[0]->literal_type_) {
@@ -317,7 +313,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
                     for (const auto &sub_array : expr.sub_array_array_) {
                         if (sub_array->literal_type_ != LiteralType::kSubArrayArray) {
                             const auto error_info = "Invalid TensorArray input format.";
-                            LOG_ERROR(error_info);
                             RecoverableError(Status::SyntaxError(error_info));
                         }
                         if (have_double) {
@@ -361,7 +356,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
                 }
                 default: {
                     String error_message = "Unexpected subarray type";
-                    LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
                     return nullptr;
                 }
@@ -378,7 +372,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildValueExpr(const ConstantExpr &e
     }
 
     String error_message = "Unreachable";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
 }
 
@@ -458,12 +451,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildFuncExpr(const FunctionExpr &ex
         }
         case FunctionType::kTable: {
             String error_message = "Table function shouldn't be bound here.";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         default: {
             String error_message = fmt::format("Unknown function type: {}", function_set_ptr->name());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -478,12 +469,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildCastExpr(const CastExpr &expr, 
 SharedPtr<BaseExpression> ExpressionBinder::BuildCaseExpr(const CaseExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
     if (!expr.case_check_array_) {
         String error_message = "No when and then expression";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (expr.case_check_array_->empty()) {
         String error_message = "No when and then expression";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -576,20 +565,17 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     // Bind query column
     if (parsed_knn_expr.column_expr_->type_ != ParsedExprType::kColumn) {
         String error_message = "Knn expression expect a column expression";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (parsed_knn_expr.topn_ <= 0) {
         String topn = std::to_string(parsed_knn_expr.topn_);
         Status status = Status::InvalidParameterValue("topn", topn, "topn should be greater than 0");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     auto expr_ptr = BuildColExpr((ColumnExpr &)*parsed_knn_expr.column_expr_, bind_context_ptr, depth, false);
     TypeInfo *type_info = expr_ptr->Type().type_info().get();
     if (type_info == nullptr or type_info->type() != TypeInfoType::kEmbedding) {
         Status status = Status::SyntaxError("Expect the column search is an embedding column");
-        LOG_ERROR(status.message());
         RecoverableError(status);
     } else {
         EmbeddingInfo *embedding_info = (EmbeddingInfo *)type_info;
@@ -597,7 +583,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
             Status status = Status::SyntaxError(fmt::format("Query embedding with dimension: {} which doesn't not matched with {}",
                                                             parsed_knn_expr.dimension_,
                                                             embedding_info->Dimension()));
-            LOG_ERROR(status.message());
             RecoverableError(status);
         }
     }
@@ -634,12 +619,10 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
         tensor_column_basic_embedding_dim = embedding_info->Dimension();
         if (tensor_column_basic_embedding_dim == 0) {
             const auto error_info = "The tensor column basic embedding dimension should be greater than 0";
-            LOG_CRITICAL(error_info);
             UnrecoverableError(error_info);
         }
     } else {
         const auto error_info = fmt::format("Expect the column search is an tensor column, but got: {}", column_data_type.ToString());
-        LOG_ERROR(error_info);
         RecoverableError(Status::SyntaxError(error_info));
     }
     Vector<SharedPtr<BaseExpression>> arguments;
@@ -665,7 +648,6 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSpar
     TypeInfo *type_info = column_data_type.type_info().get();
     if (column_data_type.type() != LogicalType::kSparse or type_info == nullptr or type_info->type() != TypeInfoType::kSparse) {
         const auto error_info = fmt::format("Expect the column search is a sparse column, but got: {}", column_data_type.ToString());
-        LOG_ERROR(error_info);
         RecoverableError(Status::SyntaxError(error_info));
     }
 
@@ -684,24 +666,30 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchSparseExpr(const MatchSpar
 }
 
 SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &expr, BindContext *bind_context_ptr, i64 depth, bool) {
-    Vector<SharedPtr<MatchExpression>> match_exprs;
-    Vector<SharedPtr<KnnExpression>> knn_exprs;
-    Vector<SharedPtr<MatchTensorExpression>> match_tensor_exprs;
-    Vector<SharedPtr<MatchSparseExpression>> match_sparse_exprs;
+    Vector<SharedPtr<BaseExpression>> match_exprs;
     Vector<SharedPtr<FusionExpression>> fusion_exprs;
-    for (MatchExpr *match_expr : expr.match_exprs_) {
-        match_exprs.push_back(MakeShared<MatchExpression>(match_expr->fields_, match_expr->matching_text_, match_expr->options_text_));
-    }
-    for (KnnExpr *knn_expr : expr.knn_exprs_) {
-        knn_exprs.push_back(static_pointer_cast<KnnExpression>(BuildKnnExpr(*knn_expr, bind_context_ptr, depth, false)));
-    }
-    for (MatchTensorExpr *match_tensor_expr : expr.match_tensor_exprs_) {
-        match_tensor_exprs.push_back(
-            static_pointer_cast<MatchTensorExpression>(BuildMatchTensorExpr(*match_tensor_expr, bind_context_ptr, depth, false)));
-    }
-    for (MatchSparseExpr *match_sparse_expr : expr.match_sparse_exprs_) {
-        match_sparse_exprs.push_back(
-            static_pointer_cast<MatchSparseExpression>(BuildMatchSparseExpr(std::move(*match_sparse_expr), bind_context_ptr, depth, false)));
+    for (ParsedExpr *match_expr : expr.match_exprs_) {
+        switch (match_expr->type_) {
+            case ParsedExprType::kKnn:
+                match_exprs.push_back(BuildKnnExpr(*static_cast<KnnExpr *>(match_expr), bind_context_ptr, depth, false));
+                break;
+            case ParsedExprType::kMatch: {
+                MatchExpr *match_text_expr = static_cast<MatchExpr *>(match_expr);
+                match_exprs.push_back(
+                    MakeShared<MatchExpression>(match_text_expr->fields_, match_text_expr->matching_text_, match_text_expr->options_text_));
+                break;
+            }
+            case ParsedExprType::kMatchTensor:
+                match_exprs.push_back(BuildMatchTensorExpr(*static_cast<MatchTensorExpr *>(match_expr), bind_context_ptr, depth, false));
+                break;
+            case ParsedExprType::kMatchSparse:
+                match_exprs.push_back(BuildMatchSparseExpr(std::move(*static_cast<MatchSparseExpr *>(match_expr)), bind_context_ptr, depth, false));
+                break;
+            default: {
+                const auto error_info = fmt::format("Unsupported match expression: {}", match_expr->ToString());
+                RecoverableError(Status::SyntaxError(error_info));
+            }
+        }
     }
     for (FusionExpr *fusion_expr : expr.fusion_exprs_) {
         auto output_expr = MakeShared<FusionExpression>(fusion_expr->method_, fusion_expr->options_);
@@ -711,8 +699,7 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildSearchExpr(const SearchExpr &ex
         }
         fusion_exprs.push_back(std::move(output_expr));
     }
-    SharedPtr<SearchExpression> bound_search_expr =
-        MakeShared<SearchExpression>(match_exprs, knn_exprs, match_tensor_exprs, match_sparse_exprs, fusion_exprs);
+    SharedPtr<SearchExpression> bound_search_expr = MakeShared<SearchExpression>(match_exprs, fusion_exprs);
     return bound_search_expr;
 }
 
@@ -749,13 +736,11 @@ ExpressionBinder::BuildSubquery(const SubqueryExpr &expr, BindContext *bind_cont
         }
         case SubqueryType::kAny: {
             const auto error_info = "Not implement: Any";
-            LOG_CRITICAL(error_info);
             UnrecoverableError(error_info);
         }
     }
 
     const auto error_info = "Unreachable";
-    LOG_CRITICAL(error_info);
     UnrecoverableError(error_info);
     return nullptr;
 }
@@ -768,7 +753,6 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
                 if (!bind_context_ptr->allow_distance) {
                     Status status =
                         Status::SyntaxError("DISTANCE() needs to be allowed only when there is only MATCH VECTOR with distance metrics, like L2");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
                 break;
@@ -777,7 +761,6 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
                 if (!bind_context_ptr->allow_similarity) {
                     Status status = Status::SyntaxError(
                         "SIMILARITY() needs to be allowed only when there is only MATCH VECTOR with similarity metrics, like Inner product");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
                 break;
@@ -785,7 +768,6 @@ Optional<SharedPtr<BaseExpression>> ExpressionBinder::TryBuildSpecialFuncExpr(co
             case SpecialType::kScore: {
                 if (!bind_context_ptr->allow_score) {
                     Status status = Status::SyntaxError("SCORE() requires Fusion or MATCH TEXT or MATCH TENSOR");
-                    LOG_ERROR(status.message());
                     RecoverableError(status);
                 }
                 break;
@@ -837,7 +819,6 @@ template <typename T, typename U>
 void FillConcatenatedTensorData(T *output_ptr, const Vector<U> &data_array, const u32 expect_dim) {
     if (data_array.size() != expect_dim) {
         const auto error_info = fmt::format("Mismatch in tensor member dimension, expect: {}, but got: {}", expect_dim, data_array.size());
-        LOG_ERROR(error_info);
         RecoverableError(Status::SyntaxError(error_info));
     }
     for (u32 i = 0; i < expect_dim; ++i) {
@@ -869,7 +850,6 @@ ptr_t GetConcatenatedTensorDataFromSubArray(const Vector<SharedPtr<ConstantExpr>
             }
             default: {
                 const auto error_info = "Tensor subarray type should be IntegerArray or DoubleArray.";
-                LOG_ERROR(error_info);
                 RecoverableError(Status::SyntaxError(error_info));
                 break;
             }
@@ -884,7 +864,6 @@ void FillConcatenatedTensorDataBit(T *output_ptr, const Vector<U> &data_array, c
     static_assert(std::is_same_v<T, u8>);
     if (data_array.size() != expect_dim) {
         const auto error_info = fmt::format("Mismatch in tensor member dimension, expect: {}, but got: {}", expect_dim, data_array.size());
-        LOG_ERROR(error_info);
         RecoverableError(Status::SyntaxError(error_info));
     }
     for (u32 i = 0; i < expect_dim; ++i) {
@@ -918,7 +897,6 @@ ptr_t GetConcatenatedTensorDataFromSubArray<bool>(const Vector<SharedPtr<Constan
             }
             default: {
                 const auto error_info = "Tensor subarray type should be IntegerArray or DoubleArray.";
-                LOG_ERROR(error_info);
                 RecoverableError(Status::SyntaxError(error_info));
                 break;
             }
@@ -935,7 +913,6 @@ ptr_t GetConcatenatedTensorData(const Vector<U> &data_array, const u32 tensor_co
         const auto error_info = fmt::format("Query embedding with dimension: {} which doesn't match with tensor basic dimension {}",
                                             query_total_dimension,
                                             tensor_column_basic_embedding_dim);
-        LOG_ERROR(error_info);
         RecoverableError(Status::SyntaxError(error_info));
     }
     if constexpr (std::is_same_v<T, bool>) {
@@ -960,7 +937,6 @@ ptr_t GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tens
     if constexpr (std::is_same_v<T, bool>) {
         if (tensor_column_basic_embedding_dim % 8 != 0) {
             String error_message = "The tensor column basic embedding dimension should be multiple of 8";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -976,7 +952,6 @@ ptr_t GetConcatenatedTensorData(const ConstantExpr *tensor_expr_, const u32 tens
         }
         default: {
             String error_message = "Unexpected case!";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return nullptr;
         }

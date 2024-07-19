@@ -143,7 +143,9 @@ export enum class GlobalOptionIndex {
     kFlushMethodAtCommit = 28,
     kResourcePath = 29,
     kRecordRunningQuery = 30,
-    kInvalid = 31
+    kPersistenceDir = 31,
+    kPersistenceObjectSizeLimit = 32,
+    kInvalid = 33
 };
 
 export struct GlobalOptions {

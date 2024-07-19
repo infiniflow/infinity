@@ -110,9 +110,11 @@ union ParsedExprType {
 3: FunctionExpr & function_expr,
 4: BetweenExpr & between_expr,
 5: KnnExpr  & knn_expr,
-6: MatchExpr  & match_expr,
-7: FusionExpr & fusion_expr,
-8: SearchExpr & search_expr,
+6: MatchSparseExpr & match_sparse_expr;
+7: MatchTensorExpr & match_tensor_expr;
+8: MatchExpr  & match_expr,
+9: FusionExpr & fusion_expr,
+10: SearchExpr & search_expr,
 }
 
 struct ParsedExpr {
@@ -191,6 +193,13 @@ struct MatchExpr {
 	3: string options_text,
 }
 
+union GenericMatchExpr {
+	1: KnnExpr & match_vector_expr;
+	2: MatchSparseExpr & match_sparse_expr;
+	3: MatchTensorExpr & match_tensor_expr;
+	4: MatchExpr & match_text_expr;
+}
+
 struct FusionExpr {
 	1: string method,
 	2: string options_text,
@@ -198,11 +207,8 @@ struct FusionExpr {
 }
 
 struct SearchExpr {
-	1: optional list<MatchExpr> match_exprs,
-	2: optional list<KnnExpr> knn_exprs,
-    3: optional list<MatchSparseExpr> match_sparse_exprs
-	4: optional list<MatchTensorExpr> match_tensor_exprs,
-	5: optional list<FusionExpr> fusion_exprs,
+	1: optional list<GenericMatchExpr> match_exprs,
+	2: optional list<FusionExpr> fusion_exprs,
 }
 
 struct FunctionExpr {

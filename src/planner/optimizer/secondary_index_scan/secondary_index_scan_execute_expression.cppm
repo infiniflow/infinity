@@ -110,7 +110,6 @@ private:
             }
             default: {
                 String error_message = "FilterExecuteSingleRangeT::AddFilter(): compare type error.";
-                LOG_CRITICAL(error_message);
                 UnrecoverableError(error_message);
             }
         }

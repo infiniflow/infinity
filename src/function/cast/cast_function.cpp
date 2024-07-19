@@ -40,49 +40,41 @@ static BoundCastFunc NumericCast(const DataType &target) {
     switch (target.type()) {
         case kTinyInt: {
             String error_message = fmt::format("Can't cast to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kSmallInt: {
             String error_message = fmt::format("Can't cast to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kInteger: {
             String error_message = fmt::format("Can't cast to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kBigInt: {
             String error_message = fmt::format("Can't cast to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kHugeInt: {
             String error_message = fmt::format("Can't cast to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kFloat: {
             String error_message = fmt::format("Can't cast to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kDouble: {
             String error_message = fmt::format("Can't cast to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         default: {
             String error_message = fmt::format("Can't cast to {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -92,7 +84,6 @@ static BoundCastFunc NumericCast(const DataType &target) {
 BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType &target) {
     if (source == target) {
         String error_message = fmt::format("Attempt to cast from {} to {}", source.ToString(), target.ToString());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -115,6 +106,12 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         case kHugeInt: {
             return BindIntegerCast<HugeIntT>(source, target);
         }
+        case kFloat16: {
+            return BindFloatCast<Float16T>(source, target);
+        }
+        case kBFloat16: {
+            return BindFloatCast<BFloat16T>(source, target);
+        }
         case kFloat: {
             return BindFloatCast<FloatT>(source, target);
         }
@@ -123,7 +120,6 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         }
         case kDecimal: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -132,67 +128,56 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         }
         case kDate: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kTime: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kDateTime: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kTimestamp: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kInterval: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kArray: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kTuple: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kPoint: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kLine: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kLineSeg: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kBox: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -204,7 +189,6 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
 //        }
         case kCircle: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -213,7 +197,6 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
 //        }
         case kUuid: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -234,19 +217,16 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         }
         case kRowID: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kMixed: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
         case kNull: {
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
         }
@@ -255,7 +235,6 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         }
         default:
             String error_message = fmt::format("Can't cast from {} to {}", source.ToString(), target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             break;
     }

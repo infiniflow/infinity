@@ -17,11 +17,12 @@ import pytest
 
 from common import common_values
 import infinity
+from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
-from infinity.remote_thrift.types import make_match_tensor_expr
-
+from infinity.remote_thrift.types import make_match_tensor_expr as remote_make_match_tensor_expr
+from infinity.local_infinity.types import make_match_tensor_expr as local_make_match_tensor_expr
 from internal.utils import copy_data, generate_commas_enwiki
 from internal.test_sdkbase import TestSdk
 
@@ -732,7 +733,7 @@ class TestKnn(TestSdk):
 
         res = db_obj.drop_table("test_sparse_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-    
+
     def _test_sparse_knn_with_index(self, check_data):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Ignore)
@@ -752,7 +753,7 @@ class TestKnn(TestSdk):
                                                       ])], ConflictType.Error)
 
         table_obj.optimize("idx1", {"topk": "3"})
-        
+
         res = (table_obj
                 .output(["*", "_row_id", "_similarity"])
                 .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3,
@@ -778,14 +779,19 @@ class TestKnn(TestSdk):
             copy_data("tensor_maxsim.csv")
         test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        match_tensor_expr = None
+        if isinstance(self.infinity_obj, RemoteThriftInfinityConnection):
+            match_tensor_expr = remote_make_match_tensor_expr('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float',
+                                                              'maxsim')
+        else:
+            match_tensor_expr = local_make_match_tensor_expr('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float',
+                                                              'maxsim')
         res = (table_obj
                .output(["*", "_row_id", "_score"])
                .match('body', 'off', 'topn=4')
                .match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim', 'topn=2')
                .fusion('rrf')
-               .fusion('match_tensor', 'topn=2',
-                       make_match_tensor_expr('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float',
-                                              'maxsim'))
+               .fusion('match_tensor', 'topn=2', match_tensor_expr)
                .to_pl())
         print(res)
 

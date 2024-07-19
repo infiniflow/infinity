@@ -59,12 +59,10 @@ void Bitmask::Reset() {
 void Bitmask::Initialize(SizeT count) {
     if (count_ != 0) {
         String error_message = "Bitmask is already initialized.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if ((count & (count - 1)) != 0) {
         String error_message = "Capacity need to be N power of 2.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     count_ = count;
@@ -96,12 +94,10 @@ void Bitmask::Resize(SizeT new_count) {
     u64 bit_count = new_count & (new_count - 1);
     if (bit_count != 0) {
         String error_message = "New capacity need to be N power of 2.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     if (new_count < count_) {
         String error_message = "New capacity < old capacity.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -254,7 +250,6 @@ void Bitmask::Merge(const Bitmask &other) {
 
     if (count() != other.count()) {
         String error_message = "Attempt to merge two bitmasks with different size.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 
@@ -281,7 +276,6 @@ void Bitmask::MergeOr(const Bitmask &other) {
 
     if (count() != other.count()) {
         String error_message = "Attempt to merge two bitmasks with different size.";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 

@@ -49,13 +49,6 @@ public:
 public:
     explicit DBEntry(DBMeta *db_meta,
                      bool is_delete,
-                     const SharedPtr<String> &db_entry_dir,
-                     const SharedPtr<String> &db_name,
-                     TransactionID txn_id,
-                     TxnTimeStamp begin_ts);
-
-    explicit DBEntry(DBMeta *db_meta,
-                     bool is_delete,
                      const SharedPtr<String> &base_dir,
                      const SharedPtr<String> &db_entry_dir,
                      const SharedPtr<String> &db_name,
@@ -64,7 +57,7 @@ public:
 
     static SharedPtr<DBEntry> NewDBEntry(DBMeta *db_meta,
                                          bool is_delete,
-                                         const SharedPtr<String> &data_dir,
+                                         const SharedPtr<String> &base_dir,
                                          const SharedPtr<String> &db_name,
                                          TransactionID txn_id,
                                          TxnTimeStamp begin_ts);
@@ -88,6 +81,8 @@ public:
     [[nodiscard]] const SharedPtr<String> &db_name_ptr() const { return db_name_; }
 
     [[nodiscard]] const SharedPtr<String> &db_entry_dir() const { return db_entry_dir_; }
+
+    SharedPtr<String> AbsoluteDir() const;
 
     String GetPathNameTail() const;
 
@@ -125,7 +120,6 @@ public:
                          TxnTimeStamp begin_ts);
 
     TableEntry *GetTableReplay(const String &table_name, TransactionID txn_id, TxnTimeStamp begin_ts);
-    //
 
     Vector<TableEntry *> TableCollections(TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -148,9 +142,9 @@ private:
     MetaMap<TableMeta> table_meta_map_{};
 
 private: // TODO: remote it
-    std::shared_mutex &rw_locker() { return table_meta_map_.rw_locker_; }
+    std::shared_mutex &GetTableMetaLock() { return table_meta_map_.GetMetaLock(); }
 
-    HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
+//    HashMap<String, UniquePtr<TableMeta>> &table_meta_map() { return table_meta_map_.meta_map_; }
 
 public:
     void PickCleanup(CleanupScanner *scanner) override;

@@ -48,25 +48,27 @@ public:
 protected:
     const char *GetHomeDir() { return "/var/infinity"; }
 
-    const char *GetDataDir() { return "/var/infinity/data"; }
+    const char *GetFullDataDir() { return "/var/infinity/data"; }
 
-    const char *GetWalDir() { return "/var/infinity/wal"; }
+    const char *GetFullWalDir() { return "/var/infinity/wal"; }
 
-    const char *GetLogDir() { return "/var/infinity/log"; }
+    const char *GetFullLogDir() { return "/var/infinity/log"; }
 
-    const char *GetTmpDir() { return "/var/infinity/tmp"; }
+    const char *GetFullTmpDir() { return "/var/infinity/tmp"; }
+
+    const char *GetTmpDir() { return "tmp"; }
 
     void CleanupDbDirs() {
-        const char *infinity_db_dirs[] = {GetDataDir(), GetWalDir(), GetLogDir(), GetTmpDir()};
+        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir()};
         for (auto &dir : infinity_db_dirs) {
             CleanupDirectory(dir);
         }
     }
 
-    void CleanupTmpDir() { CleanupDirectory(GetTmpDir()); }
+    void CleanupTmpDir() { CleanupDirectory(GetFullTmpDir()); }
 
     void RemoveDbDirs() {
-        const char *infinity_db_dirs[] = {GetDataDir(), GetWalDir(), GetLogDir(), GetTmpDir()};
+        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir()};
         for (auto &dir : infinity_db_dirs) {
             RemoveDirectory(dir);
         }

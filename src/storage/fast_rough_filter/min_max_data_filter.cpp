@@ -81,7 +81,6 @@ void MinMaxDataFilter::SerializeToStringStream(OStringStream &os, u32 total_bina
     auto end_pos = os.tellp();
     if (end_pos - begin_pos != total_binary_bytes) {
         String error_message = "MinMaxDataFilter::SerializeToStringStream(): save size error";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -101,7 +100,6 @@ void MinMaxDataFilter::DeserializeFromStringStream(IStringStream &is) {
         LOG_TRACE("MinMaxDataFilter::DeserializeFromStringStream(): begin with existing filter array");
     } else {
         String error_message = "MinMaxDataFilter::DeserializeFromStringStream(): column_count mismatch";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     for (auto &filter : min_max_filters_) {
@@ -112,7 +110,6 @@ void MinMaxDataFilter::DeserializeFromStringStream(IStringStream &is) {
         }
         if (var_id >= std::variant_size_v<InnerMinMaxDataFilter>) {
             String error_message = "MinMaxDataFilter::DeserializeFromStringStream(): invalid var_id";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
             return;
         }
@@ -120,7 +117,6 @@ void MinMaxDataFilter::DeserializeFromStringStream(IStringStream &is) {
         // check if filter is empty
         if (filter.index() != 0 and filter.index() != var_id) {
             String error_message = "MinMaxDataFilter::DeserializeFromStringStream(): var_id mismatch";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         } else if (filter.index() != 0) {
             LOG_TRACE("MinMaxDataFilter::DeserializeFromStringStream(): overwrite existing filter");
@@ -130,7 +126,6 @@ void MinMaxDataFilter::DeserializeFromStringStream(IStringStream &is) {
         VariantEmplaceFuncs[var_id](&filter);
         std::visit(Overload{[](const std::monostate &empty) -> void {
                                  String error_message = "MinMaxDataFilter::DeserializeFromStringStream(): invalid zero var_id";
-                                 LOG_CRITICAL(error_message);
                                  UnrecoverableError(error_message);
                             },
                             [&is]<typename T>(InnerMinMaxDataFilterT<T> &filter) -> void { filter.LoadFromIStringStream(is); }},
@@ -140,7 +135,6 @@ void MinMaxDataFilter::DeserializeFromStringStream(IStringStream &is) {
     auto end_pos = is.tellg();
     if (end_pos - begin_pos != expected_total_binary_bytes) {
         String error_message = "MinMaxDataFilter::DeserializeFromStringStream(): load size error";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
 }
@@ -157,7 +151,6 @@ void MinMaxDataFilter::SaveToJsonFile(nlohmann::json &entry_json) const {
     auto result_view = os.view();
     if (result_view.size() != total_binary_bytes) {
         String error_message = "MinMaxDataFilter::SaveToJsonFile(): save size error";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     entry_json[JsonTag] = base64::to_base64(result_view);
@@ -174,7 +167,6 @@ bool MinMaxDataFilter::LoadFromJsonFile(const nlohmann::json &entry_json) {
     DeserializeFromStringStream(is);
     if (!is or u32(is.tellg()) != is.view().size()) {
         String error_message = "MinMaxDataFilter::LoadFromJsonFile(): position error";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }

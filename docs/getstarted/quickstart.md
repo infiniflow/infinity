@@ -17,7 +17,7 @@ Infinity, also available as a Python module, eliminates the need for a separate 
 
 1. Install Infinity as a module:
    ```bash
-   pip install infinity-sdk==0.2.1.dev4
+   pip install infinity-sdk==0.2.1
    ```
 2. Use Infinity to conduct a KNN search:
    ```python
@@ -45,13 +45,12 @@ See [Build from Source](https://infiniflow.org/docs/dev/build_from_source).
 
 ### Try our Python examples
 
-- [Create table, insert data, and search](../../example/simple_example.py)
-- [Import file and export data](../../example/import_data.py)
-- [Delete or update data](../../example/delete_update_data.py)
-- [Conduct a vector search](../../example/vector_search.py)
-- [Conduct a full-text search](../../example/fulltext_search.py)
-- [Conduct a fused search](../../example/fusion_search.py)
-- [ColBERT reranker examples](../../example)
+- [Create table, insert data, and search](https://github.com/infiniflow/infinity/blob/main/example/simple_example.py)
+- [Import file and export data](https://github.com/infiniflow/infinity/blob/main/example/import_data.py)
+- [Delete or update data](https://github.com/infiniflow/infinity/blob/main/example/delete_update_data.py)
+- [Conduct a vector search](https://github.com/infiniflow/infinity/blob/main/example/vector_search.py)
+- [Conduct a full-text search](https://github.com/infiniflow/infinity/blob/main/example/fulltext_search.py)
+- [Conduct a hybrid search](https://github.com/infiniflow/infinity/blob/main/example/hybrid_search.py)
 
 ## Python API reference
 

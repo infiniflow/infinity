@@ -14,38 +14,29 @@
 
 module;
 
-#include <functional>
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-#include <immintrin.h>
-#elif defined(__GNUC__) && defined(__aarch64__)
-#include <simde/x86/avx512.h>
-#define __SSE2__
-#endif
-
+#include "simd_common_intrin_include.h"
+export module search_top_k_sgemm;
 import stl;
 import knn_result_handler;
 import mlas_matrix_multiply;
 import vector_distance;
 import heap_twin_operation;
 
-export module search_top_k_sgemm;
-
 namespace infinity {
 
 #if defined(__AVX2__)
-
-export template <typename ID>
-void search_top_k_with_sgemm(u32 k,
-                             u32 dimension,
-                             u32 nx,
-                             const f32 *x,
-                             u32 ny,
-                             const f32 *y,
-                             ID *labels,
-                             f32 *distances = nullptr,
-                             bool sort_ = true,
-                             u32 block_size_x = 4096,
-                             u32 block_size_y = 1024) {
+template <typename ID>
+void inner_search_top_k_with_sgemm_avx2(u32 k,
+                                        u32 dimension,
+                                        u32 nx,
+                                        const f32 *x,
+                                        u32 ny,
+                                        const f32 *y,
+                                        ID *labels,
+                                        f32 *distances,
+                                        bool sort_,
+                                        u32 block_size_x = 4096,
+                                        u32 block_size_y = 1024) {
     if (nx == 0 || ny == 0)
         return;
     UniquePtr<f32[]> distances_holder;
@@ -136,20 +127,25 @@ void search_top_k_with_sgemm(u32 k,
     }
 }
 
-#elif defined(__SSE2__)
-
 export template <typename ID>
-void search_top_k_with_sgemm(u32 k,
-                             u32 dimension,
-                             u32 nx,
-                             const f32 *x,
-                             u32 ny,
-                             const f32 *y,
-                             ID *labels,
-                             f32 *distances = nullptr,
-                             bool sort_ = true,
-                             u32 block_size_x = 4096,
-                             u32 block_size_y = 1024) {
+void search_top_k_with_sgemm_avx2(u32 k, u32 dimension, u32 nx, const f32 *x, u32 ny, const f32 *y, ID *labels, f32 *distances, bool sort_) {
+    return inner_search_top_k_with_sgemm_avx2(k, dimension, nx, x, ny, y, labels, distances, sort_);
+}
+#endif
+
+#if defined(__SSE2__)
+template <typename ID>
+void inner_search_top_k_with_sgemm_sse2(u32 k,
+                                        u32 dimension,
+                                        u32 nx,
+                                        const f32 *x,
+                                        u32 ny,
+                                        const f32 *y,
+                                        ID *labels,
+                                        f32 *distances,
+                                        bool sort_,
+                                        u32 block_size_x = 4096,
+                                        u32 block_size_y = 1024) {
     if (nx == 0 || ny == 0)
         return;
     UniquePtr<f32[]> distances_holder;
@@ -240,6 +236,27 @@ void search_top_k_with_sgemm(u32 k,
     }
 }
 
+export template <typename ID>
+void search_top_k_with_sgemm_sse2(u32 k, u32 dimension, u32 nx, const f32 *x, u32 ny, const f32 *y, ID *labels, f32 *distances, bool sort_) {
+    return inner_search_top_k_with_sgemm_sse2(k, dimension, nx, x, ny, y, labels, distances, sort_);
+}
 #endif
+
+export template <typename TypeX, typename TypeY, typename ID, typename DistType>
+void search_top_k_simple_with_dis(u32 k, u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels, DistType *distances, bool sort_) {
+    heap_twin_multiple<CompareMax<DistType, ID>> heap(nx, k, distances, labels);
+    heap.initialize();
+    for (u32 i = 0; i < nx; ++i) {
+        const DistType *x_i = x + i * dimension;
+        for (u32 j = 0; j < ny; j++) {
+            const DistType *y_j = y + j * dimension;
+            DistType distance = L2Distance<DistType>(x_i, y_j, dimension);
+            heap.add(i, distance, j);
+        }
+    }
+    if (sort_) {
+        heap.sort();
+    }
+}
 
 } // namespace infinity

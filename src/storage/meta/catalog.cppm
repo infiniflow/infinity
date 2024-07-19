@@ -214,6 +214,8 @@ public:
 
     static void AddFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &function_set);
 
+    static void AppendToScalarFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &function_set);
+
     static void AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFunction> &special_function);
 
     static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(Catalog *catalog, String function_name);
@@ -226,7 +228,7 @@ public:
 
     bool SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_path, String &delta_name);
 
-    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry, i64 wal_size);
+    void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
@@ -290,9 +292,9 @@ public:
     ProfileHistory history_{DEFAULT_PROFILER_HISTORY_SIZE};
 
 private: // TODO: remove this
-    std::shared_mutex &rw_locker() { return db_meta_map_.rw_locker_; }
+    std::shared_mutex &GetDbMetaLock() { return db_meta_map_.GetMetaLock(); }
 
-    HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
+//    HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
 
     Atomic<bool> running_{};
     UniquePtr<Thread> mem_index_commit_thread_{};
@@ -305,12 +307,6 @@ public:
     void MemIndexRecover(BufferManager *buffer_manager);
 
     void PickCleanup(CleanupScanner *scanner);
-
-    // delta checkpoint info
-public:
-    Tuple<TxnTimeStamp, i64> GetCheckpointState() const;
-
-    void InitDeltaEntry(TxnTimeStamp max_commit_ts);
 
 private:
     UniquePtr<GlobalCatalogDeltaEntry> global_catalog_delta_entry_{MakeUnique<GlobalCatalogDeltaEntry>()};

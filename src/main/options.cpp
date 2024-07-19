@@ -52,6 +52,9 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(OPTIMIZE_INTERVAL_OPTION_NAME)] = GlobalOptionIndex::kOptimizeIndexInterval;
     name2index_[String(MEM_INDEX_CAPACITY_OPTION_NAME)] = GlobalOptionIndex::kMemIndexCapacity;
 
+    name2index_[String(PERSISTENCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kPersistenceDir;
+    name2index_[String(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME)] = GlobalOptionIndex::kPersistenceObjectSizeLimit;
+
     name2index_[String(BUFFER_MANAGER_SIZE_OPTION_NAME)] = GlobalOptionIndex::kBufferManagerSize;
     name2index_[String(LRU_NUM_OPTION_NAME)] = GlobalOptionIndex::kLRUNum;
     name2index_[String(TEMP_DIR_OPTION_NAME)] = GlobalOptionIndex::kTempDir;
@@ -114,7 +117,6 @@ String GlobalOptions::GetStringValue(GlobalOptionIndex option_index) {
     BaseOption* base_option = GetOptionByIndex(option_index);
     if(base_option->data_type_ != BaseOptionDataType::kString) {
         String error_message = "Attempt to fetch string value from non-string data type option";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     StringOption* string_option = static_cast<StringOption*>(base_option);
@@ -125,7 +127,6 @@ i64 GlobalOptions::GetIntegerValue(GlobalOptionIndex option_index) {
     BaseOption* base_option = GetOptionByIndex(option_index);
     if(base_option->data_type_ != BaseOptionDataType::kInteger) {
         String error_message = "Attempt to fetch integer value from non-integer data type option";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     IntegerOption* integer_option = static_cast<IntegerOption*>(base_option);
@@ -136,7 +137,6 @@ bool GlobalOptions::GetBoolValue(GlobalOptionIndex option_index) {
     BaseOption* base_option = GetOptionByIndex(option_index);
     if(base_option->data_type_ != BaseOptionDataType::kBoolean) {
         String error_message = "Attempt to fetch bool value from non-bool data type option";
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
     }
     BooleanOption* boolean_option = static_cast<BooleanOption*>(base_option);

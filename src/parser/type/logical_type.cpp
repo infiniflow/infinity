@@ -80,6 +80,11 @@ static const char *type2name[] = {
 
     "EmptyArray",
 
+    // FP16
+    "Float16",
+    // BF16
+    "BFloat16",
+
     "Invalid",
 };
 
@@ -140,6 +145,12 @@ std::unordered_map<std::string, LogicalType> name2type = {
     // sparse
     { "sparse" , LogicalType::kSparse},
     { "emptyarray", LogicalType::kEmptyArray},
+
+    // FP16
+    {"float16", LogicalType::kFloat16},
+    // BF16
+    {"bfloat16", LogicalType::kBFloat16},
+
     { "invalid" , LogicalType::kInvalid },
 };
 
@@ -206,6 +217,10 @@ static int64_t type_size[] = {
     sizeof(SparseType),
 
     0, // empty array
+
+    2, // Float16
+    2, // BFloat16
+
     0, // Invalid
 };
 

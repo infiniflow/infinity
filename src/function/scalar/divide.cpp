@@ -46,6 +46,16 @@ struct DivFunction {
 };
 
 template <>
+inline bool DivFunction::Run(Float16T left, Float16T right, DoubleT &result) {
+    return DivFunction::Run(static_cast<float>(left), static_cast<float>(right), result);
+}
+
+template <>
+inline bool DivFunction::Run(BFloat16T left, BFloat16T right, DoubleT &result) {
+    return DivFunction::Run(static_cast<float>(left), static_cast<float>(right), result);
+}
+
+template <>
 inline bool DivFunction::Run(FloatT left, FloatT right, FloatT &result) {
     result = left / DoubleT(right);
     if (std::isnan(result) || std::isinf(result))
@@ -64,7 +74,6 @@ inline bool DivFunction::Run(DoubleT left, DoubleT right, DoubleT &result) {
 template <>
 inline bool DivFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
     Status status = Status::NotSupport("Not implement huge int divide operator.");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return false;
 }
@@ -72,7 +81,6 @@ inline bool DivFunction::Run(HugeIntT, HugeIntT, HugeIntT &) {
 template <>
 inline bool DivFunction::Run(HugeIntT, HugeIntT, DoubleT &) {
     Status status = Status::NotSupport("Not implement huge int divide operator.");
-    LOG_ERROR(status.message());
     RecoverableError(status);
     return false;
 }
@@ -111,6 +119,18 @@ void RegisterDivFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                        {DataType(LogicalType::kDouble)},
                                        &ScalarFunction::BinaryFunctionWithFailure<HugeIntT, HugeIntT, DoubleT, DivFunction>);
     function_set_ptr->AddFunction(div_function_int128);
+
+    ScalarFunction div_function_float16(func_name,
+                                        {DataType(LogicalType::kFloat16), DataType(LogicalType::kFloat16)},
+                                        {DataType(LogicalType::kDouble)},
+                                        &ScalarFunction::BinaryFunctionWithFailure<Float16T, Float16T, DoubleT, DivFunction>);
+    function_set_ptr->AddFunction(div_function_float16);
+
+    ScalarFunction div_function_bfloat16(func_name,
+                                         {DataType(LogicalType::kBFloat16), DataType(LogicalType::kBFloat16)},
+                                         {DataType(LogicalType::kDouble)},
+                                         &ScalarFunction::BinaryFunctionWithFailure<BFloat16T, BFloat16T, DoubleT, DivFunction>);
+    function_set_ptr->AddFunction(div_function_bfloat16);
 
     ScalarFunction div_function_float(func_name,
                                       {DataType(LogicalType::kFloat), DataType(LogicalType::kFloat)},

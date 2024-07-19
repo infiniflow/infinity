@@ -14,33 +14,26 @@
 
 module;
 
-#if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-#include <immintrin.h>
-#elif defined(__GNUC__) && defined(__aarch64__)
-#include <simde/x86/avx512.h>
-#define __SSE2__
-#endif
+#include "simd_common_intrin_include.h"
 
+export module search_top_1_sgemm;
 import stl;
 import mlas_matrix_multiply;
 import vector_distance;
 
-export module search_top_1_sgemm;
-
 namespace infinity {
 
 #if defined(__AVX2__)
-
-export template <typename ID>
-void search_top_1_with_sgemm(u32 dimension,
-                             u32 nx,
-                             const f32 *x,
-                             u32 ny,
-                             const f32 *y,
-                             ID *labels,
-                             f32 *distances = nullptr,
-                             u32 block_size_x = 4096,
-                             u32 block_size_y = 1024) {
+template <typename ID>
+void inner_search_top_1_with_sgemm_avx2(u32 dimension,
+                                        u32 nx,
+                                        const f32 *x,
+                                        u32 ny,
+                                        const f32 *y,
+                                        ID *labels,
+                                        f32 *distances = nullptr,
+                                        u32 block_size_x = 4096,
+                                        u32 block_size_y = 1024) {
     if (nx == 0 || ny == 0)
         return;
     UniquePtr<f32[]> distances_holder;
@@ -155,18 +148,28 @@ void search_top_1_with_sgemm(u32 dimension,
     }
 }
 
-#elif defined(__SSE2__)
+export template <typename ID>
+void search_top_1_with_dis_avx2(u32 dimension, u32 nx, const f32 *x, u32 ny, const f32 *y, ID *labels, f32 *distances) {
+    return inner_search_top_1_with_sgemm_avx2(dimension, nx, x, ny, y, labels, distances);
+}
 
 export template <typename ID>
-void search_top_1_with_sgemm(u32 dimension,
-                             u32 nx,
-                             const f32 *x,
-                             u32 ny,
-                             const f32 *y,
-                             ID *labels,
-                             f32 *distances = nullptr,
-                             u32 block_size_x = 4096,
-                             u32 block_size_y = 1024) {
+void search_top_1_without_dis_avx2(u32 dimension, u32 nx, const f32 *x, u32 ny, const f32 *y, ID *labels) {
+    return inner_search_top_1_with_sgemm_avx2(dimension, nx, x, ny, y, labels);
+}
+#endif
+
+#if defined(__SSE2__)
+template <typename ID>
+void inner_search_top_1_with_sgemm_sse2(u32 dimension,
+                                        u32 nx,
+                                        const f32 *x,
+                                        u32 ny,
+                                        const f32 *y,
+                                        ID *labels,
+                                        f32 *distances = nullptr,
+                                        u32 block_size_x = 4096,
+                                        u32 block_size_y = 1024) {
     if (nx == 0 || ny == 0)
         return;
     UniquePtr<f32[]> distances_holder;
@@ -219,22 +222,20 @@ void search_top_1_with_sgemm(u32 dimension,
 
                     __m128 ip_0 = _mm_loadu_ps(ip_line);
                     __m128 ip_1 = _mm_loadu_ps(ip_line + 4);
-                    
+
                     __m128 distances_0 = _mm_fmadd_ps(ip_0, mul_minus2, y_norm_0);
                     __m128 distances_1 = _mm_fmadd_ps(ip_1, mul_minus2, y_norm_1);
 
                     const __m128 comparison_0 = _mm_cmp_ps(min_distances, distances_0, _CMP_LE_OS);
 
                     min_distances = _mm_blendv_ps(distances_0, min_distances, comparison_0);
-                    min_indices = 
-                        _mm_castps_si128(_mm_blendv_ps(_mm_castsi128_ps(current_indices), _mm_castsi128_ps(min_indices), comparison_0));
+                    min_indices = _mm_castps_si128(_mm_blendv_ps(_mm_castsi128_ps(current_indices), _mm_castsi128_ps(min_indices), comparison_0));
                     current_indices = _mm_add_epi32(current_indices, indices_delta);
 
                     const __m128 comparison_1 = _mm_cmp_ps(min_distances, distances_1, _CMP_LE_OS);
 
                     min_distances = _mm_blendv_ps(distances_1, min_distances, comparison_1);
-                    min_indices = 
-                        _mm_castps_si128(_mm_blendv_ps(_mm_castsi128_ps(current_indices), _mm_castsi128_ps(min_indices), comparison_1));
+                    min_indices = _mm_castps_si128(_mm_blendv_ps(_mm_castsi128_ps(current_indices), _mm_castsi128_ps(min_indices), comparison_1));
                     current_indices = _mm_add_epi32(current_indices, indices_delta);
                 }
 
@@ -281,6 +282,48 @@ void search_top_1_with_sgemm(u32 dimension,
     }
 }
 
+export template <typename ID>
+void search_top_1_with_dis_sse2(u32 dimension, u32 nx, const f32 *x, u32 ny, const f32 *y, ID *labels, f32 *distances) {
+    return inner_search_top_1_with_sgemm_sse2(dimension, nx, x, ny, y, labels, distances);
+}
+
+export template <typename ID>
+void search_top_1_without_dis_sse2(u32 dimension, u32 nx, const f32 *x, u32 ny, const f32 *y, ID *labels) {
+    return inner_search_top_1_with_sgemm_sse2(dimension, nx, x, ny, y, labels);
+}
 #endif
+
+export template <typename TypeX, typename TypeY, typename ID, typename DistType>
+void search_top_1_simple_with_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels, DistType *distances) {
+    for (u32 i = 0; i < nx; ++i) {
+        DistType min_dist = std::numeric_limits<DistType>::max();
+        u32 min_idx = 0;
+        for (u32 j = 0; j < ny; ++j) {
+            DistType dist = L2Distance<DistType>(x + i * dimension, y + j * dimension, dimension);
+            if (dist < min_dist) {
+                min_dist = dist;
+                min_idx = j;
+            }
+        }
+        distances[i] = min_dist;
+        labels[i] = min_idx;
+    }
+}
+
+export template <typename DistType, typename TypeX, typename TypeY, typename ID>
+void search_top_1_simple_without_dis(u32 dimension, u32 nx, const TypeX *x, u32 ny, const TypeY *y, ID *labels) {
+    for (u32 i = 0; i < nx; ++i) {
+        DistType min_dist = std::numeric_limits<DistType>::max();
+        u32 min_idx = 0;
+        for (u32 j = 0; j < ny; ++j) {
+            DistType dist = L2Distance<DistType>(x + i * dimension, y + j * dimension, dimension);
+            if (dist < min_dist) {
+                min_dist = dist;
+                min_idx = j;
+            }
+        }
+        labels[i] = min_idx;
+    }
+}
 
 } // namespace infinity

@@ -100,7 +100,6 @@ private:
     static void BuildFilter(BuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
         if (build_bloom_filter) [[unlikely]] {
             String error_message = "BuildFilter: build_bloom_filter is true, but ValueType can only build min-max filter";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (build_min_max_filter) {
@@ -113,7 +112,6 @@ private:
     static void BuildFilter(BuildFastRoughFilterArg &arg, bool build_min_max_filter, bool build_bloom_filter) {
         if (build_min_max_filter) [[unlikely]] {
             String error_message = "BuildFilter: build_min_max_filter is true, but ValueType can only build bloom filter";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         if (build_bloom_filter) {

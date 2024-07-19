@@ -12,9 +12,9 @@ This document compares the following key specifications of Elasticsearch, Qdrant
 
 You need to watch resource (persisted index size, peak memory, peak cpu, system load etc.) manually.
 
-Keep the environment clean to ensure that the database under test is able to use up all resource of the system.
+Keep the environment clean to ensure that the database under test is able to use up all resources of the system.
 
-Avoid to run multiple databases at the same time, as each one is a significant resource consumer.
+Avoid running multiple databases at the same time, as each one is a significant resource consumer.
 
 Test environment:
 

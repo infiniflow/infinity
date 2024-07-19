@@ -38,7 +38,6 @@ export inline BoundCastFunc BindTimeCast(DataType &target) {
         }
         default: {
             String error_message = fmt::format("Can't cast from Time type to  {}", target.ToString());
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }
@@ -49,7 +48,6 @@ struct TimeTryCastToVarlen {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &, ColumnVector*) {
         String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        LOG_CRITICAL(error_message);
         UnrecoverableError(error_message);
         return false;
     }
@@ -58,7 +56,6 @@ struct TimeTryCastToVarlen {
 template <>
 inline bool TimeTryCastToVarlen::Run(TimeT, VarcharT &, ColumnVector*) {
     String error_message = "Not implement: IntegerTryCastToFixlen::Run";
-    LOG_CRITICAL(error_message);
     UnrecoverableError(error_message);
     return false;
 }

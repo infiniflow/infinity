@@ -38,7 +38,6 @@ SharedPtr<BaseExpression> CastExpression::AddCastToType(const SharedPtr<BaseExpr
         return MakeShared<CastExpression>(cast, source_expr_ptr, target_type);
     } else {
         Status status = Status::NotSupportedTypeConversion(source_expr_ptr->Type().ToString(), target_type.ToString());
-        LOG_ERROR(status.message());
         RecoverableError(status);
     }
     return nullptr;
@@ -49,7 +48,6 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
         case LogicalType::kNull:
         case LogicalType::kInvalid: {
             String error_message = "Invalid data type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
         default:;
@@ -61,6 +59,8 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
         case LogicalType::kSmallInt:
         case LogicalType::kInteger:
         case LogicalType::kBigInt:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
         case LogicalType::kFloat:
         case LogicalType::kDouble:
         case LogicalType::kDecimal: {
@@ -70,6 +70,8 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 case LogicalType::kSmallInt:
                 case LogicalType::kInteger:
                 case LogicalType::kBigInt:
+                case LogicalType::kFloat16:
+                case LogicalType::kBFloat16:
                 case LogicalType::kFloat:
                 case LogicalType::kDouble:
                 case LogicalType::kDecimal:
@@ -124,6 +126,8 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
                 case LogicalType::kSmallInt:
                 case LogicalType::kInteger:
                 case LogicalType::kBigInt:
+                case LogicalType::kFloat16:
+                case LogicalType::kBFloat16:
                 case LogicalType::kFloat:
                 case LogicalType::kDouble:
                 case LogicalType::kDecimal:
@@ -148,7 +152,6 @@ bool CastExpression::CanCast(const DataType &source, const DataType &target) {
         }
         default: {
             String error_message = "Invalid data type";
-            LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);
         }
     }

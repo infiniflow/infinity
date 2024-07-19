@@ -84,7 +84,6 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
         const SegmentID expected_segment_id = base_rowid.segment_id_;
         if (const SegmentID segment_id = segment_entry->segment_id(); segment_id != expected_segment_id) {
             const auto error_msg = fmt::format("EMVBIndex::BuildEMVBIndex: segment_id mismatch: expect {}, got {}.", expected_segment_id, segment_id);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
     }
@@ -95,13 +94,13 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
     }
     const SegmentOffset start_segment_offset = base_rowid.segment_offset_;
     const ColumnID column_id = column_def->id();
-    u32 embedding_count = 0;
+    u64 embedding_count = 0;
     Deque<Pair<u32, u32>> all_embedding_pos;
     {
         // read the segment to get total embedding count
         BlockID block_id = start_segment_offset / DEFAULT_BLOCK_CAPACITY;
         BlockOffset block_offset = start_segment_offset % DEFAULT_BLOCK_CAPACITY;
-        auto column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr));
+        auto column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr));
         const TensorT *tensor_ptr = reinterpret_cast<const TensorT *>(column_vector->data());
         for (u32 i = 0; i < row_count; ++i) {
             {
@@ -109,7 +108,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                 block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
                 if (const BlockID new_block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY; new_block_id != block_id) {
                     block_id = new_block_id;
-                    column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr));
+                    column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr));
                     tensor_ptr = reinterpret_cast<const TensorT *>(column_vector->data());
                 }
             }
@@ -128,21 +127,25 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
         LOG_INFO(std::move(oss).str());
     }
     // prepare centroid count
-    const u32 sqrt_embedding_num = std::sqrt(embedding_count);
-    const u32 centroid_count_before_8 = std::min<u32>(sqrt_embedding_num, embedding_count / 32);
-    const u32 centroid_count = (centroid_count_before_8 + 7) & (~(7u));
+    const u64 sqrt_embedding_num = std::sqrt(embedding_count);
+    const u64 centroid_count_before_8 = std::min<u64>(sqrt_embedding_num, embedding_count / 32ul);
+    const u64 centroid_count = (centroid_count_before_8 + 7ul) & (~(7ul));
     // prepare training data
-    n_centroids_ = centroid_count;
-    const u32 least_training_data_num = ExpectLeastTrainingDataNum();
+    if (centroid_count > std::numeric_limits<u32>::max()) {
+        const auto error_msg = "EMVBIndex::BuildEMVBIndex: centroid_count exceeds u32 limit!";
+        LOG_ERROR(error_msg);
+        UnrecoverableError(error_msg);
+    }
+    n_centroids_ = static_cast<u32>(centroid_count);
+    const auto least_training_data_num = ExpectLeastTrainingDataNum();
     if (embedding_count < least_training_data_num) {
         const auto error_msg =
             fmt::format("EMVBIndex::BuildEMVBIndex: embedding_count must be at least {}, got {} instead.", least_training_data_num, embedding_count);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     // train the index
     {
-        const auto training_embedding_num = std::min<u32>(embedding_count, 8 * least_training_data_num);
+        const auto training_embedding_num = std::min<u64>(embedding_count, 8ul * least_training_data_num);
         const auto training_data = MakeUniqueForOverwrite<f32[]>(training_embedding_num * embedding_dimension_);
         // prepare training data
         {
@@ -153,15 +156,14 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
             std::ranges::sample(all_embedding_pos, std::back_inserter(sample_result), training_embedding_num, gen);
             if (sample_result.size() != training_embedding_num) {
                 const auto error_msg = fmt::format("EMVBIndex::BuildEMVBIndex: sample failed to get {} samples.", training_embedding_num);
-                LOG_ERROR(error_msg);
                 UnrecoverableError(error_msg);
             }
-            for (u32 i = 0; i < training_embedding_num; ++i) {
+            for (u64 i = 0; i < training_embedding_num; ++i) {
                 const auto [sample_row, sample_id] = sample_result[i];
                 const SegmentOffset new_segment_offset = start_segment_offset + sample_row;
                 const BlockID block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY;
                 const BlockOffset block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
-                auto column_vector = block_entries[block_id]->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
+                auto column_vector = block_entries[block_id]->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr);
                 const TensorT *tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
                 const auto [embedding_num, chunk_id, chunk_offset] = tensor_ptr[block_offset];
                 const auto embedding_ptr = column_vector.buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
@@ -192,7 +194,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
         const auto time_4 = std::chrono::high_resolution_clock::now();
         BlockID block_id = start_segment_offset / DEFAULT_BLOCK_CAPACITY;
         BlockOffset block_offset = start_segment_offset % DEFAULT_BLOCK_CAPACITY;
-        auto column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr));
+        auto column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr));
         const TensorT *tensor_ptr = reinterpret_cast<const TensorT *>(column_vector->data());
         for (u32 i = 0; i < row_count; ++i) {
             {
@@ -200,7 +202,7 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
                 block_offset = new_segment_offset % DEFAULT_BLOCK_CAPACITY;
                 if (const BlockID new_block_id = new_segment_offset / DEFAULT_BLOCK_CAPACITY; new_block_id != block_id) {
                     block_id = new_block_id;
-                    column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr));
+                    column_vector = MakeUnique<ColumnVector>(block_entries[block_id]->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr));
                     tensor_ptr = reinterpret_cast<const TensorT *>(column_vector->data());
                 }
             }
@@ -223,25 +225,23 @@ void EMVBIndex::BuildEMVBIndex(const RowID base_rowid,
 // need embedding num:
 // 1. (32 ~ 256) * n_centroids_ for centroids
 // 2. (32 ~ 256) * (1 << residual_pq_subspace_bits) for residual product quantizer
-u32 EMVBIndex::ExpectLeastTrainingDataNum() const { return std::max<u32>(32 * n_centroids_, 32 * (1 << residual_pq_subspace_bits_)); }
+u64 EMVBIndex::ExpectLeastTrainingDataNum() const { return std::max<u64>(32ul * n_centroids_, 32ul * (1ul << residual_pq_subspace_bits_)); }
 
-void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const u32 embedding_num, const u32 iter_cnt) {
+void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const u64 embedding_num, const u32 iter_cnt) {
     // set n_centroids_
     n_centroids_ = centroids_num;
     // check n_centroids_
     if (((n_centroids_ % 8) != 0) || (n_centroids_ == 0)) {
         const auto error_msg = fmt::format("EMVBIndex::Train: n_centroids_ must be a multiple of 8, got {} instead.", n_centroids_);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     // allocate space for centroids
-    centroids_data_.resize(n_centroids_ * embedding_dimension_);
+    centroids_data_.resize(static_cast<u64>(n_centroids_) * embedding_dimension_);
     centroid_norms_neg_half_.resize(n_centroids_);
     centroids_to_docid_ = MakeUnique<EMVBSharedVec<u32>[]>(n_centroids_);
     // check training data num
-    if (const u32 least_num = ExpectLeastTrainingDataNum(); embedding_num < least_num) {
+    if (const auto least_num = ExpectLeastTrainingDataNum(); embedding_num < least_num) {
         const auto error_msg = fmt::format("EMVBIndex::Train: embedding_num must be at least {}, got {} instead.", least_num, embedding_num);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     // train both centroids and residual product quantizer
@@ -258,7 +258,6 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
         if (result_centroid_num != n_centroids_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::Train: KMeans failed to get {} centroids, got {} instead.", n_centroids_, result_centroid_num);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
         LOG_TRACE(fmt::format("EMVBIndex::Train: KMeans got {} centroids.", result_centroid_num));
@@ -288,11 +287,11 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
                                                        n_centroids_,
                                                        embedding_dimension_,
                                                        dist_table.get());
-        for (u32 i = 0; i < embedding_num; ++i) {
+        for (u64 i = 0; i < embedding_num; ++i) {
             const f32 *embedding_data_ptr = embedding_data + i * embedding_dimension_;
             f32 *output_ptr = residuals.get() + i * embedding_dimension_;
             f32 max_neg_distance = std::numeric_limits<f32>::lowest();
-            u32 max_id = 0;
+            u64 max_id = 0;
             const f32 *dist_ptr = dist_table.get() + i * n_centroids_;
             for (u32 k = 0; k < n_centroids_; ++k) {
                 if (const f32 neg_distance = dist_ptr[k] + centroid_norms_neg_half_[k]; neg_distance > max_neg_distance) {
@@ -329,7 +328,6 @@ void EMVBIndex::Train(const u32 centroids_num, const f32 *embedding_data, const 
 void EMVBIndex::AddOneDocEmbeddings(const f32 *embedding_data, const u32 embedding_num) {
     if (embedding_num == 0) {
         const auto error_msg = "EMVBIndex::AddOneDocEmbeddings: embedding_num must be greater than 0.";
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     std::unique_lock lock(rw_mutex_);
@@ -510,7 +508,6 @@ void Serialize(FileHandler &file_handler, const EMVBSharedVec<u32> &val, const u
     const auto [shared_u32_ptr, size] = val.GetData();
     if (size != expect_element_num) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect {}, got {}.", expect_element_num, size);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     file_handler.Write(&expect_element_num, sizeof(expect_element_num));
@@ -520,14 +517,12 @@ void Serialize(FileHandler &file_handler, const EMVBSharedVec<u32> &val, const u
 void DeSerialize(FileHandler &file_handler, EMVBSharedVec<u32> &val, const u32 expect_element_num) {
     if (const auto [_, old_size] = val.GetData(); old_size > 0) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect 0, got {}.", old_size);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     u32 size = 0;
     file_handler.Read(&size, sizeof(size));
     if (size != expect_element_num) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect {}, got {}.", expect_element_num, size);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     const auto tmp_buffer = MakeUniqueForOverwrite<u32[]>(expect_element_num);
@@ -545,7 +540,6 @@ void Serialize(FileHandler &file_handler, const EMVBSharedVec<u32> &val) {
 void DeSerialize(FileHandler &file_handler, EMVBSharedVec<u32> &val) {
     if (const auto [_, old_size] = val.GetData(); old_size > 0) {
         const auto error_msg = fmt::format("EMVBSharedVec size mismatch: expect 0, got {}.", old_size);
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     u32 element_num = 0;
@@ -588,21 +582,18 @@ void EMVBIndex::ReadIndexInner(FileHandler &file_handler) {
         if (tmp_u32 != start_segment_offset_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::ReadIndexInner: start_segment_offset_ mismatch: expect {}, got {}.", start_segment_offset_, tmp_u32);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
         file_handler.Read(&tmp_u32, sizeof(tmp_u32));
         if (tmp_u32 != embedding_dimension_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::ReadIndexInner: embedding_dimension_ mismatch: expect {}, got {}.", embedding_dimension_, tmp_u32);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
         file_handler.Read(&tmp_u32, sizeof(tmp_u32));
         if (tmp_u32 != residual_pq_subspace_num_) {
             const auto error_msg =
                 fmt::format("EMVBIndex::ReadIndexInner: residual_pq_subspace_num_ mismatch: expect {}, got {}.", residual_pq_subspace_num_, tmp_u32);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
         file_handler.Read(&tmp_u32, sizeof(tmp_u32));
@@ -610,7 +601,6 @@ void EMVBIndex::ReadIndexInner(FileHandler &file_handler) {
             const auto error_msg = fmt::format("EMVBIndex::ReadIndexInner: residual_pq_subspace_bits_ mismatch: expect {}, got {}.",
                                                residual_pq_subspace_bits_,
                                                tmp_u32);
-            LOG_ERROR(error_msg);
             UnrecoverableError(error_msg);
         }
     }
@@ -638,7 +628,6 @@ EMVBIndex &EMVBIndex::operator=(EMVBIndex &&other) {
     if (start_segment_offset_ != other.start_segment_offset_ || embedding_dimension_ != other.embedding_dimension_ ||
         residual_pq_subspace_num_ != other.residual_pq_subspace_num_ || residual_pq_subspace_bits_ != other.residual_pq_subspace_bits_) {
         const auto error_msg = "EMVBIndex::move assignment: const vals mismatch.";
-        LOG_ERROR(error_msg);
         UnrecoverableError(error_msg);
     }
     // move data
