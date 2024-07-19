@@ -197,7 +197,7 @@ class TestInsert(TestSdk):
         assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [4, 5, 6]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [[7, 8, 9], [-7, -8, -9]]}])
+        res = table_obj.insert([{"c1": np.array([[7, 8, 9], [-7, -8, -9]])}])
         assert res.error_code == ErrorCode.OK
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
@@ -243,7 +243,7 @@ class TestInsert(TestSdk):
         assert table_obj
         res = table_obj.insert([{"c1": [[[1, 2], [3, 4]], [[5, 6]]]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [[[7, 8]], [[9, 10], [11, 12]]]}])
+        res = table_obj.insert([{"c1": [np.array([[7, 8]]), np.array([[9, 10], [11, 12]])]}])
         assert res.error_code == ErrorCode.OK
         res = table_obj.insert([{"c1": [[[13, 14], [15, 16], [17, 18]]]}])
         assert res.error_code == ErrorCode.OK
