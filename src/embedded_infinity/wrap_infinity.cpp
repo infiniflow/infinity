@@ -150,6 +150,7 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
             } else {
                 create_vvv(f64_tensor_array_value, LiteralType::kDoubleArray);
             }
+            return constant_expr;
         }
         default: {
             status = Status::InvalidConstantType();
