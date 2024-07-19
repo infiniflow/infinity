@@ -9,7 +9,7 @@ from typing import Any
 import logging
 
 from .base_client import BaseClient
-
+from .utils import  csr_read_all
 
 class QdrantClient(BaseClient):
     def __init__(self, conf_path: str) -> None:
@@ -18,10 +18,12 @@ class QdrantClient(BaseClient):
             self.data = json.load(f)
         self.client = QC(self.data["connection_url"])
         self.table_name = self.data["name"]
-        if self.data["distance"] == "cosine":
-            self.distance = Distance.COSINE
-        elif self.data["distance"] == "L2":
-            self.distance = Distance.EUCLID
+        if "distance" in self.data:
+            if self.data["distance"] == "cosine":
+                self.distance = Distance.COSINE
+            elif self.data["distance"] == "L2":
+                self.distance = Distance.EUCLID
+
         self.path_prefix = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         logging.getLogger("httpx").setLevel(logging.WARNING)
 
@@ -49,13 +51,23 @@ class QdrantClient(BaseClient):
         else:
             hnsw_config = None
 
-        self.client.recreate_collection(
-            collection_name=self.table_name,
-            vectors_config=VectorParams(
-                size=self.data["vector_size"], distance=self.distance
-            ),
-            hnsw_config=hnsw_config,
-        )
+        if self.data["mode"] == "sparse_vector":
+            self.client.recreate_collection(
+                collection_name=self.table_name,
+                vectors_config={},
+                sparse_vectors_config={
+                    "text": models.SparseVectorParams(),
+                },
+            )
+        else:
+            self.client.recreate_collection(
+                collection_name=self.table_name,
+                vectors_config=VectorParams(
+                    size=self.data["vector_size"], distance=self.distance
+                ),
+                hnsw_config=hnsw_config,
+            )
+
         # set payload index
         if "payload_index_schema" in self.data:
             for field_name, field_schema in self.data["payload_index_schema"].items():
@@ -123,6 +135,35 @@ class QdrantClient(BaseClient):
                     vectors.append(line)
                 if vectors:
                     self.upload_bach(list(range(i - len(vectors) + 1, i + 1)), vectors)
+        elif ext == ".csr":
+            data_mat = csr_read_all(dataset_path)
+            points = []
+            for data_id in range(data_mat.nrow):
+                indices, values = data_mat.at(data_id)
+                if data_id % batch_size == 0 and data_id != 0:
+                    self.client.upsert(
+                        collection_name=self.table_name,
+                        points=points,
+                    )
+                    points.clear()
+                    print(data_id)
+                else:
+                    points.append(models.PointStruct(
+                        id=data_id,
+                        payload={},  # Add any additional payload if necessary
+                        vector={
+                            "text": models.SparseVector(
+                                indices=indices,
+                                values=values
+                            )
+                        },
+                    )
+                )
+            if points:
+                self.client.upsert(
+                    collection_name=self.table_name,
+                    points=points,
+                )
         else:
             raise TypeError("Unsupported file type")
 
@@ -135,11 +176,26 @@ class QdrantClient(BaseClient):
     def do_single_query(self, query_id, client_id) -> list[Any]:
         query = self.queries[query_id]
         client = self.clients[client_id]
-        assert self.data["mode"] == "vector"
-        res = client.search(
-            collection_name=self.table_name,
-            query_vector=query,
-            limit=self.data.get("topK", 10),
-            with_payload=False,
-        )
+        if self.data["mode"] == "vector":
+            res = client.search(
+                collection_name=self.table_name,
+                query_vector=query,
+                limit=self.data.get("topK", 10),
+                with_payload=False,
+            )
+        elif self.data["mode"] == "sparse_vector":
+            indices, values = self.queries[query_id]
+            res = client.search(
+                collection_name=self.table_name,
+                query_vector=models.NamedSparseVector(
+                    name="text",
+                    vector=models.SparseVector(
+                        indices=indices,
+                        values=values
+                    ),
+                ),
+                limit=self.data.get("topK", 10),
+            )
+        else:
+            raise TypeError("Unsupported type")
         return res
