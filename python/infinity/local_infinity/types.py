@@ -20,6 +20,7 @@ import numpy as np
 from numpy import dtype
 from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.embedded_infinity_ext import *
+from infinity.errors import ErrorCode
 
 def logic_type_to_dtype(ttype: WrapDataType):
     match ttype.logical_type:
@@ -254,7 +255,7 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
     data = EmbeddingData()
     elem_type = EmbeddingDataType.kElemFloat
     if embedding_data_type == 'bit':
-        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
     elif embedding_data_type == 'tinyint' or embedding_data_type == 'int8' or embedding_data_type == 'i8':
         elem_type = EmbeddingDataType.kElemInt8
         data.i8_array_value = np.asarray(embedding_data, dtype=np.int8).flatten()
@@ -274,7 +275,7 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
         elem_type = EmbeddingDataType.kElemDouble
         data.f64_array_value = np.asarray(embedding_data, dtype=np.float64).flatten()
     else:
-        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
     match_tensor_expr.embedding_data_type = elem_type
     match_tensor_expr.embedding_data = data

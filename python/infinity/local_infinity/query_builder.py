@@ -15,7 +15,7 @@ from infinity.embedded_infinity_ext import *
 from infinity.local_infinity.types import logic_type_to_dtype, make_match_tensor_expr
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
 from infinity.table import ExplainType as BaseExplainType
-
+from infinity.errors import ErrorCode
 
 class Query(ABC):
     def __init__(
@@ -82,7 +82,7 @@ class InfinityLocalQueryBuilder(ABC):
 
         if not isinstance(topn, int):
             raise InfinityException(
-                3073, f"Invalid topn, type should be embedded, but get {type(topn)}"
+                ErrorCode.INVALID_TOPK_TYPE, f"Invalid topn, type should be embedded, but get {type(topn)}"
             )
 
         # type casting
@@ -94,7 +94,7 @@ class InfinityLocalQueryBuilder(ABC):
             embedding_data = embedding_data.tolist()
         else:
             raise InfinityException(
-                3051,
+                ErrorCode.INVALID_DATA_TYPE,
                 f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}",
             )
 
@@ -130,7 +130,7 @@ class InfinityLocalQueryBuilder(ABC):
             elem_type = EmbeddingDataType.kElemDouble
             data.f64_array_value = embedding_data
         else:
-            raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
         dist_type = KnnDistanceType.kInvalid
         if distance_type == "l2":
@@ -142,7 +142,7 @@ class InfinityLocalQueryBuilder(ABC):
         elif distance_type == "hamming":
             dist_type = KnnDistanceType.kHamming
         else:
-            raise InfinityException(3056, f"Invalid distance type {distance_type}")
+            raise InfinityException(ErrorCode.INVALID_KNN_DISTANCE_TYPE, f"Invalid distance type {distance_type}")
 
         knn_opt_params = []
         if knn_params != None:
@@ -181,7 +181,7 @@ class InfinityLocalQueryBuilder(ABC):
 
         if not isinstance(topn, int):
             raise InfinityException(
-                3073, f"Invalid topn, type should be embedded, but get {type(topn)}"
+                ErrorCode.INVALID_TOPK_TYPE, f"Invalid topn, type should be embedded, but get {type(topn)}"
             )
 
         sparse_opt_params = []
@@ -205,7 +205,7 @@ class InfinityLocalQueryBuilder(ABC):
             sparse_expr.f64_array_value = sparse_data["values"]
         else:
             raise InfinityException(
-                3058, f"Invalid sparse data {sparse_data['values'][0]} type"
+                ErrorCode.INVALID_CONSTANT_TYPE, f"Invalid sparse data {sparse_data['values'][0]} type"
             )
         match_sparse_expr.sparse_expr = sparse_expr
 
