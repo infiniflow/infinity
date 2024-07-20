@@ -30,6 +30,10 @@ jobs:
       # https://github.com/hmarr/debug-action
       #- uses: hmarr/debug-action@v2
 
+      - name: Acquire read lock
+        if: always()  # always run this step even if previous steps failed
+        run: sudo /usr/local/bin/rwlock tests rlock && echo "LOCKED=1" >> $GITHUB_ENV
+
       - name: Show PR labels
         if: ${{ !cancelled() && !failure() }}
         run: |
@@ -49,7 +53,7 @@ jobs:
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
         run: |
-          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | tr -d ' ')
+          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | xargs printf "%08x\n")
           CPUS=${CPUS:-$(nproc)}
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "CPUS=${CPUS}" >> $GITHUB_ENV
@@ -74,6 +78,17 @@ jobs:
       - name: Install pysdk
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install . -v --config-settings=cmake.build-type='Debug' --config-settings=build-dir='cmake-build-debug'"
+
+      - name: Release read lock
+        if: always()  # always run this step even if previous steps failed
+        run: |
+          if [ -n "${LOCKED}" ]; then
+            sudo /usr/local/bin/rwlock tests runlock && echo "LOCKED=" >> $GITHUB_ENV
+          fi
+
+      - name: Acquire read lock
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo /usr/local/bin/rwlock tests rlock && echo "LOCKED=1" >> $GITHUB_ENV
 
       - name: Start infinity debug version
         if: ${{ !cancelled() && !failure() }}
@@ -108,6 +123,13 @@ jobs:
             sudo docker rm -f -v ${BUILDER_CONTAINER}
           fi
 
+      - name: Release read lock
+        if: always()  # always run this step even if previous steps failed
+        run: |
+          if [ -n "${LOCKED}" ]; then
+            sudo /usr/local/bin/rwlock tests runlock && echo "LOCKED=" >> $GITHUB_ENV
+          fi
+
   release_tests:
     name: release_tests and benchmark
     # https://docs.github.com/en/actions/using-jobs/using-conditions-to-control-job-execution
@@ -117,6 +139,10 @@ jobs:
     steps:
       # https://github.com/hmarr/debug-action
       #- uses: hmarr/debug-action@v2
+
+      - name: Acquire read lock
+        if: always()  # always run this step even if previous steps failed
+        run: sudo /usr/local/bin/rwlock tests rlock && echo "LOCKED=1" >> $GITHUB_ENV
 
       - name: Show PR labels
         if: ${{ !cancelled() && !failure() }}
@@ -137,7 +163,7 @@ jobs:
       - name: Start builder container
         if: ${{ !cancelled() && !failure() }}
         run: |
-          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | tr -d ' ')
+          BUILDER_CONTAINER=infinity_build_$(od -An -N4 -t u8 < /dev/urandom | xargs printf "%08x\n")
           CPUS=${CPUS:-$(nproc)}
           echo "BUILDER_CONTAINER=${BUILDER_CONTAINER}" >> $GITHUB_ENV
           echo "CPUS=${CPUS}" >> $GITHUB_ENV
@@ -148,10 +174,21 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOLS:STRING=link=4 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity test_main knn_import_benchmark knn_query_benchmark"
 
+      - name: Release read lock
+        if: always()  # always run this step even if previous steps failed
+        run: |
+          if [ -n "${LOCKED}" ]; then
+            sudo /usr/local/bin/rwlock tests runlock && echo "LOCKED=" >> $GITHUB_ENV
+          fi
+
+      - name: Acquire read lock
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo /usr/local/bin/rwlock tests rlock && echo "LOCKED=1" >> $GITHUB_ENV
+
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
-      
+
       - name: Collect infinity unit test release output
         if: ${{ !cancelled() }}
         run: cat unittest_release.log 2>/dev/null || true
@@ -165,13 +202,24 @@ jobs:
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -rf /var/infinity && source /usr/local/venv310/bin/activate && python3 tools/run_pysdk_local_infinity_test.py"
 
       - name: Start infinity release version
         if: ${{ !cancelled() && !failure() }}
         run: |
           # Run a command in the background
           sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && rm -fr /var/infinity && cmake-build-release/src/infinity --config=conf/pytest_parallel_infinity_conf.toml > release.log 2>&1" &
+
+      - name: Release read lock
+        if: always()  # always run this step even if previous steps failed
+        run: |
+          if [ -n "${LOCKED}" ]; then
+            sudo /usr/local/bin/rwlock tests runlock && echo "LOCKED=" >> $GITHUB_ENV
+          fi
+
+      - name: Acquire write lock
+        if: ${{ !cancelled() && !failure() }}
+        run: sudo /usr/local/bin/rwlock tests wlock && echo "LOCKED=1" >> $GITHUB_ENV
 
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version
         if: ${{ !cancelled() && !failure() }}
@@ -192,6 +240,13 @@ jobs:
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
         run: cat release.log 2>/dev/null || true
+
+      - name: Destroy builder container
+        if: always()  # always run this step even if previous steps failed
+        run: |
+          if [ -n "${BUILDER_CONTAINER}" ]; then
+            sudo docker rm -f -v ${BUILDER_CONTAINER}
+          fi
 
       - name: Prepare sift dataset
         if: ${{ !cancelled() && !failure() }}
@@ -215,9 +270,9 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: rm -f benchmark_sift_8_threads_latest_output.log ; echo "8 50" | ./cmake-build-release/benchmark/local_infinity/knn_query_benchmark sift 200 false $PWD/test/data $PWD/db_tmp | tee benchmark_sift_8_threads_latest_output.log ; cat benchmark_sift_8_threads_latest_output.log | ./tools/ci_tools/collect_benchmark_result.py benchmark_sift_8_threads.log ; ./tools/ci_tools/check_benchmark_result.py sift_8 benchmark_sift_8_threads.log
 
-      - name: Destroy builder container
+      - name: Release write lock
         if: always()  # always run this step even if previous steps failed
         run: |
-          if [ -n "${BUILDER_CONTAINER}" ]; then
-            sudo docker rm -f -v ${BUILDER_CONTAINER}
+          if [ -n "${LOCKED}" ]; then
+            sudo /usr/local/bin/rwlock tests wunlock && echo "LOCKED=" >> $GITHUB_ENV
           fi
