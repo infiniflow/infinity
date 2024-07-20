@@ -58,6 +58,8 @@ def logic_type_to_dtype(ttype: WrapDataType):
                         raise NotImplementedError(f"Unsupported type {ttype.embedding_type}")
         case LogicalType.kTensor:
             return object
+        case LogicalType.kTensorArray:
+            return object
         case LogicalType.kSparse:
             return object
         case _:
