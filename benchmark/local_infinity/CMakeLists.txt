@@ -23,6 +23,8 @@ target_link_libraries(
     c++abi.a
     jma
     opencc
+    jemalloc.a
+    dl
 )
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
@@ -54,6 +56,8 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    jemalloc.a
+    dl
 )
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -84,6 +88,8 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    jemalloc.a
+    dl
 )
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -116,6 +122,8 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    jemalloc.a
+    dl
 )
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -146,6 +154,8 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    jemalloc.a
+    dl
 )
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -175,6 +185,8 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    jemalloc.a
+    dl
 )
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -204,20 +216,12 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    jemalloc.a
+    dl
 )
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
-
-if(ENABLE_JEMALLOC)
-    target_link_libraries(infinity_benchmark jemalloc.a)
-    target_link_libraries(knn_import_benchmark jemalloc.a)
-    target_link_libraries(knn_query_benchmark jemalloc.a)
-    target_link_libraries(fulltext_benchmark jemalloc.a)
-    target_link_libraries(sparse_benchmark jemalloc.a)
-    target_link_libraries(bmp_benchmark jemalloc.a)
-    target_link_libraries(hnsw_benchmark jemalloc.a)
-endif()
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)

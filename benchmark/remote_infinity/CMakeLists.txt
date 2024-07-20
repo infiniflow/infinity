@@ -31,11 +31,9 @@ target_link_libraries(
         opencc
         parquet.a
         arrow.a
+        jemalloc.a
+        dl
 )
-
-if(ENABLE_JEMALLOC)
-    target_link_libraries(remote_query_benchmark jemalloc.a)
-endif()
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)

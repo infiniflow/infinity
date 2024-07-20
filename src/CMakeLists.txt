@@ -295,6 +295,8 @@ target_link_libraries(infinity
         opencc
         parquet.a
         arrow.a
+        jemalloc.a
+        dl
 )
 
 if (ENABLE_JEMALLOC)
@@ -479,6 +481,7 @@ target_link_libraries(unit_test
         thrift.a
         thriftnb.a
         jemalloc.a
+        dl
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
