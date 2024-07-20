@@ -31,6 +31,7 @@ target_link_libraries(
         opencc
         parquet.a
         arrow.a
+        dl
 )
 
 if(ENABLE_JEMALLOC)

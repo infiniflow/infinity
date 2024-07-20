@@ -25,6 +25,7 @@ target_link_libraries(
     event.a
     c++.a
     c++abi.a
+    dl
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -59,6 +60,7 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    dl
 )
 
 target_link_directories(knn_import_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -89,6 +91,7 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    dl
 )
 
 target_link_directories(knn_query_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -121,6 +124,7 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    dl
 )
 
 target_link_directories(fulltext_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -151,6 +155,7 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    dl
 )
 
 target_link_directories(sparse_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -180,6 +185,7 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    dl
 )
 
 target_link_directories(bmp_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -209,6 +215,7 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    dl
 )
 
 target_link_directories(hnsw_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
