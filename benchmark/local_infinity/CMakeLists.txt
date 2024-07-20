@@ -13,6 +13,10 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
     lz4.a
     atomic.a
     c++.a
@@ -20,6 +24,8 @@ target_link_libraries(
     jma
     opencc
 )
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 # ########################################
 # knn
@@ -44,7 +50,14 @@ target_link_libraries(
     c++abi.a
     jma
     opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 # query benchmark
 add_executable(knn_query_benchmark
@@ -67,7 +80,14 @@ target_link_libraries(
     c++abi.a
     jma
     opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 # ########################################
 # fulltext
@@ -92,7 +112,14 @@ target_link_libraries(
     c++abi.a
     jma
     opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 # ########################################
 add_executable(sparse_benchmark
@@ -115,7 +142,14 @@ target_link_libraries(
     c++.a
     c++abi.a
     opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 add_executable(bmp_benchmark
     ./sparse/bmp_benchmark.cpp
@@ -137,7 +171,14 @@ target_link_libraries(
     c++.a
     c++abi.a
     opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 add_executable(hnsw_benchmark
     ./knn/hnsw_benchmark.cpp
@@ -159,7 +200,14 @@ target_link_libraries(
     c++.a
     c++abi.a
     opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
 )
+
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 if(ENABLE_JEMALLOC)
     target_link_libraries(infinity_benchmark jemalloc.a)
