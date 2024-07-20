@@ -105,7 +105,7 @@ git config --global --add safe.directory infinity
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-18
 export CXX=/usr/bin/clang++-18
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DARROW_BUILD_SHARED=OFF -DARROW_ENABLE_TIMING_TESTS=OFF -DARROW_GGDB_DEBUG=OFF -DARROW_PARQUET=ON ..
 cmake --build .
 ```
 
@@ -151,7 +151,7 @@ git config --global --add safe.directory infinity
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-18
 export CXX=/usr/bin/clang++-18
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DARROW_BUILD_SHARED=OFF -DARROW_ENABLE_TIMING_TESTS=OFF -DARROW_GGDB_DEBUG=OFF -DARROW_PARQUET=ON ..
 cmake --build .
 ```
 
@@ -196,7 +196,7 @@ git config --global --add safe.directory infinity
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-18
 export CXX=/usr/bin/clang++-18
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DARROW_BUILD_SHARED=OFF -DARROW_ENABLE_TIMING_TESTS=OFF -DARROW_GGDB_DEBUG=OFF -DARROW_PARQUET=ON ..
 cmake --build .
 ```
 
