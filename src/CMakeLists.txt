@@ -345,8 +345,6 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         oatpp.a
         c++.a
         c++abi.a
-        jma
-        opencc
         parquet.a
         arrow.a
 )
@@ -483,7 +481,7 @@ target_link_libraries(unit_test
         jemalloc.a
 )
 
-target_link_directories(unit_test BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 target_sources(unit_test

@@ -117,8 +117,10 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
     set(CMAKE_C_FLAGS "-O0 -g")
 
     set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fno-stack-protector -fno-var-tracking ")
-    add_compile_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
-    add_link_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
+#    add_compile_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
+#    add_link_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
+    add_compile_options(-fsanitize-recover=all -fsanitize=leak)
+    add_link_options(-fsanitize-recover=all -fsanitize=leak)
 
     add_compile_options("-fno-omit-frame-pointer")
     add_link_options("-fno-omit-frame-pointer")
@@ -163,10 +165,7 @@ ADD_DEFINITIONS(-D INFINITY_DEBUG)
 endif()
 
 # find_package(Boost REQUIRED)
-#find_package(Lz4 REQUIRED)
-#find_package(Arrow REQUIRED)
-#find_package(Parquet REQUIRED)
-#find_package(Protobuf REQUIRED)
+find_package(Lz4 REQUIRED)
 
 # You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
 option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
