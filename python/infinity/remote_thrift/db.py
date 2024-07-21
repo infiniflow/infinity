@@ -142,7 +142,7 @@ def get_embedding_info(column_info, column_defs, column_name, index):
     elif element_type == "int64":
         embedding_type.element_type = ttypes.ElementType.ElementInt64
     else:
-        raise InfinityException(3057, f"Unknown element type: {element_type}")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
     embedding_type.dimension = int(length)
     assert isinstance(embedding_type, ttypes.EmbeddingType)
     assert embedding_type.element_type is not None
@@ -188,7 +188,7 @@ def get_sparse_info(column_info, column_defs, column_name, index):
     elif value_type == "int64":
         sparse_type.element_type = ttypes.ElementType.ElementInt64
     else:
-        raise InfinityException(3057, f"Unknown value type: {value_type}")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown value type: {value_type}")
     
     if index_type == "int8":
         sparse_type.index_type = ttypes.ElementType.ElementInt8
@@ -199,7 +199,7 @@ def get_sparse_info(column_info, column_defs, column_name, index):
     elif index_type == "int64":
         sparse_type.index_type = ttypes.ElementType.ElementInt64
     else:
-        raise InfinityException(3057, f"Unknown index type: {index_type}")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown index type: {index_type}")
 
     sparse_type.dimension = int(length)
     

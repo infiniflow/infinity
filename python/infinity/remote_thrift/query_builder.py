@@ -100,7 +100,7 @@ class InfinityThriftQueryBuilder(ABC):
 
         if not isinstance(topn, int):
             raise InfinityException(
-                3073, f"Invalid topn, type should be embedded, but get {type(topn)}"
+                ErrorCode.INVALID_TOPK_TYPE, f"Invalid topn, type should be embedded, but get {type(topn)}"
             )
 
         # type casting
@@ -128,7 +128,7 @@ class InfinityThriftQueryBuilder(ABC):
         elem_type = ElementType.ElementFloat32
         if embedding_data_type == "bit":
             elem_type = ElementType.ElementBit
-            raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
         elif embedding_data_type == "tinyint":
             elem_type = ElementType.ElementInt8
             data.i8_array_value = embedding_data
@@ -148,7 +148,7 @@ class InfinityThriftQueryBuilder(ABC):
             elem_type = ElementType.ElementFloat64
             data.f64_array_value = embedding_data
         else:
-            raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
         dist_type = KnnDistanceType.L2
         if distance_type == "l2":
@@ -160,7 +160,7 @@ class InfinityThriftQueryBuilder(ABC):
         elif distance_type == "hamming":
             dist_type = KnnDistanceType.Hamming
         else:
-            raise InfinityException(3056, f"Invalid distance type {distance_type}")
+            raise InfinityException(ErrorCode.INVALID_KNN_DISTANCE_TYPE, f"Invalid distance type {distance_type}")
 
         knn_opt_params = []
         if knn_params != None:
@@ -249,6 +249,8 @@ class InfinityThriftQueryBuilder(ABC):
         fusion_expr.options_text = options_text
         if match_tensor_expr is not None:
             fusion_expr.optional_match_tensor_expr = match_tensor_expr
+        elif fusion_expr.method == "match_tensor":
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Match tensor expression is required")
         self._search.fusion_exprs.append(fusion_expr)
         return self
 

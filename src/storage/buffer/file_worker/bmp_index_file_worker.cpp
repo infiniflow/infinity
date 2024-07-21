@@ -79,6 +79,7 @@ void BMPIndexFileWorker::FreeInMemory() {
             }
         },
         *p);
+    delete p;
     data_ = nullptr;
 }
 

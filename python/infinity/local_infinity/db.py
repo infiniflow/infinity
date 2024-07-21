@@ -43,7 +43,7 @@ def get_constant_expr(column_info):
                 constant_expression.literal_type = LiteralType.kDoubleArray
                 constant_expression.f64_array_value = default
         else:
-            raise InfinityException(3069, "Invalid constant expression")
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
         return constant_expression
 
 def get_ordinary_info(column_info, column_defs, column_name, index):
@@ -76,7 +76,7 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
     elif datatype == "bool":
         proto_column_type.logical_type = LogicalType.kBoolean
     else:
-        raise InfinityException(3051, f"Unknown datatype: {datatype}")
+        raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
 
     # process constraints
     proto_column_def.column_type = proto_column_type
@@ -92,7 +92,7 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
             elif constraint == "unique":
                 proto_column_def.constraints.add(ConstraintType.kUnique)
             else:
-                raise InfinityException(3055, f"Unknown constraint: {constraint}")
+                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Unknown constraint: {constraint}")
 
     proto_column_def.constant_expr = get_constant_expr(column_info)
 
@@ -117,7 +117,7 @@ def get_embedding_info(column_info, column_defs, column_name, index):
     elif column_big_info[0] == "tensorarray":
         column_type.logical_type = LogicalType.kTensorArray
     else:
-        raise InfinityException(3053, f"Unknown column type: {column_big_info[0]}")
+        raise InfinityException(ErrorCode.FTS_INDEX_NOT_EXIST, f"Unknown column type: {column_big_info[0]}")
 
     embedding_type = WrapEmbeddingType()
     if element_type == "bit":
@@ -135,7 +135,7 @@ def get_embedding_info(column_info, column_defs, column_name, index):
     elif element_type == "int64":
         embedding_type.element_type = EmbeddingDataType.kElemInt64
     else:
-        raise InfinityException(3057, f"Unknown element type: {element_type}")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
     embedding_type.dimension = int(length)
     assert isinstance(embedding_type, WrapEmbeddingType)
     assert embedding_type.element_type is not None
@@ -164,7 +164,7 @@ def get_sparse_info(column_info, column_defs, column_name, index):
     if column_big_info[0] == "sparse":
         column_type.logical_type = LogicalType.kSparse
     else:
-        raise InfinityException(3053, f"Unknown column type: {column_big_info[0]}")
+        raise InfinityException(ErrorCode.FTS_INDEX_NOT_EXIST, f"Unknown column type: {column_big_info[0]}")
 
     sparse_type = WrapSparseType()
     # embedding_type = WrapEmbeddingType()
@@ -183,7 +183,7 @@ def get_sparse_info(column_info, column_defs, column_name, index):
     elif element_type == "int64":
         sparse_type.element_type = EmbeddingDataType.kElemInt64
     else:
-        raise InfinityException(3057, f"Unknown element type: {element_type}")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
     
     if index_type == "int8":
         sparse_type.index_type = EmbeddingDataType.kElemInt8
@@ -194,7 +194,7 @@ def get_sparse_info(column_info, column_defs, column_name, index):
     elif index_type == "int64":
         sparse_type.index_type = EmbeddingDataType.kElemInt64
     else:
-        raise InfinityException(3057, f"Unknown index type: {index_type}")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown index type: {index_type}")
     sparse_type.dimension = int(length)
 
     column_type.sparse_type = sparse_type
@@ -245,7 +245,7 @@ class LocalDatabase(Database, ABC):
         elif conflict_type == ConflictType.Replace:
             create_table_conflict = LocalConflictType.kReplace
         else:
-            raise InfinityException(3066, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
         res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                       column_defs=column_defs,
                                       conflict_type=create_table_conflict)
@@ -263,7 +263,7 @@ class LocalDatabase(Database, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_table_conflict = LocalConflictType.kIgnore
         else:
-            raise InfinityException(3066, "nvalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "nvalid conflict type")
         res = self._conn.drop_table(db_name=self._db_name, table_name=table_name, conflict_type=drop_table_conflict)
         if res.error_code == ErrorCode.OK or res.error_code == ErrorCode.TABLE_NOT_EXIST:
             return res
