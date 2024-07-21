@@ -326,6 +326,8 @@ public:
 
     void AppendToJson(const String& name, nlohmann::json& json);
 
+    void AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<arrow::ArrayBuilder> &array_builder);
+
     // Member method
 public:
     explicit Value(const DataType &type);

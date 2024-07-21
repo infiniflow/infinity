@@ -1,5 +1,10 @@
 add_compile_options(-Wno-everything)
 
+################################################################################
+### arrow
+################################################################################
+add_subdirectory(arrow)
+
 # Build doctest
 add_subdirectory(googletest)
 
@@ -65,4 +70,5 @@ add_subdirectory(ijma)
 ### opencc
 ################################################################################
 add_subdirectory(opencc)
+
 

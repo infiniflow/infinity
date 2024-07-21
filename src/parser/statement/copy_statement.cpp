@@ -62,6 +62,10 @@ std::string CopyStatement::ToString() const {
             file_format = "BVECS";
             break;
         }
+        case CopyFileType::kPARQUET: {
+            file_format = "PARQUET";
+            break;
+        }
         case CopyFileType::kInvalid: {
             file_format = "Invalid";
             break;

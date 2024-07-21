@@ -796,6 +796,11 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kPARQUET: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: PARQUET");
+            result->emplace_back(file_type);
+            break;
+        }
         case CopyFileType::kInvalid: {
             String error_message = "Invalid file type";
             UnrecoverableError(error_message);
