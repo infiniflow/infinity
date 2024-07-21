@@ -461,8 +461,6 @@ set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
 target_link_libraries(unit_test
         gtest
         gtest_main
-        gmock
-        gmock_main
         sql_parser
         infinity_core
         onnxruntime_mlas
