@@ -104,6 +104,54 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
         case LiteralType::kEmptyArray: {
             return constant_expr;
         }
+        case LiteralType::kSubArrayArray: {
+            if (i64_tensor_array_value.empty() == f64_tensor_array_value.empty()) {
+                status = Status::InvalidConstantType();
+                delete constant_expr;
+                constant_expr = nullptr;
+                return nullptr;
+            }
+            auto create_vvv = [&constant_expr, &status](const auto &vvv, LiteralType basic_type) {
+                constant_expr->sub_array_array_.reserve(vvv.size());
+                for (const auto &value_1 : vvv) {
+                    auto parsed_expr_1 = MakeUnique<ConstantExpr>(LiteralType::kSubArrayArray);
+                    parsed_expr_1->sub_array_array_.reserve(value_1.size());
+                    for (const auto &value_2 : value_1) {
+                        auto parsed_expr_2 = MakeUnique<ConstantExpr>(basic_type);
+                        switch (basic_type) {
+                            case LiteralType::kIntegerArray: {
+                                parsed_expr_2->long_array_.reserve(value_2.size());
+                                for (const auto &value_3 : value_2) {
+                                    parsed_expr_2->long_array_.emplace_back(value_3);
+                                }
+                                break;
+                            }
+                            case LiteralType::kDoubleArray: {
+                                parsed_expr_2->double_array_.reserve(value_2.size());
+                                for (const auto &value_3 : value_2) {
+                                    parsed_expr_2->double_array_.emplace_back(value_3);
+                                }
+                                break;
+                            }
+                            default: {
+                                status = Status::InvalidConstantType();
+                                delete constant_expr;
+                                constant_expr = nullptr;
+                                UnrecoverableError("Unexpected usage!");
+                            }
+                        }
+                        parsed_expr_1->sub_array_array_.emplace_back(parsed_expr_2.release());
+                    }
+                    constant_expr->sub_array_array_.emplace_back(parsed_expr_1.release());
+                }
+            };
+            if (!i64_tensor_array_value.empty()) {
+                create_vvv(i64_tensor_array_value, LiteralType::kIntegerArray);
+            } else {
+                create_vvv(f64_tensor_array_value, LiteralType::kDoubleArray);
+            }
+            return constant_expr;
+        }
         default: {
             status = Status::InvalidConstantType();
             delete constant_expr;

@@ -6,26 +6,31 @@ add_executable(infinity_benchmark
 target_include_directories(infinity_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(
     infinity_benchmark
-    infinity_core
     benchmark_profiler
+    infinity_core
     sql_parser
     onnxruntime_mlas
     zsv_parser
     newpfor
     fastpfor
+    #        profiler
+    jma
+    opencc
+    dl
     parquet.a
     arrow.a
     thrift.a
     thriftnb.a
     lz4.a
     atomic.a
+    event.a
     c++.a
     c++abi.a
-    jma
-    opencc
-    jemalloc.a
-    dl
+    ${JEMALLOC_STATIC_LIB}
 )
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
@@ -46,18 +51,20 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
-    lz4.a
-    atomic.a
-    c++.a
-    c++abi.a
     jma
     opencc
+    dl
+    lz4.a
+    atomic.a
+    event.a
+    c++.a
+    c++abi.a
+    #        profiler
     parquet.a
     arrow.a
     thrift.a
     thriftnb.a
-    jemalloc.a
-    dl
+    ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -78,18 +85,18 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
     c++.a
     c++abi.a
-    jma
-    opencc
     parquet.a
     arrow.a
     thrift.a
     thriftnb.a
-    jemalloc.a
-    dl
+    ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -112,18 +119,18 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
     c++.a
     c++abi.a
-    jma
-    opencc
     parquet.a
     arrow.a
     thrift.a
     thriftnb.a
-    jemalloc.a
-    dl
+    ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -144,18 +151,18 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
-    jma
     c++.a
     c++abi.a
-    opencc
     parquet.a
     arrow.a
     thrift.a
     thriftnb.a
-    jemalloc.a
-    dl
+    ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -175,18 +182,18 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
-    jma
     c++.a
     c++abi.a
-    opencc
     parquet.a
     arrow.a
     thrift.a
     thriftnb.a
-    jemalloc.a
-    dl
+    ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -206,18 +213,19 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
-    jma
+
     c++.a
     c++abi.a
-    opencc
     parquet.a
     arrow.a
     thrift.a
     thriftnb.a
-    jemalloc.a
-    dl
+    ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")

@@ -282,6 +282,9 @@ target_link_libraries(infinity
         zsv_parser
         newpfor
         fastpfor
+        jma
+        opencc
+        dl
         thrift.a
         thriftnb.a
         lz4.a
@@ -291,17 +294,10 @@ target_link_libraries(infinity
         c++abi.a
 #        profiler
         oatpp.a
-        jma
-        opencc
         parquet.a
         arrow.a
-        jemalloc.a
-        dl
+        ${JEMALLOC_STATIC_LIB}
 )
-
-if (ENABLE_JEMALLOC)
-    target_link_libraries(infinity jemalloc.a)
-endif ()
 
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -341,6 +337,7 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         fastpfor
         jma
         opencc
+        dl
         lz4.a
         atomic.a
         event.a
@@ -349,6 +346,8 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         c++abi.a
         parquet.a
         arrow.a
+        thrift.a
+        thriftnb.a
 )
 
 # WARN: python modules shall not link to static libstdc++!!!
@@ -462,26 +461,24 @@ set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
 target_link_libraries(unit_test
         gtest
         gtest_main
-        gmock
-        gmock_main
         sql_parser
         infinity_core
         onnxruntime_mlas
         zsv_parser
         newpfor
         fastpfor
+        jma
+        opencc
+        dl
         lz4.a
         atomic.a
         c++.a
         c++abi.a
-        jma
-        opencc
         parquet.a
         arrow.a
         thrift.a
         thriftnb.a
-        jemalloc.a
-        dl
+        ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")

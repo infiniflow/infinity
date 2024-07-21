@@ -22,17 +22,17 @@ target_link_libraries(
         zsv_parser
         newpfor
         fastpfor
+        jma
+        opencc
+        dl
         lz4.a
         atomic.a
         thrift.a
         c++.a
         c++abi.a
-        jma
-        opencc
         parquet.a
         arrow.a
-        jemalloc.a
-        dl
+        ${JEMALLOC_STATIC_LIB}
 )
 
 # add_definitions(-march=native)
