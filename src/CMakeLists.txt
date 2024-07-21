@@ -282,6 +282,9 @@ target_link_libraries(infinity
         zsv_parser
         newpfor
         fastpfor
+        jma
+        opencc
+        dl
         thrift.a
         thriftnb.a
         lz4.a
@@ -291,12 +294,9 @@ target_link_libraries(infinity
         c++abi.a
 #        profiler
         oatpp.a
-        jma
-        opencc
         parquet.a
         arrow.a
         ${JEMALLOC_STATIC_LIB}
-        ${DL_DYNAMIC_LIB}
 )
 
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
@@ -337,6 +337,7 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         fastpfor
         jma
         opencc
+        dl
         lz4.a
         atomic.a
         event.a
@@ -468,12 +469,13 @@ target_link_libraries(unit_test
         zsv_parser
         newpfor
         fastpfor
+        jma
+        opencc
+        dl
         lz4.a
         atomic.a
         c++.a
         c++abi.a
-        jma
-        opencc
         parquet.a
         arrow.a
         thrift.a

@@ -16,6 +16,7 @@ target_link_libraries(
     #        profiler
     jma
     opencc
+    dl
     parquet.a
     arrow.a
     thrift.a
@@ -48,14 +49,15 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
     event.a
     c++.a
     c++abi.a
     #        profiler
-    jma
-    opencc
     parquet.a
     arrow.a
     thrift.a
@@ -81,12 +83,13 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
     c++.a
     c++abi.a
-    jma
-    opencc
     parquet.a
     arrow.a
     thrift.a
@@ -114,12 +117,13 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
     c++.a
     c++abi.a
-    jma
-    opencc
     parquet.a
     arrow.a
     thrift.a
@@ -145,12 +149,13 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
-    jma
     c++.a
     c++abi.a
-    opencc
     parquet.a
     arrow.a
     thrift.a
@@ -175,12 +180,13 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
-    jma
     c++.a
     c++abi.a
-    opencc
     parquet.a
     arrow.a
     thrift.a
@@ -205,12 +211,14 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
-    jma
+
     c++.a
     c++abi.a
-    opencc
     parquet.a
     arrow.a
     thrift.a
