@@ -366,7 +366,9 @@ takes precedence over ccache if a storage backend is configured" ON)
     # jemalloc requires thread.
     define_option(ARROW_JEMALLOC ${ARROW_JEMALLOC_DESCRIPTION} OFF)
   else()
-    define_option(ARROW_JEMALLOC ${ARROW_JEMALLOC_DESCRIPTION} ON)
+    if (ENABLE_JEMALLOC)
+      define_option(ARROW_JEMALLOC ${ARROW_JEMALLOC_DESCRIPTION} ON)
+    endif ()
   endif()
 
   define_option(ARROW_JSON "Build Arrow with JSON support (requires RapidJSON)" OFF)

@@ -295,12 +295,9 @@ target_link_libraries(infinity
         opencc
         parquet.a
         arrow.a
-	    dl
+        ${JEMALLOC_STATIC_LIB}
+        ${DL_DYNAMIC_LIB}
 )
-
-if (ENABLE_JEMALLOC)
-    target_link_libraries(infinity jemalloc.a)
-endif ()
 
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
@@ -348,7 +345,8 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         c++abi.a
         parquet.a
         arrow.a
-	    dl
+        thrift.a
+        thriftnb.a
 )
 
 # WARN: python modules shall not link to static libstdc++!!!
@@ -480,8 +478,7 @@ target_link_libraries(unit_test
         arrow.a
         thrift.a
         thriftnb.a
-        jemalloc.a
-        dl
+        ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")

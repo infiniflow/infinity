@@ -41,6 +41,10 @@ Build the debug version of infinity-sdk in the target location `cmake-build-debu
 ```shell
 pip install . -v --config-settings=cmake.build-type="Debug"  --config-settings=build-dir="cmake-build-debug"
 ```
+Note: If you run with the release version and turn jemalloc compile flag on, you must set environment variable, for example
+```shell
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so python3 example/simple_example.py
+```
 Note: If you run with the debug version, you must set the **libasan** environment variable, for example
 ```shell
 LD_PRELOAD=/usr/lib/llvm-18/lib/clang/18/lib/x86_64-pc-linux-gnu/libclang_rt.asan.so python3 example/simple_example.py
