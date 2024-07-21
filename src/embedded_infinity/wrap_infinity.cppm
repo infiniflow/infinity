@@ -89,6 +89,8 @@ export struct WrapConstantExpr {
     String str_value;
     Vector<i64> i64_array_value;
     Vector<f64> f64_array_value;
+    Vector<Vector<Vector<i64>>> i64_tensor_array_value;
+    Vector<Vector<Vector<f64>>> f64_tensor_array_value;
     Vector<i64> i64_array_idx;
 
     ParsedExpr *GetParsedExpr(Status &status);

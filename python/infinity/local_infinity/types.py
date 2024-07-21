@@ -59,6 +59,8 @@ def logic_type_to_dtype(ttype: WrapDataType):
                         raise NotImplementedError(f"Unsupported type {ttype.embedding_type}")
         case LogicalType.kTensor:
             return object
+        case LogicalType.kTensorArray:
+            return object
         case LogicalType.kSparse:
             return object
         case _:
@@ -111,6 +113,23 @@ def parse_tensor_bytes(column_data_type, bytes_data):
         tensor_data = tensor_to_list(column_data_type, bytes_data[offset:offset + length])
         results.append(tensor_data)
         offset += length
+    return results
+
+
+def parse_tensorarray_bytes(column_data_type, bytes_data):
+    results = []
+    offset = 0
+    while offset < len(bytes_data):
+        tensor_n = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+        offset += 4
+        tensorarray_data = []
+        for _ in range(tensor_n):
+            length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+            offset += 4
+            tensor_data = tensor_to_list(column_data_type, bytes_data[offset:offset + length])
+            offset += length
+            tensorarray_data.append(tensor_data)
+        results.append(tensorarray_data)
     return results
 
 def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
@@ -174,6 +193,8 @@ def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
             return parse_sparse_bytes(column_data_type, column_vector)
         case LogicalType.kTensor:
             return parse_tensor_bytes(column_data_type, column_vector)
+        case LogicalType.kTensorArray:
+            return parse_tensorarray_bytes(column_data_type, column_vector)
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
 

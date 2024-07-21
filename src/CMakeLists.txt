@@ -209,7 +209,7 @@ target_sources(infinity_core
         ${metrics_cppm}
 )
 
-add_dependencies(infinity_core thrift thriftnb)
+add_dependencies(infinity_core thrift thriftnb parquet_static)
 
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
@@ -235,6 +235,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/oatpp/src")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/eigen-3.4.0")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/arrow/src")
 
 if (NOT SUPPORT_FMA EQUAL 0)
     message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
@@ -281,6 +282,9 @@ target_link_libraries(infinity
         zsv_parser
         newpfor
         fastpfor
+        jma
+        opencc
+        dl
         thrift.a
         thriftnb.a
         lz4.a
@@ -290,16 +294,14 @@ target_link_libraries(infinity
         c++abi.a
 #        profiler
         oatpp.a
-        jma
-        opencc
+        parquet.a
+        arrow.a
+        ${JEMALLOC_STATIC_LIB}
 )
-
-if (ENABLE_JEMALLOC)
-    target_link_libraries(infinity jemalloc.a)
-endif ()
 
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
@@ -335,12 +337,17 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         fastpfor
         jma
         opencc
+        dl
         lz4.a
         atomic.a
         event.a
         oatpp.a
         c++.a
         c++abi.a
+        parquet.a
+        arrow.a
+        thrift.a
+        thriftnb.a
 )
 
 # WARN: python modules shall not link to static libstdc++!!!
@@ -349,6 +356,7 @@ set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hid
 
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
+target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 nanobind_disable_stack_protector(embedded_infinity_ext)
 nanobind_opt_size(embedded_infinity_ext)
 nanobind_strip(embedded_infinity_ext)
@@ -453,24 +461,28 @@ set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
 target_link_libraries(unit_test
         gtest
         gtest_main
-        gmock
-        gmock_main
         sql_parser
         infinity_core
         onnxruntime_mlas
         zsv_parser
         newpfor
         fastpfor
-        lz4.a
-        atomic.a
-        thrift.a
-        c++.a
-        c++abi.a
         jma
         opencc
+        dl
+        lz4.a
+        atomic.a
+        c++.a
+        c++abi.a
+        parquet.a
+        arrow.a
+        thrift.a
+        thriftnb.a
+        ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
 
 target_sources(unit_test
         PRIVATE

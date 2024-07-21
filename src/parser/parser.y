@@ -3012,6 +3012,8 @@ copy_option : FORMAT IDENTIFIER {
     } else if (strcasecmp($2, "bvecs") == 0) {
         $$->file_type_ = infinity::CopyFileType::kBVECS;
         free($2);
+    } else if (strcasecmp($2, "parquet") == 0) {
+        $$->file_type_ = infinity::CopyFileType::kPARQUET;
     } else {
         free($2);
         delete $$;
