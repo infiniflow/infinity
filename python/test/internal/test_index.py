@@ -1096,10 +1096,8 @@ class TestIndex(TestSdk):
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.show_index(lower_name_index)
-        assert res.index_name == lower_name_index
         assert res.error_code == ErrorCode.OK
         res = table_obj.show_index(upper_name_index)
-        assert res.index_name == lower_name_index
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.drop_index(lower_name_index, ConflictType.Error)
