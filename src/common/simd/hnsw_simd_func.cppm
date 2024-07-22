@@ -18,6 +18,7 @@ module;
 #include "simd_common_intrin_include.h"
 
 import stl;
+import simd_common_tools;
 
 export module hnsw_simd_func;
 
@@ -357,135 +358,90 @@ export int32_t I8IPSSEResidual(const int8_t *pv1, const int8_t *pv2, size_t dim)
 export int32_t I8L2BF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
     int32_t res = 0;
     for (size_t i = 0; i < dim; ++i) {
-        int32_t t = pv1[i] - pv2[i];
+        const int32_t t = static_cast<int32_t>(pv1[i]) - static_cast<int32_t>(pv2[i]);
         res += t * t;
     }
     return res;
 }
 
-#if defined(__AVX512F__)
-export int32_t I8L2AVX512(const int8_t *pv1, const int8_t *pv2, size_t dim) {
-    alignas(64) int8_t TmpRes[64];
-    size_t dim16 = dim >> 4;
-
-    const int8_t *pEnd1 = pv1 + (dim16 << 4);
-
-    __m512i diff, v1, v2;
-    __m512i sum = __mm512_set1_ps(0);
-
+#if defined(__AVX512BW__)
+export int32_t I8L2AVX512BW(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    const int8_t *pEnd1 = pv1 + (dim & ~(63u));
+    const __m512i fix_high_bit = _mm512_set1_epi8(-128); // turn i8 to u8 by adding 128 (equivalent to xor with -128)
+    __m512i sum = _mm512_setzero_si512();
     while (pv1 < pEnd1) {
-        v1 = _mm512_loadu_si512(pv1);
-        pv1 += 16;
-        v2 = _mm512_loadu_si512(pv2);
-        pv2 += 16;
-        diff = _mm512_sub_epi8(v1, v2);
-        sum = _mm512_add_epi8(sum, _mm512_mul_epi8(diff, diff));
+        __m512i v1 = _mm512_xor_si512(_mm512_loadu_si512((__m512i *)pv1), fix_high_bit);
+        __m512i v2 = _mm512_xor_si512(_mm512_loadu_si512((__m512i *)pv2), fix_high_bit);
+        pv1 += 64;
+        pv2 += 64;
+        __m512i diff_abs = abs_sub_epu8_avx512(v1, v2);
+        // get square sum of diff_abs
+        __m512i diff_abs_lo = _mm512_unpacklo_epi8(diff_abs, _mm512_setzero_si512());
+        __m512i diff_abs_hi = _mm512_unpackhi_epi8(diff_abs, _mm512_setzero_si512());
+        __m512i sum_lo = _mm512_madd_epi16(diff_abs_lo, diff_abs_lo);
+        __m512i sum_hi = _mm512_madd_epi16(diff_abs_hi, diff_abs_hi);
+        sum = _mm512_add_epi32(sum, sum_lo);
+        sum = _mm512_add_epi32(sum, sum_hi);
     }
-
-    _mm512_store_epi8(TmpRes, sum);
-    int32_t res = 0;
-    for (size_t i = 0; i < 64; i++) {
-        res += TmpRes[i];
-    }
-
-    return res;
+    return hsum_epi32_avx512(sum);
 }
 
-export int32_t I8L2AVX512Residual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
-    return I8L2AVX512(pv1, pv2, dim) + I8L2BF(pv1 + (dim & ~63), pv2 + (dim & ~63), dim & 63);
+export int32_t I8L2AVX512BWResidual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    return I8L2AVX512BW(pv1, pv2, dim) + I8L2BF(pv1 + (dim & ~63), pv2 + (dim & ~63), dim & 63);
 }
 #endif
 
 #if defined(__AVX2__)
-export int32_t I8L2AVX(const int8_t *pv1, const int8_t *pv2, size_t dim) {
-    alignas(32) int8_t TmpRes[32];
-    size_t dim16 = dim >> 4;
-
-    const int8_t *pEnd1 = pv1 + (dim16 << 4);
-
-    __m256i diff, v1, v2;
-    __m256i sum = _mm256_set1_epi8(0);
-    __m512i diff16, lo, hi;
-
+export int32_t I8L2AVX2(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    const int8_t *pEnd1 = pv1 + (dim & ~(31u));
+    const __m256i fix_high_bit = _mm256_set1_epi8(-128); // turn i8 to u8 by adding 128 (equivalent to xor with -128)
+    __m256i sum = _mm256_setzero_si256();
     while (pv1 < pEnd1) {
-        v1 = _mm256_loadu_epi8(pv1);
-        pv1 += 8;
-        v2 = _mm256_loadu_epi8(pv2);
-        pv2 += 8;
-        diff = _mm256_sub_epi8(v1, v2);
-        diff16 = _mm512_cvtepi8_epi16(diff);
-        lo = _mm512_extracti64x4_epi64(diff16, 0);
-        hi = _mm512_extracti64x4_epi64(diff16, 1);
-        sum = _mm256_add_epi8(sum, _mm512_mullo_epi16(diff16, diff16));
-
-        v1 = _mm256_loadu_epi8(pv1);
-        pv1 += 8;
-        v2 = _mm256_loadu_epi8(pv2);
-        pv2 += 8;
-        diff = _mm256_sub_epi8(v1, v2);
-        sum = _mm256_add_epi8(sum, _mm256_mul_epi8(diff, diff));
+        __m256i v1 = _mm256_xor_si256(_mm256_loadu_si256((__m256i *)pv1), fix_high_bit);
+        __m256i v2 = _mm256_xor_si256(_mm256_loadu_si256((__m256i *)pv2), fix_high_bit);
+        pv1 += 32;
+        pv2 += 32;
+        __m256i diff_abs = abs_sub_epu8_avx2(v1, v2);
+        // get square sum of diff_abs
+        __m256i diff_abs_lo = _mm256_unpacklo_epi8(diff_abs, _mm256_setzero_si256());
+        __m256i diff_abs_hi = _mm256_unpackhi_epi8(diff_abs, _mm256_setzero_si256());
+        __m256i sum_lo = _mm256_madd_epi16(diff_abs_lo, diff_abs_lo);
+        __m256i sum_hi = _mm256_madd_epi16(diff_abs_hi, diff_abs_hi);
+        sum = _mm256_add_epi32(sum, sum_lo);
+        sum = _mm256_add_epi32(sum, sum_hi);
     }
-
-    _mm256_storeu_epi8(TmpRes, sum);
-    int32_t res = 0;
-    for (size_t i = 0; i < 32; i++) {
-        res += TmpRes[i];
-    }
-    return res;
+    return hsum_8x32_avx2(sum);
 }
 
-export int32_t I8L2AVXResidual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
-    return I8L2AVX(pv1, pv2, dim) + I8L2BF(pv1 + (dim & ~31), pv2 + (dim & ~31), dim & 31);
+export int32_t I8L2AVX2Residual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    return I8L2AVX2(pv1, pv2, dim) + I8L2BF(pv1 + (dim & ~31), pv2 + (dim & ~31), dim & 31);
 }
 #endif
 
 #if defined(__SSE2__)
-export int32_t I8L2SSE(const int8_t *pv1, const int8_t *pv2, size_t dim) {
-    alignas(16) int32_t TmpRes[4];
-    size_t dim16 = dim >> 4;
-
-    const int8_t *pEnd1 = pv1 + (dim16 << 4);
-
-    __m128i diff, v1, v2;
-    __m128i sum = _mm_set1_ps(0);
-
+export int32_t I8L2SSE2(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    const int8_t *pEnd1 = pv1 + (dim & ~(15u));
+    const __m128i fix_high_bit = _mm_set1_epi8(-128); // turn i8 to u8 by adding 128 (equivalent to xor with -128)
+    __m128i sum = _mm_setzero_si128();
     while (pv1 < pEnd1) {
-        v1 = _mm_loadu_epi8(pv1);
-        pv1 += 4;
-        v2 = _mm_loadu_epi8(pv2);
-        pv2 += 4;
-        diff = _mm_sub_epi8(v1, v2);
-        sum = _mm_add_epi8(sum, _mm_mul_epi8(diff, diff));
-
-        v1 = _mm_loadu_epi8(pv1);
-        pv1 += 4;
-        v2 = _mm_loadu_epi8(pv2);
-        pv2 += 4;
-        diff = _mm_sub_epi8(v1, v2);
-        sum = _mm_add_epi8(sum, _mm_mul_epi8(diff, diff));
-
-        v1 = _mm_loadu_epi8(pv1);
-        pv1 += 4;
-        v2 = _mm_loadu_epi8(pv2);
-        pv2 += 4;
-        diff = _mm_sub_epi8(v1, v2);
-        sum = _mm_add_epi8(sum, _mm_mul_epi8(diff, diff));
-
-        v1 = _mm_loadu_epi8(pv1);
-        pv1 += 4;
-        v2 = _mm_loadu_epi8(pv2);
-        pv2 += 4;
-        diff = _mm_sub_epi8(v1, v2);
-        sum = _mm_add_epi8(sum, _mm_mul_epi8(diff, diff));
+        __m128i v1 = _mm_xor_si128(_mm_loadu_si128((__m128i *)pv1), fix_high_bit);
+        __m128i v2 = _mm_xor_si128(_mm_loadu_si128((__m128i *)pv2), fix_high_bit);
+        pv1 += 16;
+        pv2 += 16;
+        __m128i diff_abs = abs_sub_epu8_sse2(v1, v2);
+        // get square sum of diff_abs
+        __m128i diff_abs_lo = _mm_unpacklo_epi8(diff_abs, _mm_setzero_si128());
+        __m128i diff_abs_hi = _mm_unpackhi_epi8(diff_abs, _mm_setzero_si128());
+        __m128i sum_lo = _mm_madd_epi16(diff_abs_lo, diff_abs_lo);
+        __m128i sum_hi = _mm_madd_epi16(diff_abs_hi, diff_abs_hi);
+        sum = _mm_add_epi32(sum, sum_lo);
+        sum = _mm_add_epi32(sum, sum_hi);
     }
-
-    _mm_storeu_epi8(TmpRes, sum);
-    int32_t res = TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];
-    return res;
+    return hsum_epi32_sse2(sum);
 }
 
-export signed char I8L2SSEResidual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
-    return I8L2SSE(pv1, pv2, dim) + I8L2BF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
+export int32_t I8L2SSE2Residual(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    return I8L2SSE2(pv1, pv2, dim) + I8L2BF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
 }
 #endif
 
