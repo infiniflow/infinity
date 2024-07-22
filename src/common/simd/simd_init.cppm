@@ -25,6 +25,7 @@ export using infinity::IsF16CSupported;
 export using infinity::IsSSE2Supported;
 export using infinity::IsAVX2Supported;
 export using infinity::IsAVX512Supported;
+export using infinity::IsAVX512BWSupported;
 
 export using F32DistanceFuncType = f32(*)(const f32 *, const f32 *, SizeT);
 export using I8DistanceFuncType = i32(*)(const i8 *, const i8 *, SizeT);

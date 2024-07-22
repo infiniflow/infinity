@@ -23,6 +23,7 @@ struct SupportedSimdTypes {
     bool is_sse2_ = NGT::CpuInfo::isSSE2();
     bool is_avx2_ = NGT::CpuInfo::isAVX2();
     bool is_avx512_ = NGT::CpuInfo::isAVX512();
+    bool is_avx512bw_ = NGT::CpuInfo::isAVX512BW();
 };
 
 const SupportedSimdTypes &GetSupportedSimdTypes() {
@@ -40,5 +41,6 @@ bool IsAVX2Supported() { return GetSupportedSimdTypes().is_avx2_; }
 
 bool IsAVX512Supported() { return GetSupportedSimdTypes().is_avx512_; }
 
+bool IsAVX512BWSupported() { return GetSupportedSimdTypes().is_avx512bw_; }
 
 } // namespace infinity
