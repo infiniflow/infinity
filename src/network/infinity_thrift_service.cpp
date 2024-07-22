@@ -298,7 +298,9 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
     auto columns = new Vector<String>();
     columns->reserve(request.column_names.size());
     for (auto &column : request.column_names) {
-        columns->emplace_back(column);
+        String column_name_str = column;
+        ToLower(column_name_str);
+        columns->emplace_back(column_name_str);
     }
 
     Status constant_status;
@@ -1577,7 +1579,8 @@ Tuple<ColumnDef *, Status> InfinityThriftService::GetColumnDefFromProto(const in
         return {nullptr, status};
     }
 
-    const auto &column_def_name = column_def.name;
+    String column_def_name = column_def.name;
+    ToLower(column_def_name);
     auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def_name, constraints, const_expr);
     return {col_def, Status::OK()};
 }
