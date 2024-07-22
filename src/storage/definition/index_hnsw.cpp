@@ -63,7 +63,7 @@ IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<St
     MetricType metric_type = MetricType::kInvalid;
     HnswEncodeType encode_type = HnswEncodeType::kPlain;
     for (const auto *para : index_param_list) {
-        if (para->param_name_ == "M") {
+        if (para->param_name_ == "m") {
             M = std::stoi(para->param_value_);
         } else if (para->param_name_ == "ef_construction") {
             ef_construction = std::stoi(para->param_value_);
