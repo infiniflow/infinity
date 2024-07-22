@@ -60,6 +60,8 @@ public:
             } else {
                 SIMDFunc = GetSIMD_FUNCTIONS().HNSW_F32Cos_ptr_;
             }
+        } else if constexpr (std::is_same<DataType, u8>()) {
+            SIMDFunc = GetSIMD_FUNCTIONS().HNSW_U8Cos_ptr_;
         }
     }
 
