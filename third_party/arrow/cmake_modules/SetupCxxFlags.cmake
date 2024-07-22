@@ -66,7 +66,6 @@ if(ARROW_CPU_FLAG STREQUAL "x86")
     set(ARROW_AVX512_FLAG
         "${ARROW_AVX512_FLAG} -mavx512f -mavx512cd -mavx512vl -mavx512dq -mavx512bw")
     check_cxx_compiler_flag(${ARROW_SSE4_2_FLAG} CXX_SUPPORTS_SSE4_2)
-    message(STATUS "SUPPORT SSE4_2: ${CXX_SUPPORTS_SSE4_2}")
   endif()
   if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     # Check for AVX extensions on 64-bit systems only, as 32-bit support seems iffy
