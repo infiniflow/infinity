@@ -181,5 +181,21 @@ class TestInfinity:
     def test_create_1K_table(self):
         self.test_infinity_obj._test_create_1K_table()
 
+    def test_create_upper_table_name(self):
+        self.test_infinity_obj._test_create_upper_table_name()
 
+    @pytest.mark.skip(reason="failed")
+    def test_create_table_with_upper_column_name(self):
+        self.test_infinity_obj._test_create_table_with_upper_column_name()
 
+    @pytest.mark.skip(reason="failed")
+    def test_create_table_with_upper_param_name(self):
+        self.test_infinity_obj._test_create_table_with_upper_param_name()
+
+    @pytest.mark.skip(reason="failed")
+    def test_create_table_with_upper_data_type_name(self):
+        self.test_infinity_obj._test_create_table_with_upper_data_type_name()
+
+    @pytest.mark.skip(reason="failed")
+    def test_create_table_with_upper_constraint_name(self):
+        self.test_infinity_obj._test_create_table_with_upper_constraint_name()

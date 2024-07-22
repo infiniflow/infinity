@@ -1077,3 +1077,226 @@ class TestIndex(TestSdk):
         res = db_obj.drop_table(
             "test_unsupported_vector_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    def _test_create_upper_name_index(self):
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_upper_name_index", ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        table_obj = db_obj.create_table("test_upper_name_index", {
+            "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
+        assert table_obj is not None
+
+        upper_name_index = "MY_INDEX"
+        lower_name_index = "my_index"
+        res = table_obj.create_index(upper_name_index,
+                                     [index.IndexInfo("c1",
+                                                      index.IndexType.IVFFlat,
+                                                      [index.InitParameter("centroids_count", "128"),
+                                                       index.InitParameter("metric", "l2")])], ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.show_index(lower_name_index)
+        assert res.index_name == lower_name_index
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.show_index(upper_name_index)
+        assert res.index_name == lower_name_index
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.drop_index(lower_name_index, ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_upper_name_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_create_index_with_converse_param_name(self, index_type):
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_index", ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+
+        if index_type == index.IndexType.IVFFlat:
+            table_obj = db_obj.create_table("test_index", {
+                "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
+            assert table_obj is not None
+
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c1",
+                                                          index.IndexType.IVFFlat,
+                                                          [index.InitParameter("CENTROIDS_COUNT", "128"),
+                                                           index.InitParameter("METRIC", "l2")])], ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+        elif index_type == index.IndexType.Hnsw:
+            table_obj = db_obj.create_table(
+                "test_index", {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
+            assert table_obj is not None
+
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c1",
+                                                          index.IndexType.Hnsw,
+                                                          [
+                                                              index.InitParameter(
+                                                                  "m", "16"),
+                                                              index.InitParameter(
+                                                                  "EF_CONSTRUCTION", "50"),
+                                                              index.InitParameter(
+                                                                  "EF", "50"),
+                                                              index.InitParameter(
+                                                                  "METRIC", "l2")
+                                                          ])], ConflictType.Error)
+
+            assert res.error_code == ErrorCode.OK
+        elif index_type == index.IndexType.BMP:
+            table_obj = db_obj.create_table(
+                "test_index", {"col1": {"type": "int"}, "col2": {"type": "sparse,30000,float,int16"}}, ConflictType.Error)
+            assert table_obj is not None
+
+            # CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = compress);
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("col2",
+                                                          index.IndexType.BMP,
+                                                          [index.InitParameter("BLOCK_SIZE", "8"),
+                                                           index.InitParameter("COMPRESS_TYPE", "compress")])],
+                                         ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+        elif index_type == index.IndexType.FullText:
+            table_obj = db_obj.create_table(
+                "test_index", {
+                    "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}
+                }, ConflictType.Error)
+            assert table_obj is not None
+
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("body",
+                                                          index.IndexType.FullText,
+                                                          [index.InitParameter('analyzer', 'standard')]),
+                                          ], ConflictType.Error)
+
+            assert res.error_code == ErrorCode.OK
+        elif index_type == index.IndexType.EMVB:
+            table_obj = db_obj.create_table(
+                "test_index", {
+                    "c1": {"type": "int"}, "c2": {"type": "tensor, 128, float"}
+                }, ConflictType.Error)
+            assert table_obj is not None
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c2",
+                                                          index.IndexType.EMVB,
+                                                          [index.InitParameter("PQ_SUBSPACE_NUM", "32"),
+                                                           index.InitParameter("PQ_SUBSPACE_BITS", "8")]),
+                                          ], ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+        elif index_type == index.IndexType.Secondary:
+            table_obj = db_obj.create_table(
+                "test_index", {
+                    "c1": {"type": "int"}, "body": {"type": "varchar"}
+                }, ConflictType.Error)
+            assert table_obj is not None
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c1",
+                                                          index.IndexType.Secondary,
+                                                          []),
+                                          ], ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+
+        res = table_obj.show_index("my_index")
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_create_index_with_converse_param_value(self, index_type):
+        db_obj = self.infinity_obj.get_database("default_db")
+        res = db_obj.drop_table("test_index", ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
+        if index_type == index.IndexType.IVFFlat:
+            table_obj = db_obj.create_table("test_index", {
+                "c1": {"type": "vector,1024,float"}}, ConflictType.Error)
+            assert table_obj is not None
+
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c1",
+                                                          index.IndexType.IVFFlat,
+                                                          [index.InitParameter("centroids_count", "128"),
+                                                           index.InitParameter("metric", "L2")])], ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+        elif index_type == index.IndexType.Hnsw:
+            table_obj = db_obj.create_table(
+                "test_index", {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
+            assert table_obj is not None
+
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c1",
+                                                          index.IndexType.Hnsw,
+                                                          [
+                                                              index.InitParameter(
+                                                                  "M", "16"),
+                                                              index.InitParameter(
+                                                                  "ef_construction", "50"),
+                                                              index.InitParameter(
+                                                                  "ef", "50"),
+                                                              index.InitParameter(
+                                                                  "metric", "L2")
+                                                          ])], ConflictType.Error)
+
+            assert res.error_code == ErrorCode.OK
+        elif index_type == index.IndexType.BMP:
+            table_obj = db_obj.create_table(
+                "test_index", {"col1": {"type": "int"}, "col2": {"type": "sparse,30000,float,int16"}},
+                ConflictType.Error)
+            assert table_obj is not None
+
+            # CREATE INDEX idx1 ON test_bmp (col2) USING Bmp WITH (block_size = 16, compress_type = compress);
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("col2",
+                                                          index.IndexType.BMP,
+                                                          [index.InitParameter("block_size", "8"),
+                                                           index.InitParameter("compress_type", "COMPRESS")])],
+                                         ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+        elif index_type == index.IndexType.FullText:
+            table_obj = db_obj.create_table(
+                "test_index", {
+                    "doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}
+                }, ConflictType.Error)
+            assert table_obj is not None
+
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("body",
+                                                          index.IndexType.FullText,
+                                                          [index.InitParameter('ANALYZER', 'STANDARD')]),
+                                          ], ConflictType.Error)
+
+            assert res.error_code == ErrorCode.OK
+        elif index_type == index.IndexType.EMVB:
+            table_obj = db_obj.create_table(
+                "test_index", {
+                    "c1": {"type": "int"}, "c2": {"type": "tensor, 128, float"}
+                }, ConflictType.Error)
+            assert table_obj is not None
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c2",
+                                                          index.IndexType.EMVB,
+                                                          [index.InitParameter("pq_subspace_num", "32"),
+                                                           index.InitParameter("pq_subspace_bits", "8")]),
+                                          ], ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+        elif index_type == index.IndexType.Secondary:
+            table_obj = db_obj.create_table(
+                "test_index", {
+                    "c1": {"type": "int"}, "body": {"type": "varchar"}
+                }, ConflictType.Error)
+            assert table_obj is not None
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo("c1",
+                                                          index.IndexType.Secondary,
+                                                          []),
+                                          ], ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+
+        res = table_obj.show_index("my_index")
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
