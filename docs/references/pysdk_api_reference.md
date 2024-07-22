@@ -169,7 +169,7 @@ metadata.table_count  #0
 
 ## create_table
 
-**RemoteDatabase.create_table(*table_name, columns_definition, conflict_type = ConflictType.Error*)**
+**Database.create_table(*table_name, columns_definition, conflict_type = ConflictType.Error*)**
 
 Create a table with a given name, defining each column in it.
 
@@ -242,7 +242,7 @@ db_obj.create_table("test_create_embedding_table",
 
 ## drop_table
 
-**RemoteDatabase.drop_table(*table_name, conflict_type = ConflictType.Error*)**
+**Database.drop_table(*table_name, conflict_type = ConflictType.Error*)**
 
 Drop a table by name.
 
@@ -266,7 +266,7 @@ db_obj.drop_table("my_table", ConflictType.Error)
 
 ## get_table
 
-**RemoteDatabase.get_table(*table_name*)**
+**Database.get_table(*table_name*)**
 
 Retrieve a table object by name.
 
@@ -290,7 +290,7 @@ except Exception as e:
 
 ## list_tables
 
-**RemoteDatabase.list_tables()**
+**Database.list_tables()**
 
 List all tables in the current database.
 
@@ -308,7 +308,7 @@ res.table_names #["my_table"]
 
 ## show_table
 
-**RemoteDatabase.show_tables()**
+**Database.show_tables()**
 
 Get the information of all tables in the database.
 
@@ -346,7 +346,7 @@ res
 
 ## create_index
 
-**RemoteTable.create_index(*index_name, index_infos, conflict_type = ConflictType.Error*)**
+**Table.create_index(*index_name, index_infos, conflict_type = ConflictType.Error*)**
 
 Create an index by `IndexInfo` list.
 
@@ -443,7 +443,7 @@ table_obj.create_index("my_index",
 
 ## drop_index
 
-**RemoteTable.drop_index(*index_name, conflict_type = ConflictType.Error*)**
+**Table.drop_index(*index_name, conflict_type = ConflictType.Error*)**
 
 Drop an index by name.
 
@@ -467,7 +467,7 @@ table_obj.drop_index("my_index")
 
 ## show_index
 
-**RemoteTable.show_index(*index_name*)**
+**Table.show_index(*index_name*)**
 
 Retrieve the metadata of an index by name.
 
@@ -506,7 +506,7 @@ print(res)
 
 ## list_indexes
 
-**RemoteTable.list_indexes(*index_name*)**
+**Table.list_indexes(*index_name*)**
 
 List the indexes built on the table.
 
@@ -524,7 +524,7 @@ res.index_names #['my_index']
 
 ## insert
 
-**RemoteTable.insert(*data*)**
+**Table.insert(*data*)**
 
 Insert records into the current table. 
 
@@ -550,9 +550,9 @@ table_obj.insert([{"c1": [1.1, 2.2, 3.3]}, {"c1": [4.4, 5.5, 6.6]}, {"c1": [7.7,
 
 ## import_data
 
-**RemoteTable.import_data(*filpath, import_options = None*)**
+**Table.import_data(*filepath, import_options = None*)**
 
-Import data from a file into the table. 
+Imports data from a file into the table. 
 
 ### Parameters
 
@@ -579,9 +579,64 @@ Import data from a file into the table.
 table_obj.import_data(test_csv_dir, None)
 ```
 
+## export_data
+
+```python
+Table.export_data(filepath, export_options = None, columns = None)
+```
+
+Exports the current table to a specified file. 
+
+### Parameters
+
+#### file_path: `str` *Required*
+
+Absolute path to the file for export. Supported file type include: 
+
+- `csv`
+- `jsonl`
+- `fvecs`
+  
+#### export_options: `json`
+
+- **header**: `bool` Defaults to `False`
+  Whether to display table header or not:
+  - `True`: Display table header. 
+  - `False`: Do not display table header. 
+
+- **delimiter**: `str` Defaults to ","
+  Delimiter to separate columns. Supported delimiters include: 
+  - ",": Comma. 
+  - "\t": Tab. 
+  
+- **offset**: `int`
+  Index specifying the starting row for export. Usually used in conjunction with `limit`. If not specified, the file export starts from row 1. 
+
+- **limit**: `int`
+  The maximum number of rows to export. Usually used in conjunction with `offset`. If the table's row count exceeds `offset` + `limit`, the excess rows are excluded from the export
+
+- **row_limit**: `int`
+  Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part.
+
+#### columns: `[str]`
+
+Columns to export to the output file, for example, `["num", "name", "score"]`. If not specified, the entire table is exported. 
+
+### Returns
+
+- Success: `True`
+- Failure: `Exception`
+
+### Examples
+
+```python
+table_obj.export_data(project_directory + "/../test/data/csv/export_data.json",
+                               {"header": True, "delimiter": ",", "row_limit": 2}, ["num", "name", "score"])
+```
+
 ## delete
 
-**RemoteTable.delete(*cond = None*)**
+**Table.delete(*cond = None*)**
 
 Delete rows by condition.The condition is similar to the WHERE conditions in SQL. If  `cond` is not specified, all the data will be removed in the table object.
 
@@ -603,7 +658,7 @@ table_obj.delete()
 
 ## update
 
-**RemoteTable.update(*cond = None*)**
+**Table.update(*cond = None*)**
 
 Search for rows that match the specified condition and update them accordingly.
 
@@ -628,7 +683,7 @@ table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 
 ## output
 
-**RemoteTable.output(*columns*)**
+**Table.output(*columns*)**
 Specify the columns to display in the search output, or perform aggregation operations or arithmetic calculations. 
 
 ```python
@@ -651,12 +706,12 @@ table_obj.output(["c1+5"])
   
 ### Returns
 
-- Success: self `RemoteTable`
+- Success: self `Table`
 - Failure: `Exception`
 
 ## filter
 
-**RemoteTable.filter(*cond*)**
+**Table.filter(*cond*)**
 
 Create a filtering condition expression.
 
@@ -667,7 +722,7 @@ Create a filtering condition expression.
 
 ### Returns
 
-- Success: self `RemoteTable`
+- Success: self `Table`
 - Failure: `Exception`
 
 ### Examples
@@ -678,7 +733,7 @@ table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 
 ## knn
 
-**RemoteTable.knn(*vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None*)**
+**Table.knn(*vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None*)**
 
 Build a KNN search expression. Find the top n closet records to the given vector.
 
@@ -698,7 +753,7 @@ Build a KNN search expression. Find the top n closet records to the given vector
 
 ### Returns
 
-- Success: Self `RemoteTable`
+- Success: Self `Table`
 - Failure: `Exception`
 
 ### Examples
@@ -710,7 +765,7 @@ table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 
 ## match sparse
 
-**RemoteTable.match_sparse(*vector_column_name, sparse_data, distance_type, topn, opt_params = None*)**
+**Table.match_sparse(*vector_column_name, sparse_data, distance_type, topn, opt_params = None*)**
 
 ### Parameters
 
@@ -725,7 +780,7 @@ table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
       - 'beta=0.0~1.0'(default: 1.0): A "Query Term Pruning" parameter. The smaller the value, the more aggressive the pruning.
 
 ### Returns
-- Success: Self `RemoteTable`
+- Success: Self `Table`
 - Failure: `Exception`
 
 ### Examples
@@ -749,7 +804,7 @@ Create a full-text search expression.
 
 ### Returns
 
-- Success: Self `RemoteTable`
+- Success: Self `Table`
 - Failure: `Exception`
 
 ### Examples
@@ -769,7 +824,7 @@ for question in questions:
 
 ## match tensor
 
-**RemoteTable.match_tensor(*vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)**
+**Table.match_tensor(*vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)**
 
 Build a KNN tensor search expression. Find the top n closet records to the given tensor according to chosen method.
 
@@ -794,7 +849,7 @@ For example, find k most match tensors generated by ColBERT.
 
 ### Returns
 
-- Success: Self `RemoteTable`
+- Success: Self `Table`
 - Failure: `Exception`
 
 ### Examples
@@ -806,7 +861,7 @@ match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim
 
 ## fusion
 
-**RemoteTable.fusion(*method, options_text = ''*)**
+**Table.fusion(*method, options_text = ''*)**
 
 Build a fusion expression.
 
@@ -830,7 +885,7 @@ Build a fusion expression.
 
 ### Returns
 
-- Success: Self `RemoteTable`
+- Success: Self `Table`
 - Failure: `Exception`
 
 ### Examples
@@ -858,7 +913,7 @@ table_obj.fusion('match_tensor', 'topn=2', make_match_tensor_expr('t', [[0.0, -1
 
 ## optimize
 
-**RemoteTable.optimize(*index_name, opt_params*)**
+**Table.optimize(*index_name, opt_params*)**
 
 ### Parameters
 
@@ -880,10 +935,10 @@ table_obj.optimize('bmp_index_name', {'topk': '10'})
 
 ## get result
 
-**RemoteTable.to_result()**
-**RemoteTable.to_df()**
-**RemoteTable.to_pl()**
-**RemoteTable.to_arrow()**
+**Table.to_result()**
+**Table.to_df()**
+**Table.to_pl()**
+**Table.to_arrow()**
 
 After querying, these four methods above can get result into specific type. 
 `Note: output method must be executed before get result`
