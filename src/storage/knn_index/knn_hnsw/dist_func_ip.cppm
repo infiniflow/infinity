@@ -57,6 +57,26 @@ public:
             } else {
                 SIMDFunc = GetSIMD_FUNCTIONS().HNSW_F32IP_ptr_;
             }
+        } else if constexpr (std::is_same<DataType, i8>()) {
+            if (dim % 64 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8IP_64_ptr_;
+            } else if (dim % 32 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8IP_32_ptr_;
+            } else if (dim % 16 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8IP_16_ptr_;
+            } else {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8IP_ptr_;
+            }
+        } else if constexpr (std::is_same<DataType, u8>()) {
+            if (dim % 64 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_U8IP_64_ptr_;
+            } else if (dim % 32 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_U8IP_32_ptr_;
+            } else if (dim % 16 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_U8IP_16_ptr_;
+            } else {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_U8IP_ptr_;
+            }
         }
     }
 

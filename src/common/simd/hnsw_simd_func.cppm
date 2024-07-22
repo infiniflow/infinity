@@ -447,6 +447,97 @@ export int32_t I8L2SSE2Residual(const int8_t *pv1, const int8_t *pv2, size_t dim
 
 //------------------------------//------------------------------//------------------------------
 
+export int32_t U8IPBF(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
+    int32_t res = 0;
+    for (size_t i = 0; i < dim; ++i) {
+        res += static_cast<int32_t>(pv1[i]) * static_cast<int32_t>(pv2[i]);
+    }
+    return res;
+}
+
+#if defined(__AVX512BW__)
+export int32_t U8IPAVX512BW(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
+    const uint8_t *pEnd1 = pv1 + (dim & ~(63u));
+    __m512i sum = _mm512_setzero_si512();
+    while (pv1 < pEnd1) {
+        __m512i v1 = _mm512_loadu_si512((__m512i *)pv1);
+        __m512i v2 = _mm512_loadu_si512((__m512i *)pv2);
+        // get sum of inner product
+        __m512i v1_lo = _mm512_unpacklo_epi8(v1, _mm512_setzero_si512());
+        __m512i v2_lo = _mm512_unpacklo_epi8(v2, _mm512_setzero_si512());
+        __m512i v1_hi = _mm512_unpackhi_epi8(v1, _mm512_setzero_si512());
+        __m512i v2_hi = _mm512_unpackhi_epi8(v2, _mm512_setzero_si512());
+        __m512i mul_lo = _mm512_madd_epi16(v1_lo, v2_lo);
+        __m512i mul_hi = _mm512_madd_epi16(v1_hi, v2_hi);
+        sum = _mm512_add_epi32(sum, mul_lo);
+        sum = _mm512_add_epi32(sum, mul_hi);
+        pv1 += 64;
+        pv2 += 64;
+    }
+    return hsum_epi32_avx512(sum);
+}
+
+export int32_t U8IPAVX512BWResidual(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
+    return U8IPAVX512BW(pv1, pv2, dim) + U8IPBF(pv1 + (dim & ~63), pv2 + (dim & ~63), dim & 63);
+}
+#endif
+
+#if defined(__AVX2__)
+export int32_t U8IPAVX2(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
+    const uint8_t *pEnd1 = pv1 + (dim & ~(31u));
+    __m256i sum = _mm256_setzero_si256();
+    while (pv1 < pEnd1) {
+        __m256i v1 = _mm256_loadu_si256((__m256i *)pv1);
+        __m256i v2 = _mm256_loadu_si256((__m256i *)pv2);
+        // get sum of inner product
+        __m256i v1_lo = _mm256_unpacklo_epi8(v1, _mm256_setzero_si256());
+        __m256i v2_lo = _mm256_unpacklo_epi8(v2, _mm256_setzero_si256());
+        __m256i v1_hi = _mm256_unpackhi_epi8(v1, _mm256_setzero_si256());
+        __m256i v2_hi = _mm256_unpackhi_epi8(v2, _mm256_setzero_si256());
+        __m256i mul_lo = _mm256_madd_epi16(v1_lo, v2_lo);
+        __m256i mul_hi = _mm256_madd_epi16(v1_hi, v2_hi);
+        sum = _mm256_add_epi32(sum, mul_lo);
+        sum = _mm256_add_epi32(sum, mul_hi);
+        pv1 += 32;
+        pv2 += 32;
+    }
+    return hsum_8x32_avx2(sum);
+}
+
+export int32_t U8IPAVX2Residual(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
+    return U8IPAVX2(pv1, pv2, dim) + U8IPBF(pv1 + (dim & ~31), pv2 + (dim & ~31), dim & 31);
+}
+#endif
+
+#if defined(__SSE2__)
+export int32_t U8IPSSE2(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
+    const uint8_t *pEnd1 = pv1 + (dim & ~(15u));
+    __m128i sum = _mm_setzero_si128();
+    while (pv1 < pEnd1) {
+        __m128i v1 = _mm_loadu_si128((__m128i *)pv1);
+        __m128i v2 = _mm_loadu_si128((__m128i *)pv2);
+        // get sum of inner product
+        __m128i v1_lo = _mm_unpacklo_epi8(v1, _mm_setzero_si128());
+        __m128i v2_lo = _mm_unpacklo_epi8(v2, _mm_setzero_si128());
+        __m128i v1_hi = _mm_unpackhi_epi8(v1, _mm_setzero_si128());
+        __m128i v2_hi = _mm_unpackhi_epi8(v2, _mm_setzero_si128());
+        __m128i mul_lo = _mm_madd_epi16(v1_lo, v2_lo);
+        __m128i mul_hi = _mm_madd_epi16(v1_hi, v2_hi);
+        sum = _mm_add_epi32(sum, mul_lo);
+        sum = _mm_add_epi32(sum, mul_hi);
+        pv1 += 16;
+        pv2 += 16;
+    }
+    return hsum_epi32_sse2(sum);
+}
+
+export int32_t U8IPSSE2Residual(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
+    return U8IPSSE2(pv1, pv2, dim) + U8IPBF(pv1 + (dim & ~15), pv2 + (dim & ~15), dim & 15);
+}
+#endif
+
+//------------------------------//------------------------------//------------------------------
+
 export int32_t U8L2BF(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
     int32_t res = 0;
     for (size_t i = 0; i < dim; ++i) {

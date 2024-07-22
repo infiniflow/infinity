@@ -58,6 +58,10 @@ export U8DistanceFuncType Get_HNSW_U8L2_ptr();
 export U8DistanceFuncType Get_HNSW_U8L2_16_ptr();
 export U8DistanceFuncType Get_HNSW_U8L2_32_ptr();
 export U8DistanceFuncType Get_HNSW_U8L2_64_ptr();
+export U8DistanceFuncType Get_HNSW_U8IP_ptr();
+export U8DistanceFuncType Get_HNSW_U8IP_16_ptr();
+export U8DistanceFuncType Get_HNSW_U8IP_32_ptr();
+export U8DistanceFuncType Get_HNSW_U8IP_64_ptr();
 // EMVB
 export FilterScoresOutputIdsFuncType GetFilterScoresOutputIdsFuncPtr();
 // K-means
