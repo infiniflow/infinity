@@ -461,7 +461,7 @@ export float U8CosBF(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
 }
 
 #if defined(__AVX512BW__)
-export float U8CosAVX512(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
+export float U8CosAVX512BW(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
     const uint8_t *pend1 = pv1 + (dim & ~(63u));
     const uint8_t *pend2 = pv1 + dim;
     __m512i sum_ip = _mm512_setzero_si512();

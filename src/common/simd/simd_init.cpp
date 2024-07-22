@@ -483,6 +483,25 @@ U8DistanceFuncType Get_HNSW_U8IP_ptr() {
     return &U8IPBF;
 }
 
+U8CosDistanceFuncType Get_HNSW_U8Cos_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &U8CosAVX512BW;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &U8CosAVX2;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &U8CosSSE2;
+    }
+#endif
+    return &U8CosBF;
+}
+
 FilterScoresOutputIdsFuncType GetFilterScoresOutputIdsFuncPtr() {
 #if defined(__AVX2__)
     if (IsAVX2Supported()) {

@@ -53,6 +53,7 @@ export struct SIMD_FUNCTIONS {
     U8DistanceFuncType HNSW_U8IP_16_ptr_ = Get_HNSW_U8IP_16_ptr();
     U8DistanceFuncType HNSW_U8IP_32_ptr_ = Get_HNSW_U8IP_32_ptr();
     U8DistanceFuncType HNSW_U8IP_64_ptr_ = Get_HNSW_U8IP_64_ptr();
+    U8CosDistanceFuncType HNSW_U8Cos_ptr_ = Get_HNSW_U8Cos_ptr();
 
     // EMVB
     FilterScoresOutputIdsFuncType FilterScoresOutputIds_func_ptr_ = GetFilterScoresOutputIdsFuncPtr();

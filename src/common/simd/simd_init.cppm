@@ -30,6 +30,7 @@ export using infinity::IsAVX512BWSupported;
 export using F32DistanceFuncType = f32(*)(const f32 *, const f32 *, SizeT);
 export using I8DistanceFuncType = i32(*)(const i8 *, const i8 *, SizeT);
 export using U8DistanceFuncType = i32(*)(const u8 *, const u8 *, SizeT);
+export using U8CosDistanceFuncType = f32(*)(const u8 *, const u8 *, SizeT);
 export using FilterScoresOutputIdsFuncType = u32 * (*)(u32 *, f32, const f32 *, u32);
 export using SearchTop1WithDisF32U32FuncType = void(*)(u32, u32, const f32 *, u32, const f32 *, u32 *, f32 *);
 
@@ -62,6 +63,7 @@ export U8DistanceFuncType Get_HNSW_U8IP_ptr();
 export U8DistanceFuncType Get_HNSW_U8IP_16_ptr();
 export U8DistanceFuncType Get_HNSW_U8IP_32_ptr();
 export U8DistanceFuncType Get_HNSW_U8IP_64_ptr();
+export U8CosDistanceFuncType Get_HNSW_U8Cos_ptr();
 // EMVB
 export FilterScoresOutputIdsFuncType GetFilterScoresOutputIdsFuncPtr();
 // K-means
