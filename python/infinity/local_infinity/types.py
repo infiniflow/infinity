@@ -20,6 +20,7 @@ import numpy as np
 from numpy import dtype
 from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.embedded_infinity_ext import *
+from infinity.errors import ErrorCode
 
 def logic_type_to_dtype(ttype: WrapDataType):
     match ttype.logical_type:
@@ -57,6 +58,8 @@ def logic_type_to_dtype(ttype: WrapDataType):
                     case _:
                         raise NotImplementedError(f"Unsupported type {ttype.embedding_type}")
         case LogicalType.kTensor:
+            return object
+        case LogicalType.kTensorArray:
             return object
         case LogicalType.kSparse:
             return object
@@ -110,6 +113,23 @@ def parse_tensor_bytes(column_data_type, bytes_data):
         tensor_data = tensor_to_list(column_data_type, bytes_data[offset:offset + length])
         results.append(tensor_data)
         offset += length
+    return results
+
+
+def parse_tensorarray_bytes(column_data_type, bytes_data):
+    results = []
+    offset = 0
+    while offset < len(bytes_data):
+        tensor_n = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+        offset += 4
+        tensorarray_data = []
+        for _ in range(tensor_n):
+            length = struct.unpack('I', bytes_data[offset:offset + 4])[0]
+            offset += 4
+            tensor_data = tensor_to_list(column_data_type, bytes_data[offset:offset + length])
+            offset += length
+            tensorarray_data.append(tensor_data)
+        results.append(tensorarray_data)
     return results
 
 def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
@@ -173,6 +193,8 @@ def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
             return parse_sparse_bytes(column_data_type, column_vector)
         case LogicalType.kTensor:
             return parse_tensor_bytes(column_data_type, column_vector)
+        case LogicalType.kTensorArray:
+            return parse_tensorarray_bytes(column_data_type, column_vector)
         case _:
             raise NotImplementedError(f"Unsupported type {column_type}")
 
@@ -254,7 +276,7 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
     data = EmbeddingData()
     elem_type = EmbeddingDataType.kElemFloat
     if embedding_data_type == 'bit':
-        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
     elif embedding_data_type == 'tinyint' or embedding_data_type == 'int8' or embedding_data_type == 'i8':
         elem_type = EmbeddingDataType.kElemInt8
         data.i8_array_value = np.asarray(embedding_data, dtype=np.int8).flatten()
@@ -274,7 +296,7 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
         elem_type = EmbeddingDataType.kElemDouble
         data.f64_array_value = np.asarray(embedding_data, dtype=np.float64).flatten()
     else:
-        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
     match_tensor_expr.embedding_data_type = elem_type
     match_tensor_expr.embedding_data = data

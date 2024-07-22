@@ -20,6 +20,7 @@ from infinity.common import InfinityException
 from infinity.embedded_infinity_ext import IndexType as LocalIndexType
 from infinity.embedded_infinity_ext import InitParameter as LocalInitParameter
 from infinity.embedded_infinity_ext import WrapIndexInfo as LocalIndexInfo
+from infinity.errors import ErrorCode
 
 class IndexType(Enum):
     IVFFlat = 1
@@ -47,7 +48,7 @@ class IndexType(Enum):
             case IndexType.BMP:
                 return ttypes.IndexType.BMP
             case _:
-                raise InfinityException(3060, "Unknown index type")
+                raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
 
     def to_local_type(self):
         match self:
@@ -66,7 +67,7 @@ class IndexType(Enum):
             case IndexType.BMP:
                 return LocalIndexType.kBMP
             case _:
-                raise InfinityException(3060, "Unknown index type")
+                raise InfinityException(ErrorCode.INVALID_INDEX_TYPE, "Unknown index type")
 
 class InitParameter:
     def __init__(self, param_name: str, param_value: str):
