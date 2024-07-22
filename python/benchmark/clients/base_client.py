@@ -413,6 +413,8 @@ class BaseClient:
                     for query_id, result in enumerate(results):
                         for res in result[1:]:
                             query_results[query_id].append(res)
+                else:
+                    raise TypeError("Unsupport engine!")
 
                 recall = calculate_recall(gt, query_results)
                 precisions.append(recall)

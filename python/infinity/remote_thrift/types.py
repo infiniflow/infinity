@@ -21,6 +21,7 @@ from typing import Any, Tuple, Dict, List
 
 import polars as pl
 from numpy import dtype
+from infinity.errors import ErrorCode
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 
@@ -369,7 +370,7 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
     match_tensor_expr.extra_options = extra_option
     data = EmbeddingData()
     if embedding_data_type == 'bit':
-        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
     elif embedding_data_type == 'tinyint' or embedding_data_type == 'int8' or embedding_data_type == 'i8':
         elem_type = ElementType.ElementInt8
         data.i8_array_value = np.asarray(embedding_data, dtype=np.int8).flatten()
@@ -389,7 +390,7 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
         elem_type = ElementType.ElementFloat64
         data.f64_array_value = np.asarray(embedding_data, dtype=np.float64).flatten()
     else:
-        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
     match_tensor_expr.embedding_data_type = elem_type
     match_tensor_expr.embedding_data = data
@@ -408,7 +409,7 @@ def make_match_sparse_expr(vector_column_name: str, sparse_data: SPARSE, metric_
         query_sparse_expr.i64_array_idx = sparse_data["indices"]
         query_sparse_expr.f64_array_value = sparse_data["values"]
     else:
-        raise InfinityException(3058, f"Invalid sparse data {sparse_data['values'][0]} type")
+        raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE, f"Invalid sparse data {sparse_data['values'][0]} type")
 
     match_sparse_options = []
     if opt_params is not None:

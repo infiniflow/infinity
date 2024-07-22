@@ -181,6 +181,32 @@ class LocalTable(Table, ABC):
                     elif isinstance(value[0], float):
                         constant_expression.literal_type = LiteralType.kDoubleArray
                         constant_expression.f64_array_value = value
+                    elif isinstance(value[0], list) or isinstance(value[0], np.ndarray):
+                        if isinstance(value[0], np.ndarray):
+                            value = [x.tolist() for x in value]
+                        if isinstance(value[0][0], int):
+                            constant_expression.literal_type = LiteralType.kIntegerArray
+                            constant_expression.i64_array_value = [x for xs in value for x in xs]
+                        elif isinstance(value[0][0], float):
+                            constant_expression.literal_type = LiteralType.kDoubleArray
+                            constant_expression.f64_array_value = [x for xs in value for x in xs]
+                        elif isinstance(value[0][0], list):
+                            if isinstance(value[0][0][0], int):
+                                constant_expression.literal_type = LiteralType.kSubArrayArray
+                                constant_expression.i64_tensor_array_value = value
+                            elif isinstance(value[0][0][0], float):
+                                constant_expression.literal_type = LiteralType.kSubArrayArray
+                                constant_expression.f64_tensor_array_value = value
+                elif isinstance(value, np.ndarray) and value.ndim <= 2:
+                    float_list = value.flatten().tolist()
+                    if isinstance(float_list[0], int):
+                        constant_expression.literal_type = LiteralType.kIntegerArray
+                        constant_expression.i64_array_value = float_list
+                    elif isinstance(float_list[0], float):
+                        constant_expression.literal_type = LiteralType.kDoubleArray
+                        constant_expression.f64_array_value = float_list
+                    else:
+                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid list type: {type(value)}")
                 elif isinstance(value, dict):
                     if isinstance(value["values"][0], int):
                         constant_expression.literal_type = LiteralType.kLongSparseArray
@@ -188,19 +214,19 @@ class LocalTable(Table, ABC):
                             constant_expression.i64_array_idx = value["indices"]
                             constant_expression.i64_array_value = value["values"]
                         else:
-                            raise InfinityException(3069, "Invalid constant expression")
+                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
                     elif isinstance(value["values"][0], float):
                         constant_expression.literal_type = LiteralType.kDoubleSparseArray
                         if isinstance(value["indices"][0], int):
                             constant_expression.i64_array_idx = value["indices"]
                             constant_expression.f64_array_value = value["values"]
                         else:
-                            raise InfinityException(3069, "Invalid constant expression")
+                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
                     else:
-                        raise InfinityException(3069, "Invalid constant expression")
+                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
                     
                 else:
-                    raise InfinityException(3069, "Invalid constant expression")
+                    raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
                 parse_exprs.append(constant_expression)
 
             fields.append(parse_exprs)
@@ -231,19 +257,19 @@ class LocalTable(Table, ABC):
                     elif file_type == 'fvecs':
                         options.copy_file_type = CopyFileType.kFVECS
                     else:
-                        raise InfinityException(3037, f"Unrecognized export file type: {file_type}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
-                        raise InfinityException(3037, f"Unrecognized export file delimiter: {delimiter}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
                         options.header = v
                     else:
-                        raise InfinityException(3037, "Boolean value is expected in header field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
                 else:
-                    raise InfinityException(3037, f"Unknown export parameter: {k}")
+                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
 
         res = self._conn.import_data(db_name=self._db_name,
                                      table_name=self._table_name,
@@ -357,7 +383,7 @@ class LocalTable(Table, ABC):
                                 constant_expression.literal_type = LiteralType.kDoubleArray
                                 constant_expression.f64_array_value = value
                         else:
-                            raise InfinityException(3069, "Invalid constant expression")
+                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
 
                         parsed_expr = WrapParsedExpr(ParsedExprType.kConstant)
                         parsed_expr.constant_expr = constant_expression

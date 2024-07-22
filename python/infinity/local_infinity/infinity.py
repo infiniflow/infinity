@@ -83,7 +83,7 @@ class LocalInfinityConnection(InfinityConnection, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_database_conflict = LocalConflictType.kIgnore
         else:
-            raise InfinityException(3066, "Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
         res = self._client.drop_database(db_name, drop_database_conflict)
         if res.error_code == ErrorCode.OK:
