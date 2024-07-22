@@ -157,7 +157,9 @@ void InfinityThriftService::CreateDatabase(infinity_thrift_rpc::CommonResponse &
 
     auto [infinity, status] = GetInfinityBySessionID(request.session_id);
     if (status.ok()) {
-        auto result = infinity->CreateDatabase(request.db_name, create_database_opts);
+        String db_name = request.db_name;
+        ToLower(db_name);
+        auto result = infinity->CreateDatabase(db_name, create_database_opts);
         ProcessQueryResult(response, result);
     } else {
         ProcessStatus(response, status);
@@ -184,7 +186,9 @@ void InfinityThriftService::DropDatabase(infinity_thrift_rpc::CommonResponse &re
 
     auto [infinity, status] = GetInfinityBySessionID(request.session_id);
     if (status.ok()) {
-        auto result = infinity->DropDatabase(request.db_name, drop_database_opts);
+        String db_name = request.db_name;
+        ToLower(db_name);
+        auto result = infinity->DropDatabase(db_name, drop_database_opts);
         ProcessQueryResult(response, result);
     } else {
         ProcessStatus(response, status);
@@ -228,7 +232,9 @@ void InfinityThriftService::CreateTable(infinity_thrift_rpc::CommonResponse &res
     for (SizeT idx = 0; idx < properties_count; ++idx) {
         InitParameter *property = new InitParameter();
         property->param_name_ = request.create_option.properties[idx].key;
+        ToLower(property->param_name_);
         property->param_value_ = request.create_option.properties[idx].value;
+        ToLower(property->param_value_);
         create_table_opts.properties_.emplace_back(property);
     }
 
@@ -238,7 +244,11 @@ void InfinityThriftService::CreateTable(infinity_thrift_rpc::CommonResponse &res
         return;
     }
 
-    auto result = infinity->CreateTable(request.db_name, request.table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    auto result = infinity->CreateTable(db_name, table_name, column_defs, Vector<TableConstraint *>(), create_table_opts);
     ProcessQueryResult(response, result);
 }
 
@@ -265,7 +275,11 @@ void InfinityThriftService::DropTable(infinity_thrift_rpc::CommonResponse &respo
         }
     }
 
-    auto result = infinity->DropTable(request.db_name, request.table_name, drop_table_opts);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    auto result = infinity->DropTable(db_name, table_name, drop_table_opts);
     ProcessQueryResult(response, result);
 }
 
@@ -333,7 +347,11 @@ void InfinityThriftService::Insert(infinity_thrift_rpc::CommonResponse &response
         values->emplace_back(value_list);
     }
 
-    auto result = infinity->Insert(request.db_name, request.table_name, columns, values);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    auto result = infinity->Insert(db_name, table_name, columns, values);
     ProcessQueryResult(response, result);
 }
 
@@ -375,7 +393,11 @@ void InfinityThriftService::Import(infinity_thrift_rpc::CommonResponse &response
     }
     import_options.delimiter_ = delimiter_string[0];
 
-    const QueryResult result = infinity->Import(request.db_name, request.table_name, request.file_name.c_str(), import_options);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->Import(db_name, table_name, request.file_name.c_str(), import_options);
     ProcessQueryResult(response, result);
 }
 
@@ -426,7 +448,11 @@ void InfinityThriftService::Export(infinity_thrift_rpc::CommonResponse &response
     export_options.limit_ = request.export_option.limit;
     export_options.row_limit_ = request.export_option.row_limit;
 
-    const QueryResult result = infinity->Export(request.db_name, request.table_name, export_columns, request.file_name.c_str(), export_options);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->Export(db_name, table_name, export_columns, request.file_name.c_str(), export_options);
     ProcessQueryResult(response, result);
 }
 
@@ -568,7 +594,11 @@ void InfinityThriftService::Select(infinity_thrift_rpc::SelectResponse &response
     //
     // auto start3 = std::chrono::steady_clock::now();
 
-    const QueryResult result = infinity->Search(request.db_name, request.table_name, search_expr, filter, output_columns);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->Search(db_name, table_name, search_expr, filter, output_columns);
 
     // auto end3 = std::chrono::steady_clock::now();
     //
@@ -735,7 +765,12 @@ void InfinityThriftService::Explain(infinity_thrift_rpc::SelectResponse &respons
 
     // Explain type
     auto explain_type = GetExplainTypeFromProto(request.explain_type);
-    const QueryResult result = infinity->Explain(request.db_name, request.table_name, explain_type, search_expr, filter, output_columns);
+
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->Explain(db_name, table_name, explain_type, search_expr, filter, output_columns);
 
     if (result.IsOk()) {
         auto &columns = response.column_fields;
@@ -763,7 +798,11 @@ void InfinityThriftService::Delete(infinity_thrift_rpc::CommonResponse &response
         }
     }
 
-    const QueryResult result = infinity->Delete(request.db_name, request.table_name, filter);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->Delete(db_name, table_name, filter);
     ProcessQueryResult(response, result);
 };
 
@@ -813,7 +852,11 @@ void InfinityThriftService::Update(infinity_thrift_rpc::CommonResponse &response
         }
     }
 
-    const QueryResult result = infinity->Update(request.db_name, request.table_name, filter, update_expr_array);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->Update(db_name, table_name, filter, update_expr_array);
     ProcessQueryResult(response, result);
 }
 
@@ -826,7 +869,11 @@ void InfinityThriftService::Optimize(infinity_thrift_rpc::CommonResponse& respon
 
     auto optimize_options = GetParsedOptimizeOptionFromProto(request.optimize_options);
 
-    const QueryResult result = infinity->Optimize(request.db_name, request.table_name, std::move(optimize_options));
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->Optimize(db_name, table_name, std::move(optimize_options));
     ProcessQueryResult(response, result);
 }
 
@@ -860,7 +907,9 @@ void InfinityThriftService::ListTable(infinity_thrift_rpc::ListTableResponse &re
         return;
     }
 
-    auto result = infinity->ListTables(request.db_name);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    auto result = infinity->ListTables(db_name);
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
@@ -882,7 +931,9 @@ void InfinityThriftService::ShowDatabase(infinity_thrift_rpc::ShowDatabaseRespon
         ProcessStatus(response, infinity_status);
         return;
     }
-    const QueryResult result = infinity->ShowDatabase(request.db_name);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    const QueryResult result = infinity->ShowDatabase(db_name);
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
@@ -919,7 +970,11 @@ void InfinityThriftService::ShowTable(infinity_thrift_rpc::ShowTableResponse &re
         return;
     }
 
-    const QueryResult result = infinity->ShowTable(request.db_name, request.table_name);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->ShowTable(db_name, table_name);
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
@@ -971,7 +1026,11 @@ void InfinityThriftService::ShowColumns(infinity_thrift_rpc::SelectResponse &res
         return;
     }
 
-    const QueryResult result = infinity->ShowColumns(request.db_name, request.table_name);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->ShowColumns(db_name, table_name);
     if (result.IsOk()) {
         auto &columns = response.column_fields;
         columns.resize(result.result_table_->ColumnCount());
@@ -988,7 +1047,9 @@ void InfinityThriftService::ShowTables(infinity_thrift_rpc::SelectResponse &resp
         return;
     }
 
-    const QueryResult result = infinity->ShowTables(request.db_name);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    const QueryResult result = infinity->ShowTables(db_name);
     if (result.IsOk()) {
         auto &columns = response.column_fields;
         columns.resize(result.result_table_->ColumnCount());
@@ -1005,7 +1066,9 @@ void InfinityThriftService::GetDatabase(infinity_thrift_rpc::CommonResponse &res
         return;
     }
 
-    QueryResult result = infinity->GetDatabase(request.db_name);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    QueryResult result = infinity->GetDatabase(db_name);
     ProcessQueryResult(response, result);
 }
 
@@ -1016,7 +1079,11 @@ void InfinityThriftService::GetTable(infinity_thrift_rpc::CommonResponse &respon
         return;
     }
 
-    QueryResult result = infinity->GetTable(request.db_name, request.table_name);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    QueryResult result = infinity->GetTable(db_name, table_name);
     ProcessQueryResult(response, result);
 }
 
@@ -1069,13 +1136,17 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
             return;
         }
 
-        index_info_to_use->column_name_ = index_info.column_name;
+        String column_name = index_info.column_name;
+        ToLower(column_name);
+        index_info_to_use->column_name_ = column_name;
 
         auto *index_param_list = new Vector<InitParameter *>();
         for (auto &index_param : index_info.index_param_list) {
             auto init_parameter = new InitParameter();
             init_parameter->param_name_ = index_param.param_name;
+            ToLower(init_parameter->param_name_);
             init_parameter->param_value_ = index_param.param_value;
+            ToLower(init_parameter->param_value_);
             index_param_list->emplace_back(init_parameter);
         }
         index_info_to_use->index_param_list_ = index_param_list;
@@ -1083,7 +1154,13 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
         index_info_list_to_use->emplace_back(index_info_to_use);
     }
 
-    QueryResult result = infinity->CreateIndex(request.db_name, request.table_name, request.index_name, index_info_list_to_use, create_index_opts);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    String index_name = request.index_name;
+    ToLower(index_name);
+    QueryResult result = infinity->CreateIndex(db_name, table_name, index_name, index_info_list_to_use, create_index_opts);
     ProcessQueryResult(response, result);
 }
 
@@ -1110,7 +1187,13 @@ void InfinityThriftService::DropIndex(infinity_thrift_rpc::CommonResponse &respo
         return;
     }
 
-    QueryResult result = infinity->DropIndex(request.db_name, request.table_name, request.index_name, drop_index_opts);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    String index_name = request.index_name;
+    ToLower(index_name);
+    QueryResult result = infinity->DropIndex(db_name, table_name, index_name, drop_index_opts);
     ProcessQueryResult(response, result);
 }
 
@@ -1121,7 +1204,11 @@ void InfinityThriftService::ListIndex(infinity_thrift_rpc::ListIndexResponse &re
         return;
     }
 
-    auto result = infinity->ListTableIndexes(request.db_name, request.table_name);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    auto result = infinity->ListTableIndexes(db_name, table_name);
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
@@ -1143,7 +1230,13 @@ void InfinityThriftService::ShowIndex(infinity_thrift_rpc::ShowIndexResponse &re
         return;
     }
 
-    auto result = infinity->ShowIndex(request.db_name, request.table_name, request.index_name);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    String index_name = request.index_name;
+    ToLower(index_name);
+    auto result = infinity->ShowIndex(db_name, table_name, index_name);
 
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
@@ -1216,7 +1309,11 @@ void InfinityThriftService::ShowSegments(infinity_thrift_rpc::SelectResponse &re
         return;
     }
 
-    const QueryResult result = infinity->ShowSegments(request.db_name, request.table_name);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->ShowSegments(db_name, table_name);
     if (result.IsOk()) {
         auto &columns = response.column_fields;
         columns.resize(result.result_table_->ColumnCount());
@@ -1233,7 +1330,11 @@ void InfinityThriftService::ShowSegment(infinity_thrift_rpc::ShowSegmentResponse
         return;
     }
 
-    const QueryResult result = infinity->ShowSegment(request.db_name, request.table_name, request.segment_id);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->ShowSegment(db_name, table_name, request.segment_id);
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
@@ -1300,7 +1401,11 @@ void InfinityThriftService::ShowBlocks(infinity_thrift_rpc::SelectResponse &resp
         return;
     }
 
-    const QueryResult result = infinity->ShowBlocks(request.db_name, request.table_name, request.segment_id);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->ShowBlocks(db_name, table_name, request.segment_id);
     if (result.IsOk()) {
         auto &columns = response.column_fields;
         columns.resize(result.result_table_->ColumnCount());
@@ -1317,7 +1422,11 @@ void InfinityThriftService::ShowBlock(infinity_thrift_rpc::ShowBlockResponse &re
         return;
     }
 
-    const QueryResult result = infinity->ShowBlock(request.db_name, request.table_name, request.segment_id, request.block_id);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    const QueryResult result = infinity->ShowBlock(db_name, table_name, request.segment_id, request.block_id);
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
         auto row_count = data_block->row_count();
@@ -1375,7 +1484,11 @@ void InfinityThriftService::ShowBlockColumn(infinity_thrift_rpc::ShowBlockColumn
         return;
     }
 
-    auto result = infinity->ShowBlockColumn(request.db_name, request.table_name, request.segment_id, request.block_id, request.column_id);
+    String db_name = request.db_name;
+    ToLower(db_name);
+    String table_name = request.table_name;
+    ToLower(table_name);
+    auto result = infinity->ShowBlockColumn(db_name, table_name, request.segment_id, request.block_id, request.column_id);
 
     if (result.IsOk()) {
         SharedPtr<DataBlock> data_block = result.result_table_->GetDataBlockById(0);
@@ -1705,7 +1818,8 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
 ColumnExpr *InfinityThriftService::GetColumnExprFromProto(const infinity_thrift_rpc::ColumnExpr &column_expr) {
     auto parsed_expr = new ColumnExpr();
 
-    for (auto &column_name : column_expr.column_name) {
+    for (auto column_name : column_expr.column_name) {
+        ToLower(column_name);
         parsed_expr->names_.emplace_back(column_name);
     }
 
@@ -1715,7 +1829,9 @@ ColumnExpr *InfinityThriftService::GetColumnExprFromProto(const infinity_thrift_
 
 FunctionExpr *InfinityThriftService::GetFunctionExprFromProto(Status &status, const infinity_thrift_rpc::FunctionExpr &function_expr) {
     auto *parsed_expr = new FunctionExpr();
-    parsed_expr->func_name_ = function_expr.function_name;
+    String function_name = function_expr.function_name;
+    ToLower(function_name);
+    parsed_expr->func_name_ = function_name;
     Vector<ParsedExpr *> *arguments;
     arguments = new Vector<ParsedExpr *>();
     arguments->reserve(function_expr.arguments.size());
@@ -1787,7 +1903,9 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
     for (auto &param : expr.opt_params) {
         auto init_parameter = new InitParameter();
         init_parameter->param_name_ = param.param_name;
+        ToLower(init_parameter->param_name_);
         init_parameter->param_value_ = param.param_value;
+        ToLower(init_parameter->param_value_);
         knn_expr->opt_params_->emplace_back(init_parameter);
     }
     status = Status::OK();
@@ -1813,7 +1931,9 @@ MatchSparseExpr *InfinityThriftService::GetMatchSparseExprFromProto(Status &stat
     for (auto &param : expr.opt_params) {
         auto *init_parameter = new InitParameter();
         init_parameter->param_name_ = param.param_name;
+        ToLower(init_parameter->param_name_);
         init_parameter->param_value_ = param.param_value;
+        ToLower(init_parameter->param_value_);
         opt_params_ptr->emplace_back(init_parameter);
     }
     match_sparse_expr->SetOptParams(expr.topn, opt_params_ptr);
@@ -1837,7 +1957,10 @@ MatchTensorExpr *InfinityThriftService::GetMatchTensorExprFromProto(Status &stat
     const auto copy_bytes = EmbeddingT::EmbeddingSize(match_tensor_expr->embedding_data_type_, match_tensor_expr->dimension_);
     match_tensor_expr->query_tensor_data_ptr_ = MakeUniqueForOverwrite<char[]>(copy_bytes);
     std::memcpy(match_tensor_expr->query_tensor_data_ptr_.get(), embedding_data_ptr, copy_bytes);
-    match_tensor_expr->options_text_ = expr.extra_options;
+
+    String options_text = expr.extra_options;
+    ToLower(options_text);
+    match_tensor_expr->options_text_ = options_text;
     status = Status::OK();
     return match_tensor_expr.release();
 }
@@ -1846,6 +1969,9 @@ MatchExpr *InfinityThriftService::GetMatchExprFromProto(const infinity_thrift_rp
     auto match_expr = new MatchExpr();
     match_expr->fields_ = expr.fields;
     match_expr->matching_text_ = expr.matching_text;
+
+    String options_text = expr.options_text;
+    ToLower(options_text);
     match_expr->options_text_ = expr.options_text;
     return match_expr;
 }
@@ -1872,8 +1998,15 @@ ParsedExpr *InfinityThriftService::GetGenericMatchExprFromProto(Status &status, 
 
 FusionExpr *InfinityThriftService::GetFusionExprFromProto(const infinity_thrift_rpc::FusionExpr &expr) {
     auto fusion_expr = MakeUnique<FusionExpr>();
-    fusion_expr->method_ = expr.method;
-    fusion_expr->SetOptions(expr.options_text);
+
+    String fusion_method = expr.method;
+    ToLower(fusion_method);
+    fusion_expr->method_ = fusion_method;
+
+    String options_text = expr.options_text;
+    ToLower(options_text);
+    fusion_expr->SetOptions(options_text);
+
     if (expr.__isset.optional_match_tensor_expr) {
         Status status;
         const auto result_ptr = GetMatchTensorExprFromProto(status, expr.optional_match_tensor_expr);
@@ -1973,6 +2106,7 @@ Tuple<UpdateExpr *, Status> InfinityThriftService::GetUpdateExprFromProto(const 
     Status status;
     auto up_expr = new UpdateExpr();
     up_expr->column_name = update_expr.column_name;
+    ToLower(up_expr->column_name);
     up_expr->value = GetParsedExprFromProto(status, update_expr.value);
     return {up_expr, status};
 }
@@ -1980,10 +2114,13 @@ Tuple<UpdateExpr *, Status> InfinityThriftService::GetUpdateExprFromProto(const 
 OptimizeOptions InfinityThriftService::GetParsedOptimizeOptionFromProto(const infinity_thrift_rpc::OptimizeOptions &options) {
     OptimizeOptions opt;
     opt.index_name_ = options.index_name;
+    ToLower(opt.index_name_);
     for (const auto &param : options.opt_params) {
         auto *init_param = new InitParameter();
         init_param->param_name_ = param.param_name;
+        ToLower(init_param->param_name_);
         init_param->param_value_ = param.param_value;
+        ToLower(init_param->param_value_);
         opt.opt_params_.emplace_back(init_param);
     }
     return opt;

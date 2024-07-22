@@ -76,7 +76,7 @@ jobs:
     - name: Build release version
       run: |
         sed -i "s/^version = \".*\"/version = \"$(echo $RELEASE_TAG | cut -c2-)\"/" pyproject.toml
-        sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DARROW_BUILD_SHARED=OFF -DARROW_ENABLE_TIMING_TESTS=OFF -DARROW_GGDB_DEBUG=OFF -DARROW_PARQUET=ON -DARROW_DEPENDENCY_USE_SHARED=OFF -DCPACK_PACKAGE_VERSION=${{ env.RELEASE_TAG }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOLS:STRING='link=1' -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity"
+        sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCPACK_PACKAGE_VERSION=${{ env.RELEASE_TAG }} -DCPACK_DEBIAN_PACKAGE_ARCHITECTURE=amd64 -DCMAKE_JOB_POOLS:STRING='link=1' -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity"
 
     - name: Download resources
       run: rm -rf resource && git clone --depth=1 https://github.com/infiniflow/resource.git
