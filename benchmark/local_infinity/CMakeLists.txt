@@ -216,7 +216,6 @@ target_link_libraries(
     dl
     lz4.a
     atomic.a
-
     c++.a
     c++abi.a
     parquet.a

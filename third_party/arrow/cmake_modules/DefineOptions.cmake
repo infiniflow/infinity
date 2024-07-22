@@ -538,12 +538,12 @@ takes precedence over ccache if a storage backend is configured" ON)
   define_option(ARROW_WITH_OPENTELEMETRY
                 "Build libraries with OpenTelemetry support for distributed tracing" OFF)
 
-  define_option(ARROW_WITH_BROTLI "Build with Brotli compression" ON)
-  define_option(ARROW_WITH_BZ2 "Build with BZ2 compression" ON)
-  define_option(ARROW_WITH_LZ4 "Build with lz4 compression" ON)
-  define_option(ARROW_WITH_SNAPPY "Build with Snappy compression" ON)
-  define_option(ARROW_WITH_ZLIB "Build with zlib compression" ON)
-  define_option(ARROW_WITH_ZSTD "Build with zstd compression" ON)
+  define_option(ARROW_WITH_BROTLI "Build with Brotli compression" OFF)
+  define_option(ARROW_WITH_BZ2 "Build with BZ2 compression" OFF)
+  define_option(ARROW_WITH_LZ4 "Build with lz4 compression" OFF)
+  define_option(ARROW_WITH_SNAPPY "Build with Snappy compression" OFF)
+  define_option(ARROW_WITH_ZLIB "Build with zlib compression" OFF)
+  define_option(ARROW_WITH_ZSTD "Build with zstd compression" OFF)
 
   define_option(ARROW_WITH_UCX
                 "Build with UCX transport for Arrow Flight;(only used if ARROW_FLIGHT is ON)"
