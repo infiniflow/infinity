@@ -350,6 +350,7 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         arrow.a
         thrift.a
         thriftnb.a
+        snappy.a
 )
 
 # WARN: python modules shall not link to static libstdc++!!!
@@ -359,6 +360,7 @@ set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hid
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 nanobind_disable_stack_protector(embedded_infinity_ext)
 nanobind_opt_size(embedded_infinity_ext)
 nanobind_strip(embedded_infinity_ext)
