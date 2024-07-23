@@ -25,7 +25,7 @@ CREATE TABLE NATION (N_NATIONKEY  INT, N_REGIONKEY INT );
 
 # copy data from csv file
 query I
-COPY NATION FROM '/var/infinity/test_data/nation.csv' WITH ( DELIMITER ',' );
+COPY NATION FROM '/var/infinity/test_data/nation.csv' WITH ( DELIMITER ',', FORMAT CSV );
 ----
 
 query I

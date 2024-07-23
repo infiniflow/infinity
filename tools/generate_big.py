@@ -33,7 +33,7 @@ def generate_test_varchar(
 
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(
+            "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(
                 table_name, copy_path)
         )
         slt_file.write("----\n")
@@ -88,7 +88,7 @@ def generate_test_embedding(
 
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(
+            "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(
                 table_name, copy_path)
         )
         slt_file.write("----\n")

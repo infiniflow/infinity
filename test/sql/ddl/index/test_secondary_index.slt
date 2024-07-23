@@ -5,7 +5,7 @@ statement ok
 CREATE TABLE test_secondary_index (c1 integer, c2 boolean);
 
 statement ok
-COPY test_secondary_index FROM '/var/infinity/test_data/test_big_top.csv' WITH ( DELIMITER ',' );
+COPY test_secondary_index FROM '/var/infinity/test_data/test_big_top.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 statement ok
 CREATE INDEX idx_c1 ON test_secondary_index (c1);

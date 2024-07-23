@@ -234,7 +234,7 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, remote: bool, tab
     results.append(f"Avg total dur: {dur_sum:.2f} s")
     results.append(f"Avg QPS: {(len(queries) / dur_sum):.2f}")
 
-    conn.disconnect()
+    infinity_obj.disconnect()
 
     for result in results:
         print(result)
@@ -308,7 +308,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--ef",
         type=int,
-        default=100,
+        default=200,
         dest="ef"
     )
     parser.add_argument(
