@@ -524,49 +524,77 @@ res.index_names #['my_index']
 
 ## insert
 
-**Table.insert(*data*)**
+```python
+Table.insert(data)
+```
 
-Insert records into the current table. 
+Inserts records (rows) of data into the current table. 
 
 ### Parameters
 
-- **data** : list
-    a list of dict which contains information of a record, and must be in line with the table schama.
-    - dict
-        - key: **column name :str**
-        - value: ***str, int, float, list(vector)***
+**data** : `json`, *Required*  
+Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `json` (one record) or `json` list (multiple records), with each key-value pair corresponding to a column name and table cell value.
+
+- key: column name in `str` format. 
+- value: `str`, `int`, `varchar`, `float`, or `list(vector)`
 
 ### Returns
 
 - Success: `True`
 - Failure: `Exception`
 
-### Examples
-```python
-table_obj.insert({"profile": [1.1, 2.2, 3.3], "age": 30, "c3": "Michael"})
+:::note
+When inserting incomplete records of data, ensure that all uninserted columns have default values. Otherwise, an error will occur.
+:::
 
+### Examples
+
+```python
+# Insert one row to the table
+table_obj.insert({"c1": [1.1, 2.2, 3.3], "c2": 30, "c3": "Michael"})
+```
+
+```python
+# Insert three rows of column c1, or a column c1 to the table
 table_obj.insert([{"c1": [1.1, 2.2, 3.3]}, {"c1": [4.4, 5.5, 6.6]}, {"c1": [7.7, 8.8, 9.9]}])
 ```
 
 ## import_data
 
-**Table.import_data(*filepath, import_options = None*)**
+```python
+Table.import_data(filepath, import_options = None)
+```
 
-Imports data from a file into the table. 
+Imports data from a specified file into the current table. 
 
 ### Parameters
 
-- **file_path : str**
-- **options : dict** a dict which could contain three fields, 'file_type', 'delimiter' and 'header'. If these are not specifyed in the passing parameters, default value is 'csv', ',' and False repectively.  
-    - file_type: str
-      - `'csv'` (default)
-      - `'fvecs'`
-      - `'json'`
-      - `'jsonl'`
-    - delimiter : `str`
-      used to decode csv file (defalut: `','`)
-    - header : bool
-      specify whether the csv file has header(defalut: `False`)
+#### file_path: `str`, *Required*
+
+Absolute path to the file for export. Supported file types include: 
+- `csv`
+- `json`
+- `jsonl`
+
+#### import_options: `json`
+
+Example: `{"header":True, "delimiter": "\t", file_type}`
+
+- **header**: `bool`  
+  Whether to display table header or not. Works with **.csv** files only:
+  - `True`: Display table header. 
+  - `False`: (Default) Do not display table header. 
+
+- **delimiter**: `str`, *Optional*, Defaults to ","  
+  Delimiter to separate columns. Works with **.csv** files only.
+
+- **file_type**: `str`, *Required*  
+  The type of the imported file. Supported file types include:
+  - `csv`
+  - `json`
+  - `jsonl`
+
+
 
 ### Returns
 
@@ -589,7 +617,7 @@ Exports the current table to a specified file.
 
 ### Parameters
 
-#### file_path: `str` *Required*
+#### file_path: `str`, *Required*
 
 Absolute path to the file for export. Supported file types include: 
 
@@ -598,29 +626,31 @@ Absolute path to the file for export. Supported file types include:
   
 #### export_options: `json`
 
-- **header**: `bool` *Optional*
+Example: `{"header": False, "delimiter": "\t", "file_type": "jsonl", "offset": 2, "limit": 5}`
+
+- **header**: `bool`, *Optional*  
   Whether to display table header or not. Works with **.csv** files only:
   - `True`: Display table header. 
   - `False`: (Default) Do not display table header. 
 
-- **delimiter**: `str` *Optional* Defaults to ","
+- **delimiter**: `str`, *Optional*, Defaults to ","  
   Delimiter to separate columns. Works with **.csv** files only.
 
-- **file_type**: `str` *Required*
+- **file_type**: `str`, *Required*  
   The type of the exported file. Supported file types include:
   - `csv`
   - `jsonl`
   
-- **offset**: `int` *Optional*
+- **offset**: `int`, *Optional*  
   Index specifying the starting row for export. Usually used in conjunction with `limit`. If not specified, the file export starts from the first row. 
 
-- **limit**: `int` *Optional*
+- **limit**: `int`, *Optional*  
   The maximum number of rows to export. Usually used in conjunction with `offset`. If the table's row count exceeds `offset` + `limit`, the excess rows are excluded from the export.
 
-- **row_limit**: `int` *Optional*
+- **row_limit**: `int`, *Optional*  
   Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so one. 
 
-#### columns: `[str]` *Optional*
+#### columns: `[str]`, *Optional*
 
 Columns to export to the output file, for example, `["num", "name", "score"]`. If not specified, the entire table is exported. 
 
