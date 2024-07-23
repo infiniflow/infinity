@@ -29,6 +29,7 @@ export using infinity::IsAVX512BWSupported;
 
 export using F32DistanceFuncType = f32(*)(const f32 *, const f32 *, SizeT);
 export using I8DistanceFuncType = i32(*)(const i8 *, const i8 *, SizeT);
+export using I8CosDistanceFuncType = f32(*)(const i8 *, const i8 *, SizeT);
 export using U8DistanceFuncType = i32(*)(const u8 *, const u8 *, SizeT);
 export using U8CosDistanceFuncType = f32(*)(const u8 *, const u8 *, SizeT);
 export using FilterScoresOutputIdsFuncType = u32 * (*)(u32 *, f32, const f32 *, u32);
@@ -54,6 +55,7 @@ export I8DistanceFuncType Get_HNSW_I8L2_ptr();
 export I8DistanceFuncType Get_HNSW_I8L2_16_ptr();
 export I8DistanceFuncType Get_HNSW_I8L2_32_ptr();
 export I8DistanceFuncType Get_HNSW_I8L2_64_ptr();
+export I8CosDistanceFuncType Get_HNSW_I8Cos_ptr();
 // HNSW U8
 export U8DistanceFuncType Get_HNSW_U8L2_ptr();
 export U8DistanceFuncType Get_HNSW_U8L2_16_ptr();

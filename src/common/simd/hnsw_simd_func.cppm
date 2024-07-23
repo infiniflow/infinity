@@ -445,6 +445,163 @@ export int32_t I8L2SSE2Residual(const int8_t *pv1, const int8_t *pv2, size_t dim
 }
 #endif
 
+//------------------------------//------------------------------//------------------------------
+
+export float I8CosBF(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    int dot_product = 0;
+    int norm1 = 0;
+    int norm2 = 0;
+    for (size_t i = 0; i < dim; i++) {
+        const int v1 = *pv1;
+        const int v2 = *pv2;
+        dot_product += v1 * v2;
+        norm1 += v1 * v1;
+        norm2 += v2 * v2;
+    }
+    return dot_product ? dot_product / sqrt(static_cast<i64>(norm1) * static_cast<i64>(norm2)) : 0.0f;
+}
+
+#if defined(__AVX512BW__)
+export float I8CosAVX512BW(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    const int8_t *pend1 = pv1 + (dim & ~(31u));
+    const int8_t *pend2 = pv1 + dim;
+    __m512i sum_ip = _mm512_setzero_si512();
+    __m512i sum_norm1 = _mm512_setzero_si512();
+    __m512i sum_norm2 = _mm512_setzero_si512();
+    while (pv1 < pend1) {
+        __m256i v1_mid = _mm256_loadu_si256((__m256i *)pv1);
+        __m256i v2_mid = _mm256_loadu_si256((__m256i *)pv2);
+        __m512i v1 = _mm512_cvtepi8_epi16(v1_mid);
+        __m512i v2 = _mm512_cvtepi8_epi16(v2_mid);
+        // get sum of inner product
+        __m512i add_ip = _mm512_madd_epi16(v1, v2);
+        sum_ip = _mm512_add_epi32(sum_ip, add_ip);
+        // get sum of norm1
+        __m512i add_norm1 = _mm512_madd_epi16(v1, v1);
+        sum_norm1 = _mm512_add_epi32(sum_norm1, add_norm1);
+        // get sum of norm2
+        __m512i add_norm2 = _mm512_madd_epi16(v2, v2);
+        sum_norm2 = _mm512_add_epi32(sum_norm2, add_norm2);
+        // move to next 32 uint8_t pair
+        pv1 += 32;
+        pv2 += 32;
+    }
+    // Reduce add
+    int sum_ip_res = _mm512_reduce_add_epi32(sum_ip);
+    int sum_norm1_res = _mm512_reduce_add_epi32(sum_norm1);
+    int sum_norm2_res = _mm512_reduce_add_epi32(sum_norm2);
+    // residual
+    while (pv1 < pend2) {
+        const int v1 = *pv1;
+        const int v2 = *pv2;
+        sum_ip_res += v1 * v2;
+        sum_norm1_res += v1 * v1;
+        sum_norm2_res += v2 * v2;
+        ++pv1;
+        ++pv2;
+    }
+    // return cosine similarity
+    return sum_ip_res ? sum_ip_res / sqrt(static_cast<i64>(sum_norm1_res) * static_cast<i64>(sum_norm2_res)) : 0.0f;
+}
+#endif
+
+#if defined(__AVX2__)
+export float I8CosAVX2(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    const int8_t *pend1 = pv1 + (dim & ~(15u));
+    const int8_t *pend2 = pv1 + dim;
+    __m256i sum_ip = _mm256_setzero_si256();
+    __m256i sum_norm1 = _mm256_setzero_si256();
+    __m256i sum_norm2 = _mm256_setzero_si256();
+    while (pv1 < pend1) {
+        __m128i v1_mid = _mm_loadu_si128((__m128i *)pv1);
+        __m128i v2_mid = _mm_loadu_si128((__m128i *)pv2);
+        __m256i v1 = _mm256_cvtepi8_epi16(v1_mid);
+        __m256i v2 = _mm256_cvtepi8_epi16(v2_mid);
+        // get sum of inner product
+        __m256i add_ip = _mm256_madd_epi16(v1, v2);
+        sum_ip = _mm256_add_epi32(sum_ip, add_ip);
+        // get sum of norm1
+        __m256i add_norm1 = _mm256_madd_epi16(v1, v1);
+        sum_norm1 = _mm256_add_epi32(sum_norm1, add_norm1);
+        // get sum of norm2
+        __m256i add_norm2 = _mm256_madd_epi16(v2, v2);
+        sum_norm2 = _mm256_add_epi32(sum_norm2, add_norm2);
+        // move to next 16 uint8_t pair
+        pv1 += 16;
+        pv2 += 16;
+    }
+    // Reduce add
+    int sum_ip_res = hsum_8x32_avx2(sum_ip);
+    int sum_norm1_res = hsum_8x32_avx2(sum_norm1);
+    int sum_norm2_res = hsum_8x32_avx2(sum_norm2);
+    // residual
+    while (pv1 < pend2) {
+        const int v1 = *pv1;
+        const int v2 = *pv2;
+        sum_ip_res += v1 * v2;
+        sum_norm1_res += v1 * v1;
+        sum_norm2_res += v2 * v2;
+        ++pv1;
+        ++pv2;
+    }
+    // return cosine similarity
+    return sum_ip_res ? sum_ip_res / sqrt(static_cast<i64>(sum_norm1_res) * static_cast<i64>(sum_norm2_res)) : 0.0f;
+}
+#endif
+
+#if defined(__SSE2__)
+export float I8CosSSE2(const int8_t *pv1, const int8_t *pv2, size_t dim) {
+    const int8_t *pend1 = pv1 + (dim & ~(15u));
+    const int8_t *pend2 = pv1 + dim;
+    __m128i sum_ip = _mm_setzero_si128();
+    __m128i sum_norm1 = _mm_setzero_si128();
+    __m128i sum_norm2 = _mm_setzero_si128();
+    while (pv1 < pend1) {
+        __m128i v1 = _mm_loadu_si128((__m128i *)pv1);
+        __m128i v2 = _mm_loadu_si128((__m128i *)pv2);
+        __m128i mask1 = _mm_cmplt_epi8(v1, _mm_setzero_si128());
+        __m128i mask2 = _mm_cmplt_epi8(v2, _mm_setzero_si128());
+        __m128i v1_lo = _mm_unpacklo_epi8(v1, mask1);
+        __m128i v2_lo = _mm_unpacklo_epi8(v2, mask2);
+        __m128i v1_hi = _mm_unpackhi_epi8(v1, mask1);
+        __m128i v2_hi = _mm_unpackhi_epi8(v2, mask2);
+        // get sum of inner product
+        __m128i add_ip = _mm_madd_epi16(v1_lo, v2_lo);
+        sum_ip = _mm_add_epi32(sum_ip, add_ip);
+        add_ip = _mm_madd_epi16(v1_hi, v2_hi);
+        sum_ip = _mm_add_epi32(sum_ip, add_ip);
+        // get sum of norm1
+        __m128i add_norm1 = _mm_madd_epi16(v1_lo, v1_lo);
+        sum_norm1 = _mm_add_epi32(sum_norm1, add_norm1);
+        add_norm1 = _mm_madd_epi16(v1_hi, v1_hi);
+        sum_norm1 = _mm_add_epi32(sum_norm1, add_norm1);
+        // get sum of norm2
+        __m128i add_norm2 = _mm_madd_epi16(v2_lo, v2_lo);
+        sum_norm2 = _mm_add_epi32(sum_norm2, add_norm2);
+        add_norm2 = _mm_madd_epi16(v2_hi, v2_hi);
+        sum_norm2 = _mm_add_epi32(sum_norm2, add_norm2);
+        // move to next 16 uint8_t pair
+        pv1 += 16;
+        pv2 += 16;
+    }
+    // Reduce add
+    int sum_ip_res = hsum_epi32_sse2(sum_ip);
+    int sum_norm1_res = hsum_epi32_sse2(sum_norm1);
+    int sum_norm2_res = hsum_epi32_sse2(sum_norm2);
+    // residual
+    while (pv1 < pend2) {
+        const int v1 = *pv1;
+        const int v2 = *pv2;
+        sum_ip_res += v1 * v2;
+        sum_norm1_res += v1 * v1;
+        sum_norm2_res += v2 * v2;
+        ++pv1;
+        ++pv2;
+    }
+    // return cosine similarity
+    return sum_ip_res ? sum_ip_res / sqrt(static_cast<i64>(sum_norm1_res) * static_cast<i64>(sum_norm2_res)) : 0.0f;
+}
+#endif
 
 //------------------------------//------------------------------//------------------------------
 
@@ -453,9 +610,11 @@ export float U8CosBF(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
     int norm1 = 0;
     int norm2 = 0;
     for (size_t i = 0; i < dim; i++) {
-        dot_product += static_cast<int>(pv1[i]) * static_cast<int>(pv2[i]);
-        norm1 += static_cast<int>(pv1[i]) * static_cast<int>(pv1[i]);
-        norm2 += static_cast<int>(pv2[i]) * static_cast<int>(pv2[i]);
+        const int v1 = pv1[i];
+        const int v2 = pv2[i];
+        dot_product += v1 * v2;
+        norm1 += v1 * v1;
+        norm2 += v2 * v2;
     }
     return dot_product ? dot_product / sqrt(static_cast<i64>(norm1) * static_cast<i64>(norm2)) : 0.0f;
 }
@@ -499,9 +658,11 @@ export float U8CosAVX512BW(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
     int sum_norm2_res = _mm512_reduce_add_epi32(sum_norm2);
     // residual
     while (pv1 < pend2) {
-        sum_ip_res += static_cast<int>(pv1[0]) * static_cast<int>(pv2[0]);
-        sum_norm1_res += static_cast<int>(pv1[0]) * static_cast<int>(pv1[0]);
-        sum_norm2_res += static_cast<int>(pv2[0]) * static_cast<int>(pv2[0]);
+        const int v1 = *pv1;
+        const int v2 = *pv2;
+        sum_ip_res += v1 * v2;
+        sum_norm1_res += v1 * v1;
+        sum_norm2_res += v2 * v2;
         ++pv1;
         ++pv2;
     }
@@ -549,9 +710,11 @@ export float U8CosAVX2(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
     int sum_norm2_res = hsum_8x32_avx2(sum_norm2);
     // residual
     while (pv1 < pend2) {
-        sum_ip_res += static_cast<int>(pv1[0]) * static_cast<int>(pv2[0]);
-        sum_norm1_res += static_cast<int>(pv1[0]) * static_cast<int>(pv1[0]);
-        sum_norm2_res += static_cast<int>(pv2[0]) * static_cast<int>(pv2[0]);
+        const int v1 = *pv1;
+        const int v2 = *pv2;
+        sum_ip_res += v1 * v2;
+        sum_norm1_res += v1 * v1;
+        sum_norm2_res += v2 * v2;
         ++pv1;
         ++pv2;
     }
@@ -599,9 +762,11 @@ export float U8CosSSE2(const uint8_t *pv1, const uint8_t *pv2, size_t dim) {
     int sum_norm2_res = hsum_epi32_sse2(sum_norm2);
     // residual
     while (pv1 < pend2) {
-        sum_ip_res += static_cast<int>(pv1[0]) * static_cast<int>(pv2[0]);
-        sum_norm1_res += static_cast<int>(pv1[0]) * static_cast<int>(pv1[0]);
-        sum_norm2_res += static_cast<int>(pv2[0]) * static_cast<int>(pv2[0]);
+        const int v1 = *pv1;
+        const int v2 = *pv2;
+        sum_ip_res += v1 * v2;
+        sum_norm1_res += v1 * v1;
+        sum_norm2_res += v2 * v2;
         ++pv1;
         ++pv2;
     }

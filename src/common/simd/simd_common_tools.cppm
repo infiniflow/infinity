@@ -31,6 +31,28 @@ export inline float hsum_ps_sse1(__m128 v) {                    // v = [ D C | B
 }
 #endif
 
+#ifdef __SSE3__
+// https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
+export inline float hsum_ps_sse3(__m128 v) {
+    __m128 shuf = _mm_movehdup_ps(v); // broadcast elements 3,1 to 2,0
+    __m128 sums = _mm_add_ps(v, shuf);
+    shuf = _mm_movehl_ps(shuf, sums); // high half -> low half
+    sums = _mm_add_ss(sums, shuf);
+    return _mm_cvtss_f32(sums);
+}
+#endif
+
+#ifdef __AVX__
+// https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
+export inline float hsum256_ps_avx(__m256 v) {
+    __m128 vlow = _mm256_castps256_ps128(v);
+    __m128 vhigh = _mm256_extractf128_ps(v, 1); // high 128
+    vlow = _mm_add_ps(vlow, vhigh);             // add the low 128
+    return hsum_ps_sse3(vlow);                  // and inline the sse3 version, which is optimal for AVX
+    // (no wasted instructions, and all of them are the 4B minimum)
+}
+#endif
+
 #ifdef __SSE2__
 // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
 export int hsum_epi32_sse2(__m128i x) {
@@ -73,28 +95,6 @@ export int hsum_epi32_avx512(__m512i v)
     __m256i hi = _mm512_extracti64x4_epi64(v, 1);
     __m256i sum = _mm256_add_epi32(lo, hi);
     return hsum_8x32_avx2(sum);
-}
-#endif
-
-#ifdef __SSE3__
-// https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
-export inline float hsum_ps_sse3(__m128 v) {
-    __m128 shuf = _mm_movehdup_ps(v); // broadcast elements 3,1 to 2,0
-    __m128 sums = _mm_add_ps(v, shuf);
-    shuf = _mm_movehl_ps(shuf, sums); // high half -> low half
-    sums = _mm_add_ss(sums, shuf);
-    return _mm_cvtss_f32(sums);
-}
-#endif
-
-#ifdef __AVX__
-// https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
-export inline float hsum256_ps_avx(__m256 v) {
-    __m128 vlow = _mm256_castps256_ps128(v);
-    __m128 vhigh = _mm256_extractf128_ps(v, 1); // high 128
-    vlow = _mm_add_ps(vlow, vhigh);             // add the low 128
-    return hsum_ps_sse3(vlow);                  // and inline the sse3 version, which is optimal for AVX
-    // (no wasted instructions, and all of them are the 4B minimum)
 }
 #endif
 

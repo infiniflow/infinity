@@ -43,6 +43,7 @@ export struct SIMD_FUNCTIONS {
     I8DistanceFuncType HNSW_I8L2_16_ptr_ = Get_HNSW_I8L2_16_ptr();
     I8DistanceFuncType HNSW_I8L2_32_ptr_ = Get_HNSW_I8L2_32_ptr();
     I8DistanceFuncType HNSW_I8L2_64_ptr_ = Get_HNSW_I8L2_64_ptr();
+    I8CosDistanceFuncType HNSW_I8Cos_ptr_ = Get_HNSW_I8Cos_ptr();
 
     // HNSW U8
     U8DistanceFuncType HNSW_U8L2_ptr_ = Get_HNSW_U8L2_ptr();

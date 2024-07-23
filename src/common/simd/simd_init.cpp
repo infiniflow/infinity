@@ -331,6 +331,25 @@ I8DistanceFuncType Get_HNSW_I8L2_ptr() {
     return &I8L2BF;
 }
 
+I8CosDistanceFuncType Get_HNSW_I8Cos_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &I8CosAVX512BW;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &I8CosAVX2;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &I8CosSSE2;
+    }
+#endif
+    return &I8CosBF;
+}
+
 U8DistanceFuncType Get_HNSW_U8L2_64_ptr() {
 #if defined(__AVX512BW__)
     if (IsAVX512BWSupported()) {
