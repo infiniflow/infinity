@@ -180,9 +180,9 @@ TO              { return TO; }
 TRANSACTION     { return TRANSACTION; }
 TRANSACTIONS    { return TRANSACTIONS; }
 TRUE            { return TRUE; }
-UINT8           { return UINT8; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
+UNSIGNED        { return UNSIGNED; }
 USING           { return USING; }
 UPDATE          { return UPDATE; }
 UUID            { return UUID; }

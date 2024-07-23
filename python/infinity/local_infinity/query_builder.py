@@ -98,12 +98,8 @@ class InfinityLocalQueryBuilder(ABC):
                 f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}",
             )
 
-        if (
-            embedding_data_type == "tinyint"
-            or embedding_data_type == "smallint"
-            or embedding_data_type == "int"
-            or embedding_data_type == "bigint"
-        ):
+        if embedding_data_type in ["int", "uint8", "int8", "int16", "int32", "int64", "tinyint", "unsigned tinyint",
+                                   "smallint", "bigint"]:
             embedding_data = [int(x) for x in embedding_data]
 
         data = EmbeddingData()
@@ -111,22 +107,24 @@ class InfinityLocalQueryBuilder(ABC):
         if embedding_data_type == "bit":
             elem_type = EmbeddingDataType.kElemBit
             raise Exception(f"Invalid embedding {embedding_data[0]} type")
-        elif embedding_data_type == "tinyint":
+        elif embedding_data_type in ["unsigned tinyint", "uint8"]:
+            elem_type = EmbeddingDataType.kElemUInt8
+        elif embedding_data_type in ["tinyint", "int8"]:
             elem_type = EmbeddingDataType.kElemInt8
             data.i8_array_value = embedding_data
-        elif embedding_data_type == "smallint":
+        elif embedding_data_type in ["smallint", "int16"]:
             elem_type = EmbeddingDataType.kElemInt16
             data.i16_array_value = embedding_data
-        elif embedding_data_type == "int":
+        elif embedding_data_type in ["int", "int32"]:
             elem_type = EmbeddingDataType.kElemInt32
             data.i32_array_value = embedding_data
-        elif embedding_data_type == "bigint":
+        elif embedding_data_type in ["bigint", "int64"]:
             elem_type = EmbeddingDataType.kElemInt64
             data.i64_array_value = embedding_data
-        elif embedding_data_type == "float":
+        elif embedding_data_type in ["float", "float32"]:
             elem_type = EmbeddingDataType.kElemFloat
             data.f32_array_value = embedding_data
-        elif embedding_data_type == "double":
+        elif embedding_data_type in ["double", "float64"]:
             elem_type = EmbeddingDataType.kElemDouble
             data.f64_array_value = embedding_data
         else:

@@ -15,6 +15,7 @@
 import os
 import pytest
 
+import pandas as pd
 from common import common_values
 import infinity
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
@@ -80,6 +81,54 @@ class TestKnn(TestSdk):
         # print(res)
 
         res = db_obj.drop_table("fix_tmp_20240116", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_knn_u8(self, check_data):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_knn_u8", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_knn_u8", {
+            "c1": {"type": "int"},
+            "c2": {"type": "vector,3,uint8"}
+        }, ConflictType.Error)
+        test_csv_dir = "/var/infinity/test_data/embedding_int_dim3.csv"
+        if not check_data:
+            copy_data("embedding_int_dim3.csv")
+        print("import:", test_csv_dir, " start!")
+        table_obj.import_data(test_csv_dir, None)
+        table_obj.insert([{"c1": 11, "c2": [127, 128, 255]}])
+        res = table_obj.output(["*"]).to_df()
+        assert res.error_code == ErrorCode.OK
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': (1, 5, 9, 11), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12], [127, 128, 255])}))
+        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "uint8", "l2", 10).to_pl()
+        assert res.error_code == ErrorCode.OK
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': (1, 5, 9, 11), 'DISTANCE()': (29.000000, 149.000000, 365.000000, 97538.000000)}))
+        res = table_obj.create_index("invalid_lvq", [index.IndexInfo("c2", index.IndexType.Hnsw, [
+            index.InitParameter("M", "16"),
+            index.InitParameter("ef_construction", "50"),
+            index.InitParameter("ef", "50"),
+            index.InitParameter("metric", "l2"),
+            index.InitParameter("encode", "lvq")
+        ])], ConflictType.Error)
+        assert res.error_code != ErrorCode.OK
+        res = table_obj.create_index("valid_lvq", [index.IndexInfo("c2", index.IndexType.Hnsw, [
+            index.InitParameter("M", "16"),
+            index.InitParameter("ef_construction", "50"),
+            index.InitParameter("ef", "50"),
+            index.InitParameter("metric", "l2")
+        ])], ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "uint8", "l2", 10).to_pl()
+        assert res.error_code == ErrorCode.OK
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': (1, 5, 9, 11), 'DISTANCE()': (29.000000, 149.000000, 365.000000, 97538.000000)}))
+        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "int8", "l2", 10).to_pl()
+        assert res.error_code != ErrorCode.OK
+        res = db_obj.drop_table("test_knn_u8", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     def _test_insert_multi_column(self):

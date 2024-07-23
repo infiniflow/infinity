@@ -94,6 +94,10 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                         proto_column_type.logic_type = ttypes.LogicType.Float
                     case "double" | "float64":
                         proto_column_type.logic_type = ttypes.LogicType.Double
+                    case "float16":
+                        proto_column_type.logic_type = ttypes.LogicType.Float16
+                    case "bfloat16":
+                        proto_column_type.logic_type = ttypes.LogicType.BFloat16
                     case "varchar":
                         proto_column_type.logic_type = ttypes.LogicType.Varchar
                         proto_column_type.physical_type = ttypes.VarcharType()
@@ -164,6 +168,8 @@ def get_embedding_info(column_info, column_defs, column_name, index):
         embedding_type.element_type = ttypes.ElementType.ElementFloat32
     elif element_type == "float64" or element_type == "double":
         embedding_type.element_type = ttypes.ElementType.ElementFloat64
+    elif element_type == "uint8":
+        embedding_type.element_type = ttypes.ElementType.ElementUInt8
     elif element_type == "int8":
         embedding_type.element_type = ttypes.ElementType.ElementInt8
     elif element_type == "int16":
@@ -210,6 +216,8 @@ def get_sparse_info(column_info, column_defs, column_name, index):
         sparse_type.element_type = ttypes.ElementType.ElementFloat32
     elif value_type == "float64" or value_type == "double":
         sparse_type.element_type = ttypes.ElementType.ElementFloat64
+    elif value_type == "uint8":
+        sparse_type.element_type = ttypes.ElementType.ElementUInt8
     elif value_type == "int8":
         sparse_type.element_type = ttypes.ElementType.ElementInt8
     elif value_type == "int16":

@@ -231,7 +231,7 @@ struct SQL_LTYPE {
     DATETIME = 359,                /* DATETIME  */
     FLOAT16 = 360,                 /* FLOAT16  */
     BFLOAT16 = 361,                /* BFLOAT16  */
-    UINT8 = 362,                   /* UINT8  */
+    UNSIGNED = 362,                /* UNSIGNED  */
     TIMESTAMP = 363,               /* TIMESTAMP  */
     UUID = 364,                    /* UUID  */
     POINT = 365,                   /* POINT  */

@@ -116,12 +116,7 @@ class InfinityThriftQueryBuilder(ABC):
                 f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}",
             )
 
-        if (
-            embedding_data_type == "tinyint"
-            or embedding_data_type == "smallint"
-            or embedding_data_type == "int"
-            or embedding_data_type == "bigint"
-        ):
+        if embedding_data_type in ["uint8", "int8", "int16", "int32", "int", "int64"]:
             embedding_data = [int(x) for x in embedding_data]
 
         data = EmbeddingData()
@@ -129,22 +124,25 @@ class InfinityThriftQueryBuilder(ABC):
         if embedding_data_type == "bit":
             elem_type = ElementType.ElementBit
             raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
-        elif embedding_data_type == "tinyint":
+        elif embedding_data_type == "uint8":
+            elem_type = ElementType.ElementUInt8
+            data.i8_array_value = embedding_data
+        elif embedding_data_type == "int8":
             elem_type = ElementType.ElementInt8
             data.i8_array_value = embedding_data
-        elif embedding_data_type == "smallint":
+        elif embedding_data_type == "int16":
             elem_type = ElementType.ElementInt16
             data.i16_array_value = embedding_data
-        elif embedding_data_type == "int":
+        elif embedding_data_type in ["int", "int32"]:
             elem_type = ElementType.ElementInt32
             data.i32_array_value = embedding_data
-        elif embedding_data_type == "bigint":
+        elif embedding_data_type == "int64":
             elem_type = ElementType.ElementInt64
             data.i64_array_value = embedding_data
-        elif embedding_data_type == "float":
+        elif embedding_data_type in ["float", "float32"]:
             elem_type = ElementType.ElementFloat32
             data.f32_array_value = embedding_data
-        elif embedding_data_type == "double":
+        elif embedding_data_type in ["double", "float64"]:
             elem_type = ElementType.ElementFloat64
             data.f64_array_value = embedding_data
         else:

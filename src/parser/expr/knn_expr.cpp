@@ -89,9 +89,14 @@ std::string KnnExpr::ToString() const {
     if (!alias_.empty()) {
         return alias_;
     }
-
-    std::string expr_str =
-        fmt::format("MATCH VECTOR ({}, {}, {}, Float32, {})", column_expr_->ToString(), "xxxxxx", dimension_, KnnDistanceType2Str(distance_type_));
+    auto embedding_data_ptr = static_cast<char *>(embedding_data_ptr_);
+    EmbeddingType tmp_embedding_type(std::move(embedding_data_ptr), false);
+    std::string expr_str = fmt::format("MATCH VECTOR ({}, {}, {}, {}, {})",
+                                       column_expr_->ToString(),
+                                       EmbeddingType::Embedding2String(tmp_embedding_type, embedding_data_type_, dimension_),
+                                       EmbeddingType::EmbeddingDataType2String(embedding_data_type_),
+                                       KnnDistanceType2Str(distance_type_),
+                                       topn_);
     if (!opt_params_->empty()) {
         expr_str += '(';
         for (size_t i = 0; i < opt_params_->size(); ++i) {
@@ -145,7 +150,7 @@ bool KnnExpr::InitEmbedding(const char *data_type, const ConstantExpr *query_vec
         for (long i = 0; i < dimension_; ++i) {
             ((char *)embedding_data_ptr_)[i] = query_vec->long_array_[i];
         }
-    } else if (strcmp(data_type, "uint8") == 0 and distance_type_ != infinity::KnnDistanceType::kHamming) {
+    } else if (strcmp(data_type, "unsigned tinyint") == 0 and distance_type_ != infinity::KnnDistanceType::kHamming) {
         dimension_ = query_vec->long_array_.size();
         embedding_data_type_ = infinity::EmbeddingDataType::kElemUInt8;
         embedding_data_ptr_ = new uint8_t[dimension_];
