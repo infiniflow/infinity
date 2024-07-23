@@ -95,66 +95,66 @@ void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size
 }
 
 // Need to move up
-void BitmapEmbedding2ArrowInternal(const EmbeddingType &embedding, size_t dimension, arrow::ArrayBuilder *array_builder) {
-    if (dimension % 8 != 0) {
-        Status status = Status::SyntaxError("Binary embedding dimension should be the times of 8.");
-        LOG_ERROR(status.message());
-        RecoverableError(status);
-    }
+// template <typename Builder>
+// void BitmapEmbedding2ArrowInternal(const EmbeddingType &embedding, size_t dimension, arrow::ArrayBuilder *array_builder) {
+//     if (dimension % 8 != 0) {
+//         Status status = Status::SyntaxError("Binary embedding dimension should be the times of 8.");
+//         LOG_ERROR(status.message());
+//         RecoverableError(status);
+//     }
 
-    auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
-    auto builder = dynamic_cast<arrow::UInt8Builder *>(list_builder->value_builder()); // FIXME
-    auto *array = reinterpret_cast<const u8 *>(embedding.ptr);
-    for (size_t i = 0; i < dimension; ++i) {
-        auto status = builder->Append(array[i]);
-    }
-}
+//     auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
+//     auto builder = dynamic_cast<arrow::UInt8Builder *>(list_builder->value_builder()); // FIXME
+//     auto *array = reinterpret_cast<const u8 *>(embedding.ptr);
+//     for (size_t i = 0; i < dimension; ++i) {
+//         auto status = builder->Append(array[i]);
+//     }
+// }
 
-void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, arrow::ArrayBuilder *array_builder) {
-    auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
-    auto status = list_builder->Append();
+void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, arrow::ArrayBuilder *value_builder) {
     switch (type) {
         case kElemBit: {
-            BitmapEmbedding2ArrowInternal(embedding, dimension, array_builder);
+            UnrecoverableError("Not implemented yet.");
+            // BitmapEmbedding2ArrowInternal<Builder>(embedding, dimension, array_builder);
             break;
         }
         case kElemInt8: {
-            auto builder = dynamic_cast<arrow::Int8Builder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::Int8Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int8_t *)(embedding.ptr))[i]);
             }
             break;
         }
         case kElemInt16: {
-            auto builder = dynamic_cast<arrow::Int16Builder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::Int16Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int16_t *)(embedding.ptr))[i]);
             }
             break;
         }
         case kElemInt32: {
-            auto builder = dynamic_cast<arrow::Int32Builder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::Int32Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int32_t *)(embedding.ptr))[i]);
             }
             break;
         }
         case kElemInt64: {
-            auto builder = dynamic_cast<arrow::Int64Builder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::Int64Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int64_t *)(embedding.ptr))[i]);
             }
             break;
         }
         case kElemFloat: {
-            auto builder = dynamic_cast<arrow::FloatBuilder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::FloatBuilder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((float *)(embedding.ptr))[i]);
             }
             break;
         }
         case kElemDouble: {
-            auto builder = dynamic_cast<arrow::DoubleBuilder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::DoubleBuilder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((double *)(embedding.ptr))[i]);
             }
@@ -1343,12 +1343,16 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
                 UnrecoverableError(error_message);
             }
             const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
-            Embedding2Arrow(embedding, embedding_info->Type(), embedding_info->Dimension(), array_builder.get());
+
+            auto *fixedlist_builder = dynamic_cast<arrow::FixedSizeListBuilder *>(array_builder.get());
+            auto status = fixedlist_builder->Append();
+
+            Embedding2Arrow(embedding, embedding_info->Type(), embedding_info->Dimension(), fixedlist_builder->value_builder());
             break;
         }
         case LogicalType::kSparse: {
             const auto *sparse_info = static_cast<const SparseInfo *>(data_type->type_info().get());
-            auto struct_builder = std::static_pointer_cast<::arrow::StructBuilder>(array_builder);
+            auto struct_builder = std::static_pointer_cast<arrow::StructBuilder>(array_builder);
             auto status = struct_builder->Append();
 
             auto *index_builder = struct_builder->child(0);
@@ -1357,9 +1361,11 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
 
             EmbeddingT index_embedding(index.data(), false);
             EmbeddingT data_embedding(data.data(), false);
-            Embedding2Arrow(index_embedding, sparse_info->IndexType(), nnz, index_builder);
+            auto *list_index_builder = dynamic_cast<arrow::ListBuilder *>(index_builder);
+            Embedding2Arrow(index_embedding, sparse_info->IndexType(), nnz, list_index_builder->value_builder());
             if (value_builder) {
-                Embedding2Arrow(data_embedding, sparse_info->DataType(), nnz, value_builder);
+                auto *list_value_builder = dynamic_cast<arrow::ListBuilder *>(value_builder);
+                Embedding2Arrow(data_embedding, sparse_info->DataType(), nnz, list_value_builder->value_builder());
             }
             break;
         }

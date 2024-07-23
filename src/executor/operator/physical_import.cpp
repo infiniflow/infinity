@@ -1383,83 +1383,93 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             //            break;
             //        }
         case kEmbedding: {
-            auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
-            auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
-            SizeT dim = embedding_info->Dimension();
-            i64 start_offset = list_array->value_offset(value_idx);
-            i64 end_offset = list_array->value_offset(value_idx + 1);
-            if (end_offset - start_offset != (i64)dim) {
-                String error_message =
-                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, end_offset - start_offset);
-                LOG_ERROR(error_message);
-                UnrecoverableError(error_message);
-            }
-            switch (embedding_info->Type()) {
-                case kElemInt8: {
-                    Vector<i8> embedding;
-                    auto int8_array = std::dynamic_pointer_cast<arrow::Int8Array>(list_array->values());
-                    for (i64 j = start_offset; j < end_offset; ++j) {
-                        i8 value = int8_array->Value(j);
-                        embedding.push_back(value);
-                    }
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                case kElemInt16: {
-                    Vector<i16> embedding;
-                    auto int16_array = std::dynamic_pointer_cast<arrow::Int16Array>(list_array->values());
-                    for (i64 j = start_offset; j < end_offset; ++j) {
-                        i16 value = int16_array->Value(j);
-                        embedding.push_back(value);
-                    }
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                case kElemInt32: {
-                    Vector<i32> embedding;
-                    auto int32_array = std::dynamic_pointer_cast<arrow::Int32Array>(list_array->values());
-                    for (i64 j = start_offset; j < end_offset; ++j) {
-                        i32 value = int32_array->Value(j);
-                        embedding.push_back(value);
-                    }
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                case kElemInt64: {
-                    Vector<i64> embedding;
-                    auto int64_array = std::dynamic_pointer_cast<arrow::Int64Array>(list_array->values());
-                    for (i64 j = start_offset; j < end_offset; ++j) {
-                        i64 value = int64_array->Value(j);
-                        embedding.push_back(value);
-                    }
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                case kElemFloat: {
-                    Vector<float> embedding;
-                    auto float_array = std::dynamic_pointer_cast<arrow::FloatArray>(list_array->values());
-                    for (i64 j = start_offset; j < end_offset; ++j) {
-                        float value = float_array->Value(j);
-                        embedding.push_back(value);
-                    }
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                case kElemDouble: {
-                    Vector<double> embedding;
-                    auto double_array = std::dynamic_pointer_cast<arrow::DoubleArray>(list_array->values());
-                    for (i64 j = start_offset; j < end_offset; ++j) {
-                        double value = double_array->Value(j);
-                        embedding.push_back(value);
-                    }
-                    column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                    break;
-                }
-                default: {
-                    String error_message = "Not implement: Embedding type.";
-                    LOG_CRITICAL(error_message);
+            auto inner = [&](auto list_array) {
+                auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
+                SizeT dim = embedding_info->Dimension();
+                i64 start_offset = list_array->value_offset(value_idx);
+                i64 end_offset = list_array->value_offset(value_idx + 1);
+                if (end_offset - start_offset != (i64)dim) {
+                    String error_message =
+                        fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, end_offset - start_offset);
+                    LOG_ERROR(error_message);
                     UnrecoverableError(error_message);
                 }
+                switch (embedding_info->Type()) {
+                    case kElemInt8: {
+                        Vector<i8> embedding;
+                        auto int8_array = std::dynamic_pointer_cast<arrow::Int8Array>(list_array->values());
+                        for (i64 j = start_offset; j < end_offset; ++j) {
+                            i8 value = int8_array->Value(j);
+                            embedding.push_back(value);
+                        }
+                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                        break;
+                    }
+                    case kElemInt16: {
+                        Vector<i16> embedding;
+                        auto int16_array = std::dynamic_pointer_cast<arrow::Int16Array>(list_array->values());
+                        for (i64 j = start_offset; j < end_offset; ++j) {
+                            i16 value = int16_array->Value(j);
+                            embedding.push_back(value);
+                        }
+                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                        break;
+                    }
+                    case kElemInt32: {
+                        Vector<i32> embedding;
+                        auto int32_array = std::dynamic_pointer_cast<arrow::Int32Array>(list_array->values());
+                        for (i64 j = start_offset; j < end_offset; ++j) {
+                            i32 value = int32_array->Value(j);
+                            embedding.push_back(value);
+                        }
+                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                        break;
+                    }
+                    case kElemInt64: {
+                        Vector<i64> embedding;
+                        auto int64_array = std::dynamic_pointer_cast<arrow::Int64Array>(list_array->values());
+                        for (i64 j = start_offset; j < end_offset; ++j) {
+                            i64 value = int64_array->Value(j);
+                            embedding.push_back(value);
+                        }
+                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                        break;
+                    }
+                    case kElemFloat: {
+                        Vector<float> embedding;
+                        auto float_array = std::dynamic_pointer_cast<arrow::FloatArray>(list_array->values());
+                        for (i64 j = start_offset; j < end_offset; ++j) {
+                            float value = float_array->Value(j);
+                            embedding.push_back(value);
+                        }
+                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                        break;
+                    }
+                    case kElemDouble: {
+                        Vector<double> embedding;
+                        auto double_array = std::dynamic_pointer_cast<arrow::DoubleArray>(list_array->values());
+                        for (i64 j = start_offset; j < end_offset; ++j) {
+                            double value = double_array->Value(j);
+                            embedding.push_back(value);
+                        }
+                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
+                        break;
+                    }
+                    default: {
+                        String error_message = "Not implement: Embedding type.";
+                        LOG_CRITICAL(error_message);
+                        UnrecoverableError(error_message);
+                    }
+                }
+            };
+            if (auto fixed_list_array = std::dynamic_pointer_cast<arrow::FixedSizeListArray>(array); fixed_list_array.get() != nullptr) {
+                inner(fixed_list_array);
+            } else {
+                auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
+                if (list_array.get() == nullptr) {
+                    RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+                }
+                inner(list_array);
             }
             break;
         }

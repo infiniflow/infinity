@@ -588,32 +588,31 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
         case LogicalType::kVarchar:
             return arrow::utf8();
         case LogicalType::kEmbedding: {
-            //            auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-            //            switch (embedding_info->Type()) {
-            //                case kElemInt8: {
-            //                    return ::arrow::list(::arrow::int8());
-            //                }
-            //                case kElemInt16: {
-            //                    return ::arrow::list(::arrow::int16());
-            //                }
-            //                case kElemInt32: {
-            //                    return ::arrow::list(::arrow::int32());
-            //                }
-            //                case kElemInt64: {
-            //                    return ::arrow::list(::arrow::int64());
-            //                }
-            //                case kElemFloat: {
-            //                    return ::arrow::list(::arrow::float32());
-            //                }
-            //                case kElemDouble: {
-            //                    return ::arrow::list(::arrow::float64());
-            //                }
-            //                default: {
-            //                    String error_message = "Invalid embedding data type";
-            //                    LOG_CRITICAL(error_message);
-            //                    UnrecoverableError(error_message);
-            //                }
-            //            }
+            auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+            SizeT dimension = embedding_info->Dimension();
+            switch (embedding_info->Type()) {
+                case kElemInt8: {
+                    return ::arrow::fixed_size_list(::arrow::int8(), dimension);
+                }
+                case kElemInt16: {
+                    return ::arrow::fixed_size_list(::arrow::int16(), dimension);
+                }
+                case kElemInt32: {
+                    return ::arrow::fixed_size_list(::arrow::int32(), dimension);
+                }
+                case kElemInt64: {
+                    return ::arrow::fixed_size_list(::arrow::int64(), dimension);
+                }
+                case kElemFloat: {
+                    return ::arrow::fixed_size_list(::arrow::float32(), dimension);
+                }
+                case kElemDouble: {
+                    return ::arrow::fixed_size_list(::arrow::float64(), dimension);
+                }
+                default: {
+                    UnrecoverableError("Not implemented");
+                }
+            }
             UnrecoverableError("Not implemented");
         }
         case LogicalType::kSparse: {
@@ -748,40 +747,41 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
         }
         case LogicalType::kEmbedding: {
             auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+            SizeT dimension = embedding_info->Dimension();
             switch (embedding_info->Type()) {
                 case kElemBit: {
                     SharedPtr<arrow::BooleanBuilder> uint8_builder = MakeShared<::arrow::BooleanBuilder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), uint8_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), uint8_builder, dimension);
                     break;
                 }
                 case kElemInt8: {
                     SharedPtr<arrow::Int8Builder> int8_builder = MakeShared<::arrow::Int8Builder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), int8_builder, dimension);
                     break;
                 }
                 case kElemInt16: {
                     SharedPtr<arrow::Int16Builder> int16_builder = MakeShared<::arrow::Int16Builder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), int16_builder, dimension);
                     break;
                 }
                 case kElemInt32: {
                     SharedPtr<arrow::Int32Builder> int32_builder = MakeShared<::arrow::Int32Builder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), int32_builder, dimension);
                     break;
                 }
                 case kElemInt64: {
                     SharedPtr<arrow::Int64Builder> int64_builder = MakeShared<::arrow::Int64Builder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), int64_builder, dimension);
                     break;
                 }
                 case kElemFloat: {
                     SharedPtr<arrow::FloatBuilder> float_builder = MakeShared<::arrow::FloatBuilder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), float_builder, dimension);
                     break;
                 }
                 case kElemDouble: {
                     SharedPtr<arrow::DoubleBuilder> double_builder = MakeShared<::arrow::DoubleBuilder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), double_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), double_builder, dimension);
                     break;
                 }
                 default: {

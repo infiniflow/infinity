@@ -159,6 +159,7 @@ export using TimestampArray = arrow::TimestampArray;
 export using DurationArray = arrow::DurationArray;
 export using StringArray = arrow::StringArray;
 export using ListArray = arrow::ListArray;
+export using FixedSizeListArray = arrow::FixedSizeListArray;
 export using BinaryArray = arrow::BinaryArray;
 export using StructArray = arrow::StructArray;
 
@@ -177,6 +178,7 @@ export using TimestampBuilder = arrow::TimestampBuilder;
 export using DurationBuilder = arrow::DurationBuilder;
 export using StringBuilder = arrow::StringBuilder;
 export using ListBuilder = arrow::ListBuilder;
+export using FixedSizeListBuilder = arrow::FixedSizeListBuilder;
 export using StructBuilder = arrow::StructBuilder;
 
 export using RecordBatchReader = arrow::RecordBatchReader;
