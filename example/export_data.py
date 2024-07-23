@@ -110,10 +110,8 @@ try:
     )
 
     # TODO also show how to export other type of file
-    table_instance.export_data(project_directory + "/../test/data/csv/export_data.csv",
-                               {"header": True, "delimiter": ",", "row_limit": 2}, ["num", "name", "score"])
-    
-    print("Your data is exported to /../test/data/csv/export_data.csv!")
+    table_instance.export_data(os.getcwd() + "/export_data.jsonl",
+                               {"header": False, "file_type": "jsonl", "delimiter": ",", "row_limit": 2}, ["num", "name", "score"])
 
 
     infinity_instance.disconnect()

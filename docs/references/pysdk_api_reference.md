@@ -599,7 +599,7 @@ Absolute path to the file for export. Supported file types include:
 #### export_options: `json`
 
 - **header**: `bool` *Optional*
-  Whether to display table header or not:
+  Whether to display table header or not. Works with **.csv** files only:
   - `True`: Display table header. 
   - `False`: (Default) Do not display table header. 
 
@@ -607,18 +607,18 @@ Absolute path to the file for export. Supported file types include:
   Delimiter to separate columns. Supported delimiters include: 
   - ",": (Default) Comma. 
   - "\t": Tab. 
+  - Any ASCII characters in `str` format.
 
 - **file_type**: `str` *Required*
   The type of the exported file. Supported file types include:
   - `csv`
   - `jsonl`
-  > This setting overrides the `file_path` setting. If you specify `csv` as the file name suffix in `file_path` while setting `file_type` to `jsonl`, the exported file will be in `jsonl` format. 
   
 - **offset**: `int` *Optional*
-  Index specifying the starting row for export. Usually used in conjunction with `limit`. If not specified, the file export starts from row 1. 
+  Index specifying the starting row for export. Usually used in conjunction with `limit`. If not specified, the file export starts from the first row. 
 
 - **limit**: `int` *Optional*
-  The maximum number of rows to export. Usually used in conjunction with `offset`. If the table's row count exceeds `offset` + `limit`, the excess rows are excluded from the export
+  The maximum number of rows to export. Usually used in conjunction with `offset`. If the table's row count exceeds `offset` + `limit`, the excess rows are excluded from the export.
 
 - **row_limit**: `int` *Optional*
   Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so one. 
