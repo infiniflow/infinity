@@ -595,30 +595,32 @@ Absolute path to the file for export. Supported file type include:
 
 - `csv`
 - `jsonl`
-- `fvecs`
   
 #### export_options: `json`
 
-- **header**: `bool` Defaults to `False`
+- **header**: `bool` *Optional*
   Whether to display table header or not:
   - `True`: Display table header. 
-  - `False`: Do not display table header. 
+  - `False`: (Default) Do not display table header. 
+  
+  > This setting overrides the `file_path` setting. If you specify `csv` as the file name suffix in `file_path` while setting `file_type` to `jsonl`, the exported file will be in `jsonl` format. 
 
-- **delimiter**: `str` Defaults to ","
+
+- **delimiter**: `str` *Optional*
   Delimiter to separate columns. Supported delimiters include: 
-  - ",": Comma. 
+  - ",": (Default) Comma. 
   - "\t": Tab. 
   
-- **offset**: `int`
+- **offset**: `int` *Optional*
   Index specifying the starting row for export. Usually used in conjunction with `limit`. If not specified, the file export starts from row 1. 
 
-- **limit**: `int`
+- **limit**: `int` *Optional*
   The maximum number of rows to export. Usually used in conjunction with `offset`. If the table's row count exceeds `offset` + `limit`, the excess rows are excluded from the export
 
-- **row_limit**: `int`
-  Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part.
+- **row_limit**: `int` *Optional*
+  Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so one. 
 
-#### columns: `[str]`
+#### columns: `[str]` *Optional*
 
 Columns to export to the output file, for example, `["num", "name", "score"]`. If not specified, the entire table is exported. 
 
@@ -630,8 +632,8 @@ Columns to export to the output file, for example, `["num", "name", "score"]`. I
 ### Examples
 
 ```python
-table_obj.export_data(project_directory + "/../test/data/csv/export_data.json",
-                               {"header": True, "delimiter": ",", "row_limit": 2}, ["num", "name", "score"])
+    table_instance.export_data(os.getcwd() + "/export_data.jsonl",
+                               {"header": False, "file_type": "jsonl", "delimiter": ",", "row_limit": 2}, ["num", "name", "score"])
 ```
 
 ## delete
