@@ -209,7 +209,7 @@ target_sources(infinity_core
         ${metrics_cppm}
 )
 
-add_dependencies(infinity_core thrift thriftnb parquet_static)
+add_dependencies(infinity_core thrift thriftnb parquet_static snappy)
 
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
@@ -296,12 +296,14 @@ target_link_libraries(infinity
         oatpp.a
         parquet.a
         arrow.a
+        snappy.a
         ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
