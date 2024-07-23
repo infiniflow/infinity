@@ -58,6 +58,7 @@ ElementInt32,
 ElementInt64,
 ElementFloat32,
 ElementFloat64,
+ElementUInt8,
 }
 
 struct EmbeddingType {

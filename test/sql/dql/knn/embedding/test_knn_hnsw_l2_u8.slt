@@ -1,0 +1,57 @@
+statement ok
+DROP TABLE IF EXISTS test_knn_hnsw_l2_u8;
+
+statement ok
+CREATE TABLE test_knn_hnsw_l2_u8(c1 INT, c2 EMBEDDING(UINT8, 3));
+
+# copy to create one block
+# 1,"[2 3 4]"
+# 5,"[6,7,8]"
+# 9,"[10,11,12]"
+statement ok
+COPY test_knn_hnsw_l2_u8 FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
+
+query I
+SELECT c1 FROM test_knn_hnsw_l2_u8 SEARCH MATCH VECTOR (c2, [0, 0, 0], 'UINT8', 'l2', 3);
+----
+1
+5
+9
+
+# copy to create another new block
+# there will has 2 knn_scan operator to scan the blocks, and one merge_knn to merge
+statement ok
+COPY test_knn_hnsw_l2_u8 FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
+
+query I
+SELECT c1 FROM test_knn_hnsw_l2_u8 SEARCH MATCH VECTOR (c2, [0, 0, 0], 'UINT8', 'l2', 3);
+----
+1
+1
+5
+
+# create hnsw index on existing 2 segments
+statement ok
+CREATE INDEX idx1 ON test_knn_hnsw_l2_u8 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+# select with 2 index segment
+query I
+SELECT c1 FROM test_knn_hnsw_l2_u8 SEARCH MATCH VECTOR (c2, [0, 0, 0], 'UINT8', 'l2', 3) WITH (ef = 4);
+----
+1
+1
+5
+
+# copy to create another new block with no index
+statement ok
+COPY test_knn_hnsw_l2_u8 FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',');
+
+query I
+SELECT c1 FROM test_knn_hnsw_l2_u8 SEARCH MATCH VECTOR (c2, [0, 0, 0], 'UINT8', 'l2', 3) WITH (ef = 4);
+----
+1
+1
+1
+
+statement ok
+DROP TABLE test_knn_hnsw_l2_u8;

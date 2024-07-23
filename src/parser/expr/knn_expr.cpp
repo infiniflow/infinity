@@ -53,6 +53,11 @@ KnnExpr::~KnnExpr() {
                 delete[] data_ptr;
                 break;
             }
+            case EmbeddingDataType::kElemUInt8: {
+                uint8_t *data_ptr = reinterpret_cast<uint8_t *>(embedding_data_ptr_);
+                delete[] data_ptr;
+                break;
+            }
             case EmbeddingDataType::kElemInt16: {
                 int16_t *data_ptr = reinterpret_cast<int16_t *>(embedding_data_ptr_);
                 delete[] data_ptr;
@@ -139,6 +144,13 @@ bool KnnExpr::InitEmbedding(const char *data_type, const ConstantExpr *query_vec
 
         for (long i = 0; i < dimension_; ++i) {
             ((char *)embedding_data_ptr_)[i] = query_vec->long_array_[i];
+        }
+    } else if (strcmp(data_type, "uint8") == 0 and distance_type_ != infinity::KnnDistanceType::kHamming) {
+        dimension_ = query_vec->long_array_.size();
+        embedding_data_type_ = infinity::EmbeddingDataType::kElemUInt8;
+        embedding_data_ptr_ = new uint8_t[dimension_];
+        for (long i = 0; i < dimension_; ++i) {
+            ((uint8_t *)embedding_data_ptr_)[i] = query_vec->long_array_[i];
         }
     } else if (strcmp(data_type, "smallint") == 0 and distance_type_ != infinity::KnnDistanceType::kHamming) {
         dimension_ = query_vec->long_array_.size();

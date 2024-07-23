@@ -135,7 +135,8 @@ int _kElementTypeValues[] = {
   ElementType::ElementInt32,
   ElementType::ElementInt64,
   ElementType::ElementFloat32,
-  ElementType::ElementFloat64
+  ElementType::ElementFloat64,
+  ElementType::ElementUInt8
 };
 const char* _kElementTypeNames[] = {
   "ElementBit",
@@ -144,9 +145,10 @@ const char* _kElementTypeNames[] = {
   "ElementInt32",
   "ElementInt64",
   "ElementFloat32",
-  "ElementFloat64"
+  "ElementFloat64",
+  "ElementUInt8"
 };
-const std::map<int, const char*> _ElementType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(7, _kElementTypeValues, _kElementTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _ElementType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(8, _kElementTypeValues, _kElementTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const ElementType::type& val) {
   std::map<int, const char*>::const_iterator it = _ElementType_VALUES_TO_NAMES.find(val);

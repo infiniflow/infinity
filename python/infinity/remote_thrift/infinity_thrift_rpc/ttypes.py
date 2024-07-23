@@ -111,6 +111,7 @@ class ElementType(object):
     ElementInt64 = 4
     ElementFloat32 = 5
     ElementFloat64 = 6
+    ElementUInt8 = 7
 
     _VALUES_TO_NAMES = {
         0: "ElementBit",
@@ -120,6 +121,7 @@ class ElementType(object):
         4: "ElementInt64",
         5: "ElementFloat32",
         6: "ElementFloat64",
+        7: "ElementUInt8",
     }
 
     _NAMES_TO_VALUES = {
@@ -130,6 +132,7 @@ class ElementType(object):
         "ElementInt64": 4,
         "ElementFloat32": 5,
         "ElementFloat64": 6,
+        "ElementUInt8": 7,
     }
 
 

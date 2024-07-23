@@ -82,7 +82,8 @@ struct ElementType {
     ElementInt32 = 3,
     ElementInt64 = 4,
     ElementFloat32 = 5,
-    ElementFloat64 = 6
+    ElementFloat64 = 6,
+    ElementUInt8 = 7
   };
 };
 

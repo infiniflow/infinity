@@ -1567,6 +1567,8 @@ EmbeddingDataType InfinityThriftService::GetEmbeddingDataTypeFromProto(const inf
             return EmbeddingDataType::kElemFloat;
         case infinity_thrift_rpc::ElementType::ElementFloat64:
             return EmbeddingDataType::kElemDouble;
+        case infinity_thrift_rpc::ElementType::ElementUInt8:
+            return EmbeddingDataType::kElemUInt8;
         default:
             return EmbeddingDataType::kElemInvalid;
     }
@@ -2140,6 +2142,8 @@ infinity_thrift_rpc::ElementType::type InfinityThriftService::EmbeddingDataTypeT
             return infinity_thrift_rpc::ElementType::ElementFloat32;
         case EmbeddingDataType::kElemDouble:
             return infinity_thrift_rpc::ElementType::ElementFloat64;
+        case EmbeddingDataType::kElemUInt8:
+            return infinity_thrift_rpc::ElementType::ElementUInt8;
         case EmbeddingDataType::kElemInvalid: {
             String error_message = fmt::format("Invalid embedding element data type: {}", static_cast<i8>(embedding_data_type));
             UnrecoverableError(error_message);
