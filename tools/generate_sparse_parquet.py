@@ -41,28 +41,28 @@ def generate(generate_if_exists: bool, copy_dir: str):
     col1 = pa.array(range(row_n), type=pa.int32())
     col2_vec = []
 
-    with open(import_slt_path, "w") as stl_file:
-        stl_file.write("statement ok\n")
-        stl_file.write("DROP TABLE IF EXISTS {};\n".format(table_name))
-        stl_file.write("\n")
+    with open(import_slt_path, "w") as slt_file:
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name))
+        slt_file.write("\n")
 
-        stl_file.write("statement ok\n")
-        stl_file.write(
+        slt_file.write("statement ok\n")
+        slt_file.write(
             "CREATE TABLE {} ( c1 INT, c2 SPARSE(FLOAT, {}) WITH (SORTED));\n".format(
                 table_name, max_dim
             )
         )
-        stl_file.write("\n")
+        slt_file.write("\n")
 
-        stl_file.write("statement ok\n")
-        stl_file.write(
+        slt_file.write("statement ok\n")
+        slt_file.write(
             "COPY {} FROM '{}' WITH (FORMAT PARQUET);\n".format(table_name, copy_path)
         )
-        stl_file.write("\n")
+        slt_file.write("\n")
 
-        stl_file.write("query I\n")
-        stl_file.write("SELECT * FROM {};\n".format(table_name))
-        stl_file.write("----\n")
+        slt_file.write("query I\n")
+        slt_file.write("SELECT * FROM {};\n".format(table_name))
+        slt_file.write("----\n")
         for row_id in range(row_n):
             start, end = indptr[row_id], indptr[row_id + 1]
             col2_vec.append(
@@ -72,58 +72,58 @@ def generate(generate_if_exists: bool, copy_dir: str):
                 }
             )
 
-            stl_file.write("{} ".format(row_id))
+            slt_file.write("{} ".format(row_id))
             for j in range(start, end):
-                stl_file.write(
+                slt_file.write(
                     "{}: {}".format(indices[j], sparse_format_float(data[j]))
                 )
                 if j != end - 1:
-                    stl_file.write(", ")
-            stl_file.write("\n")
-        stl_file.write("\n")
+                    slt_file.write(", ")
+            slt_file.write("\n")
+        slt_file.write("\n")
 
-        stl_file.write("statement ok\n")
-        stl_file.write(
+        slt_file.write("statement ok\n")
+        slt_file.write(
             "COPY {} TO '{}' WITH (FORMAT PARQUET);\n".format(table_name, copy_path1)
         )
-        stl_file.write("\n")
+        slt_file.write("\n")
 
-        stl_file.write("statement ok\n")
-        stl_file.write("DROP TABLE IF EXISTS {};\n".format(table_name1))
-        stl_file.write("\n")
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name1))
+        slt_file.write("\n")
 
-        stl_file.write("statement ok\n")
-        stl_file.write(
+        slt_file.write("statement ok\n")
+        slt_file.write(
             "CREATE TABLE {} ( c1 INT, c2 SPARSE(FLOAT, {}) WITH (SORTED));\n".format(
                 table_name1, max_dim
             )
         )
-        stl_file.write("\n")
+        slt_file.write("\n")
 
-        stl_file.write("statement ok\n")
-        stl_file.write(
+        slt_file.write("statement ok\n")
+        slt_file.write(
             "COPY {} FROM '{}' WITH (FORMAT PARQUET);\n".format(table_name1, copy_path1)
         )
-        stl_file.write("\n")
+        slt_file.write("\n")
 
-        stl_file.write("query II\n")
-        stl_file.write("SELECT * FROM {};\n".format(table_name1))
-        stl_file.write("----\n")
+        slt_file.write("query II\n")
+        slt_file.write("SELECT * FROM {};\n".format(table_name1))
+        slt_file.write("----\n")
         for row_id in range(row_n):
             start, end = indptr[row_id], indptr[row_id + 1]
-            stl_file.write("{} ".format(row_id))
+            slt_file.write("{} ".format(row_id))
             for j in range(start, end):
-                stl_file.write(
+                slt_file.write(
                     "{}: {}".format(indices[j], sparse_format_float(data[j]))
                 )
                 if j != end - 1:
-                    stl_file.write(", ")
-            stl_file.write("\n")
-        stl_file.write("\n")
+                    slt_file.write(", ")
+            slt_file.write("\n")
+        slt_file.write("\n")
 
-        stl_file.write("statement ok\n")
-        stl_file.write("DROP TABLE {};\n".format(table_name))
-        stl_file.write("\n")
+        slt_file.write("statement ok\n")
+        slt_file.write("DROP TABLE {};\n".format(table_name))
+        slt_file.write("\n")
 
     col2 = pa.array(
         col2_vec,
