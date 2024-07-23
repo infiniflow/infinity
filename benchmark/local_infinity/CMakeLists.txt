@@ -26,11 +26,13 @@ target_link_libraries(
     event.a
     c++.a
     c++abi.a
+    snappy.a
     ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 # ########################################
 # knn
@@ -62,11 +64,13 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    snappy.a
     ${JEMALLOC_STATIC_LIB}
 )
 
-target_link_directories(knn_import_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 # query benchmark
 add_executable(knn_query_benchmark
@@ -94,11 +98,13 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    snappy.a
     ${JEMALLOC_STATIC_LIB}
 )
 
-target_link_directories(knn_query_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 # ########################################
 # fulltext
@@ -128,11 +134,13 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    snappy.a
     ${JEMALLOC_STATIC_LIB}
 )
 
-target_link_directories(fulltext_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 # ########################################
 add_executable(sparse_benchmark
@@ -160,11 +168,13 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    snappy.a
     ${JEMALLOC_STATIC_LIB}
 )
 
-target_link_directories(sparse_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 add_executable(bmp_benchmark
     ./sparse/bmp_benchmark.cpp
@@ -191,11 +201,13 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    snappy.a
     ${JEMALLOC_STATIC_LIB}
 )
 
-target_link_directories(bmp_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 add_executable(hnsw_benchmark
     ./knn/hnsw_benchmark.cpp
@@ -222,11 +234,13 @@ target_link_libraries(
     arrow.a
     thrift.a
     thriftnb.a
+    snappy.a
     ${JEMALLOC_STATIC_LIB}
 )
 
-target_link_directories(hnsw_benchmark BEFORE PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)
