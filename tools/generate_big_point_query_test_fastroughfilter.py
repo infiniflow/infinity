@@ -35,7 +35,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         test_slt_file1.write("\n")
         test_slt_file1.write("statement ok\n")
         test_slt_file1.write(
-            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name1, copy_path))
+            "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(table_name1, copy_path))
 
         for i in range(repeat_n):
             x = random.randint(row_n + 1, row_n * 3)
@@ -60,7 +60,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         test_slt_file2.write("\n")
         test_slt_file2.write("statement ok\n")
         test_slt_file2.write(
-            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name2, copy_path))
+            "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(table_name2, copy_path))
 
         for i in range(repeat_n):
             x = random.randint(0, row_n - 1)

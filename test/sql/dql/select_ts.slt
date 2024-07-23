@@ -5,7 +5,7 @@ statement ok
 CREATE TABLE test_select_ts ( c1 int, c2 embedding(int,3));
 
 statement ok
-COPY test_select_ts FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH ( DELIMITER ',' );
+COPY test_select_ts FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 statement ok
 SELECT ROW_ID(), CREATE_TIMESTAMP() FROM test_select_ts;
@@ -14,7 +14,7 @@ statement ok
 SELECT ROW_ID(), DELETE_TIMESTAMP() FROM test_select_ts;
 
 statement ok
-COPY test_select_ts FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH ( DELIMITER ',' );
+COPY test_select_ts FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 statement ok
 SELECT ROW_ID(), CREATE_TIMESTAMP() FROM test_select_ts;

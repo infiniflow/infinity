@@ -17,7 +17,7 @@ statement ok
 explain SELECT * FROM explain1;
 
 query I
-COPY explain1 FROM '/var/infinity/test_data/one.csv' WITH ( DELIMITER ',');
+COPY explain1 FROM '/var/infinity/test_data/one.csv' WITH ( DELIMITER ',', FORMAT CSV);
 ----
 
 query I

@@ -5,11 +5,11 @@ statement ok
 CREATE TABLE test_compact_with_index (c1 INT, c2 EMBEDDING(FLOAT, 4));
 
 query I
-COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',', FORMAT CSV);
 ----
 
 query I
-COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',', FORMAT CSV);
 ----
 
 statement ok
@@ -38,7 +38,7 @@ SELECT c1 FROM test_compact_with_index SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 
 6
 
 query I
-COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',');
+COPY test_compact_with_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',', FORMAT CSV);
 ----
 
 query I

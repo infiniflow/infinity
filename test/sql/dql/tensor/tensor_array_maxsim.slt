@@ -6,7 +6,7 @@ statement ok
 CREATE TABLE tensor_array_maxsim (c1 int, c2 TensorArray(float,8));
 
 statement ok
-COPY tensor_array_maxsim FROM '/var/infinity/test_data/tensor_array_float_dim8.csv' WITH ( DELIMITER ',' );
+COPY tensor_array_maxsim FROM '/var/infinity/test_data/tensor_array_float_dim8.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 # default top 10
 query I
