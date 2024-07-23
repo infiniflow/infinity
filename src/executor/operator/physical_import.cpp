@@ -156,7 +156,8 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
     if ((int)embedding_info->Dimension() != dimension) {
-        Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
+        Status status = Status::ImportFileFormatError(
+            fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
         RecoverableError(status);
     }
     SizeT file_size = fs.GetFileSize(*file_handler);
@@ -179,7 +180,8 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
         i32 dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
-            Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+            Status status =
+                Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
             RecoverableError(status);
         }
         ptr_t dst_ptr = buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension;
@@ -250,7 +252,8 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
     if ((int)embedding_info->Dimension() != dimension) {
-        Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
+        Status status = Status::ImportFileFormatError(
+            fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dimension, embedding_info->Dimension()));
         RecoverableError(status);
     }
     SizeT file_size = fs.GetFileSize(*file_handler);
@@ -275,7 +278,8 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         i32 dim;
         nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
         if (dim != dimension or nbytes != sizeof(dimension)) {
-            Status status = Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+            Status status =
+                Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
             RecoverableError(status);
         }
         fs.Read(*file_handler, i8_buffer.get(), sizeof(i8) * dimension);
@@ -1001,8 +1005,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemInt8: {
                             Vector<i8> &&embedding = line_json[column_def->name_].get<Vector<i8>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
@@ -1011,8 +1016,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemInt16: {
                             Vector<i16> &&embedding = line_json[column_def->name_].get<Vector<i16>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
@@ -1021,8 +1027,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemInt32: {
                             Vector<i32> &&embedding = line_json[column_def->name_].get<Vector<i32>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
@@ -1031,8 +1038,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemInt64: {
                             Vector<i64> &&embedding = line_json[column_def->name_].get<Vector<i64>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
@@ -1041,8 +1049,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemFloat: {
                             Vector<float> &&embedding = line_json[column_def->name_].get<Vector<float>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
@@ -1051,8 +1060,9 @@ void PhysicalImport::JSONLRowHandler(const nlohmann::json &line_json, Vector<Col
                         case kElemDouble: {
                             Vector<double> &&embedding = line_json[column_def->name_].get<Vector<double>>();
                             SizeT embedding_dim = embedding.size();
-                            if(embedding_dim != dim) {
-                                Status status = Status::InvalidJsonFormat(fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
+                            if (embedding_dim != dim) {
+                                Status status = Status::InvalidJsonFormat(
+                                    fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, embedding_dim));
                                 RecoverableError(status);
                             }
                             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
@@ -1180,8 +1190,12 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
 }
 
 template <typename IndexType, typename IndexArray, typename DataType, typename DataArray>
-void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArray> index_array,
-                               SharedPtr<DataArray> data_array, ColumnVector &column_vector, i64 start_offset, i64 end_offset) {
+void ParquetSparseValueHandler(const SparseInfo *sparse_info,
+                               SharedPtr<IndexArray> index_array,
+                               SharedPtr<DataArray> data_array,
+                               ColumnVector &column_vector,
+                               i64 start_offset,
+                               i64 end_offset) {
     Vector<IndexType> index_vec;
     if constexpr (std::is_same_v<DataType, bool>) {
         for (i64 j = start_offset; j < end_offset; ++j) {
@@ -1201,8 +1215,12 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArr
 }
 
 template <typename IndexType, typename IndexArray>
-void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArray> index_array,
-                               SharedPtr<arrow::ListArray> data_array, ColumnVector &column_vector, i64 start_offset, i64 end_offset) {
+void ParquetSparseValueHandler(const SparseInfo *sparse_info,
+                               SharedPtr<IndexArray> index_array,
+                               SharedPtr<arrow::ListArray> data_array,
+                               ColumnVector &column_vector,
+                               i64 start_offset,
+                               i64 end_offset) {
     if (sparse_info->DataType() != EmbeddingDataType::kElemBit && data_array.get() == nullptr) {
         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
     }
@@ -1211,7 +1229,12 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArr
             if (data_array.get() != nullptr) {
                 RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
             }
-            ParquetSparseValueHandler<IndexType, IndexArray, bool, arrow::BooleanArray>(sparse_info, index_array, nullptr, column_vector, start_offset, end_offset);
+            ParquetSparseValueHandler<IndexType, IndexArray, bool, arrow::BooleanArray>(sparse_info,
+                                                                                        index_array,
+                                                                                        nullptr,
+                                                                                        column_vector,
+                                                                                        start_offset,
+                                                                                        end_offset);
             break;
         }
         case kElemInt8: {
@@ -1222,7 +1245,12 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArr
             if (int8_value_array.get() == nullptr) {
                 RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
             }
-            ParquetSparseValueHandler<IndexType, IndexArray, i8, arrow::Int8Array>(sparse_info, index_array, int8_value_array, column_vector, start_offset, end_offset);
+            ParquetSparseValueHandler<IndexType, IndexArray, i8, arrow::Int8Array>(sparse_info,
+                                                                                   index_array,
+                                                                                   int8_value_array,
+                                                                                   column_vector,
+                                                                                   start_offset,
+                                                                                   end_offset);
             break;
         }
         case kElemInt16: {
@@ -1233,7 +1261,12 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArr
             if (int16_value_array.get() == nullptr) {
                 RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
             }
-            ParquetSparseValueHandler<IndexType, IndexArray, i16, arrow::Int16Array>(sparse_info, index_array, int16_value_array, column_vector, start_offset, end_offset);
+            ParquetSparseValueHandler<IndexType, IndexArray, i16, arrow::Int16Array>(sparse_info,
+                                                                                     index_array,
+                                                                                     int16_value_array,
+                                                                                     column_vector,
+                                                                                     start_offset,
+                                                                                     end_offset);
             break;
         }
         case kElemInt32: {
@@ -1244,7 +1277,12 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArr
             if (int32_value_array.get() == nullptr) {
                 RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
             }
-            ParquetSparseValueHandler<IndexType, IndexArray, i32, arrow::Int32Array>(sparse_info, index_array, int32_value_array, column_vector, start_offset, end_offset);
+            ParquetSparseValueHandler<IndexType, IndexArray, i32, arrow::Int32Array>(sparse_info,
+                                                                                     index_array,
+                                                                                     int32_value_array,
+                                                                                     column_vector,
+                                                                                     start_offset,
+                                                                                     end_offset);
             break;
         }
         case kElemInt64: {
@@ -1255,7 +1293,12 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArr
             if (int64_value_array.get() == nullptr) {
                 RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
             }
-            ParquetSparseValueHandler<IndexType, IndexArray, i64, arrow::Int64Array>(sparse_info, index_array, int64_value_array, column_vector, start_offset, end_offset);
+            ParquetSparseValueHandler<IndexType, IndexArray, i64, arrow::Int64Array>(sparse_info,
+                                                                                     index_array,
+                                                                                     int64_value_array,
+                                                                                     column_vector,
+                                                                                     start_offset,
+                                                                                     end_offset);
             break;
         }
         case kElemFloat: {
@@ -1266,7 +1309,12 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArr
             if (float_value_array.get() == nullptr) {
                 RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
             }
-            ParquetSparseValueHandler<IndexType, IndexArray, float, arrow::FloatArray>(sparse_info, index_array, float_value_array, column_vector, start_offset, end_offset);
+            ParquetSparseValueHandler<IndexType, IndexArray, float, arrow::FloatArray>(sparse_info,
+                                                                                       index_array,
+                                                                                       float_value_array,
+                                                                                       column_vector,
+                                                                                       start_offset,
+                                                                                       end_offset);
             break;
         }
         case kElemDouble: {
@@ -1277,7 +1325,12 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArr
             if (double_value_array.get() == nullptr) {
                 RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
             }
-            ParquetSparseValueHandler<IndexType, IndexArray, double, arrow::DoubleArray>(sparse_info, index_array, double_value_array, column_vector, start_offset, end_offset);
+            ParquetSparseValueHandler<IndexType, IndexArray, double, arrow::DoubleArray>(sparse_info,
+                                                                                         index_array,
+                                                                                         double_value_array,
+                                                                                         column_vector,
+                                                                                         start_offset,
+                                                                                         end_offset);
             break;
         }
         default: {
@@ -1323,12 +1376,12 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(&value));
             break;
         }
-//        case kVarchar: {
-//            String value_str = std::dynamic_pointer_cast<arrow::BinaryArray>(array)->GetString(value_idx);
-//            std::string_view value(value_str);
-//            column_vector.AppendByStringView(value, ',');
-//            break;
-//        }
+            //        case kVarchar: {
+            //            String value_str = std::dynamic_pointer_cast<arrow::BinaryArray>(array)->GetString(value_idx);
+            //            std::string_view value(value_str);
+            //            column_vector.AppendByStringView(value, ',');
+            //            break;
+            //        }
         case kEmbedding: {
             auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
             auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
@@ -1447,7 +1500,12 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                     if (int8_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
                     }
-                    ParquetSparseValueHandler<i8, arrow::Int8Array>(sparse_info, int8_index_array, data_array, column_vector, start_offset, end_offset);
+                    ParquetSparseValueHandler<i8, arrow::Int8Array>(sparse_info,
+                                                                    int8_index_array,
+                                                                    data_array,
+                                                                    column_vector,
+                                                                    start_offset,
+                                                                    end_offset);
                     break;
                 }
                 case kElemInt16: {
@@ -1455,7 +1513,12 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                     if (int16_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
                     }
-                    ParquetSparseValueHandler<i16, arrow::Int16Array>(sparse_info, int16_index_array, data_array, column_vector, start_offset, end_offset);
+                    ParquetSparseValueHandler<i16, arrow::Int16Array>(sparse_info,
+                                                                      int16_index_array,
+                                                                      data_array,
+                                                                      column_vector,
+                                                                      start_offset,
+                                                                      end_offset);
                     break;
                 }
                 case kElemInt32: {
@@ -1463,7 +1526,12 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                     if (int32_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
                     }
-                    ParquetSparseValueHandler<i32, arrow::Int32Array>(sparse_info, int32_index_array, data_array, column_vector, start_offset, end_offset);
+                    ParquetSparseValueHandler<i32, arrow::Int32Array>(sparse_info,
+                                                                      int32_index_array,
+                                                                      data_array,
+                                                                      column_vector,
+                                                                      start_offset,
+                                                                      end_offset);
                     break;
                 }
                 case kElemInt64: {
@@ -1471,7 +1539,12 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                     if (int64_index_array.get() == nullptr) {
                         RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
                     }
-                    ParquetSparseValueHandler<i64, arrow::Int64Array>(sparse_info, int64_index_array, data_array, column_vector, start_offset, end_offset);
+                    ParquetSparseValueHandler<i64, arrow::Int64Array>(sparse_info,
+                                                                      int64_index_array,
+                                                                      data_array,
+                                                                      column_vector,
+                                                                      start_offset,
+                                                                      end_offset);
                     break;
                 }
                 default: {
