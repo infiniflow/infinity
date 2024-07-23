@@ -603,11 +603,8 @@ Absolute path to the file for export. Supported file types include:
   - `True`: Display table header. 
   - `False`: (Default) Do not display table header. 
 
-- **delimiter**: `str` *Optional*
-  Delimiter to separate columns. Supported delimiters include: 
-  - ",": (Default) Comma. 
-  - "\t": Tab. 
-  - Any ASCII characters in `str` format.
+- **delimiter**: `str` *Optional* Defaults to ","
+  Delimiter to separate columns. Works with **.csv** files only.
 
 - **file_type**: `str` *Required*
   The type of the exported file. Supported file types include:
