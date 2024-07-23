@@ -1606,6 +1606,10 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     AppendEmbedding<BooleanT>(ele_str_views, dst_off);
                     break;
                 }
+                case kElemUInt8: {
+                    AppendEmbedding<u8>(ele_str_views, dst_off);
+                    break;
+                }
                 case kElemInt8: {
                     AppendEmbedding<TinyIntT>(ele_str_views, dst_off);
                     break;
@@ -1649,6 +1653,10 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             switch (embedding_info->Type()) {
                 case kElemBit: {
                     AppendTensor<BooleanT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemUInt8: {
+                    AppendTensor<u8>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
                 }
                 case kElemInt8: {
@@ -1702,6 +1710,10 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     AppendTensorArray<BooleanT>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
                 }
+                case kElemUInt8: {
+                    AppendTensorArray<u8>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
                 case kElemInt8: {
                     AppendTensorArray<TinyIntT>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
@@ -1753,6 +1765,10 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             switch (sparse_info->DataType()) {
                 case kElemBit: {
                     AppendSparse<BooleanT>(ele_str_views, index);
+                    break;
+                }
+                case kElemUInt8: {
+                    AppendSparse<u8>(ele_str_views, index, column_def);
                     break;
                 }
                 case kElemInt8: {

@@ -186,6 +186,28 @@ private:
     }
 
     template <>
+    inline std::string Embedding2StringInternal<int8_t>(const EmbeddingType &embedding, size_t dimension) {
+        std::stringstream ss;
+        ss << "[";
+        for (size_t i = 0; i < dimension - 1; ++i) {
+            ss << int(((int8_t *)(embedding.ptr))[i]) << ',';
+        }
+        ss << int(((int8_t *)(embedding.ptr))[dimension - 1]) << "]";
+        return ss.str();
+    }
+
+    template <>
+    inline std::string Embedding2StringInternal<uint8_t>(const EmbeddingType &embedding, size_t dimension) {
+        std::stringstream ss;
+        ss << "[";
+        for (size_t i = 0; i < dimension - 1; ++i) {
+            ss << int(((uint8_t *)(embedding.ptr))[i]) << ',';
+        }
+        ss << int(((uint8_t *)(embedding.ptr))[dimension - 1]) << "]";
+        return ss.str();
+    }
+
+    template <>
     inline std::string Embedding2StringInternal<float>(const EmbeddingType &embedding, size_t dimension) {
         std::stringstream ss;
         ss << "[";
