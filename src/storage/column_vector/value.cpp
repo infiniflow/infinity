@@ -1275,7 +1275,7 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
 void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<arrow::ArrayBuilder> &array_builder) {
     switch (data_type->type()) {
         case LogicalType::kBoolean: {
-            auto builder = std::dynamic_pointer_cast<::arrow::UInt8Builder>(array_builder);
+            auto builder = std::dynamic_pointer_cast<::arrow::BooleanBuilder>(array_builder);
             auto status = builder->Append(value_.boolean);
             break;
         }

@@ -1537,7 +1537,7 @@ Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, 
 
 } // namespace
 
-void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *column_def) {
+void ColumnVector::AppendByStringView(std::string_view sv) {
     SizeT index = tail_index_++;
     switch (data_type_->type()) {
         case kBoolean: {
@@ -1751,31 +1751,31 @@ void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *colu
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
             switch(sparse_info->DataType()) {
                 case kElemBit: {
-                    AppendSparse<BooleanT>(ele_str_views, index, column_def);
+                    AppendSparse<BooleanT>(ele_str_views, index);
                     break;
                 }
                 case kElemInt8: {
-                    AppendSparse<TinyIntT>(ele_str_views, index, column_def);
+                    AppendSparse<TinyIntT>(ele_str_views, index);
                     break;
                 }
                 case kElemInt16: {
-                    AppendSparse<SmallIntT>(ele_str_views, index, column_def);
+                    AppendSparse<SmallIntT>(ele_str_views, index);
                     break;
                 }
                 case kElemInt32: {
-                    AppendSparse<IntegerT>(ele_str_views, index, column_def);
+                    AppendSparse<IntegerT>(ele_str_views, index);
                     break;
                 }
                 case kElemInt64: {
-                    AppendSparse<BigIntT>(ele_str_views, index, column_def);
+                    AppendSparse<BigIntT>(ele_str_views, index);
                     break;
                 }
                 case kElemFloat: {
-                    AppendSparse<FloatT>(ele_str_views, index, column_def);
+                    AppendSparse<FloatT>(ele_str_views, index);
                     break;
                 }
                 case kElemDouble: {
-                    AppendSparse<DoubleT>(ele_str_views, index, column_def);
+                    AppendSparse<DoubleT>(ele_str_views, index);
                     break;
                 }
                 default: {

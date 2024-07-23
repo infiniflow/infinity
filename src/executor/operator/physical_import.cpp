@@ -730,7 +730,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
         if (cell.len) {
             str_view = std::string_view((char *)cell.str, cell.len);
             auto &column_vector = parser_context->column_vectors_[column_idx];
-            column_vector.AppendByStringView(str_view, column_def);
+            column_vector.AppendByStringView(str_view);
         } else {
             if (column_def->has_default_value()) {
                 auto const_expr = dynamic_cast<ConstantExpr *>(column_def->default_expr_.get());
@@ -1115,14 +1115,18 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
     SharedPtr<arrow::Table> table;
     auto status = parquet::OpenFile(file, pool, &arrow_reader);
     if (!status.ok()) {
-        Status::FileNotFound(file_path_);
+        RecoverableError(Status::FileNotFound(file_path_));
     }
     status = arrow_reader->ReadTable(&table);
     if (!status.ok()) {
-        Status::ImportFileFormatError(status.ToString());
+        RecoverableError(Status::ImportFileFormatError(status.ToString()));
     }
 
     row_count = table->num_rows();
+    SizeT col_count = table->num_columns();
+    if (col_count != table_entry_->ColumnCount()) {
+        RecoverableError(Status::ColumnCountMismatch(fmt::format("Column count mismatch: {} != {}", col_count, table_entry_->ColumnCount())));
+    }
 
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
@@ -1233,8 +1237,9 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             switch (embedding_info->Type()) {
                 case kElemInt8: {
                     Vector<i8> embedding;
+                    auto int8_array = std::dynamic_pointer_cast<arrow::Int8Array>(list_array->values());
                     for (i64 j = start_offset; j < end_offset; ++j) {
-                        i8 value = std::dynamic_pointer_cast<arrow::Int8Array>(list_array->values())->Value(j);
+                        i8 value = int8_array->Value(j);
                         embedding.push_back(value);
                     }
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
@@ -1242,8 +1247,9 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                 }
                 case kElemInt16: {
                     Vector<i16> embedding;
+                    auto int16_array = std::dynamic_pointer_cast<arrow::Int16Array>(list_array->values());
                     for (i64 j = start_offset; j < end_offset; ++j) {
-                        i16 value = std::dynamic_pointer_cast<arrow::Int16Array>(list_array->values())->Value(j);
+                        i16 value = int16_array->Value(j);
                         embedding.push_back(value);
                     }
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
@@ -1251,8 +1257,9 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                 }
                 case kElemInt32: {
                     Vector<i32> embedding;
+                    auto int32_array = std::dynamic_pointer_cast<arrow::Int32Array>(list_array->values());
                     for (i64 j = start_offset; j < end_offset; ++j) {
-                        i32 value = std::dynamic_pointer_cast<arrow::Int32Array>(list_array->values())->Value(j);
+                        i32 value = int32_array->Value(j);
                         embedding.push_back(value);
                     }
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
@@ -1260,8 +1267,9 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                 }
                 case kElemInt64: {
                     Vector<i64> embedding;
+                    auto int64_array = std::dynamic_pointer_cast<arrow::Int64Array>(list_array->values());
                     for (i64 j = start_offset; j < end_offset; ++j) {
-                        i64 value = std::dynamic_pointer_cast<arrow::Int64Array>(list_array->values())->Value(j);
+                        i64 value = int64_array->Value(j);
                         embedding.push_back(value);
                     }
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
@@ -1269,8 +1277,9 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                 }
                 case kElemFloat: {
                     Vector<float> embedding;
+                    auto float_array = std::dynamic_pointer_cast<arrow::FloatArray>(list_array->values());
                     for (i64 j = start_offset; j < end_offset; ++j) {
-                        float value = std::dynamic_pointer_cast<arrow::FloatArray>(list_array->values())->Value(j);
+                        float value = float_array->Value(j);
                         embedding.push_back(value);
                     }
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
@@ -1278,8 +1287,9 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                 }
                 case kElemDouble: {
                     Vector<double> embedding;
+                    auto double_array = std::dynamic_pointer_cast<arrow::DoubleArray>(list_array->values());
                     for (i64 j = start_offset; j < end_offset; ++j) {
-                        double value = std::dynamic_pointer_cast<arrow::DoubleArray>(list_array->values())->Value(j);
+                        double value = double_array->Value(j);
                         embedding.push_back(value);
                     }
                     column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));

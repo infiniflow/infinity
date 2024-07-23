@@ -161,6 +161,7 @@ export using StringArray = arrow::StringArray;
 export using ListArray = arrow::ListArray;
 export using BinaryArray = arrow::BinaryArray;
 
+export using BooleanBuilder = arrow::BooleanBuilder;
 export using UInt8Builder = arrow::UInt8Builder;
 export using Int8Builder = arrow::Int8Builder;
 export using Int16Builder = arrow::Int16Builder;

@@ -286,6 +286,7 @@ target_link_libraries(infinity
         jma
         opencc
         dl
+        snappy
         thrift.a
         thriftnb.a
         lz4.a
@@ -341,6 +342,7 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         jma
         opencc
         dl
+        snappy
         lz4.a
         atomic.a
         event.a
@@ -475,6 +477,7 @@ target_link_libraries(unit_test
         jma
         opencc
         dl
+        snappy
         lz4.a
         atomic.a
         c++.a

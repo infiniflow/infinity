@@ -536,14 +536,14 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
             }
 
 
-//            SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_row_count, block_arrays);
-//            auto status = file_writer->WriteRecordBatch(*block_batch);
-//            if (!status.ok()) {
-//                String error_message = fmt::format("Failed to write record batch to parquet file: {}", status.message());
-//                LOG_CRITICAL(error_message);
-//                UnrecoverableError(error_message);
-//            }
-//            row_count += block_row_count;
+           SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_row_count, block_arrays);
+           auto status = file_writer->WriteRecordBatch(*block_batch);
+           if (!status.ok()) {
+               String error_message = fmt::format("Failed to write record batch to parquet file: {}", status.message());
+               LOG_CRITICAL(error_message);
+               UnrecoverableError(error_message);
+           }
+           row_count += block_row_count;
         }
     }
 
@@ -630,7 +630,8 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
 
     switch (column_type->type()) {
         case LogicalType::kBoolean: {
-            array_builder = MakeShared<arrow::UInt8Builder>();
+            array_builder = MakeShared<arrow::BooleanBuilder>();
+            break;
         }
         case LogicalType::kTinyInt: {
             array_builder = MakeShared<::arrow::Int8Builder>();
