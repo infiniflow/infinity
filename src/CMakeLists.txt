@@ -483,11 +483,13 @@ target_link_libraries(unit_test
         arrow.a
         thrift.a
         thriftnb.a
+        snappy.a
         ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 target_sources(unit_test
         PRIVATE
