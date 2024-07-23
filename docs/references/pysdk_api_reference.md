@@ -591,7 +591,7 @@ Exports the current table to a specified file.
 
 #### file_path: `str` *Required*
 
-Absolute path to the file for export. Supported file type include: 
+Absolute path to the file for export. Supported file types include: 
 
 - `csv`
 - `jsonl`
@@ -609,7 +609,7 @@ Absolute path to the file for export. Supported file type include:
   - "\t": Tab. 
 
 - **file_type**: `str` *Required*
-  The type of the exported file. Supported file type include:
+  The type of the exported file. Supported file types include:
   - `csv`
   - `jsonl`
   > This setting overrides the `file_path` setting. If you specify `csv` as the file name suffix in `file_path` while setting `file_type` to `jsonl`, the exported file will be in `jsonl` format. 
