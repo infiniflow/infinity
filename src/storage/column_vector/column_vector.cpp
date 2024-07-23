@@ -1054,10 +1054,11 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         UnrecoverableError(error_message);
     }
     if (index > tail_index_) {
-        String error_message = fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
-                                           std::to_string(index),
-                                           std::to_string(tail_index_),
-                                           std::to_string(capacity_));
+        String error_message =
+            fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+                        std::to_string(index),
+                        std::to_string(tail_index_),
+                        std::to_string(capacity_));
         UnrecoverableError(error_message);
     }
 
@@ -1261,8 +1262,8 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             SizeT src_size = data_span.size();
             if (src_size != data_type_->Size()) {
                 String error_message = fmt::format("Attempt to store a value with different size than column vector type, want {}, got {}",
-                                                  data_type_->Size(),
-                                                  src_size);
+                                                   data_type_->Size(),
+                                                   src_size);
                 UnrecoverableError(error_message);
             }
             ptr_t dst_ptr = data_ptr_ + index * data_type_->Size();
@@ -1296,13 +1297,13 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
     if (index > capacity_) {
         String error_message = fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_);
         UnrecoverableError(error_message);
-
     }
     if (index > tail_index_) {
-        String error_message = fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
-                                           std::to_string(index),
-                                           std::to_string(tail_index_),
-                                           std::to_string(capacity_));
+        String error_message =
+            fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+                        std::to_string(index),
+                        std::to_string(tail_index_),
+                        std::to_string(capacity_));
         UnrecoverableError(error_message);
     }
     // We assume the value_ptr point to the same type data.
@@ -1749,7 +1750,7 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
         case kSparse: {
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
-            switch(sparse_info->DataType()) {
+            switch (sparse_info->DataType()) {
                 case kElemBit: {
                     AppendSparse<BooleanT>(ele_str_views, index);
                     break;
@@ -1819,12 +1820,14 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
     }
 
     if (*this->data_type_ != *other.data_type_) {
-        String error_message = fmt::format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString());
+        String error_message =
+            fmt::format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString());
         UnrecoverableError(error_message);
     }
 
     if (this->tail_index_ + count > this->capacity_) {
-        String error_message = fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_);
+        String error_message =
+            fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_);
         UnrecoverableError(error_message);
     }
 
@@ -2031,7 +2034,8 @@ SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
 
 void ColumnVector::ShallowCopy(const ColumnVector &other) {
     if (*this->data_type_ != *other.data_type_) {
-        String error_message = fmt::format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString());
+        String error_message =
+            fmt::format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString());
         UnrecoverableError(error_message);
     }
     if (this->buffer_.get() != other.buffer_.get()) {
@@ -2130,7 +2134,7 @@ i32 ColumnVector::GetSizeInBytes() const {
         UnrecoverableError(error_message);
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
-        String error_message =  fmt::format("Not supported vector_type {}", int(vector_type_));
+        String error_message = fmt::format("Not supported vector_type {}", int(vector_type_));
         UnrecoverableError(error_message);
     }
     i32 size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);

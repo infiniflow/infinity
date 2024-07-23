@@ -14,12 +14,12 @@
 
 module;
 
-#include <string>
 #include "arrow/type_fwd.h"
 #include <arrow/io/caching.h>
 #include <arrow/io/file.h>
-#include <parquet/properties.h>
 #include <parquet/arrow/writer.h>
+#include <parquet/properties.h>
+#include <string>
 
 module physical_export;
 
@@ -141,9 +141,9 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
     SizeT offset = offset_;
     SizeT row_count{0};
     SizeT file_no_{0};
-    Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
-    BufferManager* buffer_manager = query_context->storage()->buffer_manager();
-    for(auto& [segment_id, segment_snapshot]: segment_block_index_ref) {
+    Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
+    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+    for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
         LOG_DEBUG(fmt::format("Export segment_id: {}", segment_id));
         SizeT block_count = segment_snapshot.block_map_.size();
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
@@ -178,7 +178,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                     }
                     default: {
                         column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetConstColumnVector(buffer_manager));
-                        if(column_vectors[block_column_idx].Size() != block_row_count) {
+                        if (column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
                             UnrecoverableError(error_message);
                         }
@@ -186,14 +186,14 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 }
             }
 
-            for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
+            for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
                 // TODO: Check the visibility
-                if(offset > 0) {
-                    -- offset;
+                if (offset > 0) {
+                    --offset;
                     continue;
                 }
                 String line;
-                for(SizeT select_column_idx = 0; select_column_idx < select_column_count; ++ select_column_idx) {
+                for (SizeT select_column_idx = 0; select_column_idx < select_column_count; ++select_column_idx) {
                     Value v = column_vectors[select_column_idx].GetValue(row_idx);
                     switch (v.type().type()) {
                         case LogicalType::kEmbedding: {
@@ -211,12 +211,12 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                     }
                 }
 
-                if(row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
-                    ++ file_no_;
+                if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
+                    ++file_no_;
                     fs.Close(*file_handler);
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
-                    if(!result.second.ok()) {
+                    if (!result.second.ok()) {
                         RecoverableError(result.second);
                     }
                     file_handler = std::move(result.first);
@@ -224,8 +224,8 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
                 fs.Write(*file_handler, line.c_str(), line.size());
 
-                ++ row_count;
-                if(limit_ != 0 && row_count == limit_) {
+                ++row_count;
+                if (limit_ != 0 && row_count == limit_) {
                     return row_count;
                 }
             }
@@ -263,8 +263,8 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
     SizeT offset = offset_;
     SizeT row_count{0};
     SizeT file_no_{0};
-    Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
-    BufferManager* buffer_manager = query_context->storage()->buffer_manager();
+    Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
+    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
         SizeT block_count = segment_snapshot.block_map_.size();
@@ -301,7 +301,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                     }
                     default: {
                         column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetConstColumnVector(buffer_manager));
-                        if(column_vectors[block_column_idx].Size() != block_row_count) {
+                        if (column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
                             UnrecoverableError(error_message);
                         }
@@ -309,14 +309,14 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 }
             }
 
-            for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
+            for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
                 // TODO: Need to check visibility
-                if(offset > 0) {
-                    -- offset;
+                if (offset > 0) {
+                    --offset;
                     continue;
                 }
                 nlohmann::json line_json;
-                for(ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++ block_column_idx) {
+                for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
                     ColumnID select_column_idx = select_columns[block_column_idx];
                     switch (select_column_idx) {
                         case COLUMN_IDENTIFIER_ROW_ID: {
@@ -341,12 +341,12 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                         }
                     }
                 }
-                if(row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
-                    ++ file_no_;
+                if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
+                    ++file_no_;
                     fs.Close(*file_handler);
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
-                    if(!result.second.ok()) {
+                    if (!result.second.ok()) {
                         RecoverableError(result.second);
                     }
                     file_handler = std::move(result.first);
@@ -355,8 +355,8 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 LOG_DEBUG(line_json.dump());
                 String to_write = line_json.dump() + "\n";
                 fs.Write(*file_handler, to_write.c_str(), to_write.size());
-                ++ row_count;
-                if(limit_ != 0 && row_count == limit_) {
+                ++row_count;
+                if (limit_ != 0 && row_count == limit_) {
                     return row_count;
                 }
             }
@@ -399,8 +399,8 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     SizeT offset = offset_;
     SizeT row_count{0};
     SizeT file_no_{0};
-    Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
-    BufferManager* buffer_manager = query_context->storage()->buffer_manager();
+    Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
+    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
     // Write header
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
@@ -412,26 +412,26 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
             SizeT block_row_count = block_entry->row_count();
 
             ColumnVector exported_column_vector = block_entry->GetColumnBlockEntry(exported_column_idx)->GetConstColumnVector(buffer_manager);
-            if(exported_column_vector.Size() != block_row_count) {
+            if (exported_column_vector.Size() != block_row_count) {
                 String error_message = "Unmatched row_count between block and block_column";
                 UnrecoverableError(error_message);
             }
 
-            for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
-                if(offset > 0) {
-                    -- offset;
+            for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
+                if (offset > 0) {
+                    --offset;
                     continue;
                 }
 
                 Value v = exported_column_vector.GetValue(row_idx);
                 Span<char> embedding = v.GetEmbedding();
 
-                if(row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
-                    ++ file_no_;
+                if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
+                    ++file_no_;
                     fs.Close(*file_handler);
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
-                    if(!result.second.ok()) {
+                    if (!result.second.ok()) {
                         RecoverableError(result.second);
                     }
                     file_handler = std::move(result.first);
@@ -439,8 +439,8 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
                 fs.Write(*file_handler, &dimension, sizeof(dimension));
                 fs.Write(*file_handler, embedding.data(), embedding.size_bytes());
-                ++ row_count;
-                if(limit_ != 0 && row_count == limit_) {
+                ++row_count;
+                if (limit_ != 0 && row_count == limit_) {
                     return row_count;
                 }
             }
@@ -528,7 +528,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                 }
             }
 
-            Vector<SharedPtr<arrow::Array>> block_arrays; 
+            Vector<SharedPtr<arrow::Array>> block_arrays;
             for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
                 ColumnID select_column_idx = select_columns[block_column_idx];
                 ColumnDef *column_def = column_defs[select_column_idx].get();
@@ -536,15 +536,14 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                 block_arrays.emplace_back(BuildArrowArray(column_def, column_vector));
             }
 
-
-           SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_row_count, block_arrays);
-           auto status = file_writer->WriteRecordBatch(*block_batch);
-           if (!status.ok()) {
-               String error_message = fmt::format("Failed to write record batch to parquet file: {}", status.message());
-               LOG_CRITICAL(error_message);
-               UnrecoverableError(error_message);
-           }
-           row_count += block_row_count;
+            SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_row_count, block_arrays);
+            auto status = file_writer->WriteRecordBatch(*block_batch);
+            if (!status.ok()) {
+                String error_message = fmt::format("Failed to write record batch to parquet file: {}", status.message());
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+            row_count += block_row_count;
         }
     }
 
@@ -589,32 +588,32 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
         case LogicalType::kVarchar:
             return arrow::utf8();
         case LogicalType::kEmbedding: {
-//            auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-//            switch (embedding_info->Type()) {
-//                case kElemInt8: {
-//                    return ::arrow::list(::arrow::int8());
-//                }
-//                case kElemInt16: {
-//                    return ::arrow::list(::arrow::int16());
-//                }
-//                case kElemInt32: {
-//                    return ::arrow::list(::arrow::int32());
-//                }
-//                case kElemInt64: {
-//                    return ::arrow::list(::arrow::int64());
-//                }
-//                case kElemFloat: {
-//                    return ::arrow::list(::arrow::float32());
-//                }
-//                case kElemDouble: {
-//                    return ::arrow::list(::arrow::float64());
-//                }
-//                default: {
-//                    String error_message = "Invalid embedding data type";
-//                    LOG_CRITICAL(error_message);
-//                    UnrecoverableError(error_message);
-//                }
-//            }
+            //            auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+            //            switch (embedding_info->Type()) {
+            //                case kElemInt8: {
+            //                    return ::arrow::list(::arrow::int8());
+            //                }
+            //                case kElemInt16: {
+            //                    return ::arrow::list(::arrow::int16());
+            //                }
+            //                case kElemInt32: {
+            //                    return ::arrow::list(::arrow::int32());
+            //                }
+            //                case kElemInt64: {
+            //                    return ::arrow::list(::arrow::int64());
+            //                }
+            //                case kElemFloat: {
+            //                    return ::arrow::list(::arrow::float32());
+            //                }
+            //                case kElemDouble: {
+            //                    return ::arrow::list(::arrow::float64());
+            //                }
+            //                default: {
+            //                    String error_message = "Invalid embedding data type";
+            //                    LOG_CRITICAL(error_message);
+            //                    UnrecoverableError(error_message);
+            //                }
+            //            }
             UnrecoverableError("Not implemented");
         }
         case LogicalType::kSparse: {
