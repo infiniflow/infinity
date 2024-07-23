@@ -69,6 +69,15 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
         match lower_key:
             case "type":
                 datatype = value.lower()
+                column_big_info = [item.strip() for item in datatype.split(",")]
+                column_big_info_first_str = column_big_info[0].lower()
+                if column_big_info_first_str == "vector" or column_big_info_first_str == "tensor" or column_big_info_first_str == "tensorarray":
+                    return get_embedding_info(column_info, column_defs, column_name, index)
+                elif column_big_info_first_str == "sparse":
+                    return get_sparse_info(column_info, column_defs, column_name, index)
+                else:
+                    pass
+
                 proto_column_type = ttypes.DataType()
                 match datatype:
                     case "int8":
@@ -260,14 +269,7 @@ class RemoteDatabase(Database, ABC):
         column_defs = []
         for index, (column_name, column_info) in enumerate(columns_definition.items()):
             check_valid_name(column_name, "Column")
-            column_big_info = [item.strip() for item in column_info["type"].split(",")]
-            column_big_info_first_str = column_big_info[0].lower()
-            if column_big_info_first_str == "vector" or column_big_info_first_str == "tensor" or column_big_info_first_str == "tensorarray":
-                get_embedding_info(column_info, column_defs, column_name, index)
-            elif column_big_info_first_str == "sparse":
-                get_sparse_info(column_info, column_defs, column_name, index)
-            else:  # numeric or varchar
-                get_ordinary_info(column_info, column_defs, column_name, index)
+            get_ordinary_info(column_info, column_defs, column_name, index)
 
         create_table_conflict: ttypes.CreateConflict
         if conflict_type == ConflictType.Error:
