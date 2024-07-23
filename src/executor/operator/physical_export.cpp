@@ -39,6 +39,7 @@ import defer_op;
 import stl;
 import logical_type;
 import embedding_info;
+import sparse_info;
 import status;
 import buffer_manager;
 import default_values;
@@ -473,7 +474,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     }
 
     arrow::MemoryPool *pool = arrow::DefaultMemoryPool();
-    SharedPtr<arrow::Schema> schema = ::arrow::schema(fields);
+    SharedPtr<arrow::Schema> schema = ::arrow::schema(std::move(fields));
     SharedPtr<::arrow::io::FileOutputStream> file_stream;
     SharedPtr<::parquet::arrow::FileWriter> file_writer;
 
@@ -614,6 +615,72 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
 //                    UnrecoverableError(error_message);
 //                }
 //            }
+            UnrecoverableError("Not implemented");
+        }
+        case LogicalType::kSparse: {
+            const auto *sparse_info = static_cast<const SparseInfo *>(column_def->type()->type_info().get());
+
+            SharedPtr<arrow::DataType> index_type;
+            Optional<SharedPtr<arrow::DataType>> value_type = None;
+            switch (sparse_info->IndexType()) {
+                case EmbeddingDataType::kElemInt8: {
+                    index_type = ::arrow::list(::arrow::int8());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt16: {
+                    index_type = ::arrow::list(::arrow::int16());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt32: {
+                    index_type = ::arrow::list(::arrow::int32());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt64: {
+                    index_type = ::arrow::list(::arrow::int64());
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Index type invalid");
+                }
+            }
+            switch (sparse_info->DataType()) {
+                case EmbeddingDataType::kElemBit: {
+                    break;
+                }
+                case EmbeddingDataType::kElemInt8: {
+                    value_type = ::arrow::list(::arrow::int8());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt16: {
+                    value_type = ::arrow::list(::arrow::int16());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt32: {
+                    value_type = ::arrow::list(::arrow::int32());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt64: {
+                    value_type = ::arrow::list(::arrow::int64());
+                    break;
+                }
+                case EmbeddingDataType::kElemFloat: {
+                    value_type = ::arrow::list(::arrow::float32());
+                    break;
+                }
+                case EmbeddingDataType::kElemDouble: {
+                    value_type = ::arrow::list(::arrow::float64());
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Data type invalid");
+                }
+            }
+
+            arrow::FieldVector fields{::arrow::field("index", std::move(index_type))};
+            if (value_type.has_value()) {
+                fields.emplace_back(::arrow::field("value", value_type.value()));
+            }
+            return arrow::struct_(std::move(fields));
         }
         default: {
             String error_message = "Invalid data type";
@@ -684,7 +751,7 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
             auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
             switch (embedding_info->Type()) {
                 case kElemBit: {
-                    SharedPtr<arrow::UInt8Builder> uint8_builder = MakeShared<::arrow::UInt8Builder>();
+                    SharedPtr<arrow::BooleanBuilder> uint8_builder = MakeShared<::arrow::BooleanBuilder>();
                     array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), uint8_builder);
                     break;
                 }
@@ -726,7 +793,81 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
             }
             break;
         }
-        case LogicalType::kDecimal:
+        case LogicalType::kSparse: {
+            const auto *sparse_info = static_cast<const SparseInfo *>(column_def->type()->type_info().get());
+            SharedPtr<arrow::ArrayBuilder> index_builder = nullptr;
+            SharedPtr<arrow::ArrayBuilder> value_builder = nullptr;
+            switch (sparse_info->IndexType()) {
+                case kElemInt8: {
+                    auto int8_builder = MakeShared<::arrow::Int8Builder>();
+                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
+                    break;
+                }
+                case kElemInt16: {
+                    auto int16_builder = MakeShared<::arrow::Int16Builder>();
+                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
+                    break;
+                }
+                case kElemInt32: {
+                    auto int32_builder = MakeShared<::arrow::Int32Builder>();
+                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
+                    break;
+                }
+                case kElemInt64: {
+                    auto int64_builder = MakeShared<::arrow::Int64Builder>();
+                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid index type.");
+                }
+            }
+            switch (sparse_info->DataType()) {
+                case kElemBit: {
+                    break;
+                }
+                case kElemInt8: {
+                    auto int8_builder = MakeShared<::arrow::Int8Builder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
+                    break;
+                }
+                case kElemInt16: {
+                    auto int16_builder = MakeShared<::arrow::Int16Builder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
+                    break;
+                }
+                case kElemInt32: {
+                    auto int32_builder = MakeShared<::arrow::Int32Builder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
+                    break;
+                }
+                case kElemInt64: {
+                    auto int64_builder = MakeShared<::arrow::Int64Builder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
+                    break;
+                }
+                case kElemFloat: {
+                    auto float_builder = MakeShared<::arrow::FloatBuilder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
+                    break;
+                }
+                case kElemDouble: {
+                    auto double_builder = MakeShared<::arrow::DoubleBuilder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), double_builder);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid data type.");
+                }
+            }
+            auto struct_type = arrow::struct_({arrow::field("index", index_builder->type()), arrow::field("value", value_builder->type())});
+            Vector<SharedPtr<arrow::ArrayBuilder>> field_builders = {index_builder};
+            if (value_builder.get() != nullptr) {
+                field_builders.emplace_back(value_builder);
+            }
+            array_builder = MakeShared<::arrow::StructBuilder>(struct_type, arrow::DefaultMemoryPool(), std::move(field_builders));
+            break;
+        }
         default: {
             String error_message = "Invalid data type";
             LOG_CRITICAL(error_message);

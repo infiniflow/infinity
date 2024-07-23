@@ -27,6 +27,8 @@ from generate_csr import generate as generate16
 from generate_bvecs import generate as generate17
 from generate_emvb_test_data import generate as generate18
 from generate_emvb_test_data_2 import generate as generate19
+from generate_test_parquet import generate as generate20
+from generate_sparse_parquet import generate as generate21
 import generate_wiki_embedding
 
 class SpinnerThread(threading.Thread):
@@ -166,6 +168,8 @@ if __name__ == "__main__":
     generate18(args.generate_if_exists, args.copy)
     #generate19(args.generate_if_exists, args.copy)
     # generate_wiki_embedding.generate()
+    generate20(args.generate_if_exists, args.copy)
+    generate21(args.generate_if_exists, args.copy)
 
     print("Generate file finshed.")
 

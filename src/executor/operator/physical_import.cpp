@@ -1179,6 +1179,113 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
     import_op_state->result_msg_ = std::move(result_msg);
 }
 
+template <typename IndexType, typename IndexArray, typename DataType, typename DataArray>
+void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArray> index_array,
+                               SharedPtr<DataArray> data_array, ColumnVector &column_vector, i64 start_offset, i64 end_offset) {
+    Vector<IndexType> index_vec;
+    if constexpr (std::is_same_v<DataType, bool>) {
+        for (i64 j = start_offset; j < end_offset; ++j) {
+            index_vec.push_back(index_array->Value(j));
+        }
+        SizeT nnz = index_vec.size();
+        column_vector.AppendSparse(nnz, static_cast<DataType *>(nullptr), index_vec.data());
+    } else {
+        Vector<DataType> data_vec;
+        for (i64 j = start_offset; j < end_offset; ++j) {
+            index_vec.push_back(index_array->Value(j));
+            data_vec.push_back(data_array->Value(j));
+        }
+        SizeT nnz = index_vec.size();
+        column_vector.AppendSparse(nnz, data_vec.data(), index_vec.data());
+    }
+}
+
+template <typename IndexType, typename IndexArray>
+void ParquetSparseValueHandler(const SparseInfo *sparse_info, SharedPtr<IndexArray> index_array,
+                               SharedPtr<arrow::ListArray> data_array, ColumnVector &column_vector, i64 start_offset, i64 end_offset) {
+    if (sparse_info->DataType() != EmbeddingDataType::kElemBit && data_array.get() == nullptr) {
+        RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+    }
+    switch (sparse_info->DataType()) {
+        case kElemBit: {
+            if (data_array.get() != nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            ParquetSparseValueHandler<IndexType, IndexArray, bool, arrow::BooleanArray>(sparse_info, index_array, nullptr, column_vector, start_offset, end_offset);
+            break;
+        }
+        case kElemInt8: {
+            if (data_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            auto int8_value_array = std::dynamic_pointer_cast<arrow::Int8Array>(data_array->values());
+            if (int8_value_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            ParquetSparseValueHandler<IndexType, IndexArray, i8, arrow::Int8Array>(sparse_info, index_array, int8_value_array, column_vector, start_offset, end_offset);
+            break;
+        }
+        case kElemInt16: {
+            if (data_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            auto int16_value_array = std::dynamic_pointer_cast<arrow::Int16Array>(data_array->values());
+            if (int16_value_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            ParquetSparseValueHandler<IndexType, IndexArray, i16, arrow::Int16Array>(sparse_info, index_array, int16_value_array, column_vector, start_offset, end_offset);
+            break;
+        }
+        case kElemInt32: {
+            if (data_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            auto int32_value_array = std::dynamic_pointer_cast<arrow::Int32Array>(data_array->values());
+            if (int32_value_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            ParquetSparseValueHandler<IndexType, IndexArray, i32, arrow::Int32Array>(sparse_info, index_array, int32_value_array, column_vector, start_offset, end_offset);
+            break;
+        }
+        case kElemInt64: {
+            if (data_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            auto int64_value_array = std::dynamic_pointer_cast<arrow::Int64Array>(data_array->values());
+            if (int64_value_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            ParquetSparseValueHandler<IndexType, IndexArray, i64, arrow::Int64Array>(sparse_info, index_array, int64_value_array, column_vector, start_offset, end_offset);
+            break;
+        }
+        case kElemFloat: {
+            if (data_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            auto float_value_array = std::dynamic_pointer_cast<arrow::FloatArray>(data_array->values());
+            if (float_value_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            ParquetSparseValueHandler<IndexType, IndexArray, float, arrow::FloatArray>(sparse_info, index_array, float_value_array, column_vector, start_offset, end_offset);
+            break;
+        }
+        case kElemDouble: {
+            if (data_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            auto double_value_array = std::dynamic_pointer_cast<arrow::DoubleArray>(data_array->values());
+            if (double_value_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            ParquetSparseValueHandler<IndexType, IndexArray, double, arrow::DoubleArray>(sparse_info, index_array, double_value_array, column_vector, start_offset, end_offset);
+            break;
+        }
+        default: {
+            UnrecoverableError("Invalid sparse data type.");
+        }
+    }
+}
+
 void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx) {
     switch (column_vector.data_type()->type()) {
         case kBoolean: {
@@ -1299,6 +1406,76 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                     String error_message = "Not implement: Embedding type.";
                     LOG_CRITICAL(error_message);
                     UnrecoverableError(error_message);
+                }
+            }
+            break;
+        }
+        case kSparse: {
+            const auto *sparse_info = static_cast<SparseInfo *>(column_vector.data_type()->type_info().get());
+
+            auto struct_array = std::dynamic_pointer_cast<arrow::StructArray>(array);
+            if (struct_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+
+            auto index_raw_array = struct_array->GetFieldByName("index");
+            if (index_raw_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            auto index_array = std::dynamic_pointer_cast<arrow::ListArray>(index_raw_array);
+            if (index_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            i64 start_offset = index_array->value_offset(value_idx);
+            i64 end_offset = index_array->value_offset(value_idx + 1);
+
+            SharedPtr<arrow::ListArray> data_array;
+            auto value_raw_array = struct_array->GetFieldByName("value");
+            if (value_raw_array.get() != nullptr) {
+                data_array = std::dynamic_pointer_cast<arrow::ListArray>(value_raw_array);
+
+                i64 start_offset1 = index_array->value_offset(value_idx);
+                i64 end_offset1 = index_array->value_offset(value_idx + 1);
+                if (start_offset != start_offset1 || end_offset != end_offset1) {
+                    RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+                }
+            }
+
+            switch (sparse_info->IndexType()) {
+                case kElemInt8: {
+                    auto int8_index_array = std::dynamic_pointer_cast<arrow::Int8Array>(index_array->values());
+                    if (int8_index_array.get() == nullptr) {
+                        RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+                    }
+                    ParquetSparseValueHandler<i8, arrow::Int8Array>(sparse_info, int8_index_array, data_array, column_vector, start_offset, end_offset);
+                    break;
+                }
+                case kElemInt16: {
+                    auto int16_index_array = std::dynamic_pointer_cast<arrow::Int16Array>(index_array->values());
+                    if (int16_index_array.get() == nullptr) {
+                        RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+                    }
+                    ParquetSparseValueHandler<i16, arrow::Int16Array>(sparse_info, int16_index_array, data_array, column_vector, start_offset, end_offset);
+                    break;
+                }
+                case kElemInt32: {
+                    auto int32_index_array = std::dynamic_pointer_cast<arrow::Int32Array>(index_array->values());
+                    if (int32_index_array.get() == nullptr) {
+                        RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+                    }
+                    ParquetSparseValueHandler<i32, arrow::Int32Array>(sparse_info, int32_index_array, data_array, column_vector, start_offset, end_offset);
+                    break;
+                }
+                case kElemInt64: {
+                    auto int64_index_array = std::dynamic_pointer_cast<arrow::Int64Array>(index_array->values());
+                    if (int64_index_array.get() == nullptr) {
+                        RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+                    }
+                    ParquetSparseValueHandler<i64, arrow::Int64Array>(sparse_info, int64_index_array, data_array, column_vector, start_offset, end_offset);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid sparse index type.");
                 }
             }
             break;

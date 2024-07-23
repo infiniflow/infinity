@@ -95,23 +95,23 @@ void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size
 }
 
 // Need to move up
-void BitmapEmbedding2ArrowInternal(const EmbeddingType &embedding, size_t dimension, SharedPtr<arrow::ArrayBuilder> &array_builder) {
+void BitmapEmbedding2ArrowInternal(const EmbeddingType &embedding, size_t dimension, arrow::ArrayBuilder *array_builder) {
     if (dimension % 8 != 0) {
         Status status = Status::SyntaxError("Binary embedding dimension should be the times of 8.");
         LOG_ERROR(status.message());
         RecoverableError(status);
     }
 
-    auto list_builder = std::dynamic_pointer_cast<arrow::ListBuilder>(array_builder);
-    auto builder = dynamic_cast<arrow::UInt8Builder *>(list_builder->value_builder());
+    auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
+    auto builder = dynamic_cast<arrow::UInt8Builder *>(list_builder->value_builder()); // FIXME
     auto *array = reinterpret_cast<const u8 *>(embedding.ptr);
     for (size_t i = 0; i < dimension; ++i) {
         auto status = builder->Append(array[i]);
     }
 }
 
-void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, SharedPtr<arrow::ArrayBuilder> &array_builder) {
-    auto list_builder = std::dynamic_pointer_cast<arrow::ListBuilder>(array_builder);
+void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, arrow::ArrayBuilder *array_builder) {
+    auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
     auto status = list_builder->Append();
     switch (type) {
         case kElemBit: {
@@ -1343,10 +1343,26 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
                 UnrecoverableError(error_message);
             }
             const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
-            Embedding2Arrow(embedding, embedding_info->Type(), embedding_info->Dimension(), array_builder);
+            Embedding2Arrow(embedding, embedding_info->Type(), embedding_info->Dimension(), array_builder.get());
             break;
         }
-        case LogicalType::kDecimal:
+        case LogicalType::kSparse: {
+            const auto *sparse_info = static_cast<const SparseInfo *>(data_type->type_info().get());
+            auto struct_builder = std::static_pointer_cast<::arrow::StructBuilder>(array_builder);
+            auto status = struct_builder->Append();
+
+            auto *index_builder = struct_builder->child(0);
+            auto *value_builder = struct_builder->child(1);
+            auto [nnz, index, data] = this->GetSparse();
+
+            EmbeddingT index_embedding(index.data(), false);
+            EmbeddingT data_embedding(data.data(), false);
+            Embedding2Arrow(index_embedding, sparse_info->IndexType(), nnz, index_builder);
+            if (value_builder) {
+                Embedding2Arrow(data_embedding, sparse_info->DataType(), nnz, value_builder);
+            }
+            break;
+        }
         default: {
             String error_message = "Invalid data type";
             LOG_CRITICAL(error_message);

@@ -314,6 +314,14 @@ private:
             buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tensors.data()), tensors.size() * sizeof(TensorT));
     }
 
+public:
+    template <typename DataT, typename IdxT>
+    void AppendSparse(SizeT nnz, DataT *data, IdxT *index) {
+        SizeT dst_off = tail_index_++;
+        AppendSparseInner(nnz, data, index, dst_off);
+    }
+
+private:
     template <typename T>
     void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
         const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
