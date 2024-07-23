@@ -32,7 +32,7 @@ public:
     virtual ~MergeKnnBase() = default;
 };
 
-export template <typename DataType, template <typename, typename> typename C, typename DistType = f32>
+export template <typename DataType, template <typename, typename> typename C, typename DistType>
 class MergeKnn final : public MergeKnnBase {
     using ResultHandler = ReservoirResultHandler<C<DistType, RowID>>;
     using DistFunc = DistType (*)(const DataType *, const DataType *, SizeT);
@@ -53,9 +53,9 @@ public:
 
     void Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id, Bitmask &bitmask);
 
-    void Search(const DataType *dist, const RowID *row_ids, u16 count);
+    void Search(const DistType *dist, const RowID *row_ids, u16 count);
 
-    void Search(SizeT query_id, const DataType *dist, const RowID *row_ids, u16 count);
+    void Search(SizeT query_id, const DistType *dist, const RowID *row_ids, u16 count);
 
     void Begin();
 
@@ -139,10 +139,10 @@ void MergeKnn<DataType, C, DistType>::Search(const DataType *query,
 }
 
 template <typename DataType, template <typename, typename> typename C, typename DistType>
-void MergeKnn<DataType, C, DistType>::Search(const DataType *dist, const RowID *row_ids, u16 count) {
+void MergeKnn<DataType, C, DistType>::Search(const DistType *dist, const RowID *row_ids, u16 count) {
     this->total_count_ += count;
     for (u64 i = 0; i < this->query_count_; ++i) {
-        const DataType *d = dist + i * topk_;
+        const DistType *d = dist + i * topk_;
         const RowID *r = row_ids + i * topk_;
         for (u16 j = 0; j < count; j++) {
             result_handler_->AddResult(i, d[j], r[j]);
@@ -151,7 +151,7 @@ void MergeKnn<DataType, C, DistType>::Search(const DataType *dist, const RowID *
 }
 
 template <typename DataType, template <typename, typename> typename C, typename DistType>
-void MergeKnn<DataType, C, DistType>::Search(SizeT query_id, const DataType *dist, const RowID *row_ids, u16 count) {
+void MergeKnn<DataType, C, DistType>::Search(SizeT query_id, const DistType *dist, const RowID *row_ids, u16 count) {
     if (query_id == 0) {
         this->total_count_ += count;
     }

@@ -164,7 +164,11 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 cur
             break;
         }
         case EmbeddingDataType::kElemUInt8: {
-            Init<u8, i32>();
+            Init<u8, f32>();
+            break;
+        }
+        case EmbeddingDataType::kElemInt8: {
+            Init<i8, f32>();
             break;
         }
         default: {

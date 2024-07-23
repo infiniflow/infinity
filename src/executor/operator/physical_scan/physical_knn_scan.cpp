@@ -167,12 +167,50 @@ bool PhysicalKnnScan::Execute(QueryContext *query_context, OperatorState *operat
             switch (dist_type) {
                 case KnnDistanceType::kL2:
                 case KnnDistanceType::kHamming: {
-                    ExecuteInternal<f32, CompareMax>(query_context, knn_scan_operator_state);
+                    ExecuteInternal<f32, CompareMax, f32>(query_context, knn_scan_operator_state);
                     break;
                 }
                 case KnnDistanceType::kCosine:
                 case KnnDistanceType::kInnerProduct: {
-                    ExecuteInternal<f32, CompareMin>(query_context, knn_scan_operator_state);
+                    ExecuteInternal<f32, CompareMin, f32>(query_context, knn_scan_operator_state);
+                    break;
+                }
+                default: {
+                    Status status = Status::NotSupport("Not implemented KNN distance");
+                    RecoverableError(status);
+                }
+            }
+            break;
+        }
+        case kElemUInt8: {
+            switch (dist_type) {
+                case KnnDistanceType::kL2:
+                case KnnDistanceType::kHamming: {
+                    ExecuteInternal<u8, CompareMax, f32>(query_context, knn_scan_operator_state);
+                    break;
+                }
+                case KnnDistanceType::kCosine:
+                case KnnDistanceType::kInnerProduct: {
+                    ExecuteInternal<u8, CompareMin, f32>(query_context, knn_scan_operator_state);
+                    break;
+                }
+                default: {
+                    Status status = Status::NotSupport("Not implemented KNN distance");
+                    RecoverableError(status);
+                }
+            }
+            break;
+        }
+        case kElemInt8: {
+            switch (dist_type) {
+                case KnnDistanceType::kL2:
+                case KnnDistanceType::kHamming: {
+                    ExecuteInternal<i8, CompareMax, f32>(query_context, knn_scan_operator_state);
+                    break;
+                }
+                case KnnDistanceType::kCosine:
+                case KnnDistanceType::kInnerProduct: {
+                    ExecuteInternal<i8, CompareMin, f32>(query_context, knn_scan_operator_state);
                     break;
                 }
                 default: {
@@ -264,7 +302,7 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
 
 SizeT PhysicalKnnScan::BlockEntryCount() const { return base_table_ref_->block_index_->BlockCount(); }
 
-template <typename DataType, template <typename, typename> typename C>
+template <typename DataType, template <typename, typename> typename C, typename DistanceType>
 void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state) {
     Txn *txn = query_context->GetTxn();
     TxnTimeStamp begin_ts = txn->BeginTS();
@@ -277,9 +315,14 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
     auto knn_scan_function_data = operator_state->knn_scan_function_data_.get();
     auto knn_scan_shared_data = knn_scan_function_data->knn_scan_shared_data_;
 
-    auto dist_func = static_cast<KnnDistance1<DataType> *>(knn_scan_function_data->knn_distance_.get());
-    auto merge_heap = static_cast<MergeKnn<DataType, C> *>(knn_scan_function_data->merge_knn_base_.get());
+    auto dist_func = dynamic_cast<KnnDistance1<DataType, DistanceType> *>(knn_scan_function_data->knn_distance_.get());
+    auto merge_heap = dynamic_cast<MergeKnn<DataType, C, DistanceType> *>(knn_scan_function_data->merge_knn_base_.get());
     auto query = static_cast<const DataType *>(knn_scan_shared_data->query_embedding_);
+    if (!dist_func || !merge_heap) {
+        const auto err = "Invalid dynamic cast";
+        LOG_ERROR(err);
+        UnrecoverableError(err);
+    }
 
     const SizeT index_task_n = knn_scan_shared_data->index_entries_->size();
     const SizeT brute_task_n = knn_scan_shared_data->block_column_entries_->size();
@@ -348,6 +391,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
 
             switch (segment_index_entry->table_index_entry()->index_base()->index_type_) {
                 case IndexType::kIVFFlat: {
+                if constexpr (std::is_same_v<DataType, f32>) {
                     BufferHandle index_handle = segment_index_entry->GetIndex();
                     auto index = static_cast<const AnnIVFFlatIndexData<DataType> *>(index_handle.GetData());
                     i32 n_probes = 1;
@@ -409,6 +453,10 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                         }
                     }
                     break;
+                } else {
+                    String error_message = "Invalid data type";
+                    UnrecoverableError(error_message);
+                }
                 }
                 case IndexType::kHnsw: {
                     auto hnsw_search = [&](auto *hnsw_index, bool with_lock) {
@@ -428,7 +476,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 static_cast<const DataType *>(knn_scan_shared_data->query_embedding_) + query_idx * knn_scan_shared_data->dimension_;
 
                             SizeT result_n1 = 0;
-                            UniquePtr<DataType[]> d_ptr = nullptr;
+                            UniquePtr<DistanceType[]> d_ptr = nullptr;
                             UniquePtr<SegmentOffset[]> l_ptr = nullptr;
                             if (use_bitmask) {
                                 if (segment_entry->CheckAnyDelete(begin_ts)) {
@@ -544,7 +592,12 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
                                 if constexpr (std::is_same_v<T, nullptr_t>) {
                                     UnrecoverableError("Invalid index type");
                                 } else {
-                                    hnsw_search(arg, with_lock);
+                                    using HnswIndexDataType = typename std::remove_pointer_t<T>::DataType;
+                                    if constexpr (!std::is_same_v<DataType, HnswIndexDataType>) {
+                                        UnrecoverableError("Invalid data type");
+                                    } else {
+                                        hnsw_search(arg, with_lock);
+                                    }
                                 }
                             },
                             abstract_hnsw);
@@ -587,7 +640,7 @@ void PhysicalKnnScan::ExecuteInternal(QueryContext *query_context, KnnScanOperat
             row_ids_list.emplace_back(merge_heap->GetIDsByIdx(query_id));
         }
 
-        this->SetOutput(result_dists_list, row_ids_list, sizeof(DataType), result_n, query_context, operator_state);
+        this->SetOutput(result_dists_list, row_ids_list, sizeof(DistanceType), result_n, query_context, operator_state);
         operator_state->SetComplete();
     }
 }

@@ -34,9 +34,10 @@ class PlainIPDist {
 public:
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
+    using DistanceType = typename VecStoreMeta::DistanceType;
 
 private:
-    using SIMDFuncType = DataType (*)(const DataType *, const DataType *, SizeT);
+    using SIMDFuncType = std::conditional_t<std::is_same_v<DataType, float>, f32, i32> (*)(const DataType *, const DataType *, SizeT);
 
     SIMDFuncType SIMDFunc = nullptr;
 
@@ -80,7 +81,7 @@ public:
         }
     }
 
-    DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
+    DistanceType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
         return -SIMDFunc(v1, v2, vec_store_meta.dim());
     }
 
@@ -130,6 +131,7 @@ public:
     using This = LVQIPDist<DataType, CompressType>;
     using VecStoreMeta = LVQVecStoreMeta<DataType, CompressType, LVQIPCache<DataType, CompressType>>;
     using StoreType = typename VecStoreMeta::StoreType;
+    using DistanceType = typename VecStoreMeta::DistanceType;
 
 private:
     using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, SizeT);

@@ -73,7 +73,10 @@ public:
 
 //-------------------------------------------------------------------
 
-export class KnnDistanceBase1 {};
+export class KnnDistanceBase1 {
+public:
+    virtual ~KnnDistanceBase1() = default;
+};
 
 export template <typename DataType, typename DistType>
 class KnnDistance1 : public KnnDistanceBase1 {

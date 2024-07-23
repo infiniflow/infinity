@@ -64,6 +64,7 @@ public:
         ~LVQQuery() { delete[] reinterpret_cast<char *>(inner_.release()); }
     };
     using QueryType = LVQQuery;
+    using DistanceType = f32;
 
 private:
     LVQVecStoreMeta(SizeT dim) : dim_(dim), compress_data_size_(sizeof(LVQData) + sizeof(CompressType) * dim) {
