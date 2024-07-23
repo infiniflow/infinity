@@ -602,14 +602,19 @@ Absolute path to the file for export. Supported file type include:
   Whether to display table header or not:
   - `True`: Display table header. 
   - `False`: (Default) Do not display table header. 
-  
-  > This setting overrides the `file_path` setting. If you specify `csv` as the file name suffix in `file_path` while setting `file_type` to `jsonl`, the exported file will be in `jsonl` format. 
 
 
 - **delimiter**: `str` *Optional*
   Delimiter to separate columns. Supported delimiters include: 
   - ",": (Default) Comma. 
   - "\t": Tab. 
+
+- **file_type**: `str` *Required*
+  The type of the exported file. Supported file type include:
+  - `csv`
+  - `jsonl`
+
+  > This setting overrides the `file_path` setting. If you specify `csv` as the file name suffix in `file_path` while setting `file_type` to `jsonl`, the exported file will be in `jsonl` format. 
   
 - **offset**: `int` *Optional*
   Index specifying the starting row for export. Usually used in conjunction with `limit`. If not specified, the file export starts from row 1. 
