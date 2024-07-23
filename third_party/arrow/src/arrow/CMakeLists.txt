@@ -572,6 +572,8 @@ endif()
 
 arrow_add_object_library(ARROW_UTIL ${ARROW_UTIL_SRCS})
 
+target_include_directories(arrow_util PRIVATE "${CMAKE_SOURCE_DIR}/third_party/snappy/")
+
 # Disable DLL exports in vendored uriparser library
 #foreach(ARROW_UTIL_TARGET ${ARROW_UTIL_TARGETS})
 #  target_compile_definitions(${ARROW_UTIL_TARGET} PRIVATE URI_STATIC_BUILD)
@@ -886,11 +888,9 @@ if(ARROW_IPC)
   endif()
   arrow_add_object_library(ARROW_IPC ${ARROW_IPC_SRCS})
   foreach(ARROW_IPC_TARGET ${ARROW_IPC_TARGETS})
-    message(STATUS "bbbbb flatbuffers")
     target_link_libraries(${ARROW_IPC_TARGET} PRIVATE flatbuffers.a)
   endforeach()
   if(ARROW_JSON)
-    message(STATUS "bbbbb rapidjson")
     foreach(ARROW_IPC_TARGET ${ARROW_IPC_TARGETS})
       target_link_libraries(${ARROW_IPC_TARGET} PRIVATE RapidJSON)
     endforeach()
