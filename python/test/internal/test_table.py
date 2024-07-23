@@ -848,3 +848,89 @@ class TestTable(TestSdk):
 
         res = db_obj.drop_table("test_create_duplicated_table_with_replace_option", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    def _test_create_upper_table_name(self):
+        db_obj = self.infinity_obj.get_database("default_db")
+        table_lower_name = "test_table_my_table"
+        db_obj.drop_table(table_lower_name, ConflictType.Ignore)
+
+        table_upper_name = "TEST_TABLE_MY_TABLE"
+        # create table
+        tb = db_obj.create_table(
+            table_upper_name, {"c1": {"type": "int", "constraints": ["primary key"]}, "c2": {"type": "float"}},
+            ConflictType.Error)
+        assert tb
+
+        # get table
+        res = db_obj.get_table(table_lower_name)
+        res = db_obj.get_table(table_upper_name)
+
+    def _test_create_table_with_upper_column_name(self):
+        db_obj = self.infinity_obj.get_database("default_db")
+        table_name = "test_table_my_table"
+        db_obj.drop_table(table_name, ConflictType.Ignore)
+        # create table
+        tb = db_obj.create_table(
+            table_name, {"C1": {"type": "int", "constraints": ["primary key"]}, "C2": {"type": "float"}},
+            ConflictType.Error)
+        assert tb
+
+        # get table
+        res = db_obj.get_table(table_name)
+
+        res = db_obj.show_columns(table_name)
+        print("\n")
+        print(res)
+        assert res["column_name"][0] == "c1"
+        assert res["column_name"][1] == "c2"
+
+    def _test_create_table_with_upper_param_name(self):
+        db_obj = self.infinity_obj.get_database("default_db")
+        table_name = "test_table_my_table"
+        db_obj.drop_table(table_name, ConflictType.Ignore)
+        # create table
+        tb = db_obj.create_table(
+            table_name, {"c1": {"TYPE": "int", "CONSTRAINTS": ["primary key"]}, "C2": {"TYPE": "float"}},
+            ConflictType.Error)
+        assert tb
+
+        # get table
+        res = db_obj.get_table(table_name)
+
+        res = db_obj.show_columns(table_name)
+        print("\n")
+        print(res)
+
+    def _test_create_table_with_upper_data_type_name(self):
+        db_obj = self.infinity_obj.get_database("default_db")
+        table_name = "test_table_my_table"
+        db_obj.drop_table(table_name, ConflictType.Ignore)
+        # create table
+        tb = db_obj.create_table(
+            table_name, {"c1": {"type": "INT", "constraints": ["primary key"]}, "c2": {"type": "FLOAT"}},
+            ConflictType.Error)
+        assert tb
+
+        # get table
+        res = db_obj.get_table(table_name)
+
+        res = db_obj.show_columns(table_name)
+        print("\n")
+        print(res)
+
+    def _test_create_table_with_upper_constraint_name(self):
+        db_obj = self.infinity_obj.get_database("default_db")
+        table_name = "test_table_my_table"
+        db_obj.drop_table(table_name, ConflictType.Ignore)
+        # create table
+        tb = db_obj.create_table(
+            table_name, {"c1": {"type": "int", "constraints": ["PRIMARY KEY"]}, "c2": {"type": "float"}},
+            ConflictType.Error)
+        assert tb
+
+        # get table
+        res = db_obj.get_table(table_name)
+
+        res = db_obj.show_columns(table_name)
+        print("\n")
+        print(res)

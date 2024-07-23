@@ -555,3 +555,13 @@ class TestDatabase(TestSdk):
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST or e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
 
         db_obj.drop_table("test_show_table_columns", ConflictType.Error)
+
+    def _test_create_upper_database_name(self):
+        db_upper_name = "MY_DATABASE"
+        db_lower_name = "my_database"
+        self.infinity_obj.drop_database(db_lower_name, ConflictType.Ignore)
+
+        db = self.infinity_obj.create_database(db_upper_name, ConflictType.Error)
+
+        db = self.infinity_obj.get_database(db_lower_name)
+        db = self.infinity_obj.get_database(db_upper_name)

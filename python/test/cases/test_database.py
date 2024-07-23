@@ -113,3 +113,6 @@ class TestInfinity:
     @pytest.mark.slow
     def test_create_drop_show_1M_databases(self):
         self.test_infinity_obj._test_create_drop_show_1M_databases()
+
+    def test_create_upper_database_name(self):
+        self.test_infinity_obj._test_create_upper_database_name()
