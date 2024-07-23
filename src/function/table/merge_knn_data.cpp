@@ -43,6 +43,14 @@ MergeKnnFunctionData::MergeKnnFunctionData(i64 query_count,
             MergeKnnFunctionData::InitMergeKnn<f32>(knn_distance_type);
             break;
         }
+        case kElemInt8: {
+            MergeKnnFunctionData::InitMergeKnn<i8>(knn_distance_type);
+            break;
+        }
+        case kElemUInt8: {
+            MergeKnnFunctionData::InitMergeKnn<u8>(knn_distance_type);
+            break;
+        }
         default: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
