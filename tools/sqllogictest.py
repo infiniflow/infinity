@@ -169,23 +169,11 @@ if __name__ == "__main__":
 
     print("Generate file finshed.")
 
-    if os.path.exists("/var/infinity/test_data/test_export_embedding.jsonl"):
-        os.remove("/var/infinity/test_data/test_export_embedding.jsonl")
+    # remove all file in tmp directory and create an empty tmp
+    if os.path.exists("/var/infinity/test_data/tmp"):
+        os.system("rm -rf /var/infinity/test_data/tmp")
+    os.makedirs("/var/infinity/test_data/tmp")
 
-    if os.path.exists("/var/infinity/test_data/test_export_embedding.csv"):
-        os.remove("/var/infinity/test_data/test_export_embedding.csv")
-
-    if os.path.exists("/var/infinity/test_data/test_export_default_full.jsonl"):
-        os.remove("/var/infinity/test_data/test_export_default_full.jsonl")
-
-    if os.path.exists("/var/infinity/test_data/test_export_default_full.csv"):
-        os.remove("/var/infinity/test_data/test_export_default_full.csv")
-
-    if os.path.exists("/var/infinity/test_data/test_export_default_part.jsonl"):
-        os.remove("/var/infinity/test_data/test_export_default_part.jsonl")
-
-    if os.path.exists("/var/infinity/test_data/test_export_default_part.csv"):
-        os.remove("/var/infinity/test_data/test_export_default_part.csv")
 
     print("Start copying data...")
     if args.just_copy_all_data is True:
