@@ -16,7 +16,7 @@ def generate(generate_if_exist: bool, copy_dir: str):
     parquet_path = parquet_dir + "/" + parquet_filename
     import_slt_path = import_slt_dir + "/test_import_gen_parquet.slt"
     copy_path = copy_dir + "/" + parquet_filename
-    copy_path1 = copy_dir + "/" + parquet_filename1
+    copy_path1 = copy_dir + "/tmp/" + parquet_filename1
 
     os.makedirs(parquet_dir, exist_ok=True)
     os.makedirs(import_slt_dir, exist_ok=True)

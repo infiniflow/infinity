@@ -23,16 +23,16 @@ SELECT * FROM sqllogic_test_export_jsonl;
 4 4433253 [1.9,2,3.045,4.5]
 
 query I
-COPY sqllogic_test_export_jsonl TO '/var/infinity/test_data/test_export_embedding.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+COPY sqllogic_test_export_jsonl TO '/var/infinity/test_data/tmp/test_export_embedding.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
 
 query I
-COPY sqllogic_test_export_jsonl TO '/var/infinity/test_data/test_export_embedding.csv' WITH (FORMAT CSV, DELIMITER ',');
+COPY sqllogic_test_export_jsonl TO '/var/infinity/test_data/tmp/test_export_embedding.csv' WITH (FORMAT CSV, DELIMITER ',');
 
 query I
-COPY sqllogic_test_export_jsonl FROM '/var/infinity/test_data/test_export_embedding.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+COPY sqllogic_test_export_jsonl FROM '/var/infinity/test_data/tmp/test_export_embedding.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
 
 query I
-COPY sqllogic_test_export_csv FROM '/var/infinity/test_data/test_export_embedding.csv' WITH (FORMAT CSV, DELIMITER ',');
+COPY sqllogic_test_export_csv FROM '/var/infinity/test_data/tmp/test_export_embedding.csv' WITH (FORMAT CSV, DELIMITER ',');
 
 query III
 SELECT * FROM sqllogic_test_export_jsonl;
