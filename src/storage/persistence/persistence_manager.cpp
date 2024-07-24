@@ -123,7 +123,7 @@ String PersistenceManager::GetObjCache(const ObjAddr &object_addr) {
         UnrecoverableError(error_message);
     }
     it->second.ref_count_++;
-    return workspace_.append(object_addr.obj_key_);
+    return fs::path(workspace_).append(object_addr.obj_key_).string();
 }
 
 void PersistenceManager::PutObjCache(const ObjAddr &object_addr) {
