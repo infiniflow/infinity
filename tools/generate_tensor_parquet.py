@@ -56,6 +56,21 @@ def generate(generate_if_exists: bool, copy_dir: str):
     # t = pq.read_table(parquet_path)
     # print(t)
     with open(import_slt_path, "w") as slt_file:
+        def write_query():
+            for row_id in range(row_n):
+                slt_file.write("{} ".format(row_id))
+                for i in range(len(data[row_id])):
+                    slt_file.write("[")
+                    for j in range(dim):
+                        slt_file.write("{}".format(data[row_id][i][j]))
+                        if j != dim - 1:
+                            slt_file.write(",")
+                    slt_file.write("]")
+                    if i != len(data[row_id]) - 1:
+                        slt_file.write(",")
+                slt_file.write("\n")
+            slt_file.write("\n")
+
         slt_file.write("statement ok\n")
         slt_file.write("DROP TABLE IF EXISTS {};\n".format(table_name))
         slt_file.write("\n")
@@ -75,19 +90,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("query I\n")
         slt_file.write("SELECT * FROM {};\n".format(table_name))
         slt_file.write("----\n")
-        for row_id in range(row_n):
-            slt_file.write("{} ".format(row_id))
-            for i in range(len(data[row_id])):
-                slt_file.write("[")
-                for j in range(dim):
-                    slt_file.write("{}".format(data[row_id][i][j]))
-                    if j != dim - 1:
-                        slt_file.write(",")
-                slt_file.write("]")
-                if i != len(data[row_id]) - 1:
-                    slt_file.write(",")
-            slt_file.write("\n")
-        slt_file.write("\n")
+        write_query()
 
         slt_file.write("statement ok\n")
         slt_file.write(
@@ -114,19 +117,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("query II\n")
         slt_file.write("SELECT * FROM {};\n".format(table_name1))
         slt_file.write("----\n")
-        for row_id in range(row_n):
-            slt_file.write("{} ".format(row_id))
-            for i in range(len(data[row_id])):
-                slt_file.write("[")
-                for j in range(dim):
-                    slt_file.write("{}".format(data[row_id][i][j]))
-                    if j != dim - 1:
-                        slt_file.write(",")
-                slt_file.write("]")
-                if i != len(data[row_id]) - 1:
-                    slt_file.write(",")
-            slt_file.write("\n")
-        slt_file.write("\n")
+        write_query()
 
         slt_file.write("statement ok\n")
         slt_file.write("DROP TABLE {};\n".format(table_name1))

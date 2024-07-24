@@ -168,11 +168,27 @@ void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, siz
     }
 }
 
-void Tensor2Arrow(const Vector<EmbeddingType> &embeddings, EmbeddingDataType type, size_t dimension, arrow::ArrayBuilder *value_builder) {
-    auto *tensor_ele_builder = dynamic_cast<arrow::FixedSizeListBuilder *>(value_builder);
+void Tensor2Arrow(Span<char> tensor, const EmbeddingInfo *embedding_info, arrow::ArrayBuilder *value_builder) {
+    auto type = embedding_info->Type();
+    auto dimension = embedding_info->Dimension();
+    auto embedding_size = embedding_info->Size();
+    Vector<EmbeddingT> embeddings;
+    auto embedding_num = tensor.size() / embedding_size;
+    for (SizeT i = 0; i < embedding_num; i++) {
+        embeddings.emplace_back(const_cast<char *>(tensor.data() + i * embedding_size), false);
+    }
+    auto *tensor_builder = dynamic_cast<arrow::FixedSizeListBuilder *>(value_builder);
     for (const auto &embedding : embeddings) {
-        auto status = tensor_ele_builder->Append();
-        Embedding2Arrow(embedding, type, dimension, tensor_ele_builder->value_builder());
+        auto status = tensor_builder->Append();
+        Embedding2Arrow(embedding, type, dimension, tensor_builder->value_builder());
+    }
+}
+
+void TensorArray2Arrow(Vector<Span<char>> tensor_array, const EmbeddingInfo *embedding_info, arrow::ArrayBuilder *value_builder) {
+    auto *tensor_array_builder = dynamic_cast<arrow::ListBuilder *>(value_builder);
+    for (auto tensor : tensor_array) {
+        auto status = tensor_array_builder->Append();
+        Tensor2Arrow(tensor, embedding_info, tensor_array_builder->value_builder());
     }
 }
 
@@ -476,6 +492,15 @@ void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
     }
     auto &tensor_array_info = value_info_->Get<TensorArrayValueInfo>();
     tensor_array_info.AppendTensor(ptr, bytes);
+}
+
+void Value::AppendToTensorArray(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
+    if (type_.type() != LogicalType::kTensorArray) {
+        String error_message = fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString());
+        UnrecoverableError(error_message);
+    }
+    auto &tensor_array_info = value_info_->Get<TensorArrayValueInfo>();
+    tensor_array_info.AppendTensor(ptr_bytes);
 }
 
 // Value getter
@@ -1412,19 +1437,26 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
         }
         case LogicalType::kTensor: {
             const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type->type_info().get());
-            SizeT dim = embedding_info->Dimension();
-            auto type = embedding_info->Type();
 
             Span<char> tensor = this->GetEmbedding();
-            Vector<EmbeddingT> embeddings;
-            auto embedding_num = tensor.size() / embedding_info->Size();
-            for (SizeT i = 0; i < embedding_num; i++) {
-                embeddings.emplace_back(const_cast<char *>(tensor.data() + i * embedding_info->Size()), false);
+
+            auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder.get());
+            auto status = list_builder->Append();
+            Tensor2Arrow(tensor, embedding_info, list_builder->value_builder());
+            break;
+        }
+        case LogicalType::kTensorArray: {
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type->type_info().get());
+
+            const Vector<SharedPtr<EmbeddingValueInfo>> &embedding_value_infos = this->GetTensorArray();
+            Vector<Span<char>> tensor_array;
+            for (const auto &embedding_value_info : embedding_value_infos) {
+                tensor_array.push_back(embedding_value_info->GetData());
             }
 
             auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder.get());
             auto status = list_builder->Append();
-            Tensor2Arrow(embeddings, type, dim, list_builder->value_builder());
+            TensorArray2Arrow(tensor_array, embedding_info, list_builder->value_builder());
             break;
         }
         default: {

@@ -1431,6 +1431,31 @@ Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_
     }
 }
 
+Vector<Pair<UniquePtr<char[]>, SizeT>>
+ParquetTensorHandler(SharedPtr<arrow::ListArray> list_array, const EmbeddingInfo *embedding_info, u64 value_idx) {
+    i64 start_offset = list_array->value_offset(value_idx);
+    i64 end_offset = list_array->value_offset(value_idx + 1);
+
+    Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec;
+    if (auto fixed_tensor_ele_array = std::dynamic_pointer_cast<arrow::FixedSizeListArray>(list_array->values());
+        fixed_tensor_ele_array.get() != nullptr) {
+        for (i64 j = start_offset; j < end_offset; ++j) {
+            auto data = ParquetEmbeddingHandler(fixed_tensor_ele_array, embedding_info, j);
+            embedding_vec.push_back(std::move(data));
+        }
+    } else {
+        auto tensor_ele_array = std::dynamic_pointer_cast<arrow::ListArray>(list_array->values());
+        if (tensor_ele_array.get() == nullptr) {
+            RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+        }
+        for (i64 j = start_offset; j < end_offset; ++j) {
+            auto data = ParquetEmbeddingHandler(tensor_ele_array, embedding_info, j);
+            embedding_vec.push_back(std::move(data));
+        }
+    }
+    return embedding_vec;
+}
+
 } // namespace
 
 void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx) {
@@ -1587,33 +1612,36 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             if (list_array.get() == nullptr) {
                 RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
             }
+            Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(list_array, embedding_info.get(), value_idx);
+            Vector<Pair<ptr_t, SizeT>> embedding_data;
+            for (auto &data : embedding_vec) {
+                embedding_data.push_back({data.first.get(), data.second});
+            }
+            column_vector.AppendValue(Value::MakeTensor(embedding_data, embedding_info));
+            break;
+        }
+        case kTensorArray: {
+            const auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(column_vector.data_type()->type_info());
+            auto value = Value::MakeTensorArray(embedding_info);
+            auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
+            if (list_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
             i64 start_offset = list_array->value_offset(value_idx);
             i64 end_offset = list_array->value_offset(value_idx + 1);
-
-            Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec;
-            if (auto fixed_tensor_ele_array = std::dynamic_pointer_cast<arrow::FixedSizeListArray>(list_array->values());
-                fixed_tensor_ele_array.get() != nullptr) {
-                for (i64 j = start_offset; j < end_offset; ++j) {
-                    auto data = ParquetEmbeddingHandler(fixed_tensor_ele_array, embedding_info.get(), j);
-                    embedding_vec.push_back(std::move(data));
-                }
-            } else {
-                auto tensor_ele_array = std::dynamic_pointer_cast<arrow::ListArray>(list_array->values());
-                if (tensor_ele_array.get() == nullptr) {
-                    RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
-                }
-                for (i64 j = start_offset; j < end_offset; ++j) {
-                    auto data = ParquetEmbeddingHandler(tensor_ele_array, embedding_info.get(), j);
-                    embedding_vec.push_back(std::move(data));
-                }
+            auto tensor_array = std::dynamic_pointer_cast<arrow::ListArray>(list_array->values());
+            if (tensor_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
             }
-            {
+            for (i64 j = start_offset; j < end_offset; ++j) {
+                Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec = ParquetTensorHandler(tensor_array, embedding_info.get(), j);
                 Vector<Pair<ptr_t, SizeT>> embedding_data;
                 for (auto &data : embedding_vec) {
                     embedding_data.push_back({data.first.get(), data.second});
                 }
-                column_vector.AppendValue(Value::MakeTensor(embedding_data, embedding_info));
+                value.AppendToTensorArray(embedding_data);
             }
+            column_vector.AppendValue(std::move(value));
             break;
         }
         default: {

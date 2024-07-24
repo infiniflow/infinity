@@ -2,21 +2,19 @@ import argparse
 import os
 import pyarrow as pa
 import pyarrow.parquet as pq
-
-from generate_util.generate_sparse_data import generate_sparse_data
-from generate_util.format_data import sparse_format_float
+import numpy as np
 
 
 def generate(generate_if_exists: bool, copy_dir: str):
     parquet_dir = "./test/data/parquet"
     import_slt_dir = "./test/sql/dml/import"
 
-    table_name = "parquet_sparse_table"
-    table_name1 = "parquet_sparse_table1"
-    parquet_filename = "gen_sparse.parquet"
-    parquet_filename1 = "gen_sparse1.parquet"
+    table_name = "parquet_tensor_array_table"
+    table_name1 = "parquet_tensor_array_table1"
+    parquet_filename = "gen_tensor_array.parquet"
+    parquet_filename1 = "gen_tensor_array1.parquet"
     parquet_path = parquet_dir + "/" + parquet_filename
-    import_slt_path = import_slt_dir + "/test_import_gen_parquet_sparse.slt"
+    import_slt_path = import_slt_dir + "/test_import_gen_parquet_tensor_array.slt"
     copy_path = copy_dir + "/" + parquet_filename
     copy_path1 = copy_dir + "/tmp/" + parquet_filename1
 
@@ -35,24 +33,55 @@ def generate(generate_if_exists: bool, copy_dir: str):
         return
 
     row_n = 10
-    max_dim = 30000
-    sparsity = 0.01
-    indptr, indices, data = generate_sparse_data(row_n, max_dim, sparsity)
-    col1 = pa.array(range(row_n), type=pa.int32())
-    col2_vec = []
+    dim = 5
+    tensor_num_min = 1
+    tensor_num_max = 5
+    embedding_num_min = 1
+    embedding_num_max = 5
+    min_x = 0
+    max_x = 100
+    data = []
+    for _ in range(row_n):
+        tensor_num = np.random.randint(tensor_num_min, tensor_num_max)
+        tensor_array = []
+        for _ in range(tensor_num):
+            embedding_num = np.random.randint(embedding_num_min, embedding_num_max)
+            tensor = []
+            for _ in range(embedding_num):
+                tensor.append(
+                    [int(np.random.uniform(min_x, max_x)) for _ in range(dim)]
+                )
+            tensor_array.append(tensor)
+        data.append(tensor_array)
 
+    col1 = pa.array(range(row_n), type=pa.int32())
+    col2 = pa.array(data, type=pa.list_(pa.list_(pa.list_(pa.int32(), dim))))
+    table = pa.table({"c1": col1, "c2": col2})
+
+    with pq.ParquetWriter(parquet_path, table.schema) as writer:
+        writer.write_table(table)
+
+    # t = pq.read_table(parquet_path)
+    # print(t)
     with open(import_slt_path, "w") as slt_file:
 
         def write_query():
             for row_id in range(row_n):
-                start, end = indptr[row_id], indptr[row_id + 1]
                 slt_file.write("{} ".format(row_id))
-                for j in range(start, end):
-                    slt_file.write(
-                        "{}: {}".format(indices[j], sparse_format_float(data[j]))
-                    )
-                    if j != end - 1:
-                        slt_file.write(", ")
+                for i in range(len(data[row_id])):
+                    slt_file.write("[")
+                    for j in range(len(data[row_id][i])):
+                        slt_file.write("[")
+                        for k in range(dim):
+                            slt_file.write("{}".format(data[row_id][i][j][k]))
+                            if k != dim - 1:
+                                slt_file.write(",")
+                        slt_file.write("]")
+                        if j != len(data[row_id][i]) - 1:
+                            slt_file.write(",")
+                    slt_file.write("]")
+                    if i != len(data[row_id]) - 1:
+                        slt_file.write(",")
                 slt_file.write("\n")
             slt_file.write("\n")
 
@@ -62,8 +91,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE TABLE {} (c1 INT, c2 SPARSE(FLOAT, {}) WITH (SORTED));\n".format(
-                table_name, max_dim
+            "CREATE TABLE {} (c1 INT, c2 TENSORARRAY(INT, {}));\n".format(
+                table_name, dim
             )
         )
         slt_file.write("\n")
@@ -91,8 +120,8 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE TABLE {} (c1 INT, c2 SPARSE(FLOAT, {}) WITH (SORTED));\n".format(
-                table_name1, max_dim
+            "CREATE TABLE {} (c1 INT, c2 TENSORARRAY(INT, {}));\n".format(
+                table_name1, dim
             )
         )
         slt_file.write("\n")
@@ -115,36 +144,6 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("statement ok\n")
         slt_file.write("DROP TABLE {};\n".format(table_name))
         slt_file.write("\n")
-
-    for row_id in range(row_n):
-        start, end = indptr[row_id], indptr[row_id + 1]
-        col2_vec.append(
-            {
-                "index": indices[start:end],
-                "value": data[start:end],
-            }
-        )
-    col2 = pa.array(
-        col2_vec,
-        type=pa.struct(
-            [
-                pa.field("index", pa.list_(pa.int16())),
-                pa.field("value", pa.list_(pa.float32())),
-            ]
-        ),
-    )
-    table = pa.table(
-        {
-            "col1": col1,
-            "col2": col2,
-        }
-    )
-
-    with pq.ParquetWriter(
-        parquet_path,
-        table.schema,
-    ) as writer:
-        writer.write_table(table)
 
 
 if __name__ == "__main__":
