@@ -299,3 +299,43 @@ class TestInfinity:
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_various_fulltext_match(self, check_data, fields_and_matching_text):
         self.test_infinity_obj._test_with_various_fulltext_match(check_data, fields_and_matching_text)
+
+    @pytest.mark.parametrize("data_type", ['varchar',
+                                           pytest.param(1),
+                                           pytest.param(1.1),
+                                           pytest.param([]),
+                                           pytest.param({}),
+                                           pytest.param(()),
+                                           pytest.param("@#$!#@$SDasdf3!@#$")
+                                           ])
+    @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
+                                                "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_tensor_scan_with_invalid_data_type(self, check_data, data_type):
+        self.test_infinity_obj._test_tensor_scan_with_invalid_data_type(check_data, data_type)
+
+    @pytest.mark.parametrize("method_type", ['invalid method type',
+                                            pytest.param(1),
+                                            pytest.param(1.1),
+                                            pytest.param([]),
+                                            pytest.param({}),
+                                            pytest.param(()),
+                                            pytest.param("@#$!#@$SDasdf3!@#$")
+                                            ])
+    @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
+                                                "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_tensor_scan_with_invalid_method_type(self, check_data, method_type):
+        self.test_infinity_obj._test_tensor_scan_with_invalid_method_type(check_data, method_type)
+
+    @pytest.mark.parametrize("extra_option", ['topn=-1',
+                                              'topn=0',
+                                              'topn=100000000',
+                                            pytest.param(1),
+                                            pytest.param(1.1),
+                                            pytest.param([]),
+                                            pytest.param({}),
+                                            pytest.param(()),
+                                            ])
+    @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
+                                                "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_tensor_scan_with_invalid_extra_option(self, check_data, extra_option):
+        self.test_infinity_obj._test_tensor_scan_with_invalid_extra_option(check_data, extra_option)

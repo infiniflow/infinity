@@ -972,3 +972,66 @@ class TestKnn(TestSdk):
         res = db_obj.drop_table(
             "test_with_various_fulltext_match", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    def _test_tensor_scan_with_invalid_data_type(self, check_data, data_type):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_tensor_scan", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_tensor_scan",
+                                        {"title": {"type": "varchar"},
+                                            "num": {"type": "int"},
+                                            "t": {"type": "tensor, 4, float"},
+                                            "body": {"type": "varchar"}})
+        if not check_data:
+            copy_data("tensor_maxsim.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        with pytest.raises(Exception):
+            res = (table_obj
+                    .output(["*", "_row_id", "_score"])
+                    .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], data_type, 'maxsim', 'topn=2')
+                    .to_pl())
+
+        res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_tensor_scan_with_invalid_method_type(self, check_data, method_type):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_tensor_scan", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_tensor_scan",
+                                        {"title": {"type": "varchar"},
+                                            "num": {"type": "int"},
+                                            "t": {"type": "tensor, 4, float"},
+                                            "body": {"type": "varchar"}})
+        if not check_data:
+            copy_data("tensor_maxsim.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        with pytest.raises(Exception):
+            res = (table_obj
+                    .output(["*", "_row_id", "_score"])
+                    .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', method_type, 'topn=2')
+                    .to_pl())
+
+        res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_tensor_scan_with_invalid_extra_option(self, check_data, extra_option):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_tensor_scan", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_tensor_scan",
+                                        {"title": {"type": "varchar"},
+                                            "num": {"type": "int"},
+                                            "t": {"type": "tensor, 4, float"},
+                                            "body": {"type": "varchar"}})
+        if not check_data:
+            copy_data("tensor_maxsim.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        with pytest.raises(Exception):
+            res = (table_obj
+                    .output(["*", "_row_id", "_score"])
+                    .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', extra_option)
+                    .to_pl())
+
+        res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
