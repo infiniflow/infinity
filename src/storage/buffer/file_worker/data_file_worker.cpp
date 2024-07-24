@@ -96,7 +96,13 @@ void DataFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
 void DataFileWorker::ReadFromFileImpl() {
     LocalFileSystem fs;
 
-    SizeT file_size = fs.GetFileSize(*file_handler_);
+    SizeT file_size = 0;
+    auto file_name = file_handler_->path_.filename().string();
+    if (file_name == obj_addr_.obj_key_) {
+        file_size = obj_addr_.part_size_;
+    } else {
+        file_size = fs.GetFileSize(*file_handler_);
+    }
     if (file_size < sizeof(u64) * 3) {
         Status status = Status::DataIOError(fmt::format("Incorrect file length {}.", file_size));
         RecoverableError(status);
