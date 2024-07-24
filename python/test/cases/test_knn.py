@@ -252,3 +252,50 @@ class TestInfinity:
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_multiple_fusion(self, check_data):
         self.test_infinity_obj._test_with_multiple_fusion(check_data)
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("index_column_name", ["gender_vector"])
+    @pytest.mark.parametrize("knn_column_name", ["gender_vector"])
+    @pytest.mark.parametrize("index_distance_type", ["l2","ip", "cosine"])
+    @pytest.mark.parametrize("knn_distance_type", ["l2", "ip", "cosine"])
+    @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw, index.IndexType.IVFFlat])
+    def test_with_various_index_knn_distance_combination(self, check_data, index_column_name, knn_column_name,
+                               index_distance_type, knn_distance_type, index_type):
+        self.test_infinity_obj._test_with_various_index_knn_distance_combination(check_data, index_column_name, knn_column_name,
+                                                  index_distance_type, knn_distance_type, index_type)
+
+    def test_zero_dimension_vector(self):
+        self.test_infinity_obj._test_zero_dimension_vector()
+
+    @pytest.mark.parametrize("dim", [1000, 10000, 100000, 200000])
+    def test_big_dimension_vector(self, dim):
+        self.test_infinity_obj._test_big_dimension_vector(dim)
+
+    # "^5" indicates the point that column "body" get multipy by 5, default is multipy by 1
+    # refer to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
+    @pytest.mark.parametrize("fields_and_matching_text", [
+                                        ["body","black"],
+                                        ["doctitle,num,body", "black"],
+                                        ["doctitle,num,body^5", "black"],
+                                        ["", "body:black"],
+                                        ["", "body:black^5"],
+                                        ["", "'body':'(black)'"],
+                                        ["", "body:'(black)^5'"],
+                                        ["", "'body':'(black OR white)'"],
+                                        ["", "'body':'(black AND white)'"],
+                                        ["", "'body':'(black)^5 OR (white)'"],
+                                        ["", "'body':'(black)^5 AND (white)'"],
+                                        ["", "'body':'black - white'"],
+                                        ["", "body:black OR doctitle:black"],
+                                        ["", "body:black AND doctitle:black"],
+                                        ["", "(body:black OR doctitle:black) AND (body:white OR doctitle:white)"],
+                                        ["", "(body:black)^5 OR doctitle:black"],
+                                        ["", "(body:black)^5 AND doctitle:black"],
+                                        ["", "(body:black OR doctitle:black)^5 AND (body:white OR doctitle:white)"],
+                                        #["", "doc\*:back"] not support
+                                        ])
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_with_various_fulltext_match(self, check_data, fields_and_matching_text):
+        self.test_infinity_obj._test_with_various_fulltext_match(check_data, fields_and_matching_text)
