@@ -553,28 +553,28 @@ For information about setting default column values, see `create_table`.
 
 #### Insert primitives
 
-```python {12,14}
+```python
 # Create a table with four primitive columns:
 table_instance = db_instance.create_table("primitive_table", {
-    "c1": {"type": "int8"},
-    "c2": {"type": "int16"},
-    "c3": {"type": "int"},
-    "c4": {"type": "int32"},   # Same as int
-    "c5": {"type": "integer"}, # Same as int
-    "c6": {"type": "int64"},
+    "c1": {"type": "int8", "default": 0},
+    "c2": {"type": "int16", "default": 0},
+    "c3": {"type": "int", "default": 0},
+    "c4": {"type": "int32", "default": 0},   # Same as int
+    "c5": {"type": "integer", "default": 0}, # Same as int
+    "c6": {"type": "int64", "default": 0},
     "c7": {"type": "varchar"},
-    "c8": {"type": "float"},
-    "c8": {"type": "float32"}, # Same as float
-    "c8": {"type": "double"},
-    "c8": {"type": "float64"}, # Same as double
-    "c9": {"type": "bool", "default": False},
+    "c8": {"type": "float", "default": 1.0},
+    "c9": {"type": "float32", "default": 1.0}, # Same as float
+    "c10": {"type": "double", "default": 1.0},
+    "c11": {"type": "float64", "default": 1.0}, # Same as double
+    "c12": {"type": "bool", "default": False},
 })
 
-# Insert a complete row into the table:
-table_instance.insert("c1": 1, "c2": "Tom", "c3": 90.5, "c4": True)
+# Insert an incomplete row, with the rest columns defaulting to their defaults:
+table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
 
-# Insert an incomplete row, with the "c4" column defaulting to False:
-table_instance.insert("c1": 2, "c2": "Jeffery", "c3": 88.0)
+# Insert an incomplete row, with the rest columns defaulting to their defaults:
+table_instance.insert({"c1": 2, "c7": "Jeffery"})
 ```
 
 #### Insert vectors
