@@ -73,7 +73,7 @@ void VersionFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     }
 }
 
-void VersionFileWorker::ReadFromFileImpl() {
+void VersionFileWorker::ReadFromFileImpl(SizeT file_size) {
     if (data_ != nullptr) {
         String error_message = "Data is already allocated.";
         UnrecoverableError(error_message);
