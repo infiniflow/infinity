@@ -31,16 +31,16 @@ SELECT count(*) FROM products;
 3
 
 query I
-COPY products TO '/var/infinity/test_data/test_export_default_full.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+COPY products TO '/var/infinity/test_data/tmp/test_export_default_full.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
 
 query I
-COPY products TO '/var/infinity/test_data/test_export_default_full.csv' WITH (FORMAT CSV, DELIMITER ',');
+COPY products TO '/var/infinity/test_data/tmp/test_export_default_full.csv' WITH (FORMAT CSV, DELIMITER ',');
 
 query I
-COPY products TO '/var/infinity/test_data/test_export_default_part.jsonl' WITH (FORMAT JSONL, DELIMITER ',', OFFSET 1, LIMIT 1);
+COPY products TO '/var/infinity/test_data/tmp/test_export_default_part.jsonl' WITH (FORMAT JSONL, DELIMITER ',', OFFSET 1, LIMIT 1);
 
 query I
-COPY products TO '/var/infinity/test_data/test_export_default_part.csv' WITH (FORMAT CSV, DELIMITER ',', OFFSET 0, LIMIT 2);
+COPY products TO '/var/infinity/test_data/tmp/test_export_default_part.csv' WITH (FORMAT CSV, DELIMITER ',', OFFSET 0, LIMIT 2);
 
 statement ok
 DROP TABLE IF EXISTS products_jsonl;
@@ -49,7 +49,7 @@ statement ok
 CREATE TABLE products_jsonl (product_no integer, price integer, description varchar);
 
 query I
-COPY products_jsonl FROM '/var/infinity/test_data/test_export_default_part.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+COPY products_jsonl FROM '/var/infinity/test_data/tmp/test_export_default_part.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
 
 query II rowsort
 SELECT * FROM products_jsonl;
@@ -57,7 +57,7 @@ SELECT * FROM products_jsonl;
 3 4 abcdef
 
 query I
-COPY products_jsonl FROM '/var/infinity/test_data/test_export_default_full.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
+COPY products_jsonl FROM '/var/infinity/test_data/tmp/test_export_default_full.jsonl' WITH (FORMAT JSONL, DELIMITER ',');
 
 query III
 SELECT * FROM products_jsonl;
@@ -74,7 +74,7 @@ statement ok
 CREATE TABLE products_csv (product_no integer, price integer, description varchar);
 
 query I
-COPY products_csv FROM '/var/infinity/test_data/test_export_default_part.csv' WITH (FORMAT CSV, DELIMITER ',');
+COPY products_csv FROM '/var/infinity/test_data/tmp/test_export_default_part.csv' WITH (FORMAT CSV, DELIMITER ',');
 
 query III
 SELECT * FROM products_csv;
@@ -83,7 +83,7 @@ SELECT * FROM products_csv;
 3 4 abcdef
 
 query I
-COPY products_csv FROM '/var/infinity/test_data/test_export_default_full.csv' WITH (FORMAT CSV, DELIMITER ',');
+COPY products_csv FROM '/var/infinity/test_data/tmp/test_export_default_full.csv' WITH (FORMAT CSV, DELIMITER ',');
 
 query III
 SELECT * FROM products_csv;
