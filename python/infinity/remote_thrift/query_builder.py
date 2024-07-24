@@ -126,7 +126,7 @@ class InfinityThriftQueryBuilder(ABC):
             raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
         elif embedding_data_type == "uint8":
             elem_type = ElementType.ElementUInt8
-            data.i8_array_value = embedding_data
+            data.u8_array_value = embedding_data
         elif embedding_data_type == "int8":
             elem_type = ElementType.ElementInt8
             data.i8_array_value = embedding_data

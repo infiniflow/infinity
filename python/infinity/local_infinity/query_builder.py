@@ -109,6 +109,7 @@ class InfinityLocalQueryBuilder(ABC):
             raise Exception(f"Invalid embedding {embedding_data[0]} type")
         elif embedding_data_type in ["unsigned tinyint", "uint8"]:
             elem_type = EmbeddingDataType.kElemUInt8
+            data.u8_array_value = embedding_data
         elif embedding_data_type in ["tinyint", "int8"]:
             elem_type = EmbeddingDataType.kElemInt8
             data.i8_array_value = embedding_data

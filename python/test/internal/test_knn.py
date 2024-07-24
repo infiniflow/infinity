@@ -16,6 +16,7 @@ import os
 import pytest
 
 import pandas as pd
+from numpy import dtype
 from common import common_values
 import infinity
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
@@ -97,23 +98,27 @@ class TestKnn(TestSdk):
         table_obj.import_data(test_csv_dir, None)
         table_obj.insert([{"c1": 11, "c2": [127, 128, 255]}])
         res = table_obj.output(["*"]).to_df()
-        assert res.error_code == ErrorCode.OK
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
-            {'c1': (1, 5, 9, 11), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12], [127, 128, 255])}))
-        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "uint8", "l2", 10).to_pl()
-        assert res.error_code == ErrorCode.OK
+            {'c1': (1, 5, 9, 11), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12], [127, 128, 255])}).astype(
+            {'c1': dtype('int32')}))
+        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "uint8", "l2", 10).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
-            {'c1': (1, 5, 9, 11), 'DISTANCE()': (29.000000, 149.000000, 365.000000, 97538.000000)}))
-        res = table_obj.create_index("invalid_lvq", [index.IndexInfo("c2", index.IndexType.Hnsw, [
-            index.InitParameter("M", "16"),
-            index.InitParameter("ef_construction", "50"),
-            index.InitParameter("ef", "50"),
-            index.InitParameter("metric", "l2"),
-            index.InitParameter("encode", "lvq")
-        ])], ConflictType.Error)
-        assert res.error_code != ErrorCode.OK
+            {'c1': (1, 5, 9, 11), 'DISTANCE': (29.0, 149.0, 365.0, 97538.0)}).astype(
+            {'c1': dtype('int32'), 'DISTANCE': dtype('float32')}))
+        try:
+            res = table_obj.create_index("invalid_lvq", [index.IndexInfo("c2", index.IndexType.Hnsw, [
+                index.InitParameter("M", "16"),
+                index.InitParameter("ef_construction", "50"),
+                index.InitParameter("ef", "50"),
+                index.InitParameter("metric", "l2"),
+                index.InitParameter("encode", "lvq")
+            ])], ConflictType.Error)
+        except InfinityException as e:
+            pass
+        else:
+            assert False, "should raise exception"
         res = table_obj.create_index("valid_lvq", [index.IndexInfo("c2", index.IndexType.Hnsw, [
             index.InitParameter("M", "16"),
             index.InitParameter("ef_construction", "50"),
@@ -121,13 +126,17 @@ class TestKnn(TestSdk):
             index.InitParameter("metric", "l2")
         ])], ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "uint8", "l2", 10).to_pl()
-        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "uint8", "l2", 10).to_df()
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
-            {'c1': (1, 5, 9, 11), 'DISTANCE()': (29.000000, 149.000000, 365.000000, 97538.000000)}))
-        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "int8", "l2", 10).to_pl()
-        assert res.error_code != ErrorCode.OK
+            {'c1': (1, 5, 9, 11), 'DISTANCE': (29.0, 149.0, 365.0, 97538.0)}).astype(
+            {'c1': dtype('int32'), 'DISTANCE': dtype('float32')}))
+        try:
+            res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "int8", "l2", 10).to_result()
+        except InfinityException as e:
+            pass
+        else:
+            assert False, "should raise exception"
         res = db_obj.drop_table("test_knn_u8", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
