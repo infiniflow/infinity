@@ -110,10 +110,6 @@ void FileWorker::ReadFromFile(bool from_spill) {
 }
 
 void FileWorker::MoveFile() {
-    if (InfinityContext::instance().persistence_manager() != nullptr) {
-        LOG_DEBUG(fmt::format("Skipped MoveFile file since persistence manager is enabled: {}", *file_name_));
-        return;
-    }
     LocalFileSystem fs;
 
     String src_path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
@@ -130,6 +126,10 @@ void FileWorker::MoveFile() {
     //     UnrecoverableError(fmt::format("File {} was already been created before.", dest_path));
     // }
     fs.Rename(src_path, dest_path);
+    if (InfinityContext::instance().persistence_manager() != nullptr) {
+        obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(dest_path);
+        fs.DeleteFile(dest_path);
+    }
 }
 
 void FileWorker::CleanupFile() const {
