@@ -545,7 +545,7 @@ Bath row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once
 :::note
 When inserting incomplete records of data, ensure that all uninserted columns have default values. Otherwise, an error will occur. 
 
-```python
+```python {7,11}
 table_instance = db_instance.create_table(
     "my_table",
     {
