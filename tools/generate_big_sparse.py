@@ -77,14 +77,14 @@ def generate(generate_if_exists: bool, copy_dir: str):
                     csv_file.write(",")
             csv_file.write(']"\n')
 
-            import_slt_file.write("{} ".format(row_id))
+            import_slt_file.write("{} [".format(row_id))
             for j in range(start, end):
                 import_slt_file.write(
-                    "{}: {}".format(indices[j], sparse_format_float(data[j])),
+                    "{}:{}".format(indices[j], sparse_format_float(data[j])),
                 )
                 if j != end - 1:
-                    import_slt_file.write(", ")
-            import_slt_file.write("\n")
+                    import_slt_file.write(",")
+            import_slt_file.write("]\n")
 
         import_slt_file.write("\n")
         import_slt_file.write("statement ok\n")
@@ -129,14 +129,14 @@ def generate(generate_if_exists: bool, copy_dir: str):
         insert_slt_file.write("----\n")
         for i in range(0, row_n):
             start, end = indptr[i], indptr[i + 1]
-            insert_slt_file.write("{} ".format(i))
+            insert_slt_file.write("{} [".format(i))
             for j in range(start, end):
                 insert_slt_file.write(
-                    "{}: {}".format(indices[j], sparse_format_float(data[j])),
+                    "{}:{}".format(indices[j], sparse_format_float(data[j])),
                 )
                 if j != end - 1:
-                    insert_slt_file.write(", ")
-            insert_slt_file.write("\n")
+                    insert_slt_file.write(",")
+            insert_slt_file.write("]\n")
 
     index_name = "bmp_index"
     topk = 3

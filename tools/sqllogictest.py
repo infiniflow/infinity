@@ -30,6 +30,11 @@ from generate_emvb_test_data_2 import generate as generate19
 from generate_test_parquet import generate as generate20
 from generate_sparse_parquet import generate as generate21
 import generate_wiki_embedding
+from generate_embedding_parquet import generate as generate22
+from generate_varchar_parquet import generate as generate23
+from generate_test_parquet import generate as generate24
+from generate_tensor_parquet import generate as generate25
+from generate_tensor_array_parquet import generate as generate26
 
 class SpinnerThread(threading.Thread):
     def __init__(self):
@@ -166,10 +171,15 @@ if __name__ == "__main__":
     generate16(args.generate_if_exists, args.copy)
     generate17(args.generate_if_exists, args.copy)
     generate18(args.generate_if_exists, args.copy)
-    #generate19(args.generate_if_exists, args.copy)
+    # generate19(args.generate_if_exists, args.copy)
     # generate_wiki_embedding.generate()
     generate20(args.generate_if_exists, args.copy)
     generate21(args.generate_if_exists, args.copy)
+    generate22(args.generate_if_exists, args.copy)
+    generate23(args.generate_if_exists, args.copy)
+    generate24(args.generate_if_exists, args.copy)
+    generate25(args.generate_if_exists, args.copy)
+    generate26(args.generate_if_exists, args.copy)
 
     print("Generate file finshed.")
 
@@ -177,7 +187,6 @@ if __name__ == "__main__":
     if os.path.exists("/var/infinity/test_data/tmp"):
         os.system("rm -rf /var/infinity/test_data/tmp")
     os.makedirs("/var/infinity/test_data/tmp")
-
 
     print("Start copying data...")
     if args.just_copy_all_data is True:

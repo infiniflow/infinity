@@ -33,9 +33,9 @@ SELECT SIMILARITY() FROM test_knn_sparse_integer SEARCH MATCH SPARSE (c2, [], 'i
 query I
 SELECT c2 FROM test_knn_sparse_integer SEARCH MATCH SPARSE (c2, [0:1,20:2,80:3], 'ip', 3);
 ----
-0: 4, 40: 4, 80: 4
-0: 2, 20: 2, 40: 2, 60: 2, 80: 2
-0: 1, 10: 1, 20: 1, 30: 1, 40: 1, 50: 1, 60: 1, 70: 1, 80: 1, 90: 1
+[0:4,40:4,80:4]
+[0:2,20:2,40:2,60:2,80:2]
+[0:1,10:1,20:1,30:1,40:1,50:1,60:1,70:1,80:1,90:1]
 
 query II
 SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_sparse_integer SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 5);

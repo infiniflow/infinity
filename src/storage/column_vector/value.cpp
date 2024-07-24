@@ -94,6 +94,73 @@ void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size
     }
 }
 
+template <typename IndexT, typename DataType>
+void Sparse2JsonInternal1(const SparseValueInfo &sparse_value_info, nlohmann::json &sparse_json) {
+    auto [nnz, indice_span, data_span] = sparse_value_info.GetData();
+    for (SizeT i = 0; i < nnz; ++i) {
+        auto index = reinterpret_cast<IndexT *>(indice_span.data())[i];
+        auto data = reinterpret_cast<DataType *>(data_span.data())[i];
+        sparse_json[std::to_string(index)] = data;
+    }
+}
+
+template <typename IndexT>
+void Sparse2JsonInternal(const SparseValueInfo &sparse_value_info, const SparseInfo *sparse_info, nlohmann::json &sparse_json) {
+    switch (sparse_info->DataType()) {
+        case kElemInt8: {
+            Sparse2JsonInternal1<IndexT, i8>(sparse_value_info, sparse_json);
+            break;
+        }
+        case kElemInt16: {
+            Sparse2JsonInternal1<IndexT, i16>(sparse_value_info, sparse_json);
+            break;
+        }
+        case kElemInt32: {
+            Sparse2JsonInternal1<IndexT, i32>(sparse_value_info, sparse_json);
+            break;
+        }
+        case kElemInt64: {
+            Sparse2JsonInternal1<IndexT, i64>(sparse_value_info, sparse_json);
+            break;
+        }
+        case kElemFloat: {
+            Sparse2JsonInternal1<IndexT, f32>(sparse_value_info, sparse_json);
+            break;
+        }
+        case kElemDouble: {
+            Sparse2JsonInternal1<IndexT, f64>(sparse_value_info, sparse_json);
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented.");
+        }
+    }
+}
+
+void Sparse2Json(const SparseValueInfo &sparse_value_info, const SparseInfo *sparse_info, nlohmann::json &sparse_json) {
+    switch (sparse_info->IndexType()) {
+        case kElemInt8: {
+            Sparse2JsonInternal<i8>(sparse_value_info, sparse_info, sparse_json);
+            break;
+        }
+        case kElemInt16: {
+            Sparse2JsonInternal<i16>(sparse_value_info, sparse_info, sparse_json);
+            break;
+        }
+        case kElemInt32: {
+            Sparse2JsonInternal<i32>(sparse_value_info, sparse_info, sparse_json);
+            break;
+        }
+        case kElemInt64: {
+            Sparse2JsonInternal<i64>(sparse_value_info, sparse_info, sparse_json);
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented.");
+        }
+    }
+}
+
 // Need to move up
 // template <typename Builder>
 // void BitmapEmbedding2ArrowInternal(const EmbeddingType &embedding, size_t dimension, arrow::ArrayBuilder *array_builder) {
@@ -1326,7 +1393,12 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
             return;
         }
         case LogicalType::kSparse: {
-            json[name] = "[]";
+            const auto *sparse_info = static_cast<const SparseInfo *>(type_.type_info().get());
+            const auto &sparse_value_info = static_cast<const SparseValueInfo &>(*value_info_);
+
+            nlohmann::json sparse_json;
+            Sparse2Json(sparse_value_info, sparse_info, sparse_json);
+            json[name] = sparse_json;
             return;
         }
         default: {

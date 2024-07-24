@@ -13,8 +13,8 @@ COPY test_import_sparse_jsonl FROM '/var/infinity/test_data/invalid_sparse_float
 query I
 SELECT * FROM test_import_sparse_jsonl;
 ----
-1 10000: 1.000000, 20000: 2.000000
-3 3000: 3.000000
+1 [10000:1.000000,20000:2.000000]
+3 [3000:3.000000]
 0 (empty)
 
 #######################################
@@ -37,8 +37,8 @@ COPY test_import_sparse_jsonl FROM '/var/infinity/test_data/invalid_sparse_bit2.
 query I
 SELECT * FROM test_import_sparse_jsonl;
 ----
-1 10000, 20000
-3 3000
+1 [10000,20000]
+3 [3000]
 0 (empty)
 
 statement ok
