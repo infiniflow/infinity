@@ -204,11 +204,19 @@ void PersistenceManager::Cleanup(const ObjAddr &object_addr) {
     }
     Range range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
     auto target_range = it->second.deleted_ranges_.lower_bound(range);
-    // todo check
-    if (target_range != it->second.deleted_ranges_.end() && target_range->start_ < range.end_) {
-        String error_message = fmt::format("ObjAddr {} offset {} size {} already been deleted.", object_addr.obj_key_, object_addr.part_offset_, object_addr.part_size_);
+
+    if (target_range != it->second.deleted_ranges_.end() && target_range->HasIntersection(range)) {
+        String error_message =
+            fmt::format("ObjAddr {} offset {} size {} already been deleted.", object_addr.obj_key_, object_addr.part_offset_, object_addr.part_size_);
         UnrecoverableError(error_message);
     }
+
+    if (target_range != it->second.deleted_ranges_.begin() && std::prev(target_range)->HasIntersection(range)) {
+        String error_message =
+            fmt::format("ObjAddr {} offset {} size {} already been deleted.", object_addr.obj_key_, object_addr.part_offset_, object_addr.part_size_);
+        UnrecoverableError(error_message);
+    }
+
     it->second.deleted_ranges_.insert(range);
     it->second.deleted_size_ += object_addr.part_size_;
     assert(it->second.deleted_size_ <= it->second.obj_size_);

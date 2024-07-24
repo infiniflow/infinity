@@ -31,8 +31,12 @@ export struct ObjAddr {
 export struct Range {
     SizeT start_{};
     SizeT end_{};
-    bool operator< (const Range& rhs) {
-        return start_ < rhs.start_;
+    bool operator<(const Range &rhs) const { return start_ < rhs.start_; }
+
+    bool HasIntersection(const Range &rhs) const {
+        SizeT max_start = std::max(start_, rhs.start_);
+        SizeT min_end = std::min(end_, rhs.end_);
+        return max_start < min_end;
     }
 };
 
