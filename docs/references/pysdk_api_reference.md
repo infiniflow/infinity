@@ -730,9 +730,16 @@ Columns to export to the output file, for example, `["num", "name", "score"]`. I
 
 ### Examples
 
+#### Export your table to a csv file
+
 ```python
-table_instance.export_data(os.getcwd() + "/export_data.jsonl",
-                            {"header": False, "file_type": "jsonl", "delimiter": ",", "row_limit": 2}, ["num", "name", "score"])
+table_instance.export_data(os.getcwd() + "/export_data.csv", {"header": True, "file_type": "csv", "delimiter": ",", "offset": 2, "limit": 7, "row_limit": 3}, ["num", "name", "score"])
+```
+
+#### Export your table to a jsonl file
+
+```python
+table_instance.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2}, ["num", "name", "score"])
 ```
 
 ## delete

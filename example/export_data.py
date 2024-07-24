@@ -111,7 +111,7 @@ try:
 
     # TODO also show how to export other type of file
     table_instance.export_data(os.getcwd() + "/export_data.jsonl",
-                               {"header": False, "file_type": "jsonl", "delimiter": ",", "row_limit": 2}, ["num", "name", "score"])
+                               {"file_type": "jsonl", "offset": 2, "limit": 7, "row_limit": 2}, ["num", "name", "score"])
 
 
     infinity_instance.disconnect()
