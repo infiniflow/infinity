@@ -34,7 +34,7 @@ class TestImport(HttpTest):
         ])
 
         test_csv_dir = self.get_project_path() + TEST_DATA_DIR + file_name
-        print("test_csv_dir: " + test_csv_dir)
+        # print("test_csv_dir: " + test_csv_dir)
         assert os.path.exists(test_csv_dir)
 
         self.import_data(db_name, table_name, {
@@ -115,7 +115,7 @@ class TestImport(HttpTest):
                     "header": False,
                     "delimiter": ","
                 })
-                print(file_path)
+                # print(file_path)
             else:
                 file_path = self.get_project_path() + TEST_DATA_DIR + format + "/embedding_int_dim3." + format
                 assert os.path.exists(file_path)
@@ -354,7 +354,7 @@ class TestImport(HttpTest):
         ])
 
         test_csv_dir = self.get_project_path() + TEST_DATA_DIR + file_name
-        print("test_csv_dir: " + test_csv_dir)
+        # print("test_csv_dir: " + test_csv_dir)
         assert os.path.exists(test_csv_dir)
 
         self.import_data(db_name, table_name, {
@@ -392,7 +392,7 @@ class TestImport(HttpTest):
             }
         ])
         test_csv_dir = TEST_TMP_DIR + file_name
-        print("test_file_dir: " + test_csv_dir)
+        # print("test_file_dir: " + test_csv_dir)
         assert os.path.exists(test_csv_dir)
 
         self.import_data(db_name, table_name, {

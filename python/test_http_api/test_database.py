@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import pytest
@@ -13,7 +14,7 @@ class TestDataBase(HttpTest):
         pass
 
     def test_http_database(self):
-
+        logging.error("test_http_databasetest_http_databasetest_http_databasetest_http_databasetest_http_databasetest_http_databasetest_http_databasetest_http_databasetest_http_database")
         db_name = "test_http_my_database"
 
         self.drop_database(db_name)
@@ -78,7 +79,7 @@ class TestDataBase(HttpTest):
         # create databases
         db_count = 100
         for i in range(db_count):
-            print('create test_http_db_name' + str(i))
+            # print('create test_http_db_name' + str(i))
             self.drop_database('test_http_db_name' + str(i))
         for i in range(db_count):
             self.create_database('test_http_db_name' + str(i))
@@ -88,14 +89,14 @@ class TestDataBase(HttpTest):
         # list all databases
         http_database_count = 0
         for db_name in dbs:
-            print("db name:" + db_name)
+            # print("db name:" + db_name)
             if db_name.startswith("test_http") or db_name == "default_db":
                 http_database_count += 1
         assert http_database_count == (db_count + 1)
 
         # drop databases
         for i in range(db_count):
-            print('drop test_http_db_name' + str(i))
+            # print('drop test_http_db_name' + str(i))
             self.drop_database('test_http_db_name' + str(i))
         self.clear_http_database()
 
@@ -109,7 +110,7 @@ class TestDataBase(HttpTest):
         # create databases
         db_count = 100000
         for i in range(db_count):
-            print('create test_http_db_name' + str(i))
+            # print('create test_http_db_name' + str(i))
             self.drop_database('test_http_db_name' + str(i))
         for i in range(db_count):
             self.create_database('test_http_db_name' + str(i))
@@ -119,14 +120,14 @@ class TestDataBase(HttpTest):
         # list all databases
         http_database_count = 0
         for db_name in dbs:
-            print("db name:" + db_name)
+            # print("db name:" + db_name)
             if db_name.startswith("test_http") or db_name == "default_db":
                 http_database_count += 1
         assert http_database_count == (db_count + 1)
 
         # drop databases
         for i in range(db_count):
-            print('drop test_http_db_name' + str(i))
+            # print('drop test_http_db_name' + str(i))
             self.drop_database('test_http_db_name' + str(i))
 
 

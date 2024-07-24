@@ -28,11 +28,11 @@ class TestIndexParallel(HttpTest):
                         value.append({"doctitle": data["doctitle"][i],
                                       "docdate": data["docdate"][i], "body": data["body"][i]})
                     self.insert(db_name, table_name, value)
-                    print(f"thread {thread_id}: insert complete")
+                    # print(f"thread {thread_id}: insert complete")
                 if operation == 1:
-                    print(f"thread {thread_id}: begin import")
+                    # print(f"thread {thread_id}: begin import")
                     self.import_data(file_path, {"delimiter": "\t"})
-                    print(f"thread {thread_id}: import complete")
+                    # print(f"thread {thread_id}: import complete")
 
         def read_worker(end_time):
             db_name = "default_db"

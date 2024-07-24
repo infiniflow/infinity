@@ -527,7 +527,7 @@ class TestIndex(HttpTest):
             {"name": "body", "type": "varchar"}
         ])
         test_csv_dir = TEST_TMP_DIR + "enwiki_99.csv"
-        print("test_csv_dir: " + test_csv_dir)
+        # print("test_csv_dir: " + test_csv_dir)
         assert os.path.exists(test_csv_dir)
 
         self.create_index(db_name, table_name, idxname, ["body"], {
@@ -558,7 +558,7 @@ class TestIndex(HttpTest):
         ])
         httputils.copy_data("enwiki_9.csv")
         test_csv_dir = TEST_TMP_DIR + "enwiki_9.csv"
-        print("test_csv_dir: " + test_csv_dir)
+        # print("test_csv_dir: " + test_csv_dir)
         assert os.path.exists(test_csv_dir)
 
         self.import_data(db_name, table_name, {

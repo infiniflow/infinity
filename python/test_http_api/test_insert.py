@@ -378,7 +378,7 @@ class TestInsert(HttpTest):
                     "error_code": 3032,
                 })
             else:
-                print(values)
+                # print(values)
                 self.insert(db_name, table_name, values)
         self.drop_table(db_name, table_name)
         return
