@@ -535,15 +535,20 @@ Inserts records (rows) of data into the current table.
 **data** : `json`, *Required*  
 Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `json` (one record) or `json` list (multiple records), with each key-value pair corresponding to a column name and table cell value.
 
-- key: column name in `str` format. 
-- value: `str`, `int`, `varchar`, `float`, or `list(vector)`
+- key: Column name in `str` format. 
+- value: Table cell value. Supported data types include: 
+  - Primitive: `Union(int8, int16, int32, int, int64, float, float32, double, float64, bool, varchar)`
+  - Vector in `Union(list[int], list[float], list[float32])`
+  - Sparse vector: `{"indices": list[int], "values": Union(list[int], list[float], list[float32])}`
+  - Tensor: `Union(list[int], list[float], list[float32, np.ndarray[int], np.ndarray[float], np.ndarray[float32]])`
+  - Tensor array: `Union(list[int], list[float], list[float32, np.ndarray[int], np.ndarray[float], np.ndarray[float32]])`
 
 :::tip NOTE
 Bath row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once. 
 :::
 
 :::note
-When inserting incomplete records of data, ensure that all uninserted columns have default values. Otherwise, an error will occur. 
+When inserting incomplete records of data, ensure that all uninserted columns have default values when calling `create_table`. Otherwise, an error will occur. 
 
 ```python {7,11}
 table_instance = db_instance.create_table(
@@ -571,13 +576,53 @@ table_instance = db_instance.create_table(
 ### Examples
 
 ```python
-# Insert one row to the table
-table_obj.insert({"c1": [1.1, 2.2, 3.3], "c2": 30, "c3": "Michael"})
+# Insert one row
+table_obj.insert({"c1": 1, "vec": [1.1, 2.2, 3.3]})
 ```
 
 ```python
-# Insert three rows of column c1, or a column c1 to the table
-table_obj.insert([{"c1": [1.1, 2.2, 3.3]}, {"c1": [4.4, 5.5, 6.6]}, {"c1": [7.7, 8.8, 9.9]}])
+# Insert three rows of column vec, or a column vec to the table
+table_obj.insert([{"vec": [1.1, 2.2, 3.3]}, {"vec": [4.4, 5.5, 6.6]}, {"vec": [7.7, 8.8, 9.9]}])
+```
+
+```python
+# Insert three rows
+table_instance.insert(
+    [
+        {
+            "num": 1,
+            "vec": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}
+        },
+        {
+            "num": 2,
+            "vec": {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]}
+        },
+        {
+            "num": 3,
+            "vec":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}
+        },
+    ]
+)
+```
+
+```python
+# Insert three rows
+table_instance.insert(
+    [
+        {
+            "num": 1,
+            "vec": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}
+        },
+        {
+            "num": 2,
+            "vec": {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]}
+        },
+        {
+            "num": 3,
+            "vec":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}
+        },
+    ]
+)
 ```
 
 ## import_data
