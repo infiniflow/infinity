@@ -40,7 +40,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         top_slt_file.write("CREATE TABLE {} (c1 integer, c2 TENSOR(FLOAT, {}));\n".format(table_name, fix_dim))
         top_slt_file.write("\n")
         top_slt_file.write("statement ok\n")
-        top_slt_file.write("COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, copy_path))
+        top_slt_file.write("COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(table_name, copy_path))
         top_slt_file.write("\nstatement ok\n")
         top_slt_file.write("CREATE INDEX idx1 ON {} (c2) USING EMVB WITH ".format(table_name))
         top_slt_file.write("(pq_subspace_num = {}, pq_subspace_bits = {});\n".format(pq_subspace_num, pq_subspace_bits))

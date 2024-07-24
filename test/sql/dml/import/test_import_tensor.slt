@@ -5,7 +5,7 @@ statement ok
 CREATE TABLE test_tensor_type ( c1 int, c2 tensor(float,4));
 
 statement ok
-COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim4.csv' WITH ( DELIMITER ',' );
+COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim4.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 query II
 SELECT c1, c2 FROM test_tensor_type;
@@ -21,7 +21,7 @@ SELECT count(*) FROM test_tensor_type;
 4
 
 statement error
-COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim4_invalid.csv' WITH ( DELIMITER ',' );
+COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim4_invalid.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 # Clean up
 statement ok
@@ -31,7 +31,7 @@ statement ok
 CREATE TABLE test_tensor_type ( c1 int, c2 tensor(bit,8));
 
 statement ok
-COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim8.csv' WITH ( DELIMITER ',' );
+COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim8.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 query II
 SELECT c1, c2 FROM test_tensor_type;

@@ -55,7 +55,7 @@ export class ImportOptions {
 public:
     char delimiter_{','};
     bool header_{false};
-    CopyFileType copy_file_type_{CopyFileType::kCSV};
+    CopyFileType copy_file_type_{CopyFileType::kInvalid};
 };
 
 export class ExportOptions {
@@ -65,7 +65,7 @@ public:
     SizeT offset_{0};
     SizeT limit_{0};
     SizeT row_limit_{0};
-    CopyFileType copy_file_type_{CopyFileType::kCSV};
+    CopyFileType copy_file_type_{CopyFileType::kInvalid};
 };
 
 export class OptimizeOptions {

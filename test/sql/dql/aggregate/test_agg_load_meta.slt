@@ -29,7 +29,7 @@ SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
 0
 
 statement ok
-COPY test_agg_load_meta FROM '/var/infinity/test_data/basic.csv' WITH ( DELIMITER ',' );
+COPY test_agg_load_meta FROM '/var/infinity/test_data/basic.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 query I
 EXPLAIN SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
@@ -54,7 +54,7 @@ SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;
 2
 
 statement ok
-COPY test_agg_load_meta FROM '/var/infinity/test_data/basic.csv' WITH ( DELIMITER ',' );
+COPY test_agg_load_meta FROM '/var/infinity/test_data/basic.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 query I
 EXPLAIN SELECT COUNT(*) FROM test_agg_load_meta WHERE c2 = 5;

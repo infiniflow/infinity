@@ -12,7 +12,7 @@ CREATE TABLE test_knn_sparse_integer(c1 INT, c2 SPARSE(INT, 100));
 # 4. 4.0*1.0 + 4.0*3.0 = 16.0
 # 5. 0
 statement ok
-COPY test_knn_sparse_integer FROM '/var/infinity/test_data/sparse_knn_integer.csv' WITH (DELIMITER ',');
+COPY test_knn_sparse_integer FROM '/var/infinity/test_data/sparse_knn_integer.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 # metric ip will be in descending order. The query will return row 4, 2, 1
 query I
@@ -52,7 +52,7 @@ SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_sparse_integer SEARCH MATCH SPARSE
 # copy to create another new block
 # there will has 2 knn_scan operator to scan the blocks, and one merge_knn to merge
 statement ok
-COPY test_knn_sparse_integer FROM '/var/infinity/test_data/sparse_knn_integer.csv' WITH (DELIMITER ',');
+COPY test_knn_sparse_integer FROM '/var/infinity/test_data/sparse_knn_integer.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 # the query will return block 1 row 4, block 2 row 4 and a row 3
 query I
@@ -64,7 +64,7 @@ SELECT c1 FROM test_knn_sparse_integer SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80
 
 # copy to create another new block
 statement ok
-COPY test_knn_sparse_integer FROM '/var/infinity/test_data/sparse_knn_integer.csv' WITH (DELIMITER ',');
+COPY test_knn_sparse_integer FROM '/var/infinity/test_data/sparse_knn_integer.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 # the query will return row 4 from block 1, 2 and 3
 query I

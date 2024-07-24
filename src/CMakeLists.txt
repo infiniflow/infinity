@@ -209,7 +209,7 @@ target_sources(infinity_core
         ${metrics_cppm}
 )
 
-add_dependencies(infinity_core thrift thriftnb parquet_static)
+add_dependencies(infinity_core thrift thriftnb parquet_static snappy)
 
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
@@ -236,6 +236,7 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/eigen-3.4.0")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/arrow/src")
+target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 if (NOT SUPPORT_FMA EQUAL 0)
     message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
@@ -296,12 +297,14 @@ target_link_libraries(infinity
         oatpp.a
         parquet.a
         arrow.a
+        snappy.a
         ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
@@ -348,6 +351,7 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         arrow.a
         thrift.a
         thriftnb.a
+        snappy.a
 )
 
 # WARN: python modules shall not link to static libstdc++!!!
@@ -357,6 +361,7 @@ set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hid
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 nanobind_disable_stack_protector(embedded_infinity_ext)
 nanobind_opt_size(embedded_infinity_ext)
 nanobind_strip(embedded_infinity_ext)
@@ -478,11 +483,13 @@ target_link_libraries(unit_test
         arrow.a
         thrift.a
         thriftnb.a
+        snappy.a
         ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 target_sources(unit_test
         PRIVATE
