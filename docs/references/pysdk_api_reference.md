@@ -538,14 +538,35 @@ Data to insert. Infinity supports inserting multiple rows to a table at one time
 - key: column name in `str` format. 
 - value: `str`, `int`, `varchar`, `float`, or `list(vector)`
 
+:::tip NOTE
+Bath row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once. 
+:::
+
+:::note
+When inserting incomplete records of data, ensure that all uninserted columns have default values. Otherwise, an error will occur. 
+
+```python
+table_instance = db_instance.create_table(
+    "my_table",
+    {
+        "c1": {"type": "int"},
+        "c2": {
+            "type": "int",
+            "default": 18,
+            },
+        "c3": {
+            "type": "varchar",
+            "default": "A"
+            },
+    },
+    )
+```
+:::
+
 ### Returns
 
 - Success: `True`
 - Failure: `Exception`
-
-:::note
-When inserting incomplete records of data, ensure that all uninserted columns have default values. Otherwise, an error will occur.
-:::
 
 ### Examples
 
@@ -562,7 +583,7 @@ table_obj.insert([{"c1": [1.1, 2.2, 3.3]}, {"c1": [4.4, 5.5, 6.6]}, {"c1": [7.7,
 ## import_data
 
 ```python
-Table.import_data(filepath, import_options = None)
+Table.import_data(filepath, import_options)
 ```
 
 Imports data from a specified file into the current table. 
@@ -610,7 +631,7 @@ table_obj.import_data(test_csv_dir, None)
 ## export_data
 
 ```python
-Table.export_data(filepath, export_options = None, columns = None)
+Table.export_data(filepath, export_options, columns = None)
 ```
 
 Exports the current table to a specified file. 
