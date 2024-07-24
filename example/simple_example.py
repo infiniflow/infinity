@@ -33,7 +33,7 @@ try:
 
     # Create a table named "my_table"
     table_instance = db_instance.create_table("my_table", {
-        "num": {"type": "integer"},
+        "num": {"type": "integer", "constraints": ["PRIMARY KEY"]},
         "body": {"type": "varchar"},
         "vec": {"type": "vector, 4, float"},
     })

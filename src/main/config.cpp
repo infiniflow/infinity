@@ -124,7 +124,8 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
     toml::table config_toml{};
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
         if (config_path.get() == nullptr) {
-            fmt::print("No config file is given, use default configs.\n");
+//            fmt::print("No config file is given, use default configs.\n");
+            ;
         } else {
             if (!fs.Exists(*config_path)) {
                 fmt::print("Config file: {} is not existent.\n", *config_path);

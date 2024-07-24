@@ -12,7 +12,7 @@ CREATE TABLE test_varchar_type (c1 int, c2 varchar);
 
 # copy data from tbl file
 query I
-COPY test_varchar_type FROM '/var/infinity/test_data/varchar.csv' WITH ( DELIMITER ',' );
+COPY test_varchar_type FROM '/var/infinity/test_data/varchar.csv' WITH ( DELIMITER ',', FORMAT CSV );
 ----
 
 query II

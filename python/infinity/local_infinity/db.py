@@ -53,46 +53,77 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
     proto_column_def = WrapColumnDef()
     proto_column_def.id = index
     proto_column_def.column_name = column_name
+    proto_column_def.column_type.logical_type = LogicalType.kInvalid
 
-    proto_column_type = WrapDataType()
-    datatype = column_info["type"]
-    if datatype == "int8":
-        proto_column_type.logical_type = LogicalType.kTinyInt
-    elif datatype == "int16":
-        proto_column_type.logical_type = LogicalType.kSmallInt
-    elif datatype == "int32" or datatype == "int" or datatype == "integer":
-        proto_column_type.logical_type = LogicalType.kInteger
-    elif datatype == "int64":
-        proto_column_type.logical_type = LogicalType.kBigInt
-    elif datatype == "int128":
-        proto_column_type.logical_type = LogicalType.kHugeInt
-    elif datatype == "float" or datatype == "float32":
-        proto_column_type.logical_type = LogicalType.kFloat
-    elif datatype == "double" or datatype == "float64":
-        proto_column_type.logical_type = LogicalType.kDouble
-    elif datatype == "varchar":
-        proto_column_type.logical_type = LogicalType.kVarchar
-        # proto_column_type.physical_type = ttypes.VarcharType()
-    elif datatype == "bool":
-        proto_column_type.logical_type = LogicalType.kBoolean
-    else:
-        raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
+    for key, value in column_info.items():
+        lower_key = key.lower()
+        match lower_key:
+            case "type":
+                datatype = value.lower()
+                column_big_info = [item.strip() for item in datatype.split(",")]
+                column_big_info_first_str = column_big_info[0].lower()
+                if column_big_info_first_str == "vector" or column_big_info_first_str == "tensor" or column_big_info_first_str == "tensorarray":
+                    return get_embedding_info(column_info, column_defs, column_name, index)
+                elif column_big_info_first_str == "sparse":
+                    return get_sparse_info(column_info, column_defs, column_name, index)
+                else:
+                    pass
 
-    # process constraints
-    proto_column_def.column_type = proto_column_type
-    if "constraints" in column_info:
-        constraints = column_info["constraints"]
-        for constraint in constraints:
-            if constraint == "null":
-                proto_column_def.constraints.add(ConstraintType.kNull)
-            elif constraint == "not null":
-                proto_column_def.constraints.add(ConstraintType.kNotNull)
-            elif constraint == "primary key":
-                proto_column_def.constraints.add(ConstraintType.kPrimaryKey)
-            elif constraint == "unique":
-                proto_column_def.constraints.add(ConstraintType.kUnique)
-            else:
-                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Unknown constraint: {constraint}")
+                proto_column_type = WrapDataType()
+                match datatype:
+                    case "int8":
+                        proto_column_type.logical_type = LogicalType.kTinyInt
+                    case "int16":
+                        proto_column_type.logical_type = LogicalType.kSmallInt
+                    case "int32" | "int" | "integer":
+                        proto_column_type.logical_type = LogicalType.kInteger
+                    case "int64":
+                        proto_column_type.logical_type = LogicalType.kBigInt
+                    case "int128":
+                        proto_column_type.logical_type = LogicalType.kHugeInt
+                    case "float" | "float32":
+                        proto_column_type.logical_type = LogicalType.kFloat
+                    case "double" | "float64":
+                        proto_column_type.logical_type = LogicalType.kDouble
+                    case "varchar":
+                        proto_column_type.logical_type = LogicalType.kVarchar
+                    case "bool":
+                        proto_column_type.logical_type = LogicalType.kBoolean
+                    case _:
+                        raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
+                proto_column_def.column_type = proto_column_type
+
+            case "constraints":
+                # process constraints
+                constraints = value
+                for constraint in constraints:
+                    constraint = constraint.lower()
+                    match constraint:
+                        case "null":
+                            if ConstraintType.kNull not in proto_column_def.constraints:
+                                proto_column_def.constraints.add(ConstraintType.kNull)
+                            else:
+                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                        case "not null":
+                            if ConstraintType.kNotNull not in proto_column_def.constraints:
+                                proto_column_def.constraints.add(ConstraintType.kNotNull)
+                            else:
+                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                        case "primary key":
+                            if ConstraintType.kPrimaryKey not in proto_column_def.constraints:
+                                proto_column_def.constraints.add(ConstraintType.kPrimaryKey)
+                            else:
+                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                        case "unique":
+                            if ConstraintType.kUnique not in proto_column_def.constraints:
+                                proto_column_def.constraints.add(ConstraintType.kUnique)
+                            else:
+                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                        case _:
+                            raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Unknown constraint: {constraint}")
+
+    if proto_column_def.column_type.logical_type is None:
+        raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, f"Column definition without data type")
 
     proto_column_def.constant_expr = get_constant_expr(column_info)
 
@@ -229,13 +260,7 @@ class LocalDatabase(Database, ABC):
         column_defs = []
         for index, (column_name, column_info) in enumerate(columns_definition.items()):
             check_valid_name(column_name, "Column")
-            column_big_info = [item.strip() for item in column_info["type"].split(",")]
-            if column_big_info[0] == "vector" or column_big_info[0] == "tensor" or column_big_info[0] == "tensorarray":
-                get_embedding_info(column_info, column_defs, column_name, index)
-            elif column_big_info[0] == "sparse":
-                get_sparse_info(column_info, column_defs, column_name, index)
-            else:  # numeric or varchar
-                get_ordinary_info(column_info, column_defs, column_name, index)
+            get_ordinary_info(column_info, column_defs, column_name, index)
 
         create_table_conflict: LocalConflictType
         if conflict_type == ConflictType.Error:

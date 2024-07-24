@@ -12,6 +12,7 @@ target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/th
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 target_link_libraries(
         remote_query_benchmark
@@ -32,6 +33,7 @@ target_link_libraries(
         c++abi.a
         parquet.a
         arrow.a
+        snappy.a
         ${JEMALLOC_STATIC_LIB}
 )
 

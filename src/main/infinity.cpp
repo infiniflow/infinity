@@ -400,9 +400,16 @@ QueryResult Infinity::CreateTable(const String &db_name,
     ToLower(create_table_info->table_name_);
 
     create_table_info->column_defs_ = std::move(column_defs);
+    for(ColumnDef* column_def_ptr: create_table_info->column_defs_) {
+        ToLower(column_def_ptr->name_);
+    }
     create_table_info->constraints_ = std::move(constraints);
     create_table_info->conflict_type_ = create_table_options.conflict_type_;
     create_table_info->properties_ = std::move(create_table_options.properties_);
+    for(InitParameter* parameter_ptr: create_table_info->properties_) {
+        ToLower(parameter_ptr->param_name_);
+        ToLower(parameter_ptr->param_value_);
+    }
     create_statement->create_info_ = std::move(create_table_info);
     QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
     return result;
@@ -431,13 +438,14 @@ QueryResult Infinity::DropTable(const String &db_name, const String &table_name,
 
 QueryResult Infinity::ListTables(const String &db_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
-    query_context_ptr->set_current_schema(db_name);
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
                             InfinityContext::instance().session_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->schema_name_ = db_name;
+    ToLower(show_statement->schema_name_);
     show_statement->show_type_ = ShowStmtType::kTables;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
@@ -558,6 +566,13 @@ QueryResult Infinity::CreateIndex(const String &db_name,
     create_index_info->index_name_ = index_name;
     ToLower(create_index_info->index_name_);
 
+    for(IndexInfo* index_info_ptr: *index_info_list) {
+        ToLower(index_info_ptr->column_name_);
+        for(InitParameter* init_param_ptr: *index_info_ptr->index_param_list_) {
+            ToLower(init_param_ptr->param_name_);
+            ToLower(init_param_ptr->param_value_);
+        }
+    }
     create_index_info->index_info_list_ = index_info_list;
 
     create_statement->create_info_ = create_index_info;
@@ -580,7 +595,6 @@ Infinity::DropIndex(const String &db_name, const String &table_name, const Strin
 
     drop_index_info->schema_name_ = db_name;
     ToLower(drop_index_info->schema_name_);
-
 
     drop_index_info->table_name_ = table_name;
     ToLower(drop_index_info->table_name_);
@@ -795,6 +809,9 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
     ToLower(insert_statement->table_name_);
 
     insert_statement->columns_ = columns;
+    for(String& column_name: *insert_statement->columns_) {
+        ToLower(column_name);
+    }
     insert_statement->values_ = values;
     QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
     return result;
@@ -889,14 +906,14 @@ QueryResult Infinity::Update(const String &db_name, const String &table_name, Pa
     UniquePtr<UpdateStatement> update_statement = MakeUnique<UpdateStatement>();
 
     update_statement->schema_name_ = db_name;
-    ToLower(update_statement->schema_name_);
-
     update_statement->table_name_ = table_name;
-    ToLower(update_statement->table_name_);
 
     // TODO: to lower expression identifier string
     update_statement->where_expr_ = filter;
     update_statement->update_expr_array_ = update_list;
+    for(UpdateExpr* update_expr_ptr: *update_statement->update_expr_array_) {
+        ToLower(update_expr_ptr->column_name);
+    }
     QueryResult result = query_context_ptr->QueryStatement(update_statement.get());
     return result;
 }

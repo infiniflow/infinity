@@ -11,7 +11,7 @@ CREATE TABLE enwiki_embedding(doctitle varchar, docdate varchar, body varchar, n
 
 # copy data from csv file
 query I
-COPY enwiki_embedding FROM '/var/infinity/test_data/enwiki_embedding_9999.csv' WITH ( DELIMITER '\t' );
+COPY enwiki_embedding FROM '/var/infinity/test_data/enwiki_embedding_9999.csv' WITH ( DELIMITER '\t', FORMAT CSV );
 ----
 
 statement ok

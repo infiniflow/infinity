@@ -107,8 +107,8 @@ bool PhysicalImport::Execute(QueryContext *query_context, OperatorState *operato
             break;
         }
         case CopyFileType::kInvalid: {
-            String error_message = "Invalid file type";
-            UnrecoverableError(error_message);
+            Status status = Status::ImportFileFormatError("Invalid import file type");
+            RecoverableError(status);
         }
     }
     import_op_state->SetComplete();

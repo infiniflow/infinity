@@ -10,7 +10,7 @@ from clients.quickwit_client import QuickwitClient
 from generate_queries import generate_query_txt
 
 ENGINES = ["infinity", "qdrant", "elasticsearch", "quickwit"]
-DATA_SETS = ["gist", "sift", "geonames", "enwiki", "tantivy"]
+DATA_SETS = ["gist", "sift", "geonames", "enwiki", "tantivy", "splade"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=0,
         dest="query",
-        help="Run the query set only once using given number of clients with recording the result and latency. This is for result validation and latency analysis",
+        help="Run the query set only once using given number of clients with recording the result and latency. This is for result validation and latency analysis.",
     )
     parser.add_argument(
         "--query-express",

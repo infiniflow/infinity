@@ -78,7 +78,7 @@ private:
     String file_path_{};
     bool header_{false};
     char delimiter_{','};
-    CopyFileType file_type_{CopyFileType::kCSV};
+    CopyFileType file_type_{CopyFileType::kInvalid};
     SizeT offset_{};
     SizeT limit_{};
     SizeT row_limit_{};

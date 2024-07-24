@@ -1464,8 +1464,7 @@ Tuple<ColumnDef *, Status> InfinityThriftService::GetColumnDefFromProto(const in
         return {nullptr, status};
     }
 
-    const auto &column_def_name = column_def.name;
-    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def_name, constraints, const_expr);
+    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def.name, constraints, const_expr);
     return {col_def, Status::OK()};
 }
 
@@ -1705,7 +1704,7 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
 ColumnExpr *InfinityThriftService::GetColumnExprFromProto(const infinity_thrift_rpc::ColumnExpr &column_expr) {
     auto parsed_expr = new ColumnExpr();
 
-    for (auto &column_name : column_expr.column_name) {
+    for (auto column_name : column_expr.column_name) {
         parsed_expr->names_.emplace_back(column_name);
     }
 

@@ -5,10 +5,10 @@ statement ok
 CREATE TABLE tbl1(c1 EMBEDDING(FLOAT,2), c2 EMBEDDING(FLOAT, 4), c3 EMBEDDING(FLOAT, 4));
 
 statement ok
-COPY tbl1 FROM '/var/infinity/test_data/embedding_2.csv' WITH (DELIMITER ',');
+COPY tbl1 FROM '/var/infinity/test_data/embedding_2.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 statement ok
-COPY tbl1 FROM '/var/infinity/test_data/embedding_2.csv' WITH (DELIMITER ',');
+COPY tbl1 FROM '/var/infinity/test_data/embedding_2.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 statement ok
 CREATE INDEX idx1 ON tbl1 (c1) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
@@ -46,10 +46,10 @@ statement ok
 CREATE TABLE tbl2(c1 INT, c2 EMBEDDING(FLOAT, 4), c3 EMBEDDING(FLOAT, 4));
 
 statement ok
-COPY tbl2 FROM '/var/infinity/test_data/embedding_3.csv' WITH (DELIMITER ',');
+COPY tbl2 FROM '/var/infinity/test_data/embedding_3.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 statement ok
-COPY tbl2 FROM '/var/infinity/test_data/embedding_3.csv' WITH (DELIMITER ',');
+COPY tbl2 FROM '/var/infinity/test_data/embedding_3.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 statement ok
 CREATE INDEX idx1 ON tbl2 (c1);

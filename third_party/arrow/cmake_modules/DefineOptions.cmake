@@ -148,7 +148,7 @@ if(ARROW_DEFINE_OPTIONS)
 
   define_option(ARROW_BUILD_STATIC "Build static libraries" ON)
 
-  define_option(ARROW_BUILD_SHARED "Build shared libraries" ON)
+  define_option(ARROW_BUILD_SHARED "Build shared libraries" OFF)
 
   define_option_string(ARROW_PACKAGE_KIND
                        "Arbitrary string that identifies the kind of package;\
@@ -206,7 +206,7 @@ takes precedence over ccache if a storage backend is configured" ON)
   define_option(ARROW_INSTALL_NAME_RPATH
                 "Build Arrow libraries with install_name set to @rpath" ON)
 
-  define_option(ARROW_GGDB_DEBUG "Pass -ggdb flag to debug builds" ON)
+  define_option(ARROW_GGDB_DEBUG "Pass -ggdb flag to debug builds" OFF)
 
   define_option(ARROW_WITH_MUSL "Whether the system libc is musl or not" OFF)
 
@@ -224,7 +224,7 @@ takes precedence over ccache if a storage backend is configured" ON)
                 ARROW_IPC
                 ARROW_TESTING)
 
-  define_option(ARROW_ENABLE_TIMING_TESTS "Enable timing-sensitive tests" ON)
+  define_option(ARROW_ENABLE_TIMING_TESTS "Enable timing-sensitive tests" OFF)
 
   define_option(ARROW_BUILD_INTEGRATION
                 "Build the Arrow integration test executables"
@@ -377,7 +377,7 @@ takes precedence over ccache if a storage backend is configured" ON)
 
   define_option(ARROW_PARQUET
                 "Build the Parquet libraries"
-                OFF
+                ON
                 DEPENDS
                 ARROW_IPC)
 
@@ -469,7 +469,7 @@ takes precedence over ccache if a storage backend is configured" ON)
   define_option(ARROW_VERBOSE_THIRDPARTY_BUILD
                 "Show output from ExternalProjects rather than just logging to files" OFF)
 
-  define_option(ARROW_DEPENDENCY_USE_SHARED "Link to shared libraries" ON)
+  define_option(ARROW_DEPENDENCY_USE_SHARED "Link to shared libraries" OFF)
 
   define_option(ARROW_BOOST_USE_SHARED "Rely on Boost shared libraries where relevant"
                 ${ARROW_DEPENDENCY_USE_SHARED})
@@ -541,7 +541,7 @@ takes precedence over ccache if a storage backend is configured" ON)
   define_option(ARROW_WITH_BROTLI "Build with Brotli compression" OFF)
   define_option(ARROW_WITH_BZ2 "Build with BZ2 compression" OFF)
   define_option(ARROW_WITH_LZ4 "Build with lz4 compression" OFF)
-  define_option(ARROW_WITH_SNAPPY "Build with Snappy compression" OFF)
+  define_option(ARROW_WITH_SNAPPY "Build with Snappy compression" ON)
   define_option(ARROW_WITH_ZLIB "Build with zlib compression" OFF)
   define_option(ARROW_WITH_ZSTD "Build with zstd compression" OFF)
 
