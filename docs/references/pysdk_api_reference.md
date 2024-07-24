@@ -538,10 +538,10 @@ Data to insert. Infinity supports inserting multiple rows to a table at one time
 - key: Column name in `str` format. 
 - value: Table cell value. Supported data types include: 
   - Primitive: `Union(int8, int16, int32, int, int64, float, float32, double, float64, bool, varchar)`
-  - Vector in `Union(list[int], list[float], list[float32])`
-  - Sparse vector: `{"indices": list[int], "values": Union(list[int], list[float], list[float32])}`
-  - Tensor: `Union(list[int], list[float], list[float32, np.ndarray[int], np.ndarray[float], np.ndarray[float32]])`
-  - Tensor array: `Union(list[int], list[float], list[float32, np.ndarray[int], np.ndarray[float], np.ndarray[float32]])`
+  - Vector in `Union(list[float], list[float32])`
+  - Sparse vector: `{"indices": Union(list[int], list[int8] list[uint8], "values": Union(list[float], list[float32])}`
+  - Tensor: `Union(list[float], list[float32], np.ndarray[float], np.ndarray[float32])`
+  - Tensor array: `Union(list[np.ndarray[float]], list[np.ndarray[float32]])`
 
 :::tip NOTE
 Bath row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once. 
