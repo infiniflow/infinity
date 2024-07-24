@@ -932,6 +932,9 @@ class TestKnn(TestSdk):
             "big_vector", [0.0]*dim, "float", "l2", 5).to_pl()
         print(res)
 
+        res = db_obj.drop_table("test_big_dimension_vector", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def _test_with_various_fulltext_match(self, check_data, fields_and_matching_text):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
