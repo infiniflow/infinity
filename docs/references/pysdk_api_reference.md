@@ -528,7 +528,7 @@ res.index_names #['my_index']
 Table.insert(data)
 ```
 
-Inserts rows (rows) of data into the current table. 
+Inserts rows of data into the current table. 
 
 ### Parameters
 
