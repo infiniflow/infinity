@@ -570,11 +570,8 @@ table_instance = db_instance.create_table("primitive_table", {
     "c12": {"type": "bool", "default": False},
 })
 
-# Insert an incomplete row, with the rest columns defaulting to their defaults:
+# Insert an incomplete row, with remaining cells defaulting to their column defaults:
 table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
-
-# Insert an incomplete row, with the rest columns defaulting to their defaults:
-table_instance.insert({"c1": 2, "c7": "Jeffery"})
 ```
 
 #### Insert vectors
