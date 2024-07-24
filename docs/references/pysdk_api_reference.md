@@ -535,37 +535,13 @@ Inserts records (rows) of data into the current table.
 **data** : `json`, *Required*  
 Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `json` (one record) or `json` list (multiple records), with each key-value pair corresponding to a column name and table cell value.
 
-- key: Column name in `str` format. 
-- value: Table cell value. Supported data types include: 
-  - Primitive: `Union(int8, int16, int32, int, int64, float, float32, double, float64, bool, varchar)`
-  - Vector in `Union(list[float], list[float32])`
-  - Sparse vector: `{"indices": Union(list[int], list[int8] list[uint8], "values": Union(list[float], list[float32])}`
-  - Tensor: `Union(list[float], list[float32], np.ndarray[float], np.ndarray[float32])`
-  - Tensor array: `Union(list[np.ndarray[float]], list[np.ndarray[float32]])`
-
 :::tip NOTE
-Bath row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once. 
+Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once. 
 :::
 
 :::note
-When inserting incomplete records of data, ensure that all uninserted columns have default values when calling `create_table`. Otherwise, an error will occur. 
-
-```python {7,11}
-table_instance = db_instance.create_table(
-    "my_table",
-    {
-        "c1": {"type": "int"},
-        "c2": {
-            "type": "int",
-            "default": 18,
-            },
-        "c3": {
-            "type": "varchar",
-            "default": "A"
-            },
-    },
-    )
-```
+When inserting incomplete records of data, ensure that all uninserted columns have default values when calling `create_table`. Otherwise, an error will occur.  
+For information about setting default column values, see `create_table`.
 :::
 
 ### Returns
@@ -575,54 +551,111 @@ table_instance = db_instance.create_table(
 
 ### Examples
 
-```python
-# Insert one row
-table_obj.insert({"c1": 1, "vec": [1.1, 2.2, 3.3]})
+#### Insert primitives
+
+```python {12,14}
+# Create a table with four primitive columns:
+table_instance = db_instance.create_table("primitive_table", {
+    "c1": {"type": "integer"},
+    "c2": {"type": "varchar"},
+    "c3": {"type": "float"},
+    "c4": {
+      "type": "bool",
+      "default": False,
+      },
+})
+# Insert a complete record (row) into the table:
+table_instance.insert("c1": 1, "c2": "Tom", "c3": 90.5, "c4": True)
+# Insert an incomplete record (row), with the "c4" column defaulting to False:
+table_instance.insert("c1": 2, "c2": "Jeffery", "C3": 88.0)
 ```
 
-```python
-# Insert three rows of column vec, or a column vec to the table
-table_obj.insert([{"vec": [1.1, 2.2, 3.3]}, {"vec": [4.4, 5.5, 6.6]}, {"vec": [7.7, 8.8, 9.9]}])
-```
+#### Insert vectors
 
 ```python
-# Insert three rows
+# Create a table with a 3-d vector column "cvc":
+table_instance = db_instance.create_table("vector_table", {
+    "c1": {
+      "type": "integer",
+      "default": 2024,
+      },
+    "cvc": {"type": "vector,3,float"},
+})
+# Insert one complete record (row) into the table:
+table_obj.insert({"c1": 2023, "cvc": [1.1, 2.2, 3.3]})
+# Insert three rows into the vector column "cvc", with the "c1" column defaulting to 2024:
+table_obj.insert([{"cvc": [1.1, 2.2, 3.3]}, {"cvc": [4.4, 5.5, 6.6]}, {"cvc": [7.7, 8.8, 9.9]}])
+```
+#### Insert sparse vectors
+
+```python
+# Create a table with a 100-d sparse vector column "csp":
+table_instance = db_instance.create_table("sparse_vector_table", {
+    "c1": {
+      "type": "integer",
+      "default": 2024,
+      },
+    "csp": {"type": "sparse, 100,float,int"}
+})
+
+# Insert three rows into the table:
+# `indices` specifies the correspoing indices to the values in `values`.
+# Note that the third row sets "c1" as 2024 by default. 
 table_instance.insert(
     [
         {
-            "num": 1,
-            "vec": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}
+            "c1": 2022,
+            "csp": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}
         },
         {
-            "num": 2,
-            "vec": {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]}
+            "c1": 2023,
+            "csp": {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]}
         },
         {
-            "num": 3,
-            "vec":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}
+            "csp":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}
         },
     ]
 )
 ```
 
+#### Insert tensors
+
 ```python
-# Insert three rows
+# Create a table with a tensor column "cts": 
+table_instance = db_instance.create_table("tensor_table", {
+  "c1": {
+    "type": "integer",
+    "default": 2024,
+  }
+  "cts": {"type": "tensor,4,float"}
+})
+# Insert three rows into the tensor column "cts", with the "c1" column defaulting to 2024:
 table_instance.insert(
     [
         {
-            "num": 1,
-            "vec": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}
+            "cts": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
         },
         {
-            "num": 2,
-            "vec": {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]}
+            "cts": [[4.0, 0.0, 4.3, 4.5], [4.0, 4.2, 4.4, 5.0]],
         },
         {
-            "num": 3,
-            "vec":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}
+            "cts": [[0.9, 0.1, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
         },
     ]
 )
+```
+
+#### Insert tensor arrays
+
+```python
+# Creat a table with only one tensor array column "cta":
+table_instance = db_instance.create_table("tensor_array_table", {
+  "cta": {
+    "type": "tensorarray,2,int"
+    }
+})
+
+table_instance.insert([{"cta": [[[1, 2], [3, 4]], [[5, 6]]]}])
 ```
 
 ## import_data
