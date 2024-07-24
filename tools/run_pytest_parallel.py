@@ -22,24 +22,17 @@ def run_command(command):
 if __name__ == "__main__":
     print("Note: this script must be run under root directory of the project.")
     command_failed = False
-    try:
-        with ProcessPoolExecutor() as executor:
-            futures = [executor.submit(run_command, cmd) for cmd in commands]
-            for future in as_completed(futures):
-                try:
-                    command, elapsed_time, stdout, stderr = future.result()
-
-                    print(f"Command '{command}' executed in {elapsed_time:.2f} seconds")
-                    print(f"Command '{command}' output:\n{stdout}")
-                    if stderr:
-                        print(f"Command '{command}' error:\n{stderr}")
-                        command_failed = True
-                except RuntimeError as e:
-                    print(e)
-                    command_failed = True
-    except Exception as e:
-        print(e)
-        command_failed = True
+    for command in commands:
+        try:
+            command, elapsed_time, stdout, stderr = run_command(command)
+            print(f"Command '{command}' executed in {elapsed_time:.2f} seconds")
+            print(f"Command '{command}' output:\n{stdout}")
+            if stderr:
+                print(f"Command '{command}' error:\n{stderr}")
+                command_failed = True
+        except RuntimeError as e:
+            print(e)
+            command_failed = True
 
     if command_failed:
         sys.exit(-1)
