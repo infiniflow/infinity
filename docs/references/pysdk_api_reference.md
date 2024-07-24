@@ -528,19 +528,19 @@ res.index_names #['my_index']
 Table.insert(data)
 ```
 
-Inserts records (rows) of data into the current table. 
+Inserts rows (rows) of data into the current table. 
 
 ### Parameters
 
 **data** : `json`, *Required*  
-Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `json` (one record) or `json` list (multiple records), with each key-value pair corresponding to a column name and table cell value.
+Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `json` (one record) or `json` list (multiple rows), with each key-value pair corresponding to a column name and table cell value.
 
 :::tip NOTE
 Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once. 
 :::
 
 :::note
-When inserting incomplete records of data, ensure that all uninserted columns have default values when calling `create_table`. Otherwise, an error will occur.  
+When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table`. Otherwise, an error will occur.  
 For information about setting default column values, see `create_table`.
 :::
 
@@ -556,106 +556,68 @@ For information about setting default column values, see `create_table`.
 ```python {12,14}
 # Create a table with four primitive columns:
 table_instance = db_instance.create_table("primitive_table", {
-    "c1": {"type": "integer"},
-    "c2": {"type": "varchar"},
-    "c3": {"type": "float"},
-    "c4": {
-      "type": "bool",
-      "default": False,
-      },
+    "c1": {"type": "int8"},
+    "c2": {"type": "int16"},
+    "c3": {"type": "int"},
+    "c4": {"type": "int32"},   # Same as int
+    "c5": {"type": "integer"}, # Same as int
+    "c6": {"type": "int64"},
+    "c7": {"type": "varchar"},
+    "c8": {"type": "float"},
+    "c8": {"type": "float32"}, # Same as float
+    "c8": {"type": "double"},
+    "c8": {"type": "float64"}, # Same as double
+    "c9": {"type": "bool", "default": False},
 })
-# Insert a complete record (row) into the table:
+
+# Insert a complete row into the table:
 table_instance.insert("c1": 1, "c2": "Tom", "c3": 90.5, "c4": True)
-# Insert an incomplete record (row), with the "c4" column defaulting to False:
-table_instance.insert("c1": 2, "c2": "Jeffery", "C3": 88.0)
+
+# Insert an incomplete row, with the "c4" column defaulting to False:
+table_instance.insert("c1": 2, "c2": "Jeffery", "c3": 88.0)
 ```
 
 #### Insert vectors
 
 ```python
-# Create a table with a 3-d vector column "cvc":
-table_instance = db_instance.create_table("vector_table", {
-    "c1": {
-      "type": "integer",
-      "default": 2024,
-      },
-    "cvc": {"type": "vector,3,float"},
-})
-# Insert one complete record (row) into the table:
-table_obj.insert({"c1": 2023, "cvc": [1.1, 2.2, 3.3]})
-# Insert three rows into the vector column "cvc", with the "c1" column defaulting to 2024:
-table_obj.insert([{"cvc": [1.1, 2.2, 3.3]}, {"cvc": [4.4, 5.5, 6.6]}, {"cvc": [7.7, 8.8, 9.9]}])
+# Create a table with a integer column and a 3-d vector column:
+table_instance = db_instance.create_table("vector_table", {"c1": {"type": "integer", "default": 2024}, "vector_column": {"type": "vector,3,float"}})
+
+# Insert one complete row into the table:
+table_obj.insert({"c1": 2023, "vector_column": [1.1, 2.2, 3.3]})
+
+# Insert three rows into the table:
+table_obj.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.5, 6.6]}, {"vector_column": [7.7, 8.8, 9.9]}])
 ```
 #### Insert sparse vectors
 
 ```python
-# Create a table with a 100-d sparse vector column "csp":
-table_instance = db_instance.create_table("sparse_vector_table", {
-    "c1": {
-      "type": "integer",
-      "default": 2024,
-      },
-    "csp": {"type": "sparse, 100,float,int"}
-})
+# Create a table with a integer column and a 100-d sparse vector column:
+table_instance = db_instance.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
 
 # Insert three rows into the table:
 # `indices` specifies the correspoing indices to the values in `values`.
-# Note that the third row sets "c1" as 2024 by default. 
-table_instance.insert(
-    [
-        {
-            "c1": 2022,
-            "csp": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}
-        },
-        {
-            "c1": 2023,
-            "csp": {"indices": [40, 50, 60], "values": [4.4, 5.5, 6.6]}
-        },
-        {
-            "csp":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}
-        },
-    ]
-)
+# Note that the second row sets "c1" as 2024 by default. 
+table_instance.insert([{"c1": 2022, "sparse_column": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}, {"sparse_column":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}}}])
 ```
 
 #### Insert tensors
 
 ```python
-# Create a table with a tensor column "cts": 
-table_instance = db_instance.create_table("tensor_table", {
-  "c1": {
-    "type": "integer",
-    "default": 2024,
-  }
-  "cts": {"type": "tensor,4,float"}
-})
-# Insert three rows into the tensor column "cts", with the "c1" column defaulting to 2024:
-table_instance.insert(
-    [
-        {
-            "cts": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
-        },
-        {
-            "cts": [[4.0, 0.0, 4.3, 4.5], [4.0, 4.2, 4.4, 5.0]],
-        },
-        {
-            "cts": [[0.9, 0.1, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
-        },
-    ]
-)
+# Create a table with a tensor column: 
+table_instance = db_instance.create_table("tensor_table", {"c1": {"type": "integer", "default": 2024}, "tensor_column": {"type": "tensor,4,float"}})
+
+# Insert one row into the table, with the "c1" column defaulting to 2024:
+table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}])
 ```
 
 #### Insert tensor arrays
 
 ```python
-# Creat a table with only one tensor array column "cta":
-table_instance = db_instance.create_table("tensor_array_table", {
-  "cta": {
-    "type": "tensorarray,2,int"
-    }
-})
+# Creat a table with only one tensor array column:
+table_instance = db_instance.create_table("tensor_array_table", {"tensor_array_column": {"type": "tensorarray,2,float"}})
 
-table_instance.insert([{"cta": [[[1, 2], [3, 4]], [[5, 6]]]}])
+table_instance.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])
 ```
 
 ## import_data
@@ -866,7 +828,7 @@ table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 
 **Table.knn(*vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None*)**
 
-Build a KNN search expression. Find the top n closet records to the given vector.
+Build a KNN search expression. Find the top n closet rows to the given vector.
 
 ### Parameters
 
@@ -931,7 +893,7 @@ Create a full-text search expression.
     The column where text is searched, and has create full-text index on it before. 
 - **matching_text : str**
 - **options_text : str**
-    'topn=2': Retrieve the two most relevant records. The `topn` is `10` by default.
+    'topn=2': Retrieve the two most relevant rows. The `topn` is `10` by default.
 
 ### Returns
 
@@ -957,7 +919,7 @@ for question in questions:
 
 **Table.match_tensor(*vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)**
 
-Build a KNN tensor search expression. Find the top n closet records to the given tensor according to chosen method.
+Build a KNN tensor search expression. Find the top n closet rows to the given tensor according to chosen method.
 
 For example, find k most match tensors generated by ColBERT.
 
@@ -1004,7 +966,7 @@ Build a fusion expression.
 
     Common options:
 
-    - 'topn=10': Retrieve the 10 most relevant records. The defualt value is `100`.
+    - 'topn=10': Retrieve the 10 most relevant rows. The defualt value is `100`.
 
     Dedicated options of rrf:
 
