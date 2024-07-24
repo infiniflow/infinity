@@ -664,8 +664,16 @@ Example: `{"header":True, "delimiter": "\t", file_type}`
 
 ### Examples
 
+#### Import a csv file
+
 ```python
-table_obj.import_data(test_csv_dir, None)
+table_instance.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file_type": "csv", "delimiter": "\t"})
+```
+
+#### Import a jsonl file
+
+```python
+table_instance.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
 ```
 
 ## export_data
@@ -723,8 +731,8 @@ Columns to export to the output file, for example, `["num", "name", "score"]`. I
 ### Examples
 
 ```python
-    table_instance.export_data(os.getcwd() + "/export_data.jsonl",
-                               {"header": False, "file_type": "jsonl", "delimiter": ",", "row_limit": 2}, ["num", "name", "score"])
+table_instance.export_data(os.getcwd() + "/export_data.jsonl",
+                            {"header": False, "file_type": "jsonl", "delimiter": ",", "row_limit": 2}, ["num", "name", "score"])
 ```
 
 ## delete
