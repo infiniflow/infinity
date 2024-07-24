@@ -75,9 +75,11 @@ parser.output
 #query_parser.h
 #query_parser.cpp
 
+test/sql/**/*gen*.slt
 test/sql/**/*big*.slt
 test/sql/**/*fvecs*.slt
 test/sql/**/*csr*.slt
+test/data/**/*gen*
 test/data/csv/**/*big*.csv
 test/data/csv/*9_commas.csv
 test/data/fvecs/*big*.fvecs

@@ -57,13 +57,14 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("----\n")
         for row_id in range(row_n):
             start, end = indptr[row_id], indptr[row_id + 1]
+            slt_file.write("[")
             for j in range(start, end):
                 slt_file.write(
-                    "{}: {}".format(indices[j], sparse_format_float(data[j])),
+                    "{}:{}".format(indices[j], sparse_format_float(data[j])),
                 )
                 if j != end - 1:
-                    slt_file.write(", ")
-            slt_file.write("\n")
+                    slt_file.write(",")
+            slt_file.write("]\n")
         slt_file.write("\n")
         slt_file.write("statement ok\n")
         slt_file.write("DROP TABLE {};\n".format(table_name))

@@ -14,12 +14,12 @@
 
 module;
 
-#include <string>
 #include "arrow/type_fwd.h"
 #include <arrow/io/caching.h>
 #include <arrow/io/file.h>
-#include <parquet/properties.h>
 #include <parquet/arrow/writer.h>
+#include <parquet/properties.h>
+#include <string>
 
 module physical_export;
 
@@ -39,6 +39,7 @@ import defer_op;
 import stl;
 import logical_type;
 import embedding_info;
+import sparse_info;
 import status;
 import buffer_manager;
 import default_values;
@@ -140,9 +141,9 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
     SizeT offset = offset_;
     SizeT row_count{0};
     SizeT file_no_{0};
-    Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
-    BufferManager* buffer_manager = query_context->storage()->buffer_manager();
-    for(auto& [segment_id, segment_snapshot]: segment_block_index_ref) {
+    Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
+    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
+    for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
         LOG_DEBUG(fmt::format("Export segment_id: {}", segment_id));
         SizeT block_count = segment_snapshot.block_map_.size();
         for (SizeT block_idx = 0; block_idx < block_count; ++block_idx) {
@@ -177,7 +178,7 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                     }
                     default: {
                         column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetConstColumnVector(buffer_manager));
-                        if(column_vectors[block_column_idx].Size() != block_row_count) {
+                        if (column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
                             UnrecoverableError(error_message);
                         }
@@ -185,17 +186,18 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 }
             }
 
-            for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
+            for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
                 // TODO: Check the visibility
-                if(offset > 0) {
-                    -- offset;
+                if (offset > 0) {
+                    --offset;
                     continue;
                 }
                 String line;
-                for(SizeT select_column_idx = 0; select_column_idx < select_column_count; ++ select_column_idx) {
+                for (SizeT select_column_idx = 0; select_column_idx < select_column_count; ++select_column_idx) {
                     Value v = column_vectors[select_column_idx].GetValue(row_idx);
                     switch (v.type().type()) {
-                        case LogicalType::kEmbedding: {
+                        case LogicalType::kEmbedding:
+                        case LogicalType::kSparse: {
                             line += fmt::format("\"{}\"", v.ToString());
                             break;
                         }
@@ -210,12 +212,12 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                     }
                 }
 
-                if(row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
-                    ++ file_no_;
+                if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
+                    ++file_no_;
                     fs.Close(*file_handler);
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
-                    if(!result.second.ok()) {
+                    if (!result.second.ok()) {
                         RecoverableError(result.second);
                     }
                     file_handler = std::move(result.first);
@@ -223,8 +225,8 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
 
                 fs.Write(*file_handler, line.c_str(), line.size());
 
-                ++ row_count;
-                if(limit_ != 0 && row_count == limit_) {
+                ++row_count;
+                if (limit_ != 0 && row_count == limit_) {
                     return row_count;
                 }
             }
@@ -262,8 +264,8 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
     SizeT offset = offset_;
     SizeT row_count{0};
     SizeT file_no_{0};
-    Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
-    BufferManager* buffer_manager = query_context->storage()->buffer_manager();
+    Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
+    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
         SizeT block_count = segment_snapshot.block_map_.size();
@@ -300,7 +302,7 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                     }
                     default: {
                         column_vectors.emplace_back(block_entry->GetColumnBlockEntry(select_column_idx)->GetConstColumnVector(buffer_manager));
-                        if(column_vectors[block_column_idx].Size() != block_row_count) {
+                        if (column_vectors[block_column_idx].Size() != block_row_count) {
                             String error_message = "Unmatched row_count between block and block_column";
                             UnrecoverableError(error_message);
                         }
@@ -308,14 +310,14 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 }
             }
 
-            for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
+            for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
                 // TODO: Need to check visibility
-                if(offset > 0) {
-                    -- offset;
+                if (offset > 0) {
+                    --offset;
                     continue;
                 }
                 nlohmann::json line_json;
-                for(ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++ block_column_idx) {
+                for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
                     ColumnID select_column_idx = select_columns[block_column_idx];
                     switch (select_column_idx) {
                         case COLUMN_IDENTIFIER_ROW_ID: {
@@ -340,12 +342,12 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                         }
                     }
                 }
-                if(row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
-                    ++ file_no_;
+                if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
+                    ++file_no_;
                     fs.Close(*file_handler);
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
-                    if(!result.second.ok()) {
+                    if (!result.second.ok()) {
                         RecoverableError(result.second);
                     }
                     file_handler = std::move(result.first);
@@ -354,8 +356,8 @@ SizeT PhysicalExport::ExportToJSONL(QueryContext *query_context, ExportOperatorS
                 LOG_DEBUG(line_json.dump());
                 String to_write = line_json.dump() + "\n";
                 fs.Write(*file_handler, to_write.c_str(), to_write.size());
-                ++ row_count;
-                if(limit_ != 0 && row_count == limit_) {
+                ++row_count;
+                if (limit_ != 0 && row_count == limit_) {
                     return row_count;
                 }
             }
@@ -398,8 +400,8 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     SizeT offset = offset_;
     SizeT row_count{0};
     SizeT file_no_{0};
-    Map<SegmentID, SegmentSnapshot>& segment_block_index_ref = block_index_->segment_block_index_;
-    BufferManager* buffer_manager = query_context->storage()->buffer_manager();
+    Map<SegmentID, SegmentSnapshot> &segment_block_index_ref = block_index_->segment_block_index_;
+    BufferManager *buffer_manager = query_context->storage()->buffer_manager();
     // Write header
     LOG_DEBUG(fmt::format("Going to export segment count: {}", segment_block_index_ref.size()));
     for (auto &[segment_id, segment_snapshot] : segment_block_index_ref) {
@@ -411,26 +413,26 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
             SizeT block_row_count = block_entry->row_count();
 
             ColumnVector exported_column_vector = block_entry->GetColumnBlockEntry(exported_column_idx)->GetConstColumnVector(buffer_manager);
-            if(exported_column_vector.Size() != block_row_count) {
+            if (exported_column_vector.Size() != block_row_count) {
                 String error_message = "Unmatched row_count between block and block_column";
                 UnrecoverableError(error_message);
             }
 
-            for(SizeT row_idx = 0; row_idx < block_row_count;  ++ row_idx) {
-                if(offset > 0) {
-                    -- offset;
+            for (SizeT row_idx = 0; row_idx < block_row_count; ++row_idx) {
+                if (offset > 0) {
+                    --offset;
                     continue;
                 }
 
                 Value v = exported_column_vector.GetValue(row_idx);
                 Span<char> embedding = v.GetEmbedding();
 
-                if(row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
-                    ++ file_no_;
+                if (row_count > 0 && this->row_limit_ != 0 && (row_count % this->row_limit_) == 0) {
+                    ++file_no_;
                     fs.Close(*file_handler);
                     String new_file_path = fmt::format("{}.part{}", file_path_, file_no_);
                     auto result = fs.OpenFile(new_file_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kWriteLock);
-                    if(!result.second.ok()) {
+                    if (!result.second.ok()) {
                         RecoverableError(result.second);
                     }
                     file_handler = std::move(result.first);
@@ -438,8 +440,8 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
 
                 fs.Write(*file_handler, &dimension, sizeof(dimension));
                 fs.Write(*file_handler, embedding.data(), embedding.size_bytes());
-                ++ row_count;
-                if(limit_ != 0 && row_count == limit_) {
+                ++row_count;
+                if (limit_ != 0 && row_count == limit_) {
                     return row_count;
                 }
             }
@@ -473,7 +475,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
     }
 
     arrow::MemoryPool *pool = arrow::DefaultMemoryPool();
-    SharedPtr<arrow::Schema> schema = ::arrow::schema(fields);
+    SharedPtr<arrow::Schema> schema = ::arrow::schema(std::move(fields));
     SharedPtr<::arrow::io::FileOutputStream> file_stream;
     SharedPtr<::parquet::arrow::FileWriter> file_writer;
 
@@ -527,7 +529,7 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                 }
             }
 
-            Vector<SharedPtr<arrow::Array>> block_arrays; 
+            Vector<SharedPtr<arrow::Array>> block_arrays;
             for (ColumnID block_column_idx = 0; block_column_idx < select_column_count; ++block_column_idx) {
                 ColumnID select_column_idx = select_columns[block_column_idx];
                 ColumnDef *column_def = column_defs[select_column_idx].get();
@@ -535,15 +537,14 @@ SizeT PhysicalExport::ExportToPARQUET(QueryContext *query_context, ExportOperato
                 block_arrays.emplace_back(BuildArrowArray(column_def, column_vector));
             }
 
-
-//            SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_row_count, block_arrays);
-//            auto status = file_writer->WriteRecordBatch(*block_batch);
-//            if (!status.ok()) {
-//                String error_message = fmt::format("Failed to write record batch to parquet file: {}", status.message());
-//                LOG_CRITICAL(error_message);
-//                UnrecoverableError(error_message);
-//            }
-//            row_count += block_row_count;
+            SharedPtr<arrow::RecordBatch> block_batch = arrow::RecordBatch::Make(schema, block_row_count, block_arrays);
+            auto status = file_writer->WriteRecordBatch(*block_batch);
+            if (!status.ok()) {
+                String error_message = fmt::format("Failed to write record batch to parquet file: {}", status.message());
+                LOG_CRITICAL(error_message);
+                UnrecoverableError(error_message);
+            }
+            row_count += block_row_count;
         }
     }
 
@@ -588,32 +589,158 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
         case LogicalType::kVarchar:
             return arrow::utf8();
         case LogicalType::kEmbedding: {
-//            auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-//            switch (embedding_info->Type()) {
-//                case kElemInt8: {
-//                    return ::arrow::list(::arrow::int8());
-//                }
-//                case kElemInt16: {
-//                    return ::arrow::list(::arrow::int16());
-//                }
-//                case kElemInt32: {
-//                    return ::arrow::list(::arrow::int32());
-//                }
-//                case kElemInt64: {
-//                    return ::arrow::list(::arrow::int64());
-//                }
-//                case kElemFloat: {
-//                    return ::arrow::list(::arrow::float32());
-//                }
-//                case kElemDouble: {
-//                    return ::arrow::list(::arrow::float64());
-//                }
-//                default: {
-//                    String error_message = "Invalid embedding data type";
-//                    LOG_CRITICAL(error_message);
-//                    UnrecoverableError(error_message);
-//                }
-//            }
+            auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+            SizeT dimension = embedding_info->Dimension();
+            switch (embedding_info->Type()) {
+                case kElemInt8: {
+                    return ::arrow::fixed_size_list(::arrow::int8(), dimension);
+                }
+                case kElemInt16: {
+                    return ::arrow::fixed_size_list(::arrow::int16(), dimension);
+                }
+                case kElemInt32: {
+                    return ::arrow::fixed_size_list(::arrow::int32(), dimension);
+                }
+                case kElemInt64: {
+                    return ::arrow::fixed_size_list(::arrow::int64(), dimension);
+                }
+                case kElemFloat: {
+                    return ::arrow::fixed_size_list(::arrow::float32(), dimension);
+                }
+                case kElemDouble: {
+                    return ::arrow::fixed_size_list(::arrow::float64(), dimension);
+                }
+                default: {
+                    UnrecoverableError("Not implemented");
+                }
+            }
+            UnrecoverableError("Not implemented");
+        }
+        case LogicalType::kSparse: {
+            const auto *sparse_info = static_cast<const SparseInfo *>(column_def->type()->type_info().get());
+
+            SharedPtr<arrow::DataType> index_type;
+            Optional<SharedPtr<arrow::DataType>> value_type = None;
+            switch (sparse_info->IndexType()) {
+                case EmbeddingDataType::kElemInt8: {
+                    index_type = ::arrow::list(::arrow::int8());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt16: {
+                    index_type = ::arrow::list(::arrow::int16());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt32: {
+                    index_type = ::arrow::list(::arrow::int32());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt64: {
+                    index_type = ::arrow::list(::arrow::int64());
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Index type invalid");
+                }
+            }
+            switch (sparse_info->DataType()) {
+                case EmbeddingDataType::kElemBit: {
+                    break;
+                }
+                case EmbeddingDataType::kElemInt8: {
+                    value_type = ::arrow::list(::arrow::int8());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt16: {
+                    value_type = ::arrow::list(::arrow::int16());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt32: {
+                    value_type = ::arrow::list(::arrow::int32());
+                    break;
+                }
+                case EmbeddingDataType::kElemInt64: {
+                    value_type = ::arrow::list(::arrow::int64());
+                    break;
+                }
+                case EmbeddingDataType::kElemFloat: {
+                    value_type = ::arrow::list(::arrow::float32());
+                    break;
+                }
+                case EmbeddingDataType::kElemDouble: {
+                    value_type = ::arrow::list(::arrow::float64());
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Data type invalid");
+                }
+            }
+
+            arrow::FieldVector fields{::arrow::field("index", std::move(index_type))};
+            if (value_type.has_value()) {
+                fields.emplace_back(::arrow::field("value", value_type.value()));
+            }
+            return arrow::struct_(std::move(fields));
+        }
+        case LogicalType::kTensor: {
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
+            SizeT dimension = embedding_info->Dimension();
+            switch (embedding_info->Type()) {
+                case kElemInt8: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::int8(), dimension));
+                }
+                case kElemInt16: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::int16(), dimension));
+                }
+                case kElemInt32: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::int32(), dimension));
+                }
+                case kElemInt64: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::int64(), dimension));
+                }
+                case kElemFloat: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::float32(), dimension));
+                }
+                case kElemDouble: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::float64(), dimension));
+                }
+                default: {
+                    UnrecoverableError("Not implemented");
+                }
+            }
+            break;
+        }
+        case LogicalType::kTensorArray: {
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
+            SizeT dimension = embedding_info->Dimension();
+            switch (embedding_info->Type()) {
+                case kElemInt8: {
+                    auto tensor_array_type = ::arrow::list(::arrow::fixed_size_list(::arrow::int8(), dimension));
+                    return ::arrow::list(tensor_array_type);
+                }
+                case kElemInt16: {
+                    auto tensor_array_type = ::arrow::list(::arrow::fixed_size_list(::arrow::int16(), dimension));
+                    return ::arrow::list(tensor_array_type);
+                }
+                case kElemInt32: {
+                    auto tensor_array_type = ::arrow::list(::arrow::fixed_size_list(::arrow::int32(), dimension));
+                    return ::arrow::list(tensor_array_type);
+                }
+                case kElemInt64: {
+                    auto tensor_array_type = ::arrow::list(::arrow::fixed_size_list(::arrow::int64(), dimension));
+                    return ::arrow::list(tensor_array_type);
+                }
+                case kElemFloat: {
+                    auto tensor_array_type = ::arrow::list(::arrow::fixed_size_list(::arrow::float32(), dimension));
+                    return ::arrow::list(tensor_array_type);
+                }
+                case kElemDouble: {
+                    auto tensor_array_type = ::arrow::list(::arrow::fixed_size_list(::arrow::float64(), dimension));
+                    return ::arrow::list(tensor_array_type);
+                }
+                default: {
+                    UnrecoverableError("Not implemented");
+                }
+            }
         }
         default: {
             String error_message = "Invalid data type";
@@ -630,7 +757,8 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
 
     switch (column_type->type()) {
         case LogicalType::kBoolean: {
-            array_builder = MakeShared<arrow::UInt8Builder>();
+            array_builder = MakeShared<arrow::BooleanBuilder>();
+            break;
         }
         case LogicalType::kTinyInt: {
             array_builder = MakeShared<::arrow::Int8Builder>();
@@ -681,40 +809,41 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
         }
         case LogicalType::kEmbedding: {
             auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
+            SizeT dimension = embedding_info->Dimension();
             switch (embedding_info->Type()) {
                 case kElemBit: {
-                    SharedPtr<arrow::UInt8Builder> uint8_builder = MakeShared<::arrow::UInt8Builder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), uint8_builder);
+                    SharedPtr<arrow::BooleanBuilder> uint8_builder = MakeShared<::arrow::BooleanBuilder>();
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), uint8_builder, dimension);
                     break;
                 }
                 case kElemInt8: {
                     SharedPtr<arrow::Int8Builder> int8_builder = MakeShared<::arrow::Int8Builder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), int8_builder, dimension);
                     break;
                 }
                 case kElemInt16: {
                     SharedPtr<arrow::Int16Builder> int16_builder = MakeShared<::arrow::Int16Builder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), int16_builder, dimension);
                     break;
                 }
                 case kElemInt32: {
                     SharedPtr<arrow::Int32Builder> int32_builder = MakeShared<::arrow::Int32Builder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), int32_builder, dimension);
                     break;
                 }
                 case kElemInt64: {
                     SharedPtr<arrow::Int64Builder> int64_builder = MakeShared<::arrow::Int64Builder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), int64_builder, dimension);
                     break;
                 }
                 case kElemFloat: {
                     SharedPtr<arrow::FloatBuilder> float_builder = MakeShared<::arrow::FloatBuilder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), float_builder, dimension);
                     break;
                 }
                 case kElemDouble: {
                     SharedPtr<arrow::DoubleBuilder> double_builder = MakeShared<::arrow::DoubleBuilder>();
-                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), double_builder);
+                    array_builder = MakeShared<::arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), double_builder, dimension);
                     break;
                 }
                 default: {
@@ -725,7 +854,185 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
             }
             break;
         }
-        case LogicalType::kDecimal:
+        case LogicalType::kSparse: {
+            const auto *sparse_info = static_cast<const SparseInfo *>(column_def->type()->type_info().get());
+            SharedPtr<arrow::ArrayBuilder> index_builder = nullptr;
+            SharedPtr<arrow::ArrayBuilder> value_builder = nullptr;
+            switch (sparse_info->IndexType()) {
+                case kElemInt8: {
+                    auto int8_builder = MakeShared<::arrow::Int8Builder>();
+                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
+                    break;
+                }
+                case kElemInt16: {
+                    auto int16_builder = MakeShared<::arrow::Int16Builder>();
+                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
+                    break;
+                }
+                case kElemInt32: {
+                    auto int32_builder = MakeShared<::arrow::Int32Builder>();
+                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
+                    break;
+                }
+                case kElemInt64: {
+                    auto int64_builder = MakeShared<::arrow::Int64Builder>();
+                    index_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid index type.");
+                }
+            }
+            switch (sparse_info->DataType()) {
+                case kElemBit: {
+                    break;
+                }
+                case kElemInt8: {
+                    auto int8_builder = MakeShared<::arrow::Int8Builder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int8_builder);
+                    break;
+                }
+                case kElemInt16: {
+                    auto int16_builder = MakeShared<::arrow::Int16Builder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int16_builder);
+                    break;
+                }
+                case kElemInt32: {
+                    auto int32_builder = MakeShared<::arrow::Int32Builder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int32_builder);
+                    break;
+                }
+                case kElemInt64: {
+                    auto int64_builder = MakeShared<::arrow::Int64Builder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), int64_builder);
+                    break;
+                }
+                case kElemFloat: {
+                    auto float_builder = MakeShared<::arrow::FloatBuilder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), float_builder);
+                    break;
+                }
+                case kElemDouble: {
+                    auto double_builder = MakeShared<::arrow::DoubleBuilder>();
+                    value_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), double_builder);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Invalid data type.");
+                }
+            }
+            auto struct_type = arrow::struct_({arrow::field("index", index_builder->type()), arrow::field("value", value_builder->type())});
+            Vector<SharedPtr<arrow::ArrayBuilder>> field_builders = {index_builder};
+            if (value_builder.get() != nullptr) {
+                field_builders.emplace_back(value_builder);
+            }
+            array_builder = MakeShared<::arrow::StructBuilder>(struct_type, arrow::DefaultMemoryPool(), std::move(field_builders));
+            break;
+        }
+        case LogicalType::kTensor: {
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
+            SizeT dimension = embedding_info->Dimension();
+            switch (embedding_info->Type()) {
+                case kElemBit: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::BooleanBuilder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemInt8: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int8Builder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemInt16: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int16Builder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemInt32: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int32Builder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemInt64: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int64Builder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemFloat: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::FloatBuilder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemDouble: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::DoubleBuilder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Not implemented");
+                }
+            }
+            break;
+        }
+        case LogicalType::kTensorArray: {
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
+            SizeT dimension = embedding_info->Dimension();
+            switch (embedding_info->Type()) {
+                case kElemInt8: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int8Builder>(), dimension);
+                    auto tensor_array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_array_builder);
+                    break;
+                }
+                case kElemInt16: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int16Builder>(), dimension);
+                    auto tensor_array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_array_builder);
+                    break;
+                }
+                case kElemInt32: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int32Builder>(), dimension);
+                    auto tensor_array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_array_builder);
+                    break;
+                }
+                case kElemInt64: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int64Builder>(), dimension);
+                    auto tensor_array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_array_builder);
+                    break;
+                }
+                case kElemFloat: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::FloatBuilder>(), dimension);
+                    auto tensor_array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_array_builder);
+                    break;
+                }
+                case kElemDouble: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::DoubleBuilder>(), dimension);
+                    auto tensor_array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    array_builder = MakeShared<arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_array_builder);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Not implemented");
+                }
+            }
+            break;
+        }
         default: {
             String error_message = "Invalid data type";
             LOG_CRITICAL(error_message);

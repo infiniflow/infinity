@@ -229,7 +229,7 @@ public:
 
     void AppendByPtr(const_ptr_t value_ptr);
 
-    void AppendByStringView(std::string_view sv, const ColumnDef *column_def = nullptr);
+    void AppendByStringView(std::string_view sv);
 
     void AppendByConstantExpr(const ConstantExpr *const_expr);
 
@@ -314,24 +314,32 @@ private:
             buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tensors.data()), tensors.size() * sizeof(TensorT));
     }
 
+public:
+    template <typename DataT, typename IdxT>
+    void AppendSparse(SizeT nnz, DataT *data, IdxT *index) {
+        SizeT dst_off = tail_index_++;
+        AppendSparseInner(nnz, data, index, dst_off);
+    }
+
+private:
     template <typename T>
-    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off, const ColumnDef *column_def) {
+    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
         const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
         switch (sparse_info->IndexType()) {
             case kElemInt8: {
-                AppendSparse<T, TinyIntT>(ele_str_views, dst_off, column_def);
+                AppendSparse<T, TinyIntT>(ele_str_views, dst_off);
                 break;
             }
             case kElemInt16: {
-                AppendSparse<T, SmallIntT>(ele_str_views, dst_off, column_def);
+                AppendSparse<T, SmallIntT>(ele_str_views, dst_off);
                 break;
             }
             case kElemInt32: {
-                AppendSparse<T, IntegerT>(ele_str_views, dst_off, column_def);
+                AppendSparse<T, IntegerT>(ele_str_views, dst_off);
                 break;
             }
             case kElemInt64: {
-                AppendSparse<T, BigIntT>(ele_str_views, dst_off, column_def);
+                AppendSparse<T, BigIntT>(ele_str_views, dst_off);
                 break;
             }
             default: {
@@ -341,75 +349,89 @@ private:
         }
     }
 
-    template <typename T, typename IdxT>
-    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off, const ColumnDef *column_def) {
-        auto &target_sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
+    template <typename DataT, typename IdxT>
+    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
         SizeT total_element_count = ele_str_views.size();
-        target_sparse.nnz_ = total_element_count;
-
-        if (total_element_count == 0) {
-            target_sparse.chunk_id_ = -1;
-            target_sparse.chunk_offset_ = 0;
-            return;
-        }
-        bool to_sort = true;
-        if (column_def) {
-            auto data_type = column_def->type()->type();
-            if (data_type == LogicalType::kSparse) {
-                const auto *sparse_info = static_cast<const SparseInfo *>(column_def->type()->type_info().get());
-                if (sparse_info->StoreType() == SparseStoreType::kSorted) {
-                    to_sort = false;
-                }
-            }
-        }
-
-        auto tmp_indices = MakeUniqueForOverwrite<IdxT[]>(total_element_count);
-        HashSet<IdxT> index_set;
-        if constexpr (std::is_same_v<T, BooleanT>) {
+        Vector<IdxT> index_vec;
+        index_vec.reserve(total_element_count);
+        if constexpr (std::is_same_v<DataT, BooleanT>) {
             for (u32 i = 0; i < total_element_count; ++i) {
                 auto index = DataType::StringToValue<IdxT>(ele_str_views[i]);
                 if (index < 0) {
                     RecoverableError(Status::InvalidDataType());
                 }
-                tmp_indices[i] = index;
-                auto [iter, insert_ok] = index_set.insert(index);
-                if (!insert_ok) {
-                    RecoverableError(Status::InvalidDataType());
-                }
+                index_vec.push_back(index);
             }
-            if (to_sort) {
-                std::sort(tmp_indices.get(), tmp_indices.get() + total_element_count);
-            }
-            std::tie(target_sparse.chunk_id_, target_sparse.chunk_offset_) =
-                buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tmp_indices.get()), total_element_count * sizeof(IdxT));
+            AppendSparseInner(total_element_count, static_cast<DataT *>(nullptr), index_vec.data(), dst_off);
         } else {
-            Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
-            auto tmp_data = MakeUniqueForOverwrite<T[]>(total_element_count);
+            Vector<DataT> data_vec;
+            data_vec.reserve(total_element_count);
             for (u32 i = 0; i < total_element_count; ++i) {
-                auto [index, value] = DataType::StringToSparseValue<T, IdxT>(ele_str_views[i]);
+                auto [index, value] = DataType::StringToSparseValue<DataT, IdxT>(ele_str_views[i]);
                 if (index < 0) {
                     RecoverableError(Status::InvalidDataType());
                 }
-                tmp_indices[i] = index;
-                tmp_data[i] = value;
-                auto [iter, insert_ok] = index_set.insert(index);
-                if (!insert_ok) {
-                    RecoverableError(Status::InvalidDataType());
-                }
+                index_vec.push_back(index);
+                data_vec.push_back(value);
+            }
+            AppendSparseInner(total_element_count, data_vec.data(), index_vec.data(), dst_off);
+        }
+    }
+
+    template <typename DataT, typename IdxT>
+    void AppendSparseInner(SizeT nnz, DataT *data, IdxT *index, SizeT dst_off) {
+        auto &target_sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
+        target_sparse.nnz_ = nnz;
+        if (nnz == 0) {
+            target_sparse.chunk_id_ = -1;
+            target_sparse.chunk_offset_ = 0;
+            return;
+        }
+        bool to_sort = true;
+        {
+            auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
+            if (sparse_info->StoreType() == SparseStoreType::kSorted) {
+                to_sort = false;
+            }
+        }
+
+        if constexpr (std::is_same_v<DataT, BooleanT>) {
+            if (data != nullptr) {
+                RecoverableError(Status::InvalidDataType());
+                return;
             }
             if (to_sort) {
-                Vector<Pair<IdxT, T>> index_value_pairs(total_element_count);
-                for (u32 i = 0; i < total_element_count; ++i) {
-                    index_value_pairs[i] = {tmp_indices[i], tmp_data[i]};
-                }
-                std::sort(index_value_pairs.begin(), index_value_pairs.end(), [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
-                for (u32 i = 0; i < total_element_count; ++i) {
-                    tmp_indices[i] = index_value_pairs[i].first;
-                    tmp_data[i] = index_value_pairs[i].second;
+                auto *index_end = index + nnz;
+                std::sort(index, index_end);
+                auto *index_end1 = std::unique(index, index_end);
+                if (index_end1 != index_end) {
+                    RecoverableError(Status::InvalidDataType());
+                    return;
                 }
             }
-            data_ptrs.emplace_back(reinterpret_cast<const char *>(tmp_indices.get()), total_element_count * sizeof(IdxT));
-            data_ptrs.emplace_back(reinterpret_cast<const char *>(tmp_data.get()), total_element_count * sizeof(T));
+            std::tie(target_sparse.chunk_id_, target_sparse.chunk_offset_) =
+                buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(index), nnz * sizeof(IdxT));
+        } else {
+            if (to_sort) {
+                auto *index_end = index + nnz;
+                Vector<Pair<IdxT, DataT>> index_value_pairs(nnz);
+                for (u32 i = 0; i < nnz; ++i) {
+                    index_value_pairs[i] = {index[i], data[i]};
+                }
+                std::sort(index_value_pairs.begin(), index_value_pairs.end(), [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
+                for (u32 i = 0; i < nnz; ++i) {
+                    index[i] = index_value_pairs[i].first;
+                    data[i] = index_value_pairs[i].second;
+                }
+                auto *index_end1 = std::unique(index, index_end);
+                if (index_end1 != index_end) {
+                    RecoverableError(Status::InvalidDataType());
+                    return;
+                }
+            }
+            Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
+            data_ptrs.emplace_back(reinterpret_cast<const char *>(index), nnz * sizeof(IdxT));
+            data_ptrs.emplace_back(reinterpret_cast<const char *>(data), nnz * sizeof(DataT));
             std::tie(target_sparse.chunk_id_, target_sparse.chunk_offset_) = buffer_->fix_heap_mgr_->AppendToHeap(data_ptrs);
         }
     }
