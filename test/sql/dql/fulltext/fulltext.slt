@@ -10,7 +10,7 @@ CREATE TABLE sqllogic_test_enwiki(doctitle varchar, docdate varchar, body varcha
 
 # copy data from csv file
 query I
-COPY sqllogic_test_enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
+COPY sqllogic_test_enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t', FORMAT CSV );
 ----
 
 statement error
@@ -42,7 +42,7 @@ Anarchism 30-APR-2012 03:25:17.000 6 20.881144
 
 # copy data from csv file
 query I
-COPY sqllogic_test_enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
+COPY sqllogic_test_enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t', FORMAT CSV );
 ----
 
 query TTI rowsort
@@ -53,7 +53,7 @@ Anarchism 30-APR-2012 03:25:17.000 4294967296 22.533094
 
 # copy data from csv file
 query I
-COPY sqllogic_test_enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t' );
+COPY sqllogic_test_enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DELIMITER '\t', FORMAT CSV );
 ----
 
 query TTI rowsort

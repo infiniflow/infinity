@@ -101,7 +101,7 @@ private:
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 
     TableEntry *table_entry_{};
-    CopyFileType file_type_{CopyFileType::kCSV};
+    CopyFileType file_type_{CopyFileType::kInvalid};
     String file_path_{};
     String table_name_{};
     String schema_name_{"default_db"};

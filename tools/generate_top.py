@@ -40,7 +40,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         top_slt_file.write("\n")
         top_slt_file.write("statement ok\n")
         top_slt_file.write(
-            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, copy_path))
+            "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(table_name, copy_path))
         top_slt_file.write("\nquery I\n")
         top_slt_file.write(
             "SELECT * FROM {} order by c1 - c1, c2 desc, c1 + c1 limit 10 offset 3330;\n".format(table_name))

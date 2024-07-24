@@ -50,7 +50,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         for _ in range(import_n):
             slt_file.write("statement ok\n")
             slt_file.write(
-                "COPY {} FROM '{}{}' WITH ( DELIMITER ',' );\n".format(
+                "COPY {} FROM '{}{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(
                     table_name, copy_dir, csv_name
                 )
             )

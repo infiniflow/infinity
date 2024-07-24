@@ -104,7 +104,7 @@ def generate(generate_if_exists: bool, copy: bool):
 
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '/var/infinity/test_data/{}' WITH ( DELIMITER ',' );\n".format(
+            "COPY {} FROM '/var/infinity/test_data/{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(
                 table_name, csv_name
             )
         )

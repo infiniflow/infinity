@@ -18,7 +18,7 @@ CREATE TABLE select3 (c1 INTEGER, c2 INTEGER, c3 INTEGER);
 
 # copy data from csv file
 query I
-COPY select2 FROM '/var/infinity/test_data/nation.csv' WITH ( DELIMITER ',' );
+COPY select2 FROM '/var/infinity/test_data/nation.csv' WITH ( DELIMITER ',', FORMAT CSV );
 ----
 
 statement ok

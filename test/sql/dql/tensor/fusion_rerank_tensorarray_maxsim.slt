@@ -6,7 +6,7 @@ statement ok
 CREATE TABLE fusion_rerank_tensor_array_maxsim (title VARCHAR, num INT, t TENSORARRAY(BIT, 8), body VARCHAR);
 
 statement ok
-COPY fusion_rerank_tensor_array_maxsim FROM '/var/infinity/test_data/tensor_array_maxsim.csv' WITH ( DELIMITER ',' );
+COPY fusion_rerank_tensor_array_maxsim FROM '/var/infinity/test_data/tensor_array_maxsim.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 query I
 SELECT * FROM fusion_rerank_tensor_array_maxsim;

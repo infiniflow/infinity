@@ -5,7 +5,7 @@ statement ok
 CREATE TABLE sqllogic_d (d date, t time, dt datetime, ts timestamp);
 
 statement ok
-COPY sqllogic_d FROM '/var/infinity/test_data/test_import_time.csv' WITH ( DELIMITER ',' );
+COPY sqllogic_d FROM '/var/infinity/test_data/test_import_time.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 query I
 SELECT * FROM sqllogic_d;

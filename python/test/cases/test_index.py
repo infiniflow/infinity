@@ -241,3 +241,30 @@ class TestInfinity:
     @pytest.mark.parametrize("index_distance_type", ["cosine", "hamming"])
     def test_unsupported_vector_index(self, index_distance_type):
         self.test_infinity_obj._test_unsupported_vector_index(index_distance_type)
+
+
+    def test_create_upper_name_index(self):
+        self.test_infinity_obj._test_create_upper_name_index()
+
+    @pytest.mark.parametrize("index_type", [
+        index.IndexType.IVFFlat,
+        index.IndexType.Hnsw,
+        index.IndexType.BMP,
+        index.IndexType.FullText,
+        index.IndexType.EMVB,
+        index.IndexType.Secondary,
+    ])
+    def test_create_index_with_converse_param_name(self, index_type):
+        self.test_infinity_obj._test_create_index_with_converse_param_name(index_type)
+
+    @pytest.mark.parametrize("index_type", [
+        index.IndexType.IVFFlat,
+        index.IndexType.Hnsw,
+        index.IndexType.BMP,
+        index.IndexType.FullText,
+        index.IndexType.EMVB,
+        index.IndexType.Secondary,
+    ])
+    def test_create_index_with_converse_param_value(self, index_type):
+        self.test_infinity_obj._test_create_index_with_converse_param_value(index_type)
+

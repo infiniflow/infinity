@@ -64,7 +64,7 @@ public:
 
 private:
     TableEntry *table_entry_{};
-    CopyFileType file_type_{CopyFileType::kCSV};
+    CopyFileType file_type_{CopyFileType::kInvalid};
     String file_path_{};
     bool header_{false};
     char delimiter_{','};

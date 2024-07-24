@@ -39,7 +39,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         index_scan_slt_file.write("\nstatement ok\n")
         index_scan_slt_file.write(
-            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(table_name, copy_path))
+            "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(table_name, copy_path))
 
         index_scan_slt_file.write("\nstatement ok\n")
         index_scan_slt_file.write(
