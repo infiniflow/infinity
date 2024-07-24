@@ -9,10 +9,10 @@ def generate(generate_if_exists: bool, copy_dir: str):
     parquet_dir = "./test/data/parquet"
     import_slt_dir = "./test/sql/dml/import"
 
-    table_name = "parquet_embedding_table"
-    table_name1 = "parquet_embedding_table1"
-    parquet_filename = "gen_embedding.parquet"
-    parquet_filename1 = "gen_embedding1.parquet"
+    table_name = "parquet_varchar_table"
+    table_name1 = "parquet_varchar_table1"
+    parquet_filename = "gen_varchar.parquet"
+    parquet_filename1 = "gen_varchar1.parquet"
     parquet_path = parquet_dir + "/" + parquet_filename
     import_slt_path = import_slt_dir + "/test_import_gen_parquet_varchar.slt"
     copy_path = copy_dir + "/" + parquet_filename

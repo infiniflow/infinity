@@ -1339,6 +1339,100 @@ void ParquetSparseValueHandler(const SparseInfo *sparse_info,
     }
 }
 
+namespace {
+
+template <typename LstArray>
+Pair<UniquePtr<char[]>, SizeT> ParquetEmbeddingHandler(SharedPtr<LstArray> list_array, const EmbeddingInfo *embedding_info, u64 value_idx) {
+    SizeT dim = embedding_info->Dimension();
+    i64 start_offset = list_array->value_offset(value_idx);
+    i64 end_offset = list_array->value_offset(value_idx + 1);
+    if (end_offset - start_offset != (i64)dim) {
+        String error_message = fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, end_offset - start_offset);
+        LOG_ERROR(error_message);
+        UnrecoverableError(error_message);
+    }
+    switch (embedding_info->Type()) {
+        case kElemInt8: {
+            auto embedding = MakeUnique<char[]>(dim * sizeof(i8));
+            auto int8_array = std::dynamic_pointer_cast<arrow::Int8Array>(list_array->values());
+            if (int8_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            for (i64 j = start_offset; j < end_offset; ++j) {
+                i8 value = int8_array->Value(j);
+                reinterpret_cast<i8 *>(embedding.get())[j - start_offset] = value;
+            }
+            return {std::move(embedding), dim * sizeof(i8)};
+        }
+        case kElemInt16: {
+            auto embedding = MakeUnique<char[]>(dim * sizeof(i16));
+            auto int16_array = std::dynamic_pointer_cast<arrow::Int16Array>(list_array->values());
+            if (int16_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            for (i64 j = start_offset; j < end_offset; ++j) {
+                i16 value = int16_array->Value(j);
+                reinterpret_cast<i16 *>(embedding.get())[j - start_offset] = value;
+            }
+            return {std::move(embedding), dim * sizeof(i16)};
+        }
+        case kElemInt32: {
+            auto embedding = MakeUnique<char[]>(dim * sizeof(i32));
+            auto int32_array = std::dynamic_pointer_cast<arrow::Int32Array>(list_array->values());
+            if (int32_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            for (i64 j = start_offset; j < end_offset; ++j) {
+                i32 value = int32_array->Value(j);
+                reinterpret_cast<i32 *>(embedding.get())[j - start_offset] = value;
+            }
+            return {std::move(embedding), dim * sizeof(i32)};
+        }
+        case kElemInt64: {
+            auto embedding = MakeUnique<char[]>(dim * sizeof(i64));
+            auto int64_array = std::dynamic_pointer_cast<arrow::Int64Array>(list_array->values());
+            if (int64_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            for (i64 j = start_offset; j < end_offset; ++j) {
+                i64 value = int64_array->Value(j);
+                reinterpret_cast<i64 *>(embedding.get())[j - start_offset] = value;
+            }
+            return {std::move(embedding), dim * sizeof(i64)};
+        }
+        case kElemFloat: {
+            auto embedding = MakeUnique<char[]>(dim * sizeof(float));
+            auto float_array = std::dynamic_pointer_cast<arrow::FloatArray>(list_array->values());
+            if (float_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            for (i64 j = start_offset; j < end_offset; ++j) {
+                float value = float_array->Value(j);
+                reinterpret_cast<float *>(embedding.get())[j - start_offset] = value;
+            }
+            return {std::move(embedding), dim * sizeof(float)};
+        }
+        case kElemDouble: {
+            auto embedding = MakeUnique<char[]>(dim * sizeof(double));
+            auto double_array = std::dynamic_pointer_cast<arrow::DoubleArray>(list_array->values());
+            if (double_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            for (i64 j = start_offset; j < end_offset; ++j) {
+                double value = double_array->Value(j);
+                reinterpret_cast<double *>(embedding.get())[j - start_offset] = value;
+            }
+            return {std::move(embedding), dim * sizeof(double)};
+        }
+        default: {
+            UnrecoverableError("Invalid embedding data type.");
+            return {};
+        }
+    }
+}
+
+} // namespace
+
 void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx) {
     switch (column_vector.data_type()->type()) {
         case kBoolean: {
@@ -1383,93 +1477,17 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
             break;
         }
         case kEmbedding: {
-            auto inner = [&](auto list_array) {
-                auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
-                SizeT dim = embedding_info->Dimension();
-                i64 start_offset = list_array->value_offset(value_idx);
-                i64 end_offset = list_array->value_offset(value_idx + 1);
-                if (end_offset - start_offset != (i64)dim) {
-                    String error_message =
-                        fmt::format("Attempt to import {} dimension embedding into {} dimension column.", dim, end_offset - start_offset);
-                    LOG_ERROR(error_message);
-                    UnrecoverableError(error_message);
-                }
-                switch (embedding_info->Type()) {
-                    case kElemInt8: {
-                        Vector<i8> embedding;
-                        auto int8_array = std::dynamic_pointer_cast<arrow::Int8Array>(list_array->values());
-                        for (i64 j = start_offset; j < end_offset; ++j) {
-                            i8 value = int8_array->Value(j);
-                            embedding.push_back(value);
-                        }
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    case kElemInt16: {
-                        Vector<i16> embedding;
-                        auto int16_array = std::dynamic_pointer_cast<arrow::Int16Array>(list_array->values());
-                        for (i64 j = start_offset; j < end_offset; ++j) {
-                            i16 value = int16_array->Value(j);
-                            embedding.push_back(value);
-                        }
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    case kElemInt32: {
-                        Vector<i32> embedding;
-                        auto int32_array = std::dynamic_pointer_cast<arrow::Int32Array>(list_array->values());
-                        for (i64 j = start_offset; j < end_offset; ++j) {
-                            i32 value = int32_array->Value(j);
-                            embedding.push_back(value);
-                        }
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    case kElemInt64: {
-                        Vector<i64> embedding;
-                        auto int64_array = std::dynamic_pointer_cast<arrow::Int64Array>(list_array->values());
-                        for (i64 j = start_offset; j < end_offset; ++j) {
-                            i64 value = int64_array->Value(j);
-                            embedding.push_back(value);
-                        }
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    case kElemFloat: {
-                        Vector<float> embedding;
-                        auto float_array = std::dynamic_pointer_cast<arrow::FloatArray>(list_array->values());
-                        for (i64 j = start_offset; j < end_offset; ++j) {
-                            float value = float_array->Value(j);
-                            embedding.push_back(value);
-                        }
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    case kElemDouble: {
-                        Vector<double> embedding;
-                        auto double_array = std::dynamic_pointer_cast<arrow::DoubleArray>(list_array->values());
-                        for (i64 j = start_offset; j < end_offset; ++j) {
-                            double value = double_array->Value(j);
-                            embedding.push_back(value);
-                        }
-                        column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(embedding.data()));
-                        break;
-                    }
-                    default: {
-                        String error_message = "Not implement: Embedding type.";
-                        LOG_CRITICAL(error_message);
-                        UnrecoverableError(error_message);
-                    }
-                }
-            };
+            auto embedding_info = static_cast<EmbeddingInfo *>(column_vector.data_type()->type_info().get());
             if (auto fixed_list_array = std::dynamic_pointer_cast<arrow::FixedSizeListArray>(array); fixed_list_array.get() != nullptr) {
-                inner(fixed_list_array);
+                auto [data, size] = ParquetEmbeddingHandler(fixed_list_array, embedding_info, value_idx);
+                column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(data.get()));
             } else {
                 auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
                 if (list_array.get() == nullptr) {
                     RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
                 }
-                inner(list_array);
+                auto [data, size] = ParquetEmbeddingHandler(list_array, embedding_info, value_idx);
+                column_vector.AppendByPtr(reinterpret_cast<const_ptr_t>(data.get()));
             }
             break;
         }
@@ -1560,6 +1578,41 @@ void PhysicalImport::ParquetValueHandler(const SharedPtr<arrow::Array> &array, C
                 default: {
                     UnrecoverableError("Invalid sparse index type.");
                 }
+            }
+            break;
+        }
+        case kTensor: {
+            const auto embedding_info = std::static_pointer_cast<EmbeddingInfo>(column_vector.data_type()->type_info());
+            auto list_array = std::dynamic_pointer_cast<arrow::ListArray>(array);
+            if (list_array.get() == nullptr) {
+                RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+            }
+            i64 start_offset = list_array->value_offset(value_idx);
+            i64 end_offset = list_array->value_offset(value_idx + 1);
+
+            Vector<Pair<UniquePtr<char[]>, SizeT>> embedding_vec;
+            if (auto fixed_tensor_ele_array = std::dynamic_pointer_cast<arrow::FixedSizeListArray>(list_array->values());
+                fixed_tensor_ele_array.get() != nullptr) {
+                for (i64 j = start_offset; j < end_offset; ++j) {
+                    auto data = ParquetEmbeddingHandler(fixed_tensor_ele_array, embedding_info.get(), j);
+                    embedding_vec.push_back(std::move(data));
+                }
+            } else {
+                auto tensor_ele_array = std::dynamic_pointer_cast<arrow::ListArray>(list_array->values());
+                if (tensor_ele_array.get() == nullptr) {
+                    RecoverableError(Status::ImportFileFormatError("Invalid parquet file format."));
+                }
+                for (i64 j = start_offset; j < end_offset; ++j) {
+                    auto data = ParquetEmbeddingHandler(tensor_ele_array, embedding_info.get(), j);
+                    embedding_vec.push_back(std::move(data));
+                }
+            }
+            {
+                Vector<Pair<ptr_t, SizeT>> embedding_data;
+                for (auto &data : embedding_vec) {
+                    embedding_data.push_back({data.first.get(), data.second});
+                }
+                column_vector.AppendValue(Value::MakeTensor(embedding_data, embedding_info));
             }
             break;
         }

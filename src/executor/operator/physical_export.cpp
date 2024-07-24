@@ -680,6 +680,34 @@ SharedPtr<arrow::DataType> PhysicalExport::GetArrowType(ColumnDef *column_def) {
             }
             return arrow::struct_(std::move(fields));
         }
+        case LogicalType::kTensor: {
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
+            SizeT dimension = embedding_info->Dimension();
+            switch (embedding_info->Type()) {
+                case kElemInt8: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::int8(), dimension));
+                }
+                case kElemInt16: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::int16(), dimension));
+                }
+                case kElemInt32: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::int32(), dimension));
+                }
+                case kElemInt64: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::int64(), dimension));
+                }
+                case kElemFloat: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::float32(), dimension));
+                }
+                case kElemDouble: {
+                    return ::arrow::list(::arrow::fixed_size_list(::arrow::float64(), dimension));
+                }
+                default: {
+                    UnrecoverableError("Not implemented");
+                }
+            }
+            break;
+        }
         default: {
             String error_message = "Invalid data type";
             LOG_CRITICAL(error_message);
@@ -865,6 +893,58 @@ SharedPtr<arrow::Array> PhysicalExport::BuildArrowArray(ColumnDef *column_def, c
                 field_builders.emplace_back(value_builder);
             }
             array_builder = MakeShared<::arrow::StructBuilder>(struct_type, arrow::DefaultMemoryPool(), std::move(field_builders));
+            break;
+        }
+        case LogicalType::kTensor: {
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
+            SizeT dimension = embedding_info->Dimension();
+            switch (embedding_info->Type()) {
+                case kElemBit: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::BooleanBuilder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemInt8: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int8Builder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemInt16: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int16Builder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemInt32: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int32Builder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemInt64: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::Int64Builder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemFloat: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::FloatBuilder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                case kElemDouble: {
+                    auto tensor_ele_builder =
+                        MakeShared<arrow::FixedSizeListBuilder>(arrow::DefaultMemoryPool(), MakeShared<arrow::DoubleBuilder>(), dimension);
+                    array_builder = MakeShared<::arrow::ListBuilder>(arrow::DefaultMemoryPool(), tensor_ele_builder);
+                    break;
+                }
+                default: {
+                    UnrecoverableError("Not implemented");
+                }
+            }
             break;
         }
         default: {

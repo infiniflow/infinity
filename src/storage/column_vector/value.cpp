@@ -168,7 +168,28 @@ void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, siz
     }
 }
 
+void Tensor2Arrow(const Vector<EmbeddingType> &embeddings, EmbeddingDataType type, size_t dimension, arrow::ArrayBuilder *value_builder) {
+    auto *tensor_ele_builder = dynamic_cast<arrow::FixedSizeListBuilder *>(value_builder);
+    for (const auto &embedding : embeddings) {
+        auto status = tensor_ele_builder->Append();
+        Embedding2Arrow(embedding, type, dimension, tensor_ele_builder->value_builder());
+    }
+}
+
 } // namespace
+
+EmbeddingValueInfo::EmbeddingValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
+    len_ = 0;
+    for (const auto &[ptr, bytes] : ptr_bytes) {
+        len_ += bytes;
+    }
+    data_ = MakeUnique<char[]>(len_);
+    SizeT offset = 0;
+    for (const auto &[ptr, bytes] : ptr_bytes) {
+        std::memcpy(data_.get() + offset, ptr, bytes);
+        offset += bytes;
+    }
+}
 
 // Value maker
 Value Value::MakeValue(DataType type) {
@@ -385,6 +406,24 @@ Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_i
     }
     Value value(LogicalType::kTensor, std::move(type_info_ptr));
     value.value_info_ = EmbeddingValueInfo::MakeTensorValueInfo(ptr, bytes);
+    return value;
+}
+
+Value Value::MakeTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr) {
+    if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
+        String error_message = fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
+        UnrecoverableError(error_message);
+    }
+    const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
+    SizeT len = embedding_info->Size();
+    for (const auto [_, bytes] : ptr_bytes) {
+        if (bytes == 0 || bytes % len != 0) {
+            Status status = Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
+            RecoverableError(status);
+        }
+    }
+    Value value(LogicalType::kTensor, std::move(type_info_ptr));
+    value.value_info_ = EmbeddingValueInfo::MakeTensorValueInfo(ptr_bytes);
     return value;
 }
 
@@ -1362,11 +1401,30 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
             EmbeddingT index_embedding(index.data(), false);
             EmbeddingT data_embedding(data.data(), false);
             auto *list_index_builder = dynamic_cast<arrow::ListBuilder *>(index_builder);
+            status = list_index_builder->Append();
             Embedding2Arrow(index_embedding, sparse_info->IndexType(), nnz, list_index_builder->value_builder());
             if (value_builder) {
                 auto *list_value_builder = dynamic_cast<arrow::ListBuilder *>(value_builder);
+                status = list_value_builder->Append();
                 Embedding2Arrow(data_embedding, sparse_info->DataType(), nnz, list_value_builder->value_builder());
             }
+            break;
+        }
+        case LogicalType::kTensor: {
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type->type_info().get());
+            SizeT dim = embedding_info->Dimension();
+            auto type = embedding_info->Type();
+
+            Span<char> tensor = this->GetEmbedding();
+            Vector<EmbeddingT> embeddings;
+            auto embedding_num = tensor.size() / embedding_info->Size();
+            for (SizeT i = 0; i < embedding_num; i++) {
+                embeddings.emplace_back(const_cast<char *>(tensor.data() + i * embedding_info->Size()), false);
+            }
+
+            auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder.get());
+            auto status = list_builder->Append();
+            Tensor2Arrow(embeddings, type, dim, list_builder->value_builder());
             break;
         }
         default: {
@@ -1389,6 +1447,10 @@ SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const_ptr_
         RecoverableError(status);
     }
     return MakeShared<EmbeddingValueInfo>(ptr, bytes);
+}
+
+SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
+    return MakeShared<EmbeddingValueInfo>(ptr_bytes);
 }
 
 } // namespace infinity
