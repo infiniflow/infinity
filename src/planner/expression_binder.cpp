@@ -585,6 +585,12 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
                                                             embedding_info->Dimension()));
             RecoverableError(status);
         }
+        if (parsed_knn_expr.embedding_data_type_ != embedding_info->Type()) {
+            Status status = Status::SyntaxError(fmt::format("Query embedding with data type: {} which doesn't match with column embedding type {}.",
+                                                            EmbeddingInfo::EmbeddingDataTypeToString(parsed_knn_expr.embedding_data_type_),
+                                                            EmbeddingInfo::EmbeddingDataTypeToString(embedding_info->Type())));
+            RecoverableError(std::move(status));
+        }
     }
 
     arguments.emplace_back(expr_ptr);

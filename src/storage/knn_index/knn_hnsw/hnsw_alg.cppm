@@ -48,10 +48,11 @@ public:
     using QueryType = typename VecStoreType::QueryType;
     using DataStore = DataStore<VecStoreType, LabelType>;
     using Distance = typename VecStoreType::Distance;
+    using DistanceType = typename Distance::DistanceType;
 
-    using PDV = Pair<DataType, VertexType>;
-    using CMP = CompareByFirst<DataType, VertexType>;
-    using CMPReverse = CompareByFirstReverse<DataType, VertexType>;
+    using PDV = Pair<DistanceType, VertexType>;
+    using CMP = CompareByFirst<DistanceType, VertexType>;
+    using CMPReverse = CompareByFirstReverse<DistanceType, VertexType>;
     using DistHeap = Heap<PDV, CMP>;
 
     constexpr static int prefetch_offset_ = 0;
@@ -130,11 +131,11 @@ private:
 
     // return the nearest `ef_construction_` neighbors of `query` in layer `layer_idx`
     template <bool WithLock, FilterConcept<LabelType> Filter = NoneType>
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>>
+    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<VertexType[]>>
     SearchLayer(VertexType enter_point, const StoreType &query, i32 layer_idx, SizeT result_n, const Filter &filter) const {
-        auto d_ptr = MakeUniqueForOverwrite<DataType[]>(result_n);
+        auto d_ptr = MakeUniqueForOverwrite<DistanceType[]>(result_n);
         auto i_ptr = MakeUniqueForOverwrite<VertexType[]>(result_n);
-        HeapResultHandler<CompareMax<DataType, VertexType>> result_handler(1, result_n, d_ptr.get(), i_ptr.get());
+        HeapResultHandler<CompareMax<DistanceType, VertexType>> result_handler(1, result_n, d_ptr.get(), i_ptr.get());
         result_handler.Begin();
         DistHeap candidate;
 
@@ -202,7 +203,7 @@ private:
     template <bool WithLock>
     VertexType SearchLayerNearest(VertexType enter_point, const StoreType &query, i32 layer_idx) const {
         VertexType cur_p = enter_point;
-        DataType cur_dist = distance_(query, data_store_.GetVec(cur_p), data_store_.vec_store_meta());
+        auto cur_dist = distance_(query, data_store_.GetVec(cur_p), data_store_.vec_store_meta());
         bool check = true;
         while (check) {
             check = false;
@@ -215,7 +216,7 @@ private:
             const auto [neighbors_p, neighbor_size] = data_store_.GetNeighbors(cur_p, layer_idx);
             for (int i = neighbor_size - 1; i >= 0; --i) {
                 VertexType n_idx = neighbors_p[i];
-                DataType n_dist = distance_(query, data_store_.GetVec(n_idx), data_store_.vec_store_meta());
+                auto n_dist = distance_(query, data_store_.GetVec(n_idx), data_store_.vec_store_meta());
                 if (n_dist < cur_dist) {
                     cur_p = n_idx;
                     cur_dist = n_dist;
@@ -243,7 +244,7 @@ private:
                 bool check = true;
                 for (SizeT i = 0; i < SizeT(result_size); ++i) {
                     VertexType r_idx = result_p[i];
-                    DataType cr_dist = distance_(c_data, data_store_.GetVec(r_idx), data_store_.vec_store_meta());
+                    auto cr_dist = distance_(c_data, data_store_.GetVec(r_idx), data_store_.vec_store_meta());
                     if (cr_dist < c_dist) {
                         check = false;
                         break;
@@ -274,7 +275,7 @@ private:
                 continue;
             }
             StoreType n_data = data_store_.GetVec(n_idx);
-            DataType n_dist = distance_(n_data, data_store_.GetVec(vertex_i), data_store_.vec_store_meta());
+            auto n_dist = distance_(n_data, data_store_.GetVec(vertex_i), data_store_.vec_store_meta());
 
             Vector<PDV> candidates;
             candidates.reserve(n_neighbor_size + 1);
@@ -290,7 +291,7 @@ private:
     LabelType GetLabel(VertexType vertex_i) const { return data_store_.GetLabel(vertex_i); }
 
     template <bool WithLock, FilterConcept<LabelType> Filter = NoneType>
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<VertexType[]>> KnnSearchInner(const QueryVecType &q, SizeT k, const Filter &filter) const {
+    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<VertexType[]>> KnnSearchInner(const QueryVecType &q, SizeT k, const Filter &filter) const {
         QueryType query = data_store_.MakeQuery(q);
         auto [max_layer, ep] = data_store_.GetEnterPoint();
         if (ep == -1) {
@@ -366,7 +367,7 @@ public:
     }
 
     template <FilterConcept<LabelType> Filter = NoneType, bool WithLock = true>
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const QueryVecType &q, SizeT k, const Filter &filter) const {
+    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<LabelType[]>> KnnSearch(const QueryVecType &q, SizeT k, const Filter &filter) const {
         auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter);
         auto labels = MakeUniqueForOverwrite<LabelType[]>(result_n);
         for (SizeT i = 0; i < result_n; ++i) {
@@ -376,15 +377,15 @@ public:
     }
 
     template <bool WithLock = true>
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const QueryVecType &q, SizeT k) const {
+    Tuple<SizeT, UniquePtr<DistanceType[]>, UniquePtr<LabelType[]>> KnnSearch(const QueryVecType &q, SizeT k) const {
         return KnnSearch<NoneType, WithLock>(q, k, None);
     }
 
     // function for test, add sort for convenience
     template <FilterConcept<LabelType> Filter = NoneType, bool WithLock = true>
-    Vector<Pair<DataType, LabelType>> KnnSearchSorted(const QueryVecType &q, SizeT k, const Filter &filter) const {
+    Vector<Pair<DistanceType, LabelType>> KnnSearchSorted(const QueryVecType &q, SizeT k, const Filter &filter) const {
         auto [result_n, d_ptr, v_ptr] = KnnSearchInner<WithLock, Filter>(q, k, filter);
-        Vector<Pair<DataType, LabelType>> result(result_n);
+        Vector<Pair<DistanceType, LabelType>> result(result_n);
         for (SizeT i = 0; i < result_n; ++i) {
             result[i] = {d_ptr[i], GetLabel(v_ptr[i])};
         }
@@ -393,7 +394,7 @@ public:
     }
 
     // function for test
-    Vector<Pair<DataType, LabelType>> KnnSearchSorted(const QueryVecType &q, SizeT k) const { return KnnSearchSorted<NoneType>(q, k, None); }
+    Vector<Pair<DistanceType, LabelType>> KnnSearchSorted(const QueryVecType &q, SizeT k) const { return KnnSearchSorted<NoneType>(q, k, None); }
 
     void SetEf(SizeT ef) { ef_ = ef; }
 

@@ -69,6 +69,9 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
         RecoverableError(status);
     }
     switch (source_info->Type()) {
+        case EmbeddingDataType::kElemUInt8: {
+            return BindEmbeddingCast<u8>(target_info);
+        }
         case EmbeddingDataType::kElemInt8: {
             return BindEmbeddingCast<TinyIntT>(target_info);
         }
@@ -101,6 +104,9 @@ inline BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target) {
         case EmbeddingDataType::kElemBit: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, BooleanT, EmbeddingTryCastToFixlen>);
         }
+        case EmbeddingDataType::kElemUInt8: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, u8, EmbeddingTryCastToFixlen>);
+        }
         case EmbeddingDataType::kElemInt8: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, TinyIntT, EmbeddingTryCastToFixlen>);
         }
@@ -131,10 +137,13 @@ struct EmbeddingTryCastToFixlen {
     template <typename SourceElemType, typename TargetElemType>
     static inline bool Run(const SourceElemType *source, TargetElemType *target, SizeT len) {
         if constexpr (std::is_same_v<TargetElemType, bool>) {
-            if constexpr (!(std::is_same_v<SourceElemType, TinyIntT> || std::is_same_v<SourceElemType, SmallIntT> ||
-                            std::is_same_v<SourceElemType, IntegerT> || std::is_same_v<SourceElemType, BigIntT> ||
-                            std::is_same_v<SourceElemType, FloatT> || std::is_same_v<SourceElemType, DoubleT>)) {
-                String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>());
+            if constexpr (!(std::is_same_v<SourceElemType, u8> || std::is_same_v<SourceElemType, TinyIntT> ||
+                            std::is_same_v<SourceElemType, SmallIntT> || std::is_same_v<SourceElemType, IntegerT> ||
+                            std::is_same_v<SourceElemType, BigIntT> || std::is_same_v<SourceElemType, FloatT> ||
+                            std::is_same_v<SourceElemType, DoubleT>)) {
+                String error_message = fmt::format("Not support to cast from {} to {}",
+                                                   DataType::TypeToString<SourceElemType>(),
+                                                   DataType::TypeToString<TargetElemType>());
                 UnrecoverableError(error_message);
             }
             auto *dst = reinterpret_cast<u8 *>(target);
@@ -146,10 +155,13 @@ struct EmbeddingTryCastToFixlen {
             }
             return true;
         } else if constexpr (std::is_same_v<SourceElemType, bool>) {
-            if constexpr (!(std::is_same_v<TargetElemType, TinyIntT> || std::is_same_v<TargetElemType, SmallIntT> ||
-                            std::is_same_v<TargetElemType, IntegerT> || std::is_same_v<TargetElemType, BigIntT> ||
-                            std::is_same_v<TargetElemType, FloatT> || std::is_same_v<TargetElemType, DoubleT>)) {
-                String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>());
+            if constexpr (!(std::is_same_v<TargetElemType, u8> || std::is_same_v<TargetElemType, TinyIntT> ||
+                            std::is_same_v<TargetElemType, SmallIntT> || std::is_same_v<TargetElemType, IntegerT> ||
+                            std::is_same_v<TargetElemType, BigIntT> || std::is_same_v<TargetElemType, FloatT> ||
+                            std::is_same_v<TargetElemType, DoubleT>)) {
+                String error_message = fmt::format("Not support to cast from {} to {}",
+                                                   DataType::TypeToString<SourceElemType>(),
+                                                   DataType::TypeToString<TargetElemType>());
                 UnrecoverableError(error_message);
             }
             const auto *src = reinterpret_cast<const u8 *>(source);
@@ -157,8 +169,9 @@ struct EmbeddingTryCastToFixlen {
                 target[i] = (src[i / 8] & (1u << (i % 8))) ? 1 : 0;
             }
             return true;
-        } else if constexpr (std::is_same<SourceElemType, TinyIntT>() || std::is_same<SourceElemType, SmallIntT>() ||
-                             std::is_same<SourceElemType, IntegerT>() || std::is_same<SourceElemType, BigIntT>()) {
+        } else if constexpr (std::is_same<SourceElemType, u8>() || std::is_same<SourceElemType, TinyIntT>() ||
+                             std::is_same<SourceElemType, SmallIntT>() || std::is_same<SourceElemType, IntegerT>() ||
+                             std::is_same<SourceElemType, BigIntT>()) {
             for (SizeT i = 0; i < len; ++i) {
                 if (!IntegerTryCastToFixlen::Run(source[i], target[i])) {
                     return false;

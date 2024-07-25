@@ -95,7 +95,7 @@ public:
 private:
     void InitBlockParallelOption();
 
-    template <typename DataType, template <typename, typename> typename C>
+    template <typename DataType, template <typename, typename> typename C, typename DistanceType>
     void ExecuteInternal(QueryContext *query_context, KnnScanOperatorState *operator_state);
 };
 

@@ -159,6 +159,7 @@ public:
     static bool isSSE2() { return is(SimdTypeSSE2); }
     static bool isAVX2() { return is(SimdTypeAVX2); }
     static bool isAVX512() { return is(SimdTypeAVX512F); }
+    static bool isAVX512BW() { return is(SimdTypeAVX512BW); }
     static std::vector<char const *> getSupportedSimdTypes() {
         static constexpr char const *simdTypes[] = {"f16c",
                                                     "sse2",

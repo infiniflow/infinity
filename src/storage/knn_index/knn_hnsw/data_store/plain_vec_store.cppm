@@ -36,6 +36,7 @@ public:
     using This = PlainVecStoreMeta<DataType>;
     using StoreType = const DataType *;
     using QueryType = const DataType *;
+    using DistanceType = f32;
 
 private:
     PlainVecStoreMeta(SizeT dim) : dim_(dim) {}

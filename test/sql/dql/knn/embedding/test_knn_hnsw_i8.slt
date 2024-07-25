@@ -1,0 +1,180 @@
+statement ok
+DROP TABLE IF EXISTS test_knn_hnsw_i8;
+
+statement ok
+CREATE TABLE test_knn_hnsw_i8(c1 INT, c2 EMBEDDING(TINYINT, 3));
+
+# copy to create one block
+# 1,"[2 3 4]"
+# 5,"[6,7,8]"
+# 9,"[10,11,12]"
+statement ok
+COPY test_knn_hnsw_i8 FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',', FORMAT CSV);
+
+statement ok
+INSERT INTO test_knn_hnsw_i8 VALUES (11, [-3, -2, -1]), (111, [-126, -127, -128]), (1111, [125, 126, 127]);
+
+query I
+SELECT * FROM test_knn_hnsw_i8;
+----
+1 [2,3,4]
+5 [6,7,8]
+9 [10,11,12]
+11 [-3,-2,-1]
+111 [-126,-127,-128]
+1111 [125,126,127]
+
+statement error
+SELECT c1, DISTANCE() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [0, 0, 0], 'UNSIGNED TINYINT', 'l2', 10);
+
+query I
+SELECT c1, DISTANCE() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [0, 0, 0], 'TINYINT', 'l2', 10);
+----
+11 14.000000
+1 29.000000
+5 149.000000
+9 365.000000
+1111 47630.000000
+111 48389.000000
+
+query I
+SELECT c1, DISTANCE() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [6, 7, 9], 'TINYINT', 'l2', 10);
+----
+5 1.000000
+9 41.000000
+1 57.000000
+11 262.000000
+1111 42246.000000
+111 54149.000000
+
+query I
+SELECT c1, SIMILARITY() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [3, 2, 1], 'TINYINT', 'ip', 10);
+----
+1111 754.000000
+9 64.000000
+5 40.000000
+1 16.000000
+11 -14.000000
+111 -760.000000
+
+query I
+SELECT c1, SIMILARITY() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [-30, -20, -10], 'TINYINT', 'ip', 10);
+----
+111 7600.000000
+11 140.000000
+1 -160.000000
+5 -400.000000
+9 -640.000000
+1111 -7540.000000
+
+query I
+SELECT c1, SIMILARITY() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [-30, -20, -10], 'TINYINT', 'cosine', 10);
+----
+11 1.000000
+111 0.923371
+1 -0.794067
+5 -0.875796
+9 -0.895302
+1111 -0.923351
+
+statement ok
+COPY test_knn_hnsw_i8 FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',', FORMAT CSV);
+
+query I
+SELECT c1, DISTANCE() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [0, 0, 0], 'TINYINT', 'l2', 10);
+----
+11 14.000000
+1 29.000000
+1 29.000000
+5 149.000000
+5 149.000000
+9 365.000000
+9 365.000000
+1111 47630.000000
+111 48389.000000
+
+# not allow lvq for i8
+statement error
+CREATE INDEX idx1 ON test_knn_hnsw_i8 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2, encode = "lvq");
+
+# create hnsw index on existing 2 segments
+statement ok
+CREATE INDEX idx1 ON test_knn_hnsw_i8 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = l2);
+
+# select with 2 index segment
+query I
+SELECT c1, DISTANCE() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [0, 0, 0], 'TINYINT', 'l2', 10) WITH (ef = 4);
+----
+11 14.000000
+1 29.000000
+1 29.000000
+5 149.000000
+5 149.000000
+9 365.000000
+9 365.000000
+1111 47630.000000
+111 48389.000000
+
+statement ok
+DROP INDEX idx1 ON test_knn_hnsw_i8;
+
+statement ok
+CREATE INDEX idx2 ON test_knn_hnsw_i8 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = ip);
+
+query I
+SELECT c1, SIMILARITY() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [-30, -20, -10], 'TINYINT', 'ip', 10) WITH (ef = 4);
+----
+111 7600.000000
+11 140.000000
+1 -160.000000
+1 -160.000000
+5 -400.000000
+5 -400.000000
+9 -640.000000
+9 -640.000000
+1111 -7540.000000
+
+statement ok
+DROP INDEX idx2 ON test_knn_hnsw_i8;
+
+statement ok
+CREATE INDEX idx3 ON test_knn_hnsw_i8 (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = cos);
+
+query I
+SELECT c1, SIMILARITY() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [-30, -20, -10], 'TINYINT', 'cosine', 10);
+----
+11 1.000000
+111 0.923371
+1 -0.794067
+1 -0.794067
+5 -0.875796
+5 -0.875796
+9 -0.895302
+9 -0.895302
+1111 -0.923351
+
+# copy to create another new block with no index
+statement ok
+COPY test_knn_hnsw_i8 FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH (DELIMITER ',', FORMAT CSV);
+
+query I
+SELECT c1, SIMILARITY() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [-30, -20, -10], 'TINYINT', 'cosine', 20);
+----
+11 1.000000
+111 0.923371
+1 -0.794067
+1 -0.794067
+1 -0.794067
+5 -0.875796
+5 -0.875796
+5 -0.875796
+9 -0.895302
+9 -0.895302
+9 -0.895302
+1111 -0.923351
+
+statement error
+SELECT c1, DISTANCE() FROM test_knn_hnsw_i8 SEARCH MATCH VECTOR (c2, [1, 1, 1], 'UNSIGNED TINYINT', 'cosine', 10);
+
+statement ok
+DROP TABLE test_knn_hnsw_i8;
