@@ -1768,7 +1768,7 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     break;
                 }
                 case kElemUInt8: {
-                    AppendSparse<u8>(ele_str_views, index, column_def);
+                    AppendSparse<u8>(ele_str_views, index);
                     break;
                 }
                 case kElemInt8: {
