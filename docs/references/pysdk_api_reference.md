@@ -578,40 +578,41 @@ table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
 
 ```python
 # Create a table with a integer column and a 3-d vector column:
-table_instance = db_instance.create_table("vector_table", {"c1": {"type": "integer", "default": 2024}, "vector_column": {"type": "vector,3,float"}})
+table_instance = db_instance.create_table("vector_table", {"c1": {"type": "integer", "default": 0}, "vector_column": {"type": "vector,3,float"}})
 
-# Insert one complete row into the table:
-table_obj.insert({"c1": 2023, "vector_column": [1.1, 2.2, 3.3]})
+# Insert one incomplete row into the table:
+# Note that the 'c1' cell defaults to 0. 
+table_obj.insert({"vector_column": [1.1, 2.2, 3.3]})
 
-# Insert three rows into the table:
-table_obj.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.5, 6.6]}, {"vector_column": [7.7, 8.8, 9.9]}])
+# Insert two incomplete rows into the table:
+# Note that the 'c1' cells default to 0. 
+table_obj.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.5, 6.6]}])
 ```
 #### Insert sparse vectors
 
 ```python
-# Create a table with a integer column and a 100-d sparse vector column:
-table_instance = db_instance.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
+# Create a table with a 100-d sparse vector column only:
+table_instance = db_instance.create_table("sparse_vector_table", {"sparse_column": {"type": "sparse,100,float,int"}})
 
-# Insert three rows into the table:
+# Insert one row into the table:
 # `indices` specifies the correspoing indices to the values in `values`.
-# Note that the second row sets "c1" as 2024 by default. 
-table_instance.insert([{"c1": 2022, "sparse_column": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}, {"sparse_column":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}}}])
+table_instance.insert({"sparse_column": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}})
 ```
 
 #### Insert tensors
 
 ```python
-# Create a table with a tensor column: 
-table_instance = db_instance.create_table("tensor_table", {"c1": {"type": "integer", "default": 2024}, "tensor_column": {"type": "tensor,4,float"}})
+# Create a table with a tensor column only: 
+table_instance = db_instance.create_table("tensor_table", {"tensor_column": {"type": "tensor,4,float"}})
 
-# Insert one row into the table, with the "c1" column defaulting to 2024:
+# Insert one row into the table:
 table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}])
 ```
 
 #### Insert tensor arrays
 
 ```python
-# Creat a table with only one tensor array column:
+# Creat a table with a tensor array column only:
 table_instance = db_instance.create_table("tensor_array_table", {"tensor_array_column": {"type": "tensorarray,2,float"}})
 
 table_instance.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])

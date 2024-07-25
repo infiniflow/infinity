@@ -49,7 +49,7 @@ public:
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
 
-    void ReadFromFileImpl() override;
+    void ReadFromFileImpl(SizeT file_size) override;
 
 private:
     const EmbeddingInfo *GetEmbeddingInfo() const;

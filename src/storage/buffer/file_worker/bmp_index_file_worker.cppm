@@ -50,7 +50,7 @@ public:
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
 
-    void ReadFromFileImpl() override;
+    void ReadFromFileImpl(SizeT file_size) override;
 
 private:
     SizeT index_size_{};
