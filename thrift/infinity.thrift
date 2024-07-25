@@ -13,6 +13,8 @@ HugeInt,
 Decimal,
 Float,
 Double,
+Float16,
+BFloat16,
 Varchar,
 Embedding,
 Tensor,
@@ -52,6 +54,7 @@ struct VarcharType {}
 
 enum ElementType {
 ElementBit,
+ElementUInt8,
 ElementInt8,
 ElementInt16,
 ElementInt32,
@@ -136,12 +139,13 @@ Hamming,
 
 union EmbeddingData {
 1: list<bool> bool_array_value,
-2: list<binary> i8_array_value,
-3: list<i16> i16_array_value,
-4: list<i32> i32_array_value,
-5: list<i64> i64_array_value,
-6: list<double> f32_array_value,
-7: list<double> f64_array_value,
+2: list<i16> u8_array_value,
+3: list<i16> i8_array_value,
+4: list<i16> i16_array_value,
+5: list<i32> i32_array_value,
+6: list<i64> i64_array_value,
+7: list<double> f32_array_value,
+8: list<double> f64_array_value,
 }
 
 struct InitParameter {
@@ -263,6 +267,8 @@ ColumnInt32,
 ColumnInt64,
 ColumnFloat32,
 ColumnFloat64,
+ColumnFloat16,
+ColumnBFloat16,
 ColumnVarchar,
 ColumnEmbedding,
 ColumnTensor,
@@ -389,7 +395,6 @@ struct GetTableRequest {
 
 enum IndexType {
 IVFFlat,
-HnswLVQ,
 Hnsw,
 FullText,
 BMP,

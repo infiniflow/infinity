@@ -37,6 +37,7 @@ public:
     using QueryVecType = SparseVecRef<DataType, IdxType>;
     using StoreType = SparseVecRef<DataType, IdxType>;
     using QueryType = SparseVecRef<DataType, IdxType>;
+    using DistanceType = std::conditional_t<std::is_same_v<DataType, bool>, IdxType, std::conditional_t<std::is_same_v<DataType, f64>, f64, f32>>;
 
 private:
     SparseVecStoreMeta(SizeT max_dim) : max_dim_(max_dim) {}

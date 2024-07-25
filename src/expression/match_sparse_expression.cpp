@@ -78,6 +78,7 @@ DataType MatchSparseExpression::Type() const {
         case kElemDouble: {
             return DataType(LogicalType::kDouble);
         }
+        case kElemUInt8:
         case kElemInt8:
         case kElemInt16:
         case kElemInt32:

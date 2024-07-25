@@ -50,6 +50,12 @@ class BlockColumnEntry;
 export using AbstractHnsw = std::variant<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset> *,
                                          KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset> *,
                                          KnnHnsw<PlainL2VecStoreType<float>, SegmentOffset> *,
+                                         KnnHnsw<PlainCosVecStoreType<u8>, SegmentOffset> *,
+                                         KnnHnsw<PlainIPVecStoreType<u8>, SegmentOffset> *,
+                                         KnnHnsw<PlainL2VecStoreType<u8>, SegmentOffset> *,
+                                         KnnHnsw<PlainCosVecStoreType<i8>, SegmentOffset> *,
+                                         KnnHnsw<PlainIPVecStoreType<i8>, SegmentOffset> *,
+                                         KnnHnsw<PlainL2VecStoreType<i8>, SegmentOffset> *,
                                          KnnHnsw<LVQCosVecStoreType<float, i8>, SegmentOffset> *,
                                          KnnHnsw<LVQIPVecStoreType<float, i8>, SegmentOffset> *,
                                          KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset> *,
@@ -85,6 +91,9 @@ private:
                 }
             }
             case HnswEncodeType::kLVQ: {
+                if constexpr (std::is_same_v<DataType, u8> || std::is_same_v<DataType, i8>) {
+                    return nullptr;
+                } else {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
                         using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset>;
@@ -101,6 +110,7 @@ private:
                     default: {
                         return nullptr;
                     }
+                }
                 }
             }
             default: {

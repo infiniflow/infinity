@@ -1488,6 +1488,10 @@ SharedPtr<DataType> InfinityThriftService::GetColumnTypeFromProto(const infinity
             return MakeShared<infinity::DataType>(infinity::LogicalType::kFloat);
         case infinity_thrift_rpc::LogicType::Double:
             return MakeShared<infinity::DataType>(infinity::LogicalType::kDouble);
+        case infinity_thrift_rpc::LogicType::Float16:
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kFloat16);
+        case infinity_thrift_rpc::LogicType::BFloat16:
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kBFloat16);
         case infinity_thrift_rpc::LogicType::Tensor:
         case infinity_thrift_rpc::LogicType::TensorArray:
         case infinity_thrift_rpc::LogicType::Embedding: {
@@ -1555,6 +1559,8 @@ EmbeddingDataType InfinityThriftService::GetEmbeddingDataTypeFromProto(const inf
     switch (type) {
         case infinity_thrift_rpc::ElementType::ElementBit:
             return EmbeddingDataType::kElemBit;
+        case infinity_thrift_rpc::ElementType::ElementUInt8:
+            return EmbeddingDataType::kElemUInt8;
         case infinity_thrift_rpc::ElementType::ElementInt8:
             return EmbeddingDataType::kElemInt8;
         case infinity_thrift_rpc::ElementType::ElementInt16:
@@ -1946,7 +1952,19 @@ ExplainType InfinityThriftService::GetExplainTypeFromProto(const infinity_thrift
 }
 
 Tuple<void *, i64, Status> InfinityThriftService::GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
-    if (embedding_data.__isset.i8_array_value) {
+    if (embedding_data.__isset.u8_array_value) {
+        auto ptr_i16 = (int16_t *)(embedding_data.u8_array_value.data());
+        auto ptr_u8 = (uint8_t *)(embedding_data.u8_array_value.data());
+        for (size_t i = 0; i < embedding_data.u8_array_value.size(); ++i) {
+            ptr_u8[i] = static_cast<uint8_t>(ptr_i16[i]);
+        }
+        return {(void *)embedding_data.u8_array_value.data(), embedding_data.u8_array_value.size(), Status::OK()};
+    } else if (embedding_data.__isset.i8_array_value) {
+        auto ptr_i16 = (int16_t *)(embedding_data.i8_array_value.data());
+        auto ptr_i8 = (int8_t *)(embedding_data.i8_array_value.data());
+        for (size_t i = 0; i < embedding_data.i8_array_value.size(); ++i) {
+            ptr_i8[i] = static_cast<int8_t>(ptr_i16[i]);
+        }
         return {(void *)embedding_data.i8_array_value.data(), embedding_data.i8_array_value.size(), Status::OK()};
     } else if (embedding_data.__isset.i16_array_value) {
         return {(void *)embedding_data.i16_array_value.data(), embedding_data.i16_array_value.size(), Status::OK()};
@@ -2005,6 +2023,10 @@ infinity_thrift_rpc::ColumnType::type InfinityThriftService::DataTypeToProtoColu
             return infinity_thrift_rpc::ColumnType::ColumnFloat32;
         case LogicalType::kDouble:
             return infinity_thrift_rpc::ColumnType::ColumnFloat64;
+        case LogicalType::kFloat16:
+            return infinity_thrift_rpc::ColumnType::ColumnFloat16;
+        case LogicalType::kBFloat16:
+            return infinity_thrift_rpc::ColumnType::ColumnBFloat16;
         case LogicalType::kVarchar:
             return infinity_thrift_rpc::ColumnType::ColumnVarchar;
         case LogicalType::kEmbedding:
@@ -2060,6 +2082,16 @@ UniquePtr<infinity_thrift_rpc::DataType> InfinityThriftService::DataTypeToProtoD
         case LogicalType::kDouble: {
             auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
             data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Double);
+            return data_type_proto;
+        }
+        case LogicalType::kFloat16: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Float16);
+            return data_type_proto;
+        }
+        case LogicalType::kBFloat16: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::BFloat16);
             return data_type_proto;
         }
         case LogicalType::kVarchar: {
@@ -2128,6 +2160,8 @@ infinity_thrift_rpc::ElementType::type InfinityThriftService::EmbeddingDataTypeT
     switch (embedding_data_type) {
         case EmbeddingDataType::kElemBit:
             return infinity_thrift_rpc::ElementType::ElementBit;
+        case EmbeddingDataType::kElemUInt8:
+            return infinity_thrift_rpc::ElementType::ElementUInt8;
         case EmbeddingDataType::kElemInt8:
             return infinity_thrift_rpc::ElementType::ElementInt8;
         case EmbeddingDataType::kElemInt16:
@@ -2213,6 +2247,8 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
         case LogicalType::kInteger:
         case LogicalType::kBigInt:
         case LogicalType::kHugeInt:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
         case LogicalType::kFloat:
         case LogicalType::kDouble: {
             HandlePodType(output_column_field, row_count, column_vector);

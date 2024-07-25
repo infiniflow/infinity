@@ -31,6 +31,9 @@ import index_base;
 import logical_type;
 import statement_common;
 import logger;
+import data_type;
+import embedding_info;
+import internal_types;
 
 namespace infinity {
 
@@ -144,17 +147,35 @@ nlohmann::json IndexHnsw::Serialize() const {
     return res;
 }
 
-void IndexHnsw::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name) {
+void IndexHnsw::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref,
+                                       const String &column_name,
+                                       const Vector<InitParameter *> &index_param_list) {
+    SharedPtr<DataType> data_type_ptr;
     auto &column_names_vector = *(base_table_ref->column_names_);
     auto &column_types_vector = *(base_table_ref->column_types_);
     SizeT column_id = std::find(column_names_vector.begin(), column_names_vector.end(), column_name) - column_names_vector.begin();
     if (column_id == column_names_vector.size()) {
         Status status = Status::ColumnNotExist(column_name);
         RecoverableError(status);
-    } else if (auto &data_type = column_types_vector[column_id]; data_type->type() != LogicalType::kEmbedding) {
+    }
+    if (data_type_ptr = column_types_vector[column_id]; data_type_ptr->type() != LogicalType::kEmbedding) {
         Status status = Status::InvalidIndexDefinition(
-            fmt::format("Attempt to create HNSW index on column: {}, data type: {}.", column_name, data_type->ToString()));
+            fmt::format("Attempt to create HNSW index on column: {}, data type: {}.", column_name, data_type_ptr->ToString()));
         RecoverableError(status);
+    }
+    SharedPtr<EmbeddingInfo> embedding_info = std::dynamic_pointer_cast<EmbeddingInfo>(data_type_ptr->type_info());
+    EmbeddingDataType embedding_data_type = embedding_info->Type();
+    for (const auto *para : index_param_list) {
+        if (para->param_name_ == "encode" && StringToHnswEncodeType(para->param_value_) == HnswEncodeType::kLVQ) {
+            // TODO: now only support float?
+            if (embedding_data_type != EmbeddingDataType::kElemFloat) {
+                Status status =
+                    Status::InvalidIndexDefinition(fmt::format("Attempt to create HNSW index with LVQ encoding on column: {}, data type: {}.",
+                                                               column_name,
+                                                               data_type_ptr->ToString()));
+                RecoverableError(status);
+            }
+        }
     }
 }
 

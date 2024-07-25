@@ -42,22 +42,109 @@ import internal_types;
 import data_type;
 import status;
 import logger;
+import simd_functions;
 
 namespace infinity {
 
 template <>
-KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type) {
+KnnDistance1<f32, f32>::KnnDistance1(KnnDistanceType dist_type) {
     switch (dist_type) {
         case KnnDistanceType::kL2: {
-            dist_func_ = L2Distance<f32, f32, f32, SizeT>;
+            dist_func_ = GetSIMD_FUNCTIONS().L2Distance_func_ptr_;
             break;
         }
         case KnnDistanceType::kCosine: {
-            dist_func_ = CosineDistance<f32, f32, f32, SizeT>;
+            dist_func_ = GetSIMD_FUNCTIONS().CosineDistance_func_ptr_;
             break;
         }
         case KnnDistanceType::kInnerProduct: {
-            dist_func_ = IPDistance<f32, f32, f32, SizeT>;
+            dist_func_ = GetSIMD_FUNCTIONS().IPDistance_func_ptr_;
+            break;
+        }
+        default: {
+            Status status = Status::NotSupport(fmt::format("KnnDistanceType: {} is not support.", (i32)dist_type));
+            RecoverableError(status);
+        }
+    }
+}
+
+template <>
+KnnDistance1<u8, i32>::KnnDistance1(KnnDistanceType dist_type) {
+    switch (dist_type) {
+        case KnnDistanceType::kL2: {
+            dist_func_ = GetSIMD_FUNCTIONS().HNSW_U8L2_ptr_;
+            break;
+        }
+        case KnnDistanceType::kInnerProduct: {
+            dist_func_ = GetSIMD_FUNCTIONS().HNSW_U8IP_ptr_;
+            break;
+        }
+        default: {
+            Status status = Status::NotSupport(fmt::format("KnnDistanceType: {} is not support.", (i32)dist_type));
+            RecoverableError(status);
+        }
+    }
+}
+
+f32 hnsw_u8l2_f32_wrapper(const u8 *v1, const u8 *v2, SizeT dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_U8L2_ptr_(v1, v2, dim)); }
+f32 hnsw_u8ip_f32_wrapper(const u8 *v1, const u8 *v2, SizeT dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_U8IP_ptr_(v1, v2, dim)); }
+
+template <>
+KnnDistance1<u8, f32>::KnnDistance1(KnnDistanceType dist_type) {
+    switch (dist_type) {
+        case KnnDistanceType::kL2: {
+            dist_func_ = &hnsw_u8l2_f32_wrapper;
+            break;
+        }
+        case KnnDistanceType::kCosine: {
+            dist_func_ = GetSIMD_FUNCTIONS().HNSW_U8Cos_ptr_;
+            break;
+        }
+        case KnnDistanceType::kInnerProduct: {
+            dist_func_ = &hnsw_u8ip_f32_wrapper;
+            break;
+        }
+        default: {
+            Status status = Status::NotSupport(fmt::format("KnnDistanceType: {} is not support.", (i32)dist_type));
+            RecoverableError(status);
+        }
+    }
+}
+
+template <>
+KnnDistance1<i8, i32>::KnnDistance1(KnnDistanceType dist_type) {
+    switch (dist_type) {
+        case KnnDistanceType::kL2: {
+            dist_func_ = GetSIMD_FUNCTIONS().HNSW_I8L2_ptr_;
+            break;
+        }
+        case KnnDistanceType::kInnerProduct: {
+            dist_func_ = GetSIMD_FUNCTIONS().HNSW_I8IP_ptr_;
+            break;
+        }
+        default: {
+            Status status = Status::NotSupport(fmt::format("KnnDistanceType: {} is not support.", (i32)dist_type));
+            RecoverableError(status);
+        }
+    }
+}
+
+f32 hnsw_i8l2_f32_wrapper(const i8 *v1, const i8 *v2, SizeT dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_I8L2_ptr_(v1, v2, dim)); }
+f32 hnsw_i8ip_f32_wrapper(const i8 *v1, const i8 *v2, SizeT dim) { return static_cast<f32>(GetSIMD_FUNCTIONS().HNSW_I8IP_ptr_(v1, v2, dim)); }
+
+template <>
+KnnDistance1<i8, f32>::KnnDistance1(KnnDistanceType dist_type) {
+    switch (dist_type) {
+        case KnnDistanceType::kL2: {
+            dist_func_ = &hnsw_i8l2_f32_wrapper;
+            break;
+        }
+        case KnnDistanceType::kCosine: {
+            dist_func_ = GetSIMD_FUNCTIONS().HNSW_I8Cos_ptr_;
+            break;
+        }
+        case KnnDistanceType::kInnerProduct: {
+            dist_func_ = &hnsw_i8ip_f32_wrapper;
             break;
         }
         default: {
@@ -73,7 +160,15 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 cur
     : knn_scan_shared_data_(shared_data), task_id_(current_parallel_idx), execute_block_scan_job_(execute_block_scan_job) {
     switch (knn_scan_shared_data_->elem_type_) {
         case EmbeddingDataType::kElemFloat: {
-            Init<f32>();
+            Init<f32, f32>();
+            break;
+        }
+        case EmbeddingDataType::kElemUInt8: {
+            Init<u8, f32>();
+            break;
+        }
+        case EmbeddingDataType::kElemInt8: {
+            Init<i8, f32>();
             break;
         }
         default: {
@@ -84,7 +179,7 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 cur
     }
 }
 
-template <typename DataType>
+template <typename DataType, typename DistType>
 void KnnScanFunctionData::Init() {
     switch (knn_scan_shared_data_->knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
@@ -93,21 +188,21 @@ void KnnScanFunctionData::Init() {
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {
-            auto merge_knn_max = MakeUnique<MergeKnn<DataType, CompareMax>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
+            auto merge_knn_max = MakeUnique<MergeKnn<DataType, CompareMax, DistType>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
             merge_knn_max->Begin();
             merge_knn_base_ = std::move(merge_knn_max);
             break;
         }
         case KnnDistanceType::kCosine:
         case KnnDistanceType::kInnerProduct: {
-            auto merge_knn_min = MakeUnique<MergeKnn<DataType, CompareMin>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
+            auto merge_knn_min = MakeUnique<MergeKnn<DataType, CompareMin, DistType>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
             merge_knn_min->Begin();
             merge_knn_base_ = std::move(merge_knn_min);
             break;
         }
     }
 
-    knn_distance_ = MakeUnique<KnnDistance1<DataType>>(knn_scan_shared_data_->knn_distance_type_);
+    knn_distance_ = MakeUnique<KnnDistance1<DataType, DistType>>(knn_scan_shared_data_->knn_distance_type_);
 }
 
 } // namespace infinity

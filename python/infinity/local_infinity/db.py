@@ -85,6 +85,10 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                         proto_column_type.logical_type = LogicalType.kFloat
                     case "double" | "float64":
                         proto_column_type.logical_type = LogicalType.kDouble
+                    case "float16":
+                        proto_column_type.logical_type = LogicalType.kFloat16
+                    case "bfloat16":
+                        proto_column_type.logical_type = LogicalType.kBFloat16
                     case "varchar":
                         proto_column_type.logical_type = LogicalType.kVarchar
                     case "bool":
@@ -157,6 +161,8 @@ def get_embedding_info(column_info, column_defs, column_name, index):
         embedding_type.element_type = EmbeddingDataType.kElemFloat
     elif element_type == "float64" or element_type == "double":
         embedding_type.element_type = EmbeddingDataType.kElemDouble
+    elif element_type == "uint8":
+        embedding_type.element_type = EmbeddingDataType.kElemUInt8
     elif element_type == "int8":
         embedding_type.element_type = EmbeddingDataType.kElemInt8
     elif element_type == "int16":
@@ -205,6 +211,8 @@ def get_sparse_info(column_info, column_defs, column_name, index):
         sparse_type.element_type = EmbeddingDataType.kElemFloat
     elif element_type == "float64" or element_type == "double":
         sparse_type.element_type = EmbeddingDataType.kElemDouble
+    elif element_type == "uint8":
+        sparse_type.element_type = EmbeddingDataType.kElemUInt8
     elif element_type == "int8":
         sparse_type.element_type = EmbeddingDataType.kElemInt8
     elif element_type == "int16":

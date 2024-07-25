@@ -699,6 +699,9 @@ void ElemTypeDispatch(Params &parameter_pack, EmbeddingDataType type_enum, Args.
         case EmbeddingDataType::kElemBit: {
             return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<bool>>>(parameter_pack, extra_types...);
         }
+        case EmbeddingDataType::kElemUInt8: {
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<u8>>>(parameter_pack, extra_types...);
+        }
         case EmbeddingDataType::kElemInt8: {
             return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<i8>>>(parameter_pack, extra_types...);
         }

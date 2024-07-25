@@ -182,6 +182,7 @@ TRANSACTIONS    { return TRANSACTIONS; }
 TRUE            { return TRUE; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
+UNSIGNED        { return UNSIGNED; }
 USING           { return USING; }
 UPDATE          { return UPDATE; }
 UUID            { return UUID; }

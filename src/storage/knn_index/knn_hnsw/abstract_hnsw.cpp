@@ -54,6 +54,12 @@ AbstractHnsw HnswIndexInMem::InitAbstractIndex(const IndexBase *index_base, cons
         case EmbeddingDataType::kElemFloat: {
             return InitAbstractIndex<float>(index_hnsw);
         }
+        case EmbeddingDataType::kElemUInt8: {
+            return InitAbstractIndex<u8>(index_hnsw);
+        }
+        case EmbeddingDataType::kElemInt8: {
+            return InitAbstractIndex<i8>(index_hnsw);
+        }
         default: {
             return nullptr;
         }
