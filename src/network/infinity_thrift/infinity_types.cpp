@@ -382,7 +382,6 @@ std::string to_string(const ColumnType::type& val) {
 
 int _kIndexTypeValues[] = {
   IndexType::IVFFlat,
-  IndexType::HnswLVQ,
   IndexType::Hnsw,
   IndexType::FullText,
   IndexType::BMP,
@@ -391,14 +390,13 @@ int _kIndexTypeValues[] = {
 };
 const char* _kIndexTypeNames[] = {
   "IVFFlat",
-  "HnswLVQ",
   "Hnsw",
   "FullText",
   "BMP",
   "Secondary",
   "EMVB"
 };
-const std::map<int, const char*> _IndexType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(7, _kIndexTypeValues, _kIndexTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
+const std::map<int, const char*> _IndexType_VALUES_TO_NAMES(::apache::thrift::TEnumIterator(6, _kIndexTypeValues, _kIndexTypeNames), ::apache::thrift::TEnumIterator(-1, nullptr, nullptr));
 
 std::ostream& operator<<(std::ostream& out, const IndexType::type& val) {
   std::map<int, const char*>::const_iterator it = _IndexType_VALUES_TO_NAMES.find(val);

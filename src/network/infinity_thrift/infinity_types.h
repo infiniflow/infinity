@@ -194,12 +194,11 @@ std::string to_string(const ColumnType::type& val);
 struct IndexType {
   enum type {
     IVFFlat = 0,
-    HnswLVQ = 1,
-    Hnsw = 2,
-    FullText = 3,
-    BMP = 4,
-    Secondary = 5,
-    EMVB = 6
+    Hnsw = 1,
+    FullText = 2,
+    BMP = 3,
+    Secondary = 4,
+    EMVB = 5
   };
 };
 

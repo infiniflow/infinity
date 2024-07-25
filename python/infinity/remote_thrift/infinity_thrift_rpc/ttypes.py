@@ -312,31 +312,28 @@ class ColumnType(object):
 
 class IndexType(object):
     IVFFlat = 0
-    HnswLVQ = 1
-    Hnsw = 2
-    FullText = 3
-    BMP = 4
-    Secondary = 5
-    EMVB = 6
+    Hnsw = 1
+    FullText = 2
+    BMP = 3
+    Secondary = 4
+    EMVB = 5
 
     _VALUES_TO_NAMES = {
         0: "IVFFlat",
-        1: "HnswLVQ",
-        2: "Hnsw",
-        3: "FullText",
-        4: "BMP",
-        5: "Secondary",
-        6: "EMVB",
+        1: "Hnsw",
+        2: "FullText",
+        3: "BMP",
+        4: "Secondary",
+        5: "EMVB",
     }
 
     _NAMES_TO_VALUES = {
         "IVFFlat": 0,
-        "HnswLVQ": 1,
-        "Hnsw": 2,
-        "FullText": 3,
-        "BMP": 4,
-        "Secondary": 5,
-        "EMVB": 6,
+        "Hnsw": 1,
+        "FullText": 2,
+        "BMP": 3,
+        "Secondary": 4,
+        "EMVB": 5,
     }
 
 
