@@ -38,6 +38,11 @@ inline BooleanT NullValue() {
 }
 
 template <>
+inline u8 NullValue() {
+    return std::numeric_limits<u8>::infinity();
+}
+
+template <>
 inline TinyIntT NullValue() {
     return std::numeric_limits<i8>::infinity();
 }

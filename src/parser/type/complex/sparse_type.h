@@ -30,21 +30,23 @@ struct SparseType {
             return {};
         }
         std::stringstream ss;
+        ss << "[";
         if constexpr (std::is_same_v<DataType, bool>) {
             for (size_t i = 0; i < nnz; ++i) {
                 ss << std::to_string(indice_ptr[i]);
                 if (i < nnz - 1) {
-                    ss << ", ";
+                    ss << ",";
                 }
             }
         } else {
             for (size_t i = 0; i < nnz; ++i) {
-                ss << std::to_string(indice_ptr[i]) << ": " << std::to_string(data_ptr[i]);
+                ss << std::to_string(indice_ptr[i]) << ":" << std::to_string(data_ptr[i]);
                 if (i < nnz - 1) {
-                    ss << ", ";
+                    ss << ",";
                 }
             }
         }
+        ss << "]";
         return std::move(ss).str();
     }
 

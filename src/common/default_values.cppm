@@ -57,8 +57,9 @@ export {
     constexpr u64 MIN_VECTOR_CHUNK_SIZE = 4096UL;
     constexpr u64 MAX_VECTOR_CHUNK_SIZE = 1024 * 1024UL;
     constexpr u64 MAX_VECTOR_CHUNK_COUNT = std::numeric_limits<u64>::max();
+
     // Each row has one chunk.
-    constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 1024 * 1024; // 1MB
+    constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L; // 1MB
     constexpr u64 DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE = 8192UL * 128UL * 8UL;
 
     // segment related constants
@@ -172,6 +173,8 @@ export {
 
     constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
     constexpr std::string_view DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
+
+    constexpr SizeT INSERT_BATCH_ROW_LIMIT = 8192;
 
     // default persistence parameter
     constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "";                        // Empty means disabled

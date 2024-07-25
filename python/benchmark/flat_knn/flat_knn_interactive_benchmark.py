@@ -90,7 +90,7 @@ class FlatKNNBenchmark:
     def infinity_benchmark_flat_knn(self, data_set):
         threads = int(input("Enter number of threads:\n"))
         rounds = int(input("Enter number of rounds:\n"))
-        benchmark(threads, rounds, data_set, self.dataset_path_map[data_set])
+        benchmark(threads, rounds, data_set, 200, True, self.dataset_path_map[data_set])
 
     def faiss_benchmark_flat_knn_batch_query(self, data_set):
         xq = fvecs_read(self.dataset_path_map[data_set] + self.query_suffix[data_set])

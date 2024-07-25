@@ -42,7 +42,7 @@ public:
                                   SharedPtr<BaseTableRef> table_ref);
 
 private:
-    template <typename DistType>
+    template <typename DatType, typename DistType>
     void InitMergeKnn(KnnDistanceType knn_distance_type);
 
 public:

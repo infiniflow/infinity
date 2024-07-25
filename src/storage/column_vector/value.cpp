@@ -94,67 +94,134 @@ void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size
     }
 }
 
-// Need to move up
-void BitmapEmbedding2ArrowInternal(const EmbeddingType &embedding, size_t dimension, SharedPtr<arrow::ArrayBuilder> &array_builder) {
-    if (dimension % 8 != 0) {
-        Status status = Status::SyntaxError("Binary embedding dimension should be the times of 8.");
-        LOG_ERROR(status.message());
-        RecoverableError(status);
-    }
-
-    auto list_builder = std::dynamic_pointer_cast<arrow::ListBuilder>(array_builder);
-    auto builder = dynamic_cast<arrow::UInt8Builder *>(list_builder->value_builder());
-    auto *array = reinterpret_cast<const u8 *>(embedding.ptr);
-    for (size_t i = 0; i < dimension; ++i) {
-        auto status = builder->Append(array[i]);
+template <typename IndexT, typename DataType>
+void Sparse2JsonInternal1(const SparseValueInfo &sparse_value_info, nlohmann::json &sparse_json) {
+    auto [nnz, indice_span, data_span] = sparse_value_info.GetData();
+    for (SizeT i = 0; i < nnz; ++i) {
+        auto index = reinterpret_cast<IndexT *>(indice_span.data())[i];
+        auto data = reinterpret_cast<DataType *>(data_span.data())[i];
+        sparse_json[std::to_string(index)] = data;
     }
 }
 
-void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, SharedPtr<arrow::ArrayBuilder> &array_builder) {
-    auto list_builder = std::dynamic_pointer_cast<arrow::ListBuilder>(array_builder);
-    auto status = list_builder->Append();
+template <typename IndexT>
+void Sparse2JsonInternal(const SparseValueInfo &sparse_value_info, const SparseInfo *sparse_info, nlohmann::json &sparse_json) {
+    switch (sparse_info->DataType()) {
+        case kElemInt8: {
+            Sparse2JsonInternal1<IndexT, i8>(sparse_value_info, sparse_json);
+            break;
+        }
+        case kElemInt16: {
+            Sparse2JsonInternal1<IndexT, i16>(sparse_value_info, sparse_json);
+            break;
+        }
+        case kElemInt32: {
+            Sparse2JsonInternal1<IndexT, i32>(sparse_value_info, sparse_json);
+            break;
+        }
+        case kElemInt64: {
+            Sparse2JsonInternal1<IndexT, i64>(sparse_value_info, sparse_json);
+            break;
+        }
+        case kElemFloat: {
+            Sparse2JsonInternal1<IndexT, f32>(sparse_value_info, sparse_json);
+            break;
+        }
+        case kElemDouble: {
+            Sparse2JsonInternal1<IndexT, f64>(sparse_value_info, sparse_json);
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented.");
+        }
+    }
+}
+
+void Sparse2Json(const SparseValueInfo &sparse_value_info, const SparseInfo *sparse_info, nlohmann::json &sparse_json) {
+    switch (sparse_info->IndexType()) {
+        case kElemInt8: {
+            Sparse2JsonInternal<i8>(sparse_value_info, sparse_info, sparse_json);
+            break;
+        }
+        case kElemInt16: {
+            Sparse2JsonInternal<i16>(sparse_value_info, sparse_info, sparse_json);
+            break;
+        }
+        case kElemInt32: {
+            Sparse2JsonInternal<i32>(sparse_value_info, sparse_info, sparse_json);
+            break;
+        }
+        case kElemInt64: {
+            Sparse2JsonInternal<i64>(sparse_value_info, sparse_info, sparse_json);
+            break;
+        }
+        default: {
+            UnrecoverableError("Not implemented.");
+        }
+    }
+}
+
+// Need to move up
+// template <typename Builder>
+// void BitmapEmbedding2ArrowInternal(const EmbeddingType &embedding, size_t dimension, arrow::ArrayBuilder *array_builder) {
+//     if (dimension % 8 != 0) {
+//         Status status = Status::SyntaxError("Binary embedding dimension should be the times of 8.");
+//         LOG_ERROR(status.message());
+//         RecoverableError(status);
+//     }
+
+//     auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
+//     auto builder = dynamic_cast<arrow::UInt8Builder *>(list_builder->value_builder()); // FIXME
+//     auto *array = reinterpret_cast<const u8 *>(embedding.ptr);
+//     for (size_t i = 0; i < dimension; ++i) {
+//         auto status = builder->Append(array[i]);
+//     }
+// }
+
+void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, arrow::ArrayBuilder *value_builder) {
     switch (type) {
         case kElemBit: {
-            BitmapEmbedding2ArrowInternal(embedding, dimension, array_builder);
+            UnrecoverableError("Not implemented yet.");
+            // BitmapEmbedding2ArrowInternal<Builder>(embedding, dimension, array_builder);
             break;
         }
         case kElemInt8: {
-            auto builder = dynamic_cast<arrow::Int8Builder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::Int8Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int8_t *)(embedding.ptr))[i]);
             }
             break;
         }
         case kElemInt16: {
-            auto builder = dynamic_cast<arrow::Int16Builder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::Int16Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int16_t *)(embedding.ptr))[i]);
             }
             break;
         }
         case kElemInt32: {
-            auto builder = dynamic_cast<arrow::Int32Builder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::Int32Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int32_t *)(embedding.ptr))[i]);
             }
             break;
         }
         case kElemInt64: {
-            auto builder = dynamic_cast<arrow::Int64Builder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::Int64Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int64_t *)(embedding.ptr))[i]);
             }
             break;
         }
         case kElemFloat: {
-            auto builder = dynamic_cast<arrow::FloatBuilder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::FloatBuilder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((float *)(embedding.ptr))[i]);
             }
             break;
         }
         case kElemDouble: {
-            auto builder = dynamic_cast<arrow::DoubleBuilder *>(list_builder->value_builder());
+            auto builder = dynamic_cast<arrow::DoubleBuilder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((double *)(embedding.ptr))[i]);
             }
@@ -168,7 +235,44 @@ void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, siz
     }
 }
 
+void Tensor2Arrow(Span<char> tensor, const EmbeddingInfo *embedding_info, arrow::ArrayBuilder *value_builder) {
+    auto type = embedding_info->Type();
+    auto dimension = embedding_info->Dimension();
+    auto embedding_size = embedding_info->Size();
+    Vector<EmbeddingT> embeddings;
+    auto embedding_num = tensor.size() / embedding_size;
+    for (SizeT i = 0; i < embedding_num; i++) {
+        embeddings.emplace_back(const_cast<char *>(tensor.data() + i * embedding_size), false);
+    }
+    auto *tensor_builder = dynamic_cast<arrow::FixedSizeListBuilder *>(value_builder);
+    for (const auto &embedding : embeddings) {
+        auto status = tensor_builder->Append();
+        Embedding2Arrow(embedding, type, dimension, tensor_builder->value_builder());
+    }
+}
+
+void TensorArray2Arrow(Vector<Span<char>> tensor_array, const EmbeddingInfo *embedding_info, arrow::ArrayBuilder *value_builder) {
+    auto *tensor_array_builder = dynamic_cast<arrow::ListBuilder *>(value_builder);
+    for (auto tensor : tensor_array) {
+        auto status = tensor_array_builder->Append();
+        Tensor2Arrow(tensor, embedding_info, tensor_array_builder->value_builder());
+    }
+}
+
 } // namespace
+
+EmbeddingValueInfo::EmbeddingValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
+    len_ = 0;
+    for (const auto &[ptr, bytes] : ptr_bytes) {
+        len_ += bytes;
+    }
+    data_ = MakeUnique<char[]>(len_);
+    SizeT offset = 0;
+    for (const auto &[ptr, bytes] : ptr_bytes) {
+        std::memcpy(data_.get() + offset, ptr, bytes);
+        offset += bytes;
+    }
+}
 
 // Value maker
 Value Value::MakeValue(DataType type) {
@@ -388,6 +492,24 @@ Value Value::MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_i
     return value;
 }
 
+Value Value::MakeTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr) {
+    if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
+        String error_message = fmt::format("Value::MakeTensor(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
+        UnrecoverableError(error_message);
+    }
+    const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_info_ptr.get());
+    SizeT len = embedding_info->Size();
+    for (const auto [_, bytes] : ptr_bytes) {
+        if (bytes == 0 || bytes % len != 0) {
+            Status status = Status::SyntaxError(fmt::format("Value::MakeTensor(bytes={}) is not a multiple of embedding byte size={}", bytes, len));
+            RecoverableError(status);
+        }
+    }
+    Value value(LogicalType::kTensor, std::move(type_info_ptr));
+    value.value_info_ = EmbeddingValueInfo::MakeTensorValueInfo(ptr_bytes);
+    return value;
+}
+
 Value Value::MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr) {
     if (type_info_ptr->type() != TypeInfoType::kEmbedding) {
         String error_message = fmt::format("Value::MakeTensorArray(type_info_ptr={}) is not unsupported!", type_info_ptr->ToString());
@@ -437,6 +559,15 @@ void Value::AppendToTensorArray(const_ptr_t ptr, SizeT bytes) {
     }
     auto &tensor_array_info = value_info_->Get<TensorArrayValueInfo>();
     tensor_array_info.AppendTensor(ptr, bytes);
+}
+
+void Value::AppendToTensorArray(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
+    if (type_.type() != LogicalType::kTensorArray) {
+        String error_message = fmt::format("Value::AppendToTensorArray() is not supported for type {}", type_.ToString());
+        UnrecoverableError(error_message);
+    }
+    auto &tensor_array_info = value_info_->Get<TensorArrayValueInfo>();
+    tensor_array_info.AppendTensor(ptr_bytes);
 }
 
 // Value getter
@@ -1262,7 +1393,12 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
             return;
         }
         case LogicalType::kSparse: {
-            json[name] = "[]";
+            const auto *sparse_info = static_cast<const SparseInfo *>(type_.type_info().get());
+            const auto &sparse_value_info = static_cast<const SparseValueInfo &>(*value_info_);
+
+            nlohmann::json sparse_json;
+            Sparse2Json(sparse_value_info, sparse_info, sparse_json);
+            json[name] = sparse_json;
             return;
         }
         default: {
@@ -1275,7 +1411,7 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
 void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<arrow::ArrayBuilder> &array_builder) {
     switch (data_type->type()) {
         case LogicalType::kBoolean: {
-            auto builder = std::dynamic_pointer_cast<::arrow::UInt8Builder>(array_builder);
+            auto builder = std::dynamic_pointer_cast<::arrow::BooleanBuilder>(array_builder);
             auto status = builder->Append(value_.boolean);
             break;
         }
@@ -1343,10 +1479,58 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
                 UnrecoverableError(error_message);
             }
             const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
-            Embedding2Arrow(embedding, embedding_info->Type(), embedding_info->Dimension(), array_builder);
+
+            auto *fixedlist_builder = dynamic_cast<arrow::FixedSizeListBuilder *>(array_builder.get());
+            auto status = fixedlist_builder->Append();
+
+            Embedding2Arrow(embedding, embedding_info->Type(), embedding_info->Dimension(), fixedlist_builder->value_builder());
             break;
         }
-        case LogicalType::kDecimal:
+        case LogicalType::kSparse: {
+            const auto *sparse_info = static_cast<const SparseInfo *>(data_type->type_info().get());
+            auto struct_builder = std::static_pointer_cast<arrow::StructBuilder>(array_builder);
+            auto status = struct_builder->Append();
+
+            auto *index_builder = struct_builder->child(0);
+            auto *value_builder = struct_builder->child(1);
+            auto [nnz, index, data] = this->GetSparse();
+
+            EmbeddingT index_embedding(index.data(), false);
+            EmbeddingT data_embedding(data.data(), false);
+            auto *list_index_builder = dynamic_cast<arrow::ListBuilder *>(index_builder);
+            status = list_index_builder->Append();
+            Embedding2Arrow(index_embedding, sparse_info->IndexType(), nnz, list_index_builder->value_builder());
+            if (value_builder) {
+                auto *list_value_builder = dynamic_cast<arrow::ListBuilder *>(value_builder);
+                status = list_value_builder->Append();
+                Embedding2Arrow(data_embedding, sparse_info->DataType(), nnz, list_value_builder->value_builder());
+            }
+            break;
+        }
+        case LogicalType::kTensor: {
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type->type_info().get());
+
+            Span<char> tensor = this->GetEmbedding();
+
+            auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder.get());
+            auto status = list_builder->Append();
+            Tensor2Arrow(tensor, embedding_info, list_builder->value_builder());
+            break;
+        }
+        case LogicalType::kTensorArray: {
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type->type_info().get());
+
+            const Vector<SharedPtr<EmbeddingValueInfo>> &embedding_value_infos = this->GetTensorArray();
+            Vector<Span<char>> tensor_array;
+            for (const auto &embedding_value_info : embedding_value_infos) {
+                tensor_array.push_back(embedding_value_info->GetData());
+            }
+
+            auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder.get());
+            auto status = list_builder->Append();
+            TensorArray2Arrow(tensor_array, embedding_info, list_builder->value_builder());
+            break;
+        }
         default: {
             String error_message = "Invalid data type";
             LOG_CRITICAL(error_message);
@@ -1367,6 +1551,10 @@ SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const_ptr_
         RecoverableError(status);
     }
     return MakeShared<EmbeddingValueInfo>(ptr, bytes);
+}
+
+SharedPtr<EmbeddingValueInfo> EmbeddingValueInfo::MakeTensorValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) {
+    return MakeShared<EmbeddingValueInfo>(ptr_bytes);
 }
 
 } // namespace infinity

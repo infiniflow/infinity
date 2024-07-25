@@ -23,6 +23,7 @@ from infinity.remote_thrift.utils import check_valid_name, name_validity_check, 
 from infinity.common import ConflictType
 from infinity.common import InfinityException
 
+
 def get_constant_expr(column_info):
     # process constant expression
     default = None
@@ -37,11 +38,12 @@ def get_constant_expr(column_info):
         if isinstance(default, str):
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String,
                                                       str_value=default)
-
+        elif isinstance(default, bool):
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Boolean,
+                                                      bool_value=default)
         elif isinstance(default, int):
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
                                                       i64_value=default)
-
         elif isinstance(default, float) or isinstance(default, np.float32):
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
                                                       f64_value=default)
@@ -55,6 +57,7 @@ def get_constant_expr(column_info):
         else:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
         return constant_expression
+
 
 def get_ordinary_info(column_info, column_defs, column_name, index):
     # "c1": {"type": "int", "constraints":["primary key", ...], "default": 1/"asdf"/[1,2]/...}
@@ -94,6 +97,10 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                         proto_column_type.logic_type = ttypes.LogicType.Float
                     case "double" | "float64":
                         proto_column_type.logic_type = ttypes.LogicType.Double
+                    case "float16":
+                        proto_column_type.logic_type = ttypes.LogicType.Float16
+                    case "bfloat16":
+                        proto_column_type.logic_type = ttypes.LogicType.BFloat16
                     case "varchar":
                         proto_column_type.logic_type = ttypes.LogicType.Varchar
                         proto_column_type.physical_type = ttypes.VarcharType()
@@ -164,6 +171,8 @@ def get_embedding_info(column_info, column_defs, column_name, index):
         embedding_type.element_type = ttypes.ElementType.ElementFloat32
     elif element_type == "float64" or element_type == "double":
         embedding_type.element_type = ttypes.ElementType.ElementFloat64
+    elif element_type == "uint8":
+        embedding_type.element_type = ttypes.ElementType.ElementUInt8
     elif element_type == "int8":
         embedding_type.element_type = ttypes.ElementType.ElementInt8
     elif element_type == "int16":
@@ -210,6 +219,8 @@ def get_sparse_info(column_info, column_defs, column_name, index):
         sparse_type.element_type = ttypes.ElementType.ElementFloat32
     elif value_type == "float64" or value_type == "double":
         sparse_type.element_type = ttypes.ElementType.ElementFloat64
+    elif value_type == "uint8":
+        sparse_type.element_type = ttypes.ElementType.ElementUInt8
     elif value_type == "int8":
         sparse_type.element_type = ttypes.ElementType.ElementInt8
     elif value_type == "int16":

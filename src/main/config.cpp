@@ -85,7 +85,7 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
     u64 time_number = 0;
     for (SizeT i = 0; i < info_size - 1; ++i) {
         if (std::isdigit(time_info[i])) {
-            time_number += time_number * 10 + (time_info[i] - '0');
+            time_number = time_number * 10 + (time_info[i] - '0');
         } else {
             return Status::InvalidTimeInfo(time_info);
         }

@@ -108,6 +108,15 @@ struct FloatTryCastToVarlen {
 
 // Cast FloatT to other numeric type
 template <>
+inline bool FloatTryCastToFixlen::Run(FloatT source, u8 &target) {
+    if (source < 0.0f || source > 255.0f) {
+        return false;
+    }
+    target = static_cast<u8>(source);
+    return true;
+}
+
+template <>
 inline bool FloatTryCastToFixlen::Run(FloatT source, TinyIntT &target) {
     if (source < -128.0f || source > 127.0f) {
         return false;
@@ -204,6 +213,15 @@ inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, ColumnVec
 }
 
 // Cast DoubleT to other numeric type
+template <>
+inline bool FloatTryCastToFixlen::Run(DoubleT source, u8 &target) {
+    if (source < 0.0f || source > 255.0f) {
+        return false;
+    }
+    target = static_cast<u8>(source);
+    return true;
+}
+
 template <>
 inline bool FloatTryCastToFixlen::Run(DoubleT source, TinyIntT &target) {
     if (source < -128.0f || source > 127.0f) {

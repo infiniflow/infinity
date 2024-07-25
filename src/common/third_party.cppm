@@ -159,8 +159,11 @@ export using TimestampArray = arrow::TimestampArray;
 export using DurationArray = arrow::DurationArray;
 export using StringArray = arrow::StringArray;
 export using ListArray = arrow::ListArray;
+export using FixedSizeListArray = arrow::FixedSizeListArray;
 export using BinaryArray = arrow::BinaryArray;
+export using StructArray = arrow::StructArray;
 
+export using BooleanBuilder = arrow::BooleanBuilder;
 export using UInt8Builder = arrow::UInt8Builder;
 export using Int8Builder = arrow::Int8Builder;
 export using Int16Builder = arrow::Int16Builder;
@@ -175,6 +178,8 @@ export using TimestampBuilder = arrow::TimestampBuilder;
 export using DurationBuilder = arrow::DurationBuilder;
 export using StringBuilder = arrow::StringBuilder;
 export using ListBuilder = arrow::ListBuilder;
+export using FixedSizeListBuilder = arrow::FixedSizeListBuilder;
+export using StructBuilder = arrow::StructBuilder;
 
 export using RecordBatchReader = arrow::RecordBatchReader;
 export using RecordBatch = arrow::RecordBatch;
@@ -183,6 +188,7 @@ export MemoryPool *DefaultMemoryPool() { return arrow::default_memory_pool(); }
 
 export using DataType = arrow::DataType;
 export using Field = arrow::Field;
+export using FieldVector = arrow::FieldVector;
 export using Schema = arrow::Schema;
 export using ParquetFileReader = parquet::arrow::FileReader;
 export using ParquetFileWriter = parquet::arrow::FileWriter;

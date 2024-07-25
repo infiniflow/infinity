@@ -170,7 +170,8 @@ export struct WrapBetweenExpr {
 
 export struct EmbeddingData {
     Vector<bool> bool_array_value;
-    Vector<String> i8_array_value;
+    Vector<int16_t> u8_array_value;
+    Vector<int16_t> i8_array_value;
     Vector<int16_t> i16_array_value;
     Vector<int32_t> i32_array_value;
     Vector<int64_t> i64_array_value;

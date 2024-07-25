@@ -66,7 +66,7 @@ public:
 protected:
     virtual void WriteToFileImpl(bool to_spill, bool &prepare_success) = 0;
 
-    virtual void ReadFromFileImpl() = 0;
+    virtual void ReadFromFileImpl(SizeT file_size) = 0;
 
 private:
     String ChooseFileDir(bool spill) const { return spill ? fmt::format("{}{}", *temp_dir_, *file_dir_) : *file_dir_; }

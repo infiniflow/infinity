@@ -1,0 +1,63 @@
+statement ok
+DROP TABLE IF EXISTS sqllogic_test_export_jsonl;
+
+statement ok
+DROP TABLE IF EXISTS sqllogic_test_export_csv;
+
+statement ok
+CREATE TABLE sqllogic_test_export_jsonl (c1 INT, c2 SPARSE(FLOAT, 30000) WITH (SORTED));
+
+statement ok
+CREATE TABLE sqllogic_test_export_csv (c1 INT, c2 SPARSE(FLOAT, 30000) WITH (SORTED));
+
+statement ok
+INSERT INTO sqllogic_test_export_jsonl VALUES (1, [10000:1.0,20000:2.0]), (3, [3000:3.0]);
+
+statement ok
+INSERT INTO sqllogic_test_export_csv VALUES (1, [10000:1.0,20000:2.0]), (3, [3000:3.0]);
+
+query I
+SELECT * FROM sqllogic_test_export_jsonl;
+----
+1 [10000:1.000000,20000:2.000000]
+3 [3000:3.000000]
+
+query II
+SELECT * FROM sqllogic_test_export_csv;
+----
+1 [10000:1.000000,20000:2.000000]
+3 [3000:3.000000]
+
+statement ok
+COPY sqllogic_test_export_jsonl TO '/var/infinity/test_data/tmp/test_export_sparse.jsonl' WITH (FORMAT JSONL);
+
+statement ok
+COPY sqllogic_test_export_csv TO '/var/infinity/test_data/tmp/test_export_sparse.csv' WITH (FORMAT CSV);
+
+statement ok
+COPY sqllogic_test_export_jsonl FROM '/var/infinity/test_data/tmp/test_export_sparse.jsonl' WITH (FORMAT JSONL);
+
+statement ok
+COPY sqllogic_test_export_csv FROM '/var/infinity/test_data/tmp/test_export_sparse.csv' WITH (FORMAT CSV);
+
+query III
+SELECT * FROM sqllogic_test_export_jsonl;
+----
+1 [10000:1.000000,20000:2.000000]
+3 [3000:3.000000]
+1 [10000:1.000000,20000:2.000000]
+3 [3000:3.000000]
+
+query IV
+SELECT * FROM sqllogic_test_export_csv;
+----
+1 [10000:1.000000,20000:2.000000]
+3 [3000:3.000000]
+1 [10000:1.000000,20000:2.000000]
+3 [3000:3.000000]
+
+statement ok
+DROP TABLE sqllogic_test_export_jsonl;
+
+statement ok
+DROP TABLE sqllogic_test_export_csv;

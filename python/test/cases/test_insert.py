@@ -22,6 +22,8 @@ class TestInfinity:
     def test_insert(self):
         # self.test_infinity_obj._test_version()
         self.test_infinity_obj._test_insert_basic()
+        self.test_infinity_obj._test_insert_bool()
+        self.test_infinity_obj._test_insert_float16_bfloat16()
         self.test_infinity_obj._test_insert_varchar()
         self.test_infinity_obj._test_insert_big_varchar()
         self.test_infinity_obj._test_insert_embedding()
@@ -68,7 +70,7 @@ class TestInfinity:
         self.test_infinity_obj._test_insert_with_exceeding_invalid_value_range(values)
 
     # batch insert, within limit
-    @pytest.mark.parametrize("batch", [10, 1024, 2048])
+    @pytest.mark.parametrize("batch", [10, 1024, 2048, 8192])
     def test_batch_insert_within_limit(self, batch):
         self.test_infinity_obj._test_batch_insert_within_limit(batch)
 

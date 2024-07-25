@@ -225,6 +225,10 @@ bool PhysicalMatchSparseScan::Execute(QueryContext *query_context, OperatorState
             ExecuteInner<i64>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
             break;
         }
+        case EmbeddingDataType::kElemUInt8: {
+            ExecuteInner<u8>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -314,7 +318,7 @@ template <typename DataT, typename IdxType, typename ResultType, template <typen
 void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state) {
     MatchSparseScanFunctionData &function_data = match_sparse_scan_state->match_sparse_scan_function_data_;
 
-    using MergeHeap = MergeKnn<ResultType, C>;
+    using MergeHeap = MergeKnn<ResultType, C, ResultType>;
     auto *merge_heap = static_cast<MergeHeap *>(function_data.merge_knn_base_.get());
     if constexpr (std::is_same_v<DataT, bool>) {
         using DistFuncT = SparseBitDistance<IdxType, ResultType>;

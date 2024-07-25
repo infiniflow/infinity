@@ -560,6 +560,21 @@ BooleanT DataType::StringToValue<BooleanT>(const std::string_view &str) {
 }
 
 template <>
+uint8_t DataType::StringToValue<uint8_t>(const std::string_view &str) {
+    if (str.empty()) {
+        return {};
+    }
+    uint8_t value{};
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse u8 integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
+    return value;
+}
+
+template <>
 TinyIntT DataType::StringToValue<TinyIntT>(const std::string_view &str) {
     if (str.empty()) {
         return TinyIntT{};

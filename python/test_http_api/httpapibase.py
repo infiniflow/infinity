@@ -39,29 +39,31 @@ class HttpTest:
         # Post operation
 
     def tear_down(self, resp, expect={}):
-        print("status_code:" + str(resp.status_code))
+        # print("status_code:" + str(resp.status_code))
         if expect.get("status_code", None) is not None:
-            print(f"expect: {expect['status_code']}, actual: {resp.status_code}")
+            if resp.status_code != expect['status_code']:
+                logging.error(f"expect: {expect['status_code']}, actual: {resp.status_code}")
             assert resp.status_code == expect['status_code']
         else:
-            print(f"actual: {resp.status_code}, expect: {expected_status_code}")
-            assert resp.status_code == expected_status_code
+            if resp.status_code != expected_status_code:
+                logging.error(f"actual: {resp.status_code}, expect: {expected_status_code}")
 
         resp_json = resp.json()
         # print(resp_json)
         for item in expect.items():
             if resp_json.get(item[0], None) is None:
                 continue
-            print("[" + str(item[0]) + "]: " + "resp:" + str(resp_json[item[0]]) + ", expect:" + str(item[1]))
-            assert str(resp_json[item[0]]) == str(item[1])
-        print("----------------------------------------------")
+            if str(resp_json[item[0]]) != str(item[1]):
+                logging.error("[" + str(item[0]) + "]: " + "resp:" + str(resp_json[item[0]]) + ", expect:" + str(item[1]))
+                assert False
+        # print("----------------------------------------------")
         return
 
     def request(self, url, method, header={}, data={}):
         if header is None:
             header = {}
         url = default_url + url
-        print("url: " + url)
+        # print("url: " + url)
         match method:
             case "get":
                 response = requests.get(url, headers=header, json=data)
@@ -160,7 +162,7 @@ class HttpTest:
         d = self.set_up_data(['create_option'],
                              {'fields': fields, 'properties': properties, 'create_option': baseCreateOptions[opt]})
         r = self.request(url, "post", h, d)
-        print(r)
+        # print(r)
         self.tear_down(r, expect)
         return
 
@@ -237,7 +239,7 @@ class HttpTest:
         if exists is not None:
              copt = baseDropOptions[opt]
         
-        print("copt:"+copt)
+        # print("copt:"+copt)
 
         url = f"databases/{db_name}/tables/{table_name}/indexes/{index_name}"
 

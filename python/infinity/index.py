@@ -24,19 +24,16 @@ from infinity.errors import ErrorCode
 
 class IndexType(Enum):
     IVFFlat = 1
-    HnswLVQ = 2
-    Hnsw = 3
-    FullText = 4
-    Secondary = 5
-    EMVB = 6
-    BMP = 7
+    Hnsw = 2
+    FullText = 3
+    Secondary = 4
+    EMVB = 5
+    BMP = 6
 
     def to_ttype(self):
         match self:
             case IndexType.IVFFlat:
                 return ttypes.IndexType.IVFFlat
-            case IndexType.HnswLVQ:
-                return ttypes.IndexType.HnswLVQ
             case IndexType.Hnsw:
                 return ttypes.IndexType.Hnsw
             case IndexType.FullText:
@@ -54,8 +51,6 @@ class IndexType(Enum):
         match self:
             case IndexType.IVFFlat:
                 return LocalIndexType.kIVFFlat
-            case IndexType.HnswLVQ:
-                return LocalIndexType.kHnswLVQ
             case IndexType.Hnsw:
                 return LocalIndexType.kHnsw
             case IndexType.FullText:

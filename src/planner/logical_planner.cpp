@@ -239,6 +239,11 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     // Create value list
     Vector<Vector<SharedPtr<BaseExpression>>> value_list_array;
     SizeT value_count = statement->values_->size();
+    if(value_count > INSERT_BATCH_ROW_LIMIT) {
+        Status status = Status::NotSupport("Insert batch row limit shouldn't more than 8192.");
+        RecoverableError(status);
+    }
+
     for (SizeT idx = 0; idx < value_count; ++idx) {
         const auto *parsed_expr_list = statement->values_->at(idx);
 
@@ -680,7 +685,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         case IndexType::kHnsw: {
             assert(index_info->index_param_list_ != nullptr);
             // The following check might affect performance
-            IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_, *(index_info->index_param_list_)); // may throw exception
             base_index_ptr = IndexHnsw::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }

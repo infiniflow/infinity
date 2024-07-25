@@ -68,7 +68,7 @@ void RawFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     prepare_success = true; // Not run defer_fn
 }
 
-void RawFileWorker::ReadFromFileImpl() {
+void RawFileWorker::ReadFromFileImpl(SizeT file_size) {
     LocalFileSystem fs;
     buffer_size_ = fs.GetFileSize(*file_handler_);
     data_ = static_cast<void *>(new char[buffer_size_]);

@@ -254,6 +254,8 @@ export namespace std {
     using std::is_floating_point_v;
     using std::common_type_t;
     using std::underlying_type_t;
+    using std::conditional_t;
+    using std::remove_pointer_t;
 
     using std::function;
     using std::monostate;

@@ -71,7 +71,7 @@ public:
     virtual nlohmann::json Serialize() const override;
 
 public:
-    static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
+    static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name, const Vector<InitParameter *> &index_param_list);
 
 public:
     const MetricType metric_type_{MetricType::kInvalid};

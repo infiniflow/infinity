@@ -222,7 +222,19 @@ ParsedExpr *WrapBetweenExpr::GetParsedExpr(Status &status) {
 
 Tuple<void *, i64> GetEmbeddingDataTypeDataPtrFromProto(const EmbeddingData &embedding_data, Status &status) {
     status.code_ = ErrorCode::kOk;
-    if (embedding_data.i8_array_value.size() != 0) {
+    if (embedding_data.u8_array_value.size() != 0) {
+        auto ptr_i16 = (int16_t *)(embedding_data.u8_array_value.data());
+        auto ptr_u8 = (uint8_t *)(embedding_data.u8_array_value.data());
+        for (size_t i = 0; i < embedding_data.u8_array_value.size(); ++i) {
+            ptr_u8[i] = static_cast<uint8_t>(ptr_i16[i]);
+        }
+        return {(void *)embedding_data.u8_array_value.data(), embedding_data.u8_array_value.size()};
+    } else if (embedding_data.i8_array_value.size() != 0) {
+        auto ptr_i16 = (int16_t *)(embedding_data.i8_array_value.data());
+        auto ptr_i8 = (int8_t *)(embedding_data.i8_array_value.data());
+        for (size_t i = 0; i < embedding_data.i8_array_value.size(); ++i) {
+            ptr_i8[i] = static_cast<int8_t>(ptr_i16[i]);
+        }
         return {(void *)embedding_data.i8_array_value.data(), embedding_data.i8_array_value.size()};
     } else if (embedding_data.i16_array_value.size() != 0) {
         return {(void *)embedding_data.i16_array_value.data(), embedding_data.i16_array_value.size()};
@@ -1001,6 +1013,8 @@ void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, c
         case LogicalType::kInteger:
         case LogicalType::kBigInt:
         case LogicalType::kHugeInt:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
         case LogicalType::kFloat:
         case LogicalType::kDouble: {
             HandlePodType(output_column_field, row_count, column_vector);
@@ -1053,6 +1067,8 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
         case LogicalType::kSmallInt:
         case LogicalType::kInteger:
         case LogicalType::kBigInt:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
         case LogicalType::kFloat:
         case LogicalType::kDouble: {
             proto_data_type.logical_type = data_type->type();

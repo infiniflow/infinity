@@ -92,7 +92,7 @@ void EMVBIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) 
     prepare_success = true;
 }
 
-void EMVBIndexFileWorker::ReadFromFileImpl() {
+void EMVBIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
     if (data_) {
         const auto error_message = "Data is already allocated.";
         UnrecoverableError(error_message);

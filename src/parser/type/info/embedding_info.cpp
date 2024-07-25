@@ -47,6 +47,8 @@ std::string EmbeddingInfo::EmbeddingDataTypeToString(EmbeddingDataType type) {
             return "float";
         case kElemDouble:
             return "double";
+        case kElemUInt8:
+            return "uint8";
         default:
             ParserError("Unexpected embedding type");
     }
