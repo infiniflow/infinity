@@ -109,7 +109,7 @@ void HnswFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     prepare_success = true;
 }
 
-void HnswFileWorker::ReadFromFileImpl() {
+void HnswFileWorker::ReadFromFileImpl(SizeT file_size) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }

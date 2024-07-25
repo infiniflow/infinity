@@ -89,7 +89,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
     } else {
         read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     }
-
+    SizeT file_size = 0;
     u8 flags = FileFlags::READ_FLAG;
     auto [file_handler, status] = fs.OpenFile(read_path, flags, FileLockType::kReadLock);
     if(!status.ok()) {
@@ -97,6 +97,9 @@ void FileWorker::ReadFromFile(bool from_spill) {
     }
     if (use_object_cache) {
         fs.Seek(*file_handler, obj_addr_.part_offset_);
+        file_size = obj_addr_.part_size_;
+    } else {
+        file_size = fs.GetFileSize(*file_handler);
     }
     file_handler_ = std::move(file_handler);
     DeferFn defer_fn([&]() {
@@ -106,14 +109,10 @@ void FileWorker::ReadFromFile(bool from_spill) {
             InfinityContext::instance().persistence_manager()->PutObjCache(obj_addr_);
         }
     });
-    ReadFromFileImpl();
+    ReadFromFileImpl(file_size);
 }
 
 void FileWorker::MoveFile() {
-    if (InfinityContext::instance().persistence_manager() != nullptr) {
-        LOG_DEBUG(fmt::format("Skipped MoveFile file since persistence manager is enabled: {}", *file_name_));
-        return;
-    }
     LocalFileSystem fs;
 
     String src_path = fmt::format("{}/{}", ChooseFileDir(true), *file_name_);
@@ -130,9 +129,17 @@ void FileWorker::MoveFile() {
     //     UnrecoverableError(fmt::format("File {} was already been created before.", dest_path));
     // }
     fs.Rename(src_path, dest_path);
+    if (InfinityContext::instance().persistence_manager() != nullptr) {
+        obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(dest_path);
+        fs.DeleteFile(dest_path);
+    }
 }
 
 void FileWorker::CleanupFile() const {
+    if (InfinityContext::instance().persistence_manager() != nullptr) {
+        InfinityContext::instance().persistence_manager()->Cleanup(obj_addr_);
+        return;
+    }
     LocalFileSystem fs;
 
     String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
