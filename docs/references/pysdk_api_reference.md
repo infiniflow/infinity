@@ -6,9 +6,11 @@ slug: /python_api_reference
 
 ## connect
 
-***class*** **infinity.connect(*uri*)**
+```python
+infinity.connect(uri)
+```
 
-Connect to the Infinity server and return an Infinity object. 
+Connects to the Infinity server and gets an Infinity object. 
 
 ### Parameters
 
@@ -37,9 +39,11 @@ Connect to the Infinity server and return an Infinity object.
 
 ## disconnect
 
-**infinity.disconnect()**
+```python
+infinity.disconnect()
+```
 
-Disconnect the current Infinity object from the server.
+Disconnects the current Infinity object from the server.
 
 > This method is automatically called when an Infinity object is destructed.
 
@@ -56,9 +60,11 @@ infinity_obj.disconnect()
 
 ## create_database
 
-**Infinity.create_database(*db_name, conflict_type = ConflictType.Error*)**
+```python
+Infinity.create_database(db_name, conflict_type = ConflictType.Error)
+```
 
-Create a database with a given name. `conflict_type` determines the approach to take when a database with the same name exists. 
+Creates a database with a given name. `conflict_type` specifies the policy when a database with the same name exists. 
 
 ### Parameters
 
@@ -79,14 +85,16 @@ infinity_obj.create_database("my_database")
 
 ## drop_database
 
-**Infinity.drop_database(*db_name, conflict_type = ConflictType.Error*)**
+```python
+Infinity.drop_database(db_name, conflict_type = ConflictType.Error)
+```
 
-Drop a database by name.
+Drops a database by name.
 
 ### Parameters
 
 - `db_name`: `str` Name of the database
-- `conflict_type`:  `enum` The countermeasure to take when a database with the same name exists.  See `ConflictType`, which is defined in the **infinity.common** package. 
+- `conflict_type`:  `enum` Policy for handling an existing database with the same name.  See `ConflictType`, which is defined in the **infinity.common** package. 
   - `Error`
   - `Ignore`
 
@@ -102,9 +110,11 @@ infinity_obj.drop_database("my_database")
 
 ## list_databases
 
-**Infinity.list_databases()**
+```python
+Infinity.list_databases()
+```
 
-List all databases.
+Lists all databases.
 
 ### Returns
 
@@ -120,9 +130,11 @@ res.db_names #["my_database"]
 
 ## get_database
 
-**Infinity.get_database(*db_name*)**
+```python
+Infinity.get_database(db_name)
+```
 
-Retrieve a database object by name.
+Retrieves a database object by name.
 
 ### Parameters
 
@@ -141,9 +153,11 @@ db_obj=infinity_obj.get_database("my_database")
 
 ## show_database
 
-**Infinity.show_database(*db_name*)**
+```python
+Infinity.show_database(db_name)
+```
 
-Retrieve the metadata of a database by name.
+Retrieves the metadata of a database by name.
 
 ### Parameters
 
@@ -169,18 +183,44 @@ metadata.table_count  #0
 
 ## create_table
 
-**Database.create_table(*table_name, columns_definition, conflict_type = ConflictType.Error*)**
+```python
+Database.create_table(table_name, columns_definition, conflict_type = ConflictType.Error)
+```
 
-Create a table with a given name, defining each column in it.
+Creates a table with a specified name and defined columns.
 
 ### Parameters
 
-- **table_name : str(not empty)**  Name of the table.
-- **columns_definition : dict[str, str]**
-A dict object whose key value pair indicates name of the column and its datatype. Especially, a vector column should be declared as `"vector, \<dimension>\, \<datatype>\"`
-- **conflict_type : ConflictType** enum type defined in the `infinity.common` package:
+#### table_name: `str`, *Required*
+
+Name of the table. Must not be empty. 
+
+#### columns_definition: `dict[str, dict[str, Any]]`, *Required*
+
+Definitions for all table columns as a dictionary. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type, constraints, and default value information in key-value pairs:
+
+- **Data type** (`"type"`)  
+  Supported values include:  
+  - Primitive: `"int8"`, `"int16"`, `"int32"/"int"/"integer"`, `"int64"`, `"float"/"float32"`, `"double"/"float64"`, `"bool"`, `"varchar"`
+  - Vector: `"vector,<dimension>,<data_type>"`
+  - Sparse vector: `"sparse,<dimension>,<sparse_data_type>,<indice_data_type>"`
+  - Tensor: `"tensor,<dimension>,<data_type>"`
+  - Tensor array: `"tensorarray,<dimension>,<data_type>"`
+
+- **Constraints** (`"constraints"`)  
+  Rules or conditions applied to the column. Supported values include:
+
+
+- **Default value** (`"default"`)  
+  The default column value that a cell takes if not explicitly set.  
+
+
+#### conflict_type: `ConflictType`, *Optional*
+
+`enum` type defined in the `infinity.common` package:
   - `Error`
   - `Ignore`
+  - `Replace`
 
 
 ### note
@@ -208,7 +248,6 @@ A dict object whose key value pair indicates name of the column and its datatype
 db_obj.create_table("table_example", {
             "c1": {
                 "type": "int",
-                "constraints": ["primary key",],
                 "default": 1
             },
             "c2": {
@@ -224,7 +263,6 @@ db_obj.create_table("table_example", {
 db_obj.create_table("my_table", {
             "c1": {
                 "type": "varchar", 
-                "constraints": ["primary key"]
             },
             "c2": {
                 "type": "float"
@@ -242,9 +280,11 @@ db_obj.create_table("test_create_embedding_table",
 
 ## drop_table
 
-**Database.drop_table(*table_name, conflict_type = ConflictType.Error*)**
+```python
+Database.drop_table(table_name, conflict_type = ConflictType.Error)
+```
 
-Drop a table by name.
+Drops a table by name.
 
 ### Parameters
 
@@ -266,9 +306,11 @@ db_obj.drop_table("my_table", ConflictType.Error)
 
 ## get_table
 
-**Database.get_table(*table_name*)**
+```python
+Database.get_table(table_name)
+```
 
-Retrieve a table object by name.
+Retrieves a table object by name.
 
 ### Parameters
 
@@ -290,9 +332,11 @@ except Exception as e:
 
 ## list_tables
 
-**Database.list_tables()**
+```python
+Database.list_tables()
+```
 
-List all tables in the current database.
+Lists all tables in the current database.
 
 ### Returns
 
@@ -308,7 +352,9 @@ res.table_names #["my_table"]
 
 ## show_table
 
-**Database.show_tables()**
+```python
+Database.show_tables()
+```
 
 Get the information of all tables in the database.
 
@@ -346,9 +392,11 @@ res
 
 ## create_index
 
-**Table.create_index(*index_name, index_infos, conflict_type = ConflictType.Error*)**
+```python
+Table.create_index(index_name, index_infos, conflict_type = ConflictType.Error)
+```
 
-Create an index by `IndexInfo` list.
+Creates an index by `IndexInfo` list.
 
 ### Parameters
 
@@ -443,7 +491,9 @@ table_obj.create_index("my_index",
 
 ## drop_index
 
-**Table.drop_index(*index_name, conflict_type = ConflictType.Error*)**
+```python
+Table.drop_index(index_name, conflict_type = ConflictType.Error)
+```
 
 Drop an index by name.
 
@@ -467,9 +517,11 @@ table_obj.drop_index("my_index")
 
 ## show_index
 
-**Table.show_index(*index_name*)**
+```python
+Table.show_index(index_name)
+```
 
-Retrieve the metadata of an index by name.
+Retrieves the metadata of an index by name.
 
 ### Parameters
 
@@ -506,9 +558,11 @@ print(res)
 
 ## list_indexes
 
-**Table.list_indexes(*index_name*)**
+```python
+Table.list_indexes(index_name)
+```
 
-List the indexes built on the table.
+Lists the indexes built on the table.
 
 ### Returns
 
@@ -532,7 +586,7 @@ Inserts rows of data into the current table.
 
 ### Parameters
 
-**data** : `json`, *Required*  
+#### data: `json`, *Required*  
 Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `json` (one record) or `json` list (multiple rows), with each key-value pair corresponding to a column name and table cell value.
 
 :::tip NOTE
@@ -741,9 +795,11 @@ table_instance.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "js
 
 ## delete
 
-**Table.delete(*cond = None*)**
+```python
+Table.delete(cond = None)
+```
 
-Delete rows by condition.The condition is similar to the WHERE conditions in SQL. If  `cond` is not specified, all the data will be removed in the table object.
+Deletes rows by condition.The condition is similar to the WHERE conditions in SQL. If  `cond` is not specified, all the data will be removed in the table object.
 
 ### Parameters
 
@@ -763,9 +819,11 @@ table_obj.delete()
 
 ## update
 
-**Table.update(*cond = None*)**
+```python
+Table.update(cond = None)
+```
 
-Search for rows that match the specified condition and update them accordingly.
+Searches for rows that match the specified condition and update them accordingly.
 
 ### Parameters
 
@@ -788,7 +846,8 @@ table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 
 ## output
 
-**Table.output(*columns*)**
+```python
+Table.output(columns)
 Specify the columns to display in the search output, or perform aggregation operations or arithmetic calculations. 
 
 ```python
@@ -816,7 +875,9 @@ table_obj.output(["c1+5"])
 
 ## filter
 
-**Table.filter(*cond*)**
+```python
+Table.filter(cond)
+```
 
 Create a filtering condition expression.
 
@@ -838,9 +899,11 @@ table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 
 ## knn
 
-**Table.knn(*vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None*)**
+```python
+Table.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
+```
 
-Build a KNN search expression. Find the top n closet rows to the given vector.
+Builds a KNN search expression. Find the top n closet rows to the given vector.
 
 ### Parameters
 
@@ -870,7 +933,9 @@ table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 
 ## match sparse
 
-**Table.match_sparse(*vector_column_name, sparse_data, distance_type, topn, opt_params = None*)**
+```python
+Table.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params = None)
+```
 
 ### Parameters
 
@@ -897,7 +962,7 @@ table_obj.match_sparse('col1_with_bmp_index', {"indices": [0, 10, 20], "values":
 
 ## match
 
-Create a full-text search expression.
+Creates a full-text search expression.
 
 ### Parameters
 
@@ -929,9 +994,11 @@ for question in questions:
 
 ## match tensor
 
-**Table.match_tensor(*vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)**
+```python
+Table.match_tensor(vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)
+```
 
-Build a KNN tensor search expression. Find the top n closet rows to the given tensor according to chosen method.
+Builds a KNN tensor search expression. Find the top n closet rows to the given tensor according to chosen method.
 
 For example, find k most match tensors generated by ColBERT.
 
@@ -966,9 +1033,11 @@ match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim
 
 ## fusion
 
-**Table.fusion(*method, options_text = ''*)**
+```python
+Table.fusion(method, options_text = '')
+```
 
-Build a fusion expression.
+Builds a fusion expression.
 
 ### Parameters
 
@@ -1018,7 +1087,9 @@ table_obj.fusion('match_tensor', 'topn=2', make_match_tensor_expr('t', [[0.0, -1
 
 ## optimize
 
-**Table.optimize(*index_name, opt_params*)**
+```python
+Table.optimize(index_name, opt_params)
+```
 
 ### Parameters
 
@@ -1040,10 +1111,21 @@ table_obj.optimize('bmp_index_name', {'topk': '10'})
 
 ## get result
 
-**Table.to_result()**
-**Table.to_df()**
-**Table.to_pl()**
-**Table.to_arrow()**
+```python
+Table.to_result()
+```
+
+```python
+Table.to_df()
+```
+
+```python
+Table.to_pl()
+```
+
+```python
+Table.to_arrow()
+```
 
 After querying, these four methods above can get result into specific type. 
 `Note: output method must be executed before get result`
@@ -1058,7 +1140,7 @@ Python's built-in type
 
 ### Examples
 
-```
+```python
 res = table_obj.output(['c1', 'c1']).to_df()
 
 res = table_obj.output(['*'])
