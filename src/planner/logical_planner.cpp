@@ -239,6 +239,11 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     // Create value list
     Vector<Vector<SharedPtr<BaseExpression>>> value_list_array;
     SizeT value_count = statement->values_->size();
+    if(value_count > INSERT_BATCH_ROW_LIMIT) {
+        Status status = Status::NotSupport("Insert batch row limit shouldn't more than 8192.");
+        RecoverableError(status);
+    }
+
     for (SizeT idx = 0; idx < value_count; ++idx) {
         const auto *parsed_expr_list = statement->values_->at(idx);
 

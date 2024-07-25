@@ -43,7 +43,7 @@ try:
 
     # TODO also show how to import other type of file
     table_instance.import_data(project_directory + "/../test/data/csv/fulltext_delete.csv",
-                               {"file_type": "csv", "delimiter": "\t"})
+                               {"header": True, "file_type": "csv", "delimiter": "\t"})
 
     result = table_instance.output(["num", "doc"]).to_pl()
     print(result)

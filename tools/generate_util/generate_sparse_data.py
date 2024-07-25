@@ -2,14 +2,18 @@ import random
 import numpy as np
 
 
-def generate_sparse_data(row_n: int, max_dim: int, sparsity: float):
+def generate_sparse_data(row_n: int, max_dim: int, sparsity: float, max_col: int = 4096):
     nnz = int(row_n * max_dim * sparsity)
     indptr = np.zeros(row_n + 1).astype(np.int64)
-    indptr[0] = 0
-    for i, r in zip(range(1, row_n), random.sample(range(nnz - 1), row_n - 1)):
-        indptr[i] = r + 1
-    indptr[row_n] = nnz
-    indptr.sort()
+    while True:
+        indptr[0] = 0
+        for i, r in zip(range(1, row_n), random.sample(range(nnz - 1), row_n - 1)):
+            indptr[i] = r + 1
+        indptr[row_n] = nnz
+        indptr.sort()
+
+        if all(indptr[i + 1] - indptr[i] <= max_col for i in range(row_n)):
+            break
 
     indices = np.zeros(nnz).astype(np.int32)
     data = np.random.random(nnz).astype(np.float32)
