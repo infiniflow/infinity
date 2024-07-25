@@ -109,6 +109,26 @@ class TestInsert(TestSdk):
         res = db_obj.drop_table("python_test_fp16_bf16", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    def _test_insert_bool(self):
+        """
+        target: test insert bool column
+        method: create table with bool column
+        expected: ok
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("python_test_bool_insert", ConflictType.Ignore)
+        table_obj = db_obj.create_table("python_test_bool_insert", {"c1": {"type": "float"}, "c2": {"type": "bool"}},
+                                        ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": -1, "c2": True}, {"c1": 2, "c2": False}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-1, 2), 'c2': (True, False)}).astype(
+            {'c1': dtype('float32'), 'c2': dtype('bool')}))
+        res = db_obj.drop_table("python_test_bool_insert", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def _test_insert_varchar(self):
         """
         target: test insert varchar column
