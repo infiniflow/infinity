@@ -31,6 +31,11 @@ class TestInfinity:
     def test_knn(self, check_data):
         self.test_infinity_obj._test_knn(check_data)
 
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_knn_u8(self, check_data):
+        self.test_infinity_obj._test_knn_u8(check_data)
+
     def test_insert_multi_column(self):
         self.test_infinity_obj._test_insert_multi_column()
 

@@ -73,23 +73,26 @@ public:
 
 //-------------------------------------------------------------------
 
-export class KnnDistanceBase1 {};
+export class KnnDistanceBase1 {
+public:
+    virtual ~KnnDistanceBase1() = default;
+};
 
-export template <typename DataType>
+export template <typename DataType, typename DistType>
 class KnnDistance1 : public KnnDistanceBase1 {
 public:
     KnnDistance1(KnnDistanceType dist_type);
 
-    Vector<DataType> Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim) {
-        Vector<DataType> res(data_count);
+    Vector<DistType> Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim) {
+        Vector<DistType> res(data_count);
         for (SizeT i = 0; i < data_count; ++i) {
             res[i] = dist_func_(query, datas + i * dim, dim);
         }
         return res;
     }
 
-    Vector<DataType> Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim, Bitmask &bitmask) {
-        Vector<DataType> res(data_count);
+    Vector<DistType> Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim, Bitmask &bitmask) {
+        Vector<DistType> res(data_count);
         for (SizeT i = 0; i < data_count; ++i) {
             if (bitmask.IsTrue(i)) {
                 res[i] = dist_func_(query, datas + i * dim, dim);
@@ -99,13 +102,25 @@ public:
     }
 
 public:
-    using DistFunc = DataType (*)(const DataType *, const DataType *, SizeT);
+    using DistFunc = DistType (*)(const DataType *, const DataType *, SizeT);
 
     DistFunc dist_func_{};
 };
 
 template <>
-KnnDistance1<f32>::KnnDistance1(KnnDistanceType dist_type);
+KnnDistance1<f32, f32>::KnnDistance1(KnnDistanceType dist_type);
+
+template <>
+KnnDistance1<u8, i32>::KnnDistance1(KnnDistanceType dist_type);
+
+template <>
+KnnDistance1<u8, f32>::KnnDistance1(KnnDistanceType dist_type);
+
+template <>
+KnnDistance1<i8, i32>::KnnDistance1(KnnDistanceType dist_type);
+
+template <>
+KnnDistance1<i8, f32>::KnnDistance1(KnnDistanceType dist_type);
 
 //-------------------------------------------------------------------
 
@@ -116,7 +131,7 @@ public:
     ~KnnScanFunctionData() final = default;
 
 private:
-    template <typename DataType>
+    template <typename DataType, typename DistType>
     void Init();
 
 public:

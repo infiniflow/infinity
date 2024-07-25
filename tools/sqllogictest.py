@@ -36,6 +36,7 @@ from generate_test_parquet import generate as generate24
 from generate_tensor_parquet import generate as generate25
 from generate_tensor_array_parquet import generate as generate26
 
+
 class SpinnerThread(threading.Thread):
     def __init__(self):
         super(SpinnerThread, self).__init__()
@@ -62,7 +63,14 @@ def process_test(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
             file = os.path.join(dirpath, filename)
 
             # filename = os.path.basename(file)
-            # if "fulltext" in filename or "fusion" in filename or "test_compact_big" in filename:
+            # if (
+            #     "fulltext" in filename
+            #     or "fusion" in filename
+            #     or "test_compact_big" in filename
+            #     or "emvb" in filename
+            #     or "bmp_big" in filename
+            #     or "big_many_import" in filename
+            # ):
             #     continue
 
             print("Start running test file: " + file)

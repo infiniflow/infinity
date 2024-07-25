@@ -180,6 +180,10 @@ class RemoteTable(Table, ABC):
                     constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String,
                                                               str_value=value)
 
+                elif isinstance(value, bool):
+                    constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Boolean,
+                                                              bool_value=value)
+
                 elif isinstance(value, int):
                     constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
                                                               i64_value=value)

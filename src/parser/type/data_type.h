@@ -325,6 +325,9 @@ template <>
 BooleanT DataType::StringToValue<BooleanT>(const std::string_view &str_view);
 
 template <>
+uint8_t DataType::StringToValue<uint8_t>(const std::string_view &str_view);
+
+template <>
 TinyIntT DataType::StringToValue<TinyIntT>(const std::string_view &str_view);
 
 template <>

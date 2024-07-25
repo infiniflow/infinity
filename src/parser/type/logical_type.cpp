@@ -263,6 +263,9 @@ LogicalType GetCommonLogicalType(const EmbeddingDataType column_type) {
         case EmbeddingDataType::kElemInt8: {
             return GetCommonLogicalType<T, int8_t>();
         }
+        case EmbeddingDataType::kElemUInt8: {
+            return GetCommonLogicalType<T, uint8_t>();
+        }
         case EmbeddingDataType::kElemInt16: {
             return GetCommonLogicalType<T, int16_t>();
         }
@@ -289,6 +292,9 @@ LogicalType GetCommonLogicalType(const EmbeddingDataType type1, const EmbeddingD
     switch (type1) {
         case EmbeddingDataType::kElemInt8: {
             return GetCommonLogicalType<int8_t>(type2);
+        }
+        case EmbeddingDataType::kElemUInt8: {
+            return GetCommonLogicalType<uint8_t>(type2);
         }
         case EmbeddingDataType::kElemInt16: {
             return GetCommonLogicalType<int16_t>(type2);

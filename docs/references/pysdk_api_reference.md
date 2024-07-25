@@ -357,19 +357,21 @@ Create an index by `IndexInfo` list.
   A IndexInfo struct contains three fields,`column_name`, `index_type`, and `index_param_list`.
     - **column_name : str** Name of the column to build index on.
     - **index_type : IndexType**
-      enum type: `IVFFlat` , `Hnsw`, `HnswLVQ`, `FullText`, or `BMP`. Defined in `infinity.index`.
-      `Note: The difference between Hnsw and HnswLVQ is only adopting different clustering method. The former uses K-Means while the later uses LVQ(Learning Vector Quantization)`
+      enum type: `IVFFlat` , `Hnsw`, `FullText`, or `BMP`. Defined in `infinity.index`.
+      `Note: For Hnsw index, add encode=lvq in index_param_list to use LVQ(Locally-adaptive vector quantization)`
     - **index_param_list**
       A list of InitParameter. The InitParameter struct is like a key-value pair, with two string fields named param_name and param_value. The optional parameters of each type of index are listed below:
         - `IVFFlat`: `'centroids_count'`(default:`'128'`), `'metric'`(required)
-        - `Hnsw`: `'M'`(default:`'16'`), `'ef_construction'`(default:`'50'`), `'ef'`(default:`'50'`), `'metric'`(required)
-        - `HnswLVQ`: 
+        - `Hnsw`: 
           - `'M'`(default:`'16'`)
           - `'ef_construction'`(default:`'50'`)
           - `'ef'`(default:`'50'`)
           - `'metric'`(required)
              - `ip`: Inner product
              - `l2`: Euclidean distance
+          - `'encode'`(optional)
+              - `plain`: Plain encoding (default)
+              - `lvq`: LVQ(Locally-adaptive vector quantization)
         - `FullText`: `'ANALYZER'`(default:`'standard'`)
         - `BMP`: 
           - `block_size=1~256`(default: 16): The size of the block in BMP index

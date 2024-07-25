@@ -47,10 +47,9 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> file_dir,
 
         String index_path = GetFilePath();
         auto [file_handler, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
+        if (status.ok()) { // file may deleted if cleaned up happens
+            index_size = fs.GetFileSize(*file_handler);
         }
-        index_size = fs.GetFileSize(*file_handler);
     }
     index_size_ = index_size;
 }
@@ -114,7 +113,7 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size) {
         UnrecoverableError("Data is already allocated.");
     }
     data_ = static_cast<void *>(new AbstractHnsw(HnswIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get())));
-    auto *bmp_index = reinterpret_cast<AbstractHnsw *>(data_);
+    auto *hnsw_index = reinterpret_cast<AbstractHnsw *>(data_);
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -125,7 +124,7 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size) {
                 index = IndexT::Load(*file_handler_).release();
             }
         },
-        *bmp_index);
+        *hnsw_index);
 }
 
 } // namespace infinity

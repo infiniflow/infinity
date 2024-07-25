@@ -68,7 +68,7 @@ TEST_F(BoolCastTest, bool_cast0) {
     {
         BooleanT source = true;
         BooleanT target;
-        EXPECT_THROW(TryCastBoolean::Run(source, target), UnrecoverableException);
+        EXPECT_THROW(TryCastBoolean::Run(source, target), RecoverableException);
     }
     // BooleanT to VarcharT
 //    {
@@ -138,6 +138,6 @@ TEST_F(BoolCastTest, bool_cast1) {
     {
         DataType source(LogicalType::kBoolean);
         DataType target(LogicalType::kBoolean);
-        EXPECT_THROW(BindBoolCast(source, target), UnrecoverableException);
+        EXPECT_THROW(BindBoolCast(source, target), RecoverableException);
     }
 }

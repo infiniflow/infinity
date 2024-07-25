@@ -685,7 +685,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         case IndexType::kHnsw: {
             assert(index_info->index_param_list_ != nullptr);
             // The following check might affect performance
-            IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_, *(index_info->index_param_list_)); // may throw exception
             base_index_ptr = IndexHnsw::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }

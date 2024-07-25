@@ -55,6 +55,8 @@ bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *opera
             UnrecoverableError(error_message);
             break;
         }
+        case kElemUInt8:
+        case kElemInt8:
         case kElemFloat: {
             switch (merge_knn_data.heap_type_) {
                 case MergeKnnHeapType::kInvalid: {
@@ -91,8 +93,11 @@ void PhysicalMergeKnn::ExecuteInner(QueryContext *query_context, MergeKnnOperato
         UnrecoverableError(error_message);
     }
 
-    auto merge_knn = static_cast<MergeKnn<DataType, C> *>(merge_knn_data.merge_knn_base_.get());
-
+    auto merge_knn = dynamic_cast<MergeKnn<DataType, C, DataType> *>(merge_knn_data.merge_knn_base_.get());
+    if (merge_knn == nullptr) {
+        String error_message = "Invalid merge knn data type";
+        UnrecoverableError(error_message);
+    }
     int column_n = input_data.column_count() - 2;
     if (column_n < 0) {
         String error_message = "Input data block is invalid";

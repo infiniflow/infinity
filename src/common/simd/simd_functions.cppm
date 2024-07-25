@@ -39,6 +39,22 @@ export struct SIMD_FUNCTIONS {
     I8DistanceFuncType HNSW_I8IP_16_ptr_ = Get_HNSW_I8IP_16_ptr();
     I8DistanceFuncType HNSW_I8IP_32_ptr_ = Get_HNSW_I8IP_32_ptr();
     I8DistanceFuncType HNSW_I8IP_64_ptr_ = Get_HNSW_I8IP_64_ptr();
+    I8DistanceFuncType HNSW_I8L2_ptr_ = Get_HNSW_I8L2_ptr();
+    I8DistanceFuncType HNSW_I8L2_16_ptr_ = Get_HNSW_I8L2_16_ptr();
+    I8DistanceFuncType HNSW_I8L2_32_ptr_ = Get_HNSW_I8L2_32_ptr();
+    I8DistanceFuncType HNSW_I8L2_64_ptr_ = Get_HNSW_I8L2_64_ptr();
+    I8CosDistanceFuncType HNSW_I8Cos_ptr_ = Get_HNSW_I8Cos_ptr();
+
+    // HNSW U8
+    U8DistanceFuncType HNSW_U8L2_ptr_ = Get_HNSW_U8L2_ptr();
+    U8DistanceFuncType HNSW_U8L2_16_ptr_ = Get_HNSW_U8L2_16_ptr();
+    U8DistanceFuncType HNSW_U8L2_32_ptr_ = Get_HNSW_U8L2_32_ptr();
+    U8DistanceFuncType HNSW_U8L2_64_ptr_ = Get_HNSW_U8L2_64_ptr();
+    U8DistanceFuncType HNSW_U8IP_ptr_ = Get_HNSW_U8IP_ptr();
+    U8DistanceFuncType HNSW_U8IP_16_ptr_ = Get_HNSW_U8IP_16_ptr();
+    U8DistanceFuncType HNSW_U8IP_32_ptr_ = Get_HNSW_U8IP_32_ptr();
+    U8DistanceFuncType HNSW_U8IP_64_ptr_ = Get_HNSW_U8IP_64_ptr();
+    U8CosDistanceFuncType HNSW_U8Cos_ptr_ = Get_HNSW_U8Cos_ptr();
 
     // EMVB
     FilterScoresOutputIdsFuncType FilterScoresOutputIds_func_ptr_ = GetFilterScoresOutputIdsFuncPtr();

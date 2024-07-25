@@ -32,15 +32,15 @@ public:
     virtual ~MergeKnnBase() = default;
 };
 
-export template <typename DataType, template <typename, typename> typename C>
+export template <typename DataType, template <typename, typename> typename C, typename DistType>
 class MergeKnn final : public MergeKnnBase {
-    using ResultHandler = ReservoirResultHandler<C<DataType, RowID>>;
-    using DistFunc = DataType (*)(const DataType *, const DataType *, SizeT);
+    using ResultHandler = ReservoirResultHandler<C<DistType, RowID>>;
+    using DistFunc = DistType (*)(const DataType *, const DataType *, SizeT);
 
 public:
     explicit MergeKnn(u64 query_count, u64 topk)
         : total_count_(0), query_count_(query_count), topk_(topk), idx_array_(MakeUniqueForOverwrite<RowID[]>(topk * query_count)),
-          distance_array_(MakeUniqueForOverwrite<DataType[]>(topk * query_count)) {
+          distance_array_(MakeUniqueForOverwrite<DistType[]>(topk * query_count)) {
         result_handler_ = MakeUnique<ResultHandler>(query_count, topk, this->distance_array_.get(), this->idx_array_.get());
     }
 
@@ -53,9 +53,9 @@ public:
 
     void Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id, Bitmask &bitmask);
 
-    void Search(const DataType *dist, const RowID *row_ids, u16 count);
+    void Search(const DistType *dist, const RowID *row_ids, u16 count);
 
-    void Search(SizeT query_id, const DataType *dist, const RowID *row_ids, u16 count);
+    void Search(SizeT query_id, const DistType *dist, const RowID *row_ids, u16 count);
 
     void Begin();
 
@@ -63,11 +63,11 @@ public:
 
     void EndWithoutSort();
 
-    DataType *GetDistances() const;
+    DistType *GetDistances() const;
 
     RowID *GetIDs() const;
 
-    DataType *GetDistancesByIdx(u64 idx) const;
+    DistType *GetDistancesByIdx(u64 idx) const;
 
     RowID *GetIDsByIdx(u64 idx) const;
 
@@ -79,14 +79,14 @@ private:
     u64 query_count_{};
     i64 topk_{};
     UniquePtr<RowID[]> idx_array_{};
-    UniquePtr<DataType[]> distance_array_{};
+    UniquePtr<DistType[]> distance_array_{};
 
 private:
     UniquePtr<ResultHandler> result_handler_{};
 };
 
-template <typename DataType, template <typename, typename> typename C>
-void MergeKnn<DataType, C>::Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id) {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+void MergeKnn<DataType, C, DistType>::Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u16 row_cnt, u32 segment_id, u16 block_id) {
     this->total_count_ += row_cnt;
     u32 segment_offset_start = block_id * DEFAULT_BLOCK_CAPACITY;
     for (u64 i = 0; i < this->query_count_; ++i) {
@@ -99,8 +99,8 @@ void MergeKnn<DataType, C>::Search(const DataType *query, const DataType *data, 
     }
 }
 
-template <typename DataType, template <typename, typename> typename C>
-void MergeKnn<DataType, C>::Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u32 segment_id, u32 segment_offset) {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+void MergeKnn<DataType, C, DistType>::Search(const DataType *query, const DataType *data, u32 dim, DistFunc dist_f, u32 segment_id, u32 segment_offset) {
     ++this->total_count_;
     for (u64 i = 0; i < this->query_count_; ++i) {
         const DataType *x_i = query + i * dim;
@@ -109,15 +109,15 @@ void MergeKnn<DataType, C>::Search(const DataType *query, const DataType *data, 
     }
 }
 
-template <typename DataType, template <typename, typename> typename C>
-void MergeKnn<DataType, C>::Search(const DataType *query,
-                                   const DataType *data,
-                                   u32 dim,
-                                   DistFunc dist_f,
-                                   u16 row_cnt,
-                                   u32 segment_id,
-                                   u16 block_id,
-                                   Bitmask &bitmask) {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+void MergeKnn<DataType, C, DistType>::Search(const DataType *query,
+                                             const DataType *data,
+                                             u32 dim,
+                                             DistFunc dist_f,
+                                             u16 row_cnt,
+                                             u32 segment_id,
+                                             u16 block_id,
+                                             Bitmask &bitmask) {
     if (bitmask.IsAllTrue()) {
         Search(query, data, dim, dist_f, row_cnt, segment_id, block_id);
         return;
@@ -138,11 +138,11 @@ void MergeKnn<DataType, C>::Search(const DataType *query,
     }
 }
 
-template <typename DataType, template <typename, typename> typename C>
-void MergeKnn<DataType, C>::Search(const DataType *dist, const RowID *row_ids, u16 count) {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+void MergeKnn<DataType, C, DistType>::Search(const DistType *dist, const RowID *row_ids, u16 count) {
     this->total_count_ += count;
     for (u64 i = 0; i < this->query_count_; ++i) {
-        const DataType *d = dist + i * topk_;
+        const DistType *d = dist + i * topk_;
         const RowID *r = row_ids + i * topk_;
         for (u16 j = 0; j < count; j++) {
             result_handler_->AddResult(i, d[j], r[j]);
@@ -150,8 +150,8 @@ void MergeKnn<DataType, C>::Search(const DataType *dist, const RowID *row_ids, u
     }
 }
 
-template <typename DataType, template <typename, typename> typename C>
-void MergeKnn<DataType, C>::Search(SizeT query_id, const DataType *dist, const RowID *row_ids, u16 count) {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+void MergeKnn<DataType, C, DistType>::Search(SizeT query_id, const DistType *dist, const RowID *row_ids, u16 count) {
     if (query_id == 0) {
         this->total_count_ += count;
     }
@@ -160,8 +160,8 @@ void MergeKnn<DataType, C>::Search(SizeT query_id, const DataType *dist, const R
     }
 }
 
-template <typename DataType, template <typename, typename> typename C>
-void MergeKnn<DataType, C>::Begin() {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+void MergeKnn<DataType, C, DistType>::Begin() {
     if (this->begin_ || this->query_count_ == 0) {
         return;
     }
@@ -169,8 +169,8 @@ void MergeKnn<DataType, C>::Begin() {
     this->begin_ = true;
 }
 
-template <typename DataType, template <typename, typename> typename C>
-void MergeKnn<DataType, C>::End() {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+void MergeKnn<DataType, C, DistType>::End() {
     if (!this->begin_)
         return;
 
@@ -179,8 +179,8 @@ void MergeKnn<DataType, C>::End() {
     this->begin_ = false;
 }
 
-template <typename DataType, template <typename, typename> typename C>
-void MergeKnn<DataType, C>::EndWithoutSort() {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+void MergeKnn<DataType, C, DistType>::EndWithoutSort() {
     if (!this->begin_)
         return;
 
@@ -189,33 +189,30 @@ void MergeKnn<DataType, C>::EndWithoutSort() {
     this->begin_ = false;
 }
 
-template <typename DataType, template <typename, typename> typename C>
-DataType *MergeKnn<DataType, C>::GetDistances() const {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+DistType *MergeKnn<DataType, C, DistType>::GetDistances() const {
     return distance_array_.get();
 }
 
-template <typename DataType, template <typename, typename> typename C>
-RowID *MergeKnn<DataType, C>::GetIDs() const {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+RowID *MergeKnn<DataType, C, DistType>::GetIDs() const {
     return idx_array_.get();
 }
 
-template <typename DataType, template <typename, typename> typename C>
-DataType *MergeKnn<DataType, C>::GetDistancesByIdx(u64 idx) const {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+DistType *MergeKnn<DataType, C, DistType>::GetDistancesByIdx(u64 idx) const {
     if (idx >= this->query_count_) {
         UnrecoverableError("Query index exceeds the limit");
     }
     return distance_array_.get() + idx * this->topk_;
 }
 
-template <typename DataType, template <typename, typename> typename C>
-RowID *MergeKnn<DataType, C>::GetIDsByIdx(u64 idx) const {
+template <typename DataType, template <typename, typename> typename C, typename DistType>
+RowID *MergeKnn<DataType, C, DistType>::GetIDsByIdx(u64 idx) const {
     if (idx >= this->query_count_) {
         UnrecoverableError("Query index exceeds the limit");
     }
     return idx_array_.get() + idx * this->topk_;
 }
-
-template class MergeKnn<f32, CompareMax>;
-template class MergeKnn<f32, CompareMin>;
 
 } // namespace infinity
