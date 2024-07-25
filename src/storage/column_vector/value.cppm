@@ -105,6 +105,8 @@ public:
         std::memcpy(data_.get(), data_ptr, bytes);
     }
 
+    EmbeddingValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes);
+
     template <typename T>
     explicit EmbeddingValueInfo(const Vector<T> &values_p) : ExtraValueInfo(ExtraValueInfoType::EMBEDDING_VALUE_INFO) {
         len_ = values_p.size() * sizeof(T);
@@ -130,6 +132,8 @@ public:
     // Also used for tensor info
     static SharedPtr<EmbeddingValueInfo> MakeTensorValueInfo(const_ptr_t ptr, SizeT bytes);
 
+    static SharedPtr<EmbeddingValueInfo> MakeTensorValueInfo(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes);
+
     Span<char> GetData() const { return {data_.get(), len_}; }
 
 private:
@@ -145,6 +149,7 @@ export struct TensorArrayValueInfo : public ExtraValueInfo {
     friend struct Value;
     TensorArrayValueInfo() : ExtraValueInfo(ExtraValueInfoType::TENSORARRAY_VALUE_INFO) {}
     void AppendTensor(const_ptr_t ptr, SizeT bytes) { member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr, bytes)); }
+    void AppendTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes) { member_tensor_data_.emplace_back(EmbeddingValueInfo::MakeTensorValueInfo(ptr_bytes)); }
     Vector<SharedPtr<EmbeddingValueInfo>> member_tensor_data_;
 };
 
@@ -265,6 +270,8 @@ public:
 
     static Value MakeTensor(const_ptr_t ptr, SizeT bytes, SharedPtr<TypeInfo> type_info_ptr);
 
+    static Value MakeTensor(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes, SharedPtr<TypeInfo> type_info_ptr);
+
     static Value MakeTensorArray(SharedPtr<TypeInfo> type_info_ptr);
 
     template <typename Idx, typename T>
@@ -299,6 +306,8 @@ public:
 
     void AppendToTensorArray(const_ptr_t ptr, SizeT bytes);
 
+    void AppendToTensorArray(const Vector<Pair<ptr_t, SizeT>> &ptr_bytes);
+
     // Object member
 public:
     // Value getter template for all types in union
@@ -324,7 +333,7 @@ public:
 
     void Reset();
 
-    void AppendToJson(const String& name, nlohmann::json& json);
+    void AppendToJson(const String &name, nlohmann::json &json);
 
     void AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<arrow::ArrayBuilder> &array_builder);
 

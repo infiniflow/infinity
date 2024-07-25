@@ -253,7 +253,7 @@ class TestInsert(TestSdk):
             {'c1': ([[[1, 2], [3, 4]], [[5, 6]]], [[[7, 8]], [[9, 10], [11, 12]]], [[[13, 14], [15, 16], [17, 18]]])}))
         res = db_obj.drop_table("test_insert_tensor_array", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-    
+
     def _test_insert_sparse(self):
         """
         target: test insert sparse column
@@ -351,12 +351,12 @@ class TestInsert(TestSdk):
         assert table_obj
         values = [{"c1": 1} for _ in range(8193)]
 
-        with pytest.raises(Exception,
-                           match=".*Insert values row count 8193 is larger than default block capacity 8192*"):
+        with pytest.raises(InfinityException) as exception:
             table_obj.insert(values)
+            assert exception.type == InfinityException
+            assert exception.value.args[0] == "Insert batch row limit shouldn\'t more than 8193"
 
-        res = db_obj.drop_table(
-            "test_insert_exceed_block_size", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_exceed_block_size", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
 
@@ -558,7 +558,7 @@ class TestInsert(TestSdk):
             "test_batch_insert_within_limit", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    # batch insert, batch size limit? 8192?
+    # batch insert, batch size limit 8192
     def _test_batch_insert(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
@@ -574,7 +574,6 @@ class TestInsert(TestSdk):
 
         res = db_obj.drop_table("test_batch_insert", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-
 
     # batch insert, with invalid data type inside.
     def _test_insert_with_invalid_data_type(self, batch, types):

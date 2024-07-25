@@ -524,17 +524,25 @@ res.index_names #['my_index']
 
 ## insert
 
-**Table.insert(*data*)**
+```python
+Table.insert(data)
+```
 
-Insert records into the current table. 
+Inserts rows of data into the current table. 
 
 ### Parameters
 
-- **data** : list
-    a list of dict which contains information of a record, and must be in line with the table schama.
-    - dict
-        - key: **column name :str**
-        - value: ***str, int, float, list(vector)***
+**data** : `json`, *Required*  
+Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `json` (one record) or `json` list (multiple rows), with each key-value pair corresponding to a column name and table cell value.
+
+:::tip NOTE
+Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once. 
+:::
+
+:::note
+When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table`. Otherwise, an error will occur.  
+For information about setting default column values, see `create_table`.
+:::
 
 ### Returns
 
@@ -542,31 +550,109 @@ Insert records into the current table.
 - Failure: `Exception`
 
 ### Examples
-```python
-table_obj.insert({"profile": [1.1, 2.2, 3.3], "age": 30, "c3": "Michael"})
 
-table_obj.insert([{"c1": [1.1, 2.2, 3.3]}, {"c1": [4.4, 5.5, 6.6]}, {"c1": [7.7, 8.8, 9.9]}])
+#### Insert primitives
+
+```python
+# Create a table with four primitive columns:
+table_instance = db_instance.create_table("primitive_table", {
+    "c1": {"type": "int8", "default": 0},
+    "c2": {"type": "int16", "default": 0},
+    "c3": {"type": "int", "default": 0},
+    "c4": {"type": "int32", "default": 0},   # Same as int
+    "c5": {"type": "integer", "default": 0}, # Same as int
+    "c6": {"type": "int64", "default": 0},
+    "c7": {"type": "varchar"},
+    "c8": {"type": "float", "default": 1.0},
+    "c9": {"type": "float32", "default": 1.0}, # Same as float
+    "c10": {"type": "double", "default": 1.0},
+    "c11": {"type": "float64", "default": 1.0}, # Same as double
+    "c12": {"type": "bool", "default": False},
+})
+
+# Insert an incomplete row, with remaining cells defaulting to their column defaults:
+table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
+```
+
+#### Insert vectors
+
+```python
+# Create a table with a integer column and a 3-d vector column:
+table_instance = db_instance.create_table("vector_table", {"c1": {"type": "integer", "default": 2024}, "vector_column": {"type": "vector,3,float"}})
+
+# Insert one complete row into the table:
+table_obj.insert({"c1": 2023, "vector_column": [1.1, 2.2, 3.3]})
+
+# Insert three rows into the table:
+table_obj.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.5, 6.6]}, {"vector_column": [7.7, 8.8, 9.9]}])
+```
+#### Insert sparse vectors
+
+```python
+# Create a table with a integer column and a 100-d sparse vector column:
+table_instance = db_instance.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
+
+# Insert three rows into the table:
+# `indices` specifies the correspoing indices to the values in `values`.
+# Note that the second row sets "c1" as 2024 by default. 
+table_instance.insert([{"c1": 2022, "sparse_column": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}, {"sparse_column":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}}}])
+```
+
+#### Insert tensors
+
+```python
+# Create a table with a tensor column: 
+table_instance = db_instance.create_table("tensor_table", {"c1": {"type": "integer", "default": 2024}, "tensor_column": {"type": "tensor,4,float"}})
+
+# Insert one row into the table, with the "c1" column defaulting to 2024:
+table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}])
+```
+
+#### Insert tensor arrays
+
+```python
+# Creat a table with only one tensor array column:
+table_instance = db_instance.create_table("tensor_array_table", {"tensor_array_column": {"type": "tensorarray,2,float"}})
+
+table_instance.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])
 ```
 
 ## import_data
 
-**Table.import_data(*filepath, import_options = None*)**
+```python
+Table.import_data(filepath, import_options)
+```
 
-Imports data from a file into the table. 
+Imports data from a specified file into the current table. 
 
 ### Parameters
 
-- **file_path : str**
-- **options : dict** a dict which could contain three fields, 'file_type', 'delimiter' and 'header'. If these are not specifyed in the passing parameters, default value is 'csv', ',' and False repectively.  
-    - file_type: str
-      - `'csv'` (default)
-      - `'fvecs'`
-      - `'json'`
-      - `'jsonl'`
-    - delimiter : `str`
-      used to decode csv file (defalut: `','`)
-    - header : bool
-      specify whether the csv file has header(defalut: `False`)
+#### file_path: `str`, *Required*
+
+Absolute path to the file for export. Supported file types include: 
+- `csv`
+- `json`
+- `jsonl`
+
+#### import_options: `json`
+
+Example: `{"header":True, "delimiter": "\t", file_type}`
+
+- **header**: `bool`  
+  Whether to display table header or not. Works with **.csv** files only:
+  - `True`: Display table header. 
+  - `False`: (Default) Do not display table header. 
+
+- **delimiter**: `str`, *Optional*, Defaults to ","  
+  Delimiter to separate columns. Works with **.csv** files only.
+
+- **file_type**: `str`, *Required*  
+  The type of the imported file. Supported file types include:
+  - `csv`
+  - `json`
+  - `jsonl`
+
+
 
 ### Returns
 
@@ -575,21 +661,29 @@ Imports data from a file into the table.
 
 ### Examples
 
+#### Import a csv file
+
 ```python
-table_obj.import_data(test_csv_dir, None)
+table_instance.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file_type": "csv", "delimiter": "\t"})
+```
+
+#### Import a jsonl file
+
+```python
+table_instance.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
 ```
 
 ## export_data
 
 ```python
-Table.export_data(filepath, export_options = None, columns = None)
+Table.export_data(filepath, export_options, columns = None)
 ```
 
 Exports the current table to a specified file. 
 
 ### Parameters
 
-#### file_path: `str` *Required*
+#### file_path: `str`, *Required*
 
 Absolute path to the file for export. Supported file types include: 
 
@@ -598,29 +692,31 @@ Absolute path to the file for export. Supported file types include:
   
 #### export_options: `json`
 
-- **header**: `bool` *Optional*
+Example: `{"header": False, "delimiter": "\t", "file_type": "jsonl", "offset": 2, "limit": 5}`
+
+- **header**: `bool`, *Optional*  
   Whether to display table header or not. Works with **.csv** files only:
   - `True`: Display table header. 
   - `False`: (Default) Do not display table header. 
 
-- **delimiter**: `str` *Optional* Defaults to ","
+- **delimiter**: `str`, *Optional*, Defaults to ","  
   Delimiter to separate columns. Works with **.csv** files only.
 
-- **file_type**: `str` *Required*
+- **file_type**: `str`, *Required*  
   The type of the exported file. Supported file types include:
   - `csv`
   - `jsonl`
   
-- **offset**: `int` *Optional*
+- **offset**: `int`, *Optional*  
   Index specifying the starting row for export. Usually used in conjunction with `limit`. If not specified, the file export starts from the first row. 
 
-- **limit**: `int` *Optional*
+- **limit**: `int`, *Optional*  
   The maximum number of rows to export. Usually used in conjunction with `offset`. If the table's row count exceeds `offset` + `limit`, the excess rows are excluded from the export.
 
-- **row_limit**: `int` *Optional*
+- **row_limit**: `int`, *Optional*  
   Used when you have a large table and need to break the output file into multiple parts. This argument sets the row limit for each part. If you specify **test_export_file.csv** as the file name, the exported files will be named **test_export_file.csv**, **test_export_file.csv.part1**, **test_export_file.csv.part2**, and so one. 
 
-#### columns: `[str]` *Optional*
+#### columns: `[str]`, *Optional*
 
 Columns to export to the output file, for example, `["num", "name", "score"]`. If not specified, the entire table is exported. 
 
@@ -631,9 +727,16 @@ Columns to export to the output file, for example, `["num", "name", "score"]`. I
 
 ### Examples
 
+#### Export your table to a csv file
+
 ```python
-    table_instance.export_data(os.getcwd() + "/export_data.jsonl",
-                               {"header": False, "file_type": "jsonl", "delimiter": ",", "row_limit": 2}, ["num", "name", "score"])
+table_instance.export_data(os.getcwd() + "/export_data.csv", {"header": True, "file_type": "csv", "delimiter": ",", "offset": 2, "limit": 7, "row_limit": 3}, ["num", "name", "score"])
+```
+
+#### Export your table to a jsonl file
+
+```python
+table_instance.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2}, ["num", "name", "score"])
 ```
 
 ## delete
@@ -737,7 +840,7 @@ table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 
 **Table.knn(*vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None*)**
 
-Build a KNN search expression. Find the top n closet records to the given vector.
+Build a KNN search expression. Find the top n closet rows to the given vector.
 
 ### Parameters
 
@@ -802,7 +905,7 @@ Create a full-text search expression.
     The column where text is searched, and has create full-text index on it before. 
 - **matching_text : str**
 - **options_text : str**
-    'topn=2': Retrieve the two most relevant records. The `topn` is `10` by default.
+    'topn=2': Retrieve the two most relevant rows. The `topn` is `10` by default.
 
 ### Returns
 
@@ -828,7 +931,7 @@ for question in questions:
 
 **Table.match_tensor(*vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)**
 
-Build a KNN tensor search expression. Find the top n closet records to the given tensor according to chosen method.
+Build a KNN tensor search expression. Find the top n closet rows to the given tensor according to chosen method.
 
 For example, find k most match tensors generated by ColBERT.
 
@@ -875,7 +978,7 @@ Build a fusion expression.
 
     Common options:
 
-    - 'topn=10': Retrieve the 10 most relevant records. The defualt value is `100`.
+    - 'topn=10': Retrieve the 10 most relevant rows. The defualt value is `100`.
 
     Dedicated options of rrf:
 

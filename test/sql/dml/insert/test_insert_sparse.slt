@@ -25,8 +25,8 @@ INSERT INTO sqllogic_test_insert_sparse VALUES (0, []);
 query I
 SELECT * FROM sqllogic_test_insert_sparse;
 ----
-1 10000: 1.000000, 20000: 2.000000
-3 3000: 3.000000
+1 [10000:1.000000,20000:2.000000]
+3 [3000:3.000000]
 0 (empty)
 
 #######################################
@@ -43,7 +43,7 @@ INSERT INTO sqllogic_test_insert_sparse VALUES (1, [10000:1.0, 20000:2.0]);
 query I
 SELECT * FROM sqllogic_test_insert_sparse;
 ----
-1 10000: 1.000000, 20000: 2.000000
+1 [10000:1.000000,20000:2.000000]
 
 #######################################
 
@@ -59,7 +59,7 @@ INSERT INTO sqllogic_test_insert_sparse VALUES (1, [10000:1, 20000:2]);
 query I
 SELECT * FROM sqllogic_test_insert_sparse;
 ----
-1 10000: 1, 20000: 2
+1 [10000:1,20000:2]
 
 #######################################
 
@@ -90,8 +90,8 @@ INSERT INTO sqllogic_test_insert_sparse VALUES (0, []);
 query I
 SELECT * FROM sqllogic_test_insert_sparse;
 ----
-1 10000, 20000
-3 3000
+1 [10000,20000]
+3 [3000]
 0 (empty)
 
 statement ok

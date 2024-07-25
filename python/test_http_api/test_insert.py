@@ -153,7 +153,7 @@ class TestInsert(HttpTest):
         values = [{"c1": 1} for _ in range(8193)]
         self.insert(db_name, table_name, values, expect={
             "status_code": 500,
-            "error_code": 7011
+            "error_code": 3032
         })
         self.drop_table(db_name, table_name)
         return
@@ -378,7 +378,7 @@ class TestInsert(HttpTest):
                     "error_code": 3032,
                 })
             else:
-                print(values)
+                # print(values)
                 self.insert(db_name, table_name, values)
         self.drop_table(db_name, table_name)
         return
