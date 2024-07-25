@@ -29,7 +29,7 @@ import internal_types;
 namespace infinity {
 
 class BlockEntry;
-class SegmentEntry;
+struct SegmentEntry;
 class ChunkIndexEntry;
 enum class SegmentStatus;
 

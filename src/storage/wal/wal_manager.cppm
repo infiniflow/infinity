@@ -30,7 +30,7 @@ class Storage;
 class BGTaskProcessor;
 class TableEntry;
 class Txn;
-class SegmentEntry;
+struct SegmentEntry;
 
 export class WalManager {
 public:

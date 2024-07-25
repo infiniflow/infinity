@@ -604,4 +604,8 @@ String SegmentEntry::SegmentStatusToString(const SegmentStatus &type) {
 
 SharedPtr<String> SegmentEntry::base_dir() const { return table_entry_->base_dir(); }
 
+String SegmentEntry::ToString() const {
+    return fmt::format("Segment path: {}, id: {}, row_count: {}, block_count: {}, status: {}", *segment_dir_, segment_id_, row_count_, block_entries_.size(), SegmentStatusToString(status_));
+}
+
 } // namespace infinity
