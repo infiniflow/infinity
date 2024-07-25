@@ -23,6 +23,7 @@ from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.errors import ErrorCode
 from infinity.common import InfinityException
 
+
 class ThriftInfinityClient:
     def __init__(self, uri: URI):
         self.session_id = -1
@@ -30,7 +31,7 @@ class ThriftInfinityClient:
         self.transport = None
         self.reconnect()
         self._is_connected = True
-    
+
     def __del__(self):
         if self._is_connected:
             self.disconnect()
@@ -58,7 +59,8 @@ class ThriftInfinityClient:
         # version: 0.2.1.dev5, client_version: 9
         # version: 0.2.1, client_version: 10
         # version: 0.3.0.dev1, client_version: 11
-        res = self.client.Connect(ConnectRequest(client_version=11))
+        # version: 0.3.0.dev3, client_version: 12
+        res = self.client.Connect(ConnectRequest(client_version=12))
         if res.error_code != 0:
             raise InfinityException(res.error_code, res.error_msg)
         self.session_id = res.session_id
@@ -66,7 +68,8 @@ class ThriftInfinityClient:
     def create_database(self, db_name: str, conflict_type: CreateConflict = CreateConflict.Error):
         return self.client.CreateDatabase(CreateDatabaseRequest(session_id=self.session_id,
                                                                 db_name=db_name,
-                                                                create_option=CreateOption(conflict_type=conflict_type)))
+                                                                create_option=CreateOption(
+                                                                    conflict_type=conflict_type)))
 
     def drop_database(self, db_name: str, conflict_type: DropConflict = DropConflict.Error):
         return self.client.DropDatabase(DropDatabaseRequest(session_id=self.session_id,
@@ -158,8 +161,6 @@ class ThriftInfinityClient:
                                                        fields=fields))
                 return res
             except TTransportException as ex:
-                #import traceback
-                #traceback.print_exc()
                 self.reconnect()
                 inner_ex = ex
                 retry += 1

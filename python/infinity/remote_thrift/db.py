@@ -87,15 +87,23 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                         proto_column_type.logic_type = ttypes.LogicType.TinyInt
                     case "int16":
                         proto_column_type.logic_type = ttypes.LogicType.SmallInt
-                    case "int32" | "int" | "integer":
+                    case "int32":
+                        proto_column_type.logic_type = ttypes.LogicType.Integer
+                    case "int":
+                        proto_column_type.logic_type = ttypes.LogicType.Integer
+                    case "integer":
                         proto_column_type.logic_type = ttypes.LogicType.Integer
                     case "int64":
                         proto_column_type.logic_type = ttypes.LogicType.BigInt
                     case "int128":
                         proto_column_type.logic_type = ttypes.LogicType.HugeInt
-                    case "float" | "float32":
+                    case "float":
                         proto_column_type.logic_type = ttypes.LogicType.Float
-                    case "double" | "float64":
+                    case "float32":
+                        proto_column_type.logic_type = ttypes.LogicType.Float
+                    case "double":
+                        proto_column_type.logic_type = ttypes.LogicType.Double
+                    case "float64":
                         proto_column_type.logic_type = ttypes.LogicType.Double
                     case "float16":
                         proto_column_type.logic_type = ttypes.LogicType.Float16
@@ -156,33 +164,42 @@ def get_embedding_info(column_info, column_defs, column_name, index):
     proto_column_def.id = index
     proto_column_def.name = column_name
     column_type = ttypes.DataType()
-    if column_big_info[0] == "vector":
-        column_type.logic_type = ttypes.LogicType.Embedding
-    elif column_big_info[0] == "tensor":
-        column_type.logic_type = ttypes.LogicType.Tensor
-    elif column_big_info[0] == "tensorarray":
-        column_type.logic_type = ttypes.LogicType.TensorArray
-    else:
-        raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}")
-    embedding_type = ttypes.EmbeddingType()
-    if element_type == "bit":
-        embedding_type.element_type = ttypes.ElementType.ElementBit
-    elif element_type == "float32" or element_type == "float":
-        embedding_type.element_type = ttypes.ElementType.ElementFloat32
-    elif element_type == "float64" or element_type == "double":
-        embedding_type.element_type = ttypes.ElementType.ElementFloat64
-    elif element_type == "uint8":
-        embedding_type.element_type = ttypes.ElementType.ElementUInt8
-    elif element_type == "int8":
-        embedding_type.element_type = ttypes.ElementType.ElementInt8
-    elif element_type == "int16":
-        embedding_type.element_type = ttypes.ElementType.ElementInt16
-    elif element_type == "int32" or element_type == "int":
-        embedding_type.element_type = ttypes.ElementType.ElementInt32
-    elif element_type == "int64":
-        embedding_type.element_type = ttypes.ElementType.ElementInt64
-    else:
-        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
+    match column_big_info[0]:
+        case "vector":
+            column_type.logic_type = ttypes.LogicType.Embedding
+        case "tensor":
+            column_type.logic_type = ttypes.LogicType.Tensor
+        case "tensorarray":
+            column_type.logic_type = ttypes.LogicType.TensorArray
+        case _:
+            raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}")
+
+    match element_type:
+        case "bit":
+            embedding_type.element_type = ttypes.ElementType.ElementBit
+        case "float32":
+            embedding_type.element_type = ttypes.ElementType.ElementFloat32
+        case "float":
+            embedding_type.element_type = ttypes.ElementType.ElementFloat32
+        case "float64":
+            embedding_type.element_type = ttypes.ElementType.ElementFloat64
+        case "double":
+            embedding_type.element_type = ttypes.ElementType.ElementFloat64
+        case "uint8":
+            embedding_type.element_type = ttypes.ElementType.ElementUInt8
+        case "int8":
+            embedding_type.element_type = ttypes.ElementType.ElementInt8
+        case "int16":
+            embedding_type.element_type = ttypes.ElementType.ElementFloat16
+        case "int32":
+            embedding_type.element_type = ttypes.ElementType.ElementInt32
+        case "int":
+            embedding_type.element_type = ttypes.ElementType.ElementInt32
+        case "int64":
+            embedding_type.element_type = ttypes.ElementType.ElementInt64
+        case _:
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
+
     embedding_type.dimension = int(length)
     assert isinstance(embedding_type, ttypes.EmbeddingType)
     assert embedding_type.element_type is not None

@@ -75,15 +75,23 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                         proto_column_type.logical_type = LogicalType.kTinyInt
                     case "int16":
                         proto_column_type.logical_type = LogicalType.kSmallInt
-                    case "int32" | "int" | "integer":
+                    case "int32":
+                        proto_column_type.logical_type = LogicalType.kInteger
+                    case "int":
+                        proto_column_type.logical_type = LogicalType.kInteger
+                    case "integer":
                         proto_column_type.logical_type = LogicalType.kInteger
                     case "int64":
                         proto_column_type.logical_type = LogicalType.kBigInt
                     case "int128":
                         proto_column_type.logical_type = LogicalType.kHugeInt
-                    case "float" | "float32":
+                    case "float":
                         proto_column_type.logical_type = LogicalType.kFloat
-                    case "double" | "float64":
+                    case "float32":
+                        proto_column_type.logical_type = LogicalType.kFloat
+                    case "double":
+                        proto_column_type.logical_type = LogicalType.kDouble
+                    case "float64":
                         proto_column_type.logical_type = LogicalType.kDouble
                     case "float16":
                         proto_column_type.logical_type = LogicalType.kFloat16
