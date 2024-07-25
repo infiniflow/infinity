@@ -27,7 +27,21 @@ import third_party;
 
 namespace infinity {
 
+bool PeriodicTrigger::Check() {
+    if(interval_ == 0) {
+        return false;
+    }
+    const auto now = std::chrono::system_clock::now();
+    duration_ = (now - last_check_).count() / 1000000;
+    if (duration_ < interval_) {
+        return false;
+    }
+    last_check_ = now;
+    return true;
+}
+
 void CleanupPeriodicTrigger::Trigger() {
+    LOG_DEBUG(fmt::format("Trigger cleanup task, after {} seconds", duration_));
     TxnTimeStamp visible_ts = txn_mgr_->GetCleanupScanTS();
     // if (visible_ts == last_visible_ts_) {
     //     LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
@@ -47,18 +61,20 @@ void CleanupPeriodicTrigger::Trigger() {
 
 void CheckpointPeriodicTrigger::Trigger() {
     auto checkpoint_task = MakeShared<CheckpointTask>(is_full_checkpoint_);
-    // LOG_DEBUG(fmt::format("Trigger {} periodic checkpoint.", is_full_checkpoint_ ? "FULL" : "DELTA"));
+    LOG_DEBUG(fmt::format("Trigger {} periodic checkpoint, after {} seconds", is_full_checkpoint_ ? "FULL" : "DELTA", duration_));
     if (!wal_mgr_->TrySubmitCheckpointTask(std::move(checkpoint_task))) {
         LOG_TRACE(fmt::format("Skip {} checkpoint(time) because there is already a checkpoint task running.", is_full_checkpoint_ ? "FULL" : "DELTA"));
     }
 }
 
 void CompactSegmentPeriodicTrigger::Trigger() {
+    LOG_DEBUG(fmt::format("Trigger compact segment task, after {} seconds", duration_));
     auto compact_task = MakeShared<NotifyCompactTask>();
     compact_processor_->Submit(std::move(compact_task));
 }
 
 void OptimizeIndexPeriodicTrigger::Trigger() {
+    LOG_DEBUG(fmt::format("Trigger optimize index task, after {} seconds", duration_));
     auto optimize_task = MakeShared<NotifyOptimizeTask>();
     compact_processor_->Submit(std::move(optimize_task));
 }

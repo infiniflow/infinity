@@ -27,31 +27,29 @@ namespace infinity {
 
 export class PeriodicTrigger {
 public:
-    explicit PeriodicTrigger(std::chrono::milliseconds interval) : interval_(interval), last_check_(std::chrono::system_clock::now()) {}
+    explicit PeriodicTrigger(i64 interval) : interval_(interval), last_check_(std::chrono::system_clock::now()) {}
 
     virtual ~PeriodicTrigger() = default;
 
-    bool Check() {
-        const auto now = std::chrono::system_clock::now();
-        if (now - last_check_ < interval_) {
-            return false;
-        }
-        last_check_ = now;
-        return true;
+    bool Check();
+
+    void UpdateInternal(i64 new_interval) {
+        interval_ = new_interval;
     }
 
     virtual void Trigger() = 0;
 
     void Reset() { last_check_ = std::chrono::system_clock::now(); }
 
-private:
-    const std::chrono::milliseconds interval_;
-    std::chrono::system_clock::time_point last_check_;
+protected:
+    Atomic<i64> interval_{};
+    std::chrono::system_clock::time_point last_check_{};
+    i64 duration_{0};
 };
 
 export class CleanupPeriodicTrigger final : public PeriodicTrigger {
 public:
-    CleanupPeriodicTrigger(std::chrono::milliseconds interval, BGTaskProcessor *bg_processor, Catalog *catalog, TxnManager *txn_mgr)
+    CleanupPeriodicTrigger(i64 interval, BGTaskProcessor *bg_processor, Catalog *catalog, TxnManager *txn_mgr)
         : PeriodicTrigger(interval), bg_processor_(bg_processor), catalog_(catalog), txn_mgr_(txn_mgr) {}
 
     virtual void Trigger() override;
@@ -66,7 +64,7 @@ private:
 
 export class CheckpointPeriodicTrigger final : public PeriodicTrigger {
 public:
-    explicit CheckpointPeriodicTrigger(std::chrono::milliseconds interval, WalManager *wal_mgr, bool full_checkpoint)
+    explicit CheckpointPeriodicTrigger(i64 interval, WalManager *wal_mgr, bool full_checkpoint)
         : PeriodicTrigger(interval), wal_mgr_(wal_mgr), is_full_checkpoint_(full_checkpoint) {}
 
     virtual void Trigger() override;
@@ -78,7 +76,7 @@ private:
 
 export class CompactSegmentPeriodicTrigger final : public PeriodicTrigger {
 public:
-    explicit CompactSegmentPeriodicTrigger(std::chrono::seconds interval, CompactionProcessor *compact_processor)
+    explicit CompactSegmentPeriodicTrigger(i64 interval, CompactionProcessor *compact_processor)
         : PeriodicTrigger(interval), compact_processor_(compact_processor) {}
 
     virtual void Trigger() override;
@@ -89,7 +87,7 @@ private:
 
 export class OptimizeIndexPeriodicTrigger final : public PeriodicTrigger {
 public:
-    explicit OptimizeIndexPeriodicTrigger(std::chrono::seconds interval, CompactionProcessor *compact_processor)
+    explicit OptimizeIndexPeriodicTrigger(i64 interval, CompactionProcessor *compact_processor)
         : PeriodicTrigger(interval), compact_processor_(compact_processor) {}
 
     virtual void Trigger() override;

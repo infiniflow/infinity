@@ -42,8 +42,7 @@ public:
                         BGTaskProcessor *task_processor,
                         WalManager *wal_mgr,
                         TransactionID start_txn_id,
-                        TxnTimeStamp start_ts,
-                        bool enable_compaction);
+                        TxnTimeStamp start_ts);
 
     ~TxnManager() = default;
 
@@ -109,8 +108,6 @@ private:
     void FinishTxn(Txn *txn);
 
 public:
-    bool enable_compaction() const { return enable_compaction_; }
-
     u64 NextSequence() { return ++sequence_; }
 
     bool InCheckpointProcess(TxnTimeStamp commit_ts);
@@ -134,7 +131,6 @@ private:
 
     // For stop the txn manager
     atomic_bool is_running_{false};
-    bool enable_compaction_{};
 
     u64 sequence_{};
 

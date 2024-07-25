@@ -459,9 +459,8 @@ TxnTimeStamp Txn::Commit() {
     std::unique_lock<std::mutex> lk(lock_);
     cond_var_.wait(lk, [this] { return done_bottom_; });
 
-    if (txn_mgr_->enable_compaction()) {
-        txn_store_.MaintainCompactionAlg();
-    }
+    txn_store_.MaintainCompactionAlg();
+
     if (!local_catalog_delta_ops_entry_->operations().empty()) {
         txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
     }

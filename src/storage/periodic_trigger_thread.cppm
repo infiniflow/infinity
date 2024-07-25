@@ -31,23 +31,20 @@ public:
         }
     }
 
-    int AddTrigger(UniquePtr<PeriodicTrigger> trigger) {
-        int id = triggers_.size();
-        triggers_.push_back(std::move(trigger));
-        return id;
-    }
-
     void Start();
 
     void Stop();
 
     void Run();
 
-    void Reset(int id) { triggers_[id]->Reset(); }
+public:
+    UniquePtr<CleanupPeriodicTrigger> cleanup_trigger_;
+    UniquePtr<CheckpointPeriodicTrigger> full_checkpoint_trigger_;
+    UniquePtr<CheckpointPeriodicTrigger> delta_checkpoint_trigger_;
+    UniquePtr<CompactSegmentPeriodicTrigger> compact_segment_trigger_;
+    UniquePtr<OptimizeIndexPeriodicTrigger> optimize_index_trigger_;
 
 private:
-    Vector<UniquePtr<PeriodicTrigger>> triggers_;
-
     Thread thread_{};
     atomic_bool running_{};
 };

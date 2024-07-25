@@ -73,10 +73,13 @@ public:
     String DataDir();
 
     i64 CleanupInterval();
+    void SetCleanupInterval(i64);
 
     i64 CompactInterval();
+    void SetCompactInterval(i64);
 
     i64 OptimizeIndexInterval();
+    void SetOptimizeInterval(i64);
 
     i64 MemIndexCapacity();
 
@@ -95,8 +98,10 @@ public:
     i64 WALCompactThreshold();
 
     i64 FullCheckpointInterval();
+    void SetFullCheckpointInterval(i64);
 
     i64 DeltaCheckpointInterval();
+    void SetDeltaCheckpointInterval(i64);
 
     i64 DeltaCheckpointThreshold();
 

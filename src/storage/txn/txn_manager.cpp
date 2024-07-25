@@ -40,10 +40,8 @@ TxnManager::TxnManager(Catalog *catalog,
                        BGTaskProcessor *bg_task_processor,
                        WalManager *wal_mgr,
                        TransactionID start_txn_id,
-                       TxnTimeStamp start_ts,
-                       bool enable_compaction)
-    : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false),
-      enable_compaction_(enable_compaction) {}
+                       TxnTimeStamp start_ts)
+    : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false) {}
 
 Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     // Check if the is_running_ is true

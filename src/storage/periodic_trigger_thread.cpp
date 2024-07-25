@@ -38,13 +38,28 @@ void PeriodicTriggerThread::Stop() {
 
 void PeriodicTriggerThread::Run() {
     while (running_.load()) {
-        for (auto &trigger : triggers_) {
-            if (trigger->Check()) {
-                trigger->Trigger();
-            }
+        if(cleanup_trigger_->Check()) {
+            cleanup_trigger_->Trigger();
         }
+
+        if(full_checkpoint_trigger_->Check()) {
+            full_checkpoint_trigger_->Trigger();
+        }
+
+        if(delta_checkpoint_trigger_->Check()) {
+            delta_checkpoint_trigger_->Trigger();
+        }
+
+        if(compact_segment_trigger_->Check()) {
+            compact_segment_trigger_->Trigger();
+        }
+
+        if(optimize_index_trigger_->Check()) {
+            optimize_index_trigger_->Trigger();
+        }
+
         // sleep for 1s
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 }
 
