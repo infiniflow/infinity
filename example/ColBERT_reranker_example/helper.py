@@ -13,7 +13,12 @@
 # limitations under the License.
 
 from typing import Union
+# NOTICE: please check which infinity you are using, local or remote
+# this statement is for local infinity
 from infinity.local_infinity.types import make_match_tensor_expr
+# enable the following import statement to use remote infinity
+# from infinity.remote_thrift.types import make_match_tensor_expr
+# from infinity.common import LOCAL_HOST
 
 
 class InfinityHelperForColBERT:
@@ -55,13 +60,22 @@ class InfinityHelperForColBERT:
         from infinity import NetworkAddress
         import infinity.index as index
         from infinity.common import ConflictType
+        # NOTICE: the following statement is for local infinity
         self.infinity_obj = infinity.connect("/var/infinity")
+        # enable the following statement to use remote infinity
+        # self.infinity_obj = infinity.connect(LOCAL_HOST)
         self.infinity_obj.drop_database(self.test_db_name, ConflictType.Ignore)
         self.colbert_test_db = self.infinity_obj.create_database(self.test_db_name)
         self.colbert_test_table = self.colbert_test_db.create_table(self.test_table_name, schema, ConflictType.Error)
+        # NOTICE: the following statement is for english text
         self.colbert_test_table.create_index("test_ft_index",
                                              [index.IndexInfo(self.inner_col_txt, index.IndexType.FullText, [])],
                                              ConflictType.Error)
+        # please enable the following statement to use chinese text
+        # self.colbert_test_table.create_index("test_ft_index",
+        #                                      [index.IndexInfo(self.inner_col_txt, index.IndexType.FullText,
+        #                                                       [infinity.index.InitParameter("ANALYZER", "chinese")])],
+        #                                      ConflictType.Error)
 
     # clear the test environment for ColBERT
     def clear_test_env(self):
