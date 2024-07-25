@@ -59,31 +59,25 @@ export struct HnswIndexInMem {
 public:
     HnswIndexInMem() : hnsw_(nullptr) {}
 
-    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def)
-        : begin_row_id_(begin_row_id), hnsw_(InitAbstractIndex(index_base, column_def)) {}
+    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def);
 
 private:
     template <typename DataType>
-    static AbstractHnsw InitAbstractIndex(const IndexHnsw *index_hnsw, const EmbeddingInfo *embedding_info) {
-        SizeT chunk_size = 8192;
-        SizeT max_chunk_num = 1024;
-        SizeT dim = embedding_info->Dimension();
-        SizeT M = index_hnsw->M_;
-        SizeT ef_construction = index_hnsw->ef_construction_;
+    static AbstractHnsw InitAbstractIndex(const IndexHnsw *index_hnsw) {
         switch (index_hnsw->encode_type_) {
             case HnswEncodeType::kPlain: {
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
                         using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset>;
-                        return HnswIndex::Make(chunk_size, max_chunk_num, dim, M, ef_construction).release();
+                        return static_cast<HnswIndex *>(nullptr);
                     }
                     case MetricType::kMetricInnerProduct: {
                         using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset>;
-                        return HnswIndex::Make(chunk_size, max_chunk_num, dim, M, ef_construction).release();
+                        return static_cast<HnswIndex *>(nullptr);
                     }
                     case MetricType::kMetricCosine: {
                         using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset>;
-                        return HnswIndex::Make(chunk_size, max_chunk_num, dim, M, ef_construction).release();
+                        return static_cast<HnswIndex *>(nullptr);
                     }
                     default: {
                         return nullptr;
@@ -94,15 +88,15 @@ private:
                 switch (index_hnsw->metric_type_) {
                     case MetricType::kMetricL2: {
                         using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset>;
-                        return HnswIndex::Make(chunk_size, max_chunk_num, dim, M, ef_construction).release();
+                        return static_cast<HnswIndex *>(nullptr);
                     }
                     case MetricType::kMetricInnerProduct: {
                         using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset>;
-                        return HnswIndex::Make(chunk_size, max_chunk_num, dim, M, ef_construction).release();
+                        return static_cast<HnswIndex *>(nullptr);
                     }
                     case MetricType::kMetricCosine: {
                         using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset>;
-                        return HnswIndex::Make(chunk_size, max_chunk_num, dim, M, ef_construction).release();
+                        return static_cast<HnswIndex *>(nullptr);
                     }
                     default: {
                         return nullptr;
