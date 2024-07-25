@@ -148,6 +148,9 @@ private:
 public:
     static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def);
 
+    HnswIndexInMem(const HnswIndexInMem &) = delete;
+    HnswIndexInMem &operator=(const HnswIndexInMem &) = delete;
+
     ~HnswIndexInMem();
 
     SizeT GetRowCount() const;

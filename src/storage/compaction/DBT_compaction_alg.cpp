@@ -48,13 +48,35 @@ void SegmentLayer::RemoveSegment(SegmentEntry *shrink_segment) {
     }
 }
 
-Vector<SegmentEntry *> SegmentLayer::PickCompacting(TransactionID txn_id, SizeT M) {
+Vector<SegmentEntry *> SegmentLayer::PickCompacting(TransactionID txn_id, SizeT M, SizeT max_capacity) {
+    SizeT segment_n = segments_.size();
+    if (segment_n < M) {
+        UnrecoverableError(fmt::format("SegmentLayer::PickCompacting error."));
+    }
+
     Vector<SegmentEntry *> ret;
-    SizeT pick_n = std::min(M, segments_.size());
-    for (SizeT i = 0; i < pick_n; ++i) {
-        auto iter = segments_.begin();
-        ret.push_back(iter->second);
-        segments_.erase(iter);
+    {
+        Vector<Pair<SegmentEntry *, SizeT>> segments;
+        for (auto &[segment_id, segment_entry] : segments_) {
+            segments.emplace_back(segment_entry, segment_entry->actual_row_count());
+        }
+        Vector<int> idx(segment_n);
+        std::iota(idx.begin(), idx.end(), 0);
+        std::nth_element(idx.begin(), idx.begin() + M, idx.end(), [&](int i, int j) {
+            return segments[i].second < segments[j].second;
+        });
+        SizeT total_row_cnt = 0;
+        for (SizeT i = 0; i < M; ++i) {
+            ret.push_back(segments[idx[i]].first);
+            total_row_cnt += segments[idx[i]].second;
+        }
+        if (total_row_cnt > max_capacity) {
+            return {};
+        }
+    }
+
+    for (auto *compact_segment : ret) {
+        segments_.erase(compact_segment->segment_id());
     }
     auto [iter, insert_ok] = compacting_segments_map_.emplace(txn_id, ret); // copy here
     if (!insert_ok) {
@@ -102,10 +124,13 @@ Vector<SegmentEntry *> DBTCompactionAlg::CheckCompaction(TransactionID txn_id) {
     for (int layer = cur_layer_n - 1; layer >= 0; --layer) {
         auto &segment_layer = segment_layers_[layer];
         if (segment_layer.LayerSize() >= config_.m_) {
+            Vector<SegmentEntry *> compact_segments = segment_layer.PickCompacting(txn_id, config_.m_, max_segment_capacity_);
+            if (compact_segments.empty()) {
+                continue;
+            }
             if (++running_task_n_ == 1) {
                 status_ = CompactionStatus::kRunning;
             }
-            Vector<SegmentEntry *> compact_segments = segment_layer.PickCompacting(txn_id, config_.m_);
 
             txn_2_layer_.emplace(txn_id, layer);
             return compact_segments;
