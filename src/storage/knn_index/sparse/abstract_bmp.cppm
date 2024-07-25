@@ -55,8 +55,7 @@ export struct BMPIndexInMem {
 public:
     BMPIndexInMem() : bmp_(nullptr) {}
 
-    BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def)
-        : begin_row_id_(begin_row_id), bmp_(InitAbstractIndex(index_base, column_def)) {}
+    BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def);
 
 private:
     template <typename DataType, typename IndexType>

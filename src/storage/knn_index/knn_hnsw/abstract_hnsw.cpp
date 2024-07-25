@@ -26,6 +26,26 @@ import segment_entry;
 
 namespace infinity {
 
+HnswIndexInMem::HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def)
+    : begin_row_id_(begin_row_id), hnsw_(InitAbstractIndex(index_base, column_def)) {
+    const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
+    SizeT chunk_size = 8192;
+    SizeT max_chunk_num = 1024;
+    SizeT dim = embedding_info->Dimension();
+    SizeT M = index_hnsw->M_;
+    SizeT ef_construction = index_hnsw->ef_construction_;
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                using IndexT = std::decay_t<decltype(*index)>;
+                hnsw_ = IndexT::Make(chunk_size, max_chunk_num, dim, M, ef_construction).release();
+            }
+        },
+        hnsw_);
+}
+
 AbstractHnsw HnswIndexInMem::InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
     const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
