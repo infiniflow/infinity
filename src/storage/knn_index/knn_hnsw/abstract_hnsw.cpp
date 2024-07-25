@@ -32,7 +32,7 @@ AbstractHnsw HnswIndexInMem::InitAbstractIndex(const IndexBase *index_base, cons
 
     switch (embedding_info->Type()) {
         case EmbeddingDataType::kElemFloat: {
-            return InitAbstractIndex<float>(index_hnsw, embedding_info);
+            return InitAbstractIndex<float>(index_hnsw);
         }
         default: {
             return nullptr;

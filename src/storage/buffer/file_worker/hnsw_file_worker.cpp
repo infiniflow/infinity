@@ -47,10 +47,9 @@ HnswFileWorker::HnswFileWorker(SharedPtr<String> file_dir,
 
         String index_path = GetFilePath();
         auto [file_handler, status] = fs.OpenFile(index_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
-        if (!status.ok()) {
-            UnrecoverableError(status.message());
+        if (status.ok()) { // file may deleted if cleaned up happens
+            index_size = fs.GetFileSize(*file_handler);
         }
-        index_size = fs.GetFileSize(*file_handler);
     }
     index_size_ = index_size;
 }
