@@ -114,7 +114,7 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size) {
         UnrecoverableError("Data is already allocated.");
     }
     data_ = static_cast<void *>(new AbstractHnsw(HnswIndexInMem::InitAbstractIndex(index_base_.get(), column_def_.get())));
-    auto *bmp_index = reinterpret_cast<AbstractHnsw *>(data_);
+    auto *hnsw_index = reinterpret_cast<AbstractHnsw *>(data_);
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -125,7 +125,7 @@ void HnswFileWorker::ReadFromFileImpl(SizeT file_size) {
                 index = IndexT::Load(*file_handler_).release();
             }
         },
-        *bmp_index);
+        *hnsw_index);
 }
 
 } // namespace infinity
