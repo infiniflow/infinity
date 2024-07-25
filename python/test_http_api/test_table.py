@@ -132,7 +132,7 @@ class TestTable(HttpTest):
     def test_http_show_tables(self):
         self.show_database("default_db")
         tblist = self.get_all_tables("default_db")
-        print(tblist)
+        # print(tblist)
         return
 
     def test_http_create_varchar_table(self):
@@ -486,7 +486,7 @@ class TestTable(HttpTest):
             )
             # get all tables
         res = self.get_all_tables(db_name)
-        print("table nums: " + str(len(res)))
+        # print("table nums: " + str(len(res)))
         # assert len(res) == tb_count
 
         # show table
@@ -522,7 +522,7 @@ class TestTable(HttpTest):
             )
             # get all tables
         res = self.get_all_tables(db_name)
-        print("table nums: " + str(len(res)))
+        # print("table nums: " + str(len(res)))
         # assert len(res) == tb_count
 
         # show table
@@ -686,7 +686,7 @@ class TestTable(HttpTest):
                                   'create_option': str(i)})
 
             r = self.request(url, "post", h, d)
-            print(r)
+            # print(r)
             self.tear_down(r, {
                 "status_code": 200,
                 "error_code": 0,
@@ -706,7 +706,7 @@ class TestTable(HttpTest):
                                  {'fields': [{"name": "c1", "type": "integer"}], 'properties': {},
                                   'create_option': str(i)})
             r = self.request(url, "post", h, d)
-            print(r)
+            # print(r)
             self.tear_down(r, {
                 "status_code": 200,
                 "error_code": 0,

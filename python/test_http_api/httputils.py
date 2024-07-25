@@ -22,7 +22,7 @@ def trace_expected_exceptions(func):
         try:
             func(*args, **kwargs)
         except:
-            print("Expected exception in " + func.__name__)
+            # print("Expected exception in " + func.__name__)
             traceback.print_exc()
 
     return wrapped_func

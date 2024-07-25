@@ -17,6 +17,7 @@ def http_api_test(http_api_dir: str, pytest_mark: str):
             "-m",
             "pytest",
             "--tb=line",
+            "-s",
             "-x",
             "-m",
             pytest_mark,
