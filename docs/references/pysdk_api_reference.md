@@ -267,7 +267,7 @@ db_obj.create_table("table_example", {"c1": {"type": "bool"}})
 
 ```python
 # Create a table with a vector column only:  
-# - `sparse`: The column is a vector column
+# - `vector`: The column is a vector column
 # - `128`: The vector dimension
 # - `float`: The primitive data type of the vectors. Can be `float`/`float32` or `double`/`float64`
 db_obj.create_table("my_table", {"c1": {"type": "vector,128,float"}}, None)
