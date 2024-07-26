@@ -231,10 +231,30 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Examples
 
-#### Create a table with an int8 column and a vector column
+#### Create a table with an integer column only
 
 ```python
-db_obj.create_table("table_example", {"c1": {"type": "int8", "default": 1}, "c2": {"type": "vector,3,float32",}})
+# The `create_table`method supports creating integer columns in the following data types:
+# - int8
+# - int16
+# - int/int32/integer
+# - int64
+db_obj.create_table("table_example", {"c1": {"type": "int", "default": 1}})
+```
+
+#### Create a table with a float column only
+
+```python
+# The `create_table`method supports creating float columns in the following data types:
+# - float/float32
+# - double/float64
+db_obj.create_table("table_example", {"c1": {"type": "float64"}})
+```
+
+#### Create a table with an integer column and a bool column
+
+```python
+db_obj.create_table("table_example", {"c1": {"type": "int"}, "c2": {"type": "bool"}})
 ```
 
 #### Create a table with a vector column only
@@ -250,6 +270,10 @@ db_obj.create_table("my_table", {"c1": {"type": "vector,128,float"}}, None)
 ```python
 from infinity.common import ConflictType
 # Create a table with a vector column only:  
+# - `sparse`: The column is a sparse vector column
+# - `128`: The sparse vector dimension
+# - `float`: The primitive data type of the sparse vectors. Can be `float`/`float32` or `double`/`float64`
+# - `int`: The data type of the sparse vector indices. Can be `int8`, `int16`, `int`/`int32`/`integer`, or `int64`
 db_obj.create_table("my_table", {"c1": {"type": "sparse,128,float,int"}}, ConflictType.Error)
 ```
 
@@ -257,16 +281,21 @@ db_obj.create_table("my_table", {"c1": {"type": "sparse,128,float,int"}}, Confli
 
 ```python
 from infinity.common import ConflictType
-# Create a table with a vector column only:  
+# Create a table with a tensor column only:  
+# - `tensor`: The column is a tensor column
+# - `4`: Dimension of each vector unit in the tensor
+# - `float64`: The primitive data type of the tensors. Can be `float`/`float32` or `double`/`float64`
 db_obj.create_table("my_table", {"c1": {"type": "tensor,4,float64"}}, ConflictType.Ignore)
 ```
-
 
 #### Create a table with a tensor array column only
 
 ```python
 from infinity.common import ConflictType
-# Create a table with a vector column only:  
+# Create a table with a tensor array column only:  
+# - `tensorarray`: The column is a tensor array column
+# - `6`: Dimension of each vector unit in the tensor array
+# - `float`: The primitive data type of the tensors. Can be `float`/`float32` or `double`/`float64`
 db_obj.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Replace)
 ```
 
