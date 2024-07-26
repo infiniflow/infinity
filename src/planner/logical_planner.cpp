@@ -84,6 +84,8 @@ import create_index_info;
 import create_collection_info;
 import create_view_info;
 import drop_collection_info;
+import embedding_info;
+import type_info;
 import drop_index_info;
 import drop_schema_info;
 import drop_table_info;
@@ -464,7 +466,8 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             }
         }
 
-        switch (create_table_info->column_defs_[idx]->type()->type()) {
+        const DataType* data_type = create_table_info->column_defs_[idx]->type().get();
+        switch (data_type->type()) {
             case LogicalType::kBoolean:
             case LogicalType::kTinyInt:
             case LogicalType::kSmallInt:
@@ -478,15 +481,24 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             case LogicalType::kDate:
             case LogicalType::kTime:
             case LogicalType::kTimestamp:
-            case LogicalType::kDateTime:
-            case LogicalType::kEmbedding:
+            case LogicalType::kDateTime: {
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                TypeInfo* type_info_ptr = data_type->type_info().get();
+                EmbeddingInfo* embedding_info = static_cast<EmbeddingInfo*>(type_info_ptr);
+                if(embedding_info->Dimension() > EMBEDDING_LIMIT) {
+                    return Status::NotSupport(fmt::format("Embedding data limit is {}, which larger than limit {}", embedding_info->Dimension(), EMBEDDING_LIMIT));
+                }
+                break;
+            }
             case LogicalType::kTensor:
             case LogicalType::kTensorArray:
             case LogicalType::kSparse: {
                 break;
             }
             default: {
-                return Status::NotSupport(fmt::format("Not supported data type: {}", create_table_info->column_defs_[idx]->type()->ToString()));
+                return Status::NotSupport(fmt::format("Not supported data type: {}", data_type->ToString()));
             }
         }
 

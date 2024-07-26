@@ -331,16 +331,16 @@ class TestInsert(TestSdk):
         """
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_insert_big_embedding", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_big_embedding", {"c1": {"type": "vector,65535,int"}},
+        table_obj = db_obj.create_table("test_insert_big_embedding", {"c1": {"type": "vector,16384,int"}},
                                         ConflictType.Error)
         assert table_obj
-        res = table_obj.insert([{"c1": [1] * 65535}])
+        res = table_obj.insert([{"c1": [1] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [4] * 65535}])
+        res = table_obj.insert([{"c1": [4] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [7] * 65535}])
+        res = table_obj.insert([{"c1": [7] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [-9999999] * 65535}])
+        res = table_obj.insert([{"c1": [-9999999] * 16384}])
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(
@@ -356,16 +356,16 @@ class TestInsert(TestSdk):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_insert_big_embedding_float",
                           ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_big_embedding_float", {"c1": {"type": "vector,65535,float"}},
+        table_obj = db_obj.create_table("test_insert_big_embedding_float", {"c1": {"type": "vector,16384,float"}},
                                         ConflictType.Error)
         assert table_obj
-        res = table_obj.insert([{"c1": [1] * 65535}])
+        res = table_obj.insert([{"c1": [1] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [-9999999] * 65535}])
+        res = table_obj.insert([{"c1": [-9999999] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [1.1] * 65535}])
+        res = table_obj.insert([{"c1": [1.1] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [-9999999.988] * 65535}])
+        res = table_obj.insert([{"c1": [-9999999.988] * 16384}])
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(

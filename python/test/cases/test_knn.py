@@ -273,7 +273,7 @@ class TestInfinity:
     def test_zero_dimension_vector(self):
         self.test_infinity_obj._test_zero_dimension_vector()
 
-    @pytest.mark.parametrize("dim", [1000, 10000, 100000, 200000])
+    @pytest.mark.parametrize("dim", [1000, 16384])
     def test_big_dimension_vector(self, dim):
         self.test_infinity_obj._test_big_dimension_vector(dim)
 
