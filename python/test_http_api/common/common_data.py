@@ -1,5 +1,4 @@
 default_url = "http://localhost:23820/"
-expected_status_code = 200
 
 baseHeader = {
     'accept': 'application/json',

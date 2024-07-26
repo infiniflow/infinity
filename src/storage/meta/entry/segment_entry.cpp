@@ -394,8 +394,7 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
                                  const DeleteState *delete_state) {
     std::unique_lock w_lock(rw_locker_);
     if (status_ == SegmentStatus::kDeprecated) {
-        String error_message = "Assert: Should not commit delete to deprecated segment.";
-        UnrecoverableError(error_message);
+        return;
     }
 
     if (delete_state != nullptr) {

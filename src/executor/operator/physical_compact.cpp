@@ -33,6 +33,7 @@ import default_values;
 import logger;
 import infinity_exception;
 import third_party;
+import status;
 
 namespace infinity {
 
@@ -121,18 +122,23 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     const Vector<SegmentEntry *> &candidate_segments = compact_operator_state->segment_groups_[group_idx];
     Vector<SegmentEntry *> compactible_segments;
     {
+        String log_str = fmt::format("PhysicalCompact::Execute: group_idx: {}, candidate_segments: ", group_idx);
         for (auto *candidate_segment : candidate_segments) {
             if (candidate_segment->TrySetCompacting(compact_state_data)) {
                 compactible_segments.push_back(candidate_segment);
             }
+            log_str += fmt::format("{}, ", candidate_segment->segment_id());
         }
+        LOG_INFO(log_str);
     }
 
     auto *txn = query_context->GetTxn();
+    if (compactible_segments.empty()) {
+        RecoverableError(Status::TxnRollback(txn->TxnID(), "No segment to compact."));
+    }
     auto *txn_mgr = txn->txn_mgr();
     auto *buffer_mgr = query_context->storage()->buffer_manager();
     TxnTimeStamp scan_ts = txn_mgr->GetNewTimeStamp();
-    LOG_INFO(fmt::format("PhysicalCompact::Execute: scan_ts: {}", scan_ts));
 
     TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     BlockIndex *block_index = base_table_ref_->block_index_.get();
@@ -141,6 +147,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
 
     auto new_segment = SegmentEntry::NewSegmentEntry(table_entry, Catalog::GetNextSegmentID(table_entry), txn);
     SegmentID new_segment_id = new_segment->segment_id();
+    LOG_INFO(fmt::format("PhysicalCompact::Execute: txn_id: {}, scan_ts: {}, new segment id: {}", txn->TxnID(), scan_ts, new_segment_id));
 
     UniquePtr<BlockEntry> new_block =
         BlockEntry::NewBlockEntry(new_segment.get(), new_segment->GetNextBlockID(), 0 /*checkpoint_ts*/, column_count, txn);
@@ -189,6 +196,9 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     }
     if (new_block->row_count() > 0) {
         new_segment->AppendBlockEntry(std::move(new_block));
+    }
+    if (new_segment->actual_row_count() > new_segment->row_capacity()) {
+        UnrecoverableError(fmt::format("Compact segment {} error because of row count overflow.", new_segment_id));
     }
     compact_state_data->AddNewSegment(new_segment, std::move(compactible_segments), txn);
     compact_operator_state->compact_idx_ = ++group_idx;

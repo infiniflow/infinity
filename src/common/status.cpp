@@ -408,8 +408,8 @@ Status Status::TransactionNotFound(TransactionID txn_id) {
 }
 
 // 4. TXN fail
-Status Status::TxnRollback(u64 txn_id) {
-    return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback", txn_id)));
+Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
+    return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback. {}", txn_id, rollback_reason)));
 }
 
 Status Status::TxnConflict(u64 txn_id, const String &conflict_reason) {

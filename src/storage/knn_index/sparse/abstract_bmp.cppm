@@ -96,6 +96,9 @@ private:
 public:
     static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def);
 
+    BMPIndexInMem(const BMPIndexInMem &) = delete;
+    BMPIndexInMem &operator=(const BMPIndexInMem &) = delete;
+
     ~BMPIndexInMem();
 
     SizeT GetRowCount() const;

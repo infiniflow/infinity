@@ -5,7 +5,6 @@ from common.common_data import *
 
 
 class HttpTest:
-
     # Pre operation: set header
     def set_up_header(self, param=[], tp={}):
         header = {}
@@ -34,36 +33,44 @@ class HttpTest:
         if len(tp) != 0:
             for item in tp.items():
                 data[item[0]] = item[1]
-        # print(data)
+        # logging.debug(data)
         return data
         # Post operation
 
     def tear_down(self, resp, expect={}):
-        # print("status_code:" + str(resp.status_code))
+        logging.debug("status_code:" + str(resp.status_code))
         if expect.get("status_code", None) is not None:
-            if resp.status_code != expect['status_code']:
-                logging.error(f"expect: {expect['status_code']}, actual: {resp.status_code}")
-            assert resp.status_code == expect['status_code']
+            logging.debug(
+                f"expect: {expect['status_code']}, actual: {resp.status_code}"
+            )
+            assert resp.status_code == expect["status_code"]
         else:
-            if resp.status_code != expected_status_code:
-                logging.error(f"actual: {resp.status_code}, expect: {expected_status_code}")
+            logging.debug(f"actual: {resp.status_code}, expect: 200")
+            assert resp.status_code == 200
 
         resp_json = resp.json()
-        # print(resp_json)
+        # logging.debug(resp_json)
         for item in expect.items():
             if resp_json.get(item[0], None) is None:
                 continue
-            if str(resp_json[item[0]]) != str(item[1]):
-                logging.error("[" + str(item[0]) + "]: " + "resp:" + str(resp_json[item[0]]) + ", expect:" + str(item[1]))
-                assert False
-        # print("----------------------------------------------")
+            logging.debug(
+                "["
+                + str(item[0])
+                + "]: "
+                + "resp:"
+                + str(resp_json[item[0]])
+                + ", expect:"
+                + str(item[1])
+            )
+            assert str(resp_json[item[0]]) == str(item[1])
+        logging.debug("----------------------------------------------")
         return
 
     def request(self, url, method, header={}, data={}):
         if header is None:
             header = {}
         url = default_url + url
-        # print("url: " + url)
+        logging.debug("url: " + url)
         match method:
             case "get":
                 response = requests.get(url, headers=header, json=data)
@@ -75,61 +82,65 @@ class HttpTest:
                 response = requests.delete(url, headers=header, json=data)
         return response
 
-    def create_database(self, db_name, expect={
-        "error_code": 0
-    },opt="kIgnore"):
+    def create_database(self, db_name, expect={"error_code": 0}, opt="kIgnore"):
         url = f"databases/{db_name}"
-        h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['create_option'],{'create_option': baseCreateOptions[opt]})
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data(
+            ["create_option"], {"create_option": baseCreateOptions[opt]}
+        )
         r = self.request(url, "post", h, d)
         self.tear_down(r, expect)
         return
 
-    def create_db_without_check(self, db_name,opt="kIgnore"):
+    def create_db_without_check(self, db_name, opt="kIgnore"):
         url = f"databases/{db_name}"
-        h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['create_option'],{'create_option': baseCreateOptions[opt]})
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data(
+            ["create_option"], {"create_option": baseCreateOptions[opt]}
+        )
         r = self.request(url, "post", h, d)
         return r
 
-    def show_database(self, db_name, expect={
-        "error_code": 0,
-        "table_count": 0,
-    }):
+    def show_database(
+        self,
+        db_name,
+        expect={
+            "error_code": 0,
+            "table_count": 0,
+        },
+    ):
         expect["database_name"] = db_name
         url = f"databases/{db_name}"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h, {})
         self.tear_down(r, expect)
         return
 
-    def drop_database(self, db_name, expect={
-        "error_code": 0
-    },opt="kIgnore"):
+    def drop_database(self, db_name, expect={"error_code": 0}, opt="kIgnore"):
         url = f"databases/{db_name}"
-        h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['drop_option'],{'drop_option': baseDropOptions[opt]})
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data(["drop_option"], {"drop_option": baseDropOptions[opt]})
         r = self.request(url, "delete", h, d)
         self.tear_down(r, expect)
         return
 
     def drop_db_without_check(self, db_name):
         url = f"databases/{db_name}"
-        h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['drop_option'])
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data(["drop_option"])
         r = self.request(url, "delete", h, d)
         assert r.status_code == 200
         return r
 
     def list_database(self, expect):
-        url = f"databases"
-        self.set_up_header(['accept'])
+        url = "databases"
+        self.set_up_header(["accept"])
         r = self.request(url, "get")
         self.tear_down(r, expect)
 
     def get_database(self):
-        url = f"databases"
-        h = self.set_up_header(['accept'])
+        url = "databases"
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get")
         assert r.status_code == 200
         # return all db names
@@ -154,47 +165,70 @@ class HttpTest:
         for db_name in dbs:
             if db_name != "default_db" and db_name.startswith("test_http"):
                 self.drop_database(db_name)
-    def create_table(self, db_name, table_name, fields=[], properties=[], expect={
-        "error_code": 0
-    }, opt="kIgnore"):
+
+    def create_table(
+        self,
+        db_name,
+        table_name,
+        fields=[],
+        properties=[],
+        expect={"error_code": 0},
+        opt="kIgnore",
+    ):
         url = f"databases/{db_name}/tables/{table_name}"
-        h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['create_option'],
-                             {'fields': fields, 'properties': properties, 'create_option': baseCreateOptions[opt]})
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data(
+            ["create_option"],
+            {
+                "fields": fields,
+                "properties": properties,
+                "create_option": baseCreateOptions[opt],
+            },
+        )
         r = self.request(url, "post", h, d)
-        # print(r)
+        logging.debug(r)
         self.tear_down(r, expect)
         return
 
-    def drop_table(self, db_name, table_name, expect={
-        "error_code": 0,
-    }, opt="kIgnore"):
+    def drop_table(
+        self,
+        db_name,
+        table_name,
+        expect={
+            "error_code": 0,
+        },
+        opt="kIgnore",
+    ):
         url = f"databases/{db_name}/tables/{table_name}"
-        h = self.set_up_header(['accept', 'content-type'])
-        d = self.set_up_data(['drop_option'], {'drop_option': baseDropOptions[opt]})
+        h = self.set_up_header(["accept", "content-type"])
+        d = self.set_up_data(["drop_option"], {"drop_option": baseDropOptions[opt]})
         r = self.request(url, "delete", h, d)
         self.tear_down(r, expect)
         return
 
     def show_table(self, db_name, table_name, expect):
         url = f"databases/{db_name}/tables/{table_name}"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.tear_down(r, expect)
         return
 
-    def list_tables(self, db_name, expect={
-        "error_code": 0,
-    }):
+    def list_tables(
+        self,
+        db_name,
+        expect={
+            "error_code": 0,
+        },
+    ):
         url = f"databases/{db_name}/tables"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.tear_down(r, expect)
         return
 
     def get_all_tables(self, db_name):
         url = f"databases/{db_name}/tables"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         # return all db names
         ret = []
@@ -208,42 +242,58 @@ class HttpTest:
 
     def show_table_columns(self, db_name, table_name, expect):
         url = f"databases/{db_name}/tables/{table_name}/columns"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.tear_down(r, expect)
         return
 
     # part index
-    def create_index(self, db_name, table_name, index_name, fields=[], index={}, expect={
-        "error_code": 0
-    }, opt="kIgnore"):
-        
-        copt = opt 
+    def create_index(
+        self,
+        db_name,
+        table_name,
+        index_name,
+        fields=[],
+        index={},
+        expect={"error_code": 0},
+        opt="kIgnore",
+    ):
+        copt = opt
         exists = baseCreateOptions.get(opt, None)
         if exists is not None:
-             copt = baseCreateOptions[opt]
-        
+            copt = baseCreateOptions[opt]
+
         url = f"databases/{db_name}/tables/{table_name}/indexes/{index_name}"
-        h = self.set_up_header(['accept', 'content-type'], )
-        d = self.set_up_data(["create_option"], {"fields": fields, "index": index, "create_option": copt})
+        h = self.set_up_header(
+            ["accept", "content-type"],
+        )
+        d = self.set_up_data(
+            ["create_option"], {"fields": fields, "index": index, "create_option": copt}
+        )
         r = self.request(url, "post", h, d)
         self.tear_down(r, expect)
         return
 
-    def drop_index(self, db_name, table_name, index_name, expect={
-        "error_code": 0,
-    }, opt="kIgnore"):
-        
-        copt = opt 
+    def drop_index(
+        self,
+        db_name,
+        table_name,
+        index_name,
+        expect={
+            "error_code": 0,
+        },
+        opt="kIgnore",
+    ):
+        copt = opt
         exists = baseDropOptions.get(opt, None)
         if exists is not None:
-             copt = baseDropOptions[opt]
-        
-        # print("copt:"+copt)
+            copt = baseDropOptions[opt]
+
+        logging.debug("copt:" + copt)
 
         url = f"databases/{db_name}/tables/{table_name}/indexes/{index_name}"
 
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         d = self.set_up_data([], {"drop_option": copt})
         r = self.request(url, "delete", h, d)
         self.tear_down(r, expect)
@@ -251,14 +301,14 @@ class HttpTest:
 
     def show_index(self, db_name, table_name, index_name, expect):
         url = f"databases/{db_name}/tables/{table_name}/indexes/{index_name}"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.tear_down(r, expect)
         return
 
     def list_index(self, db_name, table_name, expect):
         url = f"databases/{db_name}/tables/{table_name}/indexes"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.tear_down(r, expect)
         r_json = r.json()
@@ -271,11 +321,9 @@ class HttpTest:
 
         # insert data to tables
 
-    def insert(self, db_name, table_name, values=[], expect={
-        "error_code": 0
-    }):
+    def insert(self, db_name, table_name, values=[], expect={"error_code": 0}):
         url = f"databases/{db_name}/tables/{table_name}/docs"
-        h = self.set_up_header(['accept', "content-type"])
+        h = self.set_up_header(["accept", "content-type"])
         r = self.request(url, "post", h, values)
         self.tear_down(r, expect)
         return
@@ -284,7 +332,7 @@ class HttpTest:
 
     def import_data(self, db_name, table_name, data={}, expect={}):
         url = f"databases/{db_name}/tables/{table_name}"
-        h = self.set_up_header(['accept', "content-type"])
+        h = self.set_up_header(["accept", "content-type"])
         d = self.set_up_data([], data)
         r = self.request(url, "put", h, d)
         self.tear_down(r, expect)
@@ -292,31 +340,53 @@ class HttpTest:
 
         # delete data from table
 
-    def delete(self, db_name, table_name, filter="", expect={
-        "error_code": 0,
-    }):
+    def delete(
+        self,
+        db_name,
+        table_name,
+        filter="",
+        expect={
+            "error_code": 0,
+        },
+    ):
         url = f"databases/{db_name}/tables/{table_name}/docs"
-        h = self.set_up_header(['accept', "content-type"])
+        h = self.set_up_header(["accept", "content-type"])
         d = self.set_up_data([], {"filter": filter})
         r = self.request(url, "delete", h, d)
         self.tear_down(r, expect)
         return
 
-    def update(self, db_name, table_name, update={}, filter="", expect={
-        "error_code": 0,
-    }):
+    def update(
+        self,
+        db_name,
+        table_name,
+        update={},
+        filter="",
+        expect={
+            "error_code": 0,
+        },
+    ):
         url = f"databases/{db_name}/tables/{table_name}/docs"
-        h = self.set_up_header(['accept', "content-type"])
+        h = self.set_up_header(["accept", "content-type"])
         d = self.set_up_data([], {"update": update, "filter": filter})
         r = self.request(url, "put", h, d)
         self.tear_down(r, expect)
         return
 
-    def select(self, db_name, table_name, output=[], filter="", fusion={}, knn={}, expect={
-        "error_code": 0,
-    }):
+    def select(
+        self,
+        db_name,
+        table_name,
+        output=[],
+        filter="",
+        fusion={},
+        knn={},
+        expect={
+            "error_code": 0,
+        },
+    ):
         url = f"databases/{db_name}/tables/{table_name}/docs"
-        h = self.set_up_header(['accept', "content-type"])
+        h = self.set_up_header(["accept", "content-type"])
         tmp = {"output": output}
         if len(filter):
             tmp.update({"filter": filter})
@@ -329,39 +399,37 @@ class HttpTest:
         self.tear_down(r, expect)
         return
 
-    def get_variables(self, variable_name, expect={
-        "error_code": 0
-    }):
+    def get_variables(self, variable_name, expect={"error_code": 0}):
         url = f"variables/{variable_name}"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.tear_down(r, expect)
         return
 
     def show_segment_list(self, db_name, table_name, expect):
         url = f"databases/{db_name}/tables/{table_name}/segments/"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.tear_down(r, expect)
         return
 
     def show_specific_segment_detail(self, db_name, table_name, segment_id, expect):
         url = f"databases/{db_name}/tables/{table_name}/segments/{segment_id}"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.tear_down(r, expect)
         return
 
     def show_blocks_list(self, db_name, table_name, segment_id, expect):
         url = f"databases/{db_name}/tables/{table_name}/segments/{segment_id}/blocks/"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.tear_down(r, expect)
         return
 
     def show_specific_block_detail(self, db_name, table_name, segment_id, bid, expect):
         url = f"databases/{db_name}/tables/{table_name}/segments/{segment_id}/blocks/{bid}"
-        h = self.set_up_header(['accept'])
+        h = self.set_up_header(["accept"])
         r = self.request(url, "get", h)
         self.tear_down(r, expect)
         return
@@ -369,13 +437,13 @@ class HttpTest:
     def get_project_path(self):
         current_file = os.path.abspath(__file__)
         index = current_file.index("infinity")
-        desired_path = current_file[:index + len("infinity")]
+        desired_path = current_file[: index + len("infinity")]
         return str(desired_path)
 
     # url: str
     # header_dict: dict
     # response_dict: dict
-    # data_dict: dict 
+    # data_dict: dict
 
     url = default_url
     header_dict = baseHeader

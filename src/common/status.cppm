@@ -275,7 +275,7 @@ public:
     static Status TransactionNotFound(TransactionID txn_id);
 
     // 4. TXN fail
-    static Status TxnRollback(u64 txn_id);
+    static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");
     static Status TxnConflict(u64 txn_id, const String &conflict_reason);
 
     // 5. Insufficient resource or exceed limits
