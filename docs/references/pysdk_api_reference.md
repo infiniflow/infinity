@@ -257,16 +257,19 @@ db_obj.create_table("table_example", {"c1": {"type": "float64"}})
 db_obj.create_table("table_example", {"c1": {"type": "varchar"}})
 ```
 
-#### Create a table with an integer column and a bool column
+#### Create a table with a bool column only
 
 ```python
-db_obj.create_table("table_example", {"c1": {"type": "int"}, "c2": {"type": "bool"}})
+db_obj.create_table("table_example", {"c1": {"type": "bool"}})
 ```
 
 #### Create a table with a vector column only
 
 ```python
 # Create a table with a vector column only:  
+# - `sparse`: The column is a vector column
+# - `128`: The vector dimension
+# - `float`: The primitive data type of the vectors. Can be `float`/`float32` or `double`/`float64`
 db_obj.create_table("my_table", {"c1": {"type": "vector,128,float"}}, None)
 
 ```
