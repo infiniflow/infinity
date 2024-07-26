@@ -251,6 +251,12 @@ db_obj.create_table("table_example", {"c1": {"type": "int", "default": 1}})
 db_obj.create_table("table_example", {"c1": {"type": "float64"}})
 ```
 
+#### Create a table with a string column only
+
+```python
+db_obj.create_table("table_example", {"c1": {"type": "varchar"}})
+```
+
 #### Create a table with an integer column and a bool column
 
 ```python
