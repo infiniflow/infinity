@@ -30,6 +30,8 @@ import constant_expr;
 import stl;
 import data_type;
 import infinity_context;
+import index_defines;
+import persistence_manager;
 
 import third_party;
 import logger;
@@ -368,12 +370,12 @@ AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, T
         switch (index_type_) {
             case IndexType::kFullText: {
                 String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(chunk_index_entry->segment_index_entry_->index_dir()));
-                String posting_file_name = chunk_index_entry->base_name_ + POSTING_SUFFIX;
-                String dict_file_name = chunk_index_entry->base_name_ + DICT_SUFFIX;
-                String column_length_file_name = chunk_index_entry->base_name_ + LENGTH_SUFFIX;
-                fulltext_obj_addrs_.posting_obj_addr_ = pm->GetObjLocalCache(full_path + posting_file_name);
-                fulltext_obj_addrs_.dict_obj_addr_ = pm->GetObjLocalCache(full_path + dict_file_name);
-                fulltext_obj_addrs_.column_length_obj_addr_ = pm->GetObjLocalCache(full_path + column_length_file_name);
+                String posting_file_name = full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX;
+                String dict_file_name = full_path + chunk_index_entry->base_name_ + DICT_SUFFIX;
+                String column_length_file_name = full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX;
+                fulltext_obj_addrs_.posting_obj_addr_ = pm->GetObjLocalCache(posting_file_name);
+                fulltext_obj_addrs_.dict_obj_addr_ = pm->GetObjLocalCache(dict_file_name);
+                fulltext_obj_addrs_.column_length_obj_addr_ = pm->GetObjLocalCache(column_length_file_name);
                 break;
             }
             default: {
@@ -498,16 +500,18 @@ UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(char *&ptr) {
     add_chunk_index_op->row_count_ = ReadBufAdv<u32>(ptr);
     add_chunk_index_op->deprecate_ts_ = ReadBufAdv<u64>(ptr);
 
-    add_chunk_index_op->index_type_ = ReadBufAdv<IndexType>(ptr);
-    switch (add_chunk_index_op->index_type_) {
-        case IndexType::kFullText: {
-            add_chunk_index_op->fulltext_obj_addrs_.posting_obj_addr_.ReadBuf(ptr);
-            add_chunk_index_op->fulltext_obj_addrs_.dict_obj_addr_.ReadBuf(ptr);
-            add_chunk_index_op->fulltext_obj_addrs_.column_length_obj_addr_.ReadBuf(ptr);
-            break;
-        }
-        default: {
-            break;
+    if (InfinityContext::instance().persistence_manager() != nullptr) {
+        add_chunk_index_op->index_type_ = ReadBufAdv<IndexType>(ptr);
+        switch (add_chunk_index_op->index_type_) {
+            case IndexType::kFullText: {
+                add_chunk_index_op->fulltext_obj_addrs_.posting_obj_addr_.ReadBuf(ptr);
+                add_chunk_index_op->fulltext_obj_addrs_.dict_obj_addr_.ReadBuf(ptr);
+                add_chunk_index_op->fulltext_obj_addrs_.column_length_obj_addr_.ReadBuf(ptr);
+                break;
+            }
+            default: {
+                break;
+            }
         }
     }
     return add_chunk_index_op;
@@ -684,16 +688,18 @@ void AddChunkIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->base_rowid_.ToUint64());
     WriteBufAdv(buf, this->row_count_);
     WriteBufAdv(buf, this->deprecate_ts_);
-    WriteBufAdv(buf, this->index_type_);
-    switch (this->index_type_) {
-        case IndexType::kFullText: {
-            this->fulltext_obj_addrs_.posting_obj_addr_.WriteBuf(buf);
-            this->fulltext_obj_addrs_.dict_obj_addr_.WriteBuf(buf);
-            this->fulltext_obj_addrs_.column_length_obj_addr_.WriteBuf(buf);
-            break;
-        }
-        default: {
-            break;
+    if (InfinityContext::instance().persistence_manager() != nullptr) {
+        WriteBufAdv(buf, this->index_type_);
+        switch (this->index_type_) {
+            case IndexType::kFullText: {
+                this->fulltext_obj_addrs_.posting_obj_addr_.WriteBuf(buf);
+                this->fulltext_obj_addrs_.dict_obj_addr_.WriteBuf(buf);
+                this->fulltext_obj_addrs_.column_length_obj_addr_.WriteBuf(buf);
+                break;
+            }
+            default: {
+                break;
+            }
         }
     }
 }

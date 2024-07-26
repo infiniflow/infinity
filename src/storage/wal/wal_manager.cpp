@@ -55,6 +55,9 @@ import default_values;
 import defer_op;
 import index_base;
 import base_table_ref;
+import index_defines;
+import create_index_info;
+import persistence_manager;
 import infinity_context;
 
 module wal_manager;
@@ -1069,12 +1072,13 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
             switch (chunk_info.index_type_) {
                 case IndexType::kFullText: {
                     String full_path = fmt::format("{}/{}", *segment_index_entry->base_dir_, *(segment_index_entry->index_dir()));
-                    String posting_file_name = chunk_info.base_name_ + POSTING_SUFFIX;
-                    String dict_file_name = chunk_info.base_name_ + DICT_SUFFIX;
-                    String column_length_file_name = chunk_info.base_name_ + LENGTH_SUFFIX;
-                    pm->PutObjLocalCache(full_path + posting_file_name, chunk_info.obj_addrs_[0]);
-                    pm->PutObjLocalCache(full_path + dict_file_name, chunk_info.obj_addrs_[1]);
-                    pm->PutObjLocalCache(full_path + column_length_file_name, chunk_info.obj_addrs_[2]) break;
+                    String posting_file_name = full_path + chunk_info.base_name_ + POSTING_SUFFIX;
+                    String dict_file_name = full_path + chunk_info.base_name_ + DICT_SUFFIX;
+                    String column_length_file_name = full_path + chunk_info.base_name_ + LENGTH_SUFFIX;
+                    pm->PutObjLocalCache(posting_file_name, chunk_info.obj_addrs_[0]);
+                    pm->PutObjLocalCache(dict_file_name, chunk_info.obj_addrs_[1]);
+                    pm->PutObjLocalCache(column_length_file_name, chunk_info.obj_addrs_[2]);
+                    break;
                 }
                 default: {
                     break;

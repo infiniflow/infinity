@@ -204,7 +204,6 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewReplayChunkIndexEntry(ChunkID chu
         }
         case IndexType::kFullText: {
             auto column_length_file_name = MakeShared<String>(base_name + LENGTH_SUFFIX);
-            String obj_path = pm->GetObjCache(column_length_file_name);
             auto file_worker = MakeUnique<RawFileWorker>(full_dir, column_length_file_name, row_count * sizeof(u32));
             chunk_index_entry->buffer_obj_ = buffer_mgr->GetBufferObject(std::move(file_worker));
             break;

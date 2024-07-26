@@ -456,45 +456,6 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
                 posting->AddPosition(term_pos);
             }
         }
-        doc_pos_list_size = temp_term_tuple->Size();
-        term_length = temp_term_tuple->term_.size();
-
-        if (term_length >= MAX_TUPLE_LENGTH) {
-            continue;
-        }
-
-        count -= temp_term_tuple->Size();
-        std::string_view term = std::string_view(temp_term_tuple->term_);
-
-        if (term != last_term) {
-            assert(last_term < term);
-            if (last_doc_id != INVALID_DOCID) {
-                posting->EndDocument(last_doc_id, 0);
-            }
-            if (posting.get()) {
-                TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
-                posting->Dump(posting_file_writer, term_meta);
-                SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
-                term_meta_dumpler.Dump(dict_file_writer, term_meta);
-                fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
-            }
-            posting = MakeUnique<PostingWriter>(posting_format_, column_lengths_);
-            last_term_str = String(term);
-            last_term = std::string_view(last_term_str);
-            last_doc_id = INVALID_DOCID;
-        }
-        for (SizeT i = 0; i < doc_pos_list_size; ++i) {
-            u32 &doc_id = temp_term_tuple->doc_pos_list_[i].first;
-            u32 &term_pos = temp_term_tuple->doc_pos_list_[i].second;
-
-            if (last_doc_id != INVALID_DOCID && last_doc_id != doc_id) {
-                assert(last_doc_id < doc_id);
-                assert(posting.get() != nullptr);
-                posting->EndDocument(last_doc_id, 0);
-            }
-            last_doc_id = doc_id;
-            posting->AddPosition(term_pos);
-        }
     }
     if (last_doc_id != INVALID_DOCID) {
         posting->EndDocument(last_doc_id, 0);

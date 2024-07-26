@@ -37,6 +37,7 @@ import segment_entry;
 import segment_index_entry;
 import chunk_index_entry;
 import local_file_system;
+import index_defines;
 import create_index_info;
 import persistence_manager;
 import infinity_context;

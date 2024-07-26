@@ -365,7 +365,8 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
             }
             memory_indexer_->Dump(false, spill);
             if (!spill) {
-                chunk_index_entry = AddFtChunkIndexEntry();
+                chunk_index_entry =
+                    AddFtChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
                 this->UpdateFulltextColumnLenInfo(memory_indexer_->GetColumnLengthSum(), memory_indexer_->GetDocCount());
                 memory_indexer_.reset();
             }
@@ -495,7 +496,8 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
                 memory_indexer_->Commit(true);
             }
             memory_indexer_->Dump(true);
-            dumped_memindex_entry = AddFtChunkIndexEntry();
+            dumped_memindex_entry =
+                AddFtChunkIndexEntry(memory_indexer_->GetBaseName(), memory_indexer_->GetBaseRowId(), memory_indexer_->GetDocCount());
             this->UpdateFulltextColumnLenInfo(memory_indexer_->GetColumnLengthSum(), memory_indexer_->GetDocCount());
             memory_indexer_.reset();
             break;
@@ -1016,14 +1018,10 @@ void SegmentIndexEntry::AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_inde
     chunk_index_entries_.push_back(chunk_index_entry);
 }
 
-SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry() {
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count) {
     std::shared_lock lock(rw_locker_);
     // row range of chunk_index_entries_ may overlop and misorder due to deprecated ones.
-    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this,
-                                                                                         memory_indexer_->GetBaseName(),
-                                                                                         memory_indexer_->GetBaseRowId(),
-                                                                                         memory_indexer_->GetDocCount(),
-                                                                                         buffer_manager_);
+    SharedPtr<ChunkIndexEntry> chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(this, base_name, base_rowid, row_count, buffer_manager_);
     chunk_index_entries_.push_back(chunk_index_entry);
     return chunk_index_entry;
 }

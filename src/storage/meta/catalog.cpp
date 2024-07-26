@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <fstream>
 #include <thread>
 #include <vector>
@@ -46,6 +47,7 @@ import data_access_state;
 import catalog_delta_entry;
 import file_writer;
 import extra_ddl_info;
+import index_defines;
 import infinity_context;
 import create_index_info;
 import persistence_manager;
@@ -920,27 +922,27 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     auto *segment_index_entry = iter2->second.get();
                     segment_index_entry
                         ->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-                }
 
-                PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-                bool use_object_cache = pm != nullptr;
-                if (use_object_cache) {
-                    Vector<ObjAddr> obj_addrs;
-                    switch (add_chunk_index_entry_op->index_type_) {
-                        case IndexType: {
-                            assert(obj_addrs.size() == 3);
-                            add_chunk_index_entry_op->fulltext_obj_addrs_.ToVec(obj_addrs);
-                            String full_path = fmt::format("{}/{}", *segment_index_entry->base_dir_, *(segment_index_entry->index_dir()));
-                            String posting_file_name = base_name + POSTING_SUFFIX;
-                            String dict_file_name = base_name + DICT_SUFFIX;
-                            String column_length_file_name = base_name + LENGTH_SUFFIX;
-                            pm->PutObjLocalCache(full_path + posting_file_name, obj_addrs[0]);
-                            pm->PutObjLocalCache(full_path + dict_file_name, obj_addrs[1]);
-                            pm->PutObjLocalCache(full_path + column_length_file_name, obj_addrs[2]);
-                            break;
-                        }
-                        default: {
-                            break;
+                    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+                    bool use_object_cache = pm != nullptr;
+                    if (use_object_cache) {
+                        Vector<ObjAddr> obj_addrs;
+                        switch (add_chunk_index_entry_op->index_type_) {
+                            case IndexType::kFullText: {
+                                assert(obj_addrs.size() == 3);
+                                add_chunk_index_entry_op->fulltext_obj_addrs_.ToVec(obj_addrs);
+                                String full_path = fmt::format("{}/{}", *segment_index_entry->base_dir_, *(segment_index_entry->index_dir()));
+                                String posting_file_name = base_name + POSTING_SUFFIX;
+                                String dict_file_name = base_name + DICT_SUFFIX;
+                                String column_length_file_name = base_name + LENGTH_SUFFIX;
+                                pm->PutObjLocalCache(full_path + posting_file_name, obj_addrs[0]);
+                                pm->PutObjLocalCache(full_path + dict_file_name, obj_addrs[1]);
+                                pm->PutObjLocalCache(full_path + column_length_file_name, obj_addrs[2]);
+                                break;
+                            }
+                            default: {
+                                break;
+                            }
                         }
                     }
                 }

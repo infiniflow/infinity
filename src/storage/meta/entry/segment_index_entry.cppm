@@ -223,7 +223,7 @@ public:
 
     void AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry);
 
-    SharedPtr<ChunkIndexEntry> AddFtChunkIndexEntry();
+    SharedPtr<ChunkIndexEntry> AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count);
 
     SharedPtr<ChunkIndexEntry> AddChunkIndexEntryReplayWal(ChunkID chunk_id,
                                                            TableEntry *table_entry,
