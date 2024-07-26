@@ -197,45 +197,29 @@ Name of the table. Must not be empty.
 
 #### columns_definition: `dict[str, dict[str, Any]]`, *Required*
 
-Definitions for all table columns as a dictionary. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type, constraints, and default value information in key-value pairs:
+Definitions for all table columns as a dictionary. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type and default value information in key-value pairs:
 
 - **Data type** (`"type"`)  
-  Supported values include:  
-  - Primitive: `"int8"`, `"int16"`, `"int32"/"int"/"integer"`, `"int64"`, `"float"/"float32"`, `"double"/"float64"`, `"bool"`, `"varchar"`
-  - Vector: `"vector,<dimension>,<data_type>"`
-  - Sparse vector: `"sparse,<dimension>,<sparse_data_type>,<indice_data_type>"`
-  - Tensor: `"tensor,<dimension>,<data_type>"`
-  - Tensor array: `"tensorarray,<dimension>,<data_type>"`
-
-- **Constraints** (`"constraints"`)  
-  Rules or conditions applied to the column. Supported values include:
-
-
+  The data type of the column. 
 - **Default value** (`"default"`)  
   The default column value that a cell takes if not explicitly set.  
 
 
 #### conflict_type: `ConflictType`, *Optional*
 
-`enum` type defined in the `infinity.common` package:
-  - `Error`
-  - `Ignore`
-  - `Replace`
+Conflict policy in `enum` for handling situations when a table with the same name exists. 
+  - `Error`: Raise an error if a table with the same name exists.
+  - `Ignore`: Ignore the table creation requrest and the table with the same name remains as is.
+  - `Replace`: Drop the existing table and create a new one. 
 
+:::tip NOTE
+You must import the `infinity.common` package to set `ConflictType`:
 
-### note
-- primitive datatype:
-    - int8
-    - int16
-    - int32/int/integer
-    - int64
-    - float/float32
-    - double/float64
-    - bool
-- vector datatype:
-    - float/float32
-- complex datatype:
-    - varchar
+```python
+from infinity.common import ConflictType
+```
+:::
+
 
 ### Returns
 
@@ -245,37 +229,19 @@ Definitions for all table columns as a dictionary. Each key in the dictionary is
 ### Examples
 
 ```python
-db_obj.create_table("table_example", {
-            "c1": {
-                "type": "int",
-                "default": 1
-            },
-            "c2": {
-                "type": "vector,3,float32",
-                "default": [2.0, 1.2, 3.1],
-            }
-        }, None)
-# CREATE TABLE table_example(
-#   c1 INT PRIMARY KEY DEFAULT 1
-#   c2 EMBEDDING(FLOAT, 3) DEFAULT [2.0,1.2,3.1]
-# );
+# Create a table with an int column and a vector column:  
+db_obj.create_table("table_example", {"c1": {"type": "int", "default": 1}, "c2": {"type": "vector,3,float32",}}, None)
+```
 
-db_obj.create_table("my_table", {
-            "c1": {
-                "type": "varchar", 
-            },
-            "c2": {
-                "type": "float"
-            }
-        })
-# CREATE TABLE my_table(
-#   c1 VARCHAR PRIMARY KEY,
-#   c2 FLOAT
-# );
+```python
+from infinity.common import ConflictType
+# Create a table with a vector column only:  
+db_obj.create_table("my_table", {"c1": {"type": "vector,128,float"}}, ConflictType.Replace)
 
-db_obj.create_table("test_create_embedding_table", 
-                    {"c1": {"type": "vector,128,float"}}, ConflictType.Replace)
-# a 128-dimensional float vector
+```
+
+```python
+
 ```
 
 ## drop_table
@@ -632,7 +598,7 @@ table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
 
 ```python
 # Create a table with a integer column and a 3-d vector column:
-table_instance = db_instance.create_table("vector_table", {"c1": {"type": "integer", "default": 2024}, "vector_column": {"type": "vector,3,float"}})
+table_obj = db_obj.create_table("vector_table", {"c1": {"type": "integer", "default": 2024}, "vector_column": {"type": "vector,3,float"}})
 
 # Insert one complete row into the table:
 table_obj.insert({"c1": 2023, "vector_column": [1.1, 2.2, 3.3]})
@@ -644,19 +610,19 @@ table_obj.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.
 
 ```python
 # Create a table with a integer column and a 100-d sparse vector column:
-table_instance = db_instance.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
+table_obj = db_obj.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
 
 # Insert three rows into the table:
 # `indices` specifies the correspoing indices to the values in `values`.
 # Note that the second row sets "c1" as 2024 by default. 
-table_instance.insert([{"c1": 2022, "sparse_column": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}, {"sparse_column":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}}}])
+table_obj.insert([{"c1": 2022, "sparse_column": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}, {"sparse_column":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}}}])
 ```
 
 #### Insert tensors
 
 ```python
 # Create a table with a tensor column: 
-table_instance = db_instance.create_table("tensor_table", {"c1": {"type": "integer", "default": 2024}, "tensor_column": {"type": "tensor,4,float"}})
+table_obj = db_obj.create_table("tensor_table", {"c1": {"type": "integer", "default": 2024}, "tensor_column": {"type": "tensor,4,float"}})
 
 # Insert one row into the table, with the "c1" column defaulting to 2024:
 table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}])
@@ -666,9 +632,9 @@ table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 
 
 ```python
 # Creat a table with only one tensor array column:
-table_instance = db_instance.create_table("tensor_array_table", {"tensor_array_column": {"type": "tensorarray,2,float"}})
+table_obj = db_obj.create_table("tensor_array_table", {"tensor_array_column": {"type": "tensorarray,2,float"}})
 
-table_instance.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])
+table_obj.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])
 ```
 
 ## import_data
