@@ -128,6 +128,34 @@ class TestInsert(TestSdk):
             {'c1': dtype('float32'), 'c2': dtype('bool')}))
         res = db_obj.drop_table("python_test_bool_insert", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+        db_obj.drop_table("python_test_bool_insert_default", ConflictType.Ignore)
+        table_instance = db_obj.create_table("python_test_bool_insert_default", {
+            "c1": {"type": "int8", "default": 0},
+            "c2": {"type": "int16", "default": 0},
+            "c3": {"type": "int", "default": 0},
+            "c4": {"type": "int32", "default": 0},  # Same as int
+            "c5": {"type": "integer", "default": 0},  # Same as int
+            "c6": {"type": "int64", "default": 0},
+            "c7": {"type": "varchar"},
+            "c8": {"type": "float", "default": 1.0},
+            "c9": {"type": "float32", "default": 1.0},  # Same as float
+            "c10": {"type": "double", "default": 1.0},
+            "c11": {"type": "float64", "default": 1.0},  # Same as double
+            "c12": {"type": "bool", "default": False}
+        })
+        assert table_instance
+        res = table_instance.insert({"c1": 1, "c7": "Tom"})
+        assert res.error_code == ErrorCode.OK
+        res = table_instance.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': (1,), 'c2': (0,), 'c3': (0,), 'c4': (0,), 'c5': (0,), 'c6': (0,), 'c7': ("Tom",), 'c8': (1.0,),
+             'c9': (1.0,), 'c10': (1.0,), 'c11': (1.0,), 'c12': (False,)}).astype(
+            {'c1': dtype('int8'), 'c2': dtype('int16'), 'c3': dtype('int32'), 'c4': dtype('int32'),
+             'c5': dtype('int32'), 'c6': dtype('int64'), 'c7': dtype('object'), 'c8': dtype('float32'),
+             'c9': dtype('float32'), 'c10': dtype('float64'), 'c11': dtype('float64'), 'c12': dtype('bool')}))
+        res = db_obj.drop_table("python_test_bool_insert_default", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
 
     def _test_insert_varchar(self):
         """
