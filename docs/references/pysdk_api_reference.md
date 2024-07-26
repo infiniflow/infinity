@@ -209,7 +209,7 @@ Definitions for all table columns as a dictionary. Each key in the dictionary is
 
 Conflict policy in `enum` for handling situations when a table with the same name exists. 
   - `Error`: Raise an error if a table with the same name exists.
-  - `Ignore`: Ignore the table creation requrest and the table with the same name remains as is.
+  - `Ignore`: Ignore the table creation requrest and keep the table with the same name as-is.
   - `Replace`: Drop the existing table and create a new one. 
 
 :::tip NOTE
@@ -228,20 +228,43 @@ from infinity.common import ConflictType
 
 ### Examples
 
+#### Create a table with an int8 column and a vector column
+
 ```python
-# Create a table with an int column and a vector column:  
-db_obj.create_table("table_example", {"c1": {"type": "int", "default": 1}, "c2": {"type": "vector,3,float32",}}, None)
+db_obj.create_table("table_example", {"c1": {"type": "int8", "default": 1}, "c2": {"type": "vector,3,float32",}})
 ```
+
+#### Create a table with a vector column only
+
+```python
+# Create a table with a vector column only:  
+db_obj.create_table("my_table", {"c1": {"type": "vector,128,float"}}, None)
+
+```
+
+#### Create a table with a sparse vector column only
 
 ```python
 from infinity.common import ConflictType
 # Create a table with a vector column only:  
-db_obj.create_table("my_table", {"c1": {"type": "vector,128,float"}}, ConflictType.Replace)
-
+db_obj.create_table("my_table", {"c1": {"type": "sparse,128,float,int"}}, ConflictType.Error)
 ```
 
-```python
+#### Create a table with a tensor column only
 
+```python
+from infinity.common import ConflictType
+# Create a table with a vector column only:  
+db_obj.create_table("my_table", {"c1": {"type": "tensor,4,float64"}}, ConflictType.Ignore)
+```
+
+
+#### Create a table with a tensor array column only
+
+```python
+from infinity.common import ConflictType
+# Create a table with a vector column only:  
+db_obj.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Replace)
 ```
 
 ## drop_table
@@ -684,13 +707,13 @@ Example: `{"header":True, "delimiter": "\t", file_type}`
 #### Import a csv file
 
 ```python
-table_instance.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file_type": "csv", "delimiter": "\t"})
+table_obj.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file_type": "csv", "delimiter": "\t"})
 ```
 
 #### Import a jsonl file
 
 ```python
-table_instance.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
+table_obj.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
 ```
 
 ## export_data
@@ -750,13 +773,13 @@ Columns to export to the output file, for example, `["num", "name", "score"]`. I
 #### Export your table to a csv file
 
 ```python
-table_instance.export_data(os.getcwd() + "/export_data.csv", {"header": True, "file_type": "csv", "delimiter": ",", "offset": 2, "limit": 7, "row_limit": 3}, ["num", "name", "score"])
+table_obj.export_data(os.getcwd() + "/export_data.csv", {"header": True, "file_type": "csv", "delimiter": ",", "offset": 2, "limit": 7, "row_limit": 3}, ["num", "name", "score"])
 ```
 
 #### Export your table to a jsonl file
 
 ```python
-table_instance.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2}, ["num", "name", "score"])
+table_obj.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2}, ["num", "name", "score"])
 ```
 
 ## delete
