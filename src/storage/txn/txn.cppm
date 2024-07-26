@@ -199,11 +199,9 @@ public:
     // WAL and replay OPS
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
-    bool Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
-
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);
 
-    bool DeltaCheckpoint();
+    TxnTimeStamp DeltaCheckpoint();
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 
