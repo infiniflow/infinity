@@ -18,7 +18,7 @@ import inspect
 import pandas as pd
 import polars as pl
 import sqlglot.expressions as exp
-
+import numpy as np
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
@@ -173,6 +173,61 @@ def parse_expr(expr) -> ttypes.ParsedExpr:
             return parsed_expr
         else:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {expr}")
+
+
+def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
+    # convert numpy types
+    if isinstance(value, np.integer):
+        value = int(value)
+    elif isinstance(value, np.floating):
+        value = float(value)
+    elif isinstance(value, list) and isinstance(value[0], np.ndarray):
+        value = [x.tolist() for x in value]
+    elif isinstance(value, np.ndarray):
+        if value.ndim <= 2:
+            value = value.flatten().tolist()
+        else:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Invalid list type: {type(value)}, ndarray dimension > 2")
+    # flatten list[list] to list
+    match value:
+        case [[(int() | float()), *_], *_]:
+            value = [x for xs in value for x in xs]
+    # match ConstantExpr
+    match value:
+        case str():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String, str_value=value)
+        case bool():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Boolean, bool_value=value)
+        case int():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64, i64_value=value)
+        case float():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double, f64_value=value)
+        case [int(), *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
+                                                      i64_array_value=value)
+        case [float(), *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
+                                                      f64_array_value=value)
+        case [[[int(), *_], *_], *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerTensorArray,
+                                                      i64_tensor_array_value=value)
+        case [[[float(), *_], *_], *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleTensorArray,
+                                                      f64_tensor_array_value=value)
+        case {"indices": [int(), *_], "values": [int(), *_]}:
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.SparseIntegerArray,
+                i64_array_value=value["values"],
+                i64_array_idx=value["indices"])
+        case {"indices": [int(), *_], "values": [float(), *_]}:
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.SparseDoubleArray,
+                f64_array_value=value["values"],
+                i64_array_idx=value["indices"])
+        case _:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
+    return constant_expression
 
 
 # invalid_name_array = [

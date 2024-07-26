@@ -18,7 +18,9 @@ import inspect
 import pandas as pd
 import polars as pl
 import sqlglot.expressions as exp
-
+import numpy as np
+from infinity.errors import ErrorCode
+from infinity.common import InfinityException
 from infinity.local_infinity.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
 from infinity.embedded_infinity_ext import WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapSearchExpr, WrapConstantExpr, ParsedExprType, LiteralType
@@ -140,6 +142,64 @@ def parse_expr(expr):
             return parsed_expr
         else:
             raise Exception(f"unknown expression type: {expr}")
+
+
+def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
+    # convert numpy types
+    if isinstance(value, np.integer):
+        value = int(value)
+    elif isinstance(value, np.floating):
+        value = float(value)
+    elif isinstance(value, list) and isinstance(value[0], np.ndarray):
+        value = [x.tolist() for x in value]
+    elif isinstance(value, np.ndarray):
+        if value.ndim <= 2:
+            value = value.flatten().tolist()
+        else:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Invalid list type: {type(value)}, ndarray dimension > 2")
+    # flatten list[list] to list
+    match value:
+        case [[(int() | float()), *_], *_]:
+            value = [x for xs in value for x in xs]
+    # match ConstantExpr
+    constant_expression = WrapConstantExpr()
+    match value:
+        case str():
+            constant_expression.literal_type = LiteralType.kString
+            constant_expression.str_value = value
+        case bool():
+            constant_expression.literal_type = LiteralType.kBoolean
+            constant_expression.bool_value = value
+        case int():
+            constant_expression.literal_type = LiteralType.kInteger
+            constant_expression.i64_value = value
+        case float():
+            constant_expression.literal_type = LiteralType.kDouble
+            constant_expression.f64_value = value
+        case [int(), *_]:
+            constant_expression.literal_type = LiteralType.kIntegerArray
+            constant_expression.i64_array_value = value
+        case [float(), *_]:
+            constant_expression.literal_type = LiteralType.kDoubleArray
+            constant_expression.f64_array_value = value
+        case [[[int(), *_], *_], *_]:
+            constant_expression.literal_type = LiteralType.kSubArrayArray
+            constant_expression.i64_tensor_array_value = value
+        case [[[float(), *_], *_], *_]:
+            constant_expression.literal_type = LiteralType.kSubArrayArray
+            constant_expression.f64_tensor_array_value = value
+        case {"indices": [int(), *_], "values": [int(), *_]}:
+            constant_expression.literal_type = LiteralType.kLongSparseArray
+            constant_expression.i64_array_idx = value["indices"]
+            constant_expression.i64_array_value = value["values"]
+        case {"indices": [int(), *_], "values": [float(), *_]}:
+            constant_expression.literal_type = LiteralType.kDoubleSparseArray
+            constant_expression.i64_array_idx = value["indices"]
+            constant_expression.f64_array_value = value["values"]
+        case _:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
+    return constant_expression
 
 
 # invalid_name_array = [
