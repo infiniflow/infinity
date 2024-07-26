@@ -34,6 +34,7 @@ import chunk_index_entry;
 import memory_indexer;
 import default_values;
 import statement_common;
+import persistence_manager;
 
 namespace infinity {
 
@@ -222,7 +223,7 @@ public:
 
     void AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry);
 
-    SharedPtr<ChunkIndexEntry> AddFtChunkIndexEntry(const String &base_name, RowID base_rowid, u32 row_count);
+    SharedPtr<ChunkIndexEntry> AddFtChunkIndexEntry();
 
     SharedPtr<ChunkIndexEntry> AddChunkIndexEntryReplayWal(ChunkID chunk_id,
                                                            TableEntry *table_entry,

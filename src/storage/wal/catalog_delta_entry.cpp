@@ -29,6 +29,7 @@ import parsed_expr;
 import constant_expr;
 import stl;
 import data_type;
+import infinity_context;
 
 import third_party;
 import logger;
@@ -36,17 +37,37 @@ import logger;
 namespace infinity {
 
 String ToString(CatalogDeltaOpType op_type) {
-    switch(op_type) {
-        case CatalogDeltaOpType::ADD_DATABASE_ENTRY: { return "AddDatabase"; }
-        case CatalogDeltaOpType::ADD_TABLE_ENTRY: { return "AddTable"; }
-        case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: { return "AddSegment"; }
-        case CatalogDeltaOpType::ADD_BLOCK_ENTRY: { return "AddBlock"; }
-        case CatalogDeltaOpType::ADD_COLUMN_ENTRY: { return "AddColumn"; }
-        case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: { return "AddTableIndex"; }
-        case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: { return "AddSegmentIndex"; }
-        case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: { return "AddChunkIndex"; }
-        case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: { return "SealSegment"; }
-        case CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED: { return "SealBlock"; }
+    switch (op_type) {
+        case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
+            return "AddDatabase";
+        }
+        case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
+            return "AddTable";
+        }
+        case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
+            return "AddSegment";
+        }
+        case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
+            return "AddBlock";
+        }
+        case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
+            return "AddColumn";
+        }
+        case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
+            return "AddTableIndex";
+        }
+        case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
+            return "AddSegmentIndex";
+        }
+        case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: {
+            return "AddChunkIndex";
+        }
+        case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
+            return "SealSegment";
+        }
+        case CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED: {
+            return "SealBlock";
+        }
         case CatalogDeltaOpType::INVALID: {
             String error_message = "Invalid catalog delta operation type.";
             UnrecoverableError(error_message);
@@ -339,7 +360,28 @@ AddSegmentIndexEntryOp::AddSegmentIndexEntryOp(SegmentIndexEntry *segment_index_
 
 AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry, commit_ts), base_name_(chunk_index_entry->base_name_),
-      base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {}
+      base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        index_type_ = chunk_index_entry->GetIndexType();
+        switch (index_type_) {
+            case IndexType::kFullText: {
+                String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(chunk_index_entry->segment_index_entry_->index_dir()));
+                String posting_file_name = chunk_index_entry->base_name_ + POSTING_SUFFIX;
+                String dict_file_name = chunk_index_entry->base_name_ + DICT_SUFFIX;
+                String column_length_file_name = chunk_index_entry->base_name_ + LENGTH_SUFFIX;
+                fulltext_obj_addrs_.posting_obj_addr_ = pm->GetObjLocalCache(full_path + posting_file_name);
+                fulltext_obj_addrs_.dict_obj_addr_ = pm->GetObjLocalCache(full_path + dict_file_name);
+                fulltext_obj_addrs_.column_length_obj_addr_ = pm->GetObjLocalCache(full_path + column_length_file_name);
+                break;
+            }
+            default: {
+                break;
+            }
+        }
+    }
+}
 
 UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(char *&ptr) {
     auto add_db_op = MakeUnique<AddDBEntryOp>();
@@ -455,6 +497,19 @@ UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(char *&ptr) {
     add_chunk_index_op->base_rowid_ = RowID::FromUint64(ReadBufAdv<u64>(ptr));
     add_chunk_index_op->row_count_ = ReadBufAdv<u32>(ptr);
     add_chunk_index_op->deprecate_ts_ = ReadBufAdv<u64>(ptr);
+
+    add_chunk_index_op->index_type_ = ReadBufAdv<IndexType>(ptr);
+    switch (add_chunk_index_op->index_type_) {
+        case IndexType::kFullText: {
+            add_chunk_index_op->fulltext_obj_addrs_.posting_obj_addr_.ReadBuf(ptr);
+            add_chunk_index_op->fulltext_obj_addrs_.dict_obj_addr_.ReadBuf(ptr);
+            add_chunk_index_op->fulltext_obj_addrs_.column_length_obj_addr_.ReadBuf(ptr);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
     return add_chunk_index_op;
 }
 
@@ -629,6 +684,18 @@ void AddChunkIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->base_rowid_.ToUint64());
     WriteBufAdv(buf, this->row_count_);
     WriteBufAdv(buf, this->deprecate_ts_);
+    WriteBufAdv(buf, this->index_type_);
+    switch (this->index_type_) {
+        case IndexType::kFullText: {
+            this->fulltext_obj_addrs_.posting_obj_addr_.WriteBuf(buf);
+            this->fulltext_obj_addrs_.dict_obj_addr_.WriteBuf(buf);
+            this->fulltext_obj_addrs_.column_length_obj_addr_.WriteBuf(buf);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
 }
 
 const String AddDBEntryOp::ToString() const {
@@ -1183,16 +1250,10 @@ Vector<CatalogDeltaOpBrief> GlobalCatalogDeltaEntry::GetOperationBriefs() const 
     {
         std::lock_guard<std::mutex> lock(catalog_delta_locker_);
         res.reserve(delta_ops_.size());
-        for(const auto& op_pair: delta_ops_) {
-            CatalogDeltaOperation* delta_op = op_pair.second.get();
+        for (const auto &op_pair : delta_ops_) {
+            CatalogDeltaOperation *delta_op = op_pair.second.get();
 
-            res.push_back({
-                delta_op->begin_ts_,
-                delta_op->commit_ts_,
-                delta_op->txn_id_,
-                delta_op->type_,
-                MakeShared<String>(delta_op->ToString())
-            });
+            res.push_back({delta_op->begin_ts_, delta_op->commit_ts_, delta_op->txn_id_, delta_op->type_, MakeShared<String>(delta_op->ToString())});
         }
     }
     return res;

@@ -25,6 +25,8 @@ import stl;
 import statement_common;
 import infinity_exception;
 import internal_types;
+import create_index_info;
+import persistence_manager;
 
 namespace infinity {
 
@@ -118,7 +120,9 @@ export struct WalSegmentInfo {
 
 export struct WalChunkIndexInfo {
     ChunkID chunk_id_{};
+    IndexType index_type_{};
     String base_name_{};
+    Vector<ObjAddr> obj_addrs_{};
     RowID base_rowid_{};
     u32 row_count_{};
     TxnTimeStamp deprecate_ts_{};
@@ -163,7 +167,7 @@ export struct WalCmdCreateDatabase final : public WalCmd {
     explicit WalCmdCreateDatabase(String db_name, String db_dir_tail) : db_name_(std::move(db_name)), db_dir_tail_(std::move(db_dir_tail)) {}
 
     WalCommandType GetType() final { return WalCommandType::CREATE_DATABASE; }
-    bool operator==(const WalCmd &other) const  final {
+    bool operator==(const WalCmd &other) const final {
         const auto *other_cmd = dynamic_cast<const WalCmdCreateDatabase *>(&other);
         return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(db_dir_tail_, other_cmd->db_dir_tail_);
     }
@@ -175,7 +179,7 @@ export struct WalCmdCreateDatabase final : public WalCmd {
     String db_dir_tail_{};
 };
 
-export struct WalCmdDropDatabase final: public WalCmd {
+export struct WalCmdDropDatabase final : public WalCmd {
     explicit WalCmdDropDatabase(String db_name) : db_name_(std::move(db_name)) {}
 
     WalCommandType GetType() final { return WalCommandType::DROP_DATABASE; }
@@ -190,7 +194,7 @@ export struct WalCmdDropDatabase final: public WalCmd {
     String db_name_{};
 };
 
-export struct WalCmdCreateTable final: public WalCmd {
+export struct WalCmdCreateTable final : public WalCmd {
     WalCmdCreateTable(String db_name, String table_dir_tail, const SharedPtr<TableDef> &table_def)
         : db_name_(std::move(db_name)), table_dir_tail_(std::move(table_dir_tail)), table_def_(table_def) {}
 
@@ -205,7 +209,7 @@ export struct WalCmdCreateTable final: public WalCmd {
     SharedPtr<TableDef> table_def_{};
 };
 
-export struct WalCmdDropTable final: public WalCmd {
+export struct WalCmdDropTable final : public WalCmd {
     WalCmdDropTable(const String &db_name, const String &table_name) : db_name_(db_name), table_name_(table_name) {}
 
     WalCommandType GetType() final { return WalCommandType::DROP_TABLE; }
@@ -221,7 +225,7 @@ export struct WalCmdDropTable final: public WalCmd {
     String table_name_{};
 };
 
-export struct WalCmdCreateIndex final: public WalCmd {
+export struct WalCmdCreateIndex final : public WalCmd {
     WalCmdCreateIndex(String db_name, String table_name, String index_dir_tail_, SharedPtr<IndexBase> index_base)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_dir_tail_(std::move(index_dir_tail_)),
           index_base_(std::move(index_base)) {}
@@ -238,7 +242,7 @@ export struct WalCmdCreateIndex final: public WalCmd {
     SharedPtr<IndexBase> index_base_{};
 };
 
-export struct WalCmdDropIndex final: public WalCmd {
+export struct WalCmdDropIndex final : public WalCmd {
     WalCmdDropIndex(const String &db_name, const String &table_name, const String &index_name)
         : db_name_(db_name), table_name_(table_name), index_name_(index_name) {}
 
@@ -253,7 +257,7 @@ export struct WalCmdDropIndex final: public WalCmd {
     const String index_name_{};
 };
 
-export struct WalCmdImport final: public WalCmd {
+export struct WalCmdImport final : public WalCmd {
     WalCmdImport(String db_name, String table_name, WalSegmentInfo &&segment_info)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), segment_info_(std::move(segment_info)) {}
 
@@ -268,7 +272,7 @@ export struct WalCmdImport final: public WalCmd {
     WalSegmentInfo segment_info_;
 };
 
-export struct WalCmdAppend final: public WalCmd {
+export struct WalCmdAppend final : public WalCmd {
     WalCmdAppend(String db_name, String table_name, const SharedPtr<DataBlock> &block)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), block_(block) {}
 
@@ -283,7 +287,7 @@ export struct WalCmdAppend final: public WalCmd {
     SharedPtr<DataBlock> block_{};
 };
 
-export struct WalCmdDelete final: public WalCmd {
+export struct WalCmdDelete final : public WalCmd {
     WalCmdDelete(String db_name, String table_name, const Vector<RowID> &row_ids)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), row_ids_(row_ids) {}
 
@@ -301,7 +305,7 @@ export struct WalCmdDelete final: public WalCmd {
 // used when append op turn an old unsealed segment full and sealed
 // will always have necessary minmax filter
 // may have user-defined bloom filter
-export struct WalCmdSetSegmentStatusSealed final: public WalCmd {
+export struct WalCmdSetSegmentStatusSealed final : public WalCmd {
     WalCmdSetSegmentStatusSealed(String db_name,
                                  String table_name,
                                  SegmentID segment_id,
@@ -326,7 +330,7 @@ export struct WalCmdSetSegmentStatusSealed final: public WalCmd {
 };
 
 // used when user-defined bloom filter need to be updated
-export struct WalCmdUpdateSegmentBloomFilterData final: public WalCmd {
+export struct WalCmdUpdateSegmentBloomFilterData final : public WalCmd {
     WalCmdUpdateSegmentBloomFilterData(String db_name,
                                        String table_name,
                                        SegmentID segment_id,
@@ -350,7 +354,7 @@ export struct WalCmdUpdateSegmentBloomFilterData final: public WalCmd {
     const Vector<Pair<BlockID, String>> block_filter_binary_data_{};
 };
 
-export struct WalCmdCheckpoint final: public WalCmd {
+export struct WalCmdCheckpoint final : public WalCmd {
     WalCmdCheckpoint(i64 max_commit_ts, bool is_full_checkpoint, String catalog_path, String catalog_name)
         : max_commit_ts_(max_commit_ts), is_full_checkpoint_(is_full_checkpoint), catalog_path_(catalog_path), catalog_name_(catalog_name) {}
     virtual WalCommandType GetType() final { return WalCommandType::CHECKPOINT; }
@@ -365,7 +369,7 @@ export struct WalCmdCheckpoint final: public WalCmd {
     String catalog_name_{};
 };
 
-export struct WalCmdCompact final: public WalCmd {
+export struct WalCmdCompact final : public WalCmd {
     WalCmdCompact(String &&db_name, String &&table_name, Vector<WalSegmentInfo> &&new_segment_infos, Vector<SegmentID> &&deprecated_segment_ids)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), new_segment_infos_(std::move(new_segment_infos)),
           deprecated_segment_ids_(std::move(deprecated_segment_ids)) {}
@@ -382,7 +386,7 @@ export struct WalCmdCompact final: public WalCmd {
     const Vector<SegmentID> deprecated_segment_ids_{};
 };
 
-export struct WalCmdOptimize final: public WalCmd {
+export struct WalCmdOptimize final : public WalCmd {
     WalCmdOptimize(String db_name, String table_name, String index_name, Vector<UniquePtr<InitParameter>> params)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), params_(std::move(params)) {}
 
@@ -398,7 +402,7 @@ export struct WalCmdOptimize final: public WalCmd {
     Vector<UniquePtr<InitParameter>> params_{};
 };
 
-export struct WalCmdDumpIndex final: public WalCmd {
+export struct WalCmdDumpIndex final : public WalCmd {
     WalCmdDumpIndex(String db_name, String table_name, String index_name, SegmentID segment_id, Vector<WalChunkIndexInfo> chunk_infos)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), segment_id_(segment_id),
           chunk_infos_(std::move(chunk_infos)) {}
@@ -444,7 +448,7 @@ export struct WalEntry : WalEntryHeader {
     // Return if the entry is a full checkpoint or delta checkpoint.
     [[nodiscard]] bool IsCheckPoint() const;
 
-    [[nodiscard]] WalCmdCheckpoint* GetCheckPoint() const;
+    [[nodiscard]] WalCmdCheckpoint *GetCheckPoint() const;
 
     [[nodiscard]] bool IsCheckPoint(Vector<SharedPtr<WalEntry>> replay_entries, WalCmdCheckpoint *&checkpoint_cmd) const;
 

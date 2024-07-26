@@ -55,6 +55,7 @@ import column_index_merger;
 import parsed_expr;
 import constant_expr;
 import infinity_context;
+import persistence_manager;
 
 namespace infinity {
 
@@ -87,10 +88,7 @@ TableEntry::TableEntry(bool is_delete,
                        TxnTimeStamp begin_ts,
                        SegmentID unsealed_id,
                        SegmentID next_segment_id)
-    : BaseEntry(EntryType::kTable,
-                is_delete,
-                table_meta ? base_dir : MakeShared<String>(),
-                TableEntry::EncodeIndex(*table_name, table_meta)),
+    : BaseEntry(EntryType::kTable, is_delete, table_meta ? base_dir : MakeShared<String>(), TableEntry::EncodeIndex(*table_name, table_meta)),
       table_meta_(table_meta), table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns),
       table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id) {
     begin_ts_ = begin_ts;
@@ -217,7 +215,7 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
     return index_meta->DeleteEntry(txn_id);
 }
 
-void TableEntry::AddIndexMetaNoLock(const String& table_meta_name, UniquePtr<TableIndexMeta> table_index_meta) {
+void TableEntry::AddIndexMetaNoLock(const String &table_meta_name, UniquePtr<TableIndexMeta> table_index_meta) {
     index_meta_map_.AddNewMetaNoLock(table_meta_name, std::move(table_index_meta));
 }
 
@@ -1093,8 +1091,17 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     SegmentID unsealed_id = table_entry_json["unsealed_id"];
     SegmentID next_segment_id = table_entry_json["next_segment_id"];
 
-    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(deleted, table_meta->base_dir(), table_entry_dir, table_name, columns, table_entry_type,
-                                                               table_meta, txn_id, begin_ts, unsealed_id, next_segment_id);
+    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(deleted,
+                                                               table_meta->base_dir(),
+                                                               table_entry_dir,
+                                                               table_name,
+                                                               columns,
+                                                               table_entry_type,
+                                                               table_meta,
+                                                               txn_id,
+                                                               begin_ts,
+                                                               unsealed_id,
+                                                               next_segment_id);
     table_entry->row_count_ = row_count;
 
     if (table_entry_json.contains("segments")) {
@@ -1228,12 +1235,10 @@ void TableEntry::Cleanup() {
 
 IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn, this); }
 
-Tuple<Vector<String>, Vector<TableIndexMeta*>, std::shared_lock<std::shared_mutex>> TableEntry::GetAllIndexMapGuard() const {
+Tuple<Vector<String>, Vector<TableIndexMeta *>, std::shared_lock<std::shared_mutex>> TableEntry::GetAllIndexMapGuard() const {
     return index_meta_map_.GetAllMetaGuard();
 }
 
-TableIndexMeta* TableEntry::GetIndexMetaPtrByName(const String& name) const {
-    return index_meta_map_.GetMetaPtrByName(name);
-}
+TableIndexMeta *TableEntry::GetIndexMetaPtrByName(const String &name) const { return index_meta_map_.GetMetaPtrByName(name); }
 
 } // namespace infinity

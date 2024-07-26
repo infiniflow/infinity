@@ -19,6 +19,7 @@ module;
 module persistence_manager;
 import stl;
 import uuid;
+import serialize;
 import third_party;
 import infinity_exception;
 
@@ -26,6 +27,32 @@ namespace fs = std::filesystem;
 
 namespace infinity {
 constexpr SizeT BUFFER_SIZE = 1024 * 1024; // 1 MB
+
+nlohmann::json ObjAddr::Serialize() const {
+    nlohmann::json obj;
+    obj["obj_key"] = obj_key_;
+    obj["part_offset"] = part_offset_;
+    obj["part_size"] = part_size_;
+    return obj;
+}
+
+void ObjAddr::Deserialize(const nlohmann::json &obj) {
+    obj_key_ = obj["obj_key"];
+    part_offset_ = obj["part_offset"];
+    part_size_ = obj["part_size"];
+}
+
+void ObjAddr::WriteBuf(char *buf) const {
+    WriteBufAdv<String>(buf, obj_key_);
+    WriteBufAdv<SizeT>(buf, part_offset_);
+    WriteBufAdv<SizeT>(buf, part_size_);
+}
+
+void ObjAddr::ReadBuf(const char *buf) {
+    obj_key_ = ReadBufAdv<String>(buf);
+    part_offset_ = ReadBufAdv<SizeT>(buf);
+    part_size_ = ReadBufAdv<SizeT>(buf);
+}
 
 ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose) {
     std::error_code ec;
@@ -52,7 +79,6 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
         if (local_path.empty()) {
             String error_message = fmt::format("Failed to find local path of {}", local_path);
             UnrecoverableError(error_message);
-            return;
         }
         assert(local_path_obj_.count(local_path) == 0);
         local_path_obj_[local_path] = obj_addr;
@@ -69,7 +95,6 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
         if (local_path.empty()) {
             String error_message = fmt::format("Failed to find local path of {}", local_path);
             UnrecoverableError(error_message);
-            return;
         }
         assert(local_path_obj_.count(local_path) == 0);
         local_path_obj_[local_path] = obj_addr;
@@ -144,6 +169,32 @@ String PersistenceManager::GetObjCache(const ObjAddr &object_addr) {
     return fs::path(workspace_).append(object_addr.obj_key_).string();
 }
 
+String PersistenceManager::GetObjCache(const String &local_path) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = local_path_obj_.find(local_path);
+    if (it == local_path_obj_.end()) {
+        String error_message = fmt::format("Failed to find object for local path {}", local_path);
+        UnrecoverableError(error_message);
+    }
+    auto oit = objects_.find(it->second.obj_key_);
+    if (oit == objects_.end()) {
+        String error_message = fmt::format("Failed to find object {}", it->second.obj_key_);
+        UnrecoverableError(error_message);
+    }
+    oit->second.ref_count_++;
+    return fs::path(workspace_).append(it->second.obj_key_).string();
+}
+
+ObjAddr PersistenceManager::GetObjLocalCache(const String &local_path) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = local_path_obj_.find(local_path);
+    if (it == local_path_obj_.end()) {
+        String error_message = fmt::format("Failed to find object for local path {}", local_path);
+        UnrecoverableError(error_message);
+    }
+    return it->second;
+}
+
 void PersistenceManager::PutObjCache(const ObjAddr &object_addr) {
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = objects_.find(object_addr.obj_key_);
@@ -152,6 +203,16 @@ void PersistenceManager::PutObjCache(const ObjAddr &object_addr) {
         UnrecoverableError(error_message);
     }
     it->second.ref_count_--;
+}
+
+void PersistenceManager::PutObjLocalCache(const String &local_path, const ObjAddr &object_addr) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = local_path_obj_.find(local_path);
+    if (it != local_path_obj_.end()) {
+        it->second = object_addr;
+    } else {
+        local_path_obj_.emplace(local_path, object_addr);
+    }
 }
 
 String PersistenceManager::ObjCreate() { return UUID().to_string(); }
@@ -173,7 +234,7 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
         }
         std::error_code ec;
         fs::create_symlink(src_fp, dst_fp);
-    } catch (const fs::filesystem_error& e) {
+    } catch (const fs::filesystem_error &e) {
         String error_message = fmt::format("Failed to link file {}.", file_path);
         UnrecoverableError(error_message);
     }
@@ -182,7 +243,6 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
     if (local_path.empty()) {
         String error_message = fmt::format("Failed to find local path of {}", local_path);
         UnrecoverableError(error_message);
-        return;
     }
     assert(local_path_obj_.count(local_path) == 0);
     local_path_obj_[local_path] = obj_addr;
@@ -199,13 +259,11 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &file_path, SizeT f
     if (!srcFile.is_open()) {
         String error_message = fmt::format("Failed to open source file {}", file_path);
         UnrecoverableError(error_message);
-        return;
     }
     std::ofstream dstFile(dst_fp, std::ios::binary | std::ios::app);
     if (!dstFile.is_open()) {
         String error_message = fmt::format("Failed to open destination file {}", dst_fp.string());
         UnrecoverableError(error_message);
-        return;
     }
     char buffer[BUFFER_SIZE];
     while (srcFile.read(buffer, BUFFER_SIZE)) {
@@ -227,7 +285,6 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
     if (it == objects_.end()) {
         String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
         UnrecoverableError(error_message);
-        return;
     }
     Range range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
     auto target_range = it->second.deleted_ranges_.lower_bound(range);
@@ -236,14 +293,12 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
         String error_message =
             fmt::format("ObjAddr {} offset {} size {} already been deleted.", object_addr.obj_key_, object_addr.part_offset_, object_addr.part_size_);
         UnrecoverableError(error_message);
-        return;
     }
 
     if (target_range != it->second.deleted_ranges_.begin() && std::prev(target_range)->HasIntersection(range)) {
         String error_message =
             fmt::format("ObjAddr {} offset {} size {} already been deleted.", object_addr.obj_key_, object_addr.part_offset_, object_addr.part_size_);
         UnrecoverableError(error_message);
-        return;
     }
 
     it->second.deleted_ranges_.insert(range);
@@ -269,7 +324,6 @@ void PersistenceManager::Cleanup(const String &file_path) {
     if (local_path.empty()) {
         String error_message = fmt::format("Failed to find local path of {}", local_path);
         UnrecoverableError(error_message);
-        return;
     }
 
     std::lock_guard<std::mutex> lock(mtx_);
@@ -277,7 +331,6 @@ void PersistenceManager::Cleanup(const String &file_path) {
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("Failed to find object {}", local_path);
         UnrecoverableError(error_message);
-        return;
     }
     CleanupNoLock(it->second);
     local_path_obj_.erase(it);
@@ -288,7 +341,6 @@ ObjAddr PersistenceManager::GetObjFromLocalPath(const String &file_path) {
     if (local_path.empty()) {
         String error_message = fmt::format("Failed to find local path of {}", local_path);
         UnrecoverableError(error_message);
-        return;
     }
 
     std::lock_guard<std::mutex> lock(mtx_);
@@ -296,8 +348,6 @@ ObjAddr PersistenceManager::GetObjFromLocalPath(const String &file_path) {
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("Failed to find file_path: {} stored object", local_path);
         UnrecoverableError(error_message);
-        // return invalid object
-        return ObjAddr();
     }
     return it->second;
 }

@@ -29,6 +29,9 @@ import index_base;
 import buffer_handle;
 import default_values;
 import column_def;
+import serialize;
+import create_index_info;
+import persistence_manager;
 
 namespace infinity {
 
@@ -125,6 +128,8 @@ public:
     void LoadPartsReader(BufferManager *buffer_mgr);
 
     BufferObj *GetBufferObj() { return buffer_obj_; }
+
+    IndexType GetIndexType();
 
     void DeprecateChunk(TxnTimeStamp commit_ts) {
         assert(commit_ts_.load() < commit_ts);
