@@ -55,7 +55,7 @@ public:
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
 
-    void ReadFromFileImpl() override;
+    void ReadFromFileImpl(SizeT file_size) override;
 
     const u32 row_count_{};
 };
@@ -81,7 +81,7 @@ public:
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
 
-    void ReadFromFileImpl() override;
+    void ReadFromFileImpl(SizeT file_size) override;
 
     const u32 row_count_;
     const u32 part_id_;

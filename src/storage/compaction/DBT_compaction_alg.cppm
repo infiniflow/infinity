@@ -59,7 +59,7 @@ public:
 
     void RemoveSegment(SegmentEntry *shrink_segment);
 
-    Vector<SegmentEntry *> PickCompacting(TransactionID txn_id, SizeT M);
+    Vector<SegmentEntry *> PickCompacting(TransactionID txn_id, SizeT M, SizeT layer);
 
     void CommitCompact(TransactionID txn_id);
 
@@ -77,8 +77,7 @@ private:
 export class DBTCompactionAlg final : public CompactionAlg {
 public:
     DBTCompactionAlg(int m, int c, int s, SizeT max_segment_capacity, TableEntry *table_entry = nullptr)
-        : CompactionAlg(), config_(m, c, s), max_layer_(config_.CalculateLayer(max_segment_capacity)), table_entry_(table_entry), running_task_n_(0) {
-    }
+        : CompactionAlg(), config_(m, c, s), max_segment_capacity_(max_segment_capacity), table_entry_(table_entry), running_task_n_(0) {}
 
     virtual Vector<SegmentEntry *> CheckCompaction(TransactionID txn_id) override;
 
@@ -102,7 +101,7 @@ private:
 
 private:
     const DBTConfig config_;
-    const int max_layer_;
+    const SizeT max_segment_capacity_;
     TableEntry *table_entry_;
 
     std::mutex mtx_;

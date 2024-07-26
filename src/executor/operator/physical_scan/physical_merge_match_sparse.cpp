@@ -114,7 +114,7 @@ void PhysicalMergeMatchSparse::ExecuteInner(QueryContext *query_context, MergeMa
     SizeT topn = match_sparse_expr_->topn_;
     MergeSparseFunctionData &match_sparse_data = operator_state->merge_sparse_function_data_;
 
-    using MergeHeap = MergeKnn<ResultType, C>;
+    using MergeHeap = MergeKnn<ResultType, C, ResultType>;
     if (match_sparse_data.merge_knn_base_.get() == nullptr) {
         auto merge_knn = MakeUnique<MergeHeap>(query_n, topn);
         merge_knn->Begin();

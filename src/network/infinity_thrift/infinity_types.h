@@ -32,12 +32,14 @@ struct LogicType {
     Decimal = 6,
     Float = 7,
     Double = 8,
-    Varchar = 9,
-    Embedding = 10,
-    Tensor = 11,
-    TensorArray = 12,
-    Sparse = 13,
-    Invalid = 14
+    Float16 = 9,
+    BFloat16 = 10,
+    Varchar = 11,
+    Embedding = 12,
+    Tensor = 13,
+    TensorArray = 14,
+    Sparse = 15,
+    Invalid = 16
   };
 };
 
@@ -77,12 +79,13 @@ std::string to_string(const DropConflict::type& val);
 struct ElementType {
   enum type {
     ElementBit = 0,
-    ElementInt8 = 1,
-    ElementInt16 = 2,
-    ElementInt32 = 3,
-    ElementInt64 = 4,
-    ElementFloat32 = 5,
-    ElementFloat64 = 6
+    ElementUInt8 = 1,
+    ElementInt8 = 2,
+    ElementInt16 = 3,
+    ElementInt32 = 4,
+    ElementInt64 = 5,
+    ElementFloat32 = 6,
+    ElementFloat64 = 7
   };
 };
 
@@ -170,13 +173,15 @@ struct ColumnType {
     ColumnInt64 = 4,
     ColumnFloat32 = 5,
     ColumnFloat64 = 6,
-    ColumnVarchar = 7,
-    ColumnEmbedding = 8,
-    ColumnTensor = 9,
-    ColumnTensorArray = 10,
-    ColumnSparse = 11,
-    ColumnRowID = 12,
-    ColumnInvalid = 13
+    ColumnFloat16 = 7,
+    ColumnBFloat16 = 8,
+    ColumnVarchar = 9,
+    ColumnEmbedding = 10,
+    ColumnTensor = 11,
+    ColumnTensorArray = 12,
+    ColumnSparse = 13,
+    ColumnRowID = 14,
+    ColumnInvalid = 15
   };
 };
 
@@ -189,12 +194,11 @@ std::string to_string(const ColumnType::type& val);
 struct IndexType {
   enum type {
     IVFFlat = 0,
-    HnswLVQ = 1,
-    Hnsw = 2,
-    FullText = 3,
-    BMP = 4,
-    Secondary = 5,
-    EMVB = 6
+    Hnsw = 1,
+    FullText = 2,
+    BMP = 3,
+    Secondary = 4,
+    EMVB = 5
   };
 };
 
@@ -1053,8 +1057,9 @@ void swap(ColumnExpr &a, ColumnExpr &b);
 std::ostream& operator<<(std::ostream& out, const ColumnExpr& obj);
 
 typedef struct _EmbeddingData__isset {
-  _EmbeddingData__isset() : bool_array_value(false), i8_array_value(false), i16_array_value(false), i32_array_value(false), i64_array_value(false), f32_array_value(false), f64_array_value(false) {}
+  _EmbeddingData__isset() : bool_array_value(false), u8_array_value(false), i8_array_value(false), i16_array_value(false), i32_array_value(false), i64_array_value(false), f32_array_value(false), f64_array_value(false) {}
   bool bool_array_value :1;
+  bool u8_array_value :1;
   bool i8_array_value :1;
   bool i16_array_value :1;
   bool i32_array_value :1;
@@ -1073,7 +1078,8 @@ class EmbeddingData : public virtual ::apache::thrift::TBase {
 
   virtual ~EmbeddingData() noexcept;
   std::vector<bool>  bool_array_value;
-  std::vector<std::string>  i8_array_value;
+  std::vector<int16_t>  u8_array_value;
+  std::vector<int16_t>  i8_array_value;
   std::vector<int16_t>  i16_array_value;
   std::vector<int32_t>  i32_array_value;
   std::vector<int64_t>  i64_array_value;
@@ -1084,7 +1090,9 @@ class EmbeddingData : public virtual ::apache::thrift::TBase {
 
   void __set_bool_array_value(const std::vector<bool> & val);
 
-  void __set_i8_array_value(const std::vector<std::string> & val);
+  void __set_u8_array_value(const std::vector<int16_t> & val);
+
+  void __set_i8_array_value(const std::vector<int16_t> & val);
 
   void __set_i16_array_value(const std::vector<int16_t> & val);
 
@@ -1101,6 +1109,10 @@ class EmbeddingData : public virtual ::apache::thrift::TBase {
     if (__isset.bool_array_value != rhs.__isset.bool_array_value)
       return false;
     else if (__isset.bool_array_value && !(bool_array_value == rhs.bool_array_value))
+      return false;
+    if (__isset.u8_array_value != rhs.__isset.u8_array_value)
+      return false;
+    else if (__isset.u8_array_value && !(u8_array_value == rhs.u8_array_value))
       return false;
     if (__isset.i8_array_value != rhs.__isset.i8_array_value)
       return false;

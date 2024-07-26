@@ -27,6 +27,23 @@ import segment_entry;
 
 namespace infinity {
 
+BMPIndexInMem::BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def)
+    : begin_row_id_(begin_row_id), bmp_(InitAbstractIndex(index_base, column_def)) {
+    const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
+    const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());
+    SizeT term_num = sparse_info->Dimension();
+    SizeT block_size = index_bmp->block_size_;
+    std::visit(
+        [&](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                using IndexT = std::decay_t<decltype(*index)>;
+                bmp_ = new IndexT(term_num, block_size);
+            }
+        },
+        bmp_);
+}
+
 AbstractBMP BMPIndexInMem::InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def) {
     const auto *index_bmp = static_cast<const IndexBMP *>(index_base);
     const auto *sparse_info = static_cast<SparseInfo *>(column_def->type()->type_info().get());

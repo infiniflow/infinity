@@ -101,7 +101,7 @@ void BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     prepare_success = true;
 }
 
-void BMPIndexFileWorker::ReadFromFileImpl() {
+void BMPIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
     if (data_ != nullptr) {
         UnrecoverableError("Data is already allocated.");
     }

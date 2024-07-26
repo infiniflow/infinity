@@ -55,22 +55,19 @@ export struct BMPIndexInMem {
 public:
     BMPIndexInMem() : bmp_(nullptr) {}
 
-    BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def)
-        : begin_row_id_(begin_row_id), bmp_(InitAbstractIndex(index_base, column_def)) {}
+    BMPIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def);
 
 private:
     template <typename DataType, typename IndexType>
-    static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse_info) {
-        SizeT term_num = sparse_info->Dimension();
-        SizeT block_size = index_bmp->block_size_;
+    static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp) {
         switch (index_bmp->compress_type_) {
             case BMPCompressType::kCompressed: {
                 using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kCompressed>;
-                return new BMPIndex(term_num, block_size);
+                return static_cast<BMPIndex *>(nullptr);
             }
             case BMPCompressType::kRaw: {
                 using BMPIndex = BMPAlg<DataType, IndexType, BMPCompressType::kRaw>;
-                return new BMPIndex(term_num, block_size);
+                return static_cast<BMPIndex *>(nullptr);
             }
             default: {
                 return nullptr;
@@ -82,13 +79,13 @@ private:
     static AbstractBMP InitAbstractIndex(const IndexBMP *index_bmp, const SparseInfo *sparse_info) {
         switch (sparse_info->IndexType()) {
             case EmbeddingDataType::kElemInt8: {
-                return InitAbstractIndex<DataType, i8>(index_bmp, sparse_info);
+                return InitAbstractIndex<DataType, i8>(index_bmp);
             }
             case EmbeddingDataType::kElemInt16: {
-                return InitAbstractIndex<DataType, i16>(index_bmp, sparse_info);
+                return InitAbstractIndex<DataType, i16>(index_bmp);
             }
             case EmbeddingDataType::kElemInt32: {
-                return InitAbstractIndex<DataType, i32>(index_bmp, sparse_info);
+                return InitAbstractIndex<DataType, i32>(index_bmp);
             }
             default: {
                 return nullptr;
@@ -98,6 +95,9 @@ private:
 
 public:
     static AbstractBMP InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def);
+
+    BMPIndexInMem(const BMPIndexInMem &) = delete;
+    BMPIndexInMem &operator=(const BMPIndexInMem &) = delete;
 
     ~BMPIndexInMem();
 

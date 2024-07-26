@@ -31,6 +31,7 @@ enum EmbeddingDataType : int8_t {
     kElemInt64,
     kElemFloat,
     kElemDouble,
+    kElemUInt8,
     kElemInvalid,
 };
 
@@ -74,6 +75,11 @@ inline EmbeddingDataType ToEmbeddingDataType<double>() {
     return EmbeddingDataType::kElemDouble;
 }
 
+template <>
+inline EmbeddingDataType ToEmbeddingDataType<uint8_t>() {
+    return EmbeddingDataType::kElemUInt8;
+}
+
 struct EmbeddingType {
 public:
     char *ptr{};
@@ -110,6 +116,8 @@ public:
                 return "FLOAT32";
             case kElemDouble:
                 return "FLOAT64";
+            case kElemUInt8:
+                return "UINT8";
             default: {
                 ParserError("Unexpected embedding type");
             }
@@ -132,6 +140,8 @@ public:
             return kElemFloat;
         } else if (sv == "FLOAT64" || sv == "DOUBLE" || sv == "F64") {
             return kElemDouble;
+        } else if (sv == "UINT8") {
+            return kElemUInt8;
         } else {
             ParserError("Unexpected embedding type");
         }
@@ -154,6 +164,8 @@ public:
                 return Embedding2StringInternal<float>(embedding, dimension);
             case kElemDouble:
                 return Embedding2StringInternal<double>(embedding, dimension);
+            case kElemUInt8:
+                return Embedding2StringInternal<uint8_t>(embedding, dimension);
             default: {
                 ParserError("Unexpected embedding type");
             }
@@ -170,6 +182,28 @@ private:
             ss << ((T *)(embedding.ptr))[i] << ',';
         }
         ss << ((T *)(embedding.ptr))[dimension - 1] << "]";
+        return ss.str();
+    }
+
+    template <>
+    inline std::string Embedding2StringInternal<int8_t>(const EmbeddingType &embedding, size_t dimension) {
+        std::stringstream ss;
+        ss << "[";
+        for (size_t i = 0; i < dimension - 1; ++i) {
+            ss << int(((int8_t *)(embedding.ptr))[i]) << ',';
+        }
+        ss << int(((int8_t *)(embedding.ptr))[dimension - 1]) << "]";
+        return ss.str();
+    }
+
+    template <>
+    inline std::string Embedding2StringInternal<uint8_t>(const EmbeddingType &embedding, size_t dimension) {
+        std::stringstream ss;
+        ss << "[";
+        for (size_t i = 0; i < dimension - 1; ++i) {
+            ss << int(((uint8_t *)(embedding.ptr))[i]) << ',';
+        }
+        ss << int(((uint8_t *)(embedding.ptr))[dimension - 1]) << "]";
         return ss.str();
     }
 

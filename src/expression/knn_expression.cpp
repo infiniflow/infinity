@@ -72,11 +72,12 @@ String KnnExpression::ToString() const {
         return alias_;
     }
 
-    String expr_str = fmt::format("MATCH VECTOR ({}, Float32, {}, {})",
-                             arguments_.at(0)->Name(),
-                             //  EmbeddingT::Embedding2String(query_embedding_, embedding_data_type_, dimension_),
-                             KnnDistanceType2Str(distance_type_),
-                             topn_);
+    String expr_str = fmt::format("MATCH VECTOR ({}, {}, {}, {}, {})",
+                                  arguments_.at(0)->Name(),
+                                  EmbeddingT::Embedding2String(query_embedding_, embedding_data_type_, dimension_),
+                                  EmbeddingT::EmbeddingDataType2String(embedding_data_type_),
+                                  KnnDistanceType2Str(distance_type_),
+                                  topn_);
 
     return expr_str;
 }
