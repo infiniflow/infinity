@@ -115,25 +115,9 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
 
     set(CMAKE_CXX_FLAGS "-O0 -g")
     set(CMAKE_C_FLAGS "-O0 -g")
-
-    if(NOT ENABLE_JEMALLOC)
-
-        set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fno-stack-protector -fno-var-tracking ")
-        add_compile_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
-        add_link_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
-
-        add_compile_options("-fno-omit-frame-pointer")
-        add_link_options("-fno-omit-frame-pointer")
-
-        #    add_compile_options("-fsanitize=undefined")
-        #    add_link_options("-fsanitize=undefined")
-
-        #    add_compile_options("-fsanitize=thread")
-        #    add_link_options("-fsanitize=thread")
-
-    endif()
-
     set(CMAKE_DEBUG_POSTFIX "")
+    add_compile_options(-fno-stack-protector -fsanitize=address -fsanitize-recover=all -fsanitize=leak)
+    add_link_options(-fsanitize=address -fsanitize-recover=all -fsanitize=leak)
 
 else ()
     message(FATAL_ERROR "Only support CMake build type: Debug, RelWithDebInfo, and Release")
@@ -170,14 +154,14 @@ endif()
 find_package(Lz4 REQUIRED)
 
 # You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
-option(ENABLE_JEMALLOC "Enable jemalloc support" OFF)
+option(ENABLE_JEMALLOC "Enable jemalloc support" ON)
+if(ENABLE_JEMALLOC AND "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+    set(ENABLE_JEMALLOC OFF)
+endif ()
 if(ENABLE_JEMALLOC)
     find_package(jemalloc REQUIRED)
     set(JEMALLOC_STATIC_LIB "jemalloc.a")
-    if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-        set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
-        set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
-    endif ()
+    add_compile_options(-DENABLE_JEMALLOC_PROF)
 endif ()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
