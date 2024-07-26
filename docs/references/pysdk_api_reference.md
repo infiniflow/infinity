@@ -925,6 +925,7 @@ questions = [
     r"space\-efficient",  # Escape reserved character '-', equivalent to: `space efficient`
     r'"space\-efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
     r'"harmful chemical"~10',  # sloppy phrase, refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query-phrase.html
+    r'title:(quick OR brown) AND body:foobar', # search `(quick OR brown)` in the `title` field. keep fields empty.
 ]
 for question in questions:
     table_obj.match('body', question, 'topn=2')

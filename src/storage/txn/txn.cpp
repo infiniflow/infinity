@@ -110,8 +110,8 @@ Status Txn::Delete(TableEntry *table_entry, const Vector<RowID> &row_ids, bool c
     this->CheckTxn(db_name);
 
     if (check_conflict && table_entry->CheckDeleteConflict(row_ids, txn_id_)) {
-        LOG_WARN(fmt::format("Rollback delete in table {} due to conflict.", table_name));
-        RecoverableError(Status::TxnRollback(TxnID()));
+        String log_msg = fmt::format("Rollback delete in table {} due to conflict.", table_name);
+        RecoverableError(Status::TxnRollback(TxnID(), log_msg));
     }
 
     TxnTableStore *table_store = this->GetTxnTableStore(table_entry);
