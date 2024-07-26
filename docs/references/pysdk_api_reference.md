@@ -220,6 +220,9 @@ from infinity.common import ConflictType
 ```
 :::
 
+:::tip NOTE
+If `ConflictType` is not set, it defaults to `Error`.
+:::
 
 ### Returns
 
@@ -273,14 +276,30 @@ db_obj.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, Conflic
 Database.drop_table(table_name, conflict_type = ConflictType.Error)
 ```
 
-Drops a table by name.
+Deletes a table from the database by its name.
 
 ### Parameters
 
-- **table_name : str(not empty)** Name of the table.
-- **conflict_type : ConflictType** Enum type `ConflictType` is defined in the **infinity.common** package: 
-   - `Error`
-   - `Ignore`
+#### table_name: `str`, *Required* 
+
+Name of the table to delete. Must not be empty. 
+
+#### conflict_type: `ConflictType`, *Optional*
+Conflict policy in `enum` for handling situations when a table with the same name does not exist. 
+  - `Error`: Raise an error if the specified table does not exist.
+  - `Ignore`: Ignore the operation and proceed regardless, if the specified table does not exist.
+
+:::tip NOTE
+You must import the `infinity.common` package to set `ConflictType`:
+
+```python
+from infinity.common import ConflictType
+```
+:::
+
+:::tip NOTE
+If `ConflictType` is not set, it defaults to `Error`.
+:::
 
 ### Returns
 
@@ -290,7 +309,16 @@ Drops a table by name.
 ### Examples
 
 ```python
-db_obj.drop_table("my_table", ConflictType.Error)
+# Delete a table named 'my_table':
+# If the specified table does not exist, raise an error. 
+db_obj.drop_table("my_table", infinity.common.ConflictType.Error)
+```
+
+```python
+from infinity.common import ConflictType
+# Drop a table named 'my_table':
+# If the specified table does not exist, silently ignore the operation and proceed.
+db_obj.drop_table("my_table", ConflictType.Ignore)
 ```
 
 ## get_table
@@ -299,11 +327,13 @@ db_obj.drop_table("my_table", ConflictType.Error)
 Database.get_table(table_name)
 ```
 
-Retrieves a table object by name.
+Retrieves a table object by its name.
 
 ### Parameters
 
-- `table_name`: `str` Name of the table to retrieve.
+#### `table_name`: `str` *Required*
+
+Name of the table to retrieve. Must not be empty. 
 
 ### Returns
 
@@ -329,17 +359,17 @@ Lists all tables in the current database.
 
 ### Returns
 
-- Success: `db_names` `list[str]`
+- Success: `db_names` in `list[str]`
 - Failure: `Exception`
 
 ### Examples
 
 ```python
-res = infinity_obj.list_tables()
+res = db_obj.list_tables()
 res.table_names #["my_table"]
 ```
 
-## show_table
+## show_tables
 
 ```python
 Database.show_tables()
@@ -350,7 +380,7 @@ Get the information of all tables in the database.
 ### Returns
 
 - Success: response `metadata`: `polars.DataFrame` The returned 
-DataFrame contains eight columns and each row in it corresponds to a table in the database.These eight columns are:
+DataFrame contains eight columns and each row in it corresponds to a table in the database. These eight columns are:
     - `database`: `str`
     - `table`: `str`
     - `type`: `str`
@@ -577,8 +607,8 @@ Inserts rows of data into the current table.
 
 ### Parameters
 
-#### data: `json`, *Required*  
-Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `json` (one record) or `json` list (multiple rows), with each key-value pair corresponding to a column name and table cell value.
+#### data: `dict[str, Any]`, *Required*  
+Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `dict[str, Any]` (one row) or `list[dict[str, Any]]` (multiple rows), with each key-value pair corresponding to a column name and table cell value.
 
 :::tip NOTE
 Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once. 
@@ -680,7 +710,7 @@ Absolute path to the file for export. Supported file types include:
 - `json`
 - `jsonl`
 
-#### import_options: `json`
+#### import_options: `dict[str, bool | str]`
 
 Example: `{"header":True, "delimiter": "\t", file_type}`
 
@@ -736,7 +766,7 @@ Absolute path to the file for export. Supported file types include:
 - `csv`
 - `jsonl`
   
-#### export_options: `json`
+#### export_options: `dict[str, Any]`
 
 Example: `{"header": False, "delimiter": "\t", "file_type": "jsonl", "offset": 2, "limit": 5}`
 
@@ -841,7 +871,7 @@ table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 ```python
 Table.output(columns)
 Specify the columns to display in the search output, or perform aggregation operations or arithmetic calculations. 
-
+```
 ```python
 table_obj.output(["*"])
 table_obj.output(["num", "body"])
@@ -871,7 +901,7 @@ table_obj.output(["c1+5"])
 Table.filter(cond)
 ```
 
-Create a filtering condition expression.
+Creates a filtering condition expression.
 
 ### Parameters
 
