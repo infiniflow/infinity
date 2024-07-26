@@ -19,13 +19,14 @@ module;
 #include <concepts>
 #include <vector>
 #include <stdexcept>
-#include "concurrentqueue.h"
+
 export module external_sort_merger;
 
 import stl;
 import loser_tree;
 import infinity_exception;
 import third_party;
+import blocking_queue;
 
 namespace infinity {
 
@@ -390,7 +391,7 @@ protected:
     std::condition_variable cycle_buf_con_;
 
     SizeT OUT_BATCH_SIZE_;
-    moodycamel::BlockingConcurrentQueue<UniquePtr<TermTupleList>> term_tuple_list_queue_;
+    BlockingQueue<SharedPtr<TermTupleList>> term_tuple_list_queue_;
 
     bool read_finish_{false};
     u32 CYCLE_BUF_SIZE_;
@@ -439,7 +440,9 @@ public:
 
     u64& Count() { return this->count_; }
 
-    moodycamel::BlockingConcurrentQueue<UniquePtr<TermTupleList>>& TermTupleListQueue() { return this->term_tuple_list_queue_; }
+//    moodycamel::BlockingConcurrentQueue<UniquePtr<TermTupleList>>& TermTupleListQueue() { return this->term_tuple_list_queue_; }
+
+    BlockingQueue<SharedPtr<TermTupleList>>& TermTupleListQueue() { return this->term_tuple_list_queue_; }
 
     void InitRunFile();
 
