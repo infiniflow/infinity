@@ -239,7 +239,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 # - int16
 # - int/int32/integer
 # - int64
-db_obj.create_table("table_example", {"c1": {"type": "int", "default": 1}})
+db_obj.create_table("my_table", {"c1": {"type": "int", "default": 1}})
 ```
 
 #### Create a table with a float column only
@@ -248,19 +248,19 @@ db_obj.create_table("table_example", {"c1": {"type": "int", "default": 1}})
 # The `create_table`method supports creating float columns in the following data types:
 # - float/float32
 # - double/float64
-db_obj.create_table("table_example", {"c1": {"type": "float64"}})
+db_obj.create_table("my_table", {"c1": {"type": "float64"}})
 ```
 
 #### Create a table with a string column only
 
 ```python
-db_obj.create_table("table_example", {"c1": {"type": "varchar"}})
+db_obj.create_table("my_table", {"c1": {"type": "varchar"}})
 ```
 
 #### Create a table with a bool column only
 
 ```python
-db_obj.create_table("table_example", {"c1": {"type": "bool"}})
+db_obj.create_table("my_table", {"c1": {"type": "bool"}})
 ```
 
 #### Create a table with a vector column only
@@ -303,8 +303,8 @@ db_obj.create_table("my_table", {"c1": {"type": "tensor,4,float64"}}, ConflictTy
 from infinity.common import ConflictType
 # Create a table with a tensor array column only:  
 # - `tensorarray`: The column is a tensor array column
-# - `6`: Dimension of each vector unit in the tensor array
-# - `float`: The primitive data type of the tensors. Can be `float`/`float32` or `double`/`float64`
+# - `6`: Dimension of each vector unit in the tensor arrays
+# - `float`: The primitive data type of the tensor arrays. Can be `float`/`float32` or `double`/`float64`
 db_obj.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Replace)
 ```
 
