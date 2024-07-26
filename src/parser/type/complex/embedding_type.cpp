@@ -25,6 +25,7 @@ size_t EmbeddingType::embedding_type_width[] = {
     8, // int64
     4, // float32
     8, // double64
+    1, // uint8
 };
 
 void EmbeddingType::Init(const void *from_ptr, size_t size) {

@@ -178,7 +178,7 @@ void WalManager::Flush() {
                 this->SwapWalFile(max_commit_ts_);
             }
 
-            for(const SharedPtr<WalCmd>& cmd: entry->cmds_) {
+            for (const SharedPtr<WalCmd> &cmd : entry->cmds_) {
                 LOG_TRACE(fmt::format("WAL CMD: {}", cmd->ToString()));
             }
 
@@ -1029,19 +1029,27 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
         UnrecoverableError(error_message);
     }
     SegmentIndexEntry *segment_index_entry = nullptr;
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
     {
         auto &index_by_segment = table_index_entry->index_by_segment();
-        auto iter = index_by_segment.find(cmd.segment_id_);
-        if (iter == index_by_segment.end()) {
+
+        if (auto iter = index_by_segment.find(cmd.segment_id_); iter != index_by_segment.end()) {
+            segment_index_entry = iter->second.get();
+        } else {
             auto create_index_param =
                 SegmentIndexEntry::GetCreateIndexParam(table_index_entry->table_index_def(), 0 /*segment_offset*/, table_index_entry->column_def());
-            iter = index_by_segment
-                       .emplace(cmd.segment_id_,
-                                SegmentIndexEntry::NewIndexEntry(table_index_entry, cmd.segment_id_, fake_txn.get(), create_index_param.get()))
-                       .first;
+            auto segment_index_entry_ptr = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
+                                                                                         table_entry,
+                                                                                         cmd.segment_id_,
+                                                                                         buffer_mgr,
+                                                                                         commit_ts /*min_ts*/,
+                                                                                         commit_ts /*max_ts*/,
+                                                                                         0 /*next_chunk_id*/,
+                                                                                         txn_id /*txn_id*/,
+                                                                                         commit_ts /*begin_ts*/,
+                                                                                         commit_ts);
+            index_by_segment.emplace(cmd.segment_id_, segment_index_entry_ptr);
+            segment_index_entry = segment_index_entry_ptr.get();
         }
-        segment_index_entry = iter->second.get();
     }
 
     for (const auto &chunk_info : cmd.chunk_infos_) {

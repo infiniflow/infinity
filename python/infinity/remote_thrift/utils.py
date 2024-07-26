@@ -88,6 +88,18 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
                 parsed_expr.type = parser_expr_type
                 return parsed_expr
 
+    elif isinstance(cons, exp.Boolean):
+        parsed_expr = ttypes.ParsedExpr()
+        constant_expr = ttypes.ConstantExpr()
+        constant_expr.literal_type = ttypes.LiteralType.Boolean
+        constant_expr.bool_value = cons.this
+
+        parser_expr_type = ttypes.ParsedExprType()
+        parser_expr_type.constant_expr = constant_expr
+
+        parsed_expr.type = parser_expr_type
+        return parsed_expr
+
     elif isinstance(cons, exp.Literal):
         parsed_expr = ttypes.ParsedExpr()
         constant_expr = ttypes.ConstantExpr()

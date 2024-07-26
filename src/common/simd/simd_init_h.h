@@ -22,5 +22,6 @@ bool IsF16CSupported();
 bool IsSSE2Supported();
 bool IsAVX2Supported();
 bool IsAVX512Supported();
+bool IsAVX512BWSupported();
 
 } // namespace infinity

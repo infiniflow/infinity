@@ -28,9 +28,23 @@ export struct ObjAddr {
     bool Valid() const { return !obj_key_.empty() && part_size_ > 0; }
 };
 
+export struct Range {
+    SizeT start_{};
+    SizeT end_{};
+    bool operator<(const Range &rhs) const { return start_ < rhs.start_; }
+
+    bool HasIntersection(const Range &rhs) const {
+        SizeT max_start = std::max(start_, rhs.start_);
+        SizeT min_end = std::min(end_, rhs.end_);
+        return max_start < min_end;
+    }
+};
+
 export struct ObjStat {
     SizeT obj_size_{};
     int ref_count_{};
+    SizeT deleted_size_{};
+    Set<Range> deleted_ranges_{};
 };
 
 export class PersistenceManager {
@@ -58,6 +72,8 @@ public:
     void PutObjCache(const ObjAddr &object_addr);
 
     ObjAddr ObjCreateRefCount(const String &file_path);
+
+    void Cleanup(const ObjAddr &object_addr);
 private:
     String ObjCreate();
 

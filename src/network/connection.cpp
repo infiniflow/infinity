@@ -270,6 +270,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         object_width = 1;
                         break;
                     }
+                    case kElemUInt8:
                     case kElemInt8: {
                         object_id = 1002;
                         object_width = 1;
@@ -319,6 +320,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         object_width = 1;
                         break;
                     }
+                    case kElemUInt8:
                     case kElemInt8: {
                         object_id = 1002;
                         object_width = 1;

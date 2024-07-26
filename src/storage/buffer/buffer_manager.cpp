@@ -198,21 +198,22 @@ Vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
 
 void BufferManager::RequestSpace(SizeT need_size) {
     std::unique_lock lock(gc_locker_);
-    SizeT free_space = memory_limit_ - current_memory_size_;
+    SizeT freed_space = 0;
+    const SizeT free_space = memory_limit_ - current_memory_size_;
     if (free_space >= need_size) {
         current_memory_size_ += need_size;
         return;
     }
     SizeT round_robin = round_robin_;
     do {
-        free_space += lru_caches_[round_robin_].RequestSpace(need_size);
+        freed_space += lru_caches_[round_robin_].RequestSpace(need_size);;
         round_robin_ = (round_robin_ + 1) % lru_caches_.size();
-    } while (free_space < need_size && round_robin_ != round_robin);
-    if (free_space < need_size) {
+    } while (freed_space + free_space < need_size && round_robin_ != round_robin);
+    if (freed_space + free_space < need_size) {
         String error_message = "Out of memory.";
         UnrecoverableError(error_message);
     }
-    current_memory_size_ += -free_space + need_size;
+    current_memory_size_ += -freed_space + need_size;
 }
 
 void BufferManager::PushGCQueue(BufferObj *buffer_obj) {

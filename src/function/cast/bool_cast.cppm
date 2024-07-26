@@ -27,6 +27,7 @@ import logical_type;
 import internal_types;
 import data_type;
 import logger;
+import status;
 
 namespace infinity {
 
@@ -34,7 +35,7 @@ export struct TryCastBoolean {
     template <typename SourceType, typename TargetType>
     static inline bool Run(SourceType, TargetType &) {
         String error_message = fmt::format("No implementation to cast from {} to {}", DataType::TypeToString<SourceType>(), DataType::TypeToString<TargetType>());
-        UnrecoverableError(error_message);
+        RecoverableError(Status::NotSupport(error_message));
         return false;
     }
 };
@@ -68,7 +69,7 @@ export inline BoundCastFunc BindBoolCast(const DataType &source, const DataType 
         }
         default: {
             String error_message = fmt::format("Can't cast from Boolean to {}", target.ToString());
-            UnrecoverableError(error_message);
+            RecoverableError(Status::NotSupport(error_message));
         }
     }
     return BoundCastFunc(nullptr);

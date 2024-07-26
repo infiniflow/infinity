@@ -67,7 +67,7 @@ public:
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
 
-    void ReadFromFileImpl() override;
+    void ReadFromFileImpl(SizeT file_size) override;
 
 private:
     EmbeddingDataType GetType() const;
@@ -136,7 +136,7 @@ void AnnIVFFlatIndexFileWorker<DataType>::WriteToFileImpl(bool to_spill, bool &p
 }
 
 template <typename DataType>
-void AnnIVFFlatIndexFileWorker<DataType>::ReadFromFileImpl() {
+void AnnIVFFlatIndexFileWorker<DataType>::ReadFromFileImpl(SizeT file_size) {
     data_ = new AnnIVFFlatIndexData<DataType>();
     auto *index = static_cast<AnnIVFFlatIndexData<DataType> *>(data_);
     index->ReadIndexInner(*file_handler_);

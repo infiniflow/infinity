@@ -255,6 +255,272 @@ I8DistanceFuncType Get_HNSW_I8IP_ptr() {
     return &I8IPBF;
 }
 
+I8DistanceFuncType Get_HNSW_I8L2_64_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &I8L2AVX512BW;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &I8L2AVX2;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &I8L2SSE2;
+    }
+#endif
+    return &I8L2BF;
+}
+
+I8DistanceFuncType Get_HNSW_I8L2_32_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &I8L2AVX512BWResidual;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &I8L2AVX2;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &I8L2SSE2;
+    }
+#endif
+    return &I8L2BF;
+}
+
+I8DistanceFuncType Get_HNSW_I8L2_16_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &I8L2AVX512BWResidual;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &I8L2AVX2Residual;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &I8L2SSE2;
+    }
+#endif
+    return &I8L2BF;
+}
+
+I8DistanceFuncType Get_HNSW_I8L2_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &I8L2AVX512BWResidual;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &I8L2AVX2Residual;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &I8L2SSE2Residual;
+    }
+#endif
+    return &I8L2BF;
+}
+
+I8CosDistanceFuncType Get_HNSW_I8Cos_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &I8CosAVX512BW;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &I8CosAVX2;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &I8CosSSE2;
+    }
+#endif
+    return &I8CosBF;
+}
+
+U8DistanceFuncType Get_HNSW_U8L2_64_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &U8L2AVX512BW;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &U8L2AVX2;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &U8L2SSE2;
+    }
+#endif
+    return &U8L2BF;
+}
+
+U8DistanceFuncType Get_HNSW_U8L2_32_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &U8L2AVX512BWResidual;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &U8L2AVX2;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &U8L2SSE2;
+    }
+#endif
+    return &U8L2BF;
+}
+
+U8DistanceFuncType Get_HNSW_U8L2_16_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &U8L2AVX512BWResidual;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &U8L2AVX2Residual;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &U8L2SSE2;
+    }
+#endif
+    return &U8L2BF;
+}
+
+U8DistanceFuncType Get_HNSW_U8L2_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &U8L2AVX512BWResidual;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &U8L2AVX2Residual;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &U8L2SSE2Residual;
+    }
+#endif
+    return &U8L2BF;
+}
+
+U8DistanceFuncType Get_HNSW_U8IP_64_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &U8IPAVX512BW;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &U8IPAVX2;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &U8IPSSE2;
+    }
+#endif
+    return &U8IPBF;
+}
+
+U8DistanceFuncType Get_HNSW_U8IP_32_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &U8IPAVX512BWResidual;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &U8IPAVX2;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &U8IPSSE2;
+    }
+#endif
+    return &U8IPBF;
+}
+
+U8DistanceFuncType Get_HNSW_U8IP_16_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &U8IPAVX512BWResidual;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &U8IPAVX2Residual;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &U8IPSSE2;
+    }
+#endif
+    return &U8IPBF;
+}
+
+U8DistanceFuncType Get_HNSW_U8IP_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &U8IPAVX512BWResidual;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &U8IPAVX2Residual;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &U8IPSSE2Residual;
+    }
+#endif
+    return &U8IPBF;
+}
+
+U8CosDistanceFuncType Get_HNSW_U8Cos_ptr() {
+#if defined(__AVX512BW__)
+    if (IsAVX512BWSupported()) {
+        return &U8CosAVX512BW;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &U8CosAVX2;
+    }
+#endif
+#if defined(__SSE2__)
+    if (IsSSE2Supported()) {
+        return &U8CosSSE2;
+    }
+#endif
+    return &U8CosBF;
+}
+
 FilterScoresOutputIdsFuncType GetFilterScoresOutputIdsFuncPtr() {
 #if defined(__AVX2__)
     if (IsAVX2Supported()) {

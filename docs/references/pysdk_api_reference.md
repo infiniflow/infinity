@@ -371,19 +371,21 @@ Creates an index by `IndexInfo` list.
   A IndexInfo struct contains three fields,`column_name`, `index_type`, and `index_param_list`.
     - **column_name : str** Name of the column to build index on.
     - **index_type : IndexType**
-      enum type: `IVFFlat` , `Hnsw`, `HnswLVQ`, `FullText`, or `BMP`. Defined in `infinity.index`.
-      `Note: The difference between Hnsw and HnswLVQ is only adopting different clustering method. The former uses K-Means while the later uses LVQ(Learning Vector Quantization)`
+      enum type: `IVFFlat` , `Hnsw`, `FullText`, or `BMP`. Defined in `infinity.index`.
+      `Note: For Hnsw index, add encode=lvq in index_param_list to use LVQ(Locally-adaptive vector quantization)`
     - **index_param_list**
       A list of InitParameter. The InitParameter struct is like a key-value pair, with two string fields named param_name and param_value. The optional parameters of each type of index are listed below:
         - `IVFFlat`: `'centroids_count'`(default:`'128'`), `'metric'`(required)
-        - `Hnsw`: `'M'`(default:`'16'`), `'ef_construction'`(default:`'50'`), `'ef'`(default:`'50'`), `'metric'`(required)
-        - `HnswLVQ`: 
+        - `Hnsw`: 
           - `'M'`(default:`'16'`)
           - `'ef_construction'`(default:`'50'`)
           - `'ef'`(default:`'50'`)
           - `'metric'`(required)
              - `ip`: Inner product
              - `l2`: Euclidean distance
+          - `'encode'`(optional)
+              - `plain`: Plain encoding (default)
+              - `lvq`: LVQ(Locally-adaptive vector quantization)
         - `FullText`: `'ANALYZER'`(default:`'standard'`)
         - `BMP`: 
           - `block_size=1~256`(default: 16): The size of the block in BMP index
@@ -600,11 +602,13 @@ table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
 # Create a table with a integer column and a 3-d vector column:
 table_obj = db_obj.create_table("vector_table", {"c1": {"type": "integer", "default": 2024}, "vector_column": {"type": "vector,3,float"}})
 
-# Insert one complete row into the table:
-table_obj.insert({"c1": 2023, "vector_column": [1.1, 2.2, 3.3]})
+# Insert one incomplete row into the table:
+# Note that the 'c1' cell defaults to 0. 
+table_obj.insert({"vector_column": [1.1, 2.2, 3.3]})
 
-# Insert three rows into the table:
-table_obj.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.5, 6.6]}, {"vector_column": [7.7, 8.8, 9.9]}])
+# Insert two incomplete rows into the table:
+# Note that the 'c1' cells default to 0. 
+table_obj.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.5, 6.6]}])
 ```
 #### Insert sparse vectors
 
@@ -612,7 +616,7 @@ table_obj.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.
 # Create a table with a integer column and a 100-d sparse vector column:
 table_obj = db_obj.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
 
-# Insert three rows into the table:
+# Insert one row into the table:
 # `indices` specifies the correspoing indices to the values in `values`.
 # Note that the second row sets "c1" as 2024 by default. 
 table_obj.insert([{"c1": 2022, "sparse_column": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}, {"sparse_column":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}}}])
@@ -624,7 +628,7 @@ table_obj.insert([{"c1": 2022, "sparse_column": {"indices": [10, 20, 30], "value
 # Create a table with a tensor column: 
 table_obj = db_obj.create_table("tensor_table", {"c1": {"type": "integer", "default": 2024}, "tensor_column": {"type": "tensor,4,float"}})
 
-# Insert one row into the table, with the "c1" column defaulting to 2024:
+# Insert one row into the table:
 table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}])
 ```
 
@@ -633,7 +637,6 @@ table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 
 ```python
 # Creat a table with only one tensor array column:
 table_obj = db_obj.create_table("tensor_array_table", {"tensor_array_column": {"type": "tensorarray,2,float"}})
-
 table_obj.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])
 ```
 
@@ -953,6 +956,7 @@ questions = [
     r"space\-efficient",  # Escape reserved character '-', equivalent to: `space efficient`
     r'"space\-efficient"',  # phrase and escape reserved character, equivalent to: `"space efficient"`
     r'"harmful chemical"~10',  # sloppy phrase, refers to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query-phrase.html
+    r'title:(quick OR brown) AND body:foobar', # search `(quick OR brown)` in the `title` field. keep fields empty.
 ]
 for question in questions:
     table_obj.match('body', question, 'topn=2')

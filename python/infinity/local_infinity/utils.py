@@ -60,6 +60,15 @@ def traverse_conditions(cons, fn=None):
 
         return parsed_expr
 
+    elif isinstance(cons, exp.Boolean):
+        parsed_expr = WrapParsedExpr()
+        constant_expr = WrapConstantExpr()
+        constant_expr.literal_type = LiteralType.kBoolean
+        constant_expr.bool_value = cons.this
+        parsed_expr.type = ParsedExprType.kConstant
+        parsed_expr.constant_expr = constant_expr
+        return parsed_expr
+
     elif isinstance(cons, exp.Literal):
         parsed_expr = WrapParsedExpr()
         constant_expr = WrapConstantExpr()

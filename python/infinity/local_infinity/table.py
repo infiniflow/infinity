@@ -168,6 +168,9 @@ class LocalTable(Table, ABC):
                 if isinstance(value, str):
                     constant_expression.literal_type = LiteralType.kString
                     constant_expression.str_value = value
+                elif isinstance(value, bool):
+                    constant_expression.literal_type = LiteralType.kBoolean
+                    constant_expression.bool_value = value
                 elif isinstance(value, int):
                     constant_expression.literal_type = LiteralType.kInteger
                     constant_expression.i64_value = value

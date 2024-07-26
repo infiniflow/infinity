@@ -251,8 +251,10 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
     compact_state_ = TxnCompactStore(type);
     for (auto &[new_segment, old_segments] : segment_data) {
         auto txn_segment_store = TxnSegmentStore::AddSegmentStore(new_segment.get());
-        compact_state_.compact_data_.emplace_back(std::move(txn_segment_store), std::move(old_segments));
-
+        compact_state_.compact_data_.emplace_back(std::move(txn_segment_store), old_segments);
+        for (auto *old_segment : old_segments) {
+            txn_segments_store_.emplace(old_segment->segment_id(), TxnSegmentStore(old_segment));
+        }
         this->AddSegmentStore(new_segment.get());
         this->AddSealedSegment(new_segment.get());
         this->flushed_segments_.emplace_back(new_segment.get());

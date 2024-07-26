@@ -34,9 +34,10 @@ class PlainL2Dist {
 public:
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
+    using DistanceType = typename VecStoreMeta::DistanceType;
 
 private:
-    using SIMDFuncType = DataType (*)(const DataType *, const DataType *, SizeT);
+    using SIMDFuncType = std::conditional_t<std::is_same_v<DataType, float>, f32, i32> (*)(const DataType *, const DataType *, SizeT);
 
     SIMDFuncType SIMDFunc = nullptr;
 
@@ -58,10 +59,30 @@ public:
             } else {
                 SIMDFunc = GetSIMD_FUNCTIONS().HNSW_F32L2_ptr_;
             }
+        } else if constexpr (std::is_same<DataType, i8>()) {
+            if (dim % 64 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8L2_64_ptr_;
+            } else if (dim % 32 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8L2_32_ptr_;
+            } else if (dim % 16 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8L2_16_ptr_;
+            } else {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8L2_ptr_;
+            }
+        } else if constexpr (std::is_same<DataType, u8>()) {
+            if (dim % 64 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_U8L2_64_ptr_;
+            } else if (dim % 32 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_U8L2_32_ptr_;
+            } else if (dim % 16 == 0) {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_U8L2_16_ptr_;
+            } else {
+                SIMDFunc = GetSIMD_FUNCTIONS().HNSW_U8L2_ptr_;
+            }
         }
     }
 
-    DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
+    DistanceType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
         return SIMDFunc(v1, v2, vec_store_meta.dim());
     }
 
@@ -101,6 +122,7 @@ public:
     using This = LVQL2Dist<DataType, CompressType>;
     using VecStoreMeta = LVQVecStoreMeta<DataType, CompressType, LVQL2Cache<DataType, CompressType>>;
     using StoreType = typename VecStoreMeta::StoreType;
+    using DistanceType = typename VecStoreMeta::DistanceType;
 
 private:
     using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, SizeT);

@@ -14,6 +14,7 @@
 
 module;
 #include <filesystem>
+#include <cassert>
 
 module persistence_manager;
 import stl;
@@ -45,7 +46,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(src_size, 0));
+        objects_.emplace(obj_key, ObjStat(src_size, 0, 0));
         return obj_addr;
     } else {
         std::lock_guard<std::mutex> lock(mtx_);
@@ -72,7 +73,7 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size, bool allow
         outFile.close();
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(src_size, 0));
+        objects_.emplace(obj_key, ObjStat(src_size, 0, 0));
         return obj_addr;
     } else {
         dst_fp.append(current_object_key_);
@@ -90,7 +91,7 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size, bool allow
         outFile.close();
         current_object_size_ += src_size;
         if (current_object_size_ >= object_size_limit_) {
-            objects_.emplace(current_object_key_, ObjStat(src_size, 0));
+            objects_.emplace(current_object_key_, ObjStat(src_size, 0, 0));
             current_object_key_ = ObjCreate();
             current_object_size_ = 0;
         }
@@ -108,7 +109,7 @@ void PersistenceManager::CurrentObjFinalize() {
 
 void PersistenceManager::CurrentObjFinalizeNoLock() {
     if (current_object_size_ > 0) {
-        objects_.emplace(current_object_key_, ObjStat(current_object_size_, 0));
+        objects_.emplace(current_object_key_, ObjStat(current_object_size_, 0, 0));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
     }
@@ -122,7 +123,7 @@ String PersistenceManager::GetObjCache(const ObjAddr &object_addr) {
         UnrecoverableError(error_message);
     }
     it->second.ref_count_++;
-    return workspace_.append(object_addr.obj_key_);
+    return fs::path(workspace_).append(object_addr.obj_key_).string();
 }
 
 void PersistenceManager::PutObjCache(const ObjAddr &object_addr) {
@@ -142,7 +143,7 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
     ObjAddr obj_addr = ObjAddr(obj_key, 0, 0);
     {
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(0, 1));
+        objects_.emplace(obj_key, ObjStat(0, 1, 0));
     }
 
     fs::path src_fp = workspace_;
@@ -188,9 +189,42 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &file_path, SizeT f
     dstFile.close();
     current_object_size_ += file_size;
     if (current_object_size_ >= object_size_limit_) {
-        objects_.emplace(current_object_key_, ObjStat(current_object_size_, 0));
+        objects_.emplace(current_object_key_, ObjStat(current_object_size_, 0, 0));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
+    }
+}
+
+void PersistenceManager::Cleanup(const ObjAddr &object_addr) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = objects_.find(object_addr.obj_key_);
+    if (it == objects_.end()) {
+        String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
+        UnrecoverableError(error_message);
+    }
+    Range range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
+    auto target_range = it->second.deleted_ranges_.lower_bound(range);
+
+    if (target_range != it->second.deleted_ranges_.end() && target_range->HasIntersection(range)) {
+        String error_message =
+            fmt::format("ObjAddr {} offset {} size {} already been deleted.", object_addr.obj_key_, object_addr.part_offset_, object_addr.part_size_);
+        UnrecoverableError(error_message);
+    }
+
+    if (target_range != it->second.deleted_ranges_.begin() && std::prev(target_range)->HasIntersection(range)) {
+        String error_message =
+            fmt::format("ObjAddr {} offset {} size {} already been deleted.", object_addr.obj_key_, object_addr.part_offset_, object_addr.part_size_);
+        UnrecoverableError(error_message);
+    }
+
+    it->second.deleted_ranges_.insert(range);
+    it->second.deleted_size_ += object_addr.part_size_;
+    assert(it->second.deleted_size_ <= it->second.obj_size_);
+    if (it->second.deleted_size_ == it->second.obj_size_ && object_addr.obj_key_ != current_object_key_) {
+        fs::path fp = workspace_;
+        fp.append(object_addr.obj_key_);
+        fs::remove(fp);
+        objects_.erase(it);
     }
 }
 
