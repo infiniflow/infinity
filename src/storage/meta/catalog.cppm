@@ -226,7 +226,7 @@ public:
 
     void SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_path, String &full_name);
 
-    bool SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_path, String &delta_name);
+    bool SaveDeltaCatalog(TxnTimeStamp &max_commit_ts, String &delta_path, String &delta_name);
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
