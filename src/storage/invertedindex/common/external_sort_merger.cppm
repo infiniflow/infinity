@@ -440,8 +440,6 @@ public:
 
     u64& Count() { return this->count_; }
 
-//    moodycamel::BlockingConcurrentQueue<UniquePtr<TermTupleList>>& TermTupleListQueue() { return this->term_tuple_list_queue_; }
-
     BlockingQueue<SharedPtr<TermTupleList>>& TermTupleListQueue() { return this->term_tuple_list_queue_; }
 
     void InitRunFile();
