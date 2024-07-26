@@ -68,8 +68,7 @@ class ThriftInfinityClient:
     def create_database(self, db_name: str, conflict_type: CreateConflict = CreateConflict.Error):
         return self.client.CreateDatabase(CreateDatabaseRequest(session_id=self.session_id,
                                                                 db_name=db_name,
-                                                                create_option=CreateOption(
-                                                                    conflict_type=conflict_type)))
+                                                                create_option=CreateOption(conflict_type=conflict_type)))
 
     def drop_database(self, db_name: str, conflict_type: DropConflict = DropConflict.Error):
         return self.client.DropDatabase(DropDatabaseRequest(session_id=self.session_id,

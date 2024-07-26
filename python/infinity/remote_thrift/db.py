@@ -174,6 +174,7 @@ def get_embedding_info(column_info, column_defs, column_name, index):
         case _:
             raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}")
 
+    embedding_type = ttypes.EmbeddingType()
     match element_type:
         case "bit":
             embedding_type.element_type = ttypes.ElementType.ElementBit
@@ -190,7 +191,7 @@ def get_embedding_info(column_info, column_defs, column_name, index):
         case "int8":
             embedding_type.element_type = ttypes.ElementType.ElementInt8
         case "int16":
-            embedding_type.element_type = ttypes.ElementType.ElementFloat16
+            embedding_type.element_type = ttypes.ElementType.ElementInt16
         case "int32":
             embedding_type.element_type = ttypes.ElementType.ElementInt32
         case "int":
