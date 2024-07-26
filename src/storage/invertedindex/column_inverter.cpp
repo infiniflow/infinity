@@ -152,6 +152,8 @@ struct TermRefRadix {
 };
 
 void ColumnInverter::SortTerms() {
+    if (term_refs_.empty())
+        return;
     Vector<u64> first_four_bytes(term_refs_.size());
     for (u32 i = 0; i < term_refs_.size(); ++i) {
         u64 first_four = ntohl(*reinterpret_cast<const u32 *>(GetTermFromRef(term_refs_[i])));
