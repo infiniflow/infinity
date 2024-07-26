@@ -137,7 +137,8 @@ void FileWorker::MoveFile() {
 
 void FileWorker::CleanupFile() const {
     if (InfinityContext::instance().persistence_manager() != nullptr) {
-        InfinityContext::instance().persistence_manager()->Cleanup(obj_addr_);
+        String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
+        InfinityContext::instance().persistence_manager()->Cleanup(path);
         return;
     }
     LocalFileSystem fs;
