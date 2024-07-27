@@ -1064,22 +1064,29 @@ void GlobalCatalogDeltaEntry::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delt
 }
 
 // background process Checkpoint call this.
-UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp max_commit_ts) {
+UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp &max_commit_ts) {
     auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
 
-    std::lock_guard<std::mutex> lock(catalog_delta_locker_);
+    Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops;
+    HashSet<TransactionID> txn_ids;
     {
-        auto delta_ops = std::exchange(delta_ops_, {});
-        auto txn_ids = std::exchange(txn_ids_, {});
+        std::lock_guard<std::mutex> lock(catalog_delta_locker_);
+        delta_ops = std::exchange(delta_ops_, {});
+        txn_ids = std::exchange(txn_ids_, {});
+    }
+    {
+        TxnTimeStamp max_ts = 0;
         for (auto &[_, delta_op] : delta_ops) {
             if (delta_op->commit_ts_ <= last_full_ckp_ts_) { // skip the delta op that is before full checkpoint
                 continue;
             }
+            max_ts = std::max(max_ts, delta_op->commit_ts_);
             flush_delta_entry->AddOperation(std::move(delta_op));
         }
-
-        flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids.begin(), txn_ids.end()));
+        max_commit_ts = max_ts;
     }
+
+    flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids.begin(), txn_ids.end()));
     flush_delta_entry->set_commit_ts(max_commit_ts);
 
     // write delta op from top to bottom.

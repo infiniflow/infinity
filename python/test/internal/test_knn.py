@@ -1093,3 +1093,240 @@ class TestKnn(TestSdk):
 
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    def _test_zero_dimension_tensor_scan(self):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_tensor_scan", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_tensor_scan",
+                                        {"t": {"type": "tensor, 0, float"}})
+        with pytest.raises(IndexError):
+            table_obj.insert([{"t": [[], []]}])
+
+        with pytest.raises(Exception):
+            res = (table_obj
+                   .output(["*", "_row_id", "_score"])
+                   .match_tensor('t', [[], []], 'float', 'maxsim', 'topn=2')
+                   .to_pl())
+
+        res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_big_dimension_tensor_scan(self, dim):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_tensor_scan", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_tensor_scan",
+                                        {"t": {"type": f"tensorarray, {dim}, float"}})
+
+        table_obj.insert([{"t": [[[1.0]*dim]*dim]*dim},
+                          {"t": [[[2.0]*dim]*dim]*dim},
+                          {"t": [[[3.0]*dim]*dim]*dim},
+                          {"t": [[[4.0]*dim]*dim]*dim},
+                          {"t": [[[5.0]*dim]*dim]*dim},])
+
+        res = (table_obj
+                   .output(["*", "_row_id", "_score"])
+                   .match_tensor('t', [[[0.0]*dim]*dim]*dim, 'float', 'maxsim', 'topn=5')
+                   .to_pl())
+        print(res)
+
+        res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_sparse_with_invalid_table_params(self, check_data, table_params):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_sparse_scan", ConflictType.Ignore)
+        params = table_params.split(",")
+        if not check_data:
+            copy_data("sparse_knn.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
+
+        if params[0] == "int8":
+            with pytest.raises(InfinityException) as e:
+                table_obj = db_obj.create_table("test_sparse_scan", {"c1": {"type": "int"}, "c2": {"type": table_params}},
+                                            ConflictType.Error)
+            assert e.value.args[0] == ErrorCode.INVALID_DATA_TYPE
+        elif params[0] == "vector":
+            table_obj = db_obj.create_table("test_sparse_scan", {"c1": {"type": "int"}, "c2": {"type": table_params}},
+                                            ConflictType.Error)
+            table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+
+            with pytest.raises(InfinityException) as e:
+                res = (table_obj.output(["*", "_row_id", "_similarity"])
+                    .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
+                    .to_pl())
+            assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
+
+            res = db_obj.drop_table("test_sparse_scan", ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+        elif params[1] == "0":
+            table_obj = db_obj.create_table("test_sparse_scan", {"c1": {"type": "int"}, "c2": {"type": table_params}},
+                                            ConflictType.Error)
+            table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+
+            with pytest.raises(InfinityException) as e:
+                res = (table_obj.output(["*", "_row_id", "_similarity"])
+                    .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
+                    .to_pl())
+            assert e.value.args[0] == ErrorCode.DATA_TYPE_MISMATCH
+
+            res = db_obj.drop_table("test_sparse_scan", ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+        elif params[2] == "int":
+            table_obj = db_obj.create_table("test_sparse_scan", {"c1": {"type": "int"}, "c2": {"type": table_params}},
+                                            ConflictType.Error)
+            with pytest.raises(InfinityException) as e:
+                table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+            assert e.value.args[0] == ErrorCode.PARSER_ERROR
+        elif params[3] == "float":
+            with pytest.raises(InfinityException) as e:
+                table_obj = db_obj.create_table("test_sparse_scan", {"c1": {"type": "int"}, "c2": {"type": table_params}},
+                                            ConflictType.Error)
+            assert e.value.args[0] == ErrorCode.INVALID_EMBEDDING_DATA_TYPE
+
+    def _test_sparse_knn_with_invalid_index_type(self, check_data, index_type):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_sparse_knn_with_index", {"c1": {"type": "int"}, "c2": {"type": "sparse,100,float,int8"}}, ConflictType.Error)
+        if not check_data:
+            copy_data("sparse_knn.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+
+        with pytest.raises(InfinityException) as e:
+            if index_type == index.IndexType.IVFFlat:
+                res = table_obj.create_index("my_index",
+                                             [index.IndexInfo("c2",
+                                                              index.IndexType.IVFFlat,
+                                                              [index.InitParameter("centroids_count", "128"),
+                                                               index.InitParameter("metric", "L2")])], ConflictType.Error)
+            elif index_type == index.IndexType.Hnsw:
+                res = table_obj.create_index("my_index",
+                                             [index.IndexInfo("c2",
+                                                              index.IndexType.Hnsw,
+                                                              [
+                                                                  index.InitParameter(
+                                                                      "M", "16"),
+                                                                  index.InitParameter(
+                                                                      "ef_construction", "50"),
+                                                                  index.InitParameter(
+                                                                      "ef", "50"),
+                                                                  index.InitParameter(
+                                                                      "metric", "L2")
+                                                              ])], ConflictType.Error)
+            elif index_type == index.IndexType.EMVB:
+                res = table_obj.create_index("my_index",
+                                             [index.IndexInfo("c2",
+                                                              index.IndexType.EMVB,
+                                                              [index.InitParameter("pq_subspace_num", "32"),
+                                                               index.InitParameter("pq_subspace_bits", "8")]),
+                                              ], ConflictType.Error)
+            elif index_type == index.IndexType.FullText:
+                res = table_obj.create_index("my_index",
+                                             [index.IndexInfo("c2",
+                                                              index.IndexType.FullText,
+                                                              [index.InitParameter('ANALYZER', 'STANDARD')]),
+                                              ], ConflictType.Error)
+            elif index_type == index.IndexType.Secondary:
+                res = table_obj.create_index("my_index",
+                                             [index.IndexInfo("c2",
+                                                              index.IndexType.Secondary,
+                                                              []),
+                                              ], ConflictType.Error)
+        assert e.value.args[0] == ErrorCode.INVALID_INDEX_DEFINITION
+
+        res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_sparse_knn_with_invalid_index_params(self, check_data, index_params):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_sparse_knn_with_index", {"c1": {"type": "int"}, "c2": {"type": "sparse,100,float,int8"}}, ConflictType.Error)
+        if not check_data:
+            copy_data("sparse_knn.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        with pytest.raises(InfinityException) as e:
+            table_obj.create_index("idx1",
+                                         [index.IndexInfo("c2",
+                                                          index.IndexType.BMP,
+                                                          [
+                                                              index.InitParameter(
+                                                                  "block_size", index_params[0]),
+                                                              index.InitParameter(
+                                                                  "compress_type", index_params[1])
+                                                          ])], ConflictType.Error)
+        assert e.value.args[0] == ErrorCode.INVALID_INDEX_PARAM
+
+        res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_sparse_knn_with_invalid_alpha_beta(self, check_data, alpha, beta):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_sparse_knn_with_index", {"c1": {"type": "int"}, "c2": {"type": "sparse,100,float,int8"}}, ConflictType.Error)
+        if not check_data:
+            copy_data("sparse_knn.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+        table_obj.create_index("idx1",
+                                     [index.IndexInfo("c2",
+                                                      index.IndexType.BMP,
+                                                      [
+                                                          index.InitParameter(
+                                                              "block_size", "8"),
+                                                          index.InitParameter(
+                                                              "compress_type", "compress")
+                                                      ])], ConflictType.Error)
+
+        table_obj.optimize("idx1", {"topk": "3"})
+
+        with pytest.raises(InfinityException) as e:
+            res = (table_obj
+                .output(["*", "_row_id", "_similarity"])
+                .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3,
+                              {"alpha": alpha, "beta": beta})
+                .to_pl())
+
+        res = table_obj.drop_index("idx1", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_sparse_knn_with_indices_values_mismatch(self, check_data):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_sparse_knn_with_index", {"c1": {"type": "int"}, "c2": {"type": "sparse,100,float,int8"}}, ConflictType.Error)
+        if not check_data:
+            copy_data("sparse_knn.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+
+        res = (table_obj
+                .output(["*", "_row_id", "_similarity"])
+                .match_sparse("c2", {"indices": [0, 20], "values": [1.0, 2.0, 3.0]}, "ip", 3,
+                              {"alpha": "1.0", "beta": "1.0"})
+                .to_pl())
+        print(res)
+
+        res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    def _test_sparse_knn_with_invalid_distance_type(self, check_data, distance_type):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_sparse_knn_with_index", {"c1": {"type": "int"}, "c2": {"type": "sparse,100,float,int8"}}, ConflictType.Error)
+        if not check_data:
+            copy_data("sparse_knn.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "sparse_knn.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
+
+        with pytest.raises(Exception):
+            res = (table_obj
+                    .output(["*", "_row_id", "_similarity"])
+                    .match_sparse("c2", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, distance_type, 3,
+                                  {"alpha": "1.0", "beta": "1.0"})
+                    .to_pl())
+
+        res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK

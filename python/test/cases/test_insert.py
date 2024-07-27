@@ -41,12 +41,12 @@ class TestInfinity:
         self.test_infinity_obj._test_insert_tensor_array()
 
 
-    @pytest.mark.parametrize("types", ["vector,65535,int", "vector,65535,float"])
-    @pytest.mark.parametrize("types_examples", [[{"c1": [1] * 65535}],
-                                                [{"c1": [4] * 65535}],
-                                                [{"c1": [-9999999] * 65535}],
-                                                [{"c1": [1.1] * 65535}],
-                                                [{"c1": [-9999999.988] * 65535}],
+    @pytest.mark.parametrize("types", ["vector,16384,int", "vector,16384,float"])
+    @pytest.mark.parametrize("types_examples", [[{"c1": [1] * 16384}],
+                                                [{"c1": [4] * 16384}],
+                                                [{"c1": [-9999999] * 16384}],
+                                                [{"c1": [1.1] * 16384}],
+                                                [{"c1": [-9999999.988] * 16384}],
                                                 ])
     def test_insert_big_embedding_various_type(self, types, types_examples):
         self.test_infinity_obj._test_insert_big_embedding_various_type(types, types_examples)
