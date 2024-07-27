@@ -108,6 +108,7 @@ bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) 
     return txn->CommitTS() < begin_ts;
 }
 
+// Prepare to commit ReadTxn
 TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
     std::lock_guard guard(locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
@@ -115,6 +116,7 @@ TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
     return commit_ts;
 }
 
+// Prepare to commit WriteTxn
 TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
     std::lock_guard guard(locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
@@ -274,10 +276,12 @@ UniquePtr<TxnInfo> TxnManager::GetTxnInfoByID(TransactionID txn_id) const {
 
 TxnTimeStamp TxnManager::CurrentTS() const { return start_ts_; }
 
+// ??????
 TxnTimeStamp TxnManager::GetNewTimeStamp() { return start_ts_++; }
 
 TxnTimeStamp TxnManager::GetCleanupScanTS() {
     std::lock_guard guard(locker_);
+    // Oldest txn_begin_ts
     TxnTimeStamp first_uncommitted_begin_ts = start_ts_;
     while (!beginned_txns_.empty()) {
         auto first_txn = beginned_txns_.front().lock();
@@ -285,6 +289,7 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
             first_uncommitted_begin_ts = first_txn->BeginTS();
             break;
         }
+        // When beginned txn is nullptr? Rollbacked?
         beginned_txns_.pop_front();
     }
     TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
@@ -312,6 +317,7 @@ void TxnManager::FinishTxn(Txn *txn) {
     TxnTimeStamp finished_ts = ++start_ts_;
     auto state = txn->GetTxnState();
     if (state == TxnState::kCommitting) {
+        // READ txn is already set to committed before. Only write txn is set to committed status, here.
         txn->SetTxnCommitted(finished_ts);
         finished_txns_.emplace_back(txn);
     } else if (state == TxnState::kRollbacking) {
@@ -320,6 +326,8 @@ void TxnManager::FinishTxn(Txn *txn) {
         String error_message = fmt::format("Invalid transaction status: {}", ToString(state));
         UnrecoverableError(error_message);
     }
+
+    // Remove the txn from prepare commit list, what about rollback txn?
     SizeT remove_n = finishing_txns_.erase(txn);
     if (remove_n == 0) {
         UnrecoverableError("Txn not found in finishing_txns_");
@@ -329,6 +337,7 @@ void TxnManager::FinishTxn(Txn *txn) {
     while (!beginned_txns_.empty()) {
         auto first_txn = beginned_txns_.front().lock();
         if (first_txn.get() == nullptr) {
+            // FIXME: when the txn ptr is null?
             beginned_txns_.pop_front();
             continue;
         }
@@ -336,6 +345,7 @@ void TxnManager::FinishTxn(Txn *txn) {
         if (status == TxnState::kCommitted || status == TxnState::kRollbacked) {
             beginned_txns_.pop_front();
         } else {
+            // Oldest?
             least_uncommitted_begin_ts = first_txn->BeginTS();
             break;
         }
