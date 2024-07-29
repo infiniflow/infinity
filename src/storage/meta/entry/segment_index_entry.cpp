@@ -66,8 +66,6 @@ import emvb_index_in_mem;
 import bmp_util;
 import hnsw_util;
 import wal_entry;
-import infinity_context;
-import persistence_manager;
 
 namespace infinity {
 

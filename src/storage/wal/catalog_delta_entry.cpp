@@ -29,6 +29,7 @@ import parsed_expr;
 import constant_expr;
 import stl;
 import data_type;
+import create_index_info;
 import infinity_context;
 import index_defines;
 import persistence_manager;
@@ -90,6 +91,18 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     WriteBufAdv(buf, this->txn_id_);
     WriteBufAdv(buf, this->commit_ts_);
     WriteBufAdv(buf, *(this->encode_));
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        Vector<String> paths = GetFilePaths();
+        WriteBufAdv(buf, paths.size());
+        for (auto &path : paths) {
+            ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
+            WriteBufAdv(buf, path);
+            obj_addr.WriteBuf(buf);
+        }
+    }
 }
 
 void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
@@ -98,6 +111,18 @@ void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
     txn_id_ = ReadBufAdv<TransactionID>(ptr);
     commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     encode_ = MakeUnique<String>(ReadBufAdv<String>(ptr));
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        SizeT size = ReadBufAdv<SizeT>(ptr);
+        for (SizeT i = 0; i < size; ++i) {
+            String path = ReadBufAdv<String>(ptr);
+            ObjAddr obj_addr;
+            obj_addr.ReadBuf(ptr);
+            pm->SaveLocalPath(path, obj_addr);
+        }
+    }
 }
 
 const String CatalogDeltaOperation::ToString() const {
@@ -363,24 +388,17 @@ AddSegmentIndexEntryOp::AddSegmentIndexEntryOp(SegmentIndexEntry *segment_index_
 AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry, commit_ts), base_name_(chunk_index_entry->base_name_),
       base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        index_type_ = chunk_index_entry->GetIndexType();
-        switch (index_type_) {
-            case IndexType::kFullText: {
-                String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(chunk_index_entry->segment_index_entry_->index_dir()));
-                String posting_file_name = full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX;
-                String dict_file_name = full_path + chunk_index_entry->base_name_ + DICT_SUFFIX;
-                String column_length_file_name = full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX;
-                fulltext_obj_addrs_.posting_obj_addr_ = pm->GetObjLocalCache(posting_file_name);
-                fulltext_obj_addrs_.dict_obj_addr_ = pm->GetObjLocalCache(dict_file_name);
-                fulltext_obj_addrs_.column_length_obj_addr_ = pm->GetObjLocalCache(column_length_file_name);
-                break;
-            }
-            default: {
-                break;
-            }
+    IndexType index_type = chunk_index_entry->segment_index_entry_->table_index_entry()->index_base()->index_type_;
+    switch (index_type) {
+        case IndexType::kFullText: {
+            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(chunk_index_entry->segment_index_entry_->index_dir()));
+            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX);
+            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + DICT_SUFFIX);
+            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
+            break;
+        }
+        default: {
+            break;
         }
     }
 }
@@ -499,21 +517,6 @@ UniquePtr<AddChunkIndexEntryOp> AddChunkIndexEntryOp::ReadAdv(char *&ptr) {
     add_chunk_index_op->base_rowid_ = RowID::FromUint64(ReadBufAdv<u64>(ptr));
     add_chunk_index_op->row_count_ = ReadBufAdv<u32>(ptr);
     add_chunk_index_op->deprecate_ts_ = ReadBufAdv<u64>(ptr);
-
-    if (InfinityContext::instance().persistence_manager() != nullptr) {
-        add_chunk_index_op->index_type_ = ReadBufAdv<IndexType>(ptr);
-        switch (add_chunk_index_op->index_type_) {
-            case IndexType::kFullText: {
-                add_chunk_index_op->fulltext_obj_addrs_.posting_obj_addr_.ReadBuf(ptr);
-                add_chunk_index_op->fulltext_obj_addrs_.dict_obj_addr_.ReadBuf(ptr);
-                add_chunk_index_op->fulltext_obj_addrs_.column_length_obj_addr_.ReadBuf(ptr);
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-    }
     return add_chunk_index_op;
 }
 
@@ -688,20 +691,6 @@ void AddChunkIndexEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->base_rowid_.ToUint64());
     WriteBufAdv(buf, this->row_count_);
     WriteBufAdv(buf, this->deprecate_ts_);
-    if (InfinityContext::instance().persistence_manager() != nullptr) {
-        WriteBufAdv(buf, this->index_type_);
-        switch (this->index_type_) {
-            case IndexType::kFullText: {
-                this->fulltext_obj_addrs_.posting_obj_addr_.WriteBuf(buf);
-                this->fulltext_obj_addrs_.dict_obj_addr_.WriteBuf(buf);
-                this->fulltext_obj_addrs_.column_length_obj_addr_.WriteBuf(buf);
-                break;
-            }
-            default: {
-                break;
-            }
-        }
-    }
 }
 
 const String AddDBEntryOp::ToString() const {

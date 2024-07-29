@@ -44,7 +44,6 @@ import emvb_index_file_worker;
 import bmp_index_file_worker;
 import column_def;
 import infinity_context;
-import persistence_manager;
 
 namespace infinity {
 
@@ -258,12 +257,7 @@ u64 ChunkIndexEntry::GetColumnLengthSum() const {
 
 BufferHandle ChunkIndexEntry::GetIndex() { return buffer_obj_->Load(); }
 
-IndexType ChunkIndexEntry::GetIndexType() { return segment_index_entry_->table_index_entry()->index_base()->index_type_; }
-
 nlohmann::json ChunkIndexEntry::Serialize() {
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-
     nlohmann::json index_entry_json;
     index_entry_json["chunk_id"] = this->chunk_id_;
     index_entry_json["base_name"] = this->base_name_;
@@ -271,24 +265,6 @@ nlohmann::json ChunkIndexEntry::Serialize() {
     index_entry_json["row_count"] = this->row_count_;
     index_entry_json["commit_ts"] = this->commit_ts_.load();
     index_entry_json["deprecate_ts"] = this->deprecate_ts_.load();
-
-    if (use_object_cache) {
-        IndexType index_type = GetIndexType();
-        switch (index_type) {
-            case IndexType::kFullText: {
-                String full_path = fmt::format("{}/{}", *this->base_dir_, *(segment_index_entry_->index_dir()));
-                String posting_file_name = base_name_ + POSTING_SUFFIX;
-                String dict_file_name = base_name_ + DICT_SUFFIX;
-                String column_length_file_name = base_name_ + LENGTH_SUFFIX;
-                index_entry_json["obj_addrs"].emplace(pm->GetObjLocalCache(full_path + posting_file_name).Serialize());
-                index_entry_json["obj_addrs"].emplace(pm->GetObjLocalCache(full_path + dict_file_name).Serialize());
-                index_entry_json["obj_addrs"].emplace(pm->GetObjLocalCache(full_path + column_length_file_name).Serialize());
-            }
-            default: {
-                break;
-            }
-        }
-    }
     return index_entry_json;
 }
 
@@ -296,9 +272,6 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
                                                         SegmentIndexEntry *segment_index_entry,
                                                         CreateIndexParam *param,
                                                         BufferManager *buffer_mgr) {
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-
     ChunkID chunk_id = index_entry_json["chunk_id"];
     String base_name = index_entry_json["base_name"];
     RowID base_rowid = RowID::FromUint64(index_entry_json["base_rowid"]);
@@ -306,29 +279,6 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::Deserialize(const nlohmann::json &in
     TxnTimeStamp commit_ts = index_entry_json["commit_ts"];
     TxnTimeStamp deprecate_ts = index_entry_json["deprecate_ts"];
     auto ret = NewReplayChunkIndexEntry(chunk_id, segment_index_entry, param, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-
-    // Deserialize obj_addrs
-    if (use_object_cache) {
-        ObjAddr obj_addr;
-        switch (param->index_base_->index_type_) {
-            case IndexType::kFullText: {
-                String full_path = fmt::format("{}/{}", *ret->base_dir_, *segment_index_entry->index_dir());
-                String posting_file_name = ret->base_name_ + POSTING_SUFFIX;
-                String dict_file_name = ret->base_name_ + DICT_SUFFIX;
-                String column_length_file_name = ret->base_name_ + LENGTH_SUFFIX;
-                obj_addr.Deserialize(index_entry_json["obj_addrs"][0]);
-                pm->PutObjLocalCache(full_path + posting_file_name, obj_addr);
-                obj_addr.Deserialize(index_entry_json["obj_addrs"][1]);
-                pm->PutObjLocalCache(full_path + dict_file_name, obj_addr);
-                obj_addr.Deserialize(index_entry_json["obj_addrs"][2]);
-                pm->PutObjLocalCache(full_path + column_length_file_name, obj_addr);
-            }
-            default: {
-                break;
-            }
-        }
-    }
-
     return ret;
 }
 

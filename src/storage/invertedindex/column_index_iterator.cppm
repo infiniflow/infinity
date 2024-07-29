@@ -28,6 +28,8 @@ private:
 
     void DecodePosList();
 
+    String dict_file_path_;
+    String posting_file_path_;
     SharedPtr<DictionaryReader> dict_reader_;
     SharedPtr<FileReader> posting_file_;
     ByteSlice *doc_list_slice_{nullptr};

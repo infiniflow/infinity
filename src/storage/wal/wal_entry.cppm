@@ -25,8 +25,6 @@ import stl;
 import statement_common;
 import infinity_exception;
 import internal_types;
-import create_index_info;
-import persistence_manager;
 
 namespace infinity {
 
@@ -120,9 +118,8 @@ export struct WalSegmentInfo {
 
 export struct WalChunkIndexInfo {
     ChunkID chunk_id_{};
-    IndexType index_type_{};
     String base_name_{};
-    Vector<ObjAddr> obj_addrs_{};
+    Vector<String> paths_{};
     RowID base_rowid_{};
     u32 row_count_{};
     TxnTimeStamp deprecate_ts_{};

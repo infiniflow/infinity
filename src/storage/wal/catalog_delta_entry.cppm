@@ -40,28 +40,8 @@ import column_def;
 import base_entry;
 import default_values;
 import constant_expr;
-import create_index_info;
-import persistence_manager;
 
 namespace infinity {
-
-export struct FullTextObjAddrs {
-    ObjAddr posting_obj_addr_;
-    ObjAddr dict_obj_addr_;
-    ObjAddr column_length_obj_addr_;
-
-    void Save(const ObjAddr &posting_obj_addr, const ObjAddr &dict_obj_addr, const ObjAddr &column_length_obj_addr) {
-        posting_obj_addr_ = posting_obj_addr;
-        dict_obj_addr_ = dict_obj_addr;
-        column_length_obj_addr_ = column_length_obj_addr;
-    }
-
-    void ToVec(Vector<ObjAddr> &obj_addrs) {
-        obj_addrs.push_back(posting_obj_addr_);
-        obj_addrs.push_back(dict_obj_addr_);
-        obj_addrs.push_back(column_length_obj_addr_);
-    }
-};
 
 export enum class CatalogDeltaOpType : i8 {
     INVALID = 0,
@@ -123,6 +103,7 @@ public:
     virtual const String ToString() const;
     virtual bool operator==(const CatalogDeltaOperation &rhs) const;
     virtual void Merge(CatalogDeltaOperation &other) = 0;
+    virtual Vector<String> GetFilePaths() const { return Vector<String>(); }
 
     static PruneFlag ToPrune(Optional<MergeFlag> old_merge_flag, MergeFlag new_merge_flag);
 
@@ -327,11 +308,11 @@ public:
     void Flush(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(CatalogDeltaOperation &other) override;
+    Vector<String> GetFilePaths() const override { return local_paths_; }
 
 public:
     String base_name_{};
-    IndexType index_type_{IndexType::kInvalid};
-    FullTextObjAddrs fulltext_obj_addrs_{};
+    Vector<String> local_paths_;
     RowID base_rowid_;
     u32 row_count_{0};
     TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};

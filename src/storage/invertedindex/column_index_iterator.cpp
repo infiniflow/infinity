@@ -31,6 +31,8 @@ ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &
     posting_file.append(POSTING_SUFFIX);
 
     if (use_object_cache) {
+        dict_file_path_ = dict_file;
+        posting_file_path_ = posting_file;
         dict_file = pm->GetObjCache(dict_file);
         posting_file = pm->GetObjCache(posting_file);
     }
@@ -48,6 +50,13 @@ ColumnIndexIterator::ColumnIndexIterator(const String &index_dir, const String &
 ColumnIndexIterator::~ColumnIndexIterator() {
     ByteSlice::DestroySlice(doc_list_slice_);
     ByteSlice::DestroySlice(pos_list_slice_);
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        pm->PutObjCache(dict_file_path_);
+        pm->PutObjCache(posting_file_path_);
+    }
 }
 
 bool ColumnIndexIterator::Next(String &key, PostingDecoder *&decoder) {

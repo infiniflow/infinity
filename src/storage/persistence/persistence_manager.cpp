@@ -13,8 +13,8 @@
 // limitations under the License.
 
 module;
-#include <filesystem>
 #include <cassert>
+#include <filesystem>
 
 module persistence_manager;
 import stl;
@@ -185,11 +185,17 @@ String PersistenceManager::GetObjCache(const String &local_path) {
     return fs::path(workspace_).append(it->second.obj_key_).string();
 }
 
-ObjAddr PersistenceManager::GetObjLocalCache(const String &local_path) {
+ObjAddr PersistenceManager::GetObjFromLocalPath(const String &file_path) {
+    String local_path = RemovePrefix(file_path);
+    if (local_path.empty()) {
+        String error_message = fmt::format("Failed to find local path of {}", local_path);
+        UnrecoverableError(error_message);
+    }
+
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {
-        String error_message = fmt::format("Failed to find object for local path {}", local_path);
+        String error_message = fmt::format("Failed to find file_path: {} stored object", local_path);
         UnrecoverableError(error_message);
     }
     return it->second;
@@ -205,7 +211,28 @@ void PersistenceManager::PutObjCache(const ObjAddr &object_addr) {
     it->second.ref_count_--;
 }
 
-void PersistenceManager::PutObjLocalCache(const String &local_path, const ObjAddr &object_addr) {
+void PersistenceManager::PutObjCache(const String &file_path) {
+    String local_path = RemovePrefix(file_path);
+    if (local_path.empty()) {
+        String error_message = fmt::format("Failed to find local path of {}", local_path);
+        UnrecoverableError(error_message);
+    }
+
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = local_path_obj_.find(local_path);
+    if (it == local_path_obj_.end()) {
+        String error_message = fmt::format("Failed to find file_path: {} stored object", local_path);
+        UnrecoverableError(error_message);
+    }
+    auto oit = objects_.find(it->second.obj_key_);
+    if (oit == objects_.end()) {
+        String error_message = fmt::format("Failed to find object {}", it->second.obj_key_);
+        UnrecoverableError(error_message);
+    }
+    oit->second.ref_count_--;
+}
+
+void PersistenceManager::SaveLocalPath(const String &local_path, const ObjAddr &object_addr) {
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
     if (it != local_path_obj_.end()) {
@@ -312,7 +339,7 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
     }
 }
 
-String PersistenceManager::RemovePrefix(const String& path) {
+String PersistenceManager::RemovePrefix(const String &path) {
     if (path.starts_with(local_data_dir_)) {
         return path.substr(local_data_dir_.length());
     }
@@ -336,20 +363,30 @@ void PersistenceManager::Cleanup(const String &file_path) {
     local_path_obj_.erase(it);
 }
 
-ObjAddr PersistenceManager::GetObjFromLocalPath(const String &file_path) {
-    String local_path = RemovePrefix(file_path);
-    if (local_path.empty()) {
-        String error_message = fmt::format("Failed to find local path of {}", local_path);
-        UnrecoverableError(error_message);
-    }
-
+nlohmann::json PersistenceManager::Serialize() {
     std::lock_guard<std::mutex> lock(mtx_);
-    auto it = local_path_obj_.find(local_path);
-    if (it == local_path_obj_.end()) {
-        String error_message = fmt::format("Failed to find file_path: {} stored object", local_path);
-        UnrecoverableError(error_message);
+    nlohmann::json json_obj;
+    json_obj["len"] = local_path_obj_.size();
+    json_obj["array"] = nlohmann::json::array();
+    for (auto &[path, obj_addr] : local_path_obj_) {
+        nlohmann::json pair;
+        pair["local_path"] = path;
+        pair["obj_addr"] = obj_addr.Serialize();
+        json_obj["array"].emplace_back(pair);
     }
-    return it->second;
+    return json_obj;
+}
+
+void PersistenceManager::Deserialize(const nlohmann::json &obj) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    SizeT len = obj["len"];
+    for (SizeT i = 0; i < len; ++i) {
+        auto &json_pair = obj["array"][0];
+        String path = json_pair["local_path"];
+        ObjAddr obj_addr;
+        obj_addr.Deserialize(json_pair["obj_addr"]);
+        local_path_obj_.emplace(path, obj_addr);
+    }
 }
 
 } // namespace infinity

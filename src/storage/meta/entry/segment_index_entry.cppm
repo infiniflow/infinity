@@ -34,7 +34,6 @@ import chunk_index_entry;
 import memory_indexer;
 import default_values;
 import statement_common;
-import persistence_manager;
 
 namespace infinity {
 

@@ -184,25 +184,19 @@ String WalSegmentInfo::ToString() const {
 }
 
 WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
-    : chunk_id_(chunk_index_entry->chunk_id_), index_type_(chunk_index_entry->GetIndexType()), base_name_(chunk_index_entry->base_name_),
-      base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
-    if (use_object_cache) {
-        switch (index_type_) {
-            case IndexType::kFullText: {
-                String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(chunk_index_entry->segment_index_entry_->index_dir()));
-                String posting_file_name = chunk_index_entry->base_name_ + POSTING_SUFFIX;
-                String dict_file_name = chunk_index_entry->base_name_ + DICT_SUFFIX;
-                String column_length_file_name = chunk_index_entry->base_name_ + LENGTH_SUFFIX;
-                obj_addrs_.push_back(pm->GetObjLocalCache(full_path + posting_file_name));
-                obj_addrs_.push_back(pm->GetObjLocalCache(full_path + dict_file_name));
-                obj_addrs_.push_back(pm->GetObjLocalCache(full_path + column_length_file_name));
-                break;
-            }
-            default: {
-                break;
-            }
+    : chunk_id_(chunk_index_entry->chunk_id_), base_name_(chunk_index_entry->base_name_), base_rowid_(chunk_index_entry->base_rowid_),
+      row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {
+    IndexType index_type = chunk_index_entry->segment_index_entry_->table_index_entry()->index_base()->index_type_;
+    switch (index_type) {
+        case IndexType::kFullText: {
+            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(chunk_index_entry->segment_index_entry_->index_dir()));
+            paths_.push_back(full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX);
+            paths_.push_back(full_path + chunk_index_entry->base_name_ + DICT_SUFFIX);
+            paths_.push_back(full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
+            break;
+        }
+        default: {
+            break;
         }
     }
 }
@@ -222,6 +216,17 @@ void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
     WriteBufAdv(buf, base_rowid_);
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, deprecate_ts_);
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        WriteBufAdv(buf, paths_.size());
+        for (auto &path : paths_) {
+            ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
+            WriteBufAdv(buf, path);
+            obj_addr.WriteBuf(buf);
+        }
+    }
 }
 
 WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(char *&ptr) {
@@ -231,6 +236,18 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(char *&ptr) {
     chunk_index_info.base_rowid_ = ReadBufAdv<RowID>(ptr);
     chunk_index_info.row_count_ = ReadBufAdv<u32>(ptr);
     chunk_index_info.deprecate_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        SizeT size = ReadBufAdv<SizeT>(ptr);
+        for (SizeT i = 0; i < size; i++) {
+            String path = ReadBufAdv<String>(ptr);
+            ObjAddr obj_addr;
+            obj_addr.ReadBuf(ptr);
+            pm->SaveLocalPath(path, obj_addr);
+        }
+    }
     return chunk_index_info;
 }
 

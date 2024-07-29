@@ -82,18 +82,22 @@ public:
 
     String GetObjCache(const String &local_path);
 
-    ObjAddr GetObjLocalCache(const String &local_path);
+    ObjAddr GetObjFromLocalPath(const String &file_path);
 
     // Decrease refcount
     void PutObjCache(const ObjAddr &object_addr);
 
-    void PutObjLocalCache(const String &local_path, const ObjAddr &object_addr);
+    void PutObjCache(const String &file_path);
+
+    void SaveLocalPath(const String &local_path, const ObjAddr &object_addr);
 
     ObjAddr ObjCreateRefCount(const String &file_path);
 
     void Cleanup(const String &file_path);
 
-    ObjAddr GetObjFromLocalPath(const String &file_path);
+    nlohmann::json Serialize();
+
+    void Deserialize(const nlohmann::json &obj);
 
 private:
     String ObjCreate();

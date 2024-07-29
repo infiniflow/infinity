@@ -508,6 +508,11 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
             json_res["databases"].emplace_back(db_meta_ptr->Serialize(max_commit_ts));
         }
     }
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        json_res["obj_addr_map"].emplace_back(pm->Serialize());
+    }
     return json_res;
 }
 
@@ -922,29 +927,6 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     auto *segment_index_entry = iter2->second.get();
                     segment_index_entry
                         ->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
-
-                    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-                    bool use_object_cache = pm != nullptr;
-                    if (use_object_cache) {
-                        Vector<ObjAddr> obj_addrs;
-                        switch (add_chunk_index_entry_op->index_type_) {
-                            case IndexType::kFullText: {
-                                assert(obj_addrs.size() == 3);
-                                add_chunk_index_entry_op->fulltext_obj_addrs_.ToVec(obj_addrs);
-                                String full_path = fmt::format("{}/{}", *segment_index_entry->base_dir_, *(segment_index_entry->index_dir()));
-                                String posting_file_name = base_name + POSTING_SUFFIX;
-                                String dict_file_name = base_name + DICT_SUFFIX;
-                                String column_length_file_name = base_name + LENGTH_SUFFIX;
-                                pm->PutObjLocalCache(full_path + posting_file_name, obj_addrs[0]);
-                                pm->PutObjLocalCache(full_path + dict_file_name, obj_addrs[1]);
-                                pm->PutObjLocalCache(full_path + column_length_file_name, obj_addrs[2]);
-                                break;
-                            }
-                            default: {
-                                break;
-                            }
-                        }
-                    }
                 }
 
                 break;
@@ -987,6 +969,12 @@ UniquePtr<Catalog> Catalog::Deserialize(const String &data_dir, const nlohmann::
         for (const auto &db_json : catalog_json["databases"]) {
             UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(*catalog->data_dir_, db_json, buffer_mgr);
             catalog->db_meta_map_.AddNewMetaNoLock(*db_meta->db_name(), std::move(db_meta));
+        }
+    }
+    if (catalog_json.contains("obj_addr_map")) {
+        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+        if (pm != nullptr) {
+            pm->Deserialize(catalog_json["obj_addr_map"]);
         }
     }
     return catalog;

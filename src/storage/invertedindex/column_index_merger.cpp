@@ -101,6 +101,11 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
                 String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
                 UnrecoverableError(error_message);
             }
+
+            if (use_object_cache) {
+                column_len_file = (Path(index_dir_) / base_names[i]).string() + LENGTH_SUFFIX;
+                pm->PutObjCache(column_len_file);
+            }
         }
 
         auto [file_handler, status] = fs_.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);

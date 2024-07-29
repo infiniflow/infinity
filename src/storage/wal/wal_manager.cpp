@@ -55,10 +55,6 @@ import default_values;
 import defer_op;
 import index_base;
 import base_table_ref;
-import index_defines;
-import create_index_info;
-import persistence_manager;
-import infinity_context;
 
 module wal_manager;
 
@@ -1061,8 +1057,6 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
         }
     }
 
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    bool use_object_cache = pm != nullptr;
     for (const auto &chunk_info : cmd.chunk_infos_) {
         segment_index_entry->AddChunkIndexEntryReplayWal(chunk_info.chunk_id_,
                                                          table_entry,
@@ -1072,24 +1066,6 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
                                                          commit_ts,
                                                          chunk_info.deprecate_ts_,
                                                          buffer_mgr);
-        // Replay dependency in PersistenceManager
-        if (use_object_cache) {
-            switch (chunk_info.index_type_) {
-                case IndexType::kFullText: {
-                    String full_path = fmt::format("{}/{}", *segment_index_entry->base_dir_, *(segment_index_entry->index_dir()));
-                    String posting_file_name = full_path + chunk_info.base_name_ + POSTING_SUFFIX;
-                    String dict_file_name = full_path + chunk_info.base_name_ + DICT_SUFFIX;
-                    String column_length_file_name = full_path + chunk_info.base_name_ + LENGTH_SUFFIX;
-                    pm->PutObjLocalCache(posting_file_name, chunk_info.obj_addrs_[0]);
-                    pm->PutObjLocalCache(dict_file_name, chunk_info.obj_addrs_[1]);
-                    pm->PutObjLocalCache(column_length_file_name, chunk_info.obj_addrs_[2]);
-                    break;
-                }
-                default: {
-                    break;
-                }
-            }
-        }
     }
 }
 

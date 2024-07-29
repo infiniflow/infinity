@@ -24,7 +24,6 @@ module;
 
 #pragma clang diagnostic pop
 
-#include "concurrentqueue.h"
 #include <cassert>
 #include <filesystem>
 #include <iostream>
