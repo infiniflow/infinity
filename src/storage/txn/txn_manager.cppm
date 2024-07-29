@@ -125,7 +125,7 @@ private:
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     WalManager *wal_mgr_;
 
-    Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
+    Map<TxnTimeStamp, TransactionID> begin_txn_by_ts_;
     HashSet<Txn *> finishing_txns_; // the txns in committing stage, can use flat_map
     Deque<Txn *> finished_txns_;  // the txns that committed_ts
 
