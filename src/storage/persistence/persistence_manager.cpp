@@ -158,17 +158,6 @@ void PersistenceManager::CurrentObjFinalizeNoLock() {
     }
 }
 
-String PersistenceManager::GetObjCache(const ObjAddr &object_addr) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = objects_.find(object_addr.obj_key_);
-    if (it == objects_.end()) {
-        String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
-        UnrecoverableError(error_message);
-    }
-    it->second.ref_count_++;
-    return fs::path(workspace_).append(object_addr.obj_key_).string();
-}
-
 String PersistenceManager::GetObjCache(const String &local_path) {
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
@@ -199,16 +188,6 @@ ObjAddr PersistenceManager::GetObjFromLocalPath(const String &file_path) {
         UnrecoverableError(error_message);
     }
     return it->second;
-}
-
-void PersistenceManager::PutObjCache(const ObjAddr &object_addr) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = objects_.find(object_addr.obj_key_);
-    if (it == objects_.end()) {
-        String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
-        UnrecoverableError(error_message);
-    }
-    it->second.ref_count_--;
 }
 
 void PersistenceManager::PutObjCache(const String &file_path) {

@@ -78,15 +78,11 @@ public:
     void CurrentObjFinalize();
 
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
-    String GetObjCache(const ObjAddr &object_addr);
-
     String GetObjCache(const String &local_path);
 
     ObjAddr GetObjFromLocalPath(const String &file_path);
 
     // Decrease refcount
-    void PutObjCache(const ObjAddr &object_addr);
-
     void PutObjCache(const String &file_path);
 
     void SaveLocalPath(const String &local_path, const ObjAddr &object_addr);
