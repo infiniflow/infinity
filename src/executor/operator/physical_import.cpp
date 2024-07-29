@@ -64,6 +64,7 @@ import catalog;
 import catalog_delta_entry;
 import build_fast_rough_filter_task;
 import stream_io;
+import parser_assert;
 
 namespace infinity {
 
@@ -173,44 +174,50 @@ void PhysicalImport::ImportFVECS(QueryContext *query_context, ImportOperatorStat
     SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
-    BufferHandle buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
-    SizeT row_idx = 0;
-    auto buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
-    while (true) {
-        i32 dim;
-        nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
-        if (dim != dimension or nbytes != sizeof(dimension)) {
-            Status status =
-                Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
-            RecoverableError(status);
-        }
-        ptr_t dst_ptr = buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension;
-        fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
-        block_entry->IncreaseRowCount(1);
-        ++row_idx;
+    try {
+        BufferHandle buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
+        SizeT row_idx = 0;
+        auto buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
+        while (true) {
+            i32 dim;
+            nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
+            if (dim != dimension or nbytes != sizeof(dimension)) {
+                Status status =
+                    Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+                RecoverableError(status);
+            }
+            ptr_t dst_ptr = buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension;
+            fs.Read(*file_handler, dst_ptr, sizeof(FloatT) * dimension);
+            block_entry->IncreaseRowCount(1);
+            ++row_idx;
 
-        if (row_idx == vector_n) {
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            SaveSegmentData(table_entry_, txn, segment_entry);
-            break;
-        }
-
-        if (block_entry->GetAvailableCapacity() <= 0) {
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            if (segment_entry->Room() <= 0) {
+            if (row_idx == vector_n) {
+                segment_entry->AppendBlockEntry(std::move(block_entry));
                 SaveSegmentData(table_entry_, txn, segment_entry);
-
-                segment_id = Catalog::GetNextSegmentID(table_entry_);
-                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+                break;
             }
 
-            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
-            buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
-            buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
+            if (block_entry->GetAvailableCapacity() <= 0) {
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+                if (segment_entry->Room() <= 0) {
+                    SaveSegmentData(table_entry_, txn, segment_entry);
+
+                    segment_id = Catalog::GetNextSegmentID(table_entry_);
+                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+                }
+
+                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+                buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
+                buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
+            }
         }
+        auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", vector_n));
+        import_op_state->result_msg_ = std::move(result_msg);
+    } catch (const RecoverableException &e) {
+        std::move(*block_entry).Cleanup();
+        std::move(*segment_entry).Cleanup();
+        throw;
     }
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", vector_n));
-    import_op_state->result_msg_ = std::move(result_msg);
 }
 
 void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorState *import_op_state) {
@@ -269,52 +276,58 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
     SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
-    BufferHandle buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
-    SizeT row_idx = 0;
-    auto buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
+    try {
+        BufferHandle buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
+        SizeT row_idx = 0;
+        auto buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
 
-    UniquePtr<i8[]> i8_buffer = MakeUniqueForOverwrite<i8[]>(sizeof(i8) * dimension);
-    while (true) {
-        i32 dim;
-        nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
-        if (dim != dimension or nbytes != sizeof(dimension)) {
-            Status status =
-                Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
-            RecoverableError(status);
-        }
-        fs.Read(*file_handler, i8_buffer.get(), sizeof(i8) * dimension);
+        UniquePtr<i8[]> i8_buffer = MakeUniqueForOverwrite<i8[]>(sizeof(i8) * dimension);
+        while (true) {
+            i32 dim;
+            nbytes = fs.Read(*file_handler, &dim, sizeof(dimension));
+            if (dim != dimension or nbytes != sizeof(dimension)) {
+                Status status =
+                    Status::ImportFileFormatError(fmt::format("Dimension in file ({}) doesn't match with table definition ({}).", dim, dimension));
+                RecoverableError(status);
+            }
+            fs.Read(*file_handler, i8_buffer.get(), sizeof(i8) * dimension);
 
-        FloatT *dst_ptr = reinterpret_cast<FloatT *>(buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension);
-        for (i32 i = 0; i < dimension; ++i) {
-            i8 value = (i8_buffer.get())[i];
-            dst_ptr[i] = static_cast<FloatT>(value);
-        }
-
-        block_entry->IncreaseRowCount(1);
-        ++row_idx;
-
-        if (row_idx == vector_n) {
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            SaveSegmentData(table_entry_, txn, segment_entry);
-            break;
-        }
-
-        if (block_entry->GetAvailableCapacity() <= 0) {
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            if (segment_entry->Room() <= 0) {
-                SaveSegmentData(table_entry_, txn, segment_entry);
-
-                segment_id = Catalog::GetNextSegmentID(table_entry_);
-                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+            FloatT *dst_ptr = reinterpret_cast<FloatT *>(buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension);
+            for (i32 i = 0; i < dimension; ++i) {
+                i8 value = (i8_buffer.get())[i];
+                dst_ptr[i] = static_cast<FloatT>(value);
             }
 
-            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
-            buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
-            buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
+            block_entry->IncreaseRowCount(1);
+            ++row_idx;
+
+            if (row_idx == vector_n) {
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+                SaveSegmentData(table_entry_, txn, segment_entry);
+                break;
+            }
+
+            if (block_entry->GetAvailableCapacity() <= 0) {
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+                if (segment_entry->Room() <= 0) {
+                    SaveSegmentData(table_entry_, txn, segment_entry);
+
+                    segment_id = Catalog::GetNextSegmentID(table_entry_);
+                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+                }
+
+                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+                buffer_handle = block_entry->GetColumnBlockEntry(0)->buffer()->Load();
+                buf_ptr = static_cast<ptr_t>(buffer_handle.GetDataMut());
+            }
         }
+        auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", vector_n));
+        import_op_state->result_msg_ = std::move(result_msg);
+    } catch (const RecoverableException &e) {
+        std::move(*block_entry).Cleanup();
+        std::move(*segment_entry).Cleanup();
+        throw;
     }
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", vector_n));
-    import_op_state->result_msg_ = std::move(result_msg);
 }
 
 template <typename IdxT>
@@ -413,45 +426,51 @@ void PhysicalImport::ImportCSR(QueryContext *query_context, ImportOperatorState 
     SegmentID segment_id = Catalog::GetNextSegmentID(table_entry_);
     SharedPtr<SegmentEntry> segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, txn);
     UniquePtr<BlockEntry> block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), 0, 0, table_entry_->ColumnCount(), txn);
-    auto column_vector = MakeShared<ColumnVector>(block_entry->GetColumnBlockEntry(0)->GetColumnVector(buffer_mgr));
+    try {
+        auto column_vector = MakeShared<ColumnVector>(block_entry->GetColumnBlockEntry(0)->GetColumnVector(buffer_mgr));
 
-    i64 row_id = 0;
-    while (true) {
-        i64 off = 0;
-        file_handler->Read(&off, sizeof(i64));
-        i64 nnz = off - prev_off;
-        SizeT data_len = sparse_info->DataSize(nnz);
-        auto tmp_indice_ptr = MakeUnique<char[]>(sizeof(i32) * nnz);
-        auto data_ptr = MakeUnique<char[]>(data_len);
-        idx_reader->Read(tmp_indice_ptr.get(), sizeof(i32) * nnz);
-        data_reader->Read(data_ptr.get(), data_len);
-        auto indice_ptr = ConvertCSRIndice(std::move(tmp_indice_ptr), sparse_info.get(), nnz);
+        i64 row_id = 0;
+        while (true) {
+            i64 off = 0;
+            file_handler->Read(&off, sizeof(i64));
+            i64 nnz = off - prev_off;
+            SizeT data_len = sparse_info->DataSize(nnz);
+            auto tmp_indice_ptr = MakeUnique<char[]>(sizeof(i32) * nnz);
+            auto data_ptr = MakeUnique<char[]>(data_len);
+            idx_reader->Read(tmp_indice_ptr.get(), sizeof(i32) * nnz);
+            data_reader->Read(data_ptr.get(), data_len);
+            auto indice_ptr = ConvertCSRIndice(std::move(tmp_indice_ptr), sparse_info.get(), nnz);
 
-        auto value = Value::MakeSparse(nnz, std::move(indice_ptr), std::move(data_ptr), sparse_info);
-        column_vector->AppendValue(value);
+            auto value = Value::MakeSparse(nnz, std::move(indice_ptr), std::move(data_ptr), sparse_info);
+            column_vector->AppendValue(value);
 
-        block_entry->IncreaseRowCount(1);
-        prev_off = off;
-        ++row_id;
-        if (row_id == nrow) {
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            SaveSegmentData(table_entry_, txn, segment_entry);
-            break;
-        }
-        if (block_entry->GetAvailableCapacity() <= 0) {
-            segment_entry->AppendBlockEntry(std::move(block_entry));
-            if (segment_entry->Room() <= 0) {
+            block_entry->IncreaseRowCount(1);
+            prev_off = off;
+            ++row_id;
+            if (row_id == nrow) {
+                segment_entry->AppendBlockEntry(std::move(block_entry));
                 SaveSegmentData(table_entry_, txn, segment_entry);
-
-                segment_id = Catalog::GetNextSegmentID(table_entry_);
-                segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+                break;
             }
-            block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
-            column_vector = MakeShared<ColumnVector>(block_entry->GetColumnBlockEntry(0)->GetColumnVector(buffer_mgr));
+            if (block_entry->GetAvailableCapacity() <= 0) {
+                segment_entry->AppendBlockEntry(std::move(block_entry));
+                if (segment_entry->Room() <= 0) {
+                    SaveSegmentData(table_entry_, txn, segment_entry);
+
+                    segment_id = Catalog::GetNextSegmentID(table_entry_);
+                    segment_entry = SegmentEntry::NewSegmentEntry(table_entry_, segment_id, query_context->GetTxn());
+                }
+                block_entry = BlockEntry::NewBlockEntry(segment_entry.get(), segment_entry->GetNextBlockID(), 0, table_entry_->ColumnCount(), txn);
+                column_vector = MakeShared<ColumnVector>(block_entry->GetColumnBlockEntry(0)->GetColumnVector(buffer_mgr));
+            }
         }
+        auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", nrow));
+        import_op_state->result_msg_ = std::move(result_msg);
+    } catch (const RecoverableException &e) {
+        std::move(*block_entry).Cleanup();
+        std::move(*segment_entry).Cleanup();
+        throw;
     }
-    auto result_msg = MakeUnique<String>(fmt::format("IMPORT {} Rows", nrow));
-    import_op_state->result_msg_ = std::move(result_msg);
 }
 
 void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState *import_op_state) {
@@ -494,8 +513,20 @@ void PhysicalImport::ImportCSV(QueryContext *query_context, ImportOperatorState 
     parser_context->parser_ = ZsvParser(opts.get());
 
     ZsvStatus csv_parser_status;
-    while ((csv_parser_status = parser_context->parser_.ParseMore()) == zsv_status_ok) {
-        ;
+    try {
+        while ((csv_parser_status = parser_context->parser_.ParseMore()) == zsv_status_ok) {
+            ;
+        }
+    } catch (const ParserException &e) {
+        parser_context->column_vectors_.clear();
+        std::move(*parser_context->block_entry_).Cleanup();
+        std::move(*parser_context->segment_entry_).Cleanup();
+        throw;
+    } catch (const RecoverableException &e) {
+        parser_context->column_vectors_.clear();
+        std::move(*parser_context->block_entry_).Cleanup();
+        std::move(*parser_context->segment_entry_).Cleanup();
+        throw;
     }
     parser_context->parser_.Finish();
 
@@ -551,8 +582,14 @@ void PhysicalImport::ImportJSONL(QueryContext *query_context, ImportOperatorStat
         String json_str;
         if (stream_io.ReadLine(json_str)) {
             nlohmann::json line_json = nlohmann::json::parse(json_str);
-
-            JSONLRowHandler(line_json, column_vectors);
+            try {
+                JSONLRowHandler(line_json, column_vectors);
+            } catch (const RecoverableException &e) {
+                column_vectors.clear();
+                std::move(*block_entry).Cleanup();
+                std::move(*segment_entry).Cleanup();
+                throw;
+            }
             block_entry->IncreaseRowCount(1);
             ++row_count;
 
@@ -657,8 +694,14 @@ void PhysicalImport::ImportJSON(QueryContext *query_context, ImportOperatorState
                 column_vectors.emplace_back(block_column_entry->GetColumnVector(txn->buffer_mgr()));
             }
         }
-
-        JSONLRowHandler(json_entry, column_vectors);
+        try {
+            JSONLRowHandler(json_entry, column_vectors);
+        } catch (const RecoverableException &e) {
+            column_vectors.clear();
+            std::move(*block_entry).Cleanup();
+            std::move(*segment_entry).Cleanup();
+            throw;
+        }
         block_entry->IncreaseRowCount(1);
         ++row_count;
     }
@@ -709,7 +752,7 @@ void PhysicalImport::CSVRowHandler(void *context) {
     auto *buffer_mgr = txn->buffer_mgr();
 
     auto segment_entry = parser_context->segment_entry_;
-    UniquePtr<BlockEntry> block_entry = std::move(parser_context->block_entry_);
+    UniquePtr<BlockEntry> &block_entry = parser_context->block_entry_;
 
     // if column count is larger than columns defined from schema, extra columns are abandoned
     if (column_count > table_entry->ColumnCount()) {
@@ -1154,7 +1197,14 @@ void PhysicalImport::ImportPARQUET(QueryContext *query_context, ImportOperatorSt
             SharedPtr<arrow::ChunkedArray> column = table->column(column_idx);
             auto &column_vector = column_vectors[column_idx];
             auto array = column->chunk(chunk_idxs[column_idx]);
-            ParquetValueHandler(array, column_vector, value_idxs[column_idx]);
+            try {
+                ParquetValueHandler(array, column_vector, value_idxs[column_idx]);
+            } catch (const RecoverableException &e) {
+                column_vectors.clear();
+                std::move(*block_entry).Cleanup();
+                std::move(*segment_entry).Cleanup();
+                throw;
+            }
             if (++value_idxs[column_idx] >= array->length()) {
                 ++chunk_idxs[column_idx];
                 value_idxs[column_idx] = 0;
