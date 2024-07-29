@@ -35,7 +35,7 @@ CharTypeTable::CharTypeTable(bool use_def_delim) {
         return;
     // set the lower 4 bit to record default char type
     for (u8 i = 0; i < BYTE_MAX; i++) {
-        if (std::isalnum(i))
+        if (std::isalnum(i) || i > 127)
             continue;
         else if (std::isspace(i))
             char_type_table_[i] = SPACE_CHR;

@@ -25,20 +25,20 @@ CREATE INDEX ft_index ON sqllogic_test_enwiki(body) USING FULLTEXT;
 query TTI
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3;block_max=compare');
 ----
-Anarchism 30-APR-2012 03:25:17.000 0 21.620300
+Anarchism 30-APR-2012 03:25:17.000 0 22.299635
 
 # only phrase
 query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', '"social customs"', 'topn=3;block_max=compare');
 ----
-Anarchism 30-APR-2012 03:25:17.000 6 20.881144
+Anarchism 30-APR-2012 03:25:17.000 6 20.753590
 
 # phrase and term
 query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle,body^5', '"social customs" harmful', 'topn=3');
 ----
-Anarchism 30-APR-2012 03:25:17.000 0 21.620300
-Anarchism 30-APR-2012 03:25:17.000 6 20.881144
+Anarchism 30-APR-2012 03:25:17.000 0 22.299635
+Anarchism 30-APR-2012 03:25:17.000 6 20.753590
 
 # copy data from csv file
 query I
@@ -48,8 +48,8 @@ COPY sqllogic_test_enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DE
 query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', 'harmful chemical', 'topn=3;block_max=compare');
 ----
-Anarchism 30-APR-2012 03:25:17.000 0 22.533094
-Anarchism 30-APR-2012 03:25:17.000 4294967296 22.533094
+Anarchism 30-APR-2012 03:25:17.000 0 23.241112
+Anarchism 30-APR-2012 03:25:17.000 4294967296 23.241112
 
 # copy data from csv file
 query I
@@ -59,17 +59,17 @@ COPY sqllogic_test_enwiki FROM '/var/infinity/test_data/enwiki_99.csv' WITH ( DE
 query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
 ----
-Anarchism 30-APR-2012 03:25:17.000 0 25.498550
-Anarchism 30-APR-2012 03:25:17.000 4294967296 25.498550
-Anarchism 30-APR-2012 03:25:17.000 8589934592 25.498550
+Anarchism 30-APR-2012 03:25:17.000 0 26.370461
+Anarchism 30-APR-2012 03:25:17.000 4294967296 26.370461
+Anarchism 30-APR-2012 03:25:17.000 8589934592 26.370461
 
 
 query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle,body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
 ----
-Anarchism 30-APR-2012 03:25:17.000 0 25.498550
-Anarchism 30-APR-2012 03:25:17.000 4294967296 25.498550
-Anarchism 30-APR-2012 03:25:17.000 8589934592 25.498550
+Anarchism 30-APR-2012 03:25:17.000 0 26.370461
+Anarchism 30-APR-2012 03:25:17.000 4294967296 26.370461
+Anarchism 30-APR-2012 03:25:17.000 8589934592 26.370461
 
 
 statement ok
@@ -78,9 +78,9 @@ CREATE INDEX ft_index2 ON sqllogic_test_enwiki(doctitle) USING FULLTEXT;
 query TTI rowsort
 SELECT doctitle, docdate, ROW_ID(), SCORE() FROM sqllogic_test_enwiki SEARCH MATCH TEXT ('doctitle,body^5', 'harmful chemical anarchism', 'topn=3;block_max=compare');
 ----
-Anarchism 30-APR-2012 03:25:17.000 0 25.500229
-Anarchism 30-APR-2012 03:25:17.000 4294967296 25.500231
-Anarchism 30-APR-2012 03:25:17.000 8589934592 25.500231
+Anarchism 30-APR-2012 03:25:17.000 0 26.372139
+Anarchism 30-APR-2012 03:25:17.000 4294967296 26.372139
+Anarchism 30-APR-2012 03:25:17.000 8589934592 26.372139
 
 
 # Clean up

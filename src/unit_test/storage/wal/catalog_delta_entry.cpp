@@ -473,7 +473,9 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
             for (auto &entry : merged_entries) {
                 global_catalog_delta_entry->ReplayDeltaEntry(std::move(entry));
             }
-            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(5);
+            TxnTimeStamp max_ts;
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(max_ts);
+            EXPECT_EQ(max_ts, 4);
             EXPECT_EQ(merged_entry->operations().size(), 1u);
         }
     }
@@ -511,7 +513,9 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
             for (auto &entry : merged_entries) {
                 global_catalog_delta_entry->ReplayDeltaEntry(std::move(entry));
             }
-            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(7);
+            TxnTimeStamp max_ts;
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(max_ts);
+            EXPECT_EQ(max_ts, 6);
             EXPECT_EQ(merged_entry->operations().size(), 1u);
         }
     }

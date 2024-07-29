@@ -318,9 +318,14 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn) {
                               txn->TxnID(),
                               txn->BeginTS(),
                               max_commit_ts));
-
-        if (!txn->Checkpoint(max_commit_ts, is_full_checkpoint)) {
-            return;
+        if (is_full_checkpoint) {
+            txn->FullCheckpoint(max_commit_ts);
+        } else {
+            auto new_max_commit_ts = txn->DeltaCheckpoint();
+            if (new_max_commit_ts == 0) {
+                return;
+            }
+            max_commit_ts = new_max_commit_ts;
         }
         SetLastCkpWalSize(wal_size);
 
