@@ -646,14 +646,9 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str) {
 #else
     // Used in libc++
     try {
-        std::string float_str;
-        size_t len = str.end() - str.begin();
-        float_str.reserve(len);
-        for(size_t i = 0; i < len; ++ i) {
-            float_str.push_back(str[i]);
-        }
+        const std::string float_str(str);
         value = std::stof(float_str);
-    } catch(const std::exception &e) {
+    } catch (const std::exception &e) {
         std::string error_message = fmt::format("Error: parse float: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
@@ -673,14 +668,9 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
     ParserAssert(ret == str.size(), "Error: parse double error");
 #else
     try {
-        std::string double_str;
-        size_t len = str.end() - str.begin();
-        double_str.reserve(len);
-        for(size_t i = 0; i < len; ++ i) {
-            double_str.push_back(str[i]);
-        }
-        value = std::stod(str.data());
-    } catch(const std::exception &e) {
+        const std::string double_str(str);
+        value = std::stod(double_str);
+    } catch (const std::exception &e) {
         std::string error_message = fmt::format("Error: parse double: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);

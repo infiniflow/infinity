@@ -182,7 +182,7 @@ private:
             ss << ((T *)(embedding.ptr))[i] << ',';
         }
         ss << ((T *)(embedding.ptr))[dimension - 1] << "]";
-        return ss.str();
+        return std::move(ss).str();
     }
 
     template <>
@@ -193,7 +193,7 @@ private:
             ss << int(((int8_t *)(embedding.ptr))[i]) << ',';
         }
         ss << int(((int8_t *)(embedding.ptr))[dimension - 1]) << "]";
-        return ss.str();
+        return std::move(ss).str();
     }
 
     template <>
@@ -204,41 +204,39 @@ private:
             ss << int(((uint8_t *)(embedding.ptr))[i]) << ',';
         }
         ss << int(((uint8_t *)(embedding.ptr))[dimension - 1]) << "]";
-        return ss.str();
+        return std::move(ss).str();
     }
 
     template <>
     inline std::string Embedding2StringInternal<float>(const EmbeddingType &embedding, size_t dimension) {
         std::stringstream ss;
         ss << "[";
+        char buffer[20];
         for (size_t i = 0; i < dimension - 1; ++i) {
-            char buffer[20];
-            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[i], std::chars_format::general, 7);
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[i]);
             ss.write((const char *)buffer, ptr - buffer);
             ss.put(',');
         }
-        char buffer[20];
-        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[dimension - 1], std::chars_format::general, 7);
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[dimension - 1]);
         ss.write((const char *)buffer, ptr - buffer);
         ss << "]";
-        return ss.str();
+        return std::move(ss).str();
     }
 
     template <>
     inline std::string Embedding2StringInternal<double>(const EmbeddingType &embedding, size_t dimension) {
         std::stringstream ss;
         ss << "[";
+        char buffer[30];
         for (size_t i = 0; i < dimension - 1; ++i) {
-            char buffer[20];
-            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((double *)(embedding.ptr))[i], std::chars_format::general, 16);
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((double *)(embedding.ptr))[i]);
             ss.write((const char *)buffer, ptr - buffer);
             ss.put(',');
         }
-        char buffer[20];
-        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((double *)(embedding.ptr))[dimension - 1], std::chars_format::general, 16);
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((double *)(embedding.ptr))[dimension - 1]);
         ss.write((const char *)buffer, ptr - buffer);
         ss << "]";
-        return ss.str();
+        return std::move(ss).str();
     }
 
     [[nodiscard]] static inline std::string BitmapEmbedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
