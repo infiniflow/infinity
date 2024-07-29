@@ -7,7 +7,7 @@ from infinity.errors import ErrorCode
 from infinity.local_infinity.table import LocalTable
 from infinity.remote_thrift.utils import check_valid_name, name_validity_check
 from infinity.common import ConflictType, InfinityException
-from infinity.local_infinity.utils import select_res_to_polars
+from infinity.local_infinity.utils import select_res_to_polars, get_local_constant_expr_from_python_value
 from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.embedded_infinity_ext import WrapColumnDef, WrapDataType, LogicalType, ConstraintType, LiteralType, WrapConstantExpr, \
     EmbeddingDataType, WrapEmbeddingType, WrapSparseType, WrapIndexInfo
@@ -18,33 +18,12 @@ def get_constant_expr(column_info):
     if "default" in column_info:
         default = column_info["default"]
 
-    constant_expression = WrapConstantExpr()
     if default is None:
+        constant_expression = WrapConstantExpr()
         constant_expression.literal_type = LiteralType.kNull
         return constant_expression
     else:
-        if isinstance(default, str):
-            constant_expression.literal_type = LiteralType.kString
-            constant_expression.str_value = default
-
-        elif isinstance(default, int):
-            constant_expression.literal_type = LiteralType.kInteger
-            constant_expression.i64_value = default
-
-        elif isinstance(default, float) or isinstance(default, np.float32):
-            constant_expression.literal_type = LiteralType.kDouble
-            constant_expression.f64_value = default
-
-        elif isinstance(default, list):
-            if isinstance(default[0], int):
-                constant_expression.literal_type = LiteralType.kIntegerArray
-                constant_expression.i64_array_value = default
-            elif isinstance(default[0], float):
-                constant_expression.literal_type = LiteralType.kDoubleArray
-                constant_expression.f64_array_value = default
-        else:
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
-        return constant_expression
+        return get_local_constant_expr_from_python_value(default)
 
 def get_ordinary_info(column_info, column_defs, column_name, index):
     # "c1": {"type": "int", "constraints":["primary key", ...], "default": 1/"asdf"/[1,2]/...}
