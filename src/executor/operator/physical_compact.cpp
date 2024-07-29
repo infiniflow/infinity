@@ -196,6 +196,8 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     }
     if (new_block->row_count() > 0) {
         new_segment->AppendBlockEntry(std::move(new_block));
+    } else {
+        std::move(*new_block).Cleanup();
     }
     if (new_segment->actual_row_count() > new_segment->row_capacity()) {
         UnrecoverableError(fmt::format("Compact segment {} error because of row count overflow.", new_segment_id));
