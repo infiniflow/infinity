@@ -294,41 +294,51 @@ void TxnManager::FinishTxn(Txn *txn) {
     auto txn_state = txn->GetTxnState();
     auto txn_type = txn->GetTxnType();
 
+    TxnTimeStamp finished_ts = ++start_ts_;
+
     std::lock_guard guard(locker_);
     if (txn_state == TxnState::kRollbacked) {
         // Rollback by TXN self
         txn_map_.erase(txn->TxnID());
         begin_txn_by_ts_.erase(txn->BeginTS());
-        return;
-    }
 
-    if (txn_type == TxnType::kRead) {
-        // Read only TXN
-        txn_map_.erase(txn->TxnID());
-        begin_txn_by_ts_.erase(txn->BeginTS());
-        return;
-    } else if (txn_type == TxnType::kInvalid) {
-        String error_message = "Txn type is invalid";
-        UnrecoverableError(error_message);
-    }
+        // If rollback happened before commit phase, finishing_txns won't involve the txn.
+        // If rollback happened at the commit phase which only caused by txn conflict, the finishing_txns will involve the txn.
+        finishing_txns_.erase(txn);
 
-    TxnTimeStamp finished_ts = ++start_ts_;
-
-    if (txn_state == TxnState::kCommitting) {
-        txn->SetTxnCommitted(finished_ts);
-        finished_txns_.emplace_back(txn);
-    } else if (txn_state == TxnState::kRollbacking) {
-        txn->SetTxnRollbacked();
     } else {
-        String error_message = fmt::format("Invalid transaction status: {}", ToString(txn_state));
-        UnrecoverableError(error_message);
-    }
-    SizeT remove_n = finishing_txns_.erase(txn);
-    if (remove_n == 0) {
-        UnrecoverableError("Txn not found in finishing_txns_");
+        // Committing status and Write TXN
+        switch(txn_type) {
+            case TxnType::kRead: {
+                // Read only TXN
+                txn_map_.erase(txn->TxnID());
+                begin_txn_by_ts_.erase(txn->BeginTS());
+                return;
+            }
+            case TxnType::kInvalid: {
+                String error_message = "Txn type is invalid";
+                UnrecoverableError(error_message);
+            }
+            case TxnType::kWrite: {
+                break;
+            }
+        }
+
+        if (txn_state == TxnState::kCommitting) {
+            txn->SetTxnCommitted(finished_ts);
+            finished_txns_.emplace_back(txn);
+        } else {
+            String error_message = fmt::format("Invalid transaction status: {}", ToString(txn_state));
+            UnrecoverableError(error_message);
+        }
+
+        SizeT remove_n = finishing_txns_.erase(txn);
+        if (remove_n == 0) {
+            UnrecoverableError("Txn not found in finishing_txns_");
+        }
     }
 
-    TxnTimeStamp least_uncommitted_begin_ts = finished_ts;
+    TxnTimeStamp oldest_uncommitted_begin_ts = finished_ts;
     while (!begin_txn_by_ts_.empty()) {
         auto first_txn_ts = begin_txn_by_ts_.begin()->first;
         auto first_txn_id = begin_txn_by_ts_.begin()->second;
@@ -338,27 +348,40 @@ void TxnManager::FinishTxn(Txn *txn) {
         }
         Txn* first_txn_ptr = txn_iter->second.get();
         auto status = first_txn_ptr->GetTxnState();
-        if (status == TxnState::kCommitted || status == TxnState::kRollbacked) {
+
+        if(status == TxnState::kCommitted) {
             begin_txn_by_ts_.erase(first_txn_ts);
-        } else {
-            least_uncommitted_begin_ts = first_txn_ptr->BeginTS();
-            break;
+            continue;
         }
+
+        if(status == TxnState::kRollbacked) {
+            UnrecoverableError(fmt::format("Rollback Txn: {}, should already be removed before.", first_txn_id));
+        }
+
+        if(status == TxnState::kInvalid) {
+            UnrecoverableError(fmt::format("Txn: {} has invalid txn state.", first_txn_id));
+        }
+
+        oldest_uncommitted_begin_ts = first_txn_ptr->BeginTS();
+        break;
     }
 
     while (!finished_txns_.empty()) {
         auto *finished_txn = finished_txns_.front();
-        if (finished_txn->CommittedTS() > least_uncommitted_begin_ts) {
-            break;
-        }
         auto finished_txn_id = finished_txn->TxnID();
-        finished_txns_.pop_front();
+        if(finished_txn->CommittedTS() <= oldest_uncommitted_begin_ts) {
+            // The finished txn is committed before the oldest commit or rollback TXN ts
+            finished_txns_.pop_front();
 
-        // LOG_INFO(fmt::format("Txn: {} is erased", finished_txn_id));
-        SizeT remove_n = txn_map_.erase(finished_txn_id);
-        if (remove_n == 0) {
-            String error_message = fmt::format("Txn: {} not found in txn map", finished_txn_id);
-            UnrecoverableError(error_message);
+            // LOG_INFO(fmt::format("Txn: {} is erased", finished_txn_id));
+            SizeT remove_n = txn_map_.erase(finished_txn_id);
+            if (remove_n == 0) {
+                String error_message = fmt::format("Txn: {} not found in txn map", finished_txn_id);
+                UnrecoverableError(error_message);
+            }
+        } else {
+            LOG_TRACE(fmt::format("{} finish TS: {}, later than {}", finished_txn_id, finished_txn->CommittedTS(), oldest_uncommitted_begin_ts));
+            break;
         }
     }
 }
