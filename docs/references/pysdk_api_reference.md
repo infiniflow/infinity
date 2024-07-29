@@ -6,9 +6,11 @@ slug: /python_api_reference
 
 ## connect
 
-***class*** **infinity.connect(*uri*)**
+```python
+infinity.connect(uri)
+```
 
-Connect to the Infinity server and return an Infinity object. 
+Connects to the Infinity server and gets an Infinity object. 
 
 ### Parameters
 
@@ -37,9 +39,11 @@ Connect to the Infinity server and return an Infinity object.
 
 ## disconnect
 
-**infinity.disconnect()**
+```python
+infinity.disconnect()
+```
 
-Disconnect the current Infinity object from the server.
+Disconnects the current Infinity object from the server.
 
 > This method is automatically called when an Infinity object is destructed.
 
@@ -56,9 +60,11 @@ infinity_obj.disconnect()
 
 ## create_database
 
-**Infinity.create_database(*db_name, conflict_type = ConflictType.Error*)**
+```python
+Infinity.create_database(db_name, conflict_type = ConflictType.Error)
+```
 
-Create a database with a given name. `conflict_type` determines the approach to take when a database with the same name exists. 
+Creates a database with a given name. `conflict_type` specifies the policy when a database with the same name exists. 
 
 ### Parameters
 
@@ -79,14 +85,16 @@ infinity_obj.create_database("my_database")
 
 ## drop_database
 
-**Infinity.drop_database(*db_name, conflict_type = ConflictType.Error*)**
+```python
+Infinity.drop_database(db_name, conflict_type = ConflictType.Error)
+```
 
-Drop a database by name.
+Drops a database by name.
 
 ### Parameters
 
 - `db_name`: `str` Name of the database
-- `conflict_type`:  `enum` The countermeasure to take when a database with the same name exists.  See `ConflictType`, which is defined in the **infinity.common** package. 
+- `conflict_type`:  `enum` Policy for handling an existing database with the same name.  See `ConflictType`, which is defined in the **infinity.common** package. 
   - `Error`
   - `Ignore`
 
@@ -102,9 +110,11 @@ infinity_obj.drop_database("my_database")
 
 ## list_databases
 
-**Infinity.list_databases()**
+```python
+Infinity.list_databases()
+```
 
-List all databases.
+Lists all databases.
 
 ### Returns
 
@@ -120,9 +130,11 @@ res.db_names #["my_database"]
 
 ## get_database
 
-**Infinity.get_database(*db_name*)**
+```python
+Infinity.get_database(db_name)
+```
 
-Retrieve a database object by name.
+Retrieves a database object by name.
 
 ### Parameters
 
@@ -141,9 +153,11 @@ db_obj=infinity_obj.get_database("my_database")
 
 ## show_database
 
-**Infinity.show_database(*db_name*)**
+```python
+Infinity.show_database(db_name)
+```
 
-Retrieve the metadata of a database by name.
+Retrieves the metadata of a database by name.
 
 ### Parameters
 
@@ -169,33 +183,46 @@ metadata.table_count  #0
 
 ## create_table
 
-**Database.create_table(*table_name, columns_definition, conflict_type = ConflictType.Error*)**
+```python
+Database.create_table(table_name, columns_definition, conflict_type = ConflictType.Error)
+```
 
-Create a table with a given name, defining each column in it.
+Creates a table with a specified name and defined columns.
 
 ### Parameters
 
-- **table_name : str(not empty)**  Name of the table.
-- **columns_definition : dict[str, str]**
-A dict object whose key value pair indicates name of the column and its datatype. Especially, a vector column should be declared as `"vector, \<dimension>\, \<datatype>\"`
-- **conflict_type : ConflictType** enum type defined in the `infinity.common` package:
-  - `Error`
-  - `Ignore`
+#### table_name: `str`, *Required*
+
+Name of the table. Must not be empty. 
+
+#### columns_definition: `dict[str, dict[str, Any]]`, *Required*
+
+Definitions for all table columns as a dictionary. Each key in the dictionary is a column name (`str`), with a corresponding 'value' dictionary defining the column's data type and default value information in key-value pairs:
+
+- **Data type** (`"type"`)  
+  The data type of the column. 
+- **Default value** (`"default"`)  
+  The default column value that a cell takes if not explicitly set.  
 
 
-### note
-- primitive datatype:
-    - int8
-    - int16
-    - int32/int/integer
-    - int64
-    - float/float32
-    - double/float64
-    - bool
-- vector datatype:
-    - float/float32
-- complex datatype:
-    - varchar
+#### conflict_type: `ConflictType`, *Optional*
+
+Conflict policy in `enum` for handling situations when a table with the same name exists. 
+  - `Error`: Raise an error if a table with the same name exists.
+  - `Ignore`: Ignore the table creation requrest and keep the table with the same name as-is.
+  - `Replace`: Drop the existing table and create a new one. 
+
+:::tip NOTE
+You must import the `infinity.common` package to set `ConflictType`:
+
+```python
+from infinity.common import ConflictType
+```
+:::
+
+:::tip NOTE
+If `ConflictType` is not set, it defaults to `Error`.
+:::
 
 ### Returns
 
@@ -204,54 +231,113 @@ A dict object whose key value pair indicates name of the column and its datatype
 
 ### Examples
 
+#### Create a table with an integer column only
+
 ```python
-db_obj.create_table("table_example", {
-            "c1": {
-                "type": "int",
-                "constraints": ["primary key",],
-                "default": 1
-            },
-            "c2": {
-                "type": "vector,3,float32",
-                "default": [2.0, 1.2, 3.1],
-            }
-        }, None)
-# CREATE TABLE table_example(
-#   c1 INT PRIMARY KEY DEFAULT 1
-#   c2 EMBEDDING(FLOAT, 3) DEFAULT [2.0,1.2,3.1]
-# );
+# The `create_table`method supports creating integer columns in the following data types:
+# - int8
+# - int16
+# - int/int32/integer
+# - int64
+db_obj.create_table("my_table", {"c1": {"type": "int", "default": 1}})
+```
 
-db_obj.create_table("my_table", {
-            "c1": {
-                "type": "varchar", 
-                "constraints": ["primary key"]
-            },
-            "c2": {
-                "type": "float"
-            }
-        })
-# CREATE TABLE my_table(
-#   c1 VARCHAR PRIMARY KEY,
-#   c2 FLOAT
-# );
+#### Create a table with a float column only
 
-db_obj.create_table("test_create_embedding_table", 
-                    {"c1": {"type": "vector,128,float"}}, ConflictType.Replace)
-# a 128-dimensional float vector
+```python
+# The `create_table`method supports creating float columns in the following data types:
+# - float/float32
+# - double/float64
+db_obj.create_table("my_table", {"c1": {"type": "float64"}})
+```
+
+#### Create a table with a string column only
+
+```python
+db_obj.create_table("my_table", {"c1": {"type": "varchar"}})
+```
+
+#### Create a table with a bool column only
+
+```python
+db_obj.create_table("my_table", {"c1": {"type": "bool"}})
+```
+
+#### Create a table with a vector column only
+
+```python
+# Create a table with a vector column only:  
+# - `vector`: The column is a vector column
+# - `128`: The vector dimension
+# - `float`: The primitive data type of the vectors. Can be `float`/`float32` or `double`/`float64`
+db_obj.create_table("my_table", {"c1": {"type": "vector,128,float"}}, None)
+
+```
+
+#### Create a table with a sparse vector column only
+
+```python
+from infinity.common import ConflictType
+# Create a table with a vector column only:  
+# - `sparse`: The column is a sparse vector column
+# - `128`: The sparse vector dimension
+# - `float`: The primitive data type of the sparse vectors. Can be `float`/`float32` or `double`/`float64`
+# - `int`: The data type of the sparse vector indices. Can be `int8`, `int16`, `int`/`int32`/`integer`, or `int64`
+db_obj.create_table("my_table", {"c1": {"type": "sparse,128,float,int"}}, ConflictType.Error)
+```
+
+#### Create a table with a tensor column only
+
+```python
+from infinity.common import ConflictType
+# Create a table with a tensor column only:  
+# - `tensor`: The column is a tensor column
+# - `4`: Dimension of each vector unit in the tensor
+# - `float64`: The primitive data type of the tensors. Can be `float`/`float32` or `double`/`float64`
+db_obj.create_table("my_table", {"c1": {"type": "tensor,4,float64"}}, ConflictType.Ignore)
+```
+
+#### Create a table with a tensor array column only
+
+```python
+from infinity.common import ConflictType
+# Create a table with a tensor array column only:  
+# - `tensorarray`: The column is a tensor array column
+# - `6`: Dimension of each vector unit in the tensor arrays
+# - `float`: The primitive data type of the tensor arrays. Can be `float`/`float32` or `double`/`float64`
+db_obj.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Replace)
 ```
 
 ## drop_table
 
-**Database.drop_table(*table_name, conflict_type = ConflictType.Error*)**
+```python
+Database.drop_table(table_name, conflict_type = ConflictType.Error)
+```
 
-Drop a table by name.
+Deletes a table from the database by its name.
 
 ### Parameters
 
-- **table_name : str(not empty)** Name of the table.
-- **conflict_type : ConflictType** Enum type `ConflictType` is defined in the **infinity.common** package: 
-   - `Error`
-   - `Ignore`
+#### table_name: `str`, *Required* 
+
+Name of the table to delete. Must not be empty. 
+
+#### conflict_type: `ConflictType`, *Optional*
+Conflict policy in `enum` for handling situations when a table with the same name does not exist. 
+  - `Error`: Raise an error if the specified table does not exist.
+  - `Ignore`: Ignore the operation and proceed regardless, if the specified table does not exist.
+
+:::tip NOTE
+You must import the `infinity.common` package to set `ConflictType`:
+
+```python
+from infinity.common import ConflictType
+```
+:::
+
+:::tip NOTE
+If `ConflictType` is not set, it defaults to `Error`.
+:::
 
 ### Returns
 
@@ -261,18 +347,31 @@ Drop a table by name.
 ### Examples
 
 ```python
-db_obj.drop_table("my_table", ConflictType.Error)
+# Delete a table named 'my_table':
+# If the specified table does not exist, raise an error. 
+db_obj.drop_table("my_table", infinity.common.ConflictType.Error)
+```
+
+```python
+from infinity.common import ConflictType
+# Drop a table named 'my_table':
+# If the specified table does not exist, silently ignore the operation and proceed.
+db_obj.drop_table("my_table", ConflictType.Ignore)
 ```
 
 ## get_table
 
-**Database.get_table(*table_name*)**
+```python
+Database.get_table(table_name)
+```
 
-Retrieve a table object by name.
+Retrieves a table object by its name.
 
 ### Parameters
 
-- `table_name`: `str` Name of the table to retrieve.
+#### `table_name`: `str` *Required*
+
+Name of the table to retrieve. Must not be empty. 
 
 ### Returns
 
@@ -290,32 +389,36 @@ except Exception as e:
 
 ## list_tables
 
-**Database.list_tables()**
+```python
+Database.list_tables()
+```
 
-List all tables in the current database.
+Lists all tables in the current database.
 
 ### Returns
 
-- Success: `db_names` `list[str]`
+- Success: `db_names` in `list[str]`
 - Failure: `Exception`
 
 ### Examples
 
 ```python
-res = infinity_obj.list_tables()
+res = db_obj.list_tables()
 res.table_names #["my_table"]
 ```
 
-## show_table
+## show_tables
 
-**Database.show_tables()**
+```python
+Database.show_tables()
+```
 
 Get the information of all tables in the database.
 
 ### Returns
 
 - Success: response `metadata`: `polars.DataFrame` The returned 
-DataFrame contains eight columns and each row in it corresponds to a table in the database.These eight columns are:
+DataFrame contains eight columns and each row in it corresponds to a table in the database. These eight columns are:
     - `database`: `str`
     - `table`: `str`
     - `type`: `str`
@@ -346,9 +449,11 @@ res
 
 ## create_index
 
-**Table.create_index(*index_name, index_infos, conflict_type = ConflictType.Error*)**
+```python
+Table.create_index(index_name, index_infos, conflict_type = ConflictType.Error)
+```
 
-Create an index by `IndexInfo` list.
+Creates an index by `IndexInfo` list.
 
 ### Parameters
 
@@ -445,7 +550,9 @@ table_obj.create_index("my_index",
 
 ## drop_index
 
-**Table.drop_index(*index_name, conflict_type = ConflictType.Error*)**
+```python
+Table.drop_index(index_name, conflict_type = ConflictType.Error)
+```
 
 Drop an index by name.
 
@@ -469,9 +576,11 @@ table_obj.drop_index("my_index")
 
 ## show_index
 
-**Table.show_index(*index_name*)**
+```python
+Table.show_index(index_name)
+```
 
-Retrieve the metadata of an index by name.
+Retrieves the metadata of an index by name.
 
 ### Parameters
 
@@ -508,9 +617,11 @@ print(res)
 
 ## list_indexes
 
-**Table.list_indexes(*index_name*)**
+```python
+Table.list_indexes(index_name)
+```
 
-List the indexes built on the table.
+Lists the indexes built on the table.
 
 ### Returns
 
@@ -534,8 +645,8 @@ Inserts rows of data into the current table.
 
 ### Parameters
 
-**data** : `json`, *Required*  
-Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `json` (one record) or `json` list (multiple rows), with each key-value pair corresponding to a column name and table cell value.
+#### data: `dict[str, Any]`, *Required*  
+Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `dict[str, Any]` (one row) or `list[dict[str, Any]]` (multiple rows), with each key-value pair corresponding to a column name and table cell value.
 
 :::tip NOTE
 Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once. 
@@ -580,7 +691,7 @@ table_instance.insert({"c1": 1, "c7": "Tom", "c12": True})
 
 ```python
 # Create a table with a integer column and a 3-d vector column:
-table_instance = db_instance.create_table("vector_table", {"c1": {"type": "integer", "default": 0}, "vector_column": {"type": "vector,3,float"}})
+table_obj = db_obj.create_table("vector_table", {"c1": {"type": "integer", "default": 2024}, "vector_column": {"type": "vector,3,float"}})
 
 # Insert one incomplete row into the table:
 # Note that the 'c1' cell defaults to 0. 
@@ -593,19 +704,20 @@ table_obj.insert([{"vector_column": [1.1, 2.2, 3.3]}, {"vector_column": [4.4, 5.
 #### Insert sparse vectors
 
 ```python
-# Create a table with a 100-d sparse vector column only:
-table_instance = db_instance.create_table("sparse_vector_table", {"sparse_column": {"type": "sparse,100,float,int"}})
+# Create a table with a integer column and a 100-d sparse vector column:
+table_obj = db_obj.create_table("sparse_vector_table", {"c1": {"type": "integer"}, "sparse_column": {"type": "sparse,100,float,int"}})
 
 # Insert one row into the table:
 # `indices` specifies the correspoing indices to the values in `values`.
-table_instance.insert({"sparse_column": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}})
+# Note that the second row sets "c1" as 2024 by default. 
+table_obj.insert([{"c1": 2022, "sparse_column": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}, {"sparse_column":  {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]}}}])
 ```
 
 #### Insert tensors
 
 ```python
-# Create a table with a tensor column only: 
-table_instance = db_instance.create_table("tensor_table", {"tensor_column": {"type": "tensor,4,float"}})
+# Create a table with a tensor column: 
+table_obj = db_obj.create_table("tensor_table", {"c1": {"type": "integer", "default": 2024}, "tensor_column": {"type": "tensor,4,float"}})
 
 # Insert one row into the table:
 table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}])
@@ -614,10 +726,9 @@ table_instance.insert([{"tensor_column": [[1.0, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 
 #### Insert tensor arrays
 
 ```python
-# Creat a table with a tensor array column only:
-table_instance = db_instance.create_table("tensor_array_table", {"tensor_array_column": {"type": "tensorarray,2,float"}})
-
-table_instance.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])
+# Creat a table with only one tensor array column:
+table_obj = db_obj.create_table("tensor_array_table", {"tensor_array_column": {"type": "tensorarray,2,float"}})
+table_obj.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])
 ```
 
 ## import_data
@@ -637,7 +748,7 @@ Absolute path to the file for export. Supported file types include:
 - `json`
 - `jsonl`
 
-#### import_options: `json`
+#### import_options: `dict[str, bool | str]`
 
 Example: `{"header":True, "delimiter": "\t", file_type}`
 
@@ -667,13 +778,13 @@ Example: `{"header":True, "delimiter": "\t", file_type}`
 #### Import a csv file
 
 ```python
-table_instance.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file_type": "csv", "delimiter": "\t"})
+table_obj.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file_type": "csv", "delimiter": "\t"})
 ```
 
 #### Import a jsonl file
 
 ```python
-table_instance.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
+table_obj.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
 ```
 
 ## export_data
@@ -693,7 +804,7 @@ Absolute path to the file for export. Supported file types include:
 - `csv`
 - `jsonl`
   
-#### export_options: `json`
+#### export_options: `dict[str, Any]`
 
 Example: `{"header": False, "delimiter": "\t", "file_type": "jsonl", "offset": 2, "limit": 5}`
 
@@ -733,20 +844,22 @@ Columns to export to the output file, for example, `["num", "name", "score"]`. I
 #### Export your table to a csv file
 
 ```python
-table_instance.export_data(os.getcwd() + "/export_data.csv", {"header": True, "file_type": "csv", "delimiter": ",", "offset": 2, "limit": 7, "row_limit": 3}, ["num", "name", "score"])
+table_obj.export_data(os.getcwd() + "/export_data.csv", {"header": True, "file_type": "csv", "delimiter": ",", "offset": 2, "limit": 7, "row_limit": 3}, ["num", "name", "score"])
 ```
 
 #### Export your table to a jsonl file
 
 ```python
-table_instance.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2}, ["num", "name", "score"])
+table_obj.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2}, ["num", "name", "score"])
 ```
 
 ## delete
 
-**Table.delete(*cond = None*)**
+```python
+Table.delete(cond = None)
+```
 
-Delete rows by condition.The condition is similar to the WHERE conditions in SQL. If  `cond` is not specified, all the data will be removed in the table object.
+Deletes rows by condition.The condition is similar to the WHERE conditions in SQL. If  `cond` is not specified, all the data will be removed in the table object.
 
 ### Parameters
 
@@ -766,9 +879,11 @@ table_obj.delete()
 
 ## update
 
-**Table.update(*cond = None*)**
+```python
+Table.update(cond = None)
+```
 
-Search for rows that match the specified condition and update them accordingly.
+Searches for rows that match the specified condition and update them accordingly.
 
 ### Parameters
 
@@ -791,9 +906,10 @@ table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 
 ## output
 
-**Table.output(*columns*)**
+```python
+Table.output(columns)
 Specify the columns to display in the search output, or perform aggregation operations or arithmetic calculations. 
-
+```
 ```python
 table_obj.output(["*"])
 table_obj.output(["num", "body"])
@@ -819,9 +935,11 @@ table_obj.output(["c1+5"])
 
 ## filter
 
-**Table.filter(*cond*)**
+```python
+Table.filter(cond)
+```
 
-Create a filtering condition expression.
+Creates a filtering condition expression.
 
 ### Parameters
 
@@ -841,9 +959,11 @@ table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 
 ## knn
 
-**Table.knn(*vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None*)**
+```python
+Table.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
+```
 
-Build a KNN search expression. Find the top n closet rows to the given vector.
+Builds a KNN search expression. Find the top n closet rows to the given vector.
 
 ### Parameters
 
@@ -873,7 +993,9 @@ table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 
 ## match sparse
 
-**Table.match_sparse(*vector_column_name, sparse_data, distance_type, topn, opt_params = None*)**
+```python
+Table.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params = None)
+```
 
 ### Parameters
 
@@ -900,7 +1022,7 @@ table_obj.match_sparse('col1_with_bmp_index', {"indices": [0, 10, 20], "values":
 
 ## match
 
-Create a full-text search expression.
+Creates a full-text search expression.
 
 ### Parameters
 
@@ -933,9 +1055,11 @@ for question in questions:
 
 ## match tensor
 
-**Table.match_tensor(*vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)**
+```python
+Table.match_tensor(vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)
+```
 
-Build a KNN tensor search expression. Find the top n closet rows to the given tensor according to chosen method.
+Builds a KNN tensor search expression. Find the top n closet rows to the given tensor according to chosen method.
 
 For example, find k most match tensors generated by ColBERT.
 
@@ -970,9 +1094,11 @@ match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim
 
 ## fusion
 
-**Table.fusion(*method, options_text = ''*)**
+```python
+Table.fusion(method, options_text = '')
+```
 
-Build a fusion expression.
+Builds a fusion expression.
 
 ### Parameters
 
@@ -1022,7 +1148,9 @@ table_obj.fusion('match_tensor', 'topn=2', make_match_tensor_expr('t', [[0.0, -1
 
 ## optimize
 
-**Table.optimize(*index_name, opt_params*)**
+```python
+Table.optimize(index_name, opt_params)
+```
 
 ### Parameters
 
@@ -1044,10 +1172,21 @@ table_obj.optimize('bmp_index_name', {'topk': '10'})
 
 ## get result
 
-**Table.to_result()**
-**Table.to_df()**
-**Table.to_pl()**
-**Table.to_arrow()**
+```python
+Table.to_result()
+```
+
+```python
+Table.to_df()
+```
+
+```python
+Table.to_pl()
+```
+
+```python
+Table.to_arrow()
+```
 
 After querying, these four methods above can get result into specific type. 
 `Note: output method must be executed before get result`
@@ -1062,7 +1201,7 @@ Python's built-in type
 
 ### Examples
 
-```
+```python
 res = table_obj.output(['c1', 'c1']).to_df()
 
 res = table_obj.output(['*'])

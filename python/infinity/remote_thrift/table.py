@@ -27,6 +27,7 @@ from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
 from infinity.remote_thrift.types import build_result
 from infinity.remote_thrift.utils import traverse_conditions, name_validity_check, select_res_to_polars
+from infinity.remote_thrift.utils import get_remote_constant_expr_from_python_value
 from infinity.table import Table, ExplainType
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
 
@@ -175,85 +176,9 @@ class RemoteTable(Table, ABC):
             column_names = list(row.keys())
             parse_exprs = []
             for column_name, value in row.items():
-                constant_expression = None
-                if isinstance(value, str):
-                    constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String,
-                                                              str_value=value)
-
-                elif isinstance(value, bool):
-                    constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Boolean,
-                                                              bool_value=value)
-
-                elif isinstance(value, int):
-                    constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
-                                                              i64_value=value)
-
-                elif isinstance(value, float) or isinstance(value, np.float32):
-                    constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
-                                                              f64_value=value)
-                elif isinstance(value, list):
-                    if isinstance(value[0], int):
-                        constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
-                                                                  i64_array_value=value)
-                    elif isinstance(value[0], float):
-                        constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
-                                                                  f64_array_value=value)
-                    elif isinstance(value[0], list) or isinstance(value[0], np.ndarray):
-                        if isinstance(value[0], np.ndarray):
-                            value = [x.tolist() for x in value]
-                        if isinstance(value[0][0], int):
-                            constant_expression = ttypes.ConstantExpr(
-                                literal_type=ttypes.LiteralType.IntegerArray,
-                                i64_array_value=[x for xs in value for x in xs])
-                        elif isinstance(value[0][0], float):
-                            constant_expression = ttypes.ConstantExpr(
-                                literal_type=ttypes.LiteralType.DoubleArray,
-                                f64_array_value=[x for xs in value for x in xs])
-                        elif isinstance(value[0][0], list):
-                            if isinstance(value[0][0][0], int):
-                                constant_expression = ttypes.ConstantExpr(
-                                    literal_type=ttypes.LiteralType.IntegerTensorArray,
-                                    i64_tensor_array_value=value)
-                            elif isinstance(value[0][0][0], float):
-                                constant_expression = ttypes.ConstantExpr(
-                                    literal_type=ttypes.LiteralType.DoubleTensorArray,
-                                    f64_tensor_array_value=value)
-                elif isinstance(value, np.ndarray) and value.ndim <= 2:
-                    float_list = value.flatten().tolist()
-                    if isinstance(float_list[0], int):
-                        constant_expression = ttypes.ConstantExpr(
-                            literal_type=ttypes.LiteralType.IntegerArray,
-                            i64_array_value=float_list)
-                    elif isinstance(float_list[0], float):
-                        constant_expression = ttypes.ConstantExpr(
-                            literal_type=ttypes.LiteralType.DoubleArray,
-                            f64_array_value=float_list)
-                    else:
-                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid list type: {type(value)}")
-                elif isinstance(value, dict):
-                    if isinstance(value["values"][0], int):
-                        if isinstance(value["indices"][0], int):
-                            constant_expression = ttypes.ConstantExpr(
-                                literal_type=ttypes.LiteralType.SparseIntegerArray,
-                                i64_array_value = value["values"],
-                                i64_array_idx = value["indices"])
-                        else:
-                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
-                    elif isinstance(value["values"][0], float):
-                        if isinstance(value["indices"][0], int):
-                            constant_expression = ttypes.ConstantExpr(
-                                literal_type=ttypes.LiteralType.SparseDoubleArray,
-                                f64_array_value = value["values"],
-                                i64_array_idx = value["indices"])
-                        else:
-                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
-                else:
-                    raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
-
-                expr_type = ttypes.ParsedExprType(
-                    constant_expr=constant_expression)
+                constant_expression = get_remote_constant_expr_from_python_value(value)
+                expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
                 paser_expr = ttypes.ParsedExpr(type=expr_type)
-
                 parse_exprs.append(paser_expr)
 
             field = ttypes.Field(parse_exprs=parse_exprs)
@@ -398,32 +323,10 @@ class RemoteTable(Table, ABC):
                 update_expr_array: list[ttypes.UpdateExpr] = []
                 for row in data:
                     for column_name, value in row.items():
-
-                        if isinstance(value, str):
-                            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String,
-                                                                      str_value=value)
-                        elif isinstance(value, int):
-                            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
-                                                                      i64_value=value)
-                        elif isinstance(value, float) or isinstance(value, np.float32):
-                            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
-                                                                      f64_value=value)
-                        elif isinstance(value, list):
-                            if isinstance(value[0], int):
-                                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
-                                                                          i64_array_value=value)
-                            elif isinstance(value[0], float):
-                                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
-                                                                          f64_array_value=value)
-                        else:
-                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
-
-                        expr_type = ttypes.ParsedExprType(
-                            constant_expr=constant_expression)
+                        constant_expression = get_remote_constant_expr_from_python_value(value)
+                        expr_type = ttypes.ParsedExprType(constant_expr=constant_expression)
                         paser_expr = ttypes.ParsedExpr(type=expr_type)
-                        update_expr = ttypes.UpdateExpr(
-                            column_name=column_name, value=paser_expr)
-
+                        update_expr = ttypes.UpdateExpr(column_name=column_name, value=paser_expr)
                         update_expr_array.append(update_expr)
 
         res = self._conn.update(db_name=self._db_name, table_name=self._table_name, where_expr=where_expr,

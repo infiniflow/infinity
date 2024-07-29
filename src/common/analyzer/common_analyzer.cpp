@@ -21,6 +21,7 @@ import stl;
 import term;
 import stemmer;
 import analyzer;
+import tokenizer;
 module common_analyzer;
 
 namespace infinity {
@@ -30,6 +31,12 @@ CommonLanguageAnalyzer::CommonLanguageAnalyzer()
     : Analyzer(), lowercase_string_buffer_(term_string_buffer_limit_), stemmer_(MakeUnique<Stemmer>()), case_sensitive_(false), contain_lower_(false),
       extract_eng_stem_(true), extract_synonym_(false), cjk_(false), remove_stopwords_(false) {
     stemmer_->Init(STEM_LANG_ENGLISH);
+    TokenizeConfig token_config;
+    String divide_str("@#$");
+    String unite_str("/");
+    token_config.AddDivides(divide_str);
+    token_config.AddUnites(unite_str);
+    tokenizer_.SetConfig(token_config);
 }
 
 CommonLanguageAnalyzer::~CommonLanguageAnalyzer() {}

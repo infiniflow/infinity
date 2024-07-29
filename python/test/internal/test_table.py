@@ -690,6 +690,8 @@ class TestTable(TestSdk):
             # wait all threads finished
             concurrent.futures.wait(futures)
 
+        db_obj.drop_table(table_name, ConflictType.Ignore)
+
     # create empty column table
     def _test_create_empty_column_table(self):
         """
