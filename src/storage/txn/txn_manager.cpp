@@ -299,8 +299,8 @@ void TxnManager::FinishTxn(Txn *txn) {
     std::lock_guard guard(locker_);
     if (txn_state == TxnState::kRollbacked) {
         // Rollback by TXN self
-        txn_map_.erase(txn->TxnID());
         begin_txn_by_ts_.erase(txn->BeginTS());
+        txn_map_.erase(txn->TxnID());
 
         // If rollback happened before commit phase, finishing_txns won't involve the txn.
         // If rollback happened at the commit phase which only caused by txn conflict, the finishing_txns will involve the txn.
@@ -311,8 +311,8 @@ void TxnManager::FinishTxn(Txn *txn) {
         switch(txn_type) {
             case TxnType::kRead: {
                 // Read only TXN
-                txn_map_.erase(txn->TxnID());
                 begin_txn_by_ts_.erase(txn->BeginTS());
+                txn_map_.erase(txn->TxnID());
                 return;
             }
             case TxnType::kInvalid: {
