@@ -65,6 +65,7 @@ public:
         //     UnrecoverableError(fmt::format("Transaction isn't in ROLLBACKING status. {}", ToString(state_)));
         // }
         state_ = TxnState::kRollbacked;
+        committed_ts_ = commit_ts_;
     }
 
     inline void SetTxnCommitted(TxnTimeStamp committed_ts) {

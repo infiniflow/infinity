@@ -168,6 +168,20 @@ bool BlockEntry::CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts
     return deleted[block_offset] == 0 || deleted[block_offset] > check_ts;
 }
 
+bool BlockEntry::CheckDeleteConflict(const Vector<BlockOffset> &block_offsets) const {
+    std::shared_lock lock(rw_locker_);
+
+    auto block_version_handle = this->block_version_->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
+
+    for (BlockOffset block_offset : block_offsets) {
+        if (block_version->deleted_[block_offset] != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void BlockEntry::SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const {
     BlockOffset read_offset = 0;
     while (true) {

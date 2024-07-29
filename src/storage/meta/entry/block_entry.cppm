@@ -148,6 +148,8 @@ public:
 
     bool CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts, bool check_append) const;
 
+    bool CheckDeleteConflict(const Vector<BlockOffset> &block_offsets) const;
+
     void SetDeleteBitmask(TxnTimeStamp query_ts, Bitmask &bitmask) const;
 
     i32 GetAvailableCapacity();
