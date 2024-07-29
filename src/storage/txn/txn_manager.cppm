@@ -49,9 +49,9 @@ public:
 
     Txn *BeginTxn(UniquePtr<String> txn_text, bool ckp_txn = false);
 
-    Txn *GetTxn(TransactionID txn_id);
+    Txn *GetTxn(TransactionID txn_id) const;
 
-    TxnState GetTxnState(TransactionID txn_id);
+    TxnState GetTxnState(TransactionID txn_id) const;
 
     bool CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts);
 

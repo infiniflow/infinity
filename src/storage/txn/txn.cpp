@@ -474,6 +474,8 @@ bool Txn::CheckConflict(Catalog *catalog) {
 }
 
 bool Txn::CheckConflict(Txn *other_txn) {
+    LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, other_txn->txn_id_));
+
     return txn_store_.CheckConflict(other_txn->txn_store_);
 }
 
