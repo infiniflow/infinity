@@ -121,6 +121,8 @@ public:
 
     void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
 
+    bool CheckConflict(Catalog *catalog, Txn *txn) const;
+
     bool CheckConflict(const TxnTableStore *txn_table_store) const;
 
     void PrepareCommit1() const;
@@ -212,6 +214,8 @@ public:
     void AddDeltaOp(CatalogDeltaEntry *local_delta_opsm, TxnManager *txn_mgr) const;
 
     void MaintainCompactionAlg() const;
+
+    bool CheckConflict(Catalog *catalog);
 
     bool CheckConflict(const TxnStore &txn_store);
 

@@ -469,9 +469,11 @@ TxnTimeStamp Txn::Commit() {
     return commit_ts;
 }
 
-bool Txn::CheckConflict(Txn *other_txn) {
-    LOG_TRACE(fmt::format("Txn {} check conflict with {}.", txn_id_, other_txn->txn_id_));
+bool Txn::CheckConflict(Catalog *catalog) {
+    return txn_store_.CheckConflict(catalog);
+}
 
+bool Txn::CheckConflict(Txn *other_txn) {
     return txn_store_.CheckConflict(other_txn->txn_store_);
 }
 

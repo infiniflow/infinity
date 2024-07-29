@@ -93,6 +93,8 @@ public:
 
     TxnTimeStamp Commit();
 
+    bool CheckConflict(Catalog *catalog);
+
     bool CheckConflict(Txn *txn);
 
     void CommitBottom();
@@ -213,6 +215,8 @@ public:
     WalEntry *GetWALEntry() const;
 
     const SharedPtr<String> GetTxnText() const { return txn_text_; }
+
+    const String &db_name() const { return db_name_; }
 
 private:
     void CheckTxnStatus();
