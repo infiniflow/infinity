@@ -153,7 +153,6 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
         if (fs::exists(dst_fp)) {
             fs::remove(dst_fp);
         }
-        std::error_code ec;
         fs::create_symlink(src_fp, dst_fp);
     } catch (const fs::filesystem_error& e) {
         String error_message = fmt::format("Failed to link file {}.", file_path);
