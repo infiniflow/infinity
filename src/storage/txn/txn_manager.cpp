@@ -58,35 +58,35 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     u64 new_txn_id = ++catalog_->next_txn_id_;
 
     // Record the start ts of the txn
-    TxnTimeStamp ts = ++start_ts_;
+    TxnTimeStamp begin_ts = ++start_ts_;
     if (ckp_txn) {
         if (ckp_begin_ts_ != UNCOMMIT_TS) {
             // not set ckp_begin_ts_ may not truncate the wal file.
-            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing", ckp_begin_ts_, ts));
+            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing", ckp_begin_ts_, begin_ts));
         } else {
-            LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", ts));
-            ckp_begin_ts_ = ts;
+            LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
+            ckp_begin_ts_ = begin_ts;
         }
     }
 
     // Create txn instance
-    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts, std::move(txn_text)));
+    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, begin_ts, std::move(txn_text)));
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
     beginned_txns_.emplace_back(new_txn);
 
-    // LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
+    // LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, begin_ts));
     return new_txn.get();
 }
 
-Txn *TxnManager::GetTxn(TransactionID txn_id) {
+Txn *TxnManager::GetTxn(TransactionID txn_id) const {
     std::lock_guard guard(locker_);
     Txn *res = txn_map_.at(txn_id).get();
     return res;
 }
 
-TxnState TxnManager::GetTxnState(TransactionID txn_id) {
+TxnState TxnManager::GetTxnState(TransactionID txn_id) const {
     std::lock_guard guard(locker_);
     auto iter = txn_map_.find(txn_id);
     if (iter == txn_map_.end()) {
@@ -111,18 +111,20 @@ bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) 
 }
 
 TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
+    txn->SetTxnRead();
+
     std::lock_guard guard(locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
-    txn->SetTxnRead();
     return commit_ts;
 }
 
 TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
+    txn->SetTxnWrite();
+
     std::lock_guard guard(locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
     finishing_txns_.emplace(txn);
-    txn->SetTxnWrite();
     return commit_ts;
 }
 
