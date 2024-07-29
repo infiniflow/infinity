@@ -77,6 +77,75 @@ class TestInfinity:
 
         res = db_obj.drop_table("table_2")
         assert res.error_code == ErrorCode.OK
+    def _test_insert_bool(self):
+        """
+        target: test insert bool column
+        method: create table with bool column
+        expected: ok
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("python_test_bool_insert", ConflictType.Ignore)
+        table_obj = db_obj.create_table("python_test_bool_insert", {"c1": {"type": "float"}, "c2": {"type": "bool"}},
+                                        ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert([{"c1": -1, "c2": True}, {"c1": 2, "c2": False}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-1, 2), 'c2': (True, False)}).astype(
+            {'c1': dtype('float32'), 'c2': dtype('bool')}))
+        res = db_obj.drop_table("python_test_bool_insert", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        db_obj.drop_table("python_test_bool_insert_default", ConflictType.Ignore)
+        table_instance = db_obj.create_table("python_test_bool_insert_default", {
+            "c1": {"type": "int8", "default": 0},
+            "c2": {"type": "int16", "default": 0},
+            "c3": {"type": "int", "default": 0},
+            "c4": {"type": "int32", "default": 0},  # Same as int
+            "c5": {"type": "integer", "default": 0},  # Same as int
+            "c6": {"type": "int64", "default": 0},
+            "c7": {"type": "varchar"},
+            "c8": {"type": "float", "default": 1.0},
+            "c9": {"type": "float32", "default": 1.0},  # Same as float
+            "c10": {"type": "double", "default": 1.0},
+            "c11": {"type": "float64", "default": 1.0},  # Same as double
+            "c12": {"type": "bool", "default": False}
+        })
+        assert table_instance
+        res = table_instance.insert({"c1": 1, "c7": "Tom"})
+        assert res.error_code == ErrorCode.OK
+        res = table_instance.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': (1,), 'c2': (0,), 'c3': (0,), 'c4': (0,), 'c5': (0,), 'c6': (0,), 'c7': ("Tom",), 'c8': (1.0,),
+             'c9': (1.0,), 'c10': (1.0,), 'c11': (1.0,), 'c12': (False,)}).astype(
+            {'c1': dtype('int8'), 'c2': dtype('int16'), 'c3': dtype('int32'), 'c4': dtype('int32'),
+             'c5': dtype('int32'), 'c6': dtype('int64'), 'c7': dtype('object'), 'c8': dtype('float32'),
+             'c9': dtype('float32'), 'c10': dtype('float64'), 'c11': dtype('float64'), 'c12': dtype('bool')}))
+        res = db_obj.drop_table("python_test_bool_insert_default", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+    def _test_insert_float16_bfloat16(self):
+        """
+        target: test insert float16 bfloat16 column
+        method: create table with float16 bfloat16 column
+        expected: ok
+        """
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("python_test_fp16_bf16", ConflictType.Ignore)
+        table_obj = db_obj.create_table("python_test_fp16_bf16", {"c1": {"type": "float"}, "c2": {"type": "float16"},
+                                                                  "c3": {"type": "bfloat16"}}, ConflictType.Error)
+        assert table_obj
+        res = table_obj.insert(
+            [{"c1": -1, "c2": 1, "c3": -1}, {"c1": 2, "c2": -2, "c3": 2}, {"c1": -3, "c2": 3, "c3": -3},
+             {"c1": 4, "c2": -4, "c3": 4}, {"c1": -5, "c2": 5, "c3": -5}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': (-1, 2, -3, 4, -5), 'c2': (1, -2, 3, -4, 5), 'c3': (-1, 2, -3, 4, -5)}).astype(
+            {'c1': dtype('float32'), 'c2': dtype('float32'), 'c3': dtype('float32')}))
+        res = db_obj.drop_table("python_test_fp16_bf16", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
     def _test_insert_varchar(self):
         """
         target: test insert varchar column
