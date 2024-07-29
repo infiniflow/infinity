@@ -20,6 +20,7 @@ from infinity.db import Database
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.table import RemoteTable
 from infinity.remote_thrift.utils import check_valid_name, name_validity_check, select_res_to_polars
+from infinity.remote_thrift.utils import get_remote_constant_expr_from_python_value
 from infinity.common import ConflictType
 from infinity.common import InfinityException
 
@@ -34,29 +35,7 @@ def get_constant_expr(column_info):
         constant_exp = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Null)
         return constant_exp
     else:
-        constant_expression = None
-        if isinstance(default, str):
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String,
-                                                      str_value=default)
-        elif isinstance(default, bool):
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Boolean,
-                                                      bool_value=default)
-        elif isinstance(default, int):
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64,
-                                                      i64_value=default)
-        elif isinstance(default, float) or isinstance(default, np.float32):
-            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double,
-                                                      f64_value=default)
-        elif isinstance(default, list):
-            if isinstance(default[0], int):
-                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
-                                                          i64_array_value=default)
-            elif isinstance(default[0], float):
-                constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
-                                                          f64_array_value=default)
-        else:
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
-        return constant_expression
+        return get_remote_constant_expr_from_python_value(default)
 
 
 def get_ordinary_info(column_info, column_defs, column_name, index):

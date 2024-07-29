@@ -382,7 +382,7 @@ public:
     void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     // Pick and remove all operations that are committed before `max_commit_ts`, after `full_ckp_ts`
-    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp max_commit_ts);
+    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp &max_commit_ts);
 
     Vector<CatalogDeltaOpBrief> GetOperationBriefs() const;
 

@@ -1002,13 +1002,13 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 }
 
 // called by bg_task
-bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog_path, String &delta_catalog_name) {
+bool Catalog::SaveDeltaCatalog(TxnTimeStamp &max_commit_ts, String &delta_catalog_path, String &delta_catalog_name) {
+    // Pick the delta entry to flush and set the max commit ts.
+    UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
+
     delta_catalog_path = *catalog_dir_;
     delta_catalog_name = CatalogFile::DeltaCheckpointFilename(max_commit_ts);
     String full_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
-
-    // Check the SegmentEntry's for flush the data to disk.
-    UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
 
     if (flush_delta_entry->operations().empty()) {
         LOG_TRACE("Save delta catalog ops is empty. Skip flush.");

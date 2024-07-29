@@ -284,18 +284,18 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def limit(self, limit: Optional[int]) -> InfinityLocalQueryBuilder:
-        constant_exp = WrapConstantExpr(
-            literal_type=LiteralType.kInteger, i64_value=limit
-        )
+        constant_exp = WrapConstantExpr()
+        constant_exp.literal_type = LiteralType.kInteger
+        constant_exp.i64_value = limit
         limit_expr = WrapParsedExpr(ParsedExprType.kConstant)
         limit_expr.constant_expr = constant_exp
         self._limit = limit_expr
         return self
 
     def offset(self, offset: Optional[int]) -> InfinityLocalQueryBuilder:
-        constant_exp = WrapConstantExpr(
-            literal_type=LiteralType.kInteger, i64_value=offset
-        )
+        constant_exp = WrapConstantExpr()
+        constant_exp.literal_type = LiteralType.kInteger
+        constant_exp.i64_value = offset
         offset_expr = WrapParsedExpr(ParsedExprType.kConstant)
         offset_expr.constant_expr = constant_exp
         self._offset = offset_expr
