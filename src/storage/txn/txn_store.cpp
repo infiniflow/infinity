@@ -275,6 +275,9 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     //     Catalog::RollbackPopulateIndex(txn_index_store.get(), txn_);
     // }
     Catalog::RollbackCompact(table_entry_, txn_id, abort_ts, compact_state_);
+    for (const auto &[new_segment_store, old_segments] : compact_state_.compact_data_) {
+        std::move(*new_segment_store.segment_entry_).Cleanup();
+    }
     blocks_.clear();
 
     for (auto &[table_index_entry, ptr_seq_n] : txn_indexes_) {
