@@ -291,6 +291,8 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         object_width = 8;
                         break;
                     }
+                    case kElemFloat16:
+                    case kElemBFloat16:
                     case kElemFloat: {
                         object_id = 1021;
                         object_width = 4;
@@ -341,6 +343,8 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         object_width = 8;
                         break;
                     }
+                    case kElemFloat16:
+                    case kElemBFloat16:
                     case kElemFloat: {
                         object_id = 1021;
                         object_width = 4;
@@ -351,7 +355,7 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                         object_width = 8;
                         break;
                     }
-                    default: {
+                    case kElemInvalid: {
                         String error_message = "Should not reach here";
                         UnrecoverableError(error_message);
                     }

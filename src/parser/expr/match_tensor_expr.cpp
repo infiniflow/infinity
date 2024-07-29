@@ -127,35 +127,47 @@ void MatchTensorExpr::SetQueryTensorStr(std::string embedding_data_type, const C
     }
     embedding_data_type_ = EmbeddingT::String2EmbeddingDataType(embedding_data_type);
     switch (embedding_data_type_) {
-        case kElemBit: {
+        case EmbeddingDataType::kElemBit: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<bool>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemInt8: {
+        case EmbeddingDataType::kElemUInt8: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<uint8_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case EmbeddingDataType::kElemInt8: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<int8_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemInt16: {
+        case EmbeddingDataType::kElemInt16: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<int16_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemInt32: {
+        case EmbeddingDataType::kElemInt32: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<int32_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemInt64: {
+        case EmbeddingDataType::kElemInt64: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<int64_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat16: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<Float16T>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<BFloat16T>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case EmbeddingDataType::kElemFloat: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<float>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemDouble: {
+        case EmbeddingDataType::kElemDouble: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<double>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        default: {
+        case EmbeddingDataType::kElemInvalid: {
             ParserError(fmt::format("Invalid embedding data type: {}", embedding_data_type));
         }
     }
@@ -168,7 +180,11 @@ void FillConcatenatedTensorData(T *output_ptr, const std::vector<U> &data_array,
         ParserError(error_info);
     }
     for (uint32_t i = 0; i < expect_dim; ++i) {
-        output_ptr[i] = data_array[i];
+        if constexpr (std::is_same_v<T, Float16T> || std::is_same_v<T, BFloat16T>) {
+            output_ptr[i] = static_cast<float>(data_array[i]);
+        } else {
+            output_ptr[i] = data_array[i];
+        }
     }
 }
 
@@ -269,7 +285,11 @@ GetConcatenatedTensorData(const std::vector<U> &data_array, const uint32_t tenso
         auto result = std::make_unique_for_overwrite<char[]>(query_total_dimension * sizeof(T));
         auto embedding_data_ptr = reinterpret_cast<T *>(result.get());
         for (uint32_t i = 0; i < query_total_dimension; ++i) {
-            embedding_data_ptr[i] = data_array[i];
+            if constexpr (std::is_same_v<T, Float16T> || std::is_same_v<T, BFloat16T>) {
+                embedding_data_ptr[i] = static_cast<float>(data_array[i]);
+            } else {
+                embedding_data_ptr[i] = data_array[i];
+            }
         }
         return result;
     }

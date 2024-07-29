@@ -15,10 +15,14 @@
 #pragma once
 
 #include "parser_assert.h"
+#include "type/number/bfloat16.h"
+#include "type/number/float16.h"
 #include <bitset>
+#include <cassert>
 #include <charconv>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <sstream>
 
 namespace infinity {
@@ -32,6 +36,8 @@ enum EmbeddingDataType : int8_t {
     kElemFloat,
     kElemDouble,
     kElemUInt8,
+    kElemFloat16,
+    kElemBFloat16,
     kElemInvalid,
 };
 
@@ -80,6 +86,16 @@ inline EmbeddingDataType ToEmbeddingDataType<uint8_t>() {
     return EmbeddingDataType::kElemUInt8;
 }
 
+template <>
+inline EmbeddingDataType ToEmbeddingDataType<float16_t>() {
+    return EmbeddingDataType::kElemFloat16;
+}
+
+template <>
+inline EmbeddingDataType ToEmbeddingDataType<bfloat16_t>() {
+    return EmbeddingDataType::kElemBFloat16;
+}
+
 struct EmbeddingType {
 public:
     char *ptr{};
@@ -118,11 +134,15 @@ public:
                 return "FLOAT64";
             case kElemUInt8:
                 return "UINT8";
+            case kElemFloat16:
+                return "FLOAT16";
+            case kElemBFloat16:
+                return "BFLOAT16";
             default: {
                 ParserError("Unexpected embedding type");
             }
         }
-        return std::string();
+        return {};
     }
 
     static EmbeddingDataType String2EmbeddingDataType(std::string_view sv) {
@@ -142,6 +162,10 @@ public:
             return kElemDouble;
         } else if (sv == "UINT8") {
             return kElemUInt8;
+        } else if (sv == "FLOAT16" || sv == "F16") {
+            return kElemFloat16;
+        } else if (sv == "BFLOAT16" || sv == "BF16") {
+            return kElemBFloat16;
         } else {
             ParserError("Unexpected embedding type");
         }
@@ -166,76 +190,41 @@ public:
                 return Embedding2StringInternal<double>(embedding, dimension);
             case kElemUInt8:
                 return Embedding2StringInternal<uint8_t>(embedding, dimension);
+            case kElemFloat16:
+                return Embedding2StringInternal<float16_t>(embedding, dimension);
+            case kElemBFloat16:
+                return Embedding2StringInternal<bfloat16_t>(embedding, dimension);
             default: {
                 ParserError("Unexpected embedding type");
             }
         }
-        return std::string();
+        return {};
     }
 
 private:
     template <typename T>
     static inline std::string Embedding2StringInternal(const EmbeddingType &embedding, size_t dimension) {
+        static_assert(!std::is_same_v<T, bool>, "bit embedding is not supported in this function.");
+        auto *val_ptr = reinterpret_cast<T *>(embedding.ptr);
         std::stringstream ss;
-        ss << "[";
-        for (size_t i = 0; i < dimension - 1; ++i) {
-            ss << ((T *)(embedding.ptr))[i] << ',';
+        ss << '[';
+        for (size_t i = 0; i < dimension; ++i) {
+            if (i) {
+                ss << ',';
+            }
+            if constexpr (std::is_same_v<T, float16_t> || std::is_same_v<T, bfloat16_t> || std::is_same_v<T, float> || std::is_same_v<T, double>) {
+                // Need to cast float16, bfloat16 to float to apply std::to_chars.
+                using FormatFloatType = std::conditional_t<std::is_same_v<T, double>, double, float>;
+                char buffer[30];
+                auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), static_cast<FormatFloatType>(val_ptr[i]));
+                ss.write(static_cast<const char *>(buffer), ptr - buffer);
+            } else {
+                // Need to cast i8, u8 to int to avoid printing as character.
+                using FormatIntType = std::conditional_t<(std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>), int, T>;
+                ss << static_cast<FormatIntType>(val_ptr[i]);
+            }
         }
-        ss << ((T *)(embedding.ptr))[dimension - 1] << "]";
-        return std::move(ss).str();
-    }
-
-    template <>
-    inline std::string Embedding2StringInternal<int8_t>(const EmbeddingType &embedding, size_t dimension) {
-        std::stringstream ss;
-        ss << "[";
-        for (size_t i = 0; i < dimension - 1; ++i) {
-            ss << int(((int8_t *)(embedding.ptr))[i]) << ',';
-        }
-        ss << int(((int8_t *)(embedding.ptr))[dimension - 1]) << "]";
-        return std::move(ss).str();
-    }
-
-    template <>
-    inline std::string Embedding2StringInternal<uint8_t>(const EmbeddingType &embedding, size_t dimension) {
-        std::stringstream ss;
-        ss << "[";
-        for (size_t i = 0; i < dimension - 1; ++i) {
-            ss << int(((uint8_t *)(embedding.ptr))[i]) << ',';
-        }
-        ss << int(((uint8_t *)(embedding.ptr))[dimension - 1]) << "]";
-        return std::move(ss).str();
-    }
-
-    template <>
-    inline std::string Embedding2StringInternal<float>(const EmbeddingType &embedding, size_t dimension) {
-        std::stringstream ss;
-        ss << "[";
-        char buffer[20];
-        for (size_t i = 0; i < dimension - 1; ++i) {
-            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[i]);
-            ss.write((const char *)buffer, ptr - buffer);
-            ss.put(',');
-        }
-        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((float *)(embedding.ptr))[dimension - 1]);
-        ss.write((const char *)buffer, ptr - buffer);
-        ss << "]";
-        return std::move(ss).str();
-    }
-
-    template <>
-    inline std::string Embedding2StringInternal<double>(const EmbeddingType &embedding, size_t dimension) {
-        std::stringstream ss;
-        ss << "[";
-        char buffer[30];
-        for (size_t i = 0; i < dimension - 1; ++i) {
-            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((double *)(embedding.ptr))[i]);
-            ss.write((const char *)buffer, ptr - buffer);
-            ss.put(',');
-        }
-        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), ((double *)(embedding.ptr))[dimension - 1]);
-        ss.write((const char *)buffer, ptr - buffer);
-        ss << "]";
+        ss << ']';
         return std::move(ss).str();
     }
 
