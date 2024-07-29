@@ -270,14 +270,108 @@ void WalManager::Checkpoint(bool is_full_checkpoint) {
     TxnManager *txn_mgr = storage_->txn_manager();
     Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), true /*is_checkpoint*/);
 
-    this->CheckpointInner(is_full_checkpoint, txn);
+    if(is_full_checkpoint) {
+        FullCheckpointInner(txn);
+    } else {
+        DeltaCheckpointInner(txn);
+    }
+
     txn_mgr->CommitTxn(txn);
 }
 
 void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
     bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
 
-    this->CheckpointInner(is_full_checkpoint, ckp_task->txn_);
+    if(is_full_checkpoint) {
+        FullCheckpointInner(ckp_task->txn_);
+    } else {
+        DeltaCheckpointInner(ckp_task->txn_);
+    }
+}
+
+void WalManager::FullCheckpointInner(Txn *txn) {
+    DeferFn defer([&] { checkpoint_in_progress_.store(false); });
+
+    TxnTimeStamp last_ckp_ts = last_ckp_ts_;
+    TxnTimeStamp last_full_ckp_ts = last_full_ckp_ts_;
+    auto [max_commit_ts, wal_size] = GetCommitState();
+    max_commit_ts = std::min(max_commit_ts, txn->BeginTS()); // txn commit after txn->BeginTS() should be ignored
+    // wal_size may be larger than the actual size. but it's ok. it only makes the swap of wal file a little bit later.
+
+    if (max_commit_ts == last_full_ckp_ts) {
+        LOG_TRACE(fmt::format("Skip full checkpoint because the max_commit_ts {} is the same as the last full checkpoint", max_commit_ts));
+        return;
+    }
+    if ((last_full_ckp_ts != UNCOMMIT_TS && last_full_ckp_ts >= max_commit_ts) || (last_ckp_ts != UNCOMMIT_TS && last_ckp_ts > max_commit_ts)) {
+        String error_msg = fmt::format("last_full_ckp_ts {} >= max_commit_ts {} or last_ckp_ts {} > max_commit_ts {}",
+                                       last_full_ckp_ts,
+                                       max_commit_ts,
+                                       last_ckp_ts,
+                                       max_commit_ts);
+        UnrecoverableError(error_msg);
+    }
+
+    try {
+        LOG_DEBUG(fmt::format("Full Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
+                              txn->TxnID(),
+                              txn->BeginTS(),
+                              max_commit_ts));
+        txn->FullCheckpoint(max_commit_ts);
+        SetLastCkpWalSize(wal_size);
+
+        LOG_DEBUG(fmt::format("Full Checkpoint is done for commit_ts <= {}", max_commit_ts));
+    } catch (RecoverableException &e) {
+        LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+    } catch (UnrecoverableException &e) {
+        LOG_CRITICAL(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+        throw e;
+    }
+    last_ckp_ts_ = max_commit_ts;
+    WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
+    last_full_ckp_ts_ = max_commit_ts;
+    const auto &catalog_dir = *storage_->catalog()->CatalogDir();
+    CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
+}
+
+void WalManager::DeltaCheckpointInner(Txn *txn) {
+    DeferFn defer([&] { checkpoint_in_progress_.store(false); });
+
+    TxnTimeStamp last_ckp_ts = last_ckp_ts_;
+    auto [max_commit_ts, wal_size] = GetCommitState();
+    max_commit_ts = std::min(max_commit_ts, txn->BeginTS()); // txn commit after txn->BeginTS() should be ignored
+    // wal_size may be larger than the actual size. but it's ok. it only makes the swap of wal file a little bit later.
+
+    if (max_commit_ts == last_ckp_ts) {
+        LOG_TRACE(fmt::format("Skip delta checkpoint because the max_commit_ts {} is the same as the last checkpoint", max_commit_ts));
+        return;
+    }
+    if (last_ckp_ts != UNCOMMIT_TS && last_ckp_ts >= max_commit_ts) {
+        String error_message = fmt::format("last_ckp_ts {} >= max_commit_ts {}", last_ckp_ts, max_commit_ts);
+        UnrecoverableError(error_message);
+    }
+
+    try {
+        LOG_DEBUG(fmt::format("Delta Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
+                              txn->TxnID(),
+                              txn->BeginTS(),
+                              max_commit_ts));
+        auto new_max_commit_ts = txn->DeltaCheckpoint();
+        if (new_max_commit_ts == 0) {
+            last_ckp_ts_ = max_commit_ts;
+            return;
+        }
+        max_commit_ts = new_max_commit_ts;
+        SetLastCkpWalSize(wal_size);
+
+        LOG_DEBUG(fmt::format("Delta Checkpoint is done for commit_ts <= {}", max_commit_ts));
+    } catch (RecoverableException &e) {
+        LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+    } catch (UnrecoverableException &e) {
+        LOG_CRITICAL(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+        throw e;
+    }
+    last_ckp_ts_ = max_commit_ts;
+    WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
 }
 
 void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn) {
@@ -323,6 +417,7 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn) {
         } else {
             auto new_max_commit_ts = txn->DeltaCheckpoint();
             if (new_max_commit_ts == 0) {
+                last_ckp_ts_ = max_commit_ts; // TODO: Need to refactor
                 return;
             }
             max_commit_ts = new_max_commit_ts;
