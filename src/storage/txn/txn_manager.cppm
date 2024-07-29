@@ -65,7 +65,9 @@ public:
 
     BGTaskProcessor *bg_task_processor() const { return bg_task_processor_; }
 
-    TxnTimeStamp GetCommitTimeStampR(Txn *txn);
+    TxnTimeStamp GetNextTimestamp() {
+        return ++ start_ts_;
+    }
 
     TxnTimeStamp GetCommitTimeStampW(Txn *txn);
 

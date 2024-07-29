@@ -110,14 +110,6 @@ bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) 
     return txn->CommitTS() < begin_ts;
 }
 
-TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
-    txn->SetTxnRead();
-
-    std::lock_guard guard(locker_);
-    TxnTimeStamp commit_ts = ++start_ts_;
-    return commit_ts;
-}
-
 TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
     txn->SetTxnWrite();
 
@@ -303,25 +295,34 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
 // A Txn can be deleted when there is no uncommitted txn whose begin is less than the commit ts of the txn
 // So maintain the least uncommitted begin ts
 void TxnManager::FinishTxn(Txn *txn) {
-    std::lock_guard guard(locker_);
+    auto txn_state = txn->GetTxnState();
+    auto txn_type = txn->GetTxnType();
 
-    if (txn->GetTxnType() == TxnType::kInvalid) {
-        String error_message = "Txn type is invalid";
-        UnrecoverableError(error_message);
-    } else if (txn->GetTxnType() == TxnType::kRead) {
+    std::lock_guard guard(locker_);
+    if (txn_state == TxnState::kRollbacked) {
+        // Rollback by TXN self
         txn_map_.erase(txn->TxnID());
         return;
     }
 
+    if (txn_type == TxnType::kRead) {
+        // Read only TXN
+        txn_map_.erase(txn->TxnID());
+        return;
+    } else if (txn_type == TxnType::kInvalid) {
+        String error_message = "Txn type is invalid";
+        UnrecoverableError(error_message);
+    }
+
     TxnTimeStamp finished_ts = ++start_ts_;
-    auto state = txn->GetTxnState();
-    if (state == TxnState::kCommitting) {
+
+    if (txn_state == TxnState::kCommitting) {
         txn->SetTxnCommitted(finished_ts);
         finished_txns_.emplace_back(txn);
-    } else if (state == TxnState::kRollbacking) {
+    } else if (txn_state == TxnState::kRollbacking) {
         txn->SetTxnRollbacked();
     } else {
-        String error_message = fmt::format("Invalid transaction status: {}", ToString(state));
+        String error_message = fmt::format("Invalid transaction status: {}", ToString(txn_state));
         UnrecoverableError(error_message);
     }
     SizeT remove_n = finishing_txns_.erase(txn);

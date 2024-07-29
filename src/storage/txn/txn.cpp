@@ -428,8 +428,11 @@ WalEntry *Txn::GetWALEntry() const { return wal_entry_.get(); }
 
 TxnTimeStamp Txn::Commit() {
     if (wal_entry_->cmds_.empty() && txn_store_.ReadOnly()) {
+        // Read only transaction
+        this->SetTxnRead();
+
         // Don't need to write empty WalEntry (read-only transactions).
-        TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampR(this);
+        TxnTimeStamp commit_ts = txn_mgr_->GetNextTimestamp();
         this->SetTxnCommitting(commit_ts);
         this->SetTxnCommitted(commit_ts);
         return commit_ts;
@@ -509,16 +512,20 @@ void Txn::Rollback() {
     auto state = txn_context_.GetTxnState();
     TxnTimeStamp abort_ts = 0;
     if (state == TxnState::kStarted) {
-        abort_ts = txn_mgr_->GetCommitTimeStampR(this);
+        // Rollback TXN before commit
+        abort_ts = txn_mgr_->GetNextTimestamp();
     } else if (state == TxnState::kCommitting) {
         abort_ts = txn_context_.GetCommitTS();
     } else {
         String error_message = fmt::format("Transaction {} state is {}.", txn_id_, ToString(state));
         UnrecoverableError(error_message);
     }
+
     txn_context_.SetTxnRollbacking(abort_ts);
 
     txn_store_.Rollback(txn_id_, abort_ts);
+
+    txn_context_.SetTxnRollbacked();
 
     LOG_TRACE(fmt::format("Txn: {} is dropped.", txn_id_));
 }
