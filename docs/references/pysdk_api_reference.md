@@ -413,36 +413,44 @@ res.table_names #["my_table"]
 Database.show_tables()
 ```
 
-Get the information of all tables in the database.
+Show the information of all tables in the database.
 
 ### Returns
 
 - Success: response `metadata`: `polars.DataFrame` The returned 
 DataFrame contains eight columns and each row in it corresponds to a table in the database. These eight columns are:
-    - `database`: `str`
-    - `table`: `str`
-    - `type`: `str`
-    - `column_count`: `int64`
-    - `block_count`: `int64`
-    - `block_capacity`: `int64`
-    - `segment_count`: `int64`
-    - `segment_capacity`: `int64`
+  - `database`: `str`
+  - `table`: `str`
+  - `type`: `str`
+  - `column_count`: `int64`
+  - `block_count`: `int64`
+  - `block_capacity`: `int64`
+  - `segment_count`: `int64`
+  - `segment_capacity`: `int64`
 - Failure: `Exception`
 
 ### Examples
 
 ```python
 res = db.show_tables()
-res
-┌──────────┬─────────────────────┬───────┬──────────────┬─────────────┬────────────────┬───────────────┬──────────────────┐
-│ database ┆ table               ┆ type  ┆ column_count ┆ block_count ┆ block_capacity ┆ segment_count ┆ segment_capacity │
-│ ---      ┆ ---                 ┆ ---   ┆ ---          ┆ ---         ┆ ---            ┆ ---           ┆ ---              │
-│ str      ┆ str                 ┆ str   ┆ i64          ┆ i64         ┆ i64            ┆ i64           ┆ i64              │
-╞══════════╪═════════════════════╪═══════╪══════════════╪═════════════╪════════════════╪═══════════════╪══════════════════╡
-│ default  ┆ test_create_varchar ┆ Table ┆ 2            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608          │
-│          ┆ table               ┆       ┆              ┆             ┆                ┆               ┆                  │
-└──────────┴─────────────────────┴───────┴──────────────┴─────────────┴────────────────┴───────────────┴──────────────────┘
+print(res)
 
+shape: (8, 8)
+┌────────────┬─────────────────┬───────┬──────────────┬─────────────┬────────────────┬───────────────┬─────────────────┐
+│ database   ┆ table           ┆ type  ┆ column_count ┆ block_count ┆ block_capacity ┆ segment_count ┆ segment_capacit │
+│ ---        ┆ ---             ┆ ---   ┆ ---          ┆ ---         ┆ ---            ┆ ---           ┆ y               │
+│ str        ┆ str             ┆ str   ┆ i64          ┆ i64         ┆ i64            ┆ i64           ┆ ---             │
+│            ┆                 ┆       ┆              ┆             ┆                ┆               ┆ i64             │
+╞════════════╪═════════════════╪═══════╪══════════════╪═════════════╪════════════════╪═══════════════╪═════════════════╡
+│ default_db ┆ my_table        ┆ Table ┆ 3            ┆ 1           ┆ 8192           ┆ 1             ┆ 8388608         │
+│ default_db ┆ my_table2       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
+│ default_db ┆ my_table3       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
+│ default_db ┆ my_table4       ┆ Table ┆ 1            ┆ 1           ┆ 8192           ┆ 1             ┆ 8388608         │
+│ default_db ┆ my_table5       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
+│ default_db ┆ my_table6       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
+│ default_db ┆ my_table7       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
+│ default_db ┆ my_table8       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
+└────────────┴─────────────────┴───────┴──────────────┴─────────────┴────────────────┴───────────────┴─────────────────┘
 ```
 
 ---
