@@ -58,35 +58,36 @@ Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     u64 new_txn_id = ++catalog_->next_txn_id_;
 
     // Record the start ts of the txn
-    TxnTimeStamp ts = ++start_ts_;
+    TxnTimeStamp begin_ts = ++start_ts_;
     if (ckp_txn) {
         if (ckp_begin_ts_ != UNCOMMIT_TS) {
             // not set ckp_begin_ts_ may not truncate the wal file.
-            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing", ckp_begin_ts_, ts));
+            LOG_WARN(fmt::format("Another checkpoint txn is started in {}, new checkpoint {} will do nothing", ckp_begin_ts_, begin_ts));
         } else {
-            LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", ts));
-            ckp_begin_ts_ = ts;
+            LOG_DEBUG(fmt::format("Checkpoint txn is started in {}", begin_ts));
+            ckp_begin_ts_ = begin_ts;
         }
     }
 
     // Create txn instance
-    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, ts, std::move(txn_text)));
+    auto new_txn = SharedPtr<Txn>(new Txn(this, buffer_mgr_, catalog_, bg_task_processor_, new_txn_id, begin_ts, std::move(txn_text)));
 
     // Storage txn in txn manager
     txn_map_[new_txn_id] = new_txn;
-    beginned_txns_.emplace_back(new_txn);
+    begin_txn_by_ts_.emplace(begin_ts, new_txn_id);
+//    beginned_txns_.emplace_back(new_txn);
 
-    // LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, ts));
+    // LOG_INFO(fmt::format("Txn: {} is Begin. begin ts: {}", new_txn_id, begin_ts));
     return new_txn.get();
 }
 
-Txn *TxnManager::GetTxn(TransactionID txn_id) {
+Txn *TxnManager::GetTxn(TransactionID txn_id) const {
     std::lock_guard guard(locker_);
     Txn *res = txn_map_.at(txn_id).get();
     return res;
 }
 
-TxnState TxnManager::GetTxnState(TransactionID txn_id) {
+TxnState TxnManager::GetTxnState(TransactionID txn_id) const {
     std::lock_guard guard(locker_);
     auto iter = txn_map_.find(txn_id);
     if (iter == txn_map_.end()) {
@@ -110,19 +111,13 @@ bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) 
     return txn->CommitTS() < begin_ts;
 }
 
-TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
-    std::lock_guard guard(locker_);
-    TxnTimeStamp commit_ts = ++start_ts_;
-    txn->SetTxnRead();
-    return commit_ts;
-}
-
 TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
+    txn->SetTxnWrite();
+
     std::lock_guard guard(locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
     wait_conflict_ck_.emplace(commit_ts, nullptr);
     finishing_txns_.emplace(txn);
-    txn->SetTxnWrite();
     return commit_ts;
 }
 
@@ -281,13 +276,8 @@ TxnTimeStamp TxnManager::GetNewTimeStamp() { return start_ts_++; }
 TxnTimeStamp TxnManager::GetCleanupScanTS() {
     std::lock_guard guard(locker_);
     TxnTimeStamp first_uncommitted_begin_ts = start_ts_;
-    while (!beginned_txns_.empty()) {
-        auto first_txn = beginned_txns_.front().lock();
-        if (first_txn.get() != nullptr) {
-            first_uncommitted_begin_ts = first_txn->BeginTS();
-            break;
-        }
-        beginned_txns_.pop_front();
+    if (!begin_txn_by_ts_.empty()) {
+        first_uncommitted_begin_ts = begin_txn_by_ts_.begin()->first;
     }
     TxnTimeStamp checkpointed_ts = wal_mgr_->GetCheckpointedTS();
     TxnTimeStamp res = std::min(first_uncommitted_begin_ts, checkpointed_ts);
@@ -301,61 +291,97 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
 // A Txn can be deleted when there is no uncommitted txn whose begin is less than the commit ts of the txn
 // So maintain the least uncommitted begin ts
 void TxnManager::FinishTxn(Txn *txn) {
-    std::lock_guard guard(locker_);
-
-    if (txn->GetTxnType() == TxnType::kInvalid) {
-        String error_message = "Txn type is invalid";
-        UnrecoverableError(error_message);
-    } else if (txn->GetTxnType() == TxnType::kRead) {
-        txn_map_.erase(txn->TxnID());
-        return;
-    }
+    auto txn_state = txn->GetTxnState();
+    auto txn_type = txn->GetTxnType();
 
     TxnTimeStamp finished_ts = ++start_ts_;
-    auto state = txn->GetTxnState();
-    if (state == TxnState::kCommitting) {
-        txn->SetTxnCommitted(finished_ts);
-        finished_txns_.emplace_back(txn);
-    } else if (state == TxnState::kRollbacking) {
-        txn->SetTxnRollbacked();
+
+    std::lock_guard guard(locker_);
+    if (txn_state == TxnState::kRollbacked) {
+        // Rollback by TXN self
+        begin_txn_by_ts_.erase(txn->BeginTS());
+        txn_map_.erase(txn->TxnID());
+
+        // If rollback happened before commit phase, finishing_txns won't involve the txn.
+        // If rollback happened at the commit phase which only caused by txn conflict, the finishing_txns will involve the txn.
+        finishing_txns_.erase(txn);
+
     } else {
-        String error_message = fmt::format("Invalid transaction status: {}", ToString(state));
-        UnrecoverableError(error_message);
-    }
-    SizeT remove_n = finishing_txns_.erase(txn);
-    if (remove_n == 0) {
-        UnrecoverableError("Txn not found in finishing_txns_");
+        // Committing status and Write TXN
+        switch(txn_type) {
+            case TxnType::kRead: {
+                // Read only TXN
+                begin_txn_by_ts_.erase(txn->BeginTS());
+                txn_map_.erase(txn->TxnID());
+                return;
+            }
+            case TxnType::kInvalid: {
+                String error_message = "Txn type is invalid";
+                UnrecoverableError(error_message);
+            }
+            case TxnType::kWrite: {
+                break;
+            }
+        }
+
+        if (txn_state == TxnState::kCommitting) {
+            txn->SetTxnCommitted(finished_ts);
+            finished_txns_.emplace_back(txn);
+        } else {
+            String error_message = fmt::format("Invalid transaction status: {}", ToString(txn_state));
+            UnrecoverableError(error_message);
+        }
+
+        SizeT remove_n = finishing_txns_.erase(txn);
+        if (remove_n == 0) {
+            UnrecoverableError("Txn not found in finishing_txns_");
+        }
     }
 
-    TxnTimeStamp least_uncommitted_begin_ts = finished_ts;
-    while (!beginned_txns_.empty()) {
-        auto first_txn = beginned_txns_.front().lock();
-        if (first_txn.get() == nullptr) {
-            beginned_txns_.pop_front();
+    TxnTimeStamp oldest_uncommitted_begin_ts = finished_ts;
+    while (!begin_txn_by_ts_.empty()) {
+        auto first_txn_ts = begin_txn_by_ts_.begin()->first;
+        auto first_txn_id = begin_txn_by_ts_.begin()->second;
+        auto txn_iter = txn_map_.find(first_txn_id);
+        if(txn_iter == txn_map_.end()) {
+            UnrecoverableError(fmt::format("Txn: {} not found in txn_map", first_txn_id));
+        }
+        Txn* first_txn_ptr = txn_iter->second.get();
+        auto status = first_txn_ptr->GetTxnState();
+
+        if(status == TxnState::kCommitted) {
+            begin_txn_by_ts_.erase(first_txn_ts);
             continue;
         }
-        auto status = first_txn->GetTxnState();
-        if (status == TxnState::kCommitted || status == TxnState::kRollbacked) {
-            beginned_txns_.pop_front();
-        } else {
-            least_uncommitted_begin_ts = first_txn->BeginTS();
-            break;
+
+        if(status == TxnState::kRollbacked) {
+            UnrecoverableError(fmt::format("Rollback Txn: {}, should already be removed before.", first_txn_id));
         }
+
+        if(status == TxnState::kInvalid) {
+            UnrecoverableError(fmt::format("Txn: {} has invalid txn state.", first_txn_id));
+        }
+
+        oldest_uncommitted_begin_ts = first_txn_ptr->BeginTS();
+        break;
     }
 
     while (!finished_txns_.empty()) {
         auto *finished_txn = finished_txns_.front();
-        if (finished_txn->CommittedTS() > least_uncommitted_begin_ts) {
-            break;
-        }
         auto finished_txn_id = finished_txn->TxnID();
-        finished_txns_.pop_front();
+        if(finished_txn->CommittedTS() <= oldest_uncommitted_begin_ts) {
+            // The finished txn is committed before the oldest commit or rollback TXN ts
+            finished_txns_.pop_front();
 
-        // LOG_INFO(fmt::format("Txn: {} is erased", finished_txn_id));
-        SizeT remove_n = txn_map_.erase(finished_txn_id);
-        if (remove_n == 0) {
-            String error_message = fmt::format("Txn: {} not found in txn map", finished_txn_id);
-            UnrecoverableError(error_message);
+            // LOG_INFO(fmt::format("Txn: {} is erased", finished_txn_id));
+            SizeT remove_n = txn_map_.erase(finished_txn_id);
+            if (remove_n == 0) {
+                String error_message = fmt::format("Txn: {} not found in txn map", finished_txn_id);
+                UnrecoverableError(error_message);
+            }
+        } else {
+            LOG_TRACE(fmt::format("{} finish TS: {}, later than {}", finished_txn_id, finished_txn->CommittedTS(), oldest_uncommitted_begin_ts));
+            break;
         }
     }
 }

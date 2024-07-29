@@ -49,9 +49,9 @@ public:
 
     Txn *BeginTxn(UniquePtr<String> txn_text, bool ckp_txn = false);
 
-    Txn *GetTxn(TransactionID txn_id);
+    Txn *GetTxn(TransactionID txn_id) const;
 
-    TxnState GetTxnState(TransactionID txn_id);
+    TxnState GetTxnState(TransactionID txn_id) const;
 
     bool CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -65,7 +65,9 @@ public:
 
     BGTaskProcessor *bg_task_processor() const { return bg_task_processor_; }
 
-    TxnTimeStamp GetCommitTimeStampR(Txn *txn);
+    TxnTimeStamp GetNextTimestamp() {
+        return ++ start_ts_;
+    }
 
     TxnTimeStamp GetCommitTimeStampW(Txn *txn);
 
@@ -123,7 +125,7 @@ private:
     HashMap<TransactionID, SharedPtr<Txn>> txn_map_{};
     WalManager *wal_mgr_;
 
-    Deque<WeakPtr<Txn>> beginned_txns_; // sorted by begin ts
+    Map<TxnTimeStamp, TransactionID> begin_txn_by_ts_;
     HashSet<Txn *> finishing_txns_; // the txns in committing stage, can use flat_map
     Deque<Txn *> finished_txns_;  // the txns that committed_ts
 

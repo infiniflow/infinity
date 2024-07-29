@@ -323,6 +323,7 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn) {
         } else {
             auto new_max_commit_ts = txn->DeltaCheckpoint();
             if (new_max_commit_ts == 0) {
+                last_ckp_ts_ = max_commit_ts; // TODO: Need to refactor
                 return;
             }
             max_commit_ts = new_max_commit_ts;
