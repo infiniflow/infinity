@@ -417,8 +417,8 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
                         segment_offsets.push_back(block_id * DEFAULT_BLOCK_CAPACITY + block_offset);
                     }
                 }
-                compact_state_data_->AddToDelete(segment_id_, segment_offsets);
                 LOG_INFO(fmt::format("Append {} rows to to_delete_list in compact list", segment_offsets.size()));
+                compact_state_data_->AddToDelete(commit_ts, segment_id_, std::move(segment_offsets));
             }
         }
     }
