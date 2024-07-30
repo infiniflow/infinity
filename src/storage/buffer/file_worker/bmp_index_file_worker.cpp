@@ -94,7 +94,7 @@ void BMPIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
             if constexpr (std::is_same_v<T, std::nullptr_t>) {
                 UnrecoverableError("Invalid index type.");
             } else {
-                index->Save(*file_handler_, index_size_);
+                index->Save(*file_handler_);
             }
         },
         *bmp_index);

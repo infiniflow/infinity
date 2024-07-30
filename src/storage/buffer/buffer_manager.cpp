@@ -206,7 +206,7 @@ void BufferManager::RequestSpace(SizeT need_size) {
     }
     SizeT round_robin = round_robin_;
     do {
-        freed_space += lru_caches_[round_robin_].RequestSpace(need_size);;
+        freed_space += lru_caches_[round_robin_].RequestSpace(need_size);
         round_robin_ = (round_robin_ + 1) % lru_caches_.size();
     } while (freed_space + free_space < need_size && round_robin_ != round_robin);
     if (freed_space + free_space < need_size) {
@@ -232,7 +232,12 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
         clean_list_.emplace_back(buffer_obj);
     }
     if (do_free) {
-        current_memory_size_ -= buffer_obj->GetBufferSize();
+        u64 memory_size = current_memory_size_.fetch_sub(buffer_obj->GetBufferSize());
+        if (memory_size < buffer_obj->GetBufferSize()) {
+            UnrecoverableError(fmt::format("BufferManager::AddToCleanList: memory_size < buffer_obj->GetBufferSize(): {} < {}",
+                                           memory_size,
+                                           buffer_obj->GetBufferSize()));
+        }
         if (!RemoveFromGCQueue(buffer_obj)) {
             String error_message = fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", buffer_obj->GetFilename());
             UnrecoverableError(error_message);
