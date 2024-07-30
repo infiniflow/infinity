@@ -158,7 +158,8 @@ void PersistenceManager::CurrentObjFinalizeNoLock() {
     }
 }
 
-String PersistenceManager::GetObjCache(const String &local_path) {
+String PersistenceManager::GetObjCache(const String &file_path) {
+    String local_path = RemovePrefix(file_path);
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {

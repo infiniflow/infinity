@@ -18,11 +18,11 @@ public:
         file_dir_ = String(GetFullTmpDir()) + "/persistence_src";
         system(("mkdir -p " + workspace_).c_str());
         system(("mkdir -p " + file_dir_).c_str());
-        pm_ = MakeUnique<PersistenceManager>(workspace_, ObjSizeLimit);
+        pm_ = MakeUnique<PersistenceManager>(workspace_, file_dir_, ObjSizeLimit);
     }
     void TearDown() override {}
 
-    void CheckObjData(const ObjAddr& obj_addr, const String& data);
+    void CheckObjData(const String& obj_addr, const String& data);
 
 protected:
     String workspace_{};
@@ -31,8 +31,9 @@ protected:
     static constexpr int ObjSizeLimit = 128;
 };
 
-void PersistenceManagerTest::CheckObjData(const ObjAddr& obj_addr, const String& data) {
-    String obj_path = pm_->GetObjCache(obj_addr);
+void PersistenceManagerTest::CheckObjData(const String& local_file_path, const String& data) {
+    String obj_path = pm_->GetObjCache(local_file_path);
+    auto obj_addr = pm_->GetObjFromLocalPath(local_file_path);
     fs::path obj_fp(obj_path);
     ASSERT_TRUE(fs::exists(obj_fp));
     ASSERT_EQ(obj_addr.part_size_, data.size());
@@ -49,7 +50,7 @@ void PersistenceManagerTest::CheckObjData(const ObjAddr& obj_addr, const String&
     ASSERT_EQ(String(buffer.get(), file_size), data);
     local_fs.Close(*file_handler);
 
-    pm_->PutObjCache(obj_addr);
+    pm_->PutObjCache(local_file_path);
 }
 
 TEST_F(PersistenceManagerTest, PersistFileBasic) {
@@ -63,7 +64,7 @@ TEST_F(PersistenceManagerTest, PersistFileBasic) {
     ASSERT_EQ(obj_addr.part_size_, persist_str.size());
     pm_->CurrentObjFinalize();
 
-    CheckObjData(obj_addr, persist_str);
+    CheckObjData(file_path, persist_str);
 }
 
 TEST_F(PersistenceManagerTest, PersistMultiFile) {
@@ -90,7 +91,7 @@ TEST_F(PersistenceManagerTest, PersistMultiFile) {
     pm_->CurrentObjFinalize();
 
     for (SizeT i = 0; i < file_paths.size(); ++i) {
-        CheckObjData(obj_addrs[i], persist_strs[i]);
+        CheckObjData(file_paths[i], persist_strs[i]);
     }
 }
 
@@ -126,7 +127,7 @@ TEST_F(PersistenceManagerTest, PersistFileMultiThread) {
     pm_->CurrentObjFinalize();
 
     for (SizeT i = 0; i < file_paths.size(); ++i) {
-        CheckObjData(obj_addrs[file_paths[i]], persist_strs[i]);
+        CheckObjData(file_paths[i], persist_strs[i]);
     }
 }
 
@@ -157,7 +158,7 @@ TEST_F(PersistenceManagerTest, CleanupBasic) {
     pm_->CurrentObjFinalize();
 
     for (SizeT i = 0; i < file_paths.size(); ++i) {
-        CheckObjData(obj_addrs[i], persist_strs[i]);
+        CheckObjData(file_paths[i], persist_strs[i]);
     }
 
     for (const auto& obj_path : obj_paths) {
@@ -166,10 +167,10 @@ TEST_F(PersistenceManagerTest, CleanupBasic) {
 
     std::random_device rd;
     std::mt19937 g(rd());
-    std::shuffle(obj_addrs.begin(), obj_addrs.end(), g);
+    std::shuffle(file_paths.begin(), file_paths.end(), g);
 
-    for (auto& obj_addr : obj_addrs) {
-        pm_->Cleanup(obj_addr);
+    for (auto& file_path : file_paths) {
+        pm_->Cleanup(file_path);
     }
     for (const auto& obj_path : obj_paths) {
         ASSERT_FALSE(fs::exists(obj_path));

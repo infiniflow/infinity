@@ -65,6 +65,10 @@ public:
         : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
+
+        if (local_data_dir_.empty() || local_data_dir_.back() != '/') {
+            local_data_dir_ += '/';
+        }
     }
     ~PersistenceManager() {}
 
