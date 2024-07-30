@@ -117,7 +117,6 @@ Conflict policy in `enum` for handling situations where a database with the same
 
   - `Error`: Raise an error if a database with the same name exists.
   - `Ignore`: Ignore the table creation requrest and keep the database with the same name as-is.
-  - `Replace`: Drop the existing database and create a new one. 
 
 :::tip NOTE
 You must import the `infinity.common` package to set `ConflictType`:
@@ -146,7 +145,7 @@ infinity_obj.create_database("my_database")
 
 ```python
 # Create a database named 'my_database':
-# If the specified database already exists, raise an error. 
+# If the specified database already exists, raise an error (same as above). 
 infinity_obj.create_database("my_database", infinity.common.ConflictType.Error)
 ```
 
@@ -171,7 +170,7 @@ Deletes a database by its name.
 
 #### db_name: `str`, *Required*
 
-Name of the database to delete. 
+Name of the database to delete. Must not be empty. 
 
 #### conflict_type: `ConflictType`, *Optional*
 
@@ -207,7 +206,7 @@ infinity_obj.drop_database("my_database")
 
 ```python
 # Delete a database named 'my_database':
-# If the specified database does not exist, raise an error. 
+# If the specified database does not exist, raise an error (same as above). 
 infinity_obj.drop_database("my_database", infinity.common.ConflictType.Error)
 ```
 
@@ -263,14 +262,13 @@ Name of the database. Must not be empty.
 
 ### Returns
 
-- Success: A database object with its name stored in the `_db_name` attribute.  
+- Success: A database object.  
 - Failure: `Exception`
 
 ### Examples
 
 ```python
 db_obj=infinity_obj.get_database("my_database")
-print(db_obj._db_name) # my_database
 ```
 
 ---
@@ -281,7 +279,7 @@ print(db_obj._db_name) # my_database
 Infinity.show_database(db_name)
 ```
 
-Retrieves the metadata of a database by name.
+Retrieves the metadata of a database by its name.
 
 ### Parameters
 
@@ -484,7 +482,7 @@ db_obj.drop_table("my_table")
 
 ```python
 # Delete a table named 'my_table':
-# If the specified table does not exist, raise an error. 
+# If the specified table does not exist, raise an error (same as above). 
 db_obj.drop_table("my_table", infinity.common.ConflictType.Error)
 ```
 
