@@ -78,7 +78,6 @@ private:
     // Checkpoint Helper
     void FullCheckpointInner(Txn *txn);
     void DeltaCheckpointInner(Txn *txn);
-    void CheckpointInner(bool is_full_checkpoint, Txn *txn);
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
     Tuple<TxnTimeStamp, i64> GetCommitState();
     i64 GetLastCkpWalSize();
