@@ -82,9 +82,7 @@ infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 2
 infinity.disconnect()
 ```
 
-Disconnects from the Infinity server in client-server mode or disconnects from the Infinity object and releases all associated resources when Infinity is deployed as a Python module. 
-
-> This method is automatically called when an Infinity object is destructed.
+Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is deployed as a Python module. 
 
 ### Returns
 
