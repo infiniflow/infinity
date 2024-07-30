@@ -247,6 +247,15 @@ public:
 
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
 
+    SegmentEntry *GetSegmentEntry(SegmentID seg_id) const {
+        std::shared_lock lock(rw_locker_);
+        auto iter = segment_map_.find(seg_id);
+        if (iter == segment_map_.end()) {
+            return nullptr;
+        }
+        return iter->second.get();
+    }
+
     const Vector<SharedPtr<ColumnDef>> &column_defs() const { return columns_; }
 
     IndexReader GetFullTextIndexReader(Txn *txn);

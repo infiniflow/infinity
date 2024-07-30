@@ -275,7 +275,6 @@ target_sources(infinity
 
 add_dependencies(infinity oatpp)
 
-message("Python3_LIBRARIES = ${Python3_LIBRARIES}")
 target_link_libraries(infinity
         infinity_core
         sql_parser
