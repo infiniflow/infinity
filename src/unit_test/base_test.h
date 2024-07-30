@@ -44,6 +44,9 @@ public:
 
     void SetUp() override {}
     void TearDown() override {}
+public:
+    static constexpr const char* NULL_CONFIG_PATH = "";
+    static constexpr const char* CONFIG_PATH = "conf/unit_test_vfs.toml";
 
 protected:
     const char *GetHomeDir() { return "/var/infinity"; }
@@ -138,3 +141,4 @@ private:
 };
 
 using BaseTest = BaseTestWithParam<void>;
+using BaseTestParamStr = BaseTestWithParam<std::string>;
