@@ -59,13 +59,13 @@ Txn::Txn(TxnManager *txn_manager,
          TransactionID txn_id,
          TxnTimeStamp begin_ts,
          SharedPtr<String> txn_text)
-    : txn_store_(this, catalog), txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog),
-      txn_id_(txn_id), txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
+    : txn_mgr_(txn_manager), buffer_mgr_(buffer_manager), bg_task_processor_(bg_task_processor), catalog_(catalog), txn_store_(this, catalog),
+      txn_id_(txn_id), txn_context_(begin_ts), wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()),
       txn_text_(std::move(txn_text)) {}
 
 Txn::Txn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts)
-    : txn_store_(this, catalog), txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_id_(txn_id), txn_context_(begin_ts),
-      wal_entry_(MakeShared<WalEntry>()), local_catalog_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
+    : txn_mgr_(txn_mgr), buffer_mgr_(buffer_mgr), catalog_(catalog), txn_store_(this, catalog), txn_id_(txn_id), txn_context_(begin_ts),
+      wal_entry_(MakeShared<WalEntry>()), txn_delta_ops_entry_(MakeUnique<CatalogDeltaEntry>()) {}
 
 UniquePtr<Txn> Txn::NewReplayTxn(BufferManager *buffer_mgr, TxnManager *txn_mgr, Catalog *catalog, TransactionID txn_id, TxnTimeStamp begin_ts) {
     auto txn = MakeUnique<Txn>(buffer_mgr, txn_mgr, catalog, txn_id, begin_ts);
@@ -456,14 +456,14 @@ TxnTimeStamp Txn::Commit() {
     txn_mgr_->SendToWAL(this);
 
     // Wait until CommitTxnBottom is done.
-    std::unique_lock<std::mutex> lk(lock_);
-    cond_var_.wait(lk, [this] { return done_bottom_; });
+    std::unique_lock<std::mutex> lk(commit_lock_);
+    commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
     if (txn_mgr_->enable_compaction()) {
         txn_store_.MaintainCompactionAlg();
     }
-    if (!local_catalog_delta_ops_entry_->operations().empty()) {
-        txn_mgr_->AddDeltaEntry(std::move(local_catalog_delta_ops_entry_));
+    if (!txn_delta_ops_entry_->operations().empty()) {
+        txn_mgr_->AddDeltaEntry(std::move(txn_delta_ops_entry_));
     }
 
     return commit_ts;
@@ -488,25 +488,25 @@ void Txn::CommitBottom() {
 
     txn_store_.CommitBottom(txn_id_, commit_ts);
 
-    txn_store_.AddDeltaOp(local_catalog_delta_ops_entry_.get(), txn_mgr_);
+    txn_store_.AddDeltaOp(txn_delta_ops_entry_.get(), txn_mgr_);
 
     // Don't need to write empty CatalogDeltaEntry (read-only transactions).
-    if (!local_catalog_delta_ops_entry_->operations().empty()) {
-        local_catalog_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
+    if (!txn_delta_ops_entry_->operations().empty()) {
+        txn_delta_ops_entry_->SaveState(txn_id_, txn_context_.GetCommitTS(), txn_mgr_->NextSequence());
     }
 
     // Notify the top half
-    std::unique_lock<std::mutex> lk(lock_);
-    done_bottom_ = true;
-    cond_var_.notify_one();
+    std::unique_lock<std::mutex> lk(commit_lock_);
+    commit_bottom_done_ = true;
+    commit_cv_.notify_one();
     LOG_TRACE(fmt::format("Txn bottom: {} is finished.", txn_id_));
 }
 
 void Txn::CancelCommitBottom() {
     txn_context_.SetTxnRollbacked();
-    std::unique_lock<std::mutex> lk(lock_);
-    done_bottom_ = true;
-    cond_var_.notify_one();
+    std::unique_lock<std::mutex> lk(commit_lock_);
+    commit_bottom_done_ = true;
+    commit_cv_.notify_one();
 }
 
 void Txn::Rollback() {

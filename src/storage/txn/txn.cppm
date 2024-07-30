@@ -180,8 +180,6 @@ public:
 
     inline TxnTimeStamp CommitTS() { return txn_context_.GetCommitTS(); }
 
-    TxnTimeStamp CommittedTS() { return txn_context_.GetCommittedTS(); }
-
     inline TxnTimeStamp BeginTS() { return txn_context_.GetBeginTS(); }
 
     inline TxnState GetTxnState() { return txn_context_.GetTxnState(); }
@@ -224,13 +222,13 @@ private:
     void CheckTxn(const String &db_name);
 
 private:
-    TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
-
+    // Reference to external class
     TxnManager *txn_mgr_{};
-    // This BufferManager ptr Only for replaying wal
-    BufferManager *buffer_mgr_{};
+    BufferManager *buffer_mgr_{};  // This BufferManager ptr Only for replaying wal
     BGTaskProcessor *bg_task_processor_{};
     Catalog *catalog_{};
+
+    TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
     TransactionID txn_id_{};
 
     TxnContext txn_context_;
@@ -242,12 +240,12 @@ private:
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
     // TODO: remove this
-    UniquePtr<CatalogDeltaEntry> local_catalog_delta_ops_entry_{};
+    UniquePtr<CatalogDeltaEntry> txn_delta_ops_entry_{};
 
-    // WalManager notify the  commit bottom half is done
-    std::mutex lock_{};
-    std::condition_variable cond_var_{};
-    bool done_bottom_{false};
+    // WalManager notify the commit bottom half is done
+    std::mutex commit_lock_{};
+    std::condition_variable commit_cv_{};
+    bool commit_bottom_done_{false};
 
     // String
     SharedPtr<String> txn_text_{nullptr};
