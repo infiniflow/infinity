@@ -28,26 +28,27 @@ When connecting to Infinity in a client-server mode, ensure that the version of 
 
 | **Client version** | **Server version** |
 | ------------------ | ------------------ |
+| v0.1.0             | v0.1.0             |
+| v0.1.1             | v0.1.1             |
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
 | v0.3.0             | v0.3.0             |
-| v0.3.1             | v0.3.1             |
-| v0.4.0             | v0.4.0             |
+
 
 If the versions do not match, please update your client or server accordingly to ensure compatibility. 
 
 In client-server mode, also ensure that your server version matches the version specified in your configuration file. The matching rule is less strict than exact match: 
 
-- The major and minor versions must be identical. 
+- The major and minor versions *must* be identical. 
 - The patch version may differ. 
 
 This allows for bug fixes without requiring configuration file changes. 
 
 | **Configuration version** | **Compatible server version** |
 | ------------------------- | ----------------------------- |
+| v0.1.0                    | v0.1.0, v0.1.1                |
 | v0.2.0                    | v0.2.0, v0.2.1                |
-| v0.3.0                    | v0.3.0, v0.3.1, v0.3.2        |
-| v1.1.0                    | v1.1.0, v1.1.1, v1.1.2        |
+
 :::
 
 ### Returns
@@ -82,9 +83,9 @@ infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 2
 infinity.disconnect()
 ```
 
-Disconnects the current Infinity client from the Infinity server.
+Disconnects from the Infinity service and releases all associated resources. 
 
-> This method is automatically called when an Infinity client is destructed.
+> This method is automatically called when an Infinity client is deleted.
 
 ### Returns
 
