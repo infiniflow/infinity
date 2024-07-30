@@ -48,7 +48,7 @@ void FileWorker::WriteToFile(bool to_spill) {
 
     u8 flags = FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG;
     auto [file_handler, status] = fs.OpenFile(write_path, flags, FileLockType::kWriteLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     file_handler_ = std::move(file_handler);
@@ -84,15 +84,14 @@ void FileWorker::ReadFromFile(bool from_spill) {
     LocalFileSystem fs;
     String read_path;
     bool use_object_cache = !from_spill && obj_addr_.Valid();
+    read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
-        read_path = InfinityContext::instance().persistence_manager()->GetObjCache(obj_addr_);
-    } else {
-        read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+        read_path = InfinityContext::instance().persistence_manager()->GetObjCache(read_path);
     }
     SizeT file_size = 0;
     u8 flags = FileFlags::READ_FLAG;
     auto [file_handler, status] = fs.OpenFile(read_path, flags, FileLockType::kReadLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
     if (use_object_cache) {
@@ -106,7 +105,8 @@ void FileWorker::ReadFromFile(bool from_spill) {
         file_handler_->Close();
         file_handler_ = nullptr;
         if (use_object_cache) {
-            InfinityContext::instance().persistence_manager()->PutObjCache(obj_addr_);
+    read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+            InfinityContext::instance().persistence_manager()->PutObjCache(read_path);
         }
     });
     ReadFromFileImpl(file_size);
@@ -137,7 +137,8 @@ void FileWorker::MoveFile() {
 
 void FileWorker::CleanupFile() const {
     if (InfinityContext::instance().persistence_manager() != nullptr) {
-        InfinityContext::instance().persistence_manager()->Cleanup(obj_addr_);
+        String path = fmt::format("{}/{}", ChooseFileDir(false), *file_name_);
+        InfinityContext::instance().persistence_manager()->Cleanup(path);
         return;
     }
     LocalFileSystem fs;
