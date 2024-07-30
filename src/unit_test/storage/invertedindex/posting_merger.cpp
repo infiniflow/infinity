@@ -78,7 +78,7 @@ void PostingMergerTest::CreateIndex() {
 }
 
 TEST_F(PostingMergerTest, Basic) {
-    using namespace infinity;
+    // using namespace infinity;
     CreateIndex();
 
     const String index_dir = GetFullTmpDir();
@@ -126,7 +126,7 @@ TEST_F(PostingMergerTest, Basic) {
     }
 
     auto merge_base_rowid = row_ids[0];
-    for (auto& row_id : row_ids) {
+    for (auto &row_id : row_ids) {
         merge_base_rowid = std::min(merge_base_rowid, row_id);
     }
 
@@ -143,7 +143,7 @@ TEST_F(PostingMergerTest, Basic) {
             RowID base_row_id = row_ids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
             auto [file_handler, status] = fs.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
-            if(!status.ok()) {
+            if (!status.ok()) {
                 String error_message = status.message();
                 UnrecoverableError(error_message);
             }

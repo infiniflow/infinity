@@ -90,7 +90,7 @@ export class CatalogDeltaOperation {
 public:
     explicit CatalogDeltaOperation(CatalogDeltaOpType type) : type_(type) {}
     CatalogDeltaOperation(CatalogDeltaOpType type, BaseEntry *base_entry, TxnTimeStamp commit_ts);
-    virtual ~CatalogDeltaOperation(){};
+    virtual ~CatalogDeltaOperation() {};
     CatalogDeltaOpType GetType() const { return type_; }
     virtual String GetTypeStr() const = 0;
     [[nodiscard]] virtual SizeT GetSizeInBytes() const = 0;
@@ -103,6 +103,7 @@ public:
     virtual const String ToString() const;
     virtual bool operator==(const CatalogDeltaOperation &rhs) const;
     virtual void Merge(CatalogDeltaOperation &other) = 0;
+    virtual Vector<String> GetFilePaths() const { return Vector<String>(); }
 
     static PruneFlag ToPrune(Optional<MergeFlag> old_merge_flag, MergeFlag new_merge_flag);
 
@@ -169,7 +170,7 @@ export class AddSegmentEntryOp : public CatalogDeltaOperation {
 public:
     static UniquePtr<AddSegmentEntryOp> ReadAdv(char *&ptr);
 
-    AddSegmentEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY){};
+    AddSegmentEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {};
 
     AddSegmentEntryOp(SegmentEntry *segment_entry, TxnTimeStamp commit_ts, String segment_filter_binary_data = "");
 
@@ -198,7 +199,7 @@ export class AddBlockEntryOp : public CatalogDeltaOperation {
 public:
     static UniquePtr<AddBlockEntryOp> ReadAdv(char *&ptr);
 
-    AddBlockEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY){};
+    AddBlockEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY) {};
 
     AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts, String block_filter_binary_data = "");
 
@@ -230,7 +231,7 @@ export class AddColumnEntryOp : public CatalogDeltaOperation {
 public:
     static UniquePtr<AddColumnEntryOp> ReadAdv(char *&ptr);
 
-    AddColumnEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY){};
+    AddColumnEntryOp() : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY) {};
 
     AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts);
 
@@ -307,9 +308,11 @@ public:
     void Flush(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(CatalogDeltaOperation &other) override;
+    Vector<String> GetFilePaths() const override { return local_paths_; }
 
 public:
     String base_name_{};
+    Vector<String> local_paths_;
     RowID base_rowid_;
     u32 row_count_{0};
     TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};

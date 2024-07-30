@@ -29,6 +29,10 @@ import parsed_expr;
 import constant_expr;
 import stl;
 import data_type;
+import create_index_info;
+import infinity_context;
+import index_defines;
+import persistence_manager;
 
 import third_party;
 import logger;
@@ -36,17 +40,37 @@ import logger;
 namespace infinity {
 
 String ToString(CatalogDeltaOpType op_type) {
-    switch(op_type) {
-        case CatalogDeltaOpType::ADD_DATABASE_ENTRY: { return "AddDatabase"; }
-        case CatalogDeltaOpType::ADD_TABLE_ENTRY: { return "AddTable"; }
-        case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: { return "AddSegment"; }
-        case CatalogDeltaOpType::ADD_BLOCK_ENTRY: { return "AddBlock"; }
-        case CatalogDeltaOpType::ADD_COLUMN_ENTRY: { return "AddColumn"; }
-        case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: { return "AddTableIndex"; }
-        case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: { return "AddSegmentIndex"; }
-        case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: { return "AddChunkIndex"; }
-        case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: { return "SealSegment"; }
-        case CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED: { return "SealBlock"; }
+    switch (op_type) {
+        case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
+            return "AddDatabase";
+        }
+        case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
+            return "AddTable";
+        }
+        case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
+            return "AddSegment";
+        }
+        case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
+            return "AddBlock";
+        }
+        case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
+            return "AddColumn";
+        }
+        case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
+            return "AddTableIndex";
+        }
+        case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
+            return "AddSegmentIndex";
+        }
+        case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: {
+            return "AddChunkIndex";
+        }
+        case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
+            return "SealSegment";
+        }
+        case CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED: {
+            return "SealBlock";
+        }
         case CatalogDeltaOpType::INVALID: {
             String error_message = "Invalid catalog delta operation type.";
             UnrecoverableError(error_message);
@@ -67,6 +91,18 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     WriteBufAdv(buf, this->txn_id_);
     WriteBufAdv(buf, this->commit_ts_);
     WriteBufAdv(buf, *(this->encode_));
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        Vector<String> paths = GetFilePaths();
+        WriteBufAdv(buf, paths.size());
+        for (auto &path : paths) {
+            ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
+            WriteBufAdv(buf, path);
+            obj_addr.WriteBuf(buf);
+        }
+    }
 }
 
 void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
@@ -75,6 +111,18 @@ void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
     txn_id_ = ReadBufAdv<TransactionID>(ptr);
     commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     encode_ = MakeUnique<String>(ReadBufAdv<String>(ptr));
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        SizeT size = ReadBufAdv<SizeT>(ptr);
+        for (SizeT i = 0; i < size; ++i) {
+            String path = ReadBufAdv<String>(ptr);
+            ObjAddr obj_addr;
+            obj_addr.ReadBuf(ptr);
+            pm->SaveLocalPath(path, obj_addr);
+        }
+    }
 }
 
 const String CatalogDeltaOperation::ToString() const {
@@ -339,7 +387,21 @@ AddSegmentIndexEntryOp::AddSegmentIndexEntryOp(SegmentIndexEntry *segment_index_
 
 AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry, commit_ts), base_name_(chunk_index_entry->base_name_),
-      base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {}
+      base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {
+    IndexType index_type = chunk_index_entry->segment_index_entry_->table_index_entry()->index_base()->index_type_;
+    switch (index_type) {
+        case IndexType::kFullText: {
+            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(chunk_index_entry->segment_index_entry_->index_dir()));
+            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX);
+            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + DICT_SUFFIX);
+            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+}
 
 UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(char *&ptr) {
     auto add_db_op = MakeUnique<AddDBEntryOp>();
@@ -1190,16 +1252,10 @@ Vector<CatalogDeltaOpBrief> GlobalCatalogDeltaEntry::GetOperationBriefs() const 
     {
         std::lock_guard<std::mutex> lock(catalog_delta_locker_);
         res.reserve(delta_ops_.size());
-        for(const auto& op_pair: delta_ops_) {
-            CatalogDeltaOperation* delta_op = op_pair.second.get();
+        for (const auto &op_pair : delta_ops_) {
+            CatalogDeltaOperation *delta_op = op_pair.second.get();
 
-            res.push_back({
-                delta_op->begin_ts_,
-                delta_op->commit_ts_,
-                delta_op->txn_id_,
-                delta_op->type_,
-                MakeShared<String>(delta_op->ToString())
-            });
+            res.push_back({delta_op->begin_ts_, delta_op->commit_ts_, delta_op->txn_id_, delta_op->type_, MakeShared<String>(delta_op->ToString())});
         }
     }
     return res;
