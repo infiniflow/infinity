@@ -63,9 +63,19 @@ RowID RowIDRemap::GetNewRowID(RowID old_row_id) const {
     return GetNewRowID(old_row_id.segment_id_, old_row_id.segment_offset_ / block_capacity_, old_row_id.segment_offset_ % block_capacity_);
 }
 
-void CompactStateData::AddToDelete(SegmentID segment_id, const Vector<SegmentOffset> &delete_offsets) {
+void CompactStateData::AddToDelete(TxnTimeStamp commit_ts, SegmentID segment_id, Vector<SegmentOffset> delete_offsets) {
     std::lock_guard lock(mutex_);
-    to_delete_[segment_id].insert(to_delete_[segment_id].end(), delete_offsets.begin(), delete_offsets.end());
+    to_delete_.emplace_back(commit_ts, segment_id, std::move(delete_offsets));
+}
+
+Vector<Pair<SegmentID, Vector<SegmentOffset>>> CompactStateData::GetToDelete() const {
+    // return all to_delete entry that commits ts is larger than the current scan ts
+    auto iter = std::upper_bound(to_delete_.begin(), to_delete_.end(), scan_ts_, [](const auto &ts, const auto &tp) { return ts < std::get<0>(tp); });
+    Vector<Pair<SegmentID, Vector<SegmentOffset>>> res;
+    for (auto it = iter; it != to_delete_.end(); ++it) {
+        res.emplace_back(std::get<1>(*it), std::get<2>(*it));
+    }
+    return res;
 }
 
 void CompactStateData::AddNewSegment(SharedPtr<SegmentEntry> new_segment, Vector<SegmentEntry *> compacted_segments, Txn *txn) {
