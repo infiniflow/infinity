@@ -275,12 +275,38 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     //     Catalog::RollbackPopulateIndex(txn_index_store.get(), txn_);
     // }
     Catalog::RollbackCompact(table_entry_, txn_id, abort_ts, compact_state_);
+    for (const auto &[new_segment_store, old_segments] : compact_state_.compact_data_) {
+        std::move(*new_segment_store.segment_entry_).Cleanup();
+    }
     blocks_.clear();
 
     for (auto &[table_index_entry, ptr_seq_n] : txn_indexes_) {
         table_index_entry->Cleanup();
         Catalog::RemoveIndexEntry(table_index_entry, txn_id); // fix me
     }
+}
+
+bool TxnTableStore::CheckConflict(Catalog *catalog, Txn *txn) const {
+    const String &db_name = txn->db_name();
+    const String &table_name = *table_entry_->GetTableName();
+    for (const auto &[index_name, index_store] : txn_indexes_store_) {
+        auto [table_index_entry1, status] = catalog->GetIndexByName(db_name, table_name, index_name, txn->TxnID(), txn->CommitTS());
+        if (!status.ok() || table_index_entry1 != index_store->table_index_entry_) {
+            return true;
+        }
+    }
+    for (const auto &[segment_id, block_map] : delete_state_.rows_) {
+        if (auto *segment_entry = table_entry_->GetSegmentEntry(segment_id); segment_entry != nullptr) {
+            for (const auto &[block_id, block_offsets] : block_map) {
+                if (auto block_entry = segment_entry->GetBlockEntryByID(block_id); block_entry.get() != nullptr) {
+                    if (block_entry->CheckDeleteConflict(block_offsets)) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
 }
 
 bool TxnTableStore::CheckConflict(const TxnTableStore *other_table_store) const {
@@ -412,10 +438,10 @@ void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) {
 }
 
 void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts, bool added) const {
-    if(!has_update_) {
+    if (!has_update_) {
         // No any option
         LOG_TRACE("Not update on txn table store, no need to add delta op");
-        return ;
+        return;
     }
 
     if (!added) {
@@ -504,6 +530,20 @@ void TxnStore::MaintainCompactionAlg() const {
     }
 }
 
+bool TxnStore::CheckConflict(Catalog *catalog) {
+    const String &db_name = txn_->db_name();
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        auto [table_entry1, status] = catalog->GetTableByName(db_name, table_name, txn_->TxnID(), txn_->CommitTS());
+        if (!status.ok() || table_entry1 != table_store->GetTableEntry()) {
+            return true;
+        }
+        if (table_store->CheckConflict(catalog, txn_)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool TxnStore::CheckConflict(const TxnStore &other_txn_store) {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
         for (const auto [table_entry, _] : other_txn_store.txn_tables_) {
@@ -574,22 +614,22 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
 
 bool TxnStore::ReadOnly() const {
     bool read_only = true;
-    if(!txn_dbs_.empty()) {
+    if (!txn_dbs_.empty()) {
         // CREATE or DROP DB
         read_only = false;
     }
-    if(!txn_tables_.empty()) {
+    if (!txn_tables_.empty()) {
         // CREATE or DROP TABLE
         read_only = false;
     }
-    if(!txn_tables_store_.empty()) {
-        for(const auto& txn_table_store: txn_tables_store_) {
-            if(txn_table_store.second->HasUpdate()) {
+    if (!txn_tables_store_.empty()) {
+        for (const auto &txn_table_store : txn_tables_store_) {
+            if (txn_table_store.second->HasUpdate()) {
                 read_only = false;
                 break;
             }
         }
-//        read_only = false;
+        //        read_only = false;
     }
 
     return read_only;

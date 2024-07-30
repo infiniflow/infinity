@@ -101,7 +101,7 @@ public:
                 do {
                     post_iter->SeekPosition(cur_pos, res_pos);
                     cur_pos = res_pos + 1;
-                } while(res_pos != INVALID_POSITION);
+                } while (res_pos != INVALID_POSITION);
             }
             if (doc_id != INVALID_ROWID) {
                 doc_id = post_iter->SeekDoc(doc_id + 1);

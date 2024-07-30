@@ -17,6 +17,8 @@ module;
 export module persistence_manager;
 
 import stl;
+import serialize;
+import third_party;
 
 // A view means a logical plan
 namespace infinity {
@@ -25,7 +27,16 @@ export struct ObjAddr {
     String obj_key_{};
     SizeT part_offset_{};
     SizeT part_size_{};
+
     bool Valid() const { return !obj_key_.empty() && part_size_ > 0; }
+
+    nlohmann::json Serialize() const;
+
+    void Deserialize(const nlohmann::json &obj);
+
+    void WriteBuf(char *buf) const;
+
+    void ReadBuf(const char *buf);
 };
 
 export struct Range {
@@ -50,7 +61,8 @@ export struct ObjStat {
 export class PersistenceManager {
 public:
     // TODO: build cache from existing files under workspace
-    PersistenceManager(const String workspace, SizeT object_size_limit) : workspace_(workspace), object_size_limit_(object_size_limit) {
+    PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit)
+        : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
     }
@@ -66,14 +78,23 @@ public:
     void CurrentObjFinalize();
 
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
-    String GetObjCache(const ObjAddr &object_addr);
+    String GetObjCache(const String &local_path);
+
+    ObjAddr GetObjFromLocalPath(const String &file_path);
 
     // Decrease refcount
-    void PutObjCache(const ObjAddr &object_addr);
+    void PutObjCache(const String &file_path);
+
+    void SaveLocalPath(const String &local_path, const ObjAddr &object_addr);
 
     ObjAddr ObjCreateRefCount(const String &file_path);
 
-    void Cleanup(const ObjAddr &object_addr);
+    void Cleanup(const String &file_path);
+
+    nlohmann::json Serialize();
+
+    void Deserialize(const nlohmann::json &obj);
+
 private:
     String ObjCreate();
 
@@ -87,11 +108,18 @@ private:
     // Finalize current object.
     void CurrentObjFinalizeNoLock();
 
+    // Cleanup
+    void CleanupNoLock(const ObjAddr &object_addr);
+
+    String RemovePrefix(const String &path);
+
     String workspace_;
+    String local_data_dir_;
     SizeT object_size_limit_;
 
     std::mutex mtx_;
-    HashMap<String, ObjStat> objects_; // obj_key -> ObjStat
+    HashMap<String, ObjStat> objects_;        // obj_key -> ObjStat
+    HashMap<String, ObjAddr> local_path_obj_; // local_file_path -> ObjAddr
     // Current unsealed object key
     String current_object_key_;
     SizeT current_object_size_;

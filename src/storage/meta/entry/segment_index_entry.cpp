@@ -602,22 +602,10 @@ Status SegmentIndexEntry::CreateIndexPrepare(const SegmentEntry *segment_entry, 
             }
             break;
         }
-        case IndexType::kHnsw: {
-            PopulateEntirely(segment_entry, txn, populate_entire_config);
-            break;
-        }
-        case IndexType::kFullText: {
-            PopulateEntirely(segment_entry, txn, populate_entire_config);
-            break;
-        }
-        case IndexType::kSecondary: {
-            PopulateEntirely(segment_entry, txn, populate_entire_config);
-            break;
-        }
-        case IndexType::kEMVB: {
-            PopulateEntirely(segment_entry, txn, populate_entire_config);
-            break;
-        }
+        case IndexType::kHnsw:
+        case IndexType::kFullText:
+        case IndexType::kSecondary:
+        case IndexType::kEMVB:
         case IndexType::kBMP: {
             PopulateEntirely(segment_entry, txn, populate_entire_config);
             break;
@@ -1135,6 +1123,7 @@ UniquePtr<SegmentIndexEntry> SegmentIndexEntry::Deserialize(const nlohmann::json
 
     segment_index_entry->ft_column_len_sum_ = index_entry_json["ft_column_len_sum"];
     segment_index_entry->ft_column_len_cnt_ = index_entry_json["ft_column_len_cnt"];
+
     return segment_index_entry;
 }
 
