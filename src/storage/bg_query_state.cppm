@@ -48,7 +48,7 @@ export struct BGQueryContextWrapper {
     }
 
     BGQueryContextWrapper(Txn *txn) : session_mgr_(InfinityContext::instance().session_manager()) {
-        session_ = session_mgr_->CreateLocalSession();
+        session_ = session_mgr_->CreateLocalSession(false);
         query_context_ = MakeUnique<QueryContext>(session_.get());
         query_context_->Init(InfinityContext::instance().config(),
                              InfinityContext::instance().task_scheduler(),

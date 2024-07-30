@@ -31,12 +31,13 @@ import variables;
 namespace infinity {
 
 void InfinityContext::Init(const SharedPtr<String> &config_path, bool m_flag, DefaultConfig* default_config) {
+    // Variables
+    VarUtil::InitVariablesMap();
+    maintenance_mode_ = m_flag;
+
     if (initialized_) {
         return;
     } else {
-        // Variables
-        VarUtil::InitVariablesMap();
-
         // Config
         config_ = MakeUnique<Config>();
         auto status = config_->Init(config_path, default_config);

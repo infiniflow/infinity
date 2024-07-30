@@ -87,7 +87,7 @@ SharedPtr<Infinity> Infinity::LocalConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
 
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    infinity_ptr->session_ = session_mgr->CreateLocalSession();
+    infinity_ptr->session_ = session_mgr->CreateLocalSession(InfinityContext::instance().MaintenanceMode());
     return infinity_ptr;
 }
 
@@ -98,7 +98,11 @@ void Infinity::LocalDisconnect() {
 SharedPtr<Infinity> Infinity::RemoteConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    infinity_ptr->session_ = session_mgr->CreateRemoteSession();
+    SharedPtr<RemoteSession> remote_session = session_mgr->CreateRemoteSession(InfinityContext::instance().MaintenanceMode());
+    if(remote_session == nullptr) {
+        return nullptr;
+    }
+    infinity_ptr->session_ = std::move(remote_session);
     return infinity_ptr;
 }
 

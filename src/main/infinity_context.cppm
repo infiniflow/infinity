@@ -45,6 +45,7 @@ public:
     [[nodiscard]] inline ThreadPool &GetFulltextInvertingThreadPool() { return inverting_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetHnswBuildThreadPool() { return hnsw_build_thread_pool_; }
+    [[nodiscard]] inline bool &MaintenanceMode() { return maintenance_mode_; }
 
     void Init(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
 
@@ -69,6 +70,7 @@ private:
     ThreadPool hnsw_build_thread_pool_{4};
 
     bool initialized_{false};
+    bool maintenance_mode_{false};
 };
 
 } // namespace infinity
