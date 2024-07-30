@@ -23,7 +23,7 @@ The `uri` here can be either a `NetworkAddress` object or a local directory in `
   - `"<SERVER_IP_ADDRESS>"` (`str`): The IP address of the Infinity server.  
   - `<PORT>` (`int`): The port number on which Infinity is running. Defaults to 23817.
 
-:::alert IMPORTANT
+:::caution IMPORTANT
 When connecting to Infinity in a client-server mode, ensure that the version of the client exactly matches the version of the server. For example: 
 
 | **Client version** | **Server version** |
@@ -103,14 +103,33 @@ infinity_obj.disconnect()
 Infinity.create_database(db_name, conflict_type = ConflictType.Error)
 ```
 
-Creates a database with a given name. `conflict_type` specifies the policy when a database with the same name exists. 
+Creates a database with a specified name.
 
 ### Parameters
 
-- **db_name : str(not empty)** Name of the database.
-- **conflict_type : ConflictType** `enum` The countermeasure to take when a database with the same name exists.  See `ConflictType`, which is defined in the **infinity.common** package: 
-  - `Error`
-  - `Ignore`
+#### db_name: `str`, *Required*
+
+Name of the database. Must not be empty. 
+
+#### conflict_type: `ConflictType`, *Optional*
+
+Conflict policy in `enum` for handling situations where a database with the same name exists. 
+
+  - `Error`: Raise an error if a database with the same name exists.
+  - `Ignore`: Ignore the table creation requrest and keep the database with the same name as-is.
+  - `Replace`: Drop the existing database and create a new one. 
+
+:::tip NOTE
+You must import the `infinity.common` package to set `ConflictType`:
+
+```python
+from infinity.common import ConflictType
+```
+:::
+
+:::tip NOTE
+If `ConflictType` is not set, it defaults to `Error`.
+:::
 
 ### Returns
 
@@ -118,8 +137,24 @@ Creates a database with a given name. `conflict_type` specifies the policy when 
 - Failure: `Exception`
 
 ### Examples
+
 ```python
+# Create a database named 'my_database':
+# If the specified database already exists, raise an error. 
 infinity_obj.create_database("my_database")
+```
+
+```python
+# Create a database named 'my_database':
+# If the specified database already exists, raise an error. 
+infinity_obj.create_database("my_database", infinity.common.ConflictType.Error)
+```
+
+```python
+from infinity.common import ConflictType
+# Create a database named 'my_database':
+# If the specified database already exists, silently ignore the operation and proceed. 
+infinity_obj.create_database("my_database", ConflictType.Ignore)
 ```
 
 ---
@@ -130,14 +165,32 @@ infinity_obj.create_database("my_database")
 Infinity.drop_database(db_name, conflict_type = ConflictType.Error)
 ```
 
-Drops a database by name.
+Deletes a database by its name. 
 
 ### Parameters
 
-- `db_name`: `str` Name of the database
-- `conflict_type`:  `enum` Policy for handling an existing database with the same name.  See `ConflictType`, which is defined in the **infinity.common** package. 
-  - `Error`
-  - `Ignore`
+#### db_name: `str`, *Required*
+
+Name of the database to delete. 
+
+#### conflict_type: `ConflictType`, *Optional*
+
+Conflict policy in `enum` for handling situations where a database with the same name does not exist. 
+
+  - `Error`: Raise an error if the specified database does not exist.
+  - `Ignore`: Ignore the operation and proceed regardless, if the specified database does not exist.
+
+:::tip NOTE
+You must import the `infinity.common` package to set `ConflictType`:
+
+```python
+from infinity.common import ConflictType
+```
+:::
+
+:::tip NOTE
+If `ConflictType` is not set, it defaults to `Error`.
+:::
 
 ### Returns
 
@@ -145,8 +198,24 @@ Drops a database by name.
 - Failure: `Exception`
 
 ### Examples
+
 ```python
+# Delete a database named 'my_database':
+# If the specified database does not exist, raise an error. 
 infinity_obj.drop_database("my_database")
+```
+
+```python
+# Delete a database named 'my_database':
+# If the specified database does not exist, raise an error. 
+infinity_obj.drop_database("my_database", infinity.common.ConflictType.Error)
+```
+
+```python
+from infinity.common import ConflictType
+# Delete a database named 'my_database':
+# If the specified database does not exist, silently ignore the operation and proceed.
+infinity_obj.drop_database("my_database", ConflictType.Ignore)
 ```
 
 ---
@@ -157,18 +226,23 @@ infinity_obj.drop_database("my_database")
 Infinity.list_databases()
 ```
 
-Lists all databases.
+Gets the names of all databases.
 
 ### Returns
 
-- Success: `db_names` `list[str]`
-- Failure: `Exception`
+This method returns a struct containing the following attributes:
+
+- `db_names`: `list[str]` A list of all database names.
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeded. 
+  - Non-zero value: A specific error condition occurred. 
+- `error_msg`: `str` The error message providing additional details. 
 
 ### Examples
 
 ```python
 res = infinity_obj.list_databases() 
-res.db_names #["my_database"]
+print(res.db_names) #['my_database', 'database_1']
 ```
 
 ---
@@ -179,21 +253,24 @@ res.db_names #["my_database"]
 Infinity.get_database(db_name)
 ```
 
-Retrieves a database object by name.
+Retrieves a database object by its name.
 
 ### Parameters
 
-- `db_name`: `str`  Name of the database.
+#### db_name: `str`, *Required*
+
+Name of the database. Must not be empty. 
 
 ### Returns
 
-- Success: A database object. 
+- Success: A database object with its name stored in the `_db_name` attribute.  
 - Failure: `Exception`
 
 ### Examples
 
 ```python
 db_obj=infinity_obj.get_database("my_database")
+print(db_obj._db_name) # my_database
 ```
 
 ---
@@ -208,7 +285,9 @@ Retrieves the metadata of a database by name.
 
 ### Parameters
 
-- **db_name : str** Name of the database
+#### db_name: `str` 
+
+Name of the database
 
 ### Returns
 
@@ -254,7 +333,7 @@ Definitions for all table columns as a dictionary. Each key in the dictionary is
 
 #### conflict_type: `ConflictType`, *Optional*
 
-Conflict policy in `enum` for handling situations when a table with the same name exists. 
+Conflict policy in `enum` for handling situations where a table with the same name exists. 
   - `Error`: Raise an error if a table with the same name exists.
   - `Ignore`: Ignore the table creation requrest and keep the table with the same name as-is.
   - `Replace`: Drop the existing table and create a new one. 
@@ -372,7 +451,9 @@ Deletes a table from the database by its name.
 Name of the table to delete. Must not be empty. 
 
 #### conflict_type: `ConflictType`, *Optional*
-Conflict policy in `enum` for handling situations when a table with the same name does not exist. 
+
+Conflict policy in `enum` for handling situations where a table with the same name does not exist. 
+
   - `Error`: Raise an error if the specified table does not exist.
   - `Ignore`: Ignore the operation and proceed regardless, if the specified table does not exist.
 
@@ -398,12 +479,18 @@ If `ConflictType` is not set, it defaults to `Error`.
 ```python
 # Delete a table named 'my_table':
 # If the specified table does not exist, raise an error. 
+db_obj.drop_table("my_table")
+```
+
+```python
+# Delete a table named 'my_table':
+# If the specified table does not exist, raise an error. 
 db_obj.drop_table("my_table", infinity.common.ConflictType.Error)
 ```
 
 ```python
 from infinity.common import ConflictType
-# Drop a table named 'my_table':
+# Delete a table named 'my_table':
 # If the specified table does not exist, silently ignore the operation and proceed.
 db_obj.drop_table("my_table", ConflictType.Ignore)
 ```
@@ -1211,7 +1298,7 @@ Builds a fusion expression.
 
 ### Examples
 
-:::alert IMPORTANT
+:::caution IMPORTANT
 Ensure that you import the following when using `make_match_tensor_expr`:
 
 ```python
