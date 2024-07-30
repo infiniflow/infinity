@@ -14,9 +14,14 @@ Connects to the Infinity server and gets an Infinity object.
 
 ### Parameters
 
-- `uri`: 
-  - `NetworkAddress` A NetworkAddress object is a struct with two fields, one for the IP address (`str`) and the other for the port number (`int`). Used when Infinity is deployed as a separate server.
-  - a path ('str') to store the Infinity data. Used when Infinity is deployed as a Python module. 
+#### `uri`: *Required*
+
+The `uri` here can be either a `NetworkAddress` object or a local directory in `str` format: 
+
+- `NetworkAddress`: Used when you have deployed Infinity as a separate server and wish to connect to it remotely. A NetworkAddress object comprises two fields:
+  - `"<SERVER_IP_ADDRESS>"` (`str`): The IP address of the Infinity server.  
+  - `<PORT>` (`int`): The port number on which Infinity is running.  
+- `"/path/to/save/to"` (`str`): A local directory for storing the Infinity data. Used when Infinity is deployed as a Python module. 
 
 ### Returns
 
@@ -25,17 +30,24 @@ Connects to the Infinity server and gets an Infinity object.
 
 ### Examples
 
-- If Infinity is deployed as a separate server: 
+#### Connect to a separate Infinity server
 
-   ```python
-   # If Infinity is deployed locally, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
-   infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
-   ```
+If you have deployed Infinity as a separate server, connect to it via its IP address. Further, if your Infinity is running on your local machine, you can also use `infinity.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet. 
 
-- If Infinity is deployed as a Python module: 
-   ```python
-   infinity_obj = infinity.connect("/path/to/save/to")
-   ```
+```python
+# If Infinity is deployed on the local machine, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
+infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+```
+
+#### Connect to Python module Infinity
+
+From v0.2.0 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed Infinity via `pip install infinity-sdk==<v0.2.0_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
+
+```python
+infinity_obj = infinity.connect("/path/to/save/to")
+```
+
+---
 
 ## disconnect
 
@@ -43,9 +55,9 @@ Connects to the Infinity server and gets an Infinity object.
 infinity.disconnect()
 ```
 
-Disconnects the current Infinity object from the server.
+Disconnects the current Infinity client from the Infinity server.
 
-> This method is automatically called when an Infinity object is destructed.
+> This method is automatically called when an Infinity client is destructed.
 
 ### Returns
 
@@ -57,6 +69,8 @@ Disconnects the current Infinity object from the server.
 ```python
 infinity_obj.disconnect()
 ```
+
+---
 
 ## create_database
 
@@ -83,6 +97,8 @@ Creates a database with a given name. `conflict_type` specifies the policy when 
 infinity_obj.create_database("my_database")
 ```
 
+---
+
 ## drop_database
 
 ```python
@@ -108,6 +124,8 @@ Drops a database by name.
 infinity_obj.drop_database("my_database")
 ```
 
+---
+
 ## list_databases
 
 ```python
@@ -127,6 +145,8 @@ Lists all databases.
 res = infinity_obj.list_databases() 
 res.db_names #["my_database"]
 ```
+
+---
 
 ## get_database
 
@@ -150,6 +170,8 @@ Retrieves a database object by name.
 ```python
 db_obj=infinity_obj.get_database("my_database")
 ```
+
+---
 
 ## show_database
 
@@ -308,6 +330,8 @@ from infinity.common import ConflictType
 db_obj.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Replace)
 ```
 
+---
+
 ## drop_table
 
 ```python
@@ -359,6 +383,8 @@ from infinity.common import ConflictType
 db_obj.drop_table("my_table", ConflictType.Ignore)
 ```
 
+---
+
 ## get_table
 
 ```python
@@ -387,6 +413,8 @@ except Exception as e:
     print(e)
 ```
 
+---
+
 ## list_tables
 
 ```python
@@ -407,13 +435,15 @@ res = db_obj.list_tables()
 res.table_names #["my_table"]
 ```
 
+---
+
 ## show_tables
 
 ```python
 Database.show_tables()
 ```
 
-Show the information of all tables in the database.
+Shows the information of all tables in the database.
 
 ### Returns
 
@@ -432,25 +462,19 @@ DataFrame contains eight columns and each row in it corresponds to a table in th
 ### Examples
 
 ```python
-res = db.show_tables()
+res = db_obj.show_tables()
 print(res)
 
-shape: (8, 8)
-┌────────────┬─────────────────┬───────┬──────────────┬─────────────┬────────────────┬───────────────┬─────────────────┐
-│ database   ┆ table           ┆ type  ┆ column_count ┆ block_count ┆ block_capacity ┆ segment_count ┆ segment_capacit │
-│ ---        ┆ ---             ┆ ---   ┆ ---          ┆ ---         ┆ ---            ┆ ---           ┆ y               │
-│ str        ┆ str             ┆ str   ┆ i64          ┆ i64         ┆ i64            ┆ i64           ┆ ---             │
-│            ┆                 ┆       ┆              ┆             ┆                ┆               ┆ i64             │
-╞════════════╪═════════════════╪═══════╪══════════════╪═════════════╪════════════════╪═══════════════╪═════════════════╡
-│ default_db ┆ my_table        ┆ Table ┆ 3            ┆ 1           ┆ 8192           ┆ 1             ┆ 8388608         │
-│ default_db ┆ my_table2       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
-│ default_db ┆ my_table3       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
-│ default_db ┆ my_table4       ┆ Table ┆ 1            ┆ 1           ┆ 8192           ┆ 1             ┆ 8388608         │
-│ default_db ┆ my_table5       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
-│ default_db ┆ my_table6       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
-│ default_db ┆ my_table7       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
-│ default_db ┆ my_table8       ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608         │
-└────────────┴─────────────────┴───────┴──────────────┴─────────────┴────────────────┴───────────────┴─────────────────┘
+shape: (3, 8)
+┌────────────┬──────────────┬───────┬──────────────┬─────────────┬────────────────┬───────────────┬──────────────────┐
+│ database   ┆ table        ┆ type  ┆ column_count ┆ block_count ┆ block_capacity ┆ segment_count ┆ segment_capacity │
+│ ---        ┆ ---          ┆ ---   ┆ ---          ┆ ---         ┆ ---            ┆ ---           ┆ ---              │
+│ str        ┆ str          ┆ str   ┆ i64          ┆ i64         ┆ i64            ┆ i64           ┆ i64              │
+╞════════════╪══════════════╪═══════╪══════════════╪═════════════╪════════════════╪═══════════════╪══════════════════╡
+│ default_db ┆ my_table     ┆ Table ┆ 3            ┆ 1           ┆ 8192           ┆ 1             ┆ 8388608          │
+│ default_db ┆ tensor_table ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608          │
+│ default_db ┆ sparse_table ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608          │
+└────────────┴──────────────┴───────┴──────────────┴─────────────┴────────────────┴───────────────┴──────────────────┘
 ```
 
 ---
@@ -556,13 +580,15 @@ table_obj.create_index("my_index",
                               ])], None)
 ```
 
+---
+
 ## drop_index
 
 ```python
 Table.drop_index(index_name, conflict_type = ConflictType.Error)
 ```
 
-Drop an index by name.
+Drops an index by name.
 
 ### Parameters
 
@@ -581,6 +607,8 @@ Drop an index by name.
 ```python
 table_obj.drop_index("my_index")
 ```
+
+---
 
 ## show_index
 
@@ -623,6 +651,8 @@ print(res)
 #infinity/data/7SJK3mOSl2_db_default/f3AsBt7SRC_table_test_create_index_show_index/1hbFtMVaRY_index_my_index', segment_index_count='0')
 ```
 
+---
+
 ## list_indexes
 
 ```python
@@ -642,6 +672,8 @@ Lists the indexes built on the table.
 res = table_obj.list_indexes()
 res.index_names #['my_index']
 ```
+
+---
 
 ## insert
 
@@ -739,6 +771,8 @@ table_obj = db_obj.create_table("tensor_array_table", {"tensor_array_column": {"
 table_obj.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])
 ```
 
+---
+
 ## import_data
 
 ```python
@@ -774,8 +808,6 @@ Example: `{"header":True, "delimiter": "\t", file_type}`
   - `json`
   - `jsonl`
 
-
-
 ### Returns
 
 - Success: `True`
@@ -794,6 +826,8 @@ table_obj.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file_ty
 ```python
 table_obj.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
 ```
+
+---
 
 ## export_data
 
@@ -861,6 +895,8 @@ table_obj.export_data(os.getcwd() + "/export_data.csv", {"header": True, "file_t
 table_obj.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2}, ["num", "name", "score"])
 ```
 
+---
+
 ## delete
 
 ```python
@@ -884,6 +920,8 @@ Deletes rows by condition.The condition is similar to the WHERE conditions in SQ
 table_obj.delete("c1 = 1")
 table_obj.delete()
 ```
+
+---
 
 ## update
 
@@ -911,6 +949,8 @@ a list of dict where key indicates column, value indicates new value.
 table_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
 table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 ```
+
+---
 
 ## output
 
@@ -941,6 +981,8 @@ table_obj.output(["c1+5"])
 - Success: self `Table`
 - Failure: `Exception`
 
+---
+
 ## filter
 
 ```python
@@ -964,6 +1006,8 @@ Creates a filtering condition expression.
 ```python
 table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 ```
+
+---
 
 ## knn
 
@@ -999,6 +1043,8 @@ table_obj.knn('col1', [0.1,0.2,0.3], 'float', 'l2', 100)
 table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 ```
 
+---
+
 ## match sparse
 
 ```python
@@ -1028,6 +1074,8 @@ table_obj.match_sparse('col1', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3
 table_obj.match_sparse('col1_with_bmp_index', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
 ```
 
+---
+
 ## match
 
 Creates a full-text search expression.
@@ -1046,6 +1094,7 @@ Creates a full-text search expression.
 - Failure: `Exception`
 
 ### Examples
+
 ```python
 questions = [
     r"blooms",  # single term
@@ -1060,6 +1109,8 @@ questions = [
 for question in questions:
     table_obj.match('body', question, 'topn=2')
 ```
+
+---
 
 ## match tensor
 
@@ -1099,6 +1150,8 @@ For example, find k most match tensors generated by ColBERT.
 match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim', 'topn=2')
 match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim', 'topn=10;emvb_centroid_nprobe=4;emvb_threshold_first=0.4;emvb_threshold_final=0.5')
 ```
+
+---
 
 ## fusion
 
@@ -1154,6 +1207,8 @@ table_obj.fusion('match_tensor', 'topn=2', make_match_tensor_expr('t', [[0.0, -1
 
 [Reciprocal rank fusion (RRF)](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) is a method that combines multiple result sets with different relevance indicators into one result set. RRF does not requires tuning, and the different relevance indicators do not have to be related to each other to achieve high-quality results.
 
+---
+
 ## optimize
 
 ```python
@@ -1177,6 +1232,8 @@ Table.optimize(index_name, opt_params)
 ```python
 table_obj.optimize('bmp_index_name', {'topk': '10'})
 ```
+
+---
 
 ## get result
 
@@ -1218,3 +1275,5 @@ res = table_obj.output(['*'])
                .fusion('rrf')
                .to_pl()
 ```
+
+---
