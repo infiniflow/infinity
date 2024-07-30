@@ -334,7 +334,6 @@ Definitions for all table columns as a dictionary. Each key in the dictionary is
 Conflict policy in `enum` for handling situations where a table with the same name exists. 
   - `Error`: Raise an error if a table with the same name exists.
   - `Ignore`: Ignore the table creation requrest and keep the table with the same name as-is.
-  - `Replace`: Drop the existing table and create a new one. 
 
 :::tip NOTE
 You must import the `infinity.common` package to set `ConflictType`:
@@ -429,7 +428,7 @@ from infinity.common import ConflictType
 # - `tensorarray`: The column is a tensor array column
 # - `6`: Dimension of each vector unit in the tensor arrays
 # - `float`: The primitive data type of the tensor arrays. Can be `float`/`float32` or `double`/`float64`
-db_obj.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Replace)
+db_obj.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Ignore)
 ```
 
 ---
