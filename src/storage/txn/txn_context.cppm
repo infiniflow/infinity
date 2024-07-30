@@ -62,7 +62,7 @@ public:
         state_ = TxnState::kRollbacked;
     }
 
-    inline void SetTxnCommitted(TxnTimeStamp committed_ts) {
+    inline void SetTxnCommitted() {
         std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
         if (state_ != TxnState::kCommitting) {
             String error_message = "Transaction isn't in COMMITTING status.";

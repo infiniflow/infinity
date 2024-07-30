@@ -186,7 +186,7 @@ public:
 
     inline TxnType GetTxnType() const { return txn_context_.GetTxnType(); }
 
-    void SetTxnCommitted(TxnTimeStamp committed_ts);
+    void SetTxnCommitted();
 
     void SetTxnCommitting(TxnTimeStamp commit_ts);
 

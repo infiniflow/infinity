@@ -311,10 +311,9 @@ void TxnManager::FinishTxn(Txn *txn) {
         return;
     }
 
-    TxnTimeStamp finished_ts = ++start_ts_;
     auto state = txn->GetTxnState();
     if (state == TxnState::kCommitting) {
-        txn->SetTxnCommitted(finished_ts);
+        txn->SetTxnCommitted();
         finished_txns_.emplace_back(txn);
     } else if (state == TxnState::kRollbacking) {
         txn->SetTxnRollbacked();

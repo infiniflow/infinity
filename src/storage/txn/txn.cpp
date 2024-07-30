@@ -403,9 +403,9 @@ Status Txn::GetViews(const String &, Vector<ViewDetail> &output_view_array) {
     return {ErrorCode::kNotSupported, "Not Implemented Txn Operation: GetViews"};
 }
 
-void Txn::SetTxnCommitted(TxnTimeStamp committed_ts) {
+void Txn::SetTxnCommitted() {
     // LOG_INFO(fmt::format("Txn {} is committed, committed_ts: {}", txn_id_, committed_ts));
-    txn_context_.SetTxnCommitted(committed_ts);
+    txn_context_.SetTxnCommitted();
 }
 
 void Txn::SetTxnCommitting(TxnTimeStamp commit_ts) {
@@ -431,7 +431,7 @@ TxnTimeStamp Txn::Commit() {
         // Don't need to write empty WalEntry (read-only transactions).
         TxnTimeStamp commit_ts = txn_mgr_->GetCommitTimeStampR(this);
         this->SetTxnCommitting(commit_ts);
-        this->SetTxnCommitted(commit_ts);
+        this->SetTxnCommitted();
         return commit_ts;
     }
 
