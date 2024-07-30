@@ -32,7 +32,6 @@ When connecting to Infinity in a client-server mode, ensure that the version of 
 | v0.1.1             | v0.1.1             |
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
-| v0.3.0             | v0.3.0             |
 
 
 If the versions do not match, please update your client or server accordingly to ensure compatibility. 
@@ -83,9 +82,9 @@ infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 2
 infinity.disconnect()
 ```
 
-Disconnects from the Infinity service and releases all associated resources. 
+Disconnects from the Infinity server in client-server mode or disconnects from the Infinity object and releases all associated resources when Python is deployed as a Python module. 
 
-> This method is automatically called when an Infinity client is deleted.
+> This method is automatically called when an Infinity object is destructed.
 
 ### Returns
 
