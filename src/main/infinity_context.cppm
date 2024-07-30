@@ -46,7 +46,7 @@ public:
     [[nodiscard]] inline ThreadPool &GetFulltextCommitingThreadPool() { return commiting_thread_pool_; }
     [[nodiscard]] inline ThreadPool &GetHnswBuildThreadPool() { return hnsw_build_thread_pool_; }
 
-    void Init(const SharedPtr<String> &config_path, DefaultConfig *default_config = nullptr);
+    void Init(const SharedPtr<String> &config_path, bool m_flag = false, DefaultConfig *default_config = nullptr);
 
     void UnInit();
 

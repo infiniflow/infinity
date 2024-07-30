@@ -84,7 +84,11 @@ bool LRUCache::RemoveFromGCQueue(BufferObj *buffer_obj) {
 }
 
 BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, SharedPtr<String> temp_dir, SizeT lru_count)
-    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), memory_limit_(memory_limit), current_memory_size_(0), lru_caches_(lru_count) {
+    : data_dir_(std::move(data_dir)), temp_dir_(std::move(temp_dir)), memory_limit_(memory_limit), current_memory_size_(0), lru_caches_(lru_count) {}
+
+BufferManager::~BufferManager() = default;
+
+void BufferManager::Start() {
     LocalFileSystem fs;
     if (!fs.Exists(*data_dir_)) {
         fs.CreateDirectory(*data_dir_);
@@ -93,7 +97,9 @@ BufferManager::BufferManager(u64 memory_limit, SharedPtr<String> data_dir, Share
     fs.CleanupDirectory(*temp_dir_);
 }
 
-BufferManager::~BufferManager() { RemoveClean(); }
+void BufferManager::Stop() {
+    RemoveClean();
+}
 
 BufferObj *BufferManager::AllocateBufferObject(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();

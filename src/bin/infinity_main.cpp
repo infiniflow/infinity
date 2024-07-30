@@ -163,20 +163,19 @@ auto main(int argc, char **argv) -> int {
                "|  | |  |\\   | |  |     |  | |  |\\   | |  |     |  |         |  |     \n"
                "|__| |__| \\__| |__|     |__| |__| \\__| |__|     |__|         |__|     \n");
 
-    StartupParameter parameters;
     CLI::App app{"infinity_main"};
-    String config_path = "";
-    app.add_option("-f,--config", config_path, "Specify the config file path. No default config file");
+
+    SharedPtr<String> config_path = MakeShared<String>();
+    bool m_flag{false};
+    app.add_option("-f,--config", *config_path, "Specify the config file path. No default config file");
+    app.add_flag("-m,--maintenance", m_flag, "Start Infinity in maintenance mode");
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError &e) {
         return app.exit(e);
     }
-    if (!config_path.empty()) {
-        parameters.config_path = MakeShared<String>(config_path);
-    }
 
-    InfinityContext::instance().Init(parameters.config_path);
+    InfinityContext::instance().Init(config_path, m_flag, nullptr);
 
     InfinityContext::instance().config()->PrintAll();
 

@@ -30,7 +30,7 @@ import variables;
 
 namespace infinity {
 
-void InfinityContext::Init(const SharedPtr<String> &config_path, DefaultConfig* default_config) {
+void InfinityContext::Init(const SharedPtr<String> &config_path, bool m_flag, DefaultConfig* default_config) {
     if (initialized_) {
         return;
     } else {

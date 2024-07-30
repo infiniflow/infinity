@@ -55,6 +55,9 @@ public:
     ~BufferManager();
 
 public:
+    void Start();
+    void Stop();
+
     // Create a new BufferHandle, or in replay process. (read data block from wal)
     BufferObj *AllocateBufferObject(UniquePtr<FileWorker> file_worker);
 
