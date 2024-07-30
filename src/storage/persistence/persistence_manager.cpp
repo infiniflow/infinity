@@ -54,6 +54,16 @@ void ObjAddr::ReadBuf(const char *buf) {
     part_size_ = ReadBufAdv<SizeT>(buf);
 }
 
+PersistenceManager::PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit)
+    : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
+    current_object_key_ = ObjCreate();
+    current_object_size_ = 0;
+
+    if (local_data_dir_.empty() || local_data_dir_.back() != '/') {
+        local_data_dir_ += '/';
+    }
+}
+
 ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose) {
     std::error_code ec;
     fs::path src_fp = file_path;

@@ -63,6 +63,7 @@ protected:
 
 public:
     void SetUp() override {
+        CleanupDbDirs();
         config_path_ = GetParam();
         if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
             std::shared_ptr<std::string> config_path = std::make_shared<std::string>(config_path_);
@@ -88,7 +89,11 @@ public:
         expected_postings_ = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
     }
 
-    void TearDown() override {}
+    void TearDown() override {
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            infinity::InfinityContext::instance().UnInit();
+        }
+    }
 
     void Check(ColumnIndexReader &reader) {
         for (SizeT i = 0; i < expected_postings_.size(); ++i) {
@@ -130,13 +135,13 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(MemoryIndexerTest, Insert) {
     // prepare fake segment index entry
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
-    MemoryIndexer indexer1(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column_, 0, 1);
     indexer1.Insert(column_, 1, 3);
     indexer1.Dump();
 
-    auto indexer2 = MakeUnique<MemoryIndexer>(GetFullTmpDir(), "chunk2", RowID(0U, 4U), flag_, "standard");
+    auto indexer2 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk2", RowID(0U, 4U), flag_, "standard");
     indexer2->Insert(column_, 4, 1);
     while (indexer2->GetInflightTasks() > 0) {
         sleep(1);
@@ -147,13 +152,13 @@ TEST_P(MemoryIndexerTest, Insert) {
     fake_segment_index_entry_1->SetMemoryIndexer(std::move(indexer2));
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{0, fake_segment_index_entry_1}};
     ColumnIndexReader reader;
-    reader.Open(flag_, GetFullTmpDir(), std::move(index_by_segment));
+    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment));
     Check(reader);
 }
 
-TEST_F(MemoryIndexerTest, test2) {
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
-    MemoryIndexer indexer1(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+TEST_P(MemoryIndexerTest, test2) {
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column_, 0, 2, true);
     indexer1.Insert(column_, 2, 2, true);
     indexer1.Insert(column_, 4, 1, true);
@@ -163,13 +168,13 @@ TEST_F(MemoryIndexerTest, test2) {
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
 
     ColumnIndexReader reader;
-    reader.Open(flag_, GetFullTmpDir(), std::move(index_by_segment));
+    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment));
     Check(reader);
 }
 
-TEST_F(MemoryIndexerTest, SpillLoadTest) {
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
-    auto indexer1 = MakeUnique<MemoryIndexer>(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+TEST_P(MemoryIndexerTest, SpillLoadTest) {
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
+    auto indexer1 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1->Insert(column_, 0, 2);
     indexer1->Insert(column_, 2, 2);
     indexer1->Insert(column_, 4, 1);
@@ -179,7 +184,7 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
     }
 
     indexer1->Dump(false, true);
-    UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
 
     loaded_indexer->Load();
     SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(loaded_indexer.get());
@@ -207,7 +212,7 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
     }
 }
 
-TEST_F(MemoryIndexerTest, SeekPosition) {
+TEST_P(MemoryIndexerTest, SeekPosition) {
     // "A B C" repeats 7 times
     String paragraph(R"#(A B C A B C A B C A B C A B C A B C A B C)#");
     auto column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
@@ -217,8 +222,8 @@ TEST_F(MemoryIndexerTest, SeekPosition) {
         column->AppendValue(v);
     }
 
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
-    MemoryIndexer indexer1(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column, 0, 8192);
     while (indexer1.GetInflightTasks() > 0) {
         sleep(1);

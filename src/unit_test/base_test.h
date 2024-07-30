@@ -46,7 +46,7 @@ public:
     void TearDown() override {}
 public:
     static constexpr const char* NULL_CONFIG_PATH = "";
-    static constexpr const char* CONFIG_PATH = "conf/unit_test_vfs.toml";
+    static constexpr const char* CONFIG_PATH = "test/data/config/test_vfs.toml";
 
 protected:
     const char *GetHomeDir() { return "/var/infinity"; }
