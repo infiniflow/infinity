@@ -18,10 +18,37 @@ Connects to the Infinity server and gets an Infinity object.
 
 The `uri` here can be either a `NetworkAddress` object or a local directory in `str` format: 
 
-- `NetworkAddress`: Used when you have deployed Infinity as a separate server and wish to connect to it remotely. A NetworkAddress object comprises two fields:
-  - `"<SERVER_IP_ADDRESS>"` (`str`): The IP address of the Infinity server.  
-  - `<PORT>` (`int`): The port number on which Infinity is running.  
 - `"/path/to/save/to"` (`str`): A local directory for storing the Infinity data. Used when Infinity is deployed as a Python module. 
+- `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A NetworkAddress object comprises two fields:
+  - `"<SERVER_IP_ADDRESS>"` (`str`): The IP address of the Infinity server.  
+  - `<PORT>` (`int`): The port number on which Infinity is running. Defaults to 23817.
+
+:::alert IMPORTANT
+When connecting to Infinity in a client-server mode, ensure that the version of the client exactly matches the version of the server. For example: 
+
+| **Client version** | **Server version** |
+| ------------------ | ------------------ |
+| v0.2.0             | v0.2.0             |
+| v0.2.1             | v0.2.1             |
+| v0.3.0             | v0.3.0             |
+| v0.3.1             | v0.3.1             |
+| v0.4.0             | v0.4.0             |
+
+If the versions do not match, please update your client or server accordingly to ensure compatibility. 
+
+In client-server mode, also ensure that your server version matches the version specified in your configuration file. The matching rule is less strict than exact match: 
+
+- The major and minor versions must be identical. 
+- The patch version may differ. 
+
+This allows for bug fixes without requiring configuration file changes. 
+
+| **Configuration version** | **Compatible server version** |
+| ------------------------- | ----------------------------- |
+| v0.2.0                    | v0.2.0, v0.2.1                |
+| v0.3.0                    | v0.3.0, v0.3.1, v0.3.2        |
+| v1.1.0                    | v1.1.0, v1.1.1, v1.1.2        |
+:::
 
 ### Returns
 
@@ -30,21 +57,21 @@ The `uri` here can be either a `NetworkAddress` object or a local directory in `
 
 ### Examples
 
-#### Connect to a separate Infinity server
+#### Connect to Python module Infinity
+
+From v0.2.1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed Infinity via `pip install infinity-sdk==<v0.2.1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
+
+```python
+infinity_obj = infinity.connect("/path/to/save/to")
+```
+
+#### Connect to Infinity in client-server mode
 
 If you have deployed Infinity as a separate server, connect to it via its IP address. Further, if your Infinity is running on your local machine, you can also use `infinity.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet. 
 
 ```python
 # If Infinity is deployed on the local machine, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
 infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
-```
-
-#### Connect to Python module Infinity
-
-From v0.2.0 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed Infinity via `pip install infinity-sdk==<v0.2.0_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
-
-```python
-infinity_obj = infinity.connect("/path/to/save/to")
 ```
 
 ---
