@@ -229,7 +229,7 @@ Gets the names of all databases.
 
 ### Returns
 
-This method returns a struct containing the following attributes:
+This method returns a structure containing the following attributes:
 
 - `db_names`: `list[str]` A list of all database names.
 - `error_code`: `int` An error code indicating the result of the operation.
@@ -289,7 +289,7 @@ Name of the database
 
 ### Returns
 
-- Success: Metadata of the database. See the `ShowDatabaseResponse` struct, which includes:
+- Success: Metadata of the database. See the `ShowDatabaseResponse` structure, which includes:
   - `database_name`: `str` Name of the database. 
   - `store_dir`: `str` Directory to the database file.
   - `table_count`: `int` Number of tables in the database.
@@ -600,13 +600,13 @@ Creates an index by `IndexInfo` list.
 
 - **index_name : str**
 - **index_infos : list[IndexInfo]**
-  A IndexInfo struct contains three fields,`column_name`, `index_type`, and `index_param_list`.
+  A IndexInfo structure contains three fields,`column_name`, `index_type`, and `index_param_list`.
     - **column_name : str** Name of the column to build index on.
     - **index_type : IndexType**
       enum type: `IVFFlat` , `Hnsw`, `FullText`, or `BMP`. Defined in `infinity.index`.
       `Note: For Hnsw index, add encode=lvq in index_param_list to use LVQ(Locally-adaptive vector quantization)`
     - **index_param_list**
-      A list of InitParameter. The InitParameter struct is like a key-value pair, with two string fields named param_name and param_value. The optional parameters of each type of index are listed below:
+      A list of InitParameter. The InitParameter structure is like a key-value pair, with two string fields named param_name and param_value. The optional parameters of each type of index are listed below:
         - `IVFFlat`: `'centroids_count'`(default:`'128'`), `'metric'`(required)
         - `Hnsw`: 
           - `'M'`(default:`'16'`)
@@ -734,7 +734,7 @@ Retrieves the metadata of an index by name.
 ### Returns
 
 - Success: `metadata` : `ShowIndexResponse`
-  the struct `ShowIndexResponse` contains:
+  the structure `ShowIndexResponse` contains:
     - **db_name: string** Name of the database
     - **table_name: string**
     - **index_name: string**
