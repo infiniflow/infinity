@@ -18,7 +18,7 @@ from typing import Optional, Union, List, Any
 
 import numpy as np
 from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
-from infinity.embedded_infinity_ext import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, \
+from infinity.embedded_infinity_ext import WrapIndexInfo, ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.common import INSERT_DATA, VEC, SPARSE, InfinityException
@@ -27,6 +27,7 @@ from infinity.index import IndexInfo
 from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
 from infinity.local_infinity.types import build_result
 from infinity.local_infinity.utils import traverse_conditions, select_res_to_polars
+from infinity.local_infinity.utils import get_local_constant_expr_from_python_value
 from infinity.remote_thrift.utils import name_validity_check
 from infinity.table import Table, ExplainType
 import infinity.index as index
@@ -164,72 +165,7 @@ class LocalTable(Table, ABC):
             column_names = list(row.keys())
             parse_exprs = []
             for column_name, value in row.items():
-                constant_expression = WrapConstantExpr()
-                if isinstance(value, str):
-                    constant_expression.literal_type = LiteralType.kString
-                    constant_expression.str_value = value
-                elif isinstance(value, bool):
-                    constant_expression.literal_type = LiteralType.kBoolean
-                    constant_expression.bool_value = value
-                elif isinstance(value, int):
-                    constant_expression.literal_type = LiteralType.kInteger
-                    constant_expression.i64_value = value
-                elif isinstance(value, float) or isinstance(value, np.float32):
-                    constant_expression.literal_type = LiteralType.kDouble
-                    constant_expression.f64_value = value
-                elif isinstance(value, list):
-                    if isinstance(value[0], int):
-                        constant_expression.literal_type = LiteralType.kIntegerArray
-                        constant_expression.i64_array_value = value
-                    elif isinstance(value[0], float):
-                        constant_expression.literal_type = LiteralType.kDoubleArray
-                        constant_expression.f64_array_value = value
-                    elif isinstance(value[0], list) or isinstance(value[0], np.ndarray):
-                        if isinstance(value[0], np.ndarray):
-                            value = [x.tolist() for x in value]
-                        if isinstance(value[0][0], int):
-                            constant_expression.literal_type = LiteralType.kIntegerArray
-                            constant_expression.i64_array_value = [x for xs in value for x in xs]
-                        elif isinstance(value[0][0], float):
-                            constant_expression.literal_type = LiteralType.kDoubleArray
-                            constant_expression.f64_array_value = [x for xs in value for x in xs]
-                        elif isinstance(value[0][0], list):
-                            if isinstance(value[0][0][0], int):
-                                constant_expression.literal_type = LiteralType.kSubArrayArray
-                                constant_expression.i64_tensor_array_value = value
-                            elif isinstance(value[0][0][0], float):
-                                constant_expression.literal_type = LiteralType.kSubArrayArray
-                                constant_expression.f64_tensor_array_value = value
-                elif isinstance(value, np.ndarray) and value.ndim <= 2:
-                    float_list = value.flatten().tolist()
-                    if isinstance(float_list[0], int):
-                        constant_expression.literal_type = LiteralType.kIntegerArray
-                        constant_expression.i64_array_value = float_list
-                    elif isinstance(float_list[0], float):
-                        constant_expression.literal_type = LiteralType.kDoubleArray
-                        constant_expression.f64_array_value = float_list
-                    else:
-                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid list type: {type(value)}")
-                elif isinstance(value, dict):
-                    if isinstance(value["values"][0], int):
-                        constant_expression.literal_type = LiteralType.kLongSparseArray
-                        if isinstance(value["indices"][0], int):
-                            constant_expression.i64_array_idx = value["indices"]
-                            constant_expression.i64_array_value = value["values"]
-                        else:
-                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
-                    elif isinstance(value["values"][0], float):
-                        constant_expression.literal_type = LiteralType.kDoubleSparseArray
-                        if isinstance(value["indices"][0], int):
-                            constant_expression.i64_array_idx = value["indices"]
-                            constant_expression.f64_array_value = value["values"]
-                        else:
-                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
-                    else:
-                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
-                    
-                else:
-                    raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
+                constant_expression = get_local_constant_expr_from_python_value(value)
                 parse_exprs.append(constant_expression)
 
             fields.append(parse_exprs)
@@ -368,26 +304,7 @@ class LocalTable(Table, ABC):
                 update_expr_array: list[WrapParsedExpr] = []
                 for row in data:
                     for column_name, value in row.items():
-                        constant_expression = WrapConstantExpr()
-                        if isinstance(value, str):
-                            constant_expression.literal_type = LiteralType.kString
-                            constant_expression.str_value = value
-                        elif isinstance(value, int):
-                            constant_expression.literal_type = LiteralType.kInteger
-                            constant_expression.i64_value = value
-                        elif isinstance(value, float) or isinstance(value, np.float32):
-                            constant_expression.literal_type = LiteralType.kDouble
-                            constant_expression.f64_value = value
-                        elif isinstance(value, list):
-                            if isinstance(value[0], int):
-                                constant_expression.literal_type = LiteralType.kIntegerArray
-                                constant_expression.i64_array_value = value
-                            elif isinstance(value[0], float):
-                                constant_expression.literal_type = LiteralType.kDoubleArray
-                                constant_expression.f64_array_value = value
-                        else:
-                            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid constant expression")
-
+                        constant_expression = get_local_constant_expr_from_python_value(value)
                         parsed_expr = WrapParsedExpr(ParsedExprType.kConstant)
                         parsed_expr.constant_expr = constant_expression
 

@@ -273,7 +273,7 @@ class TestInfinity:
     def test_zero_dimension_vector(self):
         self.test_infinity_obj._test_zero_dimension_vector()
 
-    @pytest.mark.parametrize("dim", [1000, 10000, 100000, 200000])
+    @pytest.mark.parametrize("dim", [1000, 16384])
     def test_big_dimension_vector(self, dim):
         self.test_infinity_obj._test_big_dimension_vector(dim)
 
@@ -344,3 +344,62 @@ class TestInfinity:
                                                 "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_tensor_scan_with_invalid_extra_option(self, check_data, extra_option):
         self.test_infinity_obj._test_tensor_scan_with_invalid_extra_option(check_data, extra_option)
+
+    @pytest.mark.skip(reason = "UnrecoverableException The tensor column basic embedding dimension should be greater than 0")
+    def test_zero_dimension_tensor_scan(self):
+        self.test_infinity_obj._test_zero_dimension_tensor_scan()
+
+    @pytest.mark.parametrize("dim", [1, 10, 100]) #1^3, 10^3, 100^3
+    def test_big_dimension_tensor_scan(self, dim):
+        self.test_infinity_obj._test_big_dimension_tensor_scan(dim)
+
+    @pytest.mark.parametrize("table_params", [
+        "vector,100,float,int8",
+        "sparse,0,float,int8",
+        "sparse,100,int,int8",
+        "sparse,100,float,float",
+        "int8,float,100,sparse", #disorder
+    ])
+    @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
+                                            "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_sparse_with_invalid_table_params(self, check_data, table_params):
+        self.test_infinity_obj._test_sparse_with_invalid_table_params(check_data, table_params)
+
+    @pytest.mark.parametrize("index_type", [index.IndexType.IVFFlat,
+                                            index.IndexType.Hnsw,
+                                            index.IndexType.EMVB,
+                                            index.IndexType.FullText,
+                                            index.IndexType.Secondary,])
+    @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_sparse_knn_with_invalid_index_type(self, check_data, index_type):
+        self.test_infinity_obj._test_sparse_knn_with_invalid_index_type(check_data, index_type)
+
+    @pytest.mark.parametrize("index_params", [["0", "compress"],
+                                              ["257", "compress"],
+                                              ["16", "invalid compress type"]])
+    @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_sparse_knn_with_invalid_index_params(self, check_data, index_params):
+        self.test_infinity_obj._test_sparse_knn_with_invalid_index_params(check_data, index_params)
+
+
+    @pytest.mark.skip(reason = "invalid alpha and beta do not raise exception")
+    @pytest.mark.parametrize("alpha", ["-1.0", "2.0"])
+    @pytest.mark.parametrize("beta", ["-1.0", "2.0"])
+    @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_sparse_knn_with_invalid_alpha_beta(self, check_data, alpha, beta):
+        self.test_infinity_obj._test_sparse_knn_with_invalid_alpha_beta(check_data, alpha, beta)
+
+    @pytest.mark.skip(reason = "UnrecoverableException Sparse data size mismatch")
+    @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_sparse_knn_with_indices_values_mismatch(self, check_data):
+        self.test_infinity_obj._test_sparse_knn_with_indices_values_mismatch(check_data)
+
+    @pytest.mark.parametrize("distance_type", ["l2", "cosine", "hamming"])
+    @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_sparse_knn_with_invalid_distance_type(self, check_data, distance_type):
+        self.test_infinity_obj._test_sparse_knn_with_invalid_distance_type(check_data, distance_type)

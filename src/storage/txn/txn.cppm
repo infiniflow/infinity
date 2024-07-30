@@ -93,6 +93,8 @@ public:
 
     TxnTimeStamp Commit();
 
+    bool CheckConflict(Catalog *catalog);
+
     bool CheckConflict(Txn *txn);
 
     void CommitBottom();
@@ -199,11 +201,9 @@ public:
     // WAL and replay OPS
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
-    bool Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
-
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);
 
-    bool DeltaCheckpoint(const TxnTimeStamp max_commit_ts);
+    TxnTimeStamp DeltaCheckpoint();
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 
@@ -215,6 +215,8 @@ public:
     WalEntry *GetWALEntry() const;
 
     const SharedPtr<String> GetTxnText() const { return txn_text_; }
+
+    const String &db_name() const { return db_name_; }
 
 private:
     void CheckTxnStatus();

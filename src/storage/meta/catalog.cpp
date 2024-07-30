@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <fstream>
 #include <thread>
 #include <vector>
@@ -46,6 +47,10 @@ import data_access_state;
 import catalog_delta_entry;
 import file_writer;
 import extra_ddl_info;
+import index_defines;
+import infinity_context;
+import create_index_info;
+import persistence_manager;
 
 import table_meta;
 import table_index_meta;
@@ -503,6 +508,11 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
             json_res["databases"].emplace_back(db_meta_ptr->Serialize(max_commit_ts));
         }
     }
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        json_res["obj_addr_map"].emplace_back(pm->Serialize());
+    }
     return json_res;
 }
 
@@ -918,6 +928,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     segment_index_entry
                         ->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
                 }
+
                 break;
             }
             default:
@@ -958,6 +969,12 @@ UniquePtr<Catalog> Catalog::Deserialize(const String &data_dir, const nlohmann::
         for (const auto &db_json : catalog_json["databases"]) {
             UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(*catalog->data_dir_, db_json, buffer_mgr);
             catalog->db_meta_map_.AddNewMetaNoLock(*db_meta->db_name(), std::move(db_meta));
+        }
+    }
+    if (catalog_json.contains("obj_addr_map")) {
+        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+        if (pm != nullptr) {
+            pm->Deserialize(catalog_json["obj_addr_map"]);
         }
     }
     return catalog;
@@ -1002,13 +1019,13 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 }
 
 // called by bg_task
-bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog_path, String &delta_catalog_name) {
+bool Catalog::SaveDeltaCatalog(TxnTimeStamp &max_commit_ts, String &delta_catalog_path, String &delta_catalog_name) {
+    // Pick the delta entry to flush and set the max commit ts.
+    UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
+
     delta_catalog_path = *catalog_dir_;
     delta_catalog_name = CatalogFile::DeltaCheckpointFilename(max_commit_ts);
     String full_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
-
-    // Check the SegmentEntry's for flush the data to disk.
-    UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
 
     if (flush_delta_entry->operations().empty()) {
         LOG_TRACE("Save delta catalog ops is empty. Skip flush.");
@@ -1067,9 +1084,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     return false;
 }
 
-void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
-    global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry));
-}
+void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry)); }
 
 void Catalog::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->ReplayDeltaEntry(std::move(delta_entry)); }
 
@@ -1114,8 +1129,6 @@ void Catalog::StartMemoryIndexCommit() {
 
 SizeT Catalog::GetDeltaLogCount() const { return global_catalog_delta_entry_->OpSize(); }
 
-Vector<CatalogDeltaOpBrief> Catalog::GetDeltaLogBriefs() const {
-    return global_catalog_delta_entry_->GetOperationBriefs();
-}
+Vector<CatalogDeltaOpBrief> Catalog::GetDeltaLogBriefs() const { return global_catalog_delta_entry_->GetOperationBriefs(); }
 
 } // namespace infinity
