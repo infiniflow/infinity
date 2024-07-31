@@ -698,4 +698,11 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kFragment", ExplainType::kFragment)
         .value("kInvalid", ExplainType::kInvalid)
         .export_values();
+
+    m.def("test_helper_float32_to_chars", [](float x) -> std::string {
+        char buffer[30];
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), x);
+        std::string result(buffer, ptr);
+        return result;
+    });
 }
