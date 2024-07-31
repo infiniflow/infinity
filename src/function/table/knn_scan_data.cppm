@@ -51,7 +51,7 @@ public:
                       KnnDistanceType knn_distance_type)
         : table_ref_(table_ref), block_column_entries_(std::move(block_column_entries)), index_entries_(std::move(index_entries)),
           opt_params_(std::move(opt_params)), topk_(topk), dimension_(dimension), query_count_(query_embedding_count),
-          query_embedding_(query_embedding), elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
+          query_embedding_(query_embedding), query_elem_type_(elem_type), knn_distance_type_(knn_distance_type) {}
 
 public:
     const SharedPtr<BaseTableRef> table_ref_{};
@@ -64,7 +64,7 @@ public:
     const i64 dimension_;
     const u64 query_count_;
     void *const query_embedding_;
-    const EmbeddingDataType elem_type_{EmbeddingDataType::kElemInvalid};
+    const EmbeddingDataType query_elem_type_{EmbeddingDataType::kElemInvalid};
     const KnnDistanceType knn_distance_type_{KnnDistanceType::kInvalid};
 
     atomic_u64 current_block_idx_{0};
@@ -78,12 +78,12 @@ public:
     virtual ~KnnDistanceBase1() = default;
 };
 
-export template <typename DataType, typename DistType>
+export template <typename QueryDataType, typename DistType>
 class KnnDistance1 : public KnnDistanceBase1 {
 public:
     KnnDistance1(KnnDistanceType dist_type);
 
-    Vector<DistType> Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim) {
+    Vector<DistType> Calculate(const QueryDataType *datas, SizeT data_count, const QueryDataType *query, SizeT dim) {
         Vector<DistType> res(data_count);
         for (SizeT i = 0; i < data_count; ++i) {
             res[i] = dist_func_(query, datas + i * dim, dim);
@@ -91,7 +91,7 @@ public:
         return res;
     }
 
-    Vector<DistType> Calculate(const DataType *datas, SizeT data_count, const DataType *query, SizeT dim, Bitmask &bitmask) {
+    Vector<DistType> Calculate(const QueryDataType *datas, SizeT data_count, const QueryDataType *query, SizeT dim, Bitmask &bitmask) {
         Vector<DistType> res(data_count);
         for (SizeT i = 0; i < data_count; ++i) {
             if (bitmask.IsTrue(i)) {
@@ -102,7 +102,7 @@ public:
     }
 
 public:
-    using DistFunc = DistType (*)(const DataType *, const DataType *, SizeT);
+    using DistFunc = DistType (*)(const QueryDataType *, const QueryDataType *, SizeT);
 
     DistFunc dist_func_{};
 };
@@ -131,7 +131,7 @@ public:
     ~KnnScanFunctionData() final = default;
 
 private:
-    template <typename DataType, typename DistType>
+    template <typename QueryDataType, typename DistType>
     void Init();
 
 public:
