@@ -8,6 +8,7 @@ import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
 from internal.utils import trace_expected_exceptions
+from http_adapter import http_adapter
 
 
 @pytest.fixture(scope="class")
@@ -15,13 +16,19 @@ def local_infinity(request):
     return request.config.getoption("--local-infinity")
 
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity):
+def http(request):
+    return request.config.getoption("--http")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
     if local_infinity:
         uri = common_values.TEST_LOCAL_PATH
     else:
         uri = common_values.TEST_LOCAL_HOST
     request.cls.uri = uri
     request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
     yield
     request.cls.infinity_obj.disconnect()
 
@@ -31,6 +38,7 @@ class TestInfinity:
     def skip_setup_marker(self, request):
         request.node.skip_setup = True
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_delete(self):
         """
         target: test table delete apis
@@ -148,7 +156,7 @@ class TestInfinity:
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         for i in range(len(common_values.types_array)):
-            db_obj.drop_table("test_delete_table_no_rows_met_condition" + str(i))
+            db_obj.drop_table("test_delete_table_no_rows_met_condition" + str(i), ConflictType.Ignore)
 
         for i in range(len(common_values.types_array)):
             tb = db_obj.create_table("test_delete_table_no_rows_met_condition" + str(i),
@@ -282,6 +290,7 @@ class TestInfinity:
         assert e.type == infinity.common.InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
+    @pytest.mark.usefixtures("skip_if_http")
     @trace_expected_exceptions
     @pytest.mark.parametrize('column_types', ["int", "int8", "int16", "int32", "int64", "integer",
                                               "float", "float32", "double", "float64",
@@ -319,6 +328,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_various_expression_in_where_clause", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_delete_one_block_without_expression(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
@@ -339,6 +349,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_delete_one_block_without_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_delete_one_segment_without_expression(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")

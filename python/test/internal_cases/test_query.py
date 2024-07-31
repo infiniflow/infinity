@@ -8,6 +8,7 @@ from infinity.remote_thrift.db import RemoteDatabase
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.table import RemoteTable
 from infinity.common import ConflictType
+from http_adapter import http_adapter
 
 
 @pytest.fixture(scope="class")
@@ -15,13 +16,19 @@ def local_infinity(request):
     return request.config.getoption("--local-infinity")
 
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity):
+def http(request):
+    return request.config.getoption("--http")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
     if local_infinity:
         uri = common_values.TEST_LOCAL_PATH
     else:
         uri = common_values.TEST_LOCAL_HOST
     request.cls.uri = uri
     request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
     yield
     request.cls.infinity_obj.disconnect()
 
@@ -74,16 +81,16 @@ class TestInfinity:
         res = conn.disconnect()
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_query_builder(self):
-        def _test_query_builder(self):
-            # connect
-            db_obj = self.infinity_obj.get_database("default_db")
-            db_obj.drop_table("test_query_builder",
-                              conflict_type=ConflictType.Ignore)
-            table_obj = db_obj.create_table(
-                "test_query_builder", {"c1": {"type": "int"}}, ConflictType.Error)
-            query_builder = table_obj.query_builder
-            query_builder.output(["*"]).to_df()
+        # connect
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_query_builder",
+                          conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table(
+            "test_query_builder", {"c1": {"type": "int"}}, ConflictType.Error)
+        query_builder = table_obj.query_builder
+        query_builder.output(["*"]).to_df()
 
-            res = db_obj.drop_table("test_query_builder", ConflictType.Error)
-            assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_query_builder", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK

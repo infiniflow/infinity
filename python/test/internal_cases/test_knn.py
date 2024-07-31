@@ -10,6 +10,7 @@ from infinity.local_infinity.types import make_match_tensor_expr as local_make_m
 from internal.utils import copy_data, generate_commas_enwiki
 import pandas as pd
 from numpy import dtype
+from http_adapter import http_adapter
 
 
 @pytest.fixture(scope="class")
@@ -17,13 +18,19 @@ def local_infinity(request):
     return request.config.getoption("--local-infinity")
 
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity):
+def http(request):
+    return request.config.getoption("--http")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
     if local_infinity:
         uri = common_values.TEST_LOCAL_PATH
     else:
         uri = common_values.TEST_LOCAL_HOST
     request.cls.uri = uri
     request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
     yield
     request.cls.infinity_obj.disconnect()
 
@@ -84,6 +91,7 @@ class TestInfinity:
         res = db_obj.drop_table("fix_tmp_20240116", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_knn_u8(self, check_data):
@@ -244,6 +252,7 @@ class TestInfinity:
             "test_knn_on_non_vector_column", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
@@ -318,6 +327,7 @@ class TestInfinity:
             "test_invalid_embedding_data", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
@@ -407,6 +417,7 @@ class TestInfinity:
             "test_invalid_embedding_data_type", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
@@ -462,6 +473,7 @@ class TestInfinity:
             "test_various_distance_type", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("topn", [
@@ -561,7 +573,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["variant_id"]).knn(
-            knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
+            knn_column_name, [1.0] * 4, "float", knn_distance_type, 5).to_pl()
         print(res)
 
         res = table_obj.drop_index("my_index", ConflictType.Error)
@@ -630,7 +642,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_with_index_after", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_1", ["doctitle,num,body^5"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -672,6 +684,7 @@ class TestInfinity:
             "test_with_fulltext_match_with_valid_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_1", [pytest.param(1),
                                                pytest.param(1.1),
                                                pytest.param([]),
@@ -719,6 +732,7 @@ class TestInfinity:
             "test_with_fulltext_match_with_invalid_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_2", ["a word a segment",
                                                "body=Greek"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
@@ -761,6 +775,7 @@ class TestInfinity:
             "test_with_fulltext_match_with_valid_words", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_2", [pytest.param(1),
                                                pytest.param(1.1),
                                                pytest.param([]),
@@ -809,6 +824,7 @@ class TestInfinity:
             "test_with_fulltext_match_with_invalid_words", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_3", [pytest.param("@#$!#@$SDa^sdf3!@#$"),
                                                "topn=1",
                                                "1"])
@@ -852,6 +868,7 @@ class TestInfinity:
             "test_with_fulltext_match_with_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_3", [pytest.param(1),
                                                pytest.param(1.1),
                                                pytest.param([]),
@@ -899,6 +916,7 @@ class TestInfinity:
             "test_with_fulltext_match_with_invalid_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_tensor_scan(self, check_data):
@@ -922,6 +940,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_sparse_knn(self, check_data):
@@ -940,6 +959,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_sparse_knn_with_index(self, check_data):
@@ -975,6 +995,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_multiple_fusion(self, check_data):
@@ -1069,7 +1090,7 @@ class TestInfinity:
                                                               ])], ConflictType.Error)
                 assert res.error_code == ErrorCode.OK
                 res = table_obj.output(["variant_id"]).knn(
-                    knn_column_name, [1] * 4, "float", knn_distance_type, 5).to_pl()
+                    knn_column_name, [1.0] * 4, "float", knn_distance_type, 5).to_pl()
                 print(res)
                 res = table_obj.drop_index("my_index", ConflictType.Error)
                 assert res.error_code == ErrorCode.OK
@@ -1094,14 +1115,14 @@ class TestInfinity:
                 assert res.error_code == ErrorCode.OK
                 #for IVFFlat, index_distance_type has to match knn_distance_type?
                 res = table_obj.output(["variant_id"]).knn(
-                    knn_column_name, [1] * 4, "float", index_distance_type, 5).to_pl()
+                    knn_column_name, [1.0] * 4, "float", index_distance_type, 5).to_pl()
                 print(res)
                 res = table_obj.drop_index("my_index", ConflictType.Error)
                 assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table("test_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-
+    @pytest.mark.usefixtures("skip_if_http")
     def test_zero_dimension_vector(self):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_zero_dimension_vector",
@@ -1133,6 +1154,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_zero_dimension_vector", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("dim", [1000, 16384])
     def test_big_dimension_vector(self, dim):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -1155,6 +1177,7 @@ class TestInfinity:
 
     # "^5" indicates the point that column "body" get multipy by 5, default is multipy by 1
     # refer to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("fields_and_matching_text", [
                                         ["body","black"],
                                         ["doctitle,num,body", "black"],
@@ -1216,6 +1239,7 @@ class TestInfinity:
             "test_with_various_fulltext_match", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("data_type", ['varchar',
                                            pytest.param(1),
                                            pytest.param(1.1),
@@ -1247,6 +1271,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("method_type", ['invalid method type',
                                             pytest.param(1),
                                             pytest.param(1.1),
@@ -1278,6 +1303,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("extra_option", ['topn=-1',
                                               'topn=0',
                                               'topn=100000000',
@@ -1310,6 +1336,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.skip(reason = "UnrecoverableException The tensor column basic embedding dimension should be greater than 0")
     def test_zero_dimension_tensor_scan(self):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -1328,6 +1355,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("dim", [1, 10, 100]) #1^3, 10^3, 100^3
     def test_big_dimension_tensor_scan(self, dim):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -1350,6 +1378,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("table_params", [
         "vector,100,float,int8",
         "sparse,0,float,int8",
@@ -1410,6 +1439,7 @@ class TestInfinity:
                                             ConflictType.Error)
             assert e.value.args[0] == ErrorCode.INVALID_EMBEDDING_DATA_TYPE
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("index_type", [index.IndexType.IVFFlat,
                                             index.IndexType.Hnsw,
                                             index.IndexType.EMVB,
@@ -1471,6 +1501,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("index_params", [["0", "compress"],
                                               ["257", "compress"],
                                               ["16", "invalid compress type"]])
@@ -1499,6 +1530,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.skip(reason = "invalid alpha and beta do not raise exception")
     @pytest.mark.parametrize("alpha", ["-1.0", "2.0"])
     @pytest.mark.parametrize("beta", ["-1.0", "2.0"])
@@ -1537,6 +1569,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.skip(reason = "UnrecoverableException Sparse data size mismatch")
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -1559,6 +1592,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("distance_type", ["l2", "cosine", "hamming"])
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)

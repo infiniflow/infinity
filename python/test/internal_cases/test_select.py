@@ -7,19 +7,26 @@ from numpy import dtype
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from internal.utils import copy_data
+from http_adapter import http_adapter
 
 @pytest.fixture(scope="class")
 def local_infinity(request):
     return request.config.getoption("--local-infinity")
 
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity):
+def http(request):
+    return request.config.getoption("--http")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
     if local_infinity:
         uri = common_values.TEST_LOCAL_PATH
     else:
         uri = common_values.TEST_LOCAL_HOST
     request.cls.uri = uri
     request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
     yield
     request.cls.infinity_obj.disconnect()
 
@@ -152,6 +159,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_select", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_select_aggregate(self):
         """
         target: test table select apis
@@ -469,6 +477,7 @@ class TestInfinity:
             "test_select_big_embedding", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_select_same_output(self):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_same_output", ConflictType.Ignore)
@@ -488,6 +497,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_select_same_output", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_empty_table(self):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_empty_table", ConflictType.Ignore)
