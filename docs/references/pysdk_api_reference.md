@@ -302,7 +302,7 @@ A structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
   - `0`: The operation succeeds. 
-  - Non-zero value: A specific error condition occurrs. 
+  - Non-zero value: A specific error condition occurs. 
 - `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
 - `database_name`: `str` A list of all database names.
 - `store_dir`: `str` The directory holding the database files. 
@@ -561,47 +561,6 @@ A structure containing the following attributes:
 ```python
 res = db_obj.list_tables()
 res.table_names # ['my_table, 'tensor_table', 'sparse_table']
-```
-
----
-
-## show_tables
-
-```python
-Database.show_tables()
-```
-
-Shows the information of all tables in the current database.
-
-### Returns
-
-A DataFrame with eight columns, where each row corresponds to a table in the database. These eight columns are:
-
-- `database`: `str` The database name. 
-- `table`: `str` The table name. 
-- `type`: `str`
-- `column_count`: `int64`
-- `block_count`: `int64`
-- `block_capacity`: `int64`
-- `segment_count`: `int64`
-- `segment_capacity`: `int64`
-
-### Examples
-
-```python
-res = db_obj.show_tables()
-print(res)
-
-shape: (3, 8)
-┌────────────┬──────────────┬───────┬──────────────┬─────────────┬────────────────┬───────────────┬──────────────────┐
-│ database   ┆ table        ┆ type  ┆ column_count ┆ block_count ┆ block_capacity ┆ segment_count ┆ segment_capacity │
-│ ---        ┆ ---          ┆ ---   ┆ ---          ┆ ---         ┆ ---            ┆ ---           ┆ ---              │
-│ str        ┆ str          ┆ str   ┆ i64          ┆ i64         ┆ i64            ┆ i64           ┆ i64              │
-╞════════════╪══════════════╪═══════╪══════════════╪═════════════╪════════════════╪═══════════════╪══════════════════╡
-│ default_db ┆ my_table     ┆ Table ┆ 3            ┆ 1           ┆ 8192           ┆ 1             ┆ 8388608          │
-│ default_db ┆ tensor_table ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608          │
-│ default_db ┆ sparse_table ┆ Table ┆ 1            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608          │
-└────────────┴──────────────┴───────┴──────────────┴─────────────┴────────────────┴───────────────┴──────────────────┘
 ```
 
 ---
