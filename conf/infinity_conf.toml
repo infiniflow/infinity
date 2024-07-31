@@ -38,6 +38,8 @@ buffer_manager_size      = "4GB"
 lru_num                  = 7
 temp_dir                 = "/var/infinity/tmp"
 
+memindex_memory_quota   = "1GB"
+
 [wal]
 wal_dir                       = "/var/infinity/wal"
 full_checkpoint_interval      = "86400s"
