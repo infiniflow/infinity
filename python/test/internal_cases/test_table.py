@@ -87,7 +87,7 @@ class TestInfinity:
         # create table
         with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
             # commit task into processpool
-            futures = [executor.submit(db_obj.create_table(table_name, {"c1": {"type": "int"}}, ConflictType.Error), i)
+            futures = [executor.submit(db_obj.create_table(table_name, {"c1": {"type": "int"}}, ConflictType.Ignore), i)
                        for i in
                        range(16)]
             # wait all processes finished
@@ -96,9 +96,12 @@ class TestInfinity:
         # drop table
         with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
             # commit task into threadpool
-            futures = [executor.submit(db_obj.drop_table(table_name), i) for i in range(16)]
+            futures = [executor.submit(db_obj.drop_table(table_name, ConflictType.Ignore), i) for i in range(16)]
             # wait all threads finished
             concurrent.futures.wait(futures)
+        # drop table
+        res = db_obj.drop_table(table_name, ConflictType.Ignore)
+        assert res.error_code == ErrorCode.OK
 
     def test_create_empty_column_table(self):
         """
