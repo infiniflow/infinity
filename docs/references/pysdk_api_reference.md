@@ -89,10 +89,9 @@ Disconnects the client from the Infinity server in client-server mode or destruc
 This method returns a structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
-  - `0`: The operation succeeded. 
-  - Non-zero value: A specific error condition occurred. 
-- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeded. 
-- `session_id`: `int` The correponding session ID. 
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
 
 
 ### Examples
@@ -202,12 +201,9 @@ If `ConflictType` is not set, it defaults to `Error`.
 This method returns a structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
-  - `0`: The operation succeeded. 
-  - Non-zero value: A specific error condition occurred. 
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
 - `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
-- `database_name`: `str` The name of the database to delete (Python module mode only). 
-- `store_dir`: `str` The directory holding the database files (Python module mode only). 
-- `session_id`: `int` The correponding session ID (client-server mode only). 
 
 ### Examples
 
@@ -246,8 +242,8 @@ This method returns a structure containing the following attributes:
 
 - `db_names`: `list[str]` A list of all database names.
 - `error_code`: `int` An error code indicating the result of the operation.
-  - `0`: The operation succeeded. 
-  - Non-zero value: A specific error condition occurred. 
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
 - `error_msg`: `str` The error message providing additional details. 
 
 ### Examples
@@ -302,11 +298,11 @@ Name of the database. Must not be empty.
 
 ### Returns
 
-This method returns a `ShowDatabaseResponse` structure containing the following attributes:
+This method returns a structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
-  - `0`: The operation succeeded. 
-  - Non-zero value: A specific error condition occurred. 
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurrs. 
 - `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
 - `database_name`: `str` A list of all database names.
 - `store_dir`: `str` The directory holding the database files. 
@@ -488,11 +484,9 @@ If `ConflictType` is not set, it defaults to `Error`.
 This method returns a structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
-  - `0`: The operation succeeded. 
-  - Non-zero value: A specific error condition occurred. 
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
 - `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
-
-- `session_id`: `int` The correponding session ID (client-server mode only). 
 
 ### Examples
 
@@ -757,7 +751,7 @@ Retrieves the metadata of an index by name.
 ### Returns
 
 - Success: `metadata` : `ShowIndexResponse`
-  the structure `ShowIndexResponse` contains:
+  the structure contains:
     - **db_name: string** Name of the database
     - **table_name: string**
     - **index_name: string**
