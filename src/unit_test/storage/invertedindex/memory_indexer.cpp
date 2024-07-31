@@ -63,6 +63,9 @@ protected:
 
 public:
     void SetUp() override {
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
         CleanupDbDirs();
         config_path_ = GetParam();
         if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {

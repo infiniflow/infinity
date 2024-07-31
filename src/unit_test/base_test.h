@@ -59,10 +59,12 @@ protected:
 
     const char *GetFullTmpDir() { return "/var/infinity/tmp"; }
 
+    const char *GetFullPersistDir() { return "/var/infinity/persistence"; }
+
     const char *GetTmpDir() { return "tmp"; }
 
     void CleanupDbDirs() {
-        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir()};
+        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir()};
         for (auto &dir : infinity_db_dirs) {
             CleanupDirectory(dir);
         }
