@@ -102,6 +102,17 @@ void Storage::Init() {
     new_catalog_->StartMemoryIndexCommit();
     new_catalog_->MemIndexRecover(buffer_mgr_.get());
 
+    SharedPtr<CleanupPeriodicTrigger> cleanup_trigger{};
+    {
+        std::chrono::seconds cleanup_interval = static_cast<std::chrono::seconds>(config_ptr_->CleanupInterval());
+        if (cleanup_interval.count() > 0) {
+            cleanup_trigger = MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
+            bg_processor_->SetCleanupTrigger(cleanup_trigger);
+        } else {
+            LOG_WARN("Cleanup interval is not set, auto cleanup task will not be triggered");
+        }
+    }
+
     bg_processor_->Start();
     if (compact_processor_.get() != nullptr) {
         compact_processor_->Start();
@@ -127,12 +138,8 @@ void Storage::Init() {
             LOG_WARN("Optimize interval is not set, auto optimize task will not be triggered");
         }
 
-        std::chrono::seconds cleanup_interval = static_cast<std::chrono::seconds>(config_ptr_->CleanupInterval());
-        if (cleanup_interval.count() > 0) {
-            periodic_trigger_thread_->AddTrigger(
-                MakeUnique<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
-        } else {
-            LOG_WARN("Cleanup interval is not set, auto cleanup task will not be triggered");
+        if (cleanup_trigger.get() != nullptr) {
+            periodic_trigger_thread_->AddTrigger(cleanup_trigger);
         }
 
         i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval();

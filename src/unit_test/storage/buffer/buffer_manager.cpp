@@ -270,5 +270,6 @@ TEST_F(BufferManagerTest, parallel_test) {
             thread.join();
         }
     }
+    EXPECT_EQ(buffer_mgr.memory_usage(), 0ul);
     LOG_INFO("Finished parallel test.");
 }
