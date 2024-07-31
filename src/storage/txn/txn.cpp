@@ -527,7 +527,10 @@ void Txn::Rollback() {
     LOG_TRACE(fmt::format("Txn: {} is dropped.", txn_id_));
 }
 
-void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { wal_entry_->cmds_.push_back(cmd); }
+void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) { 
+    std::lock_guard guard(txn_store_.mtx_);
+    wal_entry_->cmds_.push_back(cmd);
+}
 
 // Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
 TxnTimeStamp Txn::DeltaCheckpoint() {
