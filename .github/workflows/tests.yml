@@ -80,7 +80,7 @@ jobs:
 
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test debug version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && LD_PRELOAD=/usr/local/lib/clang/18/lib/x86_64-unknown-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 tools/run_pytest_parallel.py && python3 tools/run_http_api.py" && sleep 1s
 
       - name: Stop infinity pysdk & http_api & sqllogictest debug
         if: ${{ !cancelled() }}
@@ -169,7 +169,7 @@ jobs:
 
       - name: Run pysdk remote infinity & parallel & http_api & sqllogic test release version
         if: ${{ !cancelled() && !failure() }}
-        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel.py" && sleep 1s
+        run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_pytest_parallel.py && python3 tools/run_http_api.py" && sleep 1s
 
       - name: Stop infinity release
         if: ${{ !cancelled() }}
