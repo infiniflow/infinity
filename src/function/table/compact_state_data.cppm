@@ -63,9 +63,9 @@ export class CompactStateData {
 public:
     CompactStateData(TableEntry *table_entry) : new_table_ref_(MakeShared<BaseTableRef>(table_entry, MakeShared<BlockIndex>())){};
 
-    void AddToDelete(SegmentID segment_id, const Vector<SegmentOffset> &delete_offsets);
+    void AddToDelete(TxnTimeStamp commit_ts, SegmentID segment_id, Vector<SegmentOffset> delete_offsets);
 
-    const HashMap<SegmentID, Vector<SegmentOffset>> &GetToDelete() const { return to_delete_; }
+    Vector<Pair<SegmentID, Vector<SegmentOffset>>> GetToDelete() const;
 
     void AddNewSegment(SharedPtr<SegmentEntry> new_segment, Vector<SegmentEntry *> compacted_segments, Txn *txn);
 
@@ -78,10 +78,11 @@ public:
 public:
     Vector<CompactSegmentData> segment_data_list_;
     RowIDRemap remapper_{};
+    TxnTimeStamp scan_ts_ = UNCOMMIT_TS; // ts when compact get the visible range
 
 private:
     std::mutex mutex_;
-    HashMap<SegmentID, Vector<SegmentOffset>> to_delete_;
+    Vector<Tuple<TxnTimeStamp, SegmentID, Vector<SegmentOffset>>> to_delete_;
 
     std::mutex mutex2_;
     SharedPtr<BaseTableRef> new_table_ref_{}; // table ref after compact
