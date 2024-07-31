@@ -50,10 +50,10 @@ SizeT LRUCache::RequestSpace(SizeT need_space) {
     auto iter = gc_list_.begin();
     while (free_space < need_space && iter != gc_list_.end()) {
         auto *buffer_obj = *iter;
-        free_space += buffer_obj->GetBufferSize();
         // Free return false when the buffer is freed by cleanup
         // will not dead lock because caller is in kNew or kFree state, and `buffer_obj` is in kUnloaded or state
         if (buffer_obj->Free()) {
+            free_space += buffer_obj->GetBufferSize();
             iter = gc_list_.erase(iter);
             gc_map_.erase(buffer_obj);
         } else {
@@ -201,7 +201,7 @@ void BufferManager::RequestSpace(SizeT need_size) {
     SizeT freed_space = 0;
     const SizeT free_space = memory_limit_ - current_memory_size_;
     if (free_space >= need_size) {
-        current_memory_size_ += need_size;
+        [[maybe_unused]] auto cur_mem_size = current_memory_size_.fetch_add(need_size);
         return;
     }
     SizeT round_robin = round_robin_;
@@ -213,7 +213,7 @@ void BufferManager::RequestSpace(SizeT need_size) {
         String error_message = "Out of memory.";
         UnrecoverableError(error_message);
     }
-    current_memory_size_ += -freed_space + need_size;
+    [[maybe_unused]] auto cur_mem_size = current_memory_size_.fetch_add(need_size - freed_space);
 }
 
 void BufferManager::PushGCQueue(BufferObj *buffer_obj) {
@@ -232,7 +232,7 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
         clean_list_.emplace_back(buffer_obj);
     }
     if (do_free) {
-        u64 memory_size = current_memory_size_.fetch_sub(buffer_obj->GetBufferSize());
+        [[maybe_unused]] auto memory_size = current_memory_size_.fetch_sub(buffer_obj->GetBufferSize());
         if (memory_size < buffer_obj->GetBufferSize()) {
             UnrecoverableError(fmt::format("BufferManager::AddToCleanList: memory_size < buffer_obj->GetBufferSize(): {} < {}",
                                            memory_size,

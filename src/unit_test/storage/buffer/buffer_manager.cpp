@@ -188,7 +188,8 @@ TEST_F(BufferManagerTest, parallel_test) {
     const SizeT thread_n = 4;
     const SizeT file_n = 100;
     const SizeT avg_file_size = 100;
-    const SizeT buffer_size = std::max(avg_file_size * file_n / 4, avg_file_size * thread_n); // avg?
+    const SizeT max_file_size = avg_file_size + avg_file_size / 2;
+    const SizeT buffer_size = std::max(avg_file_size * file_n / 4, max_file_size * thread_n); // avg?
     const SizeT loop_n = 100;
 
     ASSERT_GT(loop_n, 0ull);
@@ -214,6 +215,7 @@ TEST_F(BufferManagerTest, parallel_test) {
                 if (visit_cnt == 0) {
                     EXPECT_EQ(buffer_obj, nullptr);
                     SizeT file_size = rand() % avg_file_size + avg_file_size / 2;
+                    file_info.file_size_ = file_size;
                     auto file_name = MakeShared<String>(fmt::format("file_{}", file_id));
                     auto file_worker = MakeUnique<DataFileWorker>(data_dir_, file_name, file_size);
                     if (alloc_new) {
@@ -251,7 +253,7 @@ TEST_F(BufferManagerTest, parallel_test) {
                     BufferHandle buffer_handle = buffer_obj->Load();
                     const auto *data = reinterpret_cast<const char *>(buffer_handle.GetData());
                     for (SizeT i = 0; i < file_info.file_size_; ++i) {
-                        EXPECT_EQ(data[i], char('a' + visit_cnt % 26));
+                        EXPECT_EQ(data[i], char('a' + (visit_cnt - 1) % 26));
                     }
                 }
             }
