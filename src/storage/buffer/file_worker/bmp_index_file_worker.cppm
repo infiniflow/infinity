@@ -45,8 +45,6 @@ public:
 
     SizeT GetMemoryCost() const override { return index_size_; }
 
-    void SetMemoryCost(SizeT index_size) { index_size_ = index_size; }
-
 protected:
     void WriteToFileImpl(bool to_spill, bool &prepare_success) override;
 

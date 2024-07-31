@@ -28,10 +28,11 @@ import wal_manager;
 import catalog;
 import third_party;
 import buffer_manager;
+import periodic_trigger;
 
 namespace infinity {
 
-BGTaskProcessor::BGTaskProcessor(WalManager *wal_manager, Catalog *catalog) : wal_manager_(wal_manager), catalog_(catalog) {}
+void BGTaskProcessor::SetCleanupTrigger(SharedPtr<CleanupPeriodicTrigger> cleanup_trigger) { cleanup_trigger_ = cleanup_trigger; }
 
 void BGTaskProcessor::Start() {
     processor_thread_ = Thread([this] { Process(); });
@@ -48,7 +49,7 @@ void BGTaskProcessor::Stop() {
 }
 
 void BGTaskProcessor::Submit(SharedPtr<BGTask> bg_task) {
-    ++ task_count_;
+    ++task_count_;
     task_queue_.Enqueue(std::move(bg_task));
 }
 
@@ -70,6 +71,16 @@ void BGTaskProcessor::Process() {
                 }
                 case BGTaskType::kForceCheckpoint: {
                     LOG_DEBUG("Force checkpoint in background");
+                    if (cleanup_trigger_.get() != nullptr) {
+                        LOG_DEBUG("Do cleanup before force checkpoint");
+                        auto cleanup_task = cleanup_trigger_->CreateCleanupTask();
+                        if (cleanup_task.get() != nullptr) {
+                            cleanup_task->Execute();
+                            LOG_DEBUG("Cleanup before force checkpoint done");
+                        } else {
+                            LOG_DEBUG("Skip cleanup before force checkpoint");
+                        }
+                    }
                     ForceCheckpointTask *force_ckp_task = static_cast<ForceCheckpointTask *>(bg_task.get());
                     {
                         std::unique_lock<std::mutex> locker(task_mutex_);

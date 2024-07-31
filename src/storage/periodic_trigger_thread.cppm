@@ -31,7 +31,7 @@ public:
         }
     }
 
-    int AddTrigger(UniquePtr<PeriodicTrigger> trigger) {
+    int AddTrigger(SharedPtr<PeriodicTrigger> trigger) {
         int id = triggers_.size();
         triggers_.push_back(std::move(trigger));
         return id;
@@ -46,7 +46,7 @@ public:
     void Reset(int id) { triggers_[id]->Reset(); }
 
 private:
-    Vector<UniquePtr<PeriodicTrigger>> triggers_;
+    Vector<SharedPtr<PeriodicTrigger>> triggers_;
 
     Thread thread_{};
     atomic_bool running_{};

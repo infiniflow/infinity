@@ -740,18 +740,6 @@ void SegmentIndexEntry::OptIndex(IndexBase *index_base,
                 BufferHandle buffer_handle = chunk_index_entry->GetIndex();
                 auto *abstract_bmp = static_cast<AbstractBMP *>(buffer_handle.GetDataMut());
                 optimize_index(*abstract_bmp);
-                std::visit(
-                    [&](auto &&index) {
-                        using T = std::decay_t<decltype(index)>;
-                        if constexpr (std::is_same_v<T, std::nullptr_t>) {
-                            UnrecoverableError("Invalid index type.");
-                        } else {
-                            SizeT index_size = index->GetSizeInBytes();
-                            auto *bmp_file_worker = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut());
-                            bmp_file_worker->SetMemoryCost(index_size);
-                        }
-                    },
-                    *abstract_bmp);
                 chunk_index_entry->SaveIndexFile();
             }
             if (memory_index_entry.get() != nullptr) {
