@@ -86,7 +86,7 @@ Disconnects the client from the Infinity server in client-server mode or destruc
 
 ### Returns
 
-This method returns a structure containing the following attributes:
+A structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
   - `0`: The operation succeeds. 
@@ -198,7 +198,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-This method returns a structure containing the following attributes:
+A structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
   - `0`: The operation succeeds. 
@@ -238,7 +238,7 @@ Gets the names of all databases.
 
 ### Returns
 
-This method returns a structure containing the following attributes:
+A structure containing the following attributes:
 
 - `db_names`: `list[str]` A list of all database names.
 - `error_code`: `int` An error code indicating the result of the operation.
@@ -298,7 +298,7 @@ Name of the database. Must not be empty.
 
 ### Returns
 
-This method returns a structure containing the following attributes:
+A structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
   - `0`: The operation succeeds. 
@@ -481,7 +481,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-This method returns a structure containing the following attributes:
+A structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
   - `0`: The operation succeeds. 
@@ -533,10 +533,7 @@ Name of the table to retrieve. Must not be empty.
 ### Examples
 
 ```python
-try:
-    table_obj = db_obj.get_table("my_table")
-except Exception as e:
-    print(e)
+table_obj = db_obj.get_table("my_table")
 ```
 
 ---
@@ -547,18 +544,23 @@ except Exception as e:
 Database.list_tables()
 ```
 
-Lists all tables in the current database.
+Lists the names of all tables in the current database.
 
 ### Returns
 
-- Success: `db_names` in `list[str]`
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
+- `table_names`: `list[str]` A list of table names. 
 
 ### Examples
 
 ```python
 res = db_obj.list_tables()
-res.table_names #["my_table"]
+res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 ```
 
 ---
@@ -573,17 +575,16 @@ Shows the information of all tables in the current database.
 
 ### Returns
 
-- Success: response `metadata`: `polars.DataFrame` The returned 
-DataFrame contains eight columns and each row in it corresponds to a table in the database. These eight columns are:
-  - `database`: `str`
-  - `table`: `str`
-  - `type`: `str`
-  - `column_count`: `int64`
-  - `block_count`: `int64`
-  - `block_capacity`: `int64`
-  - `segment_count`: `int64`
-  - `segment_capacity`: `int64`
-- Failure: `Exception`
+A DataFrame with eight columns, where each row corresponds to a table in the database. These eight columns are:
+
+- `database`: `str` The database name. 
+- `table`: `str` The table name. 
+- `type`: `str`
+- `column_count`: `int64`
+- `block_count`: `int64`
+- `block_capacity`: `int64`
+- `segment_count`: `int64`
+- `segment_capacity`: `int64`
 
 ### Examples
 
@@ -615,14 +616,17 @@ Creates an index by `IndexInfo` list.
 
 ### Parameters
 
-- **index_name : str**
-- **index_infos : list[IndexInfo]**
-  A IndexInfo structure contains three fields,`column_name`, `index_type`, and `index_param_list`.
-    - **column_name : str** Name of the column to build index on.
-    - **index_type : IndexType**
-      enum type: `IVFFlat` , `Hnsw`, `FullText`, or `BMP`. Defined in `infinity.index`.
-      `Note: For Hnsw index, add encode=lvq in index_param_list to use LVQ(Locally-adaptive vector quantization)`
-    - **index_param_list**
+#### index_name: `str` *Required*
+
+
+#### index_infos: `list[IndexInfo]`
+A IndexInfo structure contains three fields,`column_name`, `index_type`, and `index_param_list`.
+    
+- **column_name : str** Name of the column to build index on.
+- **index_type : IndexType**
+      enum type: `IVFFlat`, `Hnsw`, `FullText`, or `BMP`. Defined in `infinity.index`.
+      `Note: For Hnsw index, add encode=lvq in index_param_list to use LVQ (Locally-adaptive vector quantization)`
+- **index_param_list**
       A list of InitParameter. The InitParameter structure is like a key-value pair, with two string fields named param_name and param_value. The optional parameters of each type of index are listed below:
         - `IVFFlat`: `'centroids_count'`(default:`'128'`), `'metric'`(required)
         - `Hnsw`: 
@@ -639,7 +643,7 @@ Creates an index by `IndexInfo` list.
         - `BMP`: 
           - `block_size=1~256`(default: 16): The size of the block in BMP index
           - `compress_type=[compress|raww]` (default: `compress`): If set to `compress`, the block max is stored in the sparse format, which is suitable for small "block size".
-- `conflict_type`: `Enum`. See `ConflictType`, which is defined in the **infinity.common** package. 
+- **conflict_type**: `Enum`. See `ConflictType`, which is defined in the **infinity.common** package. 
           - `Error`
           - `Ignore`
 
