@@ -258,7 +258,7 @@ curl --request DELETE \
 
 ## List tables
 
-List all tables in a specified database.
+Lists all tables in a specified database.
 
 #### Request
 
@@ -303,7 +303,7 @@ curl --request GET \
 
 ## Show table
 
-Show detailed information of a specified table.
+Shows detailed information of a specified table.
 
 #### Request
 
@@ -342,7 +342,7 @@ curl --request GET \
 
 ## Show table columns
 
-Show the column information of a specific table in a specified database.
+Shows the column information of a specific table in a specified database.
 
 #### Request
 
