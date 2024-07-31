@@ -55,10 +55,12 @@ import wal_manager;
 
 using namespace infinity;
 
-class CheckpointTest : public BaseTest {
+class CheckpointTest : public BaseTestParamStr {
 protected:
     static std::shared_ptr<std::string> config_path() {
-        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_checkpoint.toml");
+        return GetParam() == BaseTestParamStr::NULL_CONFIG_PATH
+                   ? std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_checkpoint.toml")
+                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/vfs/test_checkpoint.toml");
     }
 
     void SetUp() override { RemoveDbDirs(); }
@@ -157,7 +159,11 @@ protected:
     }
 };
 
-TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         CheckpointTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+
+TEST_P(CheckpointTest, test_cleanup_and_checkpoint) {
     auto db_name = MakeShared<String>("default_db");
     auto table_name = MakeShared<String>("test_cleanup_and_checkpoint");
     auto column_name = MakeShared<String>("col1");
@@ -231,7 +237,7 @@ TEST_F(CheckpointTest, test_cleanup_and_checkpoint) {
 #endif
 }
 
-TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
+TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
 #ifdef INFINITY_DEBUG
     infinity::GlobalResourceUsage::Init();
 #endif
@@ -336,7 +342,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint1) {
 #endif
 }
 
-TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
+TEST_P(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
     constexpr u64 kInsertN = 10;
     constexpr u64 kInsertSize = 8192;
 
@@ -451,7 +457,7 @@ TEST_F(CheckpointTest, test_index_replay_with_full_and_delta_checkpoint2) {
 #endif
 }
 
-TEST_F(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
+TEST_P(CheckpointTest, test_fullcheckpoint_withsmallest_walfile) {
 #ifdef INFINITY_DEBUG
     infinity::GlobalResourceUsage::Init();
 #endif

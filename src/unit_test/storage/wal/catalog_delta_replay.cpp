@@ -54,7 +54,17 @@ import compaction_process;
 
 using namespace infinity;
 
-class CatalogDeltaReplayTest : public BaseTest {
+class CatalogDeltaReplayTest : public BaseTestParamStr {
+public:
+    void SetUp() override {
+        config_path = GetParam() == BaseTestParamStr::NULL_CONFIG_PATH
+                          ? MakeShared<String>(std::string(test_data_path()) + "/config/test_catalog_delta.toml")
+                          : MakeShared<String>(std::string(test_data_path()) + "/config/vfs/test_catalog_delta.toml");
+        RemoveDbDirs();
+    }
+
+    SharedPtr<String> config_path{};
+
 protected:
     void WaitFlushDeltaOp(Storage *storage, TxnTimeStamp last_commit_ts) {
         TxnManager *txn_mgr = storage->txn_manager();
@@ -110,10 +120,11 @@ protected:
     }
 };
 
-TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
-    RemoveDbDirs();
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         CatalogDeltaReplayTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
 
+TEST_P(CatalogDeltaReplayTest, replay_db_entry) {
     auto db_name1 = std::make_shared<std::string>("db1");
     auto db_name2 = std::make_shared<std::string>("db2");
     auto db_name3 = std::make_shared<std::string>("db3");
@@ -177,16 +188,11 @@ TEST_F(CatalogDeltaReplayTest, replay_db_entry) {
     }
 }
 
-TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
-    RemoveDbDirs();
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
-
+TEST_P(CatalogDeltaReplayTest, replay_table_entry) {
     auto db_name = std::make_shared<std::string>("default_db");
 
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name1 = std::make_shared<std::string>("tb1");
     auto table_name2 = std::make_shared<std::string>("tb2");
     auto table_name3 = std::make_shared<std::string>("tb3");
@@ -254,16 +260,11 @@ TEST_F(CatalogDeltaReplayTest, replay_table_entry) {
     }
 }
 
-TEST_F(CatalogDeltaReplayTest, replay_import) {
-    RemoveDbDirs();
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
-
+TEST_P(CatalogDeltaReplayTest, replay_import) {
     auto db_name = std::make_shared<std::string>("default_db");
 
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
 
@@ -360,16 +361,11 @@ TEST_F(CatalogDeltaReplayTest, replay_import) {
     }
 }
 
-TEST_F(CatalogDeltaReplayTest, replay_append) {
-    RemoveDbDirs();
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
-
+TEST_P(CatalogDeltaReplayTest, replay_append) {
     auto db_name = std::make_shared<std::string>("default_db");
 
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -445,16 +441,11 @@ TEST_F(CatalogDeltaReplayTest, replay_append) {
     infinity::InfinityContext::instance().UnInit();
 }
 
-TEST_F(CatalogDeltaReplayTest, replay_delete) {
-    RemoveDbDirs();
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
-
+TEST_P(CatalogDeltaReplayTest, replay_delete) {
     auto db_name = std::make_shared<std::string>("default_db");
 
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -519,16 +510,11 @@ TEST_F(CatalogDeltaReplayTest, replay_delete) {
     }
 }
 
-TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
-    RemoveDbDirs();
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
-
+TEST_P(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
     auto db_name = std::make_shared<std::string>("default_db");
 
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_name_committed = std::make_shared<std::string>("tb_committed");
     auto table_name_uncommitted = std::make_shared<std::string>("tb_uncommitted");
@@ -697,9 +683,10 @@ TEST_F(CatalogDeltaReplayTest, replay_with_full_checkpoint) {
     }
 }
 
-TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
+TEST_P(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
+    infinity::InfinityContext::instance().UnInit();
     String table_name = "tb1";
-    std::shared_ptr<std::string> config_path = nullptr;
+    config_path = nullptr;
     RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
 
@@ -760,17 +747,11 @@ TEST_F(CatalogDeltaReplayTest, replay_compact_to_single_rollback) {
     infinity::InfinityContext::instance().UnInit();
 }
 
-TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
-    RemoveDbDirs();
-    // this test is for single index,not for joint index
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
-
+TEST_P(CatalogDeltaReplayTest, replay_table_single_index) {
     auto db_name = std::make_shared<std::string>("default_db");
 
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -917,17 +898,12 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index) {
     }
 }
 
-TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
-    RemoveDbDirs();
-    // this test is for single index,not for joint index
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
+TEST_P(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
     std::shared_ptr<std::string> db_entry_dir;
     auto db_name = std::make_shared<std::string>("db1");
 
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
 
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
@@ -1085,10 +1061,7 @@ TEST_F(CatalogDeltaReplayTest, replay_table_single_index_named_db) {
     }
 }
 
-TEST_F(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
-    RemoveDbDirs();
-    // this test is for single index,not for joint index
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_catalog_delta.toml");
+TEST_P(CatalogDeltaReplayTest, replay_table_single_index_and_compact) {
     std::shared_ptr<std::string> db_entry_dir;
     auto db_name = std::make_shared<std::string>("default_db");
 

@@ -577,7 +577,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
         UnrecoverableError(error_message);
     }
     i32 n_bytes = catalog_delta_entry->GetSizeInBytes();
-    if (file_size != n_bytes) {
+    if (file_size != n_bytes && file_size != ptr - buf.data()) {
         Status status = Status::CatalogCorrupted(catalog_path);
         RecoverableError(status);
     }

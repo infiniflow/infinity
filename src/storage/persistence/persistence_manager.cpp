@@ -42,16 +42,79 @@ void ObjAddr::Deserialize(const nlohmann::json &obj) {
     part_size_ = obj["part_size"];
 }
 
-void ObjAddr::WriteBuf(char *buf) const {
+void ObjAddr::WriteBuf(char *&buf) const {
     WriteBufAdv<String>(buf, obj_key_);
     WriteBufAdv<SizeT>(buf, part_offset_);
     WriteBufAdv<SizeT>(buf, part_size_);
 }
 
-void ObjAddr::ReadBuf(const char *buf) {
+void ObjAddr::ReadBuf(char *&buf) {
     obj_key_ = ReadBufAdv<String>(buf);
     part_offset_ = ReadBufAdv<SizeT>(buf);
     part_size_ = ReadBufAdv<SizeT>(buf);
+}
+
+nlohmann::json ObjStat::Serialize() const {
+    nlohmann::json obj;
+    obj["obj_size"] = obj_size_;
+    obj["deleted_size"] = deleted_size_;
+    obj["deleted_ranges"] = nlohmann::json::array();
+    for (auto &range : deleted_ranges_) {
+        nlohmann::json range_obj;
+        range_obj["start"] = range.start_;
+        range_obj["end"] = range.end_;
+        obj["deleted_ranges"].emplace_back(range_obj);
+    }
+    return obj;
+}
+
+void ObjStat::Deserialize(const nlohmann::json &obj) {
+    obj_size_ = 0;
+    ref_count_ = 0;
+    deleted_size_ = 0;
+    if (obj.contains("obj_size")) {
+        obj_size_ = 0;
+    }
+    if (obj.contains("deleted_size")) {
+        deleted_size_ = 0;
+    }
+    if (obj.contains("deleted_ranges")) {
+        SizeT start = 0;
+        SizeT end = 0;
+        for (auto &range_obj : obj["deleted_ranges"]) {
+            if (range_obj.contains("start")) {
+                start = range_obj["start"];
+            }
+            if (range_obj.contains("end")) {
+                end = range_obj["end"];
+            }
+            deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
+        }
+    }
+}
+
+void ObjStat::WriteBuf(char *&buf) const {
+    WriteBufAdv<SizeT>(buf, obj_size_);
+    WriteBufAdv<SizeT>(buf, deleted_size_);
+    WriteBufAdv<SizeT>(buf, deleted_ranges_.size());
+    for (auto &range : deleted_ranges_) {
+        WriteBufAdv<SizeT>(buf, range.start_);
+        WriteBufAdv<SizeT>(buf, range.end_);
+    }
+}
+
+void ObjStat::ReadBuf(char *&buf) {
+    obj_size_ = ReadBufAdv<SizeT>(buf);
+    ref_count_ = 0;
+    deleted_size_ = ReadBufAdv<SizeT>(buf);
+
+    SizeT start, end;
+    SizeT len = ReadBufAdv<SizeT>(buf);
+    for (SizeT i = 0; i < len; ++i) {
+        start = ReadBufAdv<SizeT>(buf);
+        end = ReadBufAdv<SizeT>(buf);
+        deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
+    }
 }
 
 ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose) {
@@ -158,7 +221,13 @@ void PersistenceManager::CurrentObjFinalizeNoLock() {
     }
 }
 
-String PersistenceManager::GetObjCache(const String &local_path) {
+String PersistenceManager::GetObjCache(const String &file_path) {
+    String local_path = RemovePrefix(file_path);
+    if (local_path.empty()) {
+        String error_message = fmt::format("Failed to find local path of {}", local_path);
+        UnrecoverableError(error_message);
+    }
+
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {
@@ -184,8 +253,9 @@ ObjAddr PersistenceManager::GetObjFromLocalPath(const String &file_path) {
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {
-        String error_message = fmt::format("Failed to find file_path: {} stored object", local_path);
-        UnrecoverableError(error_message);
+        // String error_message = fmt::format("Failed to find file_path: {} stored object", local_path);
+        // UnrecoverableError(error_message);
+        return ObjAddr();
     }
     return it->second;
 }
@@ -209,16 +279,6 @@ void PersistenceManager::PutObjCache(const String &file_path) {
         UnrecoverableError(error_message);
     }
     oit->second.ref_count_--;
-}
-
-void PersistenceManager::SaveLocalPath(const String &local_path, const ObjAddr &object_addr) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    auto it = local_path_obj_.find(local_path);
-    if (it != local_path_obj_.end()) {
-        it->second = object_addr;
-    } else {
-        local_path_obj_.emplace(local_path, object_addr);
-    }
 }
 
 String PersistenceManager::ObjCreate() { return UUID().to_string(); }
@@ -268,7 +328,7 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &file_path, SizeT f
     }
     std::ofstream dstFile(dst_fp, std::ios::binary | std::ios::app);
     if (!dstFile.is_open()) {
-        String error_message = fmt::format("Failed to open destination file {}", dst_fp.string());
+        String error_message = fmt::format("Failed to open destination file {} {}", strerror(errno), dst_fp.string());
         UnrecoverableError(error_message);
     }
     char buffer[BUFFER_SIZE];
@@ -318,6 +378,41 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
     }
 }
 
+ObjStat PersistenceManager::GetObjStatByObjAddr(const ObjAddr &obj_addr) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = objects_.find(obj_addr.obj_key_);
+    if (it == objects_.end()) {
+        return ObjStat();
+    }
+    return it->second;
+}
+
+void PersistenceManager::SaveLocalPath(const String &file_path, const ObjAddr &object_addr) {
+    String local_path = RemovePrefix(file_path);
+    if (local_path.empty()) {
+        String error_message = fmt::format("Failed to find local path of {}", local_path);
+        UnrecoverableError(error_message);
+    }
+
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = local_path_obj_.find(local_path);
+    if (it != local_path_obj_.end()) {
+        it->second = object_addr;
+    } else {
+        local_path_obj_.emplace(local_path, object_addr);
+    }
+}
+
+void PersistenceManager::SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat) {
+    std::lock_guard<std::mutex> lock(mtx_);
+    auto it = objects_.find(obj_addr.obj_key_);
+    if (it != objects_.end()) {
+        it->second = obj_stat;
+    } else {
+        objects_.emplace(obj_addr.obj_key_, obj_stat);
+    }
+}
+
 String PersistenceManager::RemovePrefix(const String &path) {
     if (path.starts_with(local_data_dir_)) {
         return path.substr(local_data_dir_.length());
@@ -345,27 +440,90 @@ void PersistenceManager::Cleanup(const String &file_path) {
 nlohmann::json PersistenceManager::Serialize() {
     std::lock_guard<std::mutex> lock(mtx_);
     nlohmann::json json_obj;
-    json_obj["len"] = local_path_obj_.size();
-    json_obj["array"] = nlohmann::json::array();
+    json_obj["obj_stat_size"] = objects_.size();
+    json_obj["obj_stat_array"] = nlohmann::json::array();
+    for (auto &[path, obj_stat] : objects_) {
+        nlohmann::json pair;
+        pair["obj_path"] = path;
+        pair["obj_stat"] = obj_stat.Serialize();
+        json_obj["obj_stat_array"].emplace_back(pair);
+    }
+    json_obj["obj_addr_size"] = local_path_obj_.size();
+    json_obj["obj_addr_array"] = nlohmann::json::array();
     for (auto &[path, obj_addr] : local_path_obj_) {
         nlohmann::json pair;
         pair["local_path"] = path;
         pair["obj_addr"] = obj_addr.Serialize();
-        json_obj["array"].emplace_back(pair);
+        json_obj["obj_addr_array"].emplace_back(pair);
     }
     return json_obj;
 }
 
 void PersistenceManager::Deserialize(const nlohmann::json &obj) {
     std::lock_guard<std::mutex> lock(mtx_);
-    SizeT len = obj["len"];
+    SizeT len = 0;
+    if (obj.contains("obj_stat_size")) {
+        len = obj["obj_stat_size"];
+    }
     for (SizeT i = 0; i < len; ++i) {
-        auto &json_pair = obj["array"][0];
+        auto &json_pair = obj["obj_stat_array"][0];
+        String path = json_pair["obj_path"];
+        ObjStat obj_stat;
+        obj_stat.Deserialize(json_pair["obj_stat"]);
+        objects_.emplace(path, obj_stat);
+    }
+    len = 0;
+    if (obj.contains("obj_addr_size")) {
+        len = obj["obj_addr_size"];
+    }
+    for (SizeT i = 0; i < len; ++i) {
+        auto &json_pair = obj["obj_addr_array"][0];
         String path = json_pair["local_path"];
         ObjAddr obj_addr;
         obj_addr.Deserialize(json_pair["obj_addr"]);
         local_path_obj_.emplace(path, obj_addr);
     }
+}
+
+void PersistenceManager::WriteBuf(char *&buf, const Vector<String> &local_paths) {
+    WriteBufAdv(buf, local_paths.size());
+    for (auto &path : local_paths) {
+        ObjAddr obj_addr = GetObjFromLocalPath(path);
+        WriteBufAdv(buf, path);
+        obj_addr.WriteBuf(buf);
+        if (!obj_addr.Valid()) {
+            ObjStat invalid_stat;
+            invalid_stat.WriteBuf(buf);
+        } else {
+            ObjStat obj_stat = GetObjStatByObjAddr(obj_addr);
+            obj_stat.WriteBuf(buf);
+        }
+    }
+}
+
+void PersistenceManager::ReadBuf(char *&buf) {
+    SizeT size = ReadBufAdv<SizeT>(buf);
+    for (SizeT i = 0; i < size; ++i) {
+        String path = ReadBufAdv<String>(buf);
+        ObjAddr obj_addr;
+        ObjStat obj_stat;
+        obj_addr.ReadBuf(buf);
+        obj_stat.ReadBuf(buf);
+        SaveLocalPath(path, obj_addr);
+        SaveObjStat(obj_addr, obj_stat);
+    }
+}
+
+SizeT PersistenceManager::GetSizeInBytes(const Vector<String> &local_paths) {
+    SizeT size = sizeof(SizeT);
+    for (auto &path : local_paths) {
+        ObjAddr obj_addr = GetObjFromLocalPath(path);
+        ObjStat obj_stat = GetObjStatByObjAddr(obj_addr);
+        size += sizeof(i32) + path.size();
+        size += sizeof(i32) + obj_addr.obj_key_.size() + sizeof(SizeT) + sizeof(SizeT);
+        size += sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT) + obj_stat.deleted_ranges_.size() * (2 * sizeof(SizeT));
+    }
+    return size;
 }
 
 } // namespace infinity

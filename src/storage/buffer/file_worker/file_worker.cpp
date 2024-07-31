@@ -83,10 +83,16 @@ void FileWorker::WriteToFile(bool to_spill) {
 void FileWorker::ReadFromFile(bool from_spill) {
     LocalFileSystem fs;
     String read_path;
-    bool use_object_cache = !from_spill && obj_addr_.Valid();
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = !from_spill && pm != nullptr;
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
-        read_path = InfinityContext::instance().persistence_manager()->GetObjCache(read_path);
+        obj_addr_ = pm->GetObjFromLocalPath(read_path);
+        if (!obj_addr_.Valid()) {
+            String error_message = fmt::format("Failed to find file_path: {} stored object", read_path);
+            UnrecoverableError(error_message);
+        }
+        read_path = pm->GetObjCache(read_path);
     }
     SizeT file_size = 0;
     u8 flags = FileFlags::READ_FLAG;
@@ -105,8 +111,8 @@ void FileWorker::ReadFromFile(bool from_spill) {
         file_handler_->Close();
         file_handler_ = nullptr;
         if (use_object_cache) {
-    read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
-            InfinityContext::instance().persistence_manager()->PutObjCache(read_path);
+            read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
+            pm->PutObjCache(read_path);
         }
     });
     ReadFromFileImpl(file_size);
