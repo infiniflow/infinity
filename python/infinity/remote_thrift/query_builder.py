@@ -119,6 +119,9 @@ class InfinityThriftQueryBuilder(ABC):
         if embedding_data_type in ["uint8", "int8", "int16", "int32", "int", "int64"]:
             embedding_data = [int(x) for x in embedding_data]
 
+        if embedding_data_type in ["float", "float32", "double", "float64", "float16", "bfloat16"]:
+            embedding_data = [float(x) for x in embedding_data]
+
         data = EmbeddingData()
         elem_type = ElementType.ElementFloat32
         if embedding_data_type == "bit":
@@ -145,6 +148,12 @@ class InfinityThriftQueryBuilder(ABC):
         elif embedding_data_type in ["double", "float64"]:
             elem_type = ElementType.ElementFloat64
             data.f64_array_value = embedding_data
+        elif embedding_data_type == "float16":
+            elem_type = ElementType.ElementFloat16
+            data.f16_array_value = embedding_data
+        elif embedding_data_type == "bfloat16":
+            elem_type = ElementType.ElementBFloat16
+            data.bf16_array_value = embedding_data
         else:
             raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
