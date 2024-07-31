@@ -59,6 +59,10 @@ def logic_type_to_dtype(ttype: WrapDataType):
                         return object
                     case EmbeddingDataType.kElemDouble:
                         return object
+                    case EmbeddingDataType.kElemFloat16:
+                        return object
+                    case EmbeddingDataType.kElemBFloat16:
+                        return object
                     case EmbeddingDataType.kElemBit:
                         return object
                     case _:
@@ -107,6 +111,16 @@ def tensor_to_list(column_data_type, binary_data) -> list[list[Any]]:
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     elif column_data_type.embedding_type.element_type == EmbeddingDataType.kElemDouble:
         all_list = list(struct.unpack('<{}d'.format(len(binary_data) // 8), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.embedding_type.element_type == EmbeddingDataType.kElemFloat16:
+        all_list = list(struct.unpack('<{}e'.format(len(binary_data) // 2), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.embedding_type.element_type == EmbeddingDataType.kElemBFloat16:
+        tmp_u16 = np.frombuffer(binary_data, dtype='<i2')
+        result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+        result_arr[1::2] = tmp_u16
+        view_float32 = result_arr.view('<f4')
+        all_list = list(view_float32)
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     else:
         raise NotImplementedError(
@@ -193,6 +207,16 @@ def column_vector_to_list(column_type, column_data_type, column_vectors) -> \
             elif element_type == EmbeddingDataType.kElemDouble:
                 all_list = list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+            elif element_type == EmbeddingDataType.kElemFloat16:
+                all_list = list(struct.unpack('<{}e'.format(len(column_vector) // 2), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+            elif element_type == EmbeddingDataType.kElemBFloat16:
+                tmp_u16 = np.frombuffer(column_vector, dtype='<i2')
+                result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+                result_arr[1::2] = tmp_u16
+                view_float32 = result_arr.view('<f4')
+                all_list = list(view_float32)
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif element_type == EmbeddingDataType.kElemBit:
                 all_list = list(struct.unpack('<{}B'.format(len(column_vector)), column_vector))
                 result = []
@@ -266,6 +290,16 @@ def parse_sparse_bytes(column_data_type, column_vector):
             case EmbeddingDataType.kElemDouble:
                 values = struct.unpack('<{}d'.format(nnz), column_vector[offset:offset + nnz * 8])
                 offset += nnz * 8
+            case EmbeddingDataType.kElemFloat16:
+                values = struct.unpack('<{}e'.format(nnz), column_vector[offset:offset + nnz * 2])
+                offset += nnz * 2
+            case EmbeddingDataType.kElemBFloat16:
+                tmp_u16 = np.frombuffer(column_vector[offset:offset + nnz * 2], dtype='<i2')
+                result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+                result_arr[1::2] = tmp_u16
+                view_float32 = result_arr.view('<f4')
+                values = list(view_float32)
+                offset += nnz * 2
             case EmbeddingDataType.kElemBit:
                 pass
             case _:
@@ -321,6 +355,12 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
     elif embedding_data_type in ['double', 'float64', 'f64']:
         elem_type = EmbeddingDataType.kElemDouble
         data.f64_array_value = np.asarray(embedding_data, dtype=np.float64).flatten()
+    elif embedding_data_type in ['float16', 'fp16', 'f16']:
+        elem_type = EmbeddingDataType.kElemFloat16
+        data.f16_array_value = np.asarray(embedding_data, dtype=np.float16).flatten()
+    elif embedding_data_type in ['bfloat16', 'bf16']:
+        elem_type = EmbeddingDataType.kElemBFloat16
+        data.bf16_array_value = np.asarray(embedding_data, dtype=np.float32).flatten()
     else:
         raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
