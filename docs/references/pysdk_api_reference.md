@@ -14,9 +14,9 @@ Connects to the Infinity server and gets an Infinity object.
 
 ### Parameters
 
-#### `uri`: *Required*
+#### uri: *Required*
 
-The `uri` here can be either a `NetworkAddress` object or a local directory in `str` format: 
+The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
 
 - `"/path/to/save/to"` (`str`): A local directory for storing the Infinity data. Used when Infinity is deployed as a Python module. 
 - `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A NetworkAddress object comprises two fields:
@@ -24,7 +24,7 @@ The `uri` here can be either a `NetworkAddress` object or a local directory in `
   - `<PORT>` (`int`): The port number on which Infinity is running. Defaults to 23817.
 
 :::caution IMPORTANT
-When connecting to Infinity in a client-server mode, ensure that the version of the client exactly matches the version of the server. For example: 
+When connecting to Infinity in a client-server mode, ensure that the version of the client *exactly* matches the version of the server. For example: 
 
 | **Client version** | **Server version** |
 | ------------------ | ------------------ |
@@ -86,8 +86,13 @@ Disconnects the client from the Infinity server in client-server mode or destruc
 
 ### Returns
 
-- Success: `True`
-- Failure: `Exception`
+This method returns a structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
+
 
 ### Examples
 
@@ -132,7 +137,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: `True`
+- Success: A table object. 
 - Failure: `Exception`
 
 ### Examples
@@ -193,8 +198,12 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: `True`
-- Failure: `Exception`
+This method returns a structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
 
 ### Examples
 
@@ -233,15 +242,15 @@ This method returns a structure containing the following attributes:
 
 - `db_names`: `list[str]` A list of all database names.
 - `error_code`: `int` An error code indicating the result of the operation.
-  - `0`: The operation succeeded. 
-  - Non-zero value: A specific error condition occurred. 
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
 - `error_msg`: `str` The error message providing additional details. 
 
 ### Examples
 
 ```python
 res = infinity_obj.list_databases() 
-print(res.db_names) #['my_database', 'database_1']
+print(res.db_names) # ['my_database', 'database_1']
 ```
 
 ---
@@ -283,17 +292,21 @@ Retrieves the metadata of a database by its name.
 
 ### Parameters
 
-#### db_name: `str` 
+#### db_name: `str` *Required*
 
-Name of the database
+Name of the database. Must not be empty. 
 
 ### Returns
 
-- Success: Metadata of the database. See the `ShowDatabaseResponse` structure, which includes:
-  - `database_name`: `str` Name of the database. 
-  - `store_dir`: `str` Directory to the database file.
-  - `table_count`: `int` Number of tables in the database.
-- Failure: `Exception`
+This method returns a structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurrs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
+- `database_name`: `str` A list of all database names.
+- `store_dir`: `str` The directory holding the database files. 
+- `table_count`: `int` The number of tables in the database.
 
 ### Examples
 
@@ -349,7 +362,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: `True`
+- Success: A table object. 
 - Failure: `Exception`
 
 ### Examples
@@ -468,8 +481,12 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: `True`
-- Failure: `Exception`
+This method returns a structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
 
 ### Examples
 
@@ -552,7 +569,7 @@ res.table_names #["my_table"]
 Database.show_tables()
 ```
 
-Shows the information of all tables in the database.
+Shows the information of all tables in the current database.
 
 ### Returns
 
@@ -734,7 +751,7 @@ Retrieves the metadata of an index by name.
 ### Returns
 
 - Success: `metadata` : `ShowIndexResponse`
-  the structure `ShowIndexResponse` contains:
+  the structure contains:
     - **db_name: string** Name of the database
     - **table_name: string**
     - **index_name: string**
