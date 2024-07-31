@@ -54,6 +54,8 @@ import parser_assert;
 import plan_fragment;
 import bg_query_state;
 import show_statement;
+import admin_statement;
+import admin_executor;
 
 namespace infinity {
 
@@ -103,17 +105,26 @@ QueryResult QueryContext::Query(const String &query) {
         UnrecoverableError(error_message);
     }
     StopProfile(QueryPhase::kParser);
-    for (BaseStatement *statement : *parsed_result->statements_ptr_) {
-        QueryResult query_result = QueryStatement(statement);
-        return query_result;
+
+    BaseStatement *base_statement = parsed_result->statements_ptr_->at(0);
+    if(base_statement->Type() == StatementType::kAdmin) {
+        if(session_ptr_->MaintenanceMode()) {
+            AdminStatement* admin_statement = static_cast<AdminStatement*>(base_statement);
+            QueryResult query_result = HandleAdminStatement(admin_statement);
+            return query_result;
+        } else {
+            QueryResult query_result;
+            query_result.result_table_ = nullptr;
+            query_result.status_ = Status::AdminOnlySupportInMaintenanceMode();
+            return query_result;
+        }
     }
 
-    String error_message = "Not reachable";
-    UnrecoverableError(error_message);
-    return QueryResult::UnusedResult();
+    QueryResult query_result = QueryStatement(base_statement);
+    return query_result;
 }
 
-QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
+QueryResult QueryContext::QueryStatement(const BaseStatement *base_statement) {
     QueryResult query_result;
     Vector<SharedPtr<LogicalNode>> logical_plans{};
     Vector<UniquePtr<PhysicalOperator>> physical_plans{};
@@ -128,8 +139,8 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
         if(global_config_->RecordRunningQuery()) {
             bool add_record_flag = false;
-            if(statement->type_ == StatementType::kShow) {
-                const ShowStatement* show_statement = static_cast<const ShowStatement*>(statement);
+            if(base_statement->type_ == StatementType::kShow) {
+                const ShowStatement* show_statement = static_cast<const ShowStatement*>(base_statement);
                 ShowStmtType show_type = show_statement->show_type_;
                 if(show_type != ShowStmtType::kQueries and show_type != ShowStmtType::kQuery) {
                     add_record_flag = true;
@@ -139,25 +150,25 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
             }
 
             if(add_record_flag) {
-                LOG_DEBUG(fmt::format("Record running query: {}", statement->ToString()));
+                LOG_DEBUG(fmt::format("Record running query: {}", base_statement->ToString()));
                 session_manager_->AddQueryRecord(session_ptr_->session_id(),
                                                  query_id_,
-                                                 StatementType2Str(statement->type_),
-                                                 statement->ToString());
+                                                 StatementType2Str(base_statement->type_),
+                                                 base_statement->ToString());
             }
         }
 
-        this->BeginTxn(statement);
-//        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, statement: {}",
+        this->BeginTxn(base_statement);
+//        LOG_INFO(fmt::format("created transaction, txn_id: {}, begin_ts: {}, base_statement: {}",
 //                        session_ptr_->GetTxn()->TxnID(),
 //                        session_ptr_->GetTxn()->BeginTS(),
-//                        statement->ToString()));
-        RecordQueryProfiler(statement->type_);
+//                        base_statement->ToString()));
+        RecordQueryProfiler(base_statement->type_);
 
-        // Build unoptimized logical plan for each SQL statement.
+        // Build unoptimized logical plan for each SQL base_statement.
         StartProfile(QueryPhase::kLogicalPlan);
         SharedPtr<BindContext> bind_context;
-        auto status = logical_planner_->Build(statement, bind_context);
+        auto status = logical_planner_->Build(base_statement, bind_context);
         // FIXME
         if (!status.ok()) {
             RecoverableError(status);
@@ -170,7 +181,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         // Apply optimized rule to the logical plan
         StartProfile(QueryPhase::kOptimizer);
         for (auto &logical_plan : logical_plans) {
-            optimizer_->optimize(logical_plan, statement->type_);
+            optimizer_->optimize(logical_plan, base_statement->type_);
         }
         StopProfile(QueryPhase::kOptimizer);
 
@@ -199,7 +210,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         StopProfile(QueryPhase::kTaskBuild);
 //        LOG_WARN(fmt::format("Before execution cost: {}", profiler.ElapsedToString()));
         StartProfile(QueryPhase::kExecution);
-        scheduler_->Schedule(plan_fragment.get(), statement);
+        scheduler_->Schedule(plan_fragment.get(), base_statement);
         query_result.result_table_ = plan_fragment->GetResult();
         query_result.root_operator_type_ = logical_plans.back()->operator_type();
         StopProfile(QueryPhase::kExecution);
@@ -235,8 +246,8 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
 
     if(global_config_->RecordRunningQuery()) {
         bool remove_record_flag = false;
-        if(statement->type_ == StatementType::kShow) {
-            const ShowStatement* show_statement = static_cast<const ShowStatement*>(statement);
+        if(base_statement->type_ == StatementType::kShow) {
+            const ShowStatement* show_statement = static_cast<const ShowStatement*>(base_statement);
             ShowStmtType show_type = show_statement->show_type_;
             if(show_type != ShowStmtType::kQueries and show_type != ShowStmtType::kQuery) {
                 remove_record_flag = true;
@@ -246,7 +257,7 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
         }
 
         if(remove_record_flag) {
-            LOG_DEBUG(fmt::format("Remove the query string from running query container: {}", statement->ToString()));
+            LOG_DEBUG(fmt::format("Remove the query string from running query container: {}", base_statement->ToString()));
             session_manager_->RemoveQueryRecord(session_ptr_->session_id());
         }
     }
@@ -255,11 +266,11 @@ QueryResult QueryContext::QueryStatement(const BaseStatement *statement) {
     return query_result;
 }
 
-bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &state) {
+bool QueryContext::ExecuteBGStatement(BaseStatement *base_statement, BGQueryState &state) {
     QueryResult query_result;
     try {
         SharedPtr<BindContext> bind_context;
-        auto status = logical_planner_->Build(statement, bind_context);
+        auto status = logical_planner_->Build(base_statement, bind_context);
         if (!status.ok()) {
             RecoverableError(status);
         }
@@ -282,7 +293,7 @@ bool QueryContext::ExecuteBGStatement(BaseStatement *statement, BGQueryState &st
         state.notifier = MakeUnique<Notifier>();
         FragmentContext::BuildTask(this, nullptr, state.plan_fragment.get(), state.notifier.get());
 
-        scheduler_->Schedule(state.plan_fragment.get(), statement);
+        scheduler_->Schedule(state.plan_fragment.get(), base_statement);
     } catch (RecoverableException &e) {
         this->RollbackTxn();
         query_result.result_table_ = nullptr;
@@ -319,9 +330,13 @@ bool QueryContext::JoinBGStatement(BGQueryState &state, TxnTimeStamp &commit_ts,
     return true;
 }
 
-void QueryContext::BeginTxn(const BaseStatement *statement) {
+QueryResult QueryContext::HandleAdminStatement(const AdminStatement* admin_statement) {
+    return AdminExecutor::Execute(this, admin_statement);
+}
+
+void QueryContext::BeginTxn(const BaseStatement *base_statement) {
     if (session_ptr_->GetTxn() == nullptr) {
-        bool is_checkpoint = statement != nullptr && statement->type_ == StatementType::kFlush;
+        bool is_checkpoint = base_statement != nullptr && base_statement->type_ == StatementType::kFlush;
         Txn* new_txn = storage_->txn_manager()->BeginTxn(nullptr, is_checkpoint);
         session_ptr_->SetTxn(new_txn);
     }

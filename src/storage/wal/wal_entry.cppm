@@ -470,6 +470,9 @@ public:
 
     [[nodiscard]] i64 GetOffset() { return off_; };
 
+    Vector<SharedPtr<WalEntry>> GetAllEntries();
+    bool IsGood() const;
+
 private:
     bool is_backward_{};
     SizeT off_{}; // offset of last returned entry if is_backward, otherwise offset of the entry needs to be returned

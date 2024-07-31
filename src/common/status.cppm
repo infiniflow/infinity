@@ -41,6 +41,7 @@ export enum class ErrorCode : long {
     kInsufficientPrivilege = 2002,
     kUnsupportedVersionIndex = 2003,
     kClientVersionMismatch = 2004,
+    kAdminOnlySupportInMaintenanceMode = 2005,
 
     // 3. syntax error or access rule violation
     kInvalidUsername = 3001,
@@ -191,6 +192,7 @@ public:
     static Status InsufficientPrivilege(const String &user_name, const String &detailed_error);
     static Status UnsupportedVersionIndex(i64 given_index);
     static Status ClientVersionMismatch(const char* expected_version, const char* given_version);
+    static Status AdminOnlySupportInMaintenanceMode();
 
     // 3. Syntax error or access rule violation
     static Status InvalidUserName(const String &user_name);

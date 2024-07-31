@@ -1162,6 +1162,21 @@ SharedPtr<WalEntry> WalEntryIterator::Next() {
     }
 }
 
+Vector<SharedPtr<WalEntry>> WalEntryIterator::GetAllEntries() {
+    Vector<SharedPtr<WalEntry>> entries;
+    while(HasNext()) {
+        entries.emplace_back(Next());
+    }
+    if(is_backward_) {
+        std::reverse(entries.begin(), entries.end());
+    }
+    return entries;
+}
+
+bool WalEntryIterator::IsGood() const {
+    return (is_backward_ && off_ == 0) || (!is_backward_ && off_ == buf_.size());
+}
+
 WalListIterator::WalListIterator(const Vector<String> &wal_list) {
     assert(!wal_list.empty());
     for (SizeT i = 0; i < wal_list.size(); ++i) {

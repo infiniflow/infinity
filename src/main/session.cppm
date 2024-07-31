@@ -62,7 +62,9 @@ public:
 
     void SetProfile(bool flag) { enable_profile_ = flag; }
 
-    bool GetProfile() const { return enable_profile_; }
+    [[nodiscard]] bool GetProfile() const { return enable_profile_; }
+
+    [[nodiscard]] bool MaintenanceMode() const { return maintenance_mode_; }
 
 protected:
     std::time_t connected_time_;

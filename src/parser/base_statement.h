@@ -21,6 +21,7 @@ namespace infinity {
 
 enum class StatementType {
     kInvalidStmt, // unused
+    kAdmin,
     kSelect,
     kCopy,
     kInsert,
