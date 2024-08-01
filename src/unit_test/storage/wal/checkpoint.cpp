@@ -64,10 +64,10 @@ protected:
     }
 
     void SetUp() override {
+        RemoveDbDirs();
         system(("mkdir -p " + String(GetFullPersistDir())).c_str());
         system(("mkdir -p " + String(GetFullDataDir())).c_str());
         system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-        RemoveDbDirs();
     }
 
     void TearDown() override { RemoveDbDirs(); }

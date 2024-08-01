@@ -71,10 +71,10 @@ protected:
     }
 
     void SetUp() override {
+        RemoveDbDirs();
         system(("mkdir -p " + String(GetFullPersistDir())).c_str());
         system(("mkdir -p " + String(GetFullDataDir())).c_str());
         system(("mkdir -p " + String(GetFullTmpDir())).c_str());
-        RemoveDbDirs();
         tree_cmd = "tree ";
         tree_cmd += GetHomeDir();
     }
