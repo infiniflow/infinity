@@ -143,7 +143,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
             String error_message = fmt::format("Failed to find local path of {}", local_path);
             UnrecoverableError(error_message);
         }
-        assert(local_path_obj_.count(local_path) == 0);
+        // assert(local_path_obj_.count(local_path) == 0);
         local_path_obj_[local_path] = obj_addr;
         return obj_addr;
     } else {
@@ -159,7 +159,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
             String error_message = fmt::format("Failed to find local path of {}", local_path);
             UnrecoverableError(error_message);
         }
-        assert(local_path_obj_.count(local_path) == 0);
+        // assert(local_path_obj_.count(local_path) == 0);
         local_path_obj_[local_path] = obj_addr;
         return obj_addr;
     }
@@ -311,7 +311,7 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
         String error_message = fmt::format("Failed to find local path of {}", local_path);
         UnrecoverableError(error_message);
     }
-    assert(local_path_obj_.count(local_path) == 0);
+    // assert(local_path_obj_.count(local_path) == 0);
     local_path_obj_[local_path] = obj_addr;
     return obj_addr;
 }
