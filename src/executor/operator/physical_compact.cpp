@@ -139,6 +139,7 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     auto *txn_mgr = txn->txn_mgr();
     auto *buffer_mgr = query_context->storage()->buffer_manager();
     TxnTimeStamp scan_ts = txn_mgr->GetNewTimeStamp();
+    compact_state_data->scan_ts_ = scan_ts;
 
     TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     BlockIndex *block_index = base_table_ref_->block_index_.get();

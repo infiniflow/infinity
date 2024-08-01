@@ -14,9 +14,41 @@ Connects to the Infinity server and gets an Infinity object.
 
 ### Parameters
 
-- `uri`: 
-  - `NetworkAddress` A NetworkAddress object is a struct with two fields, one for the IP address (`str`) and the other for the port number (`int`). Used when Infinity is deployed as a separate server.
-  - a path ('str') to store the Infinity data. Used when Infinity is deployed as a Python module. 
+#### uri: *Required*
+
+The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
+
+- `"/path/to/save/to"` (`str`): A local directory for storing the Infinity data. Used when Infinity is deployed as a Python module. 
+- `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A NetworkAddress object comprises two fields:
+  - `"<SERVER_IP_ADDRESS>"` (`str`): The IP address of the Infinity server.  
+  - `<PORT>` (`int`): The port number on which Infinity is running. Defaults to 23817.
+
+:::caution IMPORTANT
+When connecting to Infinity in a client-server mode, ensure that the version of the client *exactly* matches the version of the server. For example: 
+
+| **Client version** | **Server version** |
+| ------------------ | ------------------ |
+| v0.1.0             | v0.1.0             |
+| v0.1.1             | v0.1.1             |
+| v0.2.0             | v0.2.0             |
+| v0.2.1             | v0.2.1             |
+
+
+If the versions do not match, please update your client or server accordingly to ensure compatibility. 
+
+In client-server mode, also ensure that your server version matches the version specified in your configuration file. The matching rule is less strict than exact match: 
+
+- The major and minor versions *must* be identical. 
+- The patch version may differ. 
+
+This allows for bug fixes without requiring configuration file changes. 
+
+| **Configuration version** | **Compatible server version** |
+| ------------------------- | ----------------------------- |
+| v0.1.0                    | v0.1.0, v0.1.1                |
+| v0.2.0                    | v0.2.0, v0.2.1                |
+
+:::
 
 ### Returns
 
@@ -25,17 +57,24 @@ Connects to the Infinity server and gets an Infinity object.
 
 ### Examples
 
-- If Infinity is deployed as a separate server: 
+#### Connect to Python module Infinity
 
-   ```python
-   # If Infinity is deployed locally, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
-   infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
-   ```
+From v0.2.1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed Infinity via `pip install infinity-sdk==<v0.2.1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
-- If Infinity is deployed as a Python module: 
-   ```python
-   infinity_obj = infinity.connect("/path/to/save/to")
-   ```
+```python
+infinity_obj = infinity.connect("/path/to/save/to")
+```
+
+#### Connect to Infinity in client-server mode
+
+If you have deployed Infinity as a separate server, connect to it via its IP address. Further, if your Infinity is running on your local machine, you can also use `infinity.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet. 
+
+```python
+# If Infinity is deployed on the local machine, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
+infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+```
+
+---
 
 ## disconnect
 
@@ -43,14 +82,17 @@ Connects to the Infinity server and gets an Infinity object.
 infinity.disconnect()
 ```
 
-Disconnects the current Infinity object from the server.
-
-> This method is automatically called when an Infinity object is destructed.
+Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is deployed as a Python module. 
 
 ### Returns
 
-- Success: `True`
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
+
 
 ### Examples
 
@@ -58,30 +100,68 @@ Disconnects the current Infinity object from the server.
 infinity_obj.disconnect()
 ```
 
+---
+
 ## create_database
 
 ```python
 Infinity.create_database(db_name, conflict_type = ConflictType.Error)
 ```
 
-Creates a database with a given name. `conflict_type` specifies the policy when a database with the same name exists. 
+Creates a database with a specified name.
 
 ### Parameters
 
-- **db_name : str(not empty)** Name of the database.
-- **conflict_type : ConflictType** `enum` The countermeasure to take when a database with the same name exists.  See `ConflictType`, which is defined in the **infinity.common** package: 
-  - `Error`
-  - `Ignore`
+#### db_name: `str`, *Required*
+
+Name of the database. Must not be empty. 
+
+#### conflict_type: `ConflictType`, *Optional*
+
+Conflict policy in `enum` for handling situations where a database with the same name exists. 
+
+  - `Error`: Raise an error if a database with the same name exists.
+  - `Ignore`: Ignore the table creation requrest and keep the database with the same name as-is.
+
+:::tip NOTE
+You must import the `infinity.common` package to set `ConflictType`:
+
+```python
+from infinity.common import ConflictType
+```
+:::
+
+:::tip NOTE
+If `ConflictType` is not set, it defaults to `Error`.
+:::
 
 ### Returns
 
-- Success: `True`
+- Success: A table object. 
 - Failure: `Exception`
 
 ### Examples
+
 ```python
+# Create a database named 'my_database':
+# If the specified database already exists, raise an error. 
 infinity_obj.create_database("my_database")
 ```
+
+```python
+# Create a database named 'my_database':
+# If the specified database already exists, raise an error (same as above). 
+infinity_obj.create_database("my_database", infinity.common.ConflictType.Error)
+```
+
+```python
+from infinity.common import ConflictType
+# Create a database named 'my_database':
+# If the specified database already exists, silently ignore the operation and proceed. 
+infinity_obj.create_database("my_database", ConflictType.Ignore)
+```
+
+---
 
 ## drop_database
 
@@ -89,24 +169,64 @@ infinity_obj.create_database("my_database")
 Infinity.drop_database(db_name, conflict_type = ConflictType.Error)
 ```
 
-Drops a database by name.
+Deletes a database by its name. 
 
 ### Parameters
 
-- `db_name`: `str` Name of the database
-- `conflict_type`:  `enum` Policy for handling an existing database with the same name.  See `ConflictType`, which is defined in the **infinity.common** package. 
-  - `Error`
-  - `Ignore`
+#### db_name: `str`, *Required*
+
+Name of the database to delete. Must not be empty. 
+
+#### conflict_type: `ConflictType`, *Optional*
+
+Conflict policy in `enum` for handling situations where a database with the same name does not exist. 
+
+  - `Error`: Raise an error if the specified database does not exist.
+  - `Ignore`: Ignore the operation and proceed regardless, if the specified database does not exist.
+
+:::tip NOTE
+You must import the `infinity.common` package to set `ConflictType`:
+
+```python
+from infinity.common import ConflictType
+```
+:::
+
+:::tip NOTE
+If `ConflictType` is not set, it defaults to `Error`.
+:::
 
 ### Returns
 
-- Success: `True`
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
 
 ### Examples
+
 ```python
+# Delete a database named 'my_database':
+# If the specified database does not exist, raise an error. 
 infinity_obj.drop_database("my_database")
 ```
+
+```python
+# Delete a database named 'my_database':
+# If the specified database does not exist, raise an error (same as above). 
+infinity_obj.drop_database("my_database", infinity.common.ConflictType.Error)
+```
+
+```python
+from infinity.common import ConflictType
+# Delete a database named 'my_database':
+# If the specified database does not exist, silently ignore the operation and proceed.
+infinity_obj.drop_database("my_database", ConflictType.Ignore)
+```
+
+---
 
 ## list_databases
 
@@ -114,19 +234,26 @@ infinity_obj.drop_database("my_database")
 Infinity.list_databases()
 ```
 
-Lists all databases.
+Gets the names of all databases.
 
 ### Returns
 
-- Success: `db_names` `list[str]`
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `db_names`: `list[str]` A list of all database names.
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. 
 
 ### Examples
 
 ```python
 res = infinity_obj.list_databases() 
-res.db_names #["my_database"]
+print(res.db_names) # ['my_database', 'database_1']
 ```
+
+---
 
 ## get_database
 
@@ -134,15 +261,17 @@ res.db_names #["my_database"]
 Infinity.get_database(db_name)
 ```
 
-Retrieves a database object by name.
+Retrieves a database object by its name.
 
 ### Parameters
 
-- `db_name`: `str`  Name of the database.
+#### db_name: `str`, *Required*
+
+Name of the database. Must not be empty. 
 
 ### Returns
 
-- Success: A database object. 
+- Success: A database object.  
 - Failure: `Exception`
 
 ### Examples
@@ -151,25 +280,33 @@ Retrieves a database object by name.
 db_obj=infinity_obj.get_database("my_database")
 ```
 
+---
+
 ## show_database
 
 ```python
 Infinity.show_database(db_name)
 ```
 
-Retrieves the metadata of a database by name.
+Retrieves the metadata of a database by its name.
 
 ### Parameters
 
-- **db_name : str** Name of the database
+#### db_name: `str` *Required*
+
+Name of the database. Must not be empty. 
 
 ### Returns
 
-- Success: Metadata of the database. See the `ShowDatabaseResponse` struct, which includes:
-  - `database_name`: `str` Name of the database. 
-  - `store_dir`: `str` Directory to the database file.
-  - `table_count`: `int` Number of tables in the database.
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
+- `database_name`: `str` A list of all database names.
+- `store_dir`: `str` The directory holding the database files. 
+- `table_count`: `int` The number of tables in the database.
 
 ### Examples
 
@@ -207,10 +344,9 @@ Definitions for all table columns as a dictionary. Each key in the dictionary is
 
 #### conflict_type: `ConflictType`, *Optional*
 
-Conflict policy in `enum` for handling situations when a table with the same name exists. 
+Conflict policy in `enum` for handling situations where a table with the same name exists. 
   - `Error`: Raise an error if a table with the same name exists.
   - `Ignore`: Ignore the table creation requrest and keep the table with the same name as-is.
-  - `Replace`: Drop the existing table and create a new one. 
 
 :::tip NOTE
 You must import the `infinity.common` package to set `ConflictType`:
@@ -226,7 +362,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: `True`
+- Success: A table object. 
 - Failure: `Exception`
 
 ### Examples
@@ -305,8 +441,10 @@ from infinity.common import ConflictType
 # - `tensorarray`: The column is a tensor array column
 # - `6`: Dimension of each vector unit in the tensor arrays
 # - `float`: The primitive data type of the tensor arrays. Can be `float`/`float32` or `double`/`float64`
-db_obj.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Replace)
+db_obj.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, ConflictType.Ignore)
 ```
+
+---
 
 ## drop_table
 
@@ -323,7 +461,9 @@ Deletes a table from the database by its name.
 Name of the table to delete. Must not be empty. 
 
 #### conflict_type: `ConflictType`, *Optional*
-Conflict policy in `enum` for handling situations when a table with the same name does not exist. 
+
+Conflict policy in `enum` for handling situations where a table with the same name does not exist. 
+
   - `Error`: Raise an error if the specified table does not exist.
   - `Ignore`: Ignore the operation and proceed regardless, if the specified table does not exist.
 
@@ -341,23 +481,35 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: `True`
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
 
 ### Examples
 
 ```python
 # Delete a table named 'my_table':
 # If the specified table does not exist, raise an error. 
+db_obj.drop_table("my_table")
+```
+
+```python
+# Delete a table named 'my_table':
+# If the specified table does not exist, raise an error (same as above). 
 db_obj.drop_table("my_table", infinity.common.ConflictType.Error)
 ```
 
 ```python
 from infinity.common import ConflictType
-# Drop a table named 'my_table':
+# Delete a table named 'my_table':
 # If the specified table does not exist, silently ignore the operation and proceed.
 db_obj.drop_table("my_table", ConflictType.Ignore)
 ```
+
+---
 
 ## get_table
 
@@ -381,11 +533,10 @@ Name of the table to retrieve. Must not be empty.
 ### Examples
 
 ```python
-try:
-    table_obj = db_obj.get_table("my_table")
-except Exception as e:
-    print(e)
+table_obj = db_obj.get_table("my_table")
 ```
+
+---
 
 ## list_tables
 
@@ -393,56 +544,23 @@ except Exception as e:
 Database.list_tables()
 ```
 
-Lists all tables in the current database.
+Lists the names of all tables in the current database.
 
 ### Returns
 
-- Success: `db_names` in `list[str]`
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
+- `table_names`: `list[str]` A list of table names. 
 
 ### Examples
 
 ```python
 res = db_obj.list_tables()
-res.table_names #["my_table"]
-```
-
-## show_tables
-
-```python
-Database.show_tables()
-```
-
-Get the information of all tables in the database.
-
-### Returns
-
-- Success: response `metadata`: `polars.DataFrame` The returned 
-DataFrame contains eight columns and each row in it corresponds to a table in the database. These eight columns are:
-    - `database`: `str`
-    - `table`: `str`
-    - `type`: `str`
-    - `column_count`: `int64`
-    - `block_count`: `int64`
-    - `block_capacity`: `int64`
-    - `segment_count`: `int64`
-    - `segment_capacity`: `int64`
-- Failure: `Exception`
-
-### Examples
-
-```python
-res = db.show_tables()
-res
-┌──────────┬─────────────────────┬───────┬──────────────┬─────────────┬────────────────┬───────────────┬──────────────────┐
-│ database ┆ table               ┆ type  ┆ column_count ┆ block_count ┆ block_capacity ┆ segment_count ┆ segment_capacity │
-│ ---      ┆ ---                 ┆ ---   ┆ ---          ┆ ---         ┆ ---            ┆ ---           ┆ ---              │
-│ str      ┆ str                 ┆ str   ┆ i64          ┆ i64         ┆ i64            ┆ i64           ┆ i64              │
-╞══════════╪═════════════════════╪═══════╪══════════════╪═════════════╪════════════════╪═══════════════╪══════════════════╡
-│ default  ┆ test_create_varchar ┆ Table ┆ 2            ┆ 0           ┆ 8192           ┆ 0             ┆ 8388608          │
-│          ┆ table               ┆       ┆              ┆             ┆                ┆               ┆                  │
-└──────────┴─────────────────────┴───────┴──────────────┴─────────────┴────────────────┴───────────────┴──────────────────┘
-
+res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 ```
 
 ---
@@ -457,15 +575,18 @@ Creates an index by `IndexInfo` list.
 
 ### Parameters
 
-- **index_name : str**
-- **index_infos : list[IndexInfo]**
-  A IndexInfo struct contains three fields,`column_name`, `index_type`, and `index_param_list`.
-    - **column_name : str** Name of the column to build index on.
-    - **index_type : IndexType**
-      enum type: `IVFFlat` , `Hnsw`, `FullText`, or `BMP`. Defined in `infinity.index`.
-      `Note: For Hnsw index, add encode=lvq in index_param_list to use LVQ(Locally-adaptive vector quantization)`
-    - **index_param_list**
-      A list of InitParameter. The InitParameter struct is like a key-value pair, with two string fields named param_name and param_value. The optional parameters of each type of index are listed below:
+#### index_name: `str` *Required*
+
+
+#### index_infos: `list[IndexInfo]`
+A IndexInfo structure contains three fields,`column_name`, `index_type`, and `index_param_list`.
+    
+- **column_name : str** Name of the column to build index on.
+- **index_type : IndexType**
+      enum type: `IVFFlat`, `Hnsw`, `FullText`, or `BMP`. Defined in `infinity.index`.
+      `Note: For Hnsw index, add encode=lvq in index_param_list to use LVQ (Locally-adaptive vector quantization)`
+- **index_param_list**
+      A list of InitParameter. The InitParameter structure is like a key-value pair, with two string fields named param_name and param_value. The optional parameters of each type of index are listed below:
         - `IVFFlat`: `'centroids_count'`(default:`'128'`), `'metric'`(required)
         - `Hnsw`: 
           - `'M'`(default:`'16'`)
@@ -481,7 +602,7 @@ Creates an index by `IndexInfo` list.
         - `BMP`: 
           - `block_size=1~256`(default: 16): The size of the block in BMP index
           - `compress_type=[compress|raww]` (default: `compress`): If set to `compress`, the block max is stored in the sparse format, which is suitable for small "block size".
-- `conflict_type`: `Enum`. See `ConflictType`, which is defined in the **infinity.common** package. 
+- **conflict_type**: `Enum`. See `ConflictType`, which is defined in the **infinity.common** package. 
           - `Error`
           - `Ignore`
 
@@ -548,13 +669,15 @@ table_obj.create_index("my_index",
                               ])], None)
 ```
 
+---
+
 ## drop_index
 
 ```python
 Table.drop_index(index_name, conflict_type = ConflictType.Error)
 ```
 
-Drop an index by name.
+Drops an index by name.
 
 ### Parameters
 
@@ -574,6 +697,8 @@ Drop an index by name.
 table_obj.drop_index("my_index")
 ```
 
+---
+
 ## show_index
 
 ```python
@@ -589,7 +714,7 @@ Retrieves the metadata of an index by name.
 ### Returns
 
 - Success: `metadata` : `ShowIndexResponse`
-  the struct `ShowIndexResponse` contains:
+  the structure contains:
     - **db_name: string** Name of the database
     - **table_name: string**
     - **index_name: string**
@@ -615,6 +740,8 @@ print(res)
 #infinity/data/7SJK3mOSl2_db_default/f3AsBt7SRC_table_test_create_index_show_index/1hbFtMVaRY_index_my_index', segment_index_count='0')
 ```
 
+---
+
 ## list_indexes
 
 ```python
@@ -634,6 +761,8 @@ Lists the indexes built on the table.
 res = table_obj.list_indexes()
 res.index_names #['my_index']
 ```
+
+---
 
 ## insert
 
@@ -731,6 +860,8 @@ table_obj = db_obj.create_table("tensor_array_table", {"tensor_array_column": {"
 table_obj.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]]]}])
 ```
 
+---
+
 ## import_data
 
 ```python
@@ -766,8 +897,6 @@ Example: `{"header":True, "delimiter": "\t", file_type}`
   - `json`
   - `jsonl`
 
-
-
 ### Returns
 
 - Success: `True`
@@ -786,6 +915,8 @@ table_obj.import_data(os.getcwd() + "/your_file.csv", {"header": False, "file_ty
 ```python
 table_obj.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
 ```
+
+---
 
 ## export_data
 
@@ -853,6 +984,8 @@ table_obj.export_data(os.getcwd() + "/export_data.csv", {"header": True, "file_t
 table_obj.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl", "offset": 1, "limit": 8, "row_limit": 2}, ["num", "name", "score"])
 ```
 
+---
+
 ## delete
 
 ```python
@@ -876,6 +1009,8 @@ Deletes rows by condition.The condition is similar to the WHERE conditions in SQ
 table_obj.delete("c1 = 1")
 table_obj.delete()
 ```
+
+---
 
 ## update
 
@@ -903,6 +1038,8 @@ a list of dict where key indicates column, value indicates new value.
 table_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
 table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 ```
+
+---
 
 ## output
 
@@ -933,6 +1070,8 @@ table_obj.output(["c1+5"])
 - Success: self `Table`
 - Failure: `Exception`
 
+---
+
 ## filter
 
 ```python
@@ -956,6 +1095,8 @@ Creates a filtering condition expression.
 ```python
 table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 ```
+
+---
 
 ## knn
 
@@ -991,6 +1132,8 @@ table_obj.knn('col1', [0.1,0.2,0.3], 'float', 'l2', 100)
 table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 ```
 
+---
+
 ## match sparse
 
 ```python
@@ -1020,6 +1163,8 @@ table_obj.match_sparse('col1', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3
 table_obj.match_sparse('col1_with_bmp_index', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
 ```
 
+---
+
 ## match
 
 Creates a full-text search expression.
@@ -1038,6 +1183,7 @@ Creates a full-text search expression.
 - Failure: `Exception`
 
 ### Examples
+
 ```python
 questions = [
     r"blooms",  # single term
@@ -1052,6 +1198,8 @@ questions = [
 for question in questions:
     table_obj.match('body', question, 'topn=2')
 ```
+
+---
 
 ## match tensor
 
@@ -1092,6 +1240,8 @@ match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim
 match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim', 'topn=10;emvb_centroid_nprobe=4;emvb_threshold_first=0.4;emvb_threshold_final=0.5')
 ```
 
+---
+
 ## fusion
 
 ```python
@@ -1125,7 +1275,7 @@ Builds a fusion expression.
 
 ### Examples
 
-:::alert IMPORTANT
+:::caution IMPORTANT
 Ensure that you import the following when using `make_match_tensor_expr`:
 
 ```python
@@ -1145,6 +1295,8 @@ table_obj.fusion('match_tensor', 'topn=2', make_match_tensor_expr('t', [[0.0, -1
 `rrf`:  Reciprocal rank fusion method.
 
 [Reciprocal rank fusion (RRF)](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) is a method that combines multiple result sets with different relevance indicators into one result set. RRF does not requires tuning, and the different relevance indicators do not have to be related to each other to achieve high-quality results.
+
+---
 
 ## optimize
 
@@ -1169,6 +1321,8 @@ Table.optimize(index_name, opt_params)
 ```python
 table_obj.optimize('bmp_index_name', {'topk': '10'})
 ```
+
+---
 
 ## get result
 
@@ -1210,3 +1364,5 @@ res = table_obj.output(['*'])
                .fusion('rrf')
                .to_pl()
 ```
+
+---

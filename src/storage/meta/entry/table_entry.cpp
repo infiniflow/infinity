@@ -115,8 +115,12 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                                 TableMeta *table_meta,
                                                 TransactionID txn_id,
                                                 TxnTimeStamp begin_ts) {
-    SharedPtr<String> temp_dir = TableEntry::DetermineTableDir(*base_dir, *db_entry_dir, *table_name);
-    SharedPtr<String> table_entry_dir = is_delete ? MakeShared<String>("deleted") : temp_dir;
+    SharedPtr<String> table_entry_dir;
+    if (is_delete) {
+        table_entry_dir = MakeShared<String>("deleted");
+    } else {
+        table_entry_dir = TableEntry::DetermineTableDir(*base_dir, *db_entry_dir, *table_name);
+    }
     return MakeShared<TableEntry>(is_delete,
                                   std::move(base_dir),
                                   std::move(table_entry_dir),
@@ -1229,7 +1233,7 @@ void TableEntry::Cleanup() {
 
     String full_table_dir = fmt::format("{}/{}", *base_dir_, *table_entry_dir_);
     LOG_DEBUG(fmt::format("Cleaning up dir: {}", full_table_dir));
-    CleanupScanner::CleanupDir(*table_entry_dir_);
+    CleanupScanner::CleanupDir(full_table_dir);
     LOG_DEBUG(fmt::format("Cleaned dir: {}", full_table_dir));
 }
 

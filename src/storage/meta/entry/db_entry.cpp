@@ -68,10 +68,14 @@ SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
                                        TransactionID txn_id,
                                        TxnTimeStamp begin_ts) {
     String delete_str = fmt::format("{}/", *base_dir);
-    SharedPtr<String> temp_dir = DetermineDBDir(*base_dir, *db_name);
-    auto pos = temp_dir->find(delete_str);
-    temp_dir->erase(pos, delete_str.size());
-    SharedPtr<String> db_entry_dir = is_delete ? MakeShared<String>("deleted") : temp_dir;
+    SharedPtr<String> db_entry_dir;
+    if (is_delete) {
+        db_entry_dir = MakeShared<String>("deleted");
+    } else {
+        db_entry_dir = DetermineDBDir(*base_dir, *db_name);
+        auto pos = db_entry_dir->find(delete_str);
+        db_entry_dir->erase(pos, delete_str.size());
+    }
     return MakeShared<DBEntry>(db_meta, is_delete, base_dir, db_entry_dir, db_name, txn_id, begin_ts);
 }
 

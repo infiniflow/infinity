@@ -435,8 +435,6 @@ TEST_F(SilentLogTestCompactTaskTest, delete_in_compact_process) {
     }
 }
 
-// Cannot compile the test. So annotate it.
-
 TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
     for (int task_i = 0; task_i < 10; ++task_i) {
         LOG_INFO(fmt::format("Test {}", task_i));

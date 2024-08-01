@@ -166,12 +166,11 @@ nlohmann::json TableMeta::Serialize(TxnTimeStamp max_commit_ts) {
     Vector<BaseEntry *> entry_candidates = table_entry_list_.GetCandidateEntry(max_commit_ts, EntryType::kTable);
 
     for (const auto &entry : entry_candidates) {
-        TableEntry* table_entry = static_cast<TableEntry*>(entry);
+        TableEntry *table_entry = static_cast<TableEntry *>(entry);
         json_res["table_entries"].emplace_back(table_entry->Serialize(max_commit_ts));
     }
 
     return json_res;
-
 }
 
 /**
@@ -202,13 +201,9 @@ UniquePtr<TableMeta> TableMeta::Deserialize(const nlohmann::json &table_meta_jso
     return table_meta;
 }
 
-void TableMeta::Sort() {
-    table_entry_list_.SortEntryListByTS();
-}
+void TableMeta::Sort() { table_entry_list_.SortEntryListByTS(); }
 
-void TableMeta::PushBackEntry(const SharedPtr<TableEntry>& new_table_entry) {
-    table_entry_list_.PushBackEntry(new_table_entry);
-}
+void TableMeta::PushBackEntry(const SharedPtr<TableEntry> &new_table_entry) { table_entry_list_.PushBackEntry(new_table_entry); }
 
 void TableMeta::Cleanup() { table_entry_list_.Cleanup(); }
 

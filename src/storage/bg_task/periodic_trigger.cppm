@@ -25,6 +25,8 @@ import wal_manager;
 
 namespace infinity {
 
+class CleanupTask;
+
 export class PeriodicTrigger {
 public:
     explicit PeriodicTrigger(std::chrono::milliseconds interval) : interval_(interval), last_check_(std::chrono::system_clock::now()) {}
@@ -54,6 +56,8 @@ public:
     CleanupPeriodicTrigger(std::chrono::milliseconds interval, BGTaskProcessor *bg_processor, Catalog *catalog, TxnManager *txn_mgr)
         : PeriodicTrigger(interval), bg_processor_(bg_processor), catalog_(catalog), txn_mgr_(txn_mgr) {}
 
+    SharedPtr<CleanupTask> CreateCleanupTask();
+
     virtual void Trigger() override;
 
 private:
@@ -61,6 +65,7 @@ private:
     Catalog *const catalog_{};
     TxnManager *const txn_mgr_{};
 
+    std::mutex mtx_;
     TxnTimeStamp last_visible_ts_{0};
 };
 

@@ -86,7 +86,7 @@ bool PhysicalCompactFinish::ApplyDeletes(QueryContext *query_context, const Comp
             }
         }
     }
-    const HashMap<SegmentID, Vector<SegmentOffset>> &to_delete = compact_state_data->GetToDelete();
+    const Vector<Pair<SegmentID, Vector<SegmentOffset>>> &to_delete = compact_state_data->GetToDelete();
     Vector<RowID> row_ids;
     for (const auto &[segment_id, delete_offsets] : to_delete) {
         for (SegmentOffset offset : delete_offsets) {

@@ -24,10 +24,15 @@ export module background_process;
 namespace infinity {
 
 class Catalog;
+class CleanupPeriodicTrigger;
 
 export class BGTaskProcessor {
 public:
-    explicit BGTaskProcessor(WalManager *wal_manager, Catalog *catalog);
+    explicit BGTaskProcessor(WalManager *wal_manager, Catalog *catalog) : wal_manager_(wal_manager), catalog_(catalog) {}
+
+    // cleanup is used before full checkpoint
+    void SetCleanupTrigger(SharedPtr<CleanupPeriodicTrigger> cleanup_trigger);
+
     void Start();
     void Stop();
 
@@ -49,6 +54,7 @@ private:
 
     WalManager *wal_manager_{};
     Catalog *catalog_{};
+    SharedPtr<CleanupPeriodicTrigger> cleanup_trigger_;
 
     Atomic<u64> task_count_{};
 
