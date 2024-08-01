@@ -55,6 +55,9 @@ public:
 
     SharedPtr<String> data_dir() const { return data_dir_; }
 
+    List<SharedPtr<DBEntry>> GetAllEntries() const {
+        return db_entry_list_.GetAllEntries();
+    }
 private:
     Tuple<DBEntry *, Status> CreateNewEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                             TransactionID txn_id,
