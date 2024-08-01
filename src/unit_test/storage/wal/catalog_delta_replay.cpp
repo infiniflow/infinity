@@ -63,7 +63,7 @@ public:
         system(("mkdir -p " + String(GetFullTmpDir())).c_str());
         config_path = GetParam() == BaseTestParamStr::NULL_CONFIG_PATH
                           ? MakeShared<String>(std::string(test_data_path()) + "/config/test_catalog_delta.toml")
-                          : MakeShared<String>(std::string(test_data_path()) + "/config/vfs/test_catalog_delta.toml");
+                          : MakeShared<String>(std::string(test_data_path()) + "/config/test_catalog_delta_vfs.toml");
     }
 
     SharedPtr<String> config_path{};

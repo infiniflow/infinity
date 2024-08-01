@@ -60,7 +60,7 @@ protected:
     static std::shared_ptr<std::string> config_path() {
         return GetParam() == BaseTestParamStr::NULL_CONFIG_PATH
                    ? std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_checkpoint.toml")
-                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/vfs/test_checkpoint.toml");
+                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_checkpoint_vfs.toml");
     }
 
     void SetUp() override {
