@@ -635,10 +635,11 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"l2"`: Euclidean distance.
       - `"cosine"`: Cosine similarity. 
   - Parameter settings for a secondary index: 
+    No parameters required for now. 
   - Parameter settings for a BMP index: 
     - `block_size`: *Optional* - The size of the block in a BMP index. Range: `"1"` ~ `"256"`. Defaults to 16.
     - `"compress_type"`: *Optional*  
-      - `"compress"`: (Default) Store the block max is stored in the sparse format. Works best with small block size situations.
+      - `"compress"`: (Default) Store the block max in sparse format. Works best with small block size situations.
       - `"raw"`: 
 
 :::tip NOTE
@@ -671,8 +672,12 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: An index object. 
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - Non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
 
 ### Examples
 
