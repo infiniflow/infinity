@@ -7,7 +7,7 @@ slug: /http_api_reference
 
 ## Create database
 
-Create a database.
+Creates a database by its name.
 
 #### Request
 
@@ -41,9 +41,11 @@ curl --request POST \
 }
 ```
 
+---
+
 ## Drop database
 
-Drop a database.
+Deletes a database by its name.
 
 #### Request
 
@@ -77,9 +79,11 @@ curl --request DELETE \
 }
 ```
 
+---
+
 ## Show database
 
-Show detailed information of a specified database.
+Shows detailed information of a specified database.
 
 #### Request
 
@@ -111,9 +115,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## List databases
 
-Retrieve all databases in the system.
+Retrieves all databases in the system.
 
 #### Request
 
@@ -137,9 +143,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Create table
 
-Create a table in a specified database.
+Creates a table in a specified database.
 
 #### Request
 
@@ -208,9 +216,11 @@ curl --request POST \
 }
 ```
 
+---
+
 ## Drop table
 
-Drop a table from a specified database.
+Deletes a table from a specified database.
 
 #### Request
 
@@ -244,9 +254,11 @@ curl --request DELETE \
 }
 ```
 
+---
+
 ## List tables
 
-List all tables in a specified database.
+Lists all tables in a specified database.
 
 #### Request
 
@@ -287,9 +299,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Show table
 
-Show detailed information of a specified table.
+Shows detailed information of a specified table.
 
 #### Request
 
@@ -324,9 +338,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Show table columns
 
-Show the column information of a specific table in a specified database.
+Shows the column information of a specific table in a specified database.
 
 #### Request
 
@@ -371,6 +387,8 @@ curl --request GET \
     "error_message": "Table {table_name} doesn't exist in {database_name}."
 }
 ```
+
+---
 
 ## Create an index
 
@@ -424,6 +442,8 @@ curl --request POST \
 }
 ```
 
+---
+
 ## Drop an index
 
 Drop an index.
@@ -459,6 +479,8 @@ curl --request DELETE \
     "error_message": "Index {index_name} doesn't exist in {table_name}."
 }
 ```
+
+---
 
 ## Show index
 
@@ -500,6 +522,8 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Show index segment
 
 Show detailed information of a specified index segment.
@@ -534,6 +558,8 @@ curl --request GET \
     "error_message": "Index {index_name} doesn't exist in {table_name}."
 }
 ```
+
+---
 
 ## Show index chunk
 
@@ -570,6 +596,8 @@ curl --request GET \
 }
 ```
 
+---
+
 ## List indexes
 
 Lists all indexes of a specified table.
@@ -605,9 +633,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Import data
 
-Import data into a specified table.
+Imports data into a specified table.
 
 #### Request
 
@@ -644,9 +674,11 @@ curl --request PUT \
 }
 ```
 
+---
+
 ## Export data
 
-Export data into a specified table.
+Exports data into a specified table.
 
 #### Request
 
@@ -683,9 +715,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Insert data
 
-Insert data into a specified table.
+Inserts data into a specified table.
 
 #### Request
 
@@ -728,9 +762,11 @@ curl --request POST \
 }
 ```
 
+---
+
 ## Delete data
 
-Delete data in a specified table.
+Deletes data in a specified table.
 
 #### Request
 
@@ -765,9 +801,11 @@ curl --request DELETE \
 }
 ```
 
+---
+
 ## Update
 
-Update data in a specified table.
+Updates data in a specified table.
 
 #### Request
 
@@ -806,9 +844,11 @@ curl --request PUT \
 }
 ```
 
+---
+
 ## Search data
 
-Search data in a specified table.
+Searches data in a specified table.
 
 #### Request
 
@@ -871,9 +911,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Show segments
 
-Show all segments of a specified table.
+Shows all segments of a specified table.
 
 #### Request
 
@@ -910,9 +952,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Show segment details
 
-Show details of a specified segment. 
+Shows details of a specified segment. 
 
 #### Request
 
@@ -951,9 +995,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Show blocks
 
-Show all blocks of specified segment.
+Shows all blocks of specified segment.
 
 #### Request
 
@@ -990,9 +1036,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Show block details
 
-Show details of a specified block.
+Shows details of a specified block.
 
 #### Request
 
@@ -1029,9 +1077,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Show block column
 
-Show details of a specified column in a specific block.
+Shows details of a specified column in a specific block.
 
 #### Request
 
@@ -1065,9 +1115,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Show variables
 
-Get all global variables.
+Gets all global variables.
 
 #### Request
 
@@ -1101,9 +1153,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Show variable
 
-Get a global variable.
+Gets a global variable.
 
 #### Request
 
@@ -1133,9 +1187,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Set a variable
 
-Set a variable with value.
+Sets a variable with value.
 
 #### Request
 
@@ -1166,9 +1222,11 @@ curl --request POST \
 }
 ```
 
+---
+
 ## Show configs
 
-Get all configs.
+Gets all configs.
 
 #### Request
 
@@ -1216,9 +1274,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Show config
 
-Get a config.
+Gets a config.
 
 #### Request
 
@@ -1248,9 +1308,11 @@ curl --request GET \
 }
 ```
 
+---
+
 ## Set a config
 
-Set a config with value.
+Sets a config with value.
 
 #### Request
 
@@ -1280,3 +1342,5 @@ curl --request POST \
     "error_message": "log level value range is trace, debug, info, warning, error, critical"
 }
 ```
+
+---
