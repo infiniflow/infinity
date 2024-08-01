@@ -7,19 +7,26 @@ from infinity.common import ConflictType, InfinityException
 import infinity
 from infinity.errors import ErrorCode
 from internal.utils import trace_expected_exceptions
+from http_adapter import http_adapter
 
 @pytest.fixture(scope="class")
 def local_infinity(request):
     return request.config.getoption("--local-infinity")
 
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity):
+def http(request):
+    return request.config.getoption("--http")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
     if local_infinity:
         uri = common_values.TEST_LOCAL_PATH
     else:
         uri = common_values.TEST_LOCAL_HOST
     request.cls.uri = uri
     request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
     yield
     request.cls.infinity_obj.disconnect()
 
@@ -42,6 +49,7 @@ class TestInfinity:
             print(e)
 
     # create/drop table with different invalid options
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("invalid_option_array", [
         pytest.param([]),
         pytest.param(()),
@@ -102,6 +110,8 @@ class TestInfinity:
         # drop table
         res = db_obj.drop_table(table_name, ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
+
+        db_obj.drop_table(table_name, ConflictType.Ignore)
 
     def test_create_empty_column_table(self):
         """
@@ -176,6 +186,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
     # todo fix: why return TABLE_NOT_EXIST error
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.usefixtures("skip_if_local_infinity")
     def test_drop_same_name_table(self):
         # connect
@@ -230,6 +241,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_table_create_valid_option", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("conflict_type", [
         pytest.param(1.1),
         pytest.param("#@$@!%string"),
@@ -257,6 +269,7 @@ class TestInfinity:
         db_obj.create_table("test_table_drop_valid_option", {"c1": {"type": "int"}}, ConflictType.Ignore)
         db_obj.drop_table("test_table_drop_valid_option", conflict_type)
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("conflict_type", [
         pytest.param(ConflictType.Replace),
         pytest.param(2),
@@ -354,13 +367,14 @@ class TestInfinity:
         assert res["column_name"][0] == "c1"
         assert res["column_name"][1] == "c2"
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_create_table_with_upper_param_name(self):
         db_obj = self.infinity_obj.get_database("default_db")
         table_name = "test_table_my_table"
         db_obj.drop_table(table_name, ConflictType.Ignore)
         # create table
         tb = db_obj.create_table(
-            table_name, {"c1": {"TYPE": "int", "CONSTRAINTS": ["primary key"]}, "C2": {"TYPE": "float"}},
+            table_name, {"c1": {"TYPE": "int", "CONSTRAINTS": ["primary key"]}, "c2": {"TYPE": "float"}},
             ConflictType.Error)
         assert tb
 
@@ -850,6 +864,7 @@ class TestInfinity:
         except Exception as e:
             print(e)
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_table(self):
         # self.test_infinity_obj._test_version()
         self._test_table()

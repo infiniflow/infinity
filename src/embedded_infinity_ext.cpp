@@ -467,6 +467,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kSecondary", IndexType::kSecondary)
         .value("kBMP", IndexType::kBMP)
         .value("kEMVB", IndexType::kEMVB)
+        .value("kDiskAnn", IndexType::kDiskAnn)
         .value("kInvalid", IndexType::kInvalid)
         .export_values();
 

@@ -7,6 +7,7 @@ import pytest
 from common import common_values
 from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
+from http_adapter import http_adapter
 
 TEST_DATA_DIR = "/test/data/"
 
@@ -15,13 +16,19 @@ def local_infinity(request):
     return request.config.getoption("--local-infinity")
 
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity):
+def http(request):
+    return request.config.getoption("--http")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
     if local_infinity:
         uri = common_values.TEST_LOCAL_PATH
     else:
         uri = common_values.TEST_LOCAL_HOST
     request.cls.uri = uri
     request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
     yield
     request.cls.infinity_obj.disconnect()
 
@@ -77,6 +84,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_index_hnsw", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("block_size", [8, 128])
     @pytest.mark.parametrize("compress_type", ["compress", "raww"])
     def test_create_index_BMP(self, block_size, compress_type):
@@ -124,6 +132,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_index_fulltext", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_create_index_secondary(self):
         # CREATE INDEX idx_secondary ON t(c1);
         db_obj = self.infinity_obj.get_database("default_db")
@@ -155,6 +164,7 @@ class TestInfinity:
 
         # drop non-existent index
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_create_index_emvb(self):
         # CREATE INDEX idx_emvb ON t(c2) USING EMVB;
         db_obj = self.infinity_obj.get_database("default_db")
@@ -532,6 +542,7 @@ class TestInfinity:
             "test_create_index_import_data", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_insert_data_fulltext_index_search(self, file_format):
         # prepare data for insert
@@ -598,6 +609,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_fulltext_match_with_invalid_analyzer", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_create_index_on_deleted_table(self):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
@@ -698,6 +710,7 @@ class TestInfinity:
             "test_create_index_with_valid_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("conflict_type", [pytest.param(1.1),
                                                pytest.param("#@$@!%string"),
                                                pytest.param([]),
@@ -825,6 +838,7 @@ class TestInfinity:
             "test_create_duplicated_index_with_valid_error_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("conflict_type", [pytest.param(1.1),
                                                pytest.param("#@$@!%string"),
                                                pytest.param([]),
@@ -1057,6 +1071,7 @@ class TestInfinity:
             "test_drop_index_with_valid_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("conflict_type", [pytest.param(1.1),
                                                pytest.param("#@$@!%string"),
                                                pytest.param([]),
@@ -1197,6 +1212,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_upper_name_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("index_type", [
         index.IndexType.IVFFlat,
         index.IndexType.Hnsw,
@@ -1302,6 +1318,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("index_type", [
         index.IndexType.IVFFlat,
         index.IndexType.Hnsw,

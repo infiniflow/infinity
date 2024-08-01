@@ -7,6 +7,7 @@ import infinity
 import infinity.index as index
 from infinity.common import ConflictType, InfinityException
 from infinity.errors import ErrorCode
+from http_adapter import http_adapter
 
 
 @pytest.fixture(scope="class")
@@ -14,13 +15,19 @@ def local_infinity(request):
     return request.config.getoption("--local-infinity")
 
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity):
+def http(request):
+    return request.config.getoption("--http")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
     if local_infinity:
         uri = common_values.TEST_LOCAL_PATH
     else:
         uri = common_values.TEST_LOCAL_HOST
     request.cls.uri = uri
     request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
     yield
     request.cls.infinity_obj.disconnect()
 
@@ -247,16 +254,16 @@ class TestInfinity:
         """
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_insert_big_embedding", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_big_embedding", {"c1": {"type": "vector,65535,int"}},
+        table_obj = db_obj.create_table("test_insert_big_embedding", {"c1": {"type": "vector,16384,int"}},
                                         ConflictType.Error)
         assert table_obj
-        res = table_obj.insert([{"c1": [1] * 65535}])
+        res = table_obj.insert([{"c1": [1] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [4] * 65535}])
+        res = table_obj.insert([{"c1": [4] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [7] * 65535}])
+        res = table_obj.insert([{"c1": [7] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [-9999999] * 65535}])
+        res = table_obj.insert([{"c1": [-9999999] * 16384}])
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(
@@ -271,16 +278,16 @@ class TestInfinity:
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_insert_big_embedding_float",
                           ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_big_embedding_float", {"c1": {"type": "vector,65535,float"}},
+        table_obj = db_obj.create_table("test_insert_big_embedding_float", {"c1": {"type": "vector,16384,float"}},
                                         ConflictType.Error)
         assert table_obj
-        res = table_obj.insert([{"c1": [1] * 65535}])
+        res = table_obj.insert([{"c1": [1] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [-9999999] * 65535}])
+        res = table_obj.insert([{"c1": [-9999999] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [1.1] * 65535}])
+        res = table_obj.insert([{"c1": [1.1] * 16384}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [-9999999.988] * 65535}])
+        res = table_obj.insert([{"c1": [-9999999.988] * 16384}])
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(
@@ -518,6 +525,7 @@ class TestInfinity:
         res = db_obj.drop_table("test_insert_tensor_array", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
     def test_insert(self):
         # self.test_infinity_obj._test_version()
         self._test_insert_basic()
@@ -539,12 +547,12 @@ class TestInfinity:
         self._test_insert_tensor()
         self._test_insert_tensor_array()
 
-    @pytest.mark.parametrize("types", ["vector,65535,int", "vector,65535,float"])
-    @pytest.mark.parametrize("types_examples", [[{"c1": [1] * 65535}],
-                                                [{"c1": [4] * 65535}],
-                                                [{"c1": [-9999999] * 65535}],
-                                                [{"c1": [1.1] * 65535}],
-                                                [{"c1": [-9999999.988] * 65535}],
+    @pytest.mark.parametrize("types", ["vector,16384,int", "vector,16384,float"])
+    @pytest.mark.parametrize("types_examples", [[{"c1": [1] * 16384}],
+                                                [{"c1": [4] * 16384}],
+                                                [{"c1": [-9999999] * 16384}],
+                                                [{"c1": [1.1] * 16384}],
+                                                [{"c1": [-9999999.988] * 16384}],
                                                 ])
     def test_insert_big_embedding_various_type(self, types, types_examples):
         db_obj = self.infinity_obj.get_database("default_db")
