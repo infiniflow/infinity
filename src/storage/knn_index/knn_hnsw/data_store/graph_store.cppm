@@ -147,9 +147,10 @@ public:
         }
     }
 
-    static GraphStoreInner Make(SizeT max_vertex, const GraphStoreMeta &meta) {
+    static GraphStoreInner Make(SizeT max_vertex, const GraphStoreMeta &meta, SizeT &mem_usage) {
         GraphStoreInner graph_store(max_vertex, meta, 0);
         std::fill(graph_store.graph_.get(), graph_store.graph_.get() + max_vertex * meta.level0_size(), 0);
+        mem_usage += max_vertex * meta.level0_size();
         return graph_store;
     }
 
@@ -181,7 +182,7 @@ public:
         }
     }
 
-    static GraphStoreInner Load(FileHandler &file_handler, SizeT cur_vertex_n, SizeT max_vertex, const GraphStoreMeta &meta) {
+    static GraphStoreInner Load(FileHandler &file_handler, SizeT cur_vertex_n, SizeT max_vertex, const GraphStoreMeta &meta, SizeT &mem_usage) {
         assert(cur_vertex_n <= max_vertex);
 
         SizeT layer_sum;
@@ -203,15 +204,19 @@ public:
             }
         }
         graph_store.loaded_layers_ = std::move(loaded_layers);
+
+        mem_usage += max_vertex * meta.level0_size() + layer_sum * meta.levelx_size();
         return graph_store;
     }
 
-    void AddVertex(VertexType vertex_i, i32 layer_n, const GraphStoreMeta &meta) {
+    void AddVertex(VertexType vertex_i, i32 layer_n, const GraphStoreMeta &meta, SizeT &mem_usage) {
         VertexL0 *v = GetLevel0(vertex_i, meta);
         v->neighbor_n_ = 0;
         v->layer_n_ = layer_n;
         if (layer_n) {
             v->layers_p_ = new char[meta.levelx_size() * layer_n];
+            mem_usage += meta.levelx_size() * layer_n;
+
             for (i32 layer_i = 1; layer_i <= layer_n; ++layer_i) {
                 GetLevelX(v->layers_p_, layer_i, meta)->neighbor_n_ = 0;
             }

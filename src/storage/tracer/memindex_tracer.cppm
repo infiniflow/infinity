@@ -36,7 +36,7 @@ public:
 
     void RegisterMemIndex(BaseMemIndex *memindex);
 
-    void AddUsage(SizeT usage);
+    void AddMemUsed(SizeT usage);
 
     Vector<MemIndexTracerInfo> GetMemIndexTracerInfo();
 
@@ -53,7 +53,7 @@ private:
 
 inline void MemIndexTracer::RegisterMemIndex(BaseMemIndex *memindex) { memindexes_.insert(memindex); }
 
-inline void MemIndexTracer::AddUsage(SizeT add) {
+inline void MemIndexTracer::AddMemUsed(SizeT add) {
     SizeT old_index_memory = cur_index_memory.fetch_add(add);
     if (old_index_memory > index_memory_limit_) {
         TriggerDump();

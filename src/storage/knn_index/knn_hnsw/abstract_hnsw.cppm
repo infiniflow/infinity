@@ -40,6 +40,7 @@ import embedding_info;
 import infinity_context;
 import logger;
 import base_memindex;
+import memindex_tracer;
 
 namespace infinity {
 
@@ -66,7 +67,10 @@ export struct HnswIndexInMem : public BaseMemIndex {
 public:
     HnswIndexInMem() : hnsw_(nullptr) {}
 
-    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry);
+    static UniquePtr<HnswIndexInMem>
+    Make(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace = false);
+
+    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace);
 
 private:
     template <typename DataType>
@@ -121,10 +125,11 @@ private:
     }
 
     template <typename Iter, typename Index>
-    static void InsertVecs(Index &index, Iter iter, const HnswInsertConfig &config) {
+    static void InsertVecs(Index &index, Iter iter, const HnswInsertConfig &config, SizeT &mem_usage) {
         auto &thread_pool = InfinityContext::instance().GetHnswBuildThreadPool();
         using T = std::decay_t<decltype(index)>;
         if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+            SizeT mem1 = index->mem_usage();
             auto [start, end] = index->StoreData(std::move(iter), config);
             SizeT bucket_size = std::max(kBuildBucketSize, SizeT(end - start - 1) / thread_pool.size() + 1);
             SizeT bucket_n = (end - start - 1) / bucket_size + 1;
@@ -143,6 +148,8 @@ private:
             for (auto &fut : futs) {
                 fut.wait();
             }
+            SizeT mem2 = index->mem_usage();
+            mem_usage = mem2 - mem1;
         }
     }
 
@@ -177,8 +184,7 @@ public:
     AbstractHnsw *get_ptr() { return &hnsw_; }
 
 protected:
-    BaseMemIndexInfo GetInfoInner() const override;
-
+    MemIndexTracerInfo GetInfo() const override;
 
 private:
     static constexpr SizeT kBuildBucketSize = 1024;
@@ -187,6 +193,7 @@ private:
     AbstractHnsw hnsw_ = nullptr;
 
     SegmentIndexEntry *segment_index_entry_{};
+    bool trace_{};
 };
 
 } // namespace infinity

@@ -18,30 +18,19 @@ export module base_memindex;
 
 import stl;
 import memindex_tracer;
+import infinity_context;
 
 namespace infinity {
 
-export struct BaseMemIndexInfo {
-    SharedPtr<String> table_name_;
-    SharedPtr<String> index_name_;
-    SharedPtr<String> db_name_;
-    SizeT row_count_;
-};
-
 export class BaseMemIndex {
 public:
-    MemIndexTracerInfo GetInfo() const {
-        BaseMemIndexInfo info = GetInfoInner();
-        return {info.table_name_, info.index_name_, info.db_name_, info.row_count_, mem_used_};
-    }
+    virtual MemIndexTracerInfo GetInfo() const = 0;
 
 protected:
-    void AddMemUsed(SizeT mem) { mem_used_ += mem; }
-
-    virtual BaseMemIndexInfo GetInfoInner() const = 0;
-
-private:
-    SizeT mem_used_ = 0;
+    void AddMemUsed(SizeT mem) {
+        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+        memindex_tracer->AddMemUsed(mem);
+    }
 };
 
 } // namespace infinity
