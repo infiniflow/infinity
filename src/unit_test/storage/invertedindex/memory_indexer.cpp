@@ -41,11 +41,10 @@ import inmem_index_segment_reader;
 import segment_posting;
 import global_resource_usage;
 import infinity_context;
-import third_party;
 
 using namespace infinity;
 
-class MemoryIndexerTest : public BaseTestParamStr {
+class MemoryIndexerTest : public BaseTest {
 public:
     struct ExpectedPosting {
         String term;
@@ -59,16 +58,9 @@ protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     SharedPtr<ColumnVector> column_;
     Vector<ExpectedPosting> expected_postings_;
-    String config_path_{};
 
 public:
     void SetUp() override {
-        config_path_ = GetParam();
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            std::shared_ptr<std::string> config_path = std::make_shared<std::string>(config_path_);
-            infinity::InfinityContext::instance().Init(config_path);
-        }
-
         // https://en.wikipedia.org/wiki/Finite-state_transducer
         const char *paragraphs[] = {
             R"#(A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.)#",
@@ -119,16 +111,7 @@ public:
     }
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    TestWithDifferentParams,
-    MemoryIndexerTest,
-    ::testing::Values(
-        BaseTestParamStr::NULL_CONFIG_PATH,
-        BaseTestParamStr::CONFIG_PATH
-    )
-);
-
-TEST_P(MemoryIndexerTest, Insert) {
+TEST_F(MemoryIndexerTest, Insert) {
     // prepare fake segment index entry
     auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
     MemoryIndexer indexer1(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
