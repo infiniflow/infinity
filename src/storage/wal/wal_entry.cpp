@@ -36,6 +36,7 @@ import block_entry;
 import segment_entry;
 import segment_index_entry;
 import chunk_index_entry;
+import block_version;
 import local_file_system;
 import index_defines;
 import create_index_info;
@@ -53,7 +54,11 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
         for (u32 layer_n = 0; layer_n < 2; ++layer_n) {
             col_i_outline_info.emplace_back(column->OutlineBufferCount(layer_n), column->LastChunkOff(layer_n));
         }
+        paths_.push_back(column->FilePath());
     }
+    String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
+    String version_file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
+    paths_.push_back(version_file_path);
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
@@ -66,6 +71,12 @@ i32 WalBlockInfo::GetSizeInBytes() const {
     size += sizeof(i32);
     for (const auto &v : outline_infos_) {
         size += sizeof(i32) + v.size() * (sizeof(u32) + sizeof(u64));
+    }
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        size += pm->GetSizeInBytes(paths_);
     }
     return size;
 }
@@ -81,6 +92,11 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
             WriteBufAdv(buf, idx);
             WriteBufAdv(buf, off);
         }
+    }
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        pm->WriteBuf(buf, paths_);
     }
 }
 
@@ -100,6 +116,11 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
             const auto last_chunk_offset = ReadBufAdv<u64>(ptr);
             outline_info[j] = {buffer_cnt, last_chunk_offset};
         }
+    }
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        pm->ReadBuf(ptr);
     }
     return block_info;
 }

@@ -88,13 +88,6 @@ SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
         size += pm->GetSizeInBytes(GetFilePaths());
-        // size += sizeof(SizeT);
-        // Vector<String> paths = GetFilePaths();
-        // for (auto &path : paths) {
-        //     ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
-        //     size += sizeof(i32) + path.size();
-        //     size += sizeof(i32) + obj_addr.obj_key_.size() + sizeof(SizeT) + sizeof(SizeT);
-        // }
     }
     return size;
 }

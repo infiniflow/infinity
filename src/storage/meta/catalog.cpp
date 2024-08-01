@@ -511,7 +511,7 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
-        json_res["obj_addr_map"].emplace_back(pm->Serialize());
+        json_res["obj_addr_map"] = pm->Serialize();
     }
     return json_res;
 }

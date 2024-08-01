@@ -235,11 +235,11 @@ String PersistenceManager::GetObjCache(const String &file_path) {
         UnrecoverableError(error_message);
     }
     auto oit = objects_.find(it->second.obj_key_);
-    if (oit == objects_.end()) {
-        String error_message = fmt::format("Failed to find object {}", it->second.obj_key_);
-        UnrecoverableError(error_message);
+    if (oit != objects_.end()) {
+        // String error_message = fmt::format("Failed to find object {}", it->second.obj_key_);
+        // UnrecoverableError(error_message);
+        oit->second.ref_count_++;
     }
-    oit->second.ref_count_++;
     return fs::path(workspace_).append(it->second.obj_key_).string();
 }
 
@@ -275,8 +275,9 @@ void PersistenceManager::PutObjCache(const String &file_path) {
     }
     auto oit = objects_.find(it->second.obj_key_);
     if (oit == objects_.end()) {
-        String error_message = fmt::format("Failed to find object {}", it->second.obj_key_);
-        UnrecoverableError(error_message);
+        // String error_message = fmt::format("Failed to find object {}", it->second.obj_key_);
+        // UnrecoverableError(error_message);
+        return;
     }
     oit->second.ref_count_--;
 }
@@ -466,7 +467,7 @@ void PersistenceManager::Deserialize(const nlohmann::json &obj) {
         len = obj["obj_stat_size"];
     }
     for (SizeT i = 0; i < len; ++i) {
-        auto &json_pair = obj["obj_stat_array"][0];
+        auto &json_pair = obj["obj_stat_array"][i];
         String path = json_pair["obj_path"];
         ObjStat obj_stat;
         obj_stat.Deserialize(json_pair["obj_stat"]);
@@ -477,7 +478,7 @@ void PersistenceManager::Deserialize(const nlohmann::json &obj) {
         len = obj["obj_addr_size"];
     }
     for (SizeT i = 0; i < len; ++i) {
-        auto &json_pair = obj["obj_addr_array"][0];
+        auto &json_pair = obj["obj_addr_array"][i];
         String path = json_pair["local_path"];
         ObjAddr obj_addr;
         obj_addr.Deserialize(json_pair["obj_addr"]);

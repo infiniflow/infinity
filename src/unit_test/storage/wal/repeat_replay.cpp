@@ -47,10 +47,12 @@ import physical_import;
 
 using namespace infinity;
 
-class RepeatReplayTest : public BaseTest {
+class RepeatReplayTest : public BaseTestParamStr {
 protected:
     static std::shared_ptr<std::string> close_ckp_config() {
-        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
+        return GetParam() == BaseTestParamStr::NULL_CONFIG_PATH
+                   ? std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml")
+                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/vfs/test_close_ckp.toml");
     }
 
     void SetUp() override { RemoveDbDirs(); }
@@ -58,14 +60,16 @@ protected:
     void TearDown() override { RemoveDbDirs(); }
 };
 
-TEST_F(RepeatReplayTest, append) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         RepeatReplayTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+
+TEST_P(RepeatReplayTest, append) {
     std::shared_ptr<std::string> config_path = RepeatReplayTest::close_ckp_config();
 
     auto db_name = std::make_shared<std::string>("default_db");
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
 
@@ -177,14 +181,12 @@ TEST_F(RepeatReplayTest, append) {
     }
 }
 
-TEST_F(RepeatReplayTest, import) {
+TEST_P(RepeatReplayTest, import) {
     std::shared_ptr<std::string> config_path = RepeatReplayTest::close_ckp_config();
 
     auto db_name = std::make_shared<std::string>("default_db");
-    auto column_def1 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
-    auto column_def2 =
-        std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
+    auto column_def1 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kInteger), "col1", std::set<ConstraintType>());
+    auto column_def2 = std::make_shared<ColumnDef>(0, std::make_shared<DataType>(LogicalType::kVarchar), "col2", std::set<ConstraintType>());
     auto table_name = std::make_shared<std::string>("tb1");
     auto table_def = TableDef::Make(db_name, table_name, {column_def1, column_def2});
 

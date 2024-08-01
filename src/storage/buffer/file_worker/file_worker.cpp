@@ -88,11 +88,9 @@ void FileWorker::ReadFromFile(bool from_spill) {
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
         obj_addr_ = pm->GetObjFromLocalPath(read_path);
-        if (!obj_addr_.Valid()) {
-            String error_message = fmt::format("Failed to find file_path: {} stored object", read_path);
-            UnrecoverableError(error_message);
+        if (obj_addr_.Valid()) {
+            read_path = pm->GetObjCache(read_path);
         }
-        read_path = pm->GetObjCache(read_path);
     }
     SizeT file_size = 0;
     u8 flags = FileFlags::READ_FLAG;
@@ -110,7 +108,7 @@ void FileWorker::ReadFromFile(bool from_spill) {
     DeferFn defer_fn([&]() {
         file_handler_->Close();
         file_handler_ = nullptr;
-        if (use_object_cache) {
+        if (use_object_cache && obj_addr_.Valid()) {
             read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
             pm->PutObjCache(read_path);
         }
