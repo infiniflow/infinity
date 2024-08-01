@@ -17,6 +17,7 @@ module;
 export module memindex_tracer;
 
 import stl;
+import bg_task;
 
 namespace infinity {
 
@@ -34,30 +35,56 @@ export class MemIndexTracer {
 public:
     MemIndexTracer(SizeT index_memory_limit);
 
+    virtual ~MemIndexTracer() = default;
+
     void RegisterMemIndex(BaseMemIndex *memindex);
+
+    void UnregisterMemIndex(BaseMemIndex *memindex);
 
     void AddMemUsed(SizeT usage);
 
+    void DumpDone(SizeT actual_dump_size, int dump_task_id);
+
+    void DumpFail(int dump_task_id);
+
     Vector<MemIndexTracerInfo> GetMemIndexTracerInfo();
 
+    virtual void TriggerDump(UniquePtr<DumpIndexTask> task) = 0;
+
 private:
-    void TriggerDump();
+    UniquePtr<DumpIndexTask> MakeDumpTask();
+
+    using MemIndexMapIter = HashSet<BaseMemIndex *>::iterator;
+
+    static SizeT ChooseDump(const Vector<Pair<MemIndexTracerInfo, MemIndexMapIter>> &info_vec);
 
 private:
     const SizeT index_memory_limit_;
-    Atomic<SizeT> cur_index_memory = 0;
+    Atomic<SizeT> cur_index_memory_ = 0;
 
     std::mutex mtx_;
     HashSet<BaseMemIndex *> memindexes_{};
+
+    i64 dump_task_id_ = 0;
+    HashMap<int, Pair<SizeT, BaseMemIndex *>> proposed_dump_{};
+    Atomic<SizeT> accumulate_dump_size_ = 0;
 };
 
-inline void MemIndexTracer::RegisterMemIndex(BaseMemIndex *memindex) { memindexes_.insert(memindex); }
-
 inline void MemIndexTracer::AddMemUsed(SizeT add) {
-    SizeT old_index_memory = cur_index_memory.fetch_add(add);
-    if (old_index_memory > index_memory_limit_) {
-        TriggerDump();
+    SizeT old_index_memory = cur_index_memory_.fetch_add(add);
+    if (old_index_memory + add > index_memory_limit_) {
+        if (old_index_memory + add > index_memory_limit_ - accumulate_dump_size_.load()) {
+            auto dump_task = MakeDumpTask();
+            TriggerDump(std::move(dump_task));
+        }
     }
 }
+
+export class BGMemIndexTracer : public MemIndexTracer {
+public:
+    BGMemIndexTracer(SizeT index_memory_limit) : MemIndexTracer(index_memory_limit) {}
+
+    void TriggerDump(UniquePtr<DumpIndexTask> task) override;
+};
 
 } // namespace infinity

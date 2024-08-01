@@ -177,7 +177,7 @@ public:
                     bool check_ts,
                     const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
+    SharedPtr<ChunkIndexEntry> Finish(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr) &&;
 
     const AbstractHnsw &get() const { return hnsw_; }
 

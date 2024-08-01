@@ -4472,7 +4472,7 @@ void PhysicalShow::ExecuteShowMemIndex(QueryContext *query_context, ShowOperator
     output_block_ptr->Init(column_types);
     SizeT row_count = 0;
 
-    MemIndexTracer *mem_index_tracer = query_context->storage()->memindex_tracer();
+    BGMemIndexTracer *mem_index_tracer = query_context->storage()->memindex_tracer();
     Vector<MemIndexTracerInfo> mem_index_tracer_info_array = mem_index_tracer->GetMemIndexTracerInfo();
     for (const auto &memindex_tracer_info : mem_index_tracer_info_array) {
         if (output_block_ptr.get() == nullptr) {

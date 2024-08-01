@@ -123,7 +123,7 @@ public:
     void MemIndexCommit();
 
     // Dump or spill the memory indexer
-    SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false);
+    SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false, SizeT *dump_size = nullptr);
 
     void AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn);
 

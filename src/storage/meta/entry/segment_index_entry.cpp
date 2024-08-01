@@ -287,7 +287,6 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             if (memory_hnsw_index_.get() == nullptr) {
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
                 memory_hnsw_index_ = HnswIndexInMem::Make(begin_row_id, index_base.get(), column_def.get(), this, true /*trace*/);
-                InfinityContext::instance().storage()->memindex_tracer()->RegisterMemIndex(memory_hnsw_index_.get());
             }
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
             memory_hnsw_index_->InsertVecs(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
@@ -351,7 +350,7 @@ void SegmentIndexEntry::MemIndexCommit() {
     memory_indexer_->Commit();
 }
 
-SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
+SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *dump_size) {
     SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
     const IndexBase *index_base = table_index_entry_->index_base();
     switch (index_base->index_type_) {
@@ -359,11 +358,13 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill) {
             if (memory_hnsw_index_.get() == nullptr) {
                 break;
             }
-            std::unique_lock lck(rw_locker_);
-            chunk_index_entry = memory_hnsw_index_->Dump(this, buffer_manager_);
+            {
+                std::unique_lock lck(rw_locker_);
+                chunk_index_entry = std::move(*memory_hnsw_index_).Finish(this, buffer_manager_, dump_size);
+                chunk_index_entries_.push_back(chunk_index_entry);
+                memory_hnsw_index_.reset();
+            }
             chunk_index_entry->SaveIndexFile();
-            chunk_index_entries_.push_back(chunk_index_entry);
-            memory_hnsw_index_.reset();
             break;
         }
         case IndexType::kFullText: {
@@ -937,7 +938,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                     }
                 },
                 abstract_hnsw);
-            merged_chunk_index_entry = memory_hnsw_index->Dump(this, buffer_mgr);
+            merged_chunk_index_entry = std::move(*memory_hnsw_index).Finish(this, buffer_mgr);
             break;
         }
         case IndexType::kBMP: {

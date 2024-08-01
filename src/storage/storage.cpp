@@ -59,7 +59,7 @@ void Storage::Init() {
                                             MakeShared<String>(config_ptr_->TempDir()),
                                             config_ptr_->LRUNum());
     buffer_mgr_->Start();
-    memory_index_tracer_ = MakeUnique<MemIndexTracer>(config_ptr_->MemIndexMemoryQuota());
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota());
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,

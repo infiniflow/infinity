@@ -114,7 +114,7 @@ public:
 
     // MemIndexCommit is blocking.
     // Dump or spill the memory indexer
-    SharedPtr<ChunkIndexEntry> MemIndexDump(Txn *txn, TxnIndexStore *txn_index_store, bool spill = false);
+    SharedPtr<ChunkIndexEntry> MemIndexDump(TxnIndexStore *txn_index_store, bool spill = false, SizeT *dump_size = nullptr);
 
     // PopulateEntirely is blocking.
     // Populate index entirely for the segment

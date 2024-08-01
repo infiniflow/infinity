@@ -98,6 +98,11 @@ HnswIndexInMem::~HnswIndexInMem() {
             }
         },
         hnsw_);
+    if (trace_) {
+        auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+        auto *base_memidx = static_cast<BaseMemIndex *>(this);
+        memindex_tracer->UnregisterMemIndex(base_memidx);
+    }
 }
 
 SizeT HnswIndexInMem::GetRowCount() const {
@@ -162,9 +167,10 @@ void HnswIndexInMem::InsertVecs(const SegmentEntry *segment_entry,
         hnsw_);
 }
 
-SharedPtr<ChunkIndexEntry> HnswIndexInMem::Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr) {
+SharedPtr<ChunkIndexEntry> HnswIndexInMem::Finish(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size_ptr) && {
     SizeT row_count = 0;
     SizeT index_size = 0;
+    SizeT dump_size = 0;
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -173,10 +179,17 @@ SharedPtr<ChunkIndexEntry> HnswIndexInMem::Dump(SegmentIndexEntry *segment_index
             } else {
                 row_count = index->GetVecNum();
                 index_size = index->GetSizeInBytes();
+                dump_size = index->mem_usage();
             }
         },
         hnsw_);
     auto new_chunk_indey_entry = segment_index_entry->CreateHnswIndexChunkIndexEntry(begin_row_id_, row_count, buffer_mgr, index_size);
+    if (dump_size_ptr != nullptr) {
+        *dump_size_ptr = dump_size;
+    } else if (trace_) {
+        UnrecoverableError("Dump size ptr is nullptr");
+    }
+    trace_ = false;
 
     BufferHandle handle = new_chunk_indey_entry->GetIndex();
     auto *data_ptr = static_cast<AbstractHnsw *>(handle.GetDataMut());
