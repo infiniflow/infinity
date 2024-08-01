@@ -28,20 +28,18 @@ import third_party;
 namespace infinity {
 
 SharedPtr<CleanupTask> CleanupPeriodicTrigger::CreateCleanupTask() {
+    std::lock_guard lck(mtx_);
     TxnTimeStamp visible_ts = txn_mgr_->GetCleanupScanTS();
-    {
-        std::lock_guard lck(mtx_);
-        if (visible_ts == last_visible_ts_) {
-            LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
-            return nullptr;
-        }
-        if (visible_ts < last_visible_ts_) {
-            UnrecoverableError("The visible timestamp is not monotonic.");
-            return nullptr;
-        }
-        last_visible_ts_ = visible_ts;
-        LOG_DEBUG(fmt::format("Cleanup visible timestamp: {}", visible_ts));
+    if (visible_ts == last_visible_ts_) {
+        LOG_TRACE(fmt::format("Skip cleanup. visible timestamp: {}", visible_ts));
+        return nullptr;
     }
+    if (visible_ts < last_visible_ts_) {
+        UnrecoverableError("The visible timestamp is not monotonic.");
+        return nullptr;
+    }
+    last_visible_ts_ = visible_ts;
+    LOG_DEBUG(fmt::format("Cleanup visible timestamp: {}", visible_ts));
 
     auto buffer_mgr = txn_mgr_->GetBufferMgr();
     return MakeShared<CleanupTask>(catalog_, visible_ts, buffer_mgr);

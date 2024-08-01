@@ -887,7 +887,7 @@ static const yytype_int16 yyrline[] =
     3076,  3082,  3088,  3094,  3100,  3106,  3112,  3118,  3129,  3133,
     3138,  3168,  3178,  3183,  3188,  3193,  3199,  3203,  3204,  3206,
     3207,  3209,  3210,  3222,  3230,  3234,  3237,  3241,  3244,  3248,
-    3252,  3257,  3263,  3273,  3280,  3291,  3295,  3303,  3355
+    3252,  3257,  3263,  3273,  3280,  3291,  3295,  3303,  3357
 };
 #endif
 
@@ -8072,6 +8072,8 @@ Return2:
         index_type = infinity::IndexType::kIVFFlat;
     } else if (strcmp((yyvsp[-1].str_value), "emvb") == 0) {
         index_type = infinity::IndexType::kEMVB;
+    } else if(strcmp((yyvsp[-1].str_value), "diskann") == 0){
+        index_type = infinity::IndexType::kDiskAnn;
     } else {
         free((yyvsp[-1].str_value));
         delete (yyvsp[-4].identifier_array_t);
@@ -8111,11 +8113,11 @@ Return2:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 8115 "parser.cpp"
+#line 8117 "parser.cpp"
     break;
 
   case 458: /* index_info_list_one_pack: '(' identifier_array ')'  */
-#line 3355 "parser.y"
+#line 3357 "parser.y"
                            {
     infinity::IndexType index_type = infinity::IndexType::kSecondary;
     size_t index_count = (yyvsp[-1].identifier_array_t)->size();
@@ -8129,11 +8131,11 @@ Return2:
     }
     delete (yyvsp[-1].identifier_array_t);
 }
-#line 8133 "parser.cpp"
+#line 8135 "parser.cpp"
     break;
 
 
-#line 8137 "parser.cpp"
+#line 8139 "parser.cpp"
 
       default: break;
     }
@@ -8362,7 +8364,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 3369 "parser.y"
+#line 3371 "parser.y"
 
 
 void

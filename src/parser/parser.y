@@ -3313,6 +3313,8 @@ index_info_list_one_pack : '(' identifier_array ')' USING IDENTIFIER with_index_
         index_type = infinity::IndexType::kIVFFlat;
     } else if (strcmp($5, "emvb") == 0) {
         index_type = infinity::IndexType::kEMVB;
+    } else if(strcmp($5, "diskann") == 0){
+        index_type = infinity::IndexType::kDiskAnn;
     } else {
         free($5);
         delete $2;

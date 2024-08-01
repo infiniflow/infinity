@@ -7,18 +7,25 @@ from infinity.common import ConflictType, InfinityException
 
 from internal.utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
     generate_commas_enwiki
+from http_adapter import http_adapter
 
 @pytest.fixture(scope="class")
 def local_infinity(request):
     return request.config.getoption("--local-infinity")
+
 @pytest.fixture(scope="class")
-def setup_class(request, local_infinity):
+def http(request):
+    return request.config.getoption("--http")
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
     if local_infinity:
         uri = common_values.TEST_LOCAL_PATH
     else:
         uri = common_values.TEST_LOCAL_HOST
     request.cls.uri = uri
     request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
     yield
     request.cls.infinity_obj.disconnect()
 
@@ -303,6 +310,7 @@ class TestInfinity:
         print(res)
         db_obj.drop_table("test_import_embedding_with_not_match_definition", ConflictType.Error)
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("types", [pytest.param("vector, 3, bool"),
@@ -445,6 +453,7 @@ class TestInfinity:
         print(res)
         db_obj.drop_table("test_import_exceeding_columns", ConflictType.Error)
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "test_default.jsonl",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_jsonl_file_with_default(self, check_data):
@@ -481,6 +490,7 @@ class TestInfinity:
         print(res)
         db_obj.drop_table("test_import_jsonl_file_with_default", ConflictType.Error)
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_import_default.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_csv_file_with_default(self, check_data):
@@ -513,6 +523,7 @@ class TestInfinity:
         print(res)
         db_obj.drop_table("test_import_csv_file_with_default", ConflictType.Error)
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_default.json",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_json_file_with_default(self, check_data):

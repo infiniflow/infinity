@@ -4,17 +4,21 @@ from sqlglot import condition
 from infinity.remote_thrift.table import traverse_conditions
 import infinity
 from infinity.errors import ErrorCode
+from http_adapter import http_adapter
 
 
 @pytest.mark.usefixtures("local_infinity")
+@pytest.mark.usefixtures("http")
 class TestInfinity:
     @pytest.fixture(autouse=True)
-    def setup(self, local_infinity):
+    def setup(self, local_infinity, http):
         if local_infinity:
             self.uri = common_values.TEST_LOCAL_PATH
         else:
             self.uri = common_values.TEST_LOCAL_HOST
         self.infinity_obj = infinity.connect(self.uri)
+        if http:
+            self.infinity_obj = http_adapter()
         assert self.infinity_obj
 
     def teardown(self):

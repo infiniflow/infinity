@@ -1592,6 +1592,8 @@ IndexType InfinityThriftService::GetIndexTypeFromProto(const infinity_thrift_rpc
             return IndexType::kEMVB;
         case infinity_thrift_rpc::IndexType::BMP:
             return IndexType::kBMP;
+        case infinity_thrift_rpc::IndexType::DiskAnn:
+            return IndexType::kDiskAnn;
         default:
             return IndexType::kInvalid;
     }
