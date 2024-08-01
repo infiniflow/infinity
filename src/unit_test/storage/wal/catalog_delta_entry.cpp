@@ -34,6 +34,9 @@ using namespace infinity;
 class CatalogDeltaEntryTest : public BaseTestParamStr {
 public:
     void SetUp() override {
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
         config_path_ = GetParam();
         SharedPtr<String> config_path =
             config_path_ == BaseTestParamStr::NULL_CONFIG_PATH ? nullptr : MakeShared<String>(std::string("test/data") + config_path_);

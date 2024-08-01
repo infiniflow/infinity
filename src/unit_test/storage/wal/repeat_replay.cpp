@@ -55,7 +55,12 @@ protected:
                    : std::make_shared<std::string>(std::string(test_data_path()) + "/config/vfs/test_close_ckp.toml");
     }
 
-    void SetUp() override { RemoveDbDirs(); }
+    void SetUp() override {
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        RemoveDbDirs();
+    }
 
     void TearDown() override { RemoveDbDirs(); }
 };
