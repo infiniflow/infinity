@@ -532,4 +532,8 @@ Status Status::DuplicateEntry() { return Status(ErrorCode::kDuplicateEntry, Make
 
 Status Status::EmptyEntryList() { return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>("Empty entry list")); }
 
+Status Status::NoWALEntryFound(const String& file_name, i64 index) {
+    return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>(fmt::format("No WAL entry: {} found in WAL file: {}", index, file_name)));
+}
+
 } // namespace infinity

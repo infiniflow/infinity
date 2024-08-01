@@ -2186,7 +2186,7 @@ admin_statement: ADMIN SHOW CATALOGS {
 }
 | ADMIN SHOW LOG LONG_VALUE INDEX LONG_VALUE {
      $$ = new infinity::AdminStatement();
-     $$->admin_type_ = infinity::AdminStmtType::kListLogIndexes;
+     $$->admin_type_ = infinity::AdminStmtType::kShowLogIndex;
      $$->log_file_index_ = $4;
      $$->log_index_in_file_ = $6;
 }

@@ -6288,7 +6288,7 @@ yyreduce:
 #line 2187 "parser.y"
                                              {
      (yyval.admin_stmt) = new infinity::AdminStatement();
-     (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kListLogIndexes;
+     (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kShowLogIndex;
      (yyval.admin_stmt)->log_file_index_ = (yyvsp[-2].long_value);
      (yyval.admin_stmt)->log_index_in_file_ = (yyvsp[0].long_value);
 }

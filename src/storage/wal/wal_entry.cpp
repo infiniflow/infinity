@@ -895,6 +895,121 @@ String WalCmdDumpIndex::ToString() const {
     return ss.str();
 }
 
+String WalCmdCreateDatabase::CompactInfo() const {
+    return fmt::format("{}: database: {}, dir: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, db_dir_tail_);
+}
+
+String WalCmdDropDatabase::CompactInfo() const { return fmt::format("{}: database: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_); }
+
+String WalCmdCreateTable::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, dir: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_def_->ToString(),
+                       table_dir_tail_);
+}
+
+String WalCmdDropTable::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, table_name_);
+}
+
+String WalCmdCreateIndex::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, index: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       index_base_->ToString());
+}
+
+String WalCmdDropIndex::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, index: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, table_name_, index_name_);
+}
+
+String WalCmdImport::CompactInfo() const {
+    auto &segment_info = segment_info_;
+    return fmt::format("{}: database: {}, table: {}, segment: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       segment_info.ToString());
+}
+
+String WalCmdAppend::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, block: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       block_->ToBriefString());
+}
+
+String WalCmdDelete::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, deleted: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, table_name_, row_ids_.size());
+}
+
+String WalCmdSetSegmentStatusSealed::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, segment: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, table_name_, segment_id_);
+}
+
+String WalCmdUpdateSegmentBloomFilterData::CompactInfo() const {
+    return fmt::format("{}: database: {}, table: {}, segment: {}", WalCmd::WalCommandTypeToString(GetType()), db_name_, table_name_, segment_id_);
+}
+
+String WalCmdCheckpoint::CompactInfo() const {
+    return fmt::format("{}: path: {}, max_commit_ts: {}, full_checkpoint: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       fmt::format("{}/{}", catalog_path_, catalog_name_),
+                       max_commit_ts_,
+                       is_full_checkpoint_);
+}
+
+String WalCmdCompact::CompactInfo() const {
+    std::stringstream ss;
+    ss << WalCmd::WalCommandTypeToString(GetType()) << ": ";
+    ss << "database: " << db_name_;
+    ss << "table: " << table_name_ << std::endl;
+    ss << "deprecated segment: ";
+    for (SegmentID segment_id : deprecated_segment_ids_) {
+        ss << segment_id << " | ";
+    }
+    ss << std::endl;
+    ss << "new segment: ";
+    for (auto &new_seg_info : new_segment_infos_) {
+        ss << new_seg_info.ToString() << " | ";
+    }
+    ss << std::endl;
+    return String();
+}
+
+String WalCmdOptimize::CompactInfo() const {
+    std::stringstream ss;
+    for (auto &param_ptr : params_) {
+        ss << param_ptr->ToString() << " | ";
+    }
+    return fmt::format("{}: database: {}, table: {}, index: {}, parameter: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       index_name_,
+                       ss.str());
+}
+
+String WalCmdDumpIndex::CompactInfo() const {
+    std::stringstream ss;
+    for (auto &chunk_info : chunk_infos_) {
+        ss << chunk_info.ToString() << " | ";
+    }
+
+    return fmt::format("{}: database: {}, table: {}, index: {}, segment: {}, parameter: {}",
+                       WalCmd::WalCommandTypeToString(GetType()),
+                       db_name_,
+                       table_name_,
+                       index_name_,
+                       segment_id_,
+                       ss.str());
+
+    return ss.str();
+}
+
 bool WalEntry::operator==(const WalEntry &other) const {
     if (this->txn_id_ != other.txn_id_ || this->commit_ts_ != other.commit_ts_ || this->cmds_.size() != other.cmds_.size()) {
         return false;
@@ -1057,6 +1172,19 @@ String WalEntry::ToString() const {
     return ss.str();
 }
 
+String WalEntry::CompactInfo() const {
+    std::stringstream ss;
+    SizeT cmd_size = cmds_.size();
+    for(SizeT idx = 0; idx < cmd_size - 1; ++ idx) {
+        auto& cmd = cmds_[idx];
+        ss << cmd->CompactInfo() << std::endl;
+    }
+    if(cmds_.size() > 0) {
+        ss << cmds_.back()->CompactInfo();
+    }
+    return ss.str();
+}
+
 String WalCmd::WalCommandTypeToString(WalCommandType type) {
     String command{};
     switch (type) {
@@ -1162,20 +1290,31 @@ SharedPtr<WalEntry> WalEntryIterator::Next() {
     }
 }
 
+SharedPtr<WalEntry> WalEntryIterator::GetEntryByIndex(i64 index) {
+    i64 count = 0;
+    while (HasNext()) {
+        if (count == index) {
+            return Next();
+        } else {
+            Next();
+        }
+        ++count;
+    }
+    return nullptr;
+}
+
 Vector<SharedPtr<WalEntry>> WalEntryIterator::GetAllEntries() {
     Vector<SharedPtr<WalEntry>> entries;
-    while(HasNext()) {
+    while (HasNext()) {
         entries.emplace_back(Next());
     }
-    if(is_backward_) {
+    if (is_backward_) {
         std::reverse(entries.begin(), entries.end());
     }
     return entries;
 }
 
-bool WalEntryIterator::IsGood() const {
-    return (is_backward_ && off_ == 0) || (!is_backward_ && off_ == buf_.size());
-}
+bool WalEntryIterator::IsGood() const { return (is_backward_ && off_ == 0) || (!is_backward_ && off_ == buf_.size()); }
 
 WalListIterator::WalListIterator(const Vector<String> &wal_list) {
     assert(!wal_list.empty());

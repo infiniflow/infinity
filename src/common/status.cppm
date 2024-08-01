@@ -169,6 +169,7 @@ export enum class ErrorCode : long {
     kDuplicateEntry = 8002,
     kNotFoundEntry = 8003,
     kEmptyEntryList = 8004,
+    kNoWALEntryFound = 8005,
 };
 
 export class Status {
@@ -315,6 +316,7 @@ public:
     static Status NotFoundEntry();
     static Status DuplicateEntry();
     static Status EmptyEntryList();
+    static Status NoWALEntryFound(const String& file_name, i64 index);
 
 public:
     Status() = default;
