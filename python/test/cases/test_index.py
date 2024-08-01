@@ -28,6 +28,9 @@ class TestInfinity:
     def test_create_index_HNSW(self):
         self.test_infinity_obj._test_create_index_HNSW()
 
+    def test_create_index_DiskAnn(self):
+        self.test_infinity_obj._test_create_index_DiskAnn()
+
     @pytest.mark.parametrize("block_size", [8, 128])
     @pytest.mark.parametrize("compress_type", ["compress", "raww"])
     def test_create_index_BMP(self, block_size, compress_type):
@@ -58,7 +61,8 @@ class TestInfinity:
         ((1, 2), False),
         ({"1": 2}, False),
         (index.IndexType.Hnsw, False),
-        (index.IndexType.IVFFlat, True)
+        (index.IndexType.IVFFlat, True),
+        (index.IndexType.DiskAnn, False)
     ])
     @pytest.mark.parametrize("params", [
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((1, 2), False), ({"1": 2}, False),
@@ -105,7 +109,8 @@ class TestInfinity:
     @pytest.mark.parametrize("index_type", [
         (index.IndexType.Hnsw, False, ErrorCode.INVALID_INDEX_PARAM),
         (index.IndexType.IVFFlat, True),
-        (index.IndexType.FullText, False, ErrorCode.INVALID_INDEX_DEFINITION)
+        (index.IndexType.FullText, False, ErrorCode.INVALID_INDEX_DEFINITION),
+        (index.IndexType.DiskAnn, False, ErrorCode.INVALID_INDEX_PARAM)
     ])
     def test_create_index_on_different_type_of_column(self, types, index_type):
         self.test_infinity_obj._test_create_index_on_different_type_of_column(types, index_type)
