@@ -617,8 +617,15 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"plain"`: (Default) Plain encoding. 
       - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
   - Parameter settings for an EMVB index: 
-    - `"pq_subspace_num"`: *Required* - Recommended: "32". 
-    - `"pq_subspace_bits"`: *Required* - Recommended: "8". 
+    - `"pq_subspace_num"`: *Required*
+      - `"8"` 
+      - `"16"` (recommended) 
+      - `"32"` (recommended) 
+      - `"64"`
+      - `"128"`
+    - `"pq_subspace_bits"`: *Required*
+      - `"8"` (Recommended)
+      - `"16"`
   - Parameter settings for a full text index: 
     - `"ANALYZER"`: *Optional* - Defaults to `"standard"`
   - Parameter settings for an IVFFlat index:  
@@ -691,6 +698,7 @@ table_obj.create_index(
 ```
 
 ```python
+from infinity.index import IndexType
 # Create a table named "test_index_hnsw" with a vector column "c1"
 table_obj = db_obj.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an HNSW index named "my_index" on column "c1"
@@ -713,26 +721,40 @@ table_obj.create_index(
 ```
 
 ```python
+from infinity.index import IndexType
 # Create a table named "test_index_fulltext" with a vector column "c1"
 table_obj = db_obj.create_table("test_index_fulltext", {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}}, None)
 # Create a full-text index named "my_index" on column "c1"
-table_obj.create_index("my_index",
-                             [index.IndexInfo("body", IndexType.FullText, []),
-                              index.IndexInfo("doctitle", IndexType.FullText, []),
-                              index.IndexInfo("docdate", IndexType.FullText, []),
-                              ], None)
+table_obj.create_index(
+    "my_index",
+    [
+        index.IndexInfo("body", IndexType.FullText, []),
+        index.IndexInfo("doctitle", IndexType.FullText, []),
+        index.IndexInfo("docdate", IndexType.FullText, []),
+    ],
+    None
+)
 ```
 
 ```python
+from infinity.index import IndexType
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
 table_obj = db_obj.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
 # Create a BMP index named "my_index" on column "c1"
-table_obj.create_index("my_index",
-                             [index.IndexInfo("c1", IndexType.BMP,
-                              [
-                                  index.InitParameter("block_size", "16"),
-                                  index.InitParameter("compress_type", "compress")
-                              ])], None)
+table_obj.create_index(
+    "my_index",
+    [
+        index.IndexInfo(
+            "c1",
+            IndexType.BMP,
+            [
+                index.InitParameter("block_size", "16"),
+                index.InitParameter("compress_type", "compress")
+            ]
+        )
+    ],
+    None
+)
 ```
 
 ---
