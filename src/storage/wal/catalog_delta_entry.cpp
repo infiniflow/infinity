@@ -102,7 +102,7 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->WriteBuf(buf, GetFilePaths());
+        pm->WriteBufAdv(buf, GetFilePaths());
     }
 }
 
@@ -116,7 +116,7 @@ void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->ReadBuf(ptr);
+        pm->ReadBufAdv(ptr);
     }
 }
 

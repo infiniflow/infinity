@@ -42,16 +42,16 @@ void ObjAddr::Deserialize(const nlohmann::json &obj) {
     part_size_ = obj["part_size"];
 }
 
-void ObjAddr::WriteBuf(char *&buf) const {
-    WriteBufAdv<String>(buf, obj_key_);
-    WriteBufAdv<SizeT>(buf, part_offset_);
-    WriteBufAdv<SizeT>(buf, part_size_);
+void ObjAddr::WriteBufAdv(char *&buf) const {
+    ::infinity::WriteBufAdv(buf, obj_key_);
+    ::infinity::WriteBufAdv(buf, part_offset_);
+    ::infinity::WriteBufAdv(buf, part_size_);
 }
 
-void ObjAddr::ReadBuf(char *&buf) {
-    obj_key_ = ReadBufAdv<String>(buf);
-    part_offset_ = ReadBufAdv<SizeT>(buf);
-    part_size_ = ReadBufAdv<SizeT>(buf);
+void ObjAddr::ReadBufAdv(char *&buf) {
+    obj_key_ = ::infinity::ReadBufAdv<String>(buf);
+    part_offset_ = ::infinity::ReadBufAdv<SizeT>(buf);
+    part_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
 }
 
 nlohmann::json ObjStat::Serialize() const {
@@ -93,26 +93,26 @@ void ObjStat::Deserialize(const nlohmann::json &obj) {
     }
 }
 
-void ObjStat::WriteBuf(char *&buf) const {
-    WriteBufAdv<SizeT>(buf, obj_size_);
-    WriteBufAdv<SizeT>(buf, deleted_size_);
-    WriteBufAdv<SizeT>(buf, deleted_ranges_.size());
+void ObjStat::WriteBufAdv(char *&buf) const {
+    ::infinity::WriteBufAdv(buf, obj_size_);
+    ::infinity::WriteBufAdv(buf, deleted_size_);
+    ::infinity::WriteBufAdv(buf, deleted_ranges_.size());
     for (auto &range : deleted_ranges_) {
-        WriteBufAdv<SizeT>(buf, range.start_);
-        WriteBufAdv<SizeT>(buf, range.end_);
+        ::infinity::WriteBufAdv(buf, range.start_);
+        ::infinity::WriteBufAdv(buf, range.end_);
     }
 }
 
-void ObjStat::ReadBuf(char *&buf) {
-    obj_size_ = ReadBufAdv<SizeT>(buf);
+void ObjStat::ReadBufAdv(char *&buf) {
+    obj_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
     ref_count_ = 0;
-    deleted_size_ = ReadBufAdv<SizeT>(buf);
+    deleted_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
 
     SizeT start, end;
-    SizeT len = ReadBufAdv<SizeT>(buf);
+    SizeT len = ::infinity::ReadBufAdv<SizeT>(buf);
     for (SizeT i = 0; i < len; ++i) {
-        start = ReadBufAdv<SizeT>(buf);
-        end = ReadBufAdv<SizeT>(buf);
+        start = ::infinity::ReadBufAdv<SizeT>(buf);
+        end = ::infinity::ReadBufAdv<SizeT>(buf);
         deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
     }
 }
@@ -143,7 +143,6 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
             String error_message = fmt::format("Failed to find local path of {}", local_path);
             UnrecoverableError(error_message);
         }
-        // assert(local_path_obj_.count(local_path) == 0);
         local_path_obj_[local_path] = obj_addr;
         return obj_addr;
     } else {
@@ -159,7 +158,6 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
             String error_message = fmt::format("Failed to find local path of {}", local_path);
             UnrecoverableError(error_message);
         }
-        // assert(local_path_obj_.count(local_path) == 0);
         local_path_obj_[local_path] = obj_addr;
         return obj_addr;
     }
@@ -236,8 +234,6 @@ String PersistenceManager::GetObjCache(const String &file_path) {
     }
     auto oit = objects_.find(it->second.obj_key_);
     if (oit != objects_.end()) {
-        // String error_message = fmt::format("Failed to find object {}", it->second.obj_key_);
-        // UnrecoverableError(error_message);
         oit->second.ref_count_++;
     }
     return fs::path(workspace_).append(it->second.obj_key_).string();
@@ -253,8 +249,6 @@ ObjAddr PersistenceManager::GetObjFromLocalPath(const String &file_path) {
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {
-        // String error_message = fmt::format("Failed to find file_path: {} stored object", local_path);
-        // UnrecoverableError(error_message);
         return ObjAddr();
     }
     return it->second;
@@ -275,8 +269,6 @@ void PersistenceManager::PutObjCache(const String &file_path) {
     }
     auto oit = objects_.find(it->second.obj_key_);
     if (oit == objects_.end()) {
-        // String error_message = fmt::format("Failed to find object {}", it->second.obj_key_);
-        // UnrecoverableError(error_message);
         return;
     }
     oit->second.ref_count_--;
@@ -311,7 +303,6 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
         String error_message = fmt::format("Failed to find local path of {}", local_path);
         UnrecoverableError(error_message);
     }
-    // assert(local_path_obj_.count(local_path) == 0);
     local_path_obj_[local_path] = obj_addr;
     return obj_addr;
 }
@@ -486,30 +477,30 @@ void PersistenceManager::Deserialize(const nlohmann::json &obj) {
     }
 }
 
-void PersistenceManager::WriteBuf(char *&buf, const Vector<String> &local_paths) {
-    WriteBufAdv(buf, local_paths.size());
+void PersistenceManager::WriteBufAdv(char *&buf, const Vector<String> &local_paths) {
+    ::infinity::WriteBufAdv(buf, local_paths.size());
     for (auto &path : local_paths) {
         ObjAddr obj_addr = GetObjFromLocalPath(path);
-        WriteBufAdv(buf, path);
-        obj_addr.WriteBuf(buf);
+        ::infinity::WriteBufAdv(buf, path);
+        obj_addr.WriteBufAdv(buf);
         if (!obj_addr.Valid()) {
             ObjStat invalid_stat;
-            invalid_stat.WriteBuf(buf);
+            invalid_stat.WriteBufAdv(buf);
         } else {
             ObjStat obj_stat = GetObjStatByObjAddr(obj_addr);
-            obj_stat.WriteBuf(buf);
+            obj_stat.WriteBufAdv(buf);
         }
     }
 }
 
-void PersistenceManager::ReadBuf(char *&buf) {
-    SizeT size = ReadBufAdv<SizeT>(buf);
+void PersistenceManager::ReadBufAdv(char *&buf) {
+    SizeT size = ::infinity::ReadBufAdv<SizeT>(buf);
     for (SizeT i = 0; i < size; ++i) {
-        String path = ReadBufAdv<String>(buf);
+        String path = ::infinity::ReadBufAdv<String>(buf);
         ObjAddr obj_addr;
         ObjStat obj_stat;
-        obj_addr.ReadBuf(buf);
-        obj_stat.ReadBuf(buf);
+        obj_addr.ReadBufAdv(buf);
+        obj_stat.ReadBufAdv(buf);
         SaveLocalPath(path, obj_addr);
         SaveObjStat(obj_addr, obj_stat);
     }

@@ -34,9 +34,9 @@ export struct ObjAddr {
 
     void Deserialize(const nlohmann::json &obj);
 
-    void WriteBuf(char *&buf) const;
+    void WriteBufAdv(char *&buf) const;
 
-    void ReadBuf(char *&buf);
+    void ReadBufAdv(char *&buf);
 };
 
 export struct Range {
@@ -61,9 +61,9 @@ export struct ObjStat {
 
     void Deserialize(const nlohmann::json &obj);
 
-    void WriteBuf(char *&buf) const;
+    void WriteBufAdv(char *&buf) const;
 
-    void ReadBuf(char *&buf);
+    void ReadBufAdv(char *&buf);
 };
 
 export class PersistenceManager {
@@ -101,9 +101,9 @@ public:
 
     void Deserialize(const nlohmann::json &obj);
 
-    void WriteBuf(char *&buf, const Vector<String> &local_paths);
+    void WriteBufAdv(char *&buf, const Vector<String> &local_paths);
 
-    void ReadBuf(char *&buf);
+    void ReadBufAdv(char *&buf);
 
     SizeT GetSizeInBytes(const Vector<String> &local_paths);
 

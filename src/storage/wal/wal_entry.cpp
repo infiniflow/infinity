@@ -96,7 +96,7 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->WriteBuf(buf, paths_);
+        pm->WriteBufAdv(buf, paths_);
     }
 }
 
@@ -120,7 +120,7 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->ReadBuf(ptr);
+        pm->ReadBufAdv(ptr);
     }
     return block_info;
 }
@@ -259,7 +259,7 @@ void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->WriteBuf(buf, paths_);
+        pm->WriteBufAdv(buf, paths_);
     }
 }
 
@@ -274,7 +274,7 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->ReadBuf(ptr);
+        pm->ReadBufAdv(ptr);
     }
     return chunk_index_info;
 }
