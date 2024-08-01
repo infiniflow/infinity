@@ -170,6 +170,7 @@ export enum class ErrorCode : long {
     kNotFoundEntry = 8003,
     kEmptyEntryList = 8004,
     kNoWALEntryFound = 8005,
+    kWrongCheckpointType = 8006,
 };
 
 export class Status {
@@ -317,6 +318,7 @@ public:
     static Status DuplicateEntry();
     static Status EmptyEntryList();
     static Status NoWALEntryFound(const String& file_name, i64 index);
+    static Status WrongCheckpointType(const String& expect_type, const String& actual_type);
 
 public:
     Status() = default;

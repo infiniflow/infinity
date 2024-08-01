@@ -2063,112 +2063,126 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->admin_type_ = infinity::AdminStmtType::kShowCatalog;
      $$->catalog_file_index_ = $4;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASES {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASES {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListDatabases;
-     $$->catalog_file_index_ = $4;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowDatabase;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLES {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLES {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListTables;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowTable;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
-     $$->table_index_ = $8;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
+     $$->table_index_ = $9;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENTS {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENTS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListSegments;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
-     $$->table_index_ = $8;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
+     $$->table_index_ = $9;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENT LONG_VALUE {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENT LONG_VALUE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowSegment;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
-     $$->table_index_ = $8;
-     $$->segment_index_ = $10;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
+     $$->table_index_ = $9;
+     $$->segment_index_ = $11;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENT LONG_VALUE BLOCKS {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENT LONG_VALUE BLOCKS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListBlocks;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
-     $$->table_index_ = $8;
-     $$->segment_index_ = $10;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
+     $$->table_index_ = $9;
+     $$->segment_index_ = $11;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENT LONG_VALUE BLOCK LONG_VALUE {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENT LONG_VALUE BLOCK LONG_VALUE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowBlock;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
-     $$->table_index_ = $8;
-     $$->segment_index_ = $10;
-     $$->block_index_ = $12;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
+     $$->table_index_ = $9;
+     $$->segment_index_ = $11;
+     $$->block_index_ = $13;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENT LONG_VALUE BLOCK LONG_VALUE COLUMNS {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENT LONG_VALUE BLOCK LONG_VALUE COLUMNS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListColumns;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
-     $$->table_index_ = $8;
-     $$->segment_index_ = $10;
-     $$->block_index_ = $12;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
+     $$->table_index_ = $9;
+     $$->segment_index_ = $11;
+     $$->block_index_ = $13;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENT LONG_VALUE BLOCK LONG_VALUE COLUMN LONG_VALUE {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE SEGMENT LONG_VALUE BLOCK LONG_VALUE COLUMN LONG_VALUE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowColumn;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
-     $$->table_index_ = $8;
-     $$->segment_index_ = $10;
-     $$->block_index_ = $12;
-     $$->column_index_ = $14;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
+     $$->table_index_ = $9;
+     $$->segment_index_ = $11;
+     $$->block_index_ = $13;
+     $$->column_index_ = $15;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE INDEXES {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE INDEXES {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListIndexes;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
-     $$->table_index_ = $8;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
+     $$->table_index_ = $9;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE INDEX LONG_VALUE {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE INDEX LONG_VALUE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowIndex;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
-     $$->table_index_ = $8;
-     $$->index_index_ = $10;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
+     $$->table_index_ = $9;
+     $$->index_index_ = $11;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE INDEX LONG_VALUE SEGMENTS {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE INDEX LONG_VALUE SEGMENTS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListIndexSegments;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
-     $$->table_index_ = $8;
-     $$->index_index_ = $10;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
+     $$->table_index_ = $9;
+     $$->index_index_ = $11;
 }
-| ADMIN SHOW CATALOG LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE INDEX LONG_VALUE SEGMENT LONG_VALUE {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE TABLE LONG_VALUE INDEX LONG_VALUE SEGMENT LONG_VALUE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowIndexSegment;
-     $$->catalog_file_index_ = $4;
-     $$->database_index_ = $6;
-     $$->table_index_ = $8;
-     $$->index_index_ = $10;
-     $$->segment_index_ = $12;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_index_ = $7;
+     $$->table_index_ = $9;
+     $$->index_index_ = $11;
+     $$->segment_index_ = $13;
 }
 | ADMIN SHOW LOGS {
      $$ = new infinity::AdminStatement();

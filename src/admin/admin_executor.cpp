@@ -36,12 +36,15 @@ import value_expression;
 import logical_node;
 import local_file_system;
 import wal_entry;
+import buffer_manager;
+import catalog;
+import db_meta;
 
 namespace infinity {
 
-QueryResult AdminExecutor::Execute(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::Execute(QueryContext *query_context, const AdminStatement *admin_statement) {
 
-    switch(admin_statement->admin_type_) {
+    switch (admin_statement->admin_type_) {
 
         case AdminStmtType::kListLogFiles: {
             return ListLogFiles(query_context, admin_statement);
@@ -112,7 +115,7 @@ QueryResult AdminExecutor::Execute(QueryContext* query_context, const AdminState
     }
 }
 
-QueryResult AdminExecutor::ListLogFiles(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ListLogFiles(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -161,7 +164,7 @@ QueryResult AdminExecutor::ListLogFiles(QueryContext* query_context, const Admin
         value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
     }
 
-    ++ row_count;
+    ++row_count;
 
     for (const auto &wal_info : wal_infos) {
         if (output_block_ptr.get() == nullptr) {
@@ -190,7 +193,7 @@ QueryResult AdminExecutor::ListLogFiles(QueryContext* query_context, const Admin
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
 
-        ++ row_count;
+        ++row_count;
         if (row_count % output_block_ptr->capacity() == 0) {
             output_block_ptr->Finalize();
             query_result.result_table_->Append(std::move(output_block_ptr));
@@ -203,7 +206,7 @@ QueryResult AdminExecutor::ListLogFiles(QueryContext* query_context, const Admin
     return query_result;
 }
 
-QueryResult AdminExecutor::ShowLogFile(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ShowLogFile(QueryContext *query_context, const AdminStatement *admin_statement) {
 
     QueryResult query_result;
 
@@ -231,7 +234,7 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext* query_context, const AdminS
 
     i64 file_index = admin_statement->log_file_index_.value();
     String file_path;
-    if(file_index == 0) {
+    if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
         file_path = wal_infos[file_index - 1].path_;
@@ -300,7 +303,7 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext* query_context, const AdminS
 
         ++column_id;
         {
-            Value value = Value::MakeVarchar(is_wal_good ? "good": "bad");
+            Value value = Value::MakeVarchar(is_wal_good ? "good" : "bad");
             ValueExpression value_expr(value);
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
@@ -327,13 +330,13 @@ QueryResult AdminExecutor::ShowLogFile(QueryContext* query_context, const AdminS
     return query_result;
 }
 
-QueryResult AdminExecutor::ListLogIndexes(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ListLogIndexes(QueryContext *query_context, const AdminStatement *admin_statement) {
     String wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
 
     i64 file_index = admin_statement->log_file_index_.value();
     String file_path;
-    if(file_index == 0) {
+    if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
         file_path = wal_infos[file_index - 1].path_;
@@ -418,7 +421,7 @@ QueryResult AdminExecutor::ListLogIndexes(QueryContext* query_context, const Adm
             value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
         }
 
-        ++ row_count;
+        ++row_count;
         if (row_count % output_block_ptr->capacity() == 0) {
             output_block_ptr->Finalize();
             query_result.result_table_->Append(std::move(output_block_ptr));
@@ -431,7 +434,7 @@ QueryResult AdminExecutor::ListLogIndexes(QueryContext* query_context, const Adm
     return query_result;
 }
 
-QueryResult AdminExecutor::ShowLogIndex(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ShowLogIndex(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
 
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -461,7 +464,7 @@ QueryResult AdminExecutor::ShowLogIndex(QueryContext* query_context, const Admin
 
     i64 file_index = admin_statement->log_file_index_.value();
     String file_path;
-    if(file_index == 0) {
+    if (file_index == 0) {
         file_path = temp_wal_info->path_;
     } else {
         file_path = wal_infos[file_index - 1].path_;
@@ -470,7 +473,7 @@ QueryResult AdminExecutor::ShowLogIndex(QueryContext* query_context, const Admin
     UniquePtr<WalEntryIterator> wal_iterator = WalEntryIterator::Make(file_path, false);
     i64 log_index_in_file = admin_statement->log_index_in_file_.value();
     SharedPtr<WalEntry> wal_entry = wal_iterator->GetEntryByIndex(log_index_in_file);
-    if(wal_entry == nullptr) {
+    if (wal_entry == nullptr) {
         query_result.result_table_ = nullptr;
         query_result.status_ = Status::NoWALEntryFound(file_path, log_index_in_file);
         return query_result;
@@ -503,7 +506,7 @@ QueryResult AdminExecutor::ShowLogIndex(QueryContext* query_context, const Admin
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
 
-        ++ row_count;
+        ++row_count;
         if (row_count % output_block_ptr->capacity() == 0) {
             output_block_ptr->Finalize();
             query_result.result_table_->Append(std::move(output_block_ptr));
@@ -516,13 +519,11 @@ QueryResult AdminExecutor::ShowLogIndex(QueryContext* query_context, const Admin
     return query_result;
 }
 
-Vector<SharedPtr<WalEntry>> AdminExecutor::GetAllCheckpointEntries(QueryContext* query_context, const AdminStatement* admin_statement) {
+Vector<SharedPtr<WalEntry>> AdminExecutor::GetAllCheckpointEntries(QueryContext *query_context, const AdminStatement *admin_statement) {
     String wal_dir = query_context->storage()->wal_manager()->wal_dir();
     auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
     if (!wal_infos.empty()) {
-        std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
-            return a.max_commit_ts_ > b.max_commit_ts_;
-        });
+        std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) { return a.max_commit_ts_ > b.max_commit_ts_; });
     }
     Vector<String> wal_list;
     if (temp_wal_info.has_value()) {
@@ -551,7 +552,7 @@ Vector<SharedPtr<WalEntry>> AdminExecutor::GetAllCheckpointEntries(QueryContext*
     return checkpoint_entries;
 }
 
-QueryResult AdminExecutor::ListCatalogs(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ListCatalogs(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
 
     auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
@@ -570,7 +571,7 @@ QueryResult AdminExecutor::ListCatalogs(QueryContext* query_context, const Admin
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
     Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
-    if(checkpoint_entries.empty()) {
+    if (checkpoint_entries.empty()) {
         return query_result;
     }
 
@@ -588,7 +589,7 @@ QueryResult AdminExecutor::ListCatalogs(QueryContext* query_context, const Admin
     SizeT row_count = 0;
 
     for (const auto &checkpoint_entry : checkpoint_entries) {
-        WalCmdCheckpoint* checkpoint_cmd = static_cast<WalCmdCheckpoint*>(checkpoint_entry->cmds_[0].get());
+        WalCmdCheckpoint *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(checkpoint_entry->cmds_[0].get());
 
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -630,7 +631,7 @@ QueryResult AdminExecutor::ListCatalogs(QueryContext* query_context, const Admin
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
 
-        ++ row_count;
+        ++row_count;
         if (row_count % output_block_ptr->capacity() == 0) {
             output_block_ptr->Finalize();
             query_result.result_table_->Append(std::move(output_block_ptr));
@@ -643,7 +644,7 @@ QueryResult AdminExecutor::ListCatalogs(QueryContext* query_context, const Admin
     return query_result;
 }
 
-QueryResult AdminExecutor::ShowCatalog(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ShowCatalog(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
 
     auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
@@ -658,7 +659,175 @@ QueryResult AdminExecutor::ShowCatalog(QueryContext* query_context, const AdminS
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), column_defs);
     query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
 
-    Vector<SharedPtr<DataType>> column_types{
+    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    if (checkpoint_entries.empty()) {
+        return query_result;
+    }
+
+    i64 catalog_file_index = admin_statement->catalog_file_index_.value();
+    WalCmdCheckpoint *checkpoint_cmd = static_cast<WalCmdCheckpoint *>(checkpoint_entries[catalog_file_index]->cmds_[0].get());
+
+    if (checkpoint_cmd->is_full_checkpoint_) {
+
+        Vector<SharedPtr<DataType>> column_types{
+            varchar_type,
+            varchar_type,
+        };
+
+        UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+        output_block_ptr->Init(column_types);
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("full_checkpoint");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(checkpoint_cmd->is_full_checkpoint_ ? "true" : "false");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("max_commit_ts");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(std::to_string(checkpoint_cmd->max_commit_ts_));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("path");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(checkpoint_cmd->catalog_path_);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("name");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                Value value = Value::MakeVarchar(checkpoint_cmd->catalog_name_);
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        {
+            SizeT column_id = 0;
+            {
+                Value value = Value::MakeVarchar("size");
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+
+            ++column_id;
+            {
+                LocalFileSystem fs;
+                String file_path = fmt::format("{}/{}", checkpoint_cmd->catalog_path_, checkpoint_cmd->catalog_name_);
+                SizeT file_size = fs.GetFileSizeByPath(file_path);
+                Value value = Value::MakeVarchar(std::to_string(file_size));
+                ValueExpression value_expr(value);
+                value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            }
+        }
+
+        output_block_ptr->Finalize();
+        query_result.result_table_->Append(std::move(output_block_ptr));
+    } else {
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::NotSupport("Delta catalog detail isn't implemented");
+        return query_result;
+    }
+
+    return query_result;
+}
+
+Tuple<UniquePtr<Catalog>, Status> AdminExecutor::LoadCatalogFiles(QueryContext* query_context, const AdminStatement* admin_statement, Vector<SharedPtr<WalEntry>>& ckp_entries) {
+
+    i64 catalog_file_start_index = admin_statement->catalog_file_start_index_.value();
+    i64 catalog_file_end_index = admin_statement->catalog_file_end_index_.value();
+    if (catalog_file_end_index < catalog_file_start_index) {
+        return {nullptr, Status::InvalidCommand(fmt::format("start_index {} is larger than end_index {}", catalog_file_start_index, catalog_file_end_index))};
+    }
+
+    WalCmdCheckpoint *full_ckp_cmd = static_cast<WalCmdCheckpoint *>(ckp_entries[catalog_file_start_index]->cmds_[0].get());
+    if (!full_ckp_cmd->is_full_checkpoint_) {
+        return {nullptr, Status::WrongCheckpointType("Full", "Delta")};
+    }
+
+    FullCatalogFileInfo full_catalog_file_info;
+    full_catalog_file_info.path_ = fmt::format("{}/{}", full_ckp_cmd->catalog_path_, full_ckp_cmd->catalog_name_);
+    full_catalog_file_info.max_commit_ts_ = full_ckp_cmd->max_commit_ts_;
+
+    Vector<DeltaCatalogFileInfo> delta_catalog_fileinfo_array;
+    delta_catalog_fileinfo_array.reserve(catalog_file_end_index - catalog_file_start_index + 1);
+    for (i64 idx = catalog_file_start_index + 1; idx <= catalog_file_end_index; ++idx) {
+        WalCmdCheckpoint *delta_ckp_cmd = static_cast<WalCmdCheckpoint *>(ckp_entries[idx]->cmds_[0].get());
+        if (!delta_ckp_cmd->is_full_checkpoint_) {
+            return {nullptr, Status::WrongCheckpointType("Delta", "Full")};
+        }
+
+        DeltaCatalogFileInfo delta_catalog_file_info;
+        delta_catalog_file_info.path_ = fmt::format("{}/{}", delta_ckp_cmd->catalog_path_, delta_ckp_cmd->catalog_name_);
+        delta_catalog_file_info.max_commit_ts_ = delta_ckp_cmd->max_commit_ts_;
+
+        delta_catalog_fileinfo_array.emplace_back(delta_catalog_file_info);
+    }
+
+    BufferManager* buffer_mgr = query_context->storage()->buffer_manager();
+    const String& data_dir = query_context->storage()->wal_manager()->data_path();
+
+    UniquePtr<Catalog> catalog_ptr = Catalog::LoadFromFiles(data_dir, full_catalog_file_info, delta_catalog_fileinfo_array, buffer_mgr);
+    return {std::move(catalog_ptr), Status::OK()};
+}
+
+QueryResult AdminExecutor::ListDatabases(QueryContext *query_context, const AdminStatement *admin_statement) {
+    QueryResult query_result;
+
+    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "dir", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_catalog"), column_defs);
+    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+
+    Vector<SharedPtr<DataType>> column_types {
+        bigint_type,
         varchar_type,
         varchar_type,
     };
@@ -667,93 +836,51 @@ QueryResult AdminExecutor::ShowCatalog(QueryContext* query_context, const AdminS
     output_block_ptr->Init(column_types);
 
     Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
-    if(checkpoint_entries.empty()) {
+    if (checkpoint_entries.empty()) {
         return query_result;
     }
 
-    i64 catalog_file_index = admin_statement->catalog_file_index_.value();
-    WalCmdCheckpoint* checkpoint_cmd = static_cast<WalCmdCheckpoint*>(checkpoint_entries[catalog_file_index]->cmds_[0].get());
-
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("full_checkpoint");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-
-        ++column_id;
-        {
-            Value value = Value::MakeVarchar(checkpoint_cmd->is_full_checkpoint_ ? "true" : "false");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
+    auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
+    if(!status.ok()) {
+        query_result.status_ = status;
+        return query_result;
     }
 
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("max_commit_ts");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+    SizeT row_count = 0;
+    auto [_, meta_ptrs, meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
+    for(auto& meta_ptr: meta_ptrs) {
+        DBMeta* db_meta = static_cast<DBMeta*>(meta_ptr);
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
         }
 
-        ++column_id;
         {
-            Value value = Value::MakeVarchar(std::to_string(checkpoint_cmd->max_commit_ts_));
+            // index
+            Value value = Value::MakeBigInt(row_count);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("path");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
         }
 
-        ++column_id;
         {
-            Value value = Value::MakeVarchar(checkpoint_cmd->catalog_path_);
+            // database name
+            Value value = Value::MakeVarchar(*db_meta->db_name());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("name");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
 
-        ++column_id;
         {
-            Value value = Value::MakeVarchar(checkpoint_cmd->catalog_name_);
+            // dir
+            Value value = Value::MakeVarchar(*db_meta->data_dir());
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
-        }
-    }
-
-    {
-        SizeT column_id = 0;
-        {
-            Value value = Value::MakeVarchar("size");
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
 
-        ++column_id;
-        {
-            LocalFileSystem fs;
-            String file_path = fmt::format("{}/{}", checkpoint_cmd->catalog_path_, checkpoint_cmd->catalog_name_);
-            SizeT file_size = fs.GetFileSizeByPath(file_path);
-            Value value = Value::MakeVarchar(std::to_string(file_size));
-            ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
+        ++row_count;
+        if (row_count % output_block_ptr->capacity() == 0) {
+            output_block_ptr->Finalize();
+            query_result.result_table_->Append(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
         }
     }
 
@@ -762,102 +889,95 @@ QueryResult AdminExecutor::ShowCatalog(QueryContext* query_context, const AdminS
     return query_result;
 }
 
-QueryResult AdminExecutor::ListDatabases(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ShowDatabase(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ShowDatabase(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ListTables(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ShowTable(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ListSegments(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ListSegments(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ShowSegment(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ShowSegment(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ListBlocks(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ListBlocks(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ShowBlock(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ShowBlock(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ListColumns(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ListColumns(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ShowColumn(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ShowColumn(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ListIndexes(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ListIndexes(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ShowIndex(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ShowIndex(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ListIndexSegments(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ListIndexSegments(QueryContext* query_context, const AdminStatement* admin_statement) {
+QueryResult AdminExecutor::ShowIndexSegment(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
     query_result.result_table_ = nullptr;
     query_result.status_ = Status::NotSupport("Not support to handle admin statement");
     return query_result;
 }
 
-QueryResult AdminExecutor::ShowIndexSegment(QueryContext* query_context, const AdminStatement* admin_statement) {
-    QueryResult query_result;
-    query_result.result_table_ = nullptr;
-    query_result.status_ = Status::NotSupport("Not support to handle admin statement");
-    return query_result;
-}
-
-}
+} // namespace infinity

@@ -20,6 +20,8 @@ import query_context;
 import query_result;
 import stl;
 import wal_entry;
+import catalog;
+import status;
 
 namespace infinity {
 
@@ -49,6 +51,7 @@ private:
     static QueryResult ShowIndexSegment(QueryContext* query_context, const AdminStatement* admin_statement);
 
     static Vector<SharedPtr<WalEntry>> GetAllCheckpointEntries(QueryContext* query_context, const AdminStatement* admin_statement);
+    static Tuple<UniquePtr<Catalog>, Status> LoadCatalogFiles(QueryContext* query_context, const AdminStatement* admin_statement, Vector<SharedPtr<WalEntry>>& ckp_entries);
 };
 
 }

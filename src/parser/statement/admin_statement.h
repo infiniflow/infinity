@@ -50,6 +50,8 @@ public:
 
     AdminStmtType admin_type_{AdminStmtType::kInvalid};
     std::optional<int64_t> catalog_file_index_{};
+    std::optional<int64_t> catalog_file_start_index_{};
+    std::optional<int64_t> catalog_file_end_index_{};
     std::optional<int64_t> database_index_{};
     std::optional<int64_t> table_index_{};
     std::optional<int64_t> segment_index_{};
