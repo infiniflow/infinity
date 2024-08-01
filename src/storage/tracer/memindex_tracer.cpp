@@ -33,9 +33,13 @@ void MemIndexTracer::RegisterMemIndex(BaseMemIndex *memindex) {
     memindexes_.insert(memindex);
 }
 
-void MemIndexTracer::UnregisterMemIndex(BaseMemIndex *memindex) {
+void MemIndexTracer::UnregisterMemIndex(BaseMemIndex *memindex, SizeT mem_used) {
     std::lock_guard lck(mtx_);
     memindexes_.erase(memindex);
+    SizeT old_index_memory = cur_index_memory_.fetch_sub(mem_used);
+    if (old_index_memory < mem_used) {
+        UnrecoverableException(fmt::format("Memindex memory {} is larger than current index memory {}", mem_used, old_index_memory));
+    }
 }
 
 void MemIndexTracer::DumpDone(SizeT actual_dump_size, int dump_task_id) {

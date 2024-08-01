@@ -39,7 +39,7 @@ public:
 
     void RegisterMemIndex(BaseMemIndex *memindex);
 
-    void UnregisterMemIndex(BaseMemIndex *memindex);
+    void UnregisterMemIndex(BaseMemIndex *memindex, SizeT mem_used);
 
     void AddMemUsed(SizeT usage);
 
@@ -50,6 +50,8 @@ public:
     Vector<MemIndexTracerInfo> GetMemIndexTracerInfo();
 
     virtual void TriggerDump(UniquePtr<DumpIndexTask> task) = 0;
+
+    SizeT cur_index_memory() const { return cur_index_memory_.load(); }
 
 private:
     UniquePtr<DumpIndexTask> MakeDumpTask();
@@ -71,6 +73,9 @@ private:
 };
 
 inline void MemIndexTracer::AddMemUsed(SizeT add) {
+    if (add == 0) {
+        return;
+    }
     SizeT old_index_memory = cur_index_memory_.fetch_add(add);
     if (old_index_memory + add > index_memory_limit_) {
         if (old_index_memory + add > index_memory_limit_ - accumulate_dump_size_.load()) {

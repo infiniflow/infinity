@@ -39,6 +39,16 @@ UniquePtr<HnswIndexInMem> HnswIndexInMem::Make(RowID begin_row_id,
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
         auto *base_memidx = static_cast<BaseMemIndex *>(memidx.get());
         memindex_tracer->RegisterMemIndex(base_memidx);
+        std::visit(
+            [&](auto &&index) {
+                using T = std::decay_t<decltype(index)>;
+                if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+                    if (index != nullptr) {
+                        memindex_tracer->AddMemUsed(index->mem_usage());
+                    }
+                }
+            },
+            memidx->hnsw_);
     }
     return memidx;
 }
@@ -88,11 +98,13 @@ AbstractHnsw HnswIndexInMem::InitAbstractIndex(const IndexBase *index_base, cons
 }
 
 HnswIndexInMem::~HnswIndexInMem() {
+    SizeT mem_usage = 0;
     std::visit(
-        [](auto &&arg) {
+        [&](auto &&arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (!std::is_same_v<T, std::nullptr_t>) {
                 if (arg != nullptr) {
+                    mem_usage = arg->mem_usage();
                     delete arg;
                 }
             }
@@ -100,8 +112,10 @@ HnswIndexInMem::~HnswIndexInMem() {
         hnsw_);
     if (trace_) {
         auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
-        auto *base_memidx = static_cast<BaseMemIndex *>(this);
-        memindex_tracer->UnregisterMemIndex(base_memidx);
+        if (memindex_tracer != nullptr) {
+            auto *base_memidx = static_cast<BaseMemIndex *>(this);
+            memindex_tracer->UnregisterMemIndex(base_memidx, mem_usage);
+        }
     }
 }
 
@@ -180,14 +194,17 @@ SharedPtr<ChunkIndexEntry> HnswIndexInMem::Finish(SegmentIndexEntry *segment_ind
                 row_count = index->GetVecNum();
                 index_size = index->GetSizeInBytes();
                 dump_size = index->mem_usage();
+                if (trace_) {
+                    auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+                    auto *base_memidx = static_cast<BaseMemIndex *>(this);
+                    memindex_tracer->UnregisterMemIndex(base_memidx, dump_size);
+                }
             }
         },
         hnsw_);
     auto new_chunk_indey_entry = segment_index_entry->CreateHnswIndexChunkIndexEntry(begin_row_id_, row_count, buffer_mgr, index_size);
     if (dump_size_ptr != nullptr) {
         *dump_size_ptr = dump_size;
-    } else if (trace_) {
-        UnrecoverableError("Dump size ptr is nullptr");
     }
     trace_ = false;
 
