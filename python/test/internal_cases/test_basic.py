@@ -6,6 +6,7 @@ import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
 from internal.utils import copy_data
+from http_adapter import http_adapter
 
 test_csv_file = "embedding_int_dim3.csv"
 test_export_csv_file = "export_embedding_int_dim3.csv"
@@ -14,14 +15,17 @@ test_export_jsonl_file = "export_embedding_int_dim3.jsonl"
 test_export_jsonl_file_part = "export_embedding_int_dim3_part.jsonl"
 
 @pytest.mark.usefixtures("local_infinity")
+@pytest.mark.usefixtures("http")
 class TestInfinity:
     @pytest.fixture(autouse=True)
-    def setup(self, local_infinity):
+    def setup(self, local_infinity, http):
         if local_infinity:
             self.uri = common_values.TEST_LOCAL_PATH
         else:
             self.uri = common_values.TEST_LOCAL_HOST
         self.infinity_obj = infinity.connect(self.uri)
+        if http:
+            self.infinity_obj = http_adapter()
 
     def teardown(self):
         res = self.infinity_obj.disconnect()
@@ -54,6 +58,7 @@ class TestInfinity:
             db = infinity_obj.create_database("")
         assert infinity_obj.disconnect()
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_basic(self, check_data):
