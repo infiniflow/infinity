@@ -19,6 +19,7 @@ import admin_statement;
 import query_context;
 import query_result;
 import stl;
+import wal_entry;
 
 namespace infinity {
 
@@ -46,6 +47,8 @@ private:
     static QueryResult ShowIndex(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult ListIndexSegments(QueryContext* query_context, const AdminStatement* admin_statement);
     static QueryResult ShowIndexSegment(QueryContext* query_context, const AdminStatement* admin_statement);
+
+    static Vector<SharedPtr<WalEntry>> GetAllCheckpointEntries(QueryContext* query_context, const AdminStatement* admin_statement);
 };
 
 }

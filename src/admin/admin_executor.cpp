@@ -104,7 +104,10 @@ QueryResult AdminExecutor::Execute(QueryContext* query_context, const AdminState
             return ShowIndexSegment(query_context, admin_statement);
         }
         case AdminStmtType::kInvalid: {
-            return ListCatalogs(query_context, admin_statement);
+            QueryResult query_result;
+            query_result.result_table_ = nullptr;
+            query_result.status_ = Status::InvalidCommand(fmt::format("Invalid admin command"));
+            return query_result;
         }
     }
 }
@@ -513,10 +516,130 @@ QueryResult AdminExecutor::ShowLogIndex(QueryContext* query_context, const Admin
     return query_result;
 }
 
+Vector<SharedPtr<WalEntry>> AdminExecutor::GetAllCheckpointEntries(QueryContext* query_context, const AdminStatement* admin_statement) {
+    String wal_dir = query_context->storage()->wal_manager()->wal_dir();
+    auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir);
+    if (!wal_infos.empty()) {
+        std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
+            return a.max_commit_ts_ > b.max_commit_ts_;
+        });
+    }
+    Vector<String> wal_list;
+    if (temp_wal_info.has_value()) {
+        wal_list.push_back(temp_wal_info->path_);
+    }
+    for (const auto &wal_info : wal_infos) {
+        wal_list.push_back(wal_info.path_);
+    }
+
+    Vector<SharedPtr<WalEntry>> checkpoint_entries;
+    if (wal_list.empty()) {
+        return checkpoint_entries;
+    }
+
+    WalListIterator iterator(wal_list);
+    while (iterator.HasNext()) {
+        auto wal_entry_ptr = iterator.Next();
+        for (auto &entry_cmd : wal_entry_ptr->cmds_) {
+            if (entry_cmd->GetType() == WalCommandType::CHECKPOINT) {
+                checkpoint_entries.push_back(wal_entry_ptr);
+                break;
+            }
+        }
+    }
+
+    return checkpoint_entries;
+}
+
 QueryResult AdminExecutor::ListCatalogs(QueryContext* query_context, const AdminStatement* admin_statement) {
     QueryResult query_result;
-    query_result.result_table_ = nullptr;
-    query_result.status_ = Status::NotSupport("Not support to handle admin statement");
+
+    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, bool_type, "full_checkpoint", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, bigint_type, "max_commit_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, varchar_type, "path", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(4, varchar_type, "file", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_log_entry_command"), column_defs);
+    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+
+    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    if(checkpoint_entries.empty()) {
+        return query_result;
+    }
+
+    // Prepare the output table
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        bool_type,
+        bigint_type,
+        varchar_type,
+        varchar_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    for (const auto &checkpoint_entry : checkpoint_entries) {
+        WalCmdCheckpoint* checkpoint_cmd = static_cast<WalCmdCheckpoint*>(checkpoint_entry->cmds_[0].get());
+
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // index
+            Value value = Value::MakeBigInt(row_count);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // full_checkpoint
+            Value value = Value::MakeBool(checkpoint_cmd->is_full_checkpoint_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // max_commit_ts
+            Value value = Value::MakeBigInt(checkpoint_cmd->max_commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // catalog_path_
+            Value value = Value::MakeVarchar(checkpoint_cmd->catalog_path_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // catalog_name_
+            Value value = Value::MakeVarchar(checkpoint_cmd->catalog_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        ++ row_count;
+        if (row_count % output_block_ptr->capacity() == 0) {
+            output_block_ptr->Finalize();
+            query_result.result_table_->Append(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    query_result.result_table_->Append(std::move(output_block_ptr));
     return query_result;
 }
 
