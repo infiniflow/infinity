@@ -286,30 +286,31 @@ struct SQL_LTYPE {
     BUFFER = 413,                  /* BUFFER  */
     TRANSACTIONS = 414,            /* TRANSACTIONS  */
     TRANSACTION = 415,             /* TRANSACTION  */
-    USING = 416,                   /* USING  */
-    SESSION = 417,                 /* SESSION  */
-    GLOBAL = 418,                  /* GLOBAL  */
-    OFF = 419,                     /* OFF  */
-    EXPORT = 420,                  /* EXPORT  */
-    PROFILE = 421,                 /* PROFILE  */
-    CONFIGS = 422,                 /* CONFIGS  */
-    CONFIG = 423,                  /* CONFIG  */
-    PROFILES = 424,                /* PROFILES  */
-    VARIABLES = 425,               /* VARIABLES  */
-    VARIABLE = 426,                /* VARIABLE  */
-    DELTA = 427,                   /* DELTA  */
-    LOGS = 428,                    /* LOGS  */
-    CATALOGS = 429,                /* CATALOGS  */
-    CATALOG = 430,                 /* CATALOG  */
-    SEARCH = 431,                  /* SEARCH  */
-    MATCH = 432,                   /* MATCH  */
-    MAXSIM = 433,                  /* MAXSIM  */
-    QUERY = 434,                   /* QUERY  */
-    QUERIES = 435,                 /* QUERIES  */
-    FUSION = 436,                  /* FUSION  */
-    ROWLIMIT = 437,                /* ROWLIMIT  */
-    ADMIN = 438,                   /* ADMIN  */
-    NUMBER = 439                   /* NUMBER  */
+    MEMINDEX = 416,                /* MEMINDEX  */
+    USING = 417,                   /* USING  */
+    SESSION = 418,                 /* SESSION  */
+    GLOBAL = 419,                  /* GLOBAL  */
+    OFF = 420,                     /* OFF  */
+    EXPORT = 421,                  /* EXPORT  */
+    PROFILE = 422,                 /* PROFILE  */
+    CONFIGS = 423,                 /* CONFIGS  */
+    CONFIG = 424,                  /* CONFIG  */
+    PROFILES = 425,                /* PROFILES  */
+    VARIABLES = 426,               /* VARIABLES  */
+    VARIABLE = 427,                /* VARIABLE  */
+    DELTA = 428,                   /* DELTA  */
+    LOGS = 429,                    /* LOGS  */
+    CATALOGS = 430,                /* CATALOGS  */
+    CATALOG = 431,                 /* CATALOG  */
+    SEARCH = 432,                  /* SEARCH  */
+    MATCH = 433,                   /* MATCH  */
+    MAXSIM = 434,                  /* MAXSIM  */
+    QUERY = 435,                   /* QUERY  */
+    QUERIES = 436,                 /* QUERIES  */
+    FUSION = 437,                  /* FUSION  */
+    ROWLIMIT = 438,                /* ROWLIMIT  */
+    ADMIN = 439,                   /* ADMIN  */
+    NUMBER = 440                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -396,7 +397,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 400 "parser.h"
+#line 401 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

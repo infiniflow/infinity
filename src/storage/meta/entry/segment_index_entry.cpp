@@ -66,6 +66,7 @@ import emvb_index_in_mem;
 import bmp_util;
 import hnsw_util;
 import wal_entry;
+import infinity_context;
 
 namespace infinity {
 
@@ -285,7 +286,8 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
         case IndexType::kHnsw: {
             if (memory_hnsw_index_.get() == nullptr) {
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
-                memory_hnsw_index_ = MakeShared<HnswIndexInMem>(begin_row_id, index_base.get(), column_def.get());
+                memory_hnsw_index_ = MakeShared<HnswIndexInMem>(begin_row_id, index_base.get(), column_def.get(), this);
+                InfinityContext::instance().storage()->memindex_tracer()->RegisterMemIndex(memory_hnsw_index_.get());
             }
             BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
             memory_hnsw_index_->InsertVecs(block_offset, block_column_entry, buffer_manager, row_offset, row_count);
@@ -508,7 +510,7 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kHnsw: {
-            memory_hnsw_index_ = MakeShared<HnswIndexInMem>(base_row_id, index_base, column_def.get());
+            memory_hnsw_index_ = MakeShared<HnswIndexInMem>(base_row_id, index_base, column_def.get(), this);
 
             HnswInsertConfig insert_config;
             insert_config.optimize_ = true;
@@ -917,7 +919,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
     SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = nullptr;
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
-            auto memory_hnsw_index = MakeShared<HnswIndexInMem>(base_rowid, index_base, column_def.get());
+            auto memory_hnsw_index = MakeShared<HnswIndexInMem>(base_rowid, index_base, column_def.get(), this);
             const AbstractHnsw &abstract_hnsw = memory_hnsw_index->get();
 
             std::visit(

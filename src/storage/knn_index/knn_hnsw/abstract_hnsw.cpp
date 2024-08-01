@@ -23,11 +23,13 @@ import buffer_handle;
 import block_column_iter;
 import segment_iter;
 import segment_entry;
+import table_index_entry;
+import table_entry;
 
 namespace infinity {
 
-HnswIndexInMem::HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def)
-    : begin_row_id_(begin_row_id), hnsw_(InitAbstractIndex(index_base, column_def)) {
+HnswIndexInMem::HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry)
+    : begin_row_id_(begin_row_id), hnsw_(InitAbstractIndex(index_base, column_def)), segment_index_entry_(segment_index_entry) {
     const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
     SizeT chunk_size = 8192;
@@ -156,6 +158,26 @@ SharedPtr<ChunkIndexEntry> HnswIndexInMem::Dump(SegmentIndexEntry *segment_index
     *data_ptr = hnsw_;
     hnsw_ = nullptr;
     return new_chunk_indey_entry;
+}
+
+BaseMemIndexInfo HnswIndexInMem::GetInfoInner() const {
+    auto *table_index_entry = segment_index_entry_->table_index_entry();
+    SharedPtr<String> index_name = table_index_entry->GetIndexName();
+    auto *table_entry = table_index_entry->table_index_meta()->GetTableEntry();
+    SharedPtr<String> table_name = table_entry->GetTableName();
+    SharedPtr<String> db_name = table_entry->GetDBName();
+
+    SizeT row_cnt = std::visit(
+        [](auto &&index) {
+            using T = std::decay_t<decltype(index)>;
+            if constexpr (std::is_same_v<T, std::nullptr_t>) {
+                return SizeT(0);
+            } else {
+                return index->GetVecNum();
+            }
+        },
+        hnsw_);
+    return {index_name, table_name, db_name, row_cnt};
 }
 
 } // namespace infinity
