@@ -124,7 +124,7 @@ Conflict policy in `enum` for handling situations where a database with the same
   - `Ignore`: Ignore the table creation requrest and keep the database with the same name as-is.
 
 :::tip NOTE
-You must import the `infinity.common` package to set `ConflictType`:
+You may want to import the `infinity.common` package to set `ConflictType`:
 
 ```python
 from infinity.common import ConflictType
@@ -185,7 +185,7 @@ Conflict policy in `enum` for handling situations where a database with the spec
   - `Ignore`: Ignore the operation and proceed regardless, if the specified database does not exist.
 
 :::tip NOTE
-You must import the `infinity.common` package to set `ConflictType`:
+You may want to import the `infinity.common` package to set `ConflictType`:
 
 ```python
 from infinity.common import ConflictType
@@ -345,11 +345,12 @@ Definitions for all table columns as a dictionary. Each key in the dictionary is
 #### conflict_type: `ConflictType`, *Optional*
 
 Conflict policy in `enum` for handling situations where a table with the same name exists. 
-  - `Error`: Raise an error if a table with the same name exists.
-  - `Ignore`: Ignore the table creation requrest and keep the table with the same name as-is.
+
+- `Error`: Raise an error if a table with the same name exists.
+- `Ignore`: Ignore the table creation requrest and keep the table with the same name as-is.
 
 :::tip NOTE
-You must import the `infinity.common` package to set `ConflictType`:
+You may want to import the `infinity.common` package to set `ConflictType`:
 
 ```python
 from infinity.common import ConflictType
@@ -468,7 +469,7 @@ Conflict policy in `enum` for handling situations where a table with the specifi
 - `Ignore`: Ignore the operation and proceed regardless, if the specified table does not exist.
 
 :::tip NOTE
-You must import the `infinity.common` package to set `ConflictType`:
+You may want to import the `infinity.common` package to set `ConflictType`:
 
 ```python
 from infinity.common import ConflictType
@@ -595,18 +596,18 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
 - **column_name**: `str`, *Required*  
   The name of the column to build index on. Must not be empty. 
 - **index_type**: `IndexType`, *Required*  
-  Index type. You must import `infinity.index` to set `IndexType`: `from infinity.index import IndexType`  
+  Index type. You may want to import `infinity.index` to set `IndexType`: `from infinity.index import IndexType`  
   - `Hnsw`: A HNSW index. 
   - `EMVB`: An EMVB index. Works with tensors only.
   - `FullText`: A full-text index.  
   - `IVFFlat`: An IVFFlat index. 
   - `Secondary`: A secondary index. Works with structured data only. 
-  - `BMP`: A bitmap index. Works with sparse vectors only. 
+  - `BMP`: A Block-Max Pruning index. Works with sparse vectors only. 
 - **index_param_list**: `list[InitParameter(str, str)]`  
   A list of `InitParameter` objects specifying parameter settings for the chosen index type. Each object handles one parameter setting. To set a specific index parameter, pass the parameter name and its corresponding value as two separate strings to the `InitParameter` object: 
   - Parameter settings for an HNSW index: 
     - `"M"`: *Optional* - Defaults to`"16"`.
-    - `"ef_construction"`: *Optional* - Defauls to`"50"`.
+    - `"ef_construction"`: *Optional* - Defaults to`"50"`.
     - `"ef"`: *Optional* - Defaults to `"50"`. 
     - `"metric"` *Required* - The distance metric to use in similarity search.
       - `"ip"`: Inner product.
@@ -614,10 +615,10 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"cosine"`: Cosine similarity. 
     - `"encode"`: *Optional*
       - `"plain"`: (Default) Plain encoding. 
-      - `"lvq"`: Locally-adaptive vector quantization.
+      - `"lvq"`: Locally-adaptive vector quantization. Works with float vector element only.  
   - Parameter settings for an EMVB index: 
-    - `"pq_subspace_num"`: *Optional* - Defaults to "32". 
-    - `"pq_subspace_bits"`: *Optional* - Defaults to "8". 
+    - `"pq_subspace_num"`: *Required* - Recommended: "32". 
+    - `"pq_subspace_bits"`: *Required* - Recommended: "8". 
   - Parameter settings for a full text index: 
     - `"ANALYZER"`: *Optional* - Defaults to `"standard"`
   - Parameter settings for an IVFFlat index:  
@@ -628,16 +629,16 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"cosine"`: Cosine similarity. 
   - Parameter settings for a secondary index: 
   - Parameter settings for a BMP index: 
-    - `block_size=1~256`: *Required* - The size of the block in a bitmap index. Range: `"1"` ~ `"256"`. Defaults to 16.
-    - `"compress_type"`:
+    - `block_size`: *Optional* - The size of the block in a BMP index. Range: `"1"` ~ `"256"`. Defaults to 16.
+    - `"compress_type"`: *Optional*  
       - `"compress"`: (Default) Store the block max is stored in the sparse format. Works best with small block size situations.
       - `"raw"`: 
 
 :::tip NOTE
-You must import the `infinity.index` package to set `IndexType`:
+You may want to import the `infinity.index` package to set `IndexType`:
 
 ```python
-from infinity.index import ConflictType
+from infinity.index import IndexType
 ```
 :::
 
@@ -650,7 +651,7 @@ Conflict policy in `enum` for handling situations where an index with the same n
 - `Ignore`: Ignore the index creation requrest and keep the table with the same name as-is.
 
 :::tip NOTE
-You must import the `infinity.common` package to set `ConflictType`:
+You may want to import the `infinity.common` package to set `ConflictType`:
 
 ```python
 from infinity.common import ConflictType
@@ -663,12 +664,13 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: `True`
+- Success: An index object. 
 - Failure: `Exception`
 
 ### Examples
 
 ```python
+from infinity.index import IndexType
 # Create a table named "test_index_ivfflat" with a vector column "c1"
 table_ojbect = db_obj.create_table("test_index_ivfflat", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an IVFFlat index named "my_index" on column "c1"
@@ -724,7 +726,7 @@ table_obj.create_index("my_index",
 ```python
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
 table_obj = db_obj.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
-# Create a bitmap index named "my_index" on column "c1"
+# Create a BMP index named "my_index" on column "c1"
 table_obj.create_index("my_index",
                              [index.IndexInfo("c1", IndexType.BMP,
                               [
@@ -757,7 +759,7 @@ Conflict policy in `enum` for handling situations where a specified index does n
 - `Ignore`: Ignore the index creation requrest and keep the table with the same name as-is.
 
 :::tip NOTE
-You must import the `infinity.common` package to set `ConflictType`:
+You may want to import the `infinity.common` package to set `ConflictType`:
 
 ```python
 from infinity.common import ConflictType
