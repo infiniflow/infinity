@@ -31,7 +31,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE TABLE {} ( c1 embedding(float, {}));\n".format(table_name, dim)
+            "CREATE TABLE {} ( c1 embedding(tinyint, {}));\n".format(table_name, dim)
         )
         slt_file.write("\n")
         slt_file.write("query I\n")
