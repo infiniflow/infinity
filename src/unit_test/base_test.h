@@ -44,6 +44,9 @@ public:
 
     void SetUp() override {}
     void TearDown() override {}
+public:
+    static constexpr const char* NULL_CONFIG_PATH = "";
+    static constexpr const char* VFS_CONFIG_PATH = "test/data/config/test_vfs.toml";
 
 protected:
     const char *GetHomeDir() { return "/var/infinity"; }
@@ -56,10 +59,12 @@ protected:
 
     const char *GetFullTmpDir() { return "/var/infinity/tmp"; }
 
+    const char *GetFullPersistDir() { return "/var/infinity/persistence"; }
+
     const char *GetTmpDir() { return "tmp"; }
 
     void CleanupDbDirs() {
-        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir()};
+        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir()};
         for (auto &dir : infinity_db_dirs) {
             CleanupDirectory(dir);
         }
@@ -138,3 +143,4 @@ private:
 };
 
 using BaseTest = BaseTestWithParam<void>;
+using BaseTestParamStr = BaseTestWithParam<std::string>;

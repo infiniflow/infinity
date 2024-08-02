@@ -41,10 +41,11 @@ import inmem_index_segment_reader;
 import segment_posting;
 import global_resource_usage;
 import infinity_context;
+import third_party;
 
 using namespace infinity;
 
-class MemoryIndexerTest : public BaseTest {
+class MemoryIndexerTest : public BaseTestParamStr {
 public:
     struct ExpectedPosting {
         String term;
@@ -58,9 +59,20 @@ protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     SharedPtr<ColumnVector> column_;
     Vector<ExpectedPosting> expected_postings_;
+    String config_path_{};
 
 public:
     void SetUp() override {
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        CleanupDbDirs();
+        config_path_ = GetParam();
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            std::shared_ptr<std::string> config_path = std::make_shared<std::string>(config_path_);
+            infinity::InfinityContext::instance().Init(config_path);
+        }
+
         // https://en.wikipedia.org/wiki/Finite-state_transducer
         const char *paragraphs[] = {
             R"#(A finite-state transducer (FST) is a finite-state machine with two memory tapes, following the terminology for Turing machines: an input tape and an output tape. This contrasts with an ordinary finite-state automaton, which has a single tape. An FST is a type of finite-state automaton (FSA) that maps between two sets of symbols.[1] An FST is more general than an FSA. An FSA defines a formal language by defining a set of accepted strings, while an FST defines a relation between sets of strings.)#",
@@ -80,7 +92,14 @@ public:
         expected_postings_ = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
     }
 
-    void TearDown() override {}
+    void TearDown() override {
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            if (InfinityContext::instance().persistence_manager() != nullptr) {
+                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
+            }
+            infinity::InfinityContext::instance().UnInit();
+        }
+    }
 
     void Check(ColumnIndexReader &reader) {
         for (SizeT i = 0; i < expected_postings_.size(); ++i) {
@@ -111,15 +130,24 @@ public:
     }
 };
 
-TEST_F(MemoryIndexerTest, Insert) {
+INSTANTIATE_TEST_SUITE_P(
+    TestWithDifferentParams,
+    MemoryIndexerTest,
+    ::testing::Values(
+        BaseTestParamStr::NULL_CONFIG_PATH,
+        BaseTestParamStr::VFS_CONFIG_PATH
+    )
+);
+
+TEST_P(MemoryIndexerTest, Insert) {
     // prepare fake segment index entry
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
-    MemoryIndexer indexer1(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column_, 0, 1);
     indexer1.Insert(column_, 1, 3);
     indexer1.Dump();
 
-    auto indexer2 = MakeUnique<MemoryIndexer>(GetFullTmpDir(), "chunk2", RowID(0U, 4U), flag_, "standard");
+    auto indexer2 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk2", RowID(0U, 4U), flag_, "standard");
     indexer2->Insert(column_, 4, 1);
     while (indexer2->GetInflightTasks() > 0) {
         sleep(1);
@@ -130,13 +158,13 @@ TEST_F(MemoryIndexerTest, Insert) {
     fake_segment_index_entry_1->SetMemoryIndexer(std::move(indexer2));
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{0, fake_segment_index_entry_1}};
     ColumnIndexReader reader;
-    reader.Open(flag_, GetFullTmpDir(), std::move(index_by_segment));
+    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment));
     Check(reader);
 }
 
-TEST_F(MemoryIndexerTest, test2) {
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
-    MemoryIndexer indexer1(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+TEST_P(MemoryIndexerTest, test2) {
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column_, 0, 2, true);
     indexer1.Insert(column_, 2, 2, true);
     indexer1.Insert(column_, 4, 1, true);
@@ -146,13 +174,13 @@ TEST_F(MemoryIndexerTest, test2) {
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment = {{1, fake_segment_index_entry_1}};
 
     ColumnIndexReader reader;
-    reader.Open(flag_, GetFullTmpDir(), std::move(index_by_segment));
+    reader.Open(flag_, GetFullDataDir(), std::move(index_by_segment));
     Check(reader);
 }
 
-TEST_F(MemoryIndexerTest, SpillLoadTest) {
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
-    auto indexer1 = MakeUnique<MemoryIndexer>(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+TEST_P(MemoryIndexerTest, SpillLoadTest) {
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
+    auto indexer1 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1->Insert(column_, 0, 2);
     indexer1->Insert(column_, 2, 2);
     indexer1->Insert(column_, 4, 1);
@@ -162,7 +190,7 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
     }
 
     indexer1->Dump(false, true);
-    UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    UniquePtr<MemoryIndexer> loaded_indexer = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
 
     loaded_indexer->Load();
     SharedPtr<InMemIndexSegmentReader> segment_reader = MakeShared<InMemIndexSegmentReader>(loaded_indexer.get());
@@ -190,7 +218,7 @@ TEST_F(MemoryIndexerTest, SpillLoadTest) {
     }
 }
 
-TEST_F(MemoryIndexerTest, SeekPosition) {
+TEST_P(MemoryIndexerTest, SeekPosition) {
     // "A B C" repeats 7 times
     String paragraph(R"#(A B C A B C A B C A B C A B C A B C A B C)#");
     auto column = ColumnVector::Make(MakeShared<DataType>(LogicalType::kVarchar));
@@ -200,8 +228,8 @@ TEST_F(MemoryIndexerTest, SeekPosition) {
         column->AppendValue(v);
     }
 
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
-    MemoryIndexer indexer1(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column, 0, 8192);
     while (indexer1.GetInflightTasks() > 0) {
         sleep(1);
