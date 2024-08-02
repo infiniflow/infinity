@@ -195,6 +195,10 @@ class LocalTable(Table, ABC):
                         options.copy_file_type = CopyFileType.kJSONL
                     elif file_type == 'fvecs':
                         options.copy_file_type = CopyFileType.kFVECS
+                    elif file_type == 'csr':
+                        options.copy_file_type = CopyFileType.kCSR
+                    elif file_type == 'bvecs':
+                        options.copy_file_type = CopyFileType.kBVECS
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':

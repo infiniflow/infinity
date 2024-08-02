@@ -317,6 +317,7 @@ class IndexType(object):
     BMP = 3
     Secondary = 4
     EMVB = 5
+    DiskAnn = 6
 
     _VALUES_TO_NAMES = {
         0: "IVFFlat",
@@ -325,6 +326,7 @@ class IndexType(object):
         3: "BMP",
         4: "Secondary",
         5: "EMVB",
+        6: "DiskAnn",
     }
 
     _NAMES_TO_VALUES = {
@@ -334,6 +336,7 @@ class IndexType(object):
         "BMP": 3,
         "Secondary": 4,
         "EMVB": 5,
+        "DiskAnn": 6,
     }
 
 

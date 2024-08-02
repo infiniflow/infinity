@@ -4,16 +4,20 @@ from common import common_values
 import infinity
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.common import ConflictType, InfinityException
+from http_adapter import http_adapter
 
 @pytest.mark.usefixtures("local_infinity")
+@pytest.mark.usefixtures("http")
 class TestInfinity:
     @pytest.fixture(autouse=True)
-    def setup(self, local_infinity):
+    def setup(self, local_infinity, http):
         if local_infinity:
             self.uri = common_values.TEST_LOCAL_PATH
         else:
             self.uri = common_values.TEST_LOCAL_HOST
         self.infinity_obj = infinity.connect(self.uri)
+        if http:
+            self.infinity_obj = http_adapter()
         assert self.infinity_obj
 
     def teardown(self):
@@ -68,6 +72,8 @@ class TestInfinity:
         res = table_obj.output(["c1", "c2", "c1"]).to_df()
         print(res)
         db_obj.drop_table("test_to_df", ConflictType.Error)
+
+    @pytest.mark.usefixtures("skip_if_http")
     def test_without_output_select_list(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
@@ -88,6 +94,7 @@ class TestInfinity:
 
         db_obj.drop_table("test_without_output_select_list", ConflictType.Error)
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("condition_list", ["c1 > 0.1 and c2 < 3.0",
                                                 "c1 > 0.1 and c2 < 1.0",
                                                 "c1 < 0.1 and c2 < 1.0",
@@ -135,6 +142,7 @@ class TestInfinity:
         db_obj.drop_table("test_with_invalid_select_list_output", ConflictType.Error)
 
     # skipped tests using InfinityThriftQueryBuilder which is incompatible with local infinity
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("filter_list", [
         "c1 > 10",
         "c2 > 1",
@@ -162,6 +170,7 @@ class TestInfinity:
 
         db_obj.drop_table("test_output_with_valid_filter_function", ConflictType.Error)
 
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.usefixtures("skip_if_local_infinity")
     @pytest.mark.parametrize("filter_list", [
         pytest.param("c1"),

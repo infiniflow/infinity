@@ -211,6 +211,8 @@ class RemoteTable(Table, ABC):
                         options.copy_file_type = ttypes.CopyFileType.FVECS
                     elif file_type == 'csr':
                         options.copy_file_type = ttypes.CopyFileType.CSR
+                    elif file_type == 'bvecs':
+                        options.copy_file_type = ttypes.CopyFileType.BVECS
                     else:
                         raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':

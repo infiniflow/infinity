@@ -83,6 +83,11 @@ def skip_if_remote_infinity(request):
     if not request.config.getoption("--local-infinity"):
         pytest.skip("Skipping remote-infinity test")
 
+@pytest.fixture(scope="function")
+def skip_if_http(request):
+    if request.config.getoption("--http"):
+        pytest.skip("Skipping http test")
+
 @pytest.fixture(scope="function", autouse=False)
 def get_infinity_connection_pool():
     connection_pool = ConnectionPool(common_values.TEST_LOCAL_HOST)
@@ -113,6 +118,10 @@ def disable_items_with_mark(items, mark, reason):
 def local_infinity(request):
     return request.config.getoption("--local-infinity")
 
+@pytest.fixture
+def http(request):
+    return request.config.getoption("--http")
+
 def pytest_addoption(parser):
     parser.addoption(
         "--run-integration",
@@ -126,4 +135,11 @@ def pytest_addoption(parser):
         action="store_true",
         default=False,
         help="Run local infinity tests (default is remote)",
+    )
+
+    parser.addoption(
+        "--http",
+        action="store_true",
+        default=False,
+        help="Run http api infinity tests (default is remote)",
     )

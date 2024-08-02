@@ -43,15 +43,15 @@ pip install . -v --config-settings=cmake.build-type="Debug"  --config-settings=b
 ```
 Note: If you run with the release version and turn jemalloc compile flag on, you must set environment variable, for example
 ```shell
-LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so python3 example/simple_example.py
+LD_PRELOAD=$(ldconfig -p | grep 'libjemalloc.so ' | awk '{print $4}') python3 example/simple_example.py
 ```
 Note: If you run with the debug version, you must set the **libasan** environment variable, for example
 ```shell
-LD_PRELOAD=/usr/lib/llvm-18/lib/clang/18/lib/x86_64-pc-linux-gnu/libclang_rt.asan.so python3 example/simple_example.py
+LD_PRELOAD=$(find $(clang-18 -print-resource-dir) -name "libclang_rt.asan.so") python3 example/simple_example.py
 ```
 Note: When running with the debug version infinity-sdk, you may find some memory leaks caused by arrow. You can use `ASAN_OPTIONS=detect_leaks=0` to disable memory leak detection, for example
 ```shell
-LD_PRELOAD=/usr/lib/llvm-18/lib/clang/18/lib/x86_64-pc-linux-gnu/libclang_rt.asan.so ASAN_OPTIONS=detect_leaks=0 python3 example/simple_example.py
+LD_PRELOAD=$(find $(clang-18 -print-resource-dir) -name "libclang_rt.asan.so") ASAN_OPTIONS=detect_leaks=0 python3 example/simple_example.py
 ```
 
 # run pysdk test
