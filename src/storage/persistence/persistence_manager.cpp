@@ -335,6 +335,14 @@ String PersistenceManager::RemovePrefix(const String &path) {
     return "";
 }
 
+SizeT PersistenceManager::SumRefCounts() {
+    SizeT ref_counts = 0;
+    for (auto& [key, obj_stat] : objects_) {
+        ref_counts += obj_stat.ref_count_;
+    }
+    return ref_counts;
+}
+
 void PersistenceManager::Cleanup(const String &file_path) {
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {

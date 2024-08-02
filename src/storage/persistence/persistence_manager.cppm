@@ -92,6 +92,8 @@ public:
 
     void Deserialize(const nlohmann::json &obj);
 
+    SizeT SumRefCounts();
+
 private:
     String ObjCreate();
 

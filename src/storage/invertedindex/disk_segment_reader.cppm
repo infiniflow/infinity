@@ -40,6 +40,7 @@ private:
     RowID base_row_id_{INVALID_ROWID};
     SharedPtr<DictionaryReader> dict_reader_;
     String posting_file_{};
+    String posting_file_obj_{};
     String dict_file_{};
     u8 *data_ptr_{};
     SizeT data_len_{};

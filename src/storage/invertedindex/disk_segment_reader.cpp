@@ -56,6 +56,7 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
     String posting_file = posting_file_;
     if (nullptr != pm) {
         posting_file = pm->GetObjCache(posting_file);
+        posting_file_obj_ = posting_file;
     }
     int rc = fs_.MmapFile(posting_file, data_ptr_, data_len_);
     assert(rc == 0);
@@ -69,7 +70,7 @@ DiskIndexSegmentReader::~DiskIndexSegmentReader() {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     String posting_file = posting_file_;
     if (nullptr != pm) {
-        posting_file = pm->GetObjCache(posting_file);
+        posting_file = posting_file_obj_;
     }
     int rc = fs_.MunmapFile(posting_file);
     assert(rc == 0);

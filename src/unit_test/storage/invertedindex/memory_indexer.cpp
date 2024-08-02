@@ -94,6 +94,9 @@ public:
 
     void TearDown() override {
         if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            if (InfinityContext::instance().persistence_manager() != nullptr) {
+                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
+            }
             infinity::InfinityContext::instance().UnInit();
         }
     }
@@ -132,7 +135,7 @@ INSTANTIATE_TEST_SUITE_P(
     MemoryIndexerTest,
     ::testing::Values(
         BaseTestParamStr::NULL_CONFIG_PATH,
-        BaseTestParamStr::CONFIG_PATH
+        BaseTestParamStr::VFS_CONFIG_PATH
     )
 );
 
