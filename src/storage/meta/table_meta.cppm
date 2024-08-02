@@ -70,6 +70,9 @@ public:
 
     DBEntry *db_entry() { return db_entry_; }
 
+    List<SharedPtr<TableEntry>> GetAllEntries() const {
+        return table_entry_list_.GetAllEntries();
+    }
 private:
     Tuple<TableEntry *, Status> CreateEntry(std::shared_lock<std::shared_mutex> &&r_lock,
                                             TableEntryType table_entry_type,

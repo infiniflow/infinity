@@ -40,6 +40,8 @@ import buffer_manager;
 import catalog;
 import db_meta;
 import db_entry;
+import table_meta;
+import table_entry;
 
 namespace infinity {
 
@@ -1153,8 +1155,217 @@ QueryResult AdminExecutor::ListTables(QueryContext *query_context, const AdminSt
 
 QueryResult AdminExecutor::ShowTable(QueryContext *query_context, const AdminStatement *admin_statement) {
     QueryResult query_result;
-    query_result.result_table_ = nullptr;
-    query_result.status_ = Status::NotSupport("Not support to handle admin statement");
+
+    auto bool_type = MakeShared<DataType>(LogicalType::kBoolean);
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, bigint_type, "index", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "dir", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, bigint_type, "transaction", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(4, bigint_type, "begin_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(5, bigint_type, "commit_ts", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(6, bool_type, "deleted", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(7, varchar_type, "base_dir", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(8, varchar_type, "encode", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(9, bigint_type, "column_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(10, bigint_type, "row_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(11, bigint_type, "segment_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(12, bigint_type, "unsealed_segment", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(13, bigint_type, "next_segment", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("list_tables"), column_defs);
+    query_result.result_table_ = MakeShared<DataTable>(table_def, TableType::kDataTable);
+
+    Vector<SharedPtr<DataType>> column_types {
+        bigint_type,
+        varchar_type,
+        varchar_type,
+        bigint_type,
+        bigint_type,
+        bigint_type,
+        bool_type,
+        varchar_type,
+        varchar_type,
+        bigint_type,
+        bigint_type,
+        bigint_type,
+        bigint_type,
+        bigint_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+
+    Vector<SharedPtr<WalEntry>> checkpoint_entries = GetAllCheckpointEntries(query_context, admin_statement);
+    if (checkpoint_entries.empty()) {
+        return query_result;
+    }
+
+    auto [catalog, status] = LoadCatalogFiles(query_context, admin_statement, checkpoint_entries);
+    if(!status.ok()) {
+        query_result.result_table_ = nullptr;
+        query_result.status_ = status;
+        return query_result;
+    }
+
+    auto [_, db_meta_ptrs, db_meta_lock] = catalog->db_meta_map_.GetAllMetaGuard();
+
+    u64 database_meta_index = admin_statement->database_meta_index_.value();
+    if(database_meta_index >= db_meta_ptrs.size()) {
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::InvalidDatabaseIndex(database_meta_index, db_meta_ptrs.size());
+        return query_result;
+    }
+    DBMeta* db_meta = db_meta_ptrs[database_meta_index];
+    List<SharedPtr<DBEntry>> entry_list = db_meta->GetAllEntries();
+
+    u64 database_entry_index = admin_statement->database_entry_index_.value();
+    if(database_entry_index >= entry_list.size()) {
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::InvalidDatabaseIndex(database_entry_index, entry_list.size());
+        return query_result;
+    }
+
+    SizeT row_count = 0;
+    DBEntry* current_db_entry = nullptr;
+    for(const SharedPtr<DBEntry>& db_entry: entry_list) {
+        if(row_count == database_entry_index) {
+            current_db_entry = db_entry.get();
+        }
+        ++ row_count;
+    }
+
+    row_count = 0;
+    auto [table_names, table_meta_ptrs, table_meta_lock] = current_db_entry->GetAllTableMetas();
+
+    u64 table_meta_index = admin_statement->table_meta_index_.value();
+    if(table_meta_index >= table_meta_ptrs.size()) {
+        query_result.result_table_ = nullptr;
+        query_result.status_ = Status::InvalidTableIndex(table_meta_index, table_meta_ptrs.size());
+        return query_result;
+    }
+
+    TableMeta* table_meta = table_meta_ptrs[table_meta_index];
+    List<SharedPtr<TableEntry>> table_entry_list = table_meta->GetAllEntries();
+    for(const SharedPtr<TableEntry>& table_entry: table_entry_list) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // index
+            Value value = Value::MakeBigInt(row_count);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+
+        {
+            // database name
+            Value value = Value::MakeVarchar(*table_entry->GetTableName());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+
+        {
+            // dir
+            String dir_str = table_entry->TableEntryDir() == nullptr ? "" : *table_entry->TableEntryDir();
+            Value value = Value::MakeVarchar(dir_str);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+
+        {
+            // transaction
+            Value value = Value::MakeBigInt(table_entry->txn_id_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        {
+            // begin_ts
+            Value value = Value::MakeBigInt(table_entry->begin_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        {
+            // commit_ts
+            Value value = Value::MakeBigInt(table_entry->commit_ts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[5]);
+        }
+
+        {
+            // delete
+            Value value = Value::MakeBool(table_entry->deleted_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[6]);
+        }
+
+        {
+            // base_dir
+            Value value = Value::MakeVarchar(*table_entry->base_dir_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[7]);
+        }
+
+        {
+            // encode
+            Value value = Value::MakeVarchar(table_entry->encode());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[8]);
+        }
+
+        {
+            // column count
+            Value value = Value::MakeBigInt(table_entry->ColumnCount());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[9]);
+        }
+
+        {
+            // row count
+            Value value = Value::MakeBigInt(table_entry->row_count());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[10]);
+        }
+
+        {
+            // segment count
+            Value value = Value::MakeBigInt(table_entry->segment_map().size());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[11]);
+        }
+
+        {
+            // unsealed_segment
+            Value value = Value::MakeBigInt(table_entry->unsealed_id());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[12]);
+        }
+
+        {
+            // next segment id
+            Value value = Value::MakeBigInt(table_entry->next_segment_id());
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[13]);
+        }
+
+        ++row_count;
+        if (row_count % output_block_ptr->capacity() == 0) {
+            output_block_ptr->Finalize();
+            query_result.result_table_->Append(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    query_result.result_table_->Append(std::move(output_block_ptr));
     return query_result;
 }
 
