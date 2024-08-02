@@ -36,7 +36,6 @@ namespace nb = nanobind;
 using namespace infinity;
 
 NB_MODULE(embedded_infinity_ext, m) {
-    nb::bytes a;
     nb::class_<WrapUpdateExpr>(m, "WrapUpdateExpr")
         .def(nb::init<>())
         .def_rw("column_name", &WrapUpdateExpr::column_name)

@@ -66,10 +66,6 @@ export f32 maxsim_f32_bit_ip_avx512(const f32 *v1, const u8 *v2, SizeT dim) {
     if (reinterpret_cast<uintptr_t>(v2) % alignof(u16) == 0) {
         // use u16 ptr
         // assume endianness
-        static_assert([] constexpr -> bool {
-            alignas(alignof(u16)) u8 v[2] = {1, 0};
-            return *reinterpret_cast<const u16 *>(v) == 1;
-        }() == true);
         const SizeT dim8 = dim / 8;
         const auto *v2_16 = reinterpret_cast<const u16 *>(v2);
         __m512 sum = _mm512_maskz_loadu_ps(v2_16[0], v1);
@@ -135,10 +131,6 @@ export i32 maxsim_i32_bit_ip_avx512(const i32 *v1, const u8 *v2, SizeT dim) {
     if (reinterpret_cast<uintptr_t>(v2) % alignof(u16) == 0) {
         // use u16 ptr
         // assume endianness
-        static_assert([] constexpr -> bool {
-            alignas(alignof(u16)) u8 v[2] = {1, 0};
-            return *reinterpret_cast<const u16 *>(v) == 1;
-        }() == true);
         const SizeT dim8 = dim / 8;
         const auto *v2_16 = reinterpret_cast<const u16 *>(v2);
         __m512i sum = _mm512_maskz_loadu_epi32(v2_16[0], v1);
