@@ -54,6 +54,16 @@ void ObjAddr::ReadBuf(const char *buf) {
     part_size_ = ReadBufAdv<SizeT>(buf);
 }
 
+PersistenceManager::PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit)
+    : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
+    current_object_key_ = ObjCreate();
+    current_object_size_ = 0;
+
+    if (local_data_dir_.empty() || local_data_dir_.back() != '/') {
+        local_data_dir_ += '/';
+    }
+}
+
 ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose) {
     std::error_code ec;
     fs::path src_fp = file_path;
@@ -158,7 +168,8 @@ void PersistenceManager::CurrentObjFinalizeNoLock() {
     }
 }
 
-String PersistenceManager::GetObjCache(const String &local_path) {
+String PersistenceManager::GetObjCache(const String &file_path) {
+    String local_path = RemovePrefix(file_path);
     std::lock_guard<std::mutex> lock(mtx_);
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {
@@ -238,7 +249,6 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
         if (fs::exists(dst_fp)) {
             fs::remove(dst_fp);
         }
-        std::error_code ec;
         fs::create_symlink(src_fp, dst_fp);
     } catch (const fs::filesystem_error &e) {
         String error_message = fmt::format("Failed to link file {}.", file_path);
@@ -323,6 +333,14 @@ String PersistenceManager::RemovePrefix(const String &path) {
         return path.substr(local_data_dir_.length());
     }
     return "";
+}
+
+SizeT PersistenceManager::SumRefCounts() {
+    SizeT ref_counts = 0;
+    for (auto& [key, obj_stat] : objects_) {
+        ref_counts += obj_stat.ref_count_;
+    }
+    return ref_counts;
 }
 
 void PersistenceManager::Cleanup(const String &file_path) {
