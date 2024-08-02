@@ -289,7 +289,7 @@ class RemoteDatabase(Database, ABC):
             return self._conn.drop_table(db_name=self._db_name, table_name=table_name,
                                          conflict_type=ttypes.DropConflict.Ignore)
         else:
-            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "nvalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "Invalid conflict type")
 
     def list_tables(self):
         res = self._conn.list_tables(self._db_name)
