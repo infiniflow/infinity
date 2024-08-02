@@ -239,6 +239,10 @@ Status DBEntry::GetTablesDetail(Txn *txn, Vector<TableDetail> &output_table_arra
     return Status::OK();
 }
 
+Tuple<Vector<String>, Vector<TableMeta*>, std::shared_lock<std::shared_mutex>> DBEntry::GetAllTableMetas() const {
+    return table_meta_map_.GetAllMetaGuard();
+}
+
 SharedPtr<String> DBEntry::ToString() {
     SharedPtr<String> res =
         MakeShared<String>(fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *AbsoluteDir(), txn_id_, table_meta_map_.Size()));

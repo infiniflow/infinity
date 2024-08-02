@@ -52,8 +52,10 @@ public:
     std::optional<int64_t> catalog_file_index_{};
     std::optional<int64_t> catalog_file_start_index_{};
     std::optional<int64_t> catalog_file_end_index_{};
-    std::optional<int64_t> database_index_{};
-    std::optional<int64_t> table_index_{};
+    std::optional<int64_t> database_meta_index_{};
+    std::optional<int64_t> database_entry_index_{};
+    std::optional<int64_t> table_meta_index_{};
+    std::optional<int64_t> table_entry_index_{};
     std::optional<int64_t> segment_index_{};
     std::optional<int64_t> block_index_{};
     std::optional<int64_t> column_index_{};

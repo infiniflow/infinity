@@ -129,6 +129,7 @@ export enum class ErrorCode : long {
     kNameMismatched = 3083,
     kTransactionNotFound = 3084,
     kInvalidDatabaseIndex = 3085,
+    kInvalidTableIndex = 3086,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -279,6 +280,7 @@ public:
     static Status NameMismatched(const String& name_left, const String& name_right);
     static Status TransactionNotFound(TransactionID txn_id);
     static Status InvalidDatabaseIndex(u64 database_index, u64 capacity);
+    static Status InvalidTableIndex(u64 table_index, u64 capacity);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");

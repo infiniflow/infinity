@@ -417,6 +417,10 @@ Status Status::InvalidDatabaseIndex(u64 database_index, u64 capacity) {
     return Status(ErrorCode::kInvalidDatabaseIndex, MakeUnique<String>(fmt::format("Invalid database index: {} (0-{})", database_index, capacity - 1)));
 }
 
+Status Status::InvalidTableIndex(u64 table_index, u64 capacity) {
+    return Status(ErrorCode::kInvalidTableIndex, MakeUnique<String>(fmt::format("Invalid table index: {} (0-{})", table_index, capacity - 1)));
+}
+
 // 4. TXN fail
 Status Status::TxnRollback(u64 txn_id, const String &rollback_reason) {
     return Status(ErrorCode::kTxnRollback, MakeUnique<String>(fmt::format("Transaction: {} is rollback. {}", txn_id, rollback_reason)));
