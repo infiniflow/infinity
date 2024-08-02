@@ -1245,11 +1245,11 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                         }
                     }
                 }
-                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kHnswBlockSize) == nullptr) {
-                    i64 hnsw_block_size = HNSW_BLOCK_SIZE;
-                    UniquePtr<IntegerOption> hnsw_block_size_option = MakeUnique<IntegerOption>(HNSW_BLOCK_SIZE_OPTION_NAME, hnsw_block_size, 1024, 1);
-                    global_options_.AddOption(std::move(hnsw_block_size_option));
-                }
+            }
+            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kHnswBlockSize) == nullptr) {
+                i64 hnsw_block_size = HNSW_BLOCK_SIZE;
+                UniquePtr<IntegerOption> hnsw_block_size_option = MakeUnique<IntegerOption>(HNSW_BLOCK_SIZE_OPTION_NAME, hnsw_block_size, 1024, 1);
+                global_options_.AddOption(std::move(hnsw_block_size_option));
             }
         }
 
