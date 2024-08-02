@@ -19,7 +19,7 @@ SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [0.0, -10.0
 
 # default top 10
 query I
-SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [5, -10, 0, 0, 0, 0, 11, 0], 'int', 'maxsim');
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [5, -10, 0, 0, 0, 0, 11, 0], 'double', 'maxsim');
 ----
 6 102.399994
 8 4.200000
@@ -27,7 +27,7 @@ SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [5, -10, 0,
 2 0.700000
 
 query I
-SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [1, 0, 0, 0, 0, 0, 0, 1], 'bit', 'maxsim');
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [1, 0, 0, 0, 0, 0, 0, 1], 'float16', 'maxsim');
 ----
 6 0.700000
 8 0.500000
@@ -36,7 +36,7 @@ SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [1, 0, 0, 0
 
 # default top 10
 query I
-SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [[5, -10, 0, 0, 0, 0, 11, 0],[1, 0, 0, 0, 0, 0, 0, 1]], 'int', 'maxsim');
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [[5, -10, 0, 0, 0, 0, 11, 0],[1, 0, 0, 0, 0, 0, 0, 1]], 'bfloat16', 'maxsim');
 ----
 6 103.099991
 8 4.700000
@@ -45,7 +45,7 @@ SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [[5, -10, 0
 
 # option top 2
 query I
-SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [1, 0, 0, 0, 0, 0, 0, 1], 'bit', 'maxsim', 'topn=2');
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [1, 0, 0, 0, 0, 0, 0, 1], 'bfloat16', 'maxsim', 'topn=2');
 ----
 6 0.700000
 8 0.500000

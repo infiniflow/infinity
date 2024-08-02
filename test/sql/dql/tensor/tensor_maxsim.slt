@@ -104,7 +104,7 @@ test11 -9.660001
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0, -10, 0, 1], [9, 46, -56, 4]], 'int8', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0, -10, 0, 1], [9, 46, -56, 4]], 'float16', 'maxsim') WHERE 10 > num;
 ----
 test22 639.399963
 test33 3.700001
