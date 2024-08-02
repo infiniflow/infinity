@@ -1243,34 +1243,55 @@ public:
             nlohmann::json http_body_json = nlohmann::json::parse(data_body);
 
             const String filter_string = http_body_json["filter"];
+            if(filter_string != "") {
+                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+                ExprParser expr_parser;
+                expr_parser.Parse(filter_string, expr_parsed_result.get());
+                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
+                    json_response["error_code"] = ErrorCode::kInvalidFilterExpression;
+                    json_response["error_message"] = fmt::format("Invalid filter expression: {}", filter_string);
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
 
-            UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
-            ExprParser expr_parser;
-            expr_parser.Parse(filter_string, expr_parsed_result.get());
-            if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
-                json_response["error_code"] = ErrorCode::kInvalidFilterExpression;
-                json_response["error_message"] = fmt::format("Invalid filter expression: {}", filter_string);
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                const QueryResult result = infinity->Delete(database_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
+                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+
+                if (result.IsOk()) {
+                    json_response["error_code"] = 0;
+                    http_status = HTTPStatus::CODE_200;
+
+                    // Only one block
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    // Get sum delete rows
+                    Value value = data_block->GetValue(1, 0);
+                    json_response["delete_row_count"] = value.value_.big_int;
+                } else {
+                    json_response["error_code"] = result.ErrorCode();
+                    json_response["error_message"] = result.ErrorMsg();
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
+            else {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                const QueryResult result = infinity->Delete(database_name, table_name, nullptr);
 
-            auto database_name = request->getPathVariable("database_name");
-            auto table_name = request->getPathVariable("table_name");
-            const QueryResult result = infinity->Delete(database_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
-            expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+                if (result.IsOk()) {
+                    json_response["error_code"] = 0;
+                    http_status = HTTPStatus::CODE_200;
 
-            if (result.IsOk()) {
-                json_response["error_code"] = 0;
-                http_status = HTTPStatus::CODE_200;
-
-                // Only one block
-                DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-                // Get sum delete rows
-                Value value = data_block->GetValue(1, 0);
-                json_response["delete_row_count"] = value.value_.big_int;
-            } else {
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
-                http_status = HTTPStatus::CODE_500;
+                    // Only one block
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    // Get sum delete rows
+                    Value value = data_block->GetValue(1, 0);
+                    json_response["delete_row_count"] = value.value_.big_int;
+                } else {
+                    json_response["error_code"] = result.ErrorCode();
+                    json_response["error_message"] = result.ErrorMsg();
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
         } catch (nlohmann::json::exception &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
