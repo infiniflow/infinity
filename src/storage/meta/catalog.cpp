@@ -511,7 +511,7 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     if (pm != nullptr) {
-        json_res["obj_addr_map"].emplace_back(pm->Serialize());
+        json_res["obj_addr_map"] = pm->Serialize();
     }
     return json_res;
 }
@@ -577,7 +577,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
         UnrecoverableError(error_message);
     }
     i32 n_bytes = catalog_delta_entry->GetSizeInBytes();
-    if (file_size != n_bytes) {
+    if (file_size != n_bytes && file_size != ptr - buf.data()) {
         Status status = Status::CatalogCorrupted(catalog_path);
         RecoverableError(status);
     }
