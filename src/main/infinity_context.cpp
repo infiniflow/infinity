@@ -30,7 +30,7 @@ import variables;
 
 namespace infinity {
 
-void InfinityContext::Init(const SharedPtr<String> &config_path, DefaultConfig* default_config) {
+void InfinityContext::Init(const SharedPtr<String> &config_path, DefaultConfig *default_config) {
     if (initialized_) {
         return;
     } else {
@@ -53,14 +53,14 @@ void InfinityContext::Init(const SharedPtr<String> &config_path, DefaultConfig* 
 
         session_mgr_ = MakeUnique<SessionManager>();
 
-        storage_ = MakeUnique<Storage>(config_.get());
-        storage_->Init();
-
         String persistence_dir = config_->PersistenceDir();
         if (!persistence_dir.empty()) {
             i64 persistence_object_size_limit = config_->PersistenceObjectSizeLimit();
             persistence_manager_ = MakeUnique<PersistenceManager>(persistence_dir, config_->DataDir(), (SizeT)persistence_object_size_limit);
         }
+
+        storage_ = MakeUnique<Storage>(config_.get());
+        storage_->Init();
 
         inverting_thread_pool_.resize(config_->CPULimit());
         commiting_thread_pool_.resize(config_->CPULimit());
@@ -87,6 +87,7 @@ void InfinityContext::UnInit() {
     persistence_manager_.reset();
 
     Logger::Shutdown();
+    persistence_manager_.reset();
 
     config_.reset();
 }

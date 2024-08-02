@@ -46,7 +46,11 @@ public:
     void TearDown() override {}
 public:
     static constexpr const char* NULL_CONFIG_PATH = "";
+
+    static constexpr const char* CONFIG_PATH = "/config/test_vfs.toml";
+
     static constexpr const char* VFS_CONFIG_PATH = "test/data/config/test_vfs.toml";
+
 
 protected:
     const char *GetHomeDir() { return "/var/infinity"; }
@@ -73,7 +77,7 @@ protected:
     void CleanupTmpDir() { CleanupDirectory(GetFullTmpDir()); }
 
     void RemoveDbDirs() {
-        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir()};
+        const char *infinity_db_dirs[] = {GetFullDataDir(), GetFullWalDir(), GetFullLogDir(), GetFullTmpDir(), GetFullPersistDir()};
         for (auto &dir : infinity_db_dirs) {
             RemoveDirectory(dir);
         }
