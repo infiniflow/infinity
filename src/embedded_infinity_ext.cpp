@@ -306,6 +306,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kJSON", CopyFileType::kJSON)
         .value("kJSONL", CopyFileType::kJSONL)
         .value("kFVECS", CopyFileType::kFVECS)
+        .value("kCSR", CopyFileType::kCSR)
+        .value("kBVECS", CopyFileType::kBVECS)
         .value("kInvalid", CopyFileType::kInvalid);
 
     nb::class_<InitParameter>(m, "InitParameter")
@@ -467,6 +469,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kSecondary", IndexType::kSecondary)
         .value("kBMP", IndexType::kBMP)
         .value("kEMVB", IndexType::kEMVB)
+        .value("kDiskAnn", IndexType::kDiskAnn)
         .value("kInvalid", IndexType::kInvalid)
         .export_values();
 

@@ -69,6 +69,7 @@ import default_values;
 import index_base;
 import index_ivfflat;
 import index_hnsw;
+import index_diskann;
 import index_secondary;
 import index_emvb;
 import index_bmp;
@@ -722,6 +723,12 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             assert(index_info->index_param_list_ != nullptr);
             IndexBMP::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
             base_index_ptr = IndexBMP::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            break;
+        }
+        case IndexType::kDiskAnn: {
+            assert(index_info->index_param_list_ != nullptr);
+            IndexDiskAnn::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr = IndexDiskAnn::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kInvalid: {

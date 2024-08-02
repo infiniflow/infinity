@@ -349,6 +349,8 @@ Tuple<CopyFileType, Status> InfinityThriftService::GetCopyFileType(infinity_thri
             return {CopyFileType::kFVECS, Status::OK()};
         case infinity_thrift_rpc::CopyFileType::CSR:
             return {CopyFileType::kCSR, Status::OK()};
+        case infinity_thrift_rpc::CopyFileType::BVECS:
+            return {CopyFileType::kBVECS, Status::OK()};
         default: {
             return {CopyFileType::kInvalid, Status::ImportFileFormatError("Not implemented yet")};
         }
@@ -1592,6 +1594,8 @@ IndexType InfinityThriftService::GetIndexTypeFromProto(const infinity_thrift_rpc
             return IndexType::kEMVB;
         case infinity_thrift_rpc::IndexType::BMP:
             return IndexType::kBMP;
+        case infinity_thrift_rpc::IndexType::DiskAnn:
+            return IndexType::kDiskAnn;
         default:
             return IndexType::kInvalid;
     }

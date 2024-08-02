@@ -231,8 +231,8 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
         RecoverableError(status);
     }
     auto embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
-    if (embedding_info->Type() != kElemFloat) {
-        Status status = Status::ImportFileFormatError("BVECS file must have only one embedding column with float element.");
+    if (embedding_info->Type() != kElemInt8) {
+        Status status = Status::ImportFileFormatError("BVECS file must have only one embedding column with int8 element.");
         RecoverableError(status);
     }
 
@@ -292,10 +292,10 @@ void PhysicalImport::ImportBVECS(QueryContext *query_context, ImportOperatorStat
             }
             fs.Read(*file_handler, i8_buffer.get(), sizeof(i8) * dimension);
 
-            FloatT *dst_ptr = reinterpret_cast<FloatT *>(buf_ptr + block_entry->row_count() * sizeof(FloatT) * dimension);
+            i8 *dst_ptr = reinterpret_cast<i8 *>(buf_ptr + block_entry->row_count() * sizeof(i8) * dimension);
             for (i32 i = 0; i < dimension; ++i) {
                 i8 value = (i8_buffer.get())[i];
-                dst_ptr[i] = static_cast<FloatT>(value);
+                dst_ptr[i] = static_cast<i8>(value);
             }
 
             block_entry->IncreaseRowCount(1);

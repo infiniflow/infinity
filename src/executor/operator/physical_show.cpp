@@ -1124,6 +1124,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
                     chunk_index_entries = std::get<0>(segment_index_entry->GetBMPIndexSnapshot());
                     break;
                 }
+                case IndexType::kDiskAnn:
                 case IndexType::kInvalid: {
                     Status status3 = Status::InvalidIndexName(index_type_name);
                     RecoverableError(status3);
@@ -1203,6 +1204,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
             chunk_indexes = chunk_index_entries;
             break;
         }
+        case IndexType::kDiskAnn:
         case IndexType::kInvalid: {
             Status status3 = Status::InvalidIndexName(index_type_name);
             RecoverableError(status3);
