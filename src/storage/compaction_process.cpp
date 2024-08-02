@@ -168,9 +168,8 @@ void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
         }
 
         TxnTableStore *txn_table_store = dump_txn->GetTxnTableStore(table_entry);
-        TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
         SizeT dump_size = 0;
-        table_index_entry->MemIndexDump(txn_index_store, false /*spill*/, &dump_size);
+        table_index_entry->MemIndexDump(dump_txn, txn_table_store, false /*spill*/, &dump_size);
 
         txn_mgr_->CommitTxn(dump_txn);
         memindex_tracer->DumpDone(dump_size, dump_task->task_id_);
@@ -209,6 +208,7 @@ void CompactionProcessor::Process() {
                     LOG_DEBUG(dump_task->ToString());
                     DoDump(dump_task);
                     LOG_DEBUG("Dump index done.");
+                    break;
                 }
                 default: {
                     String error_message = fmt::format("Invalid background task: {}", (u8)bg_task->type_);

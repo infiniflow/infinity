@@ -368,8 +368,6 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         PopulateEntireConfig populate_entire_config{.prepare_ = false, .check_ts_ = false};
         SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
         if (segment_index_entry.get() != nullptr) {
-            Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
-            txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
             segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
             for (auto &chunk_index_entry : chunk_index_entries) {
@@ -844,7 +842,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
                     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
                     Vector<ChunkIndexEntry *> old_chunks;
-                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, txn->BeginTS());
+                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, txn);
                     if (chunk_index_entries.size() <= 1) {
                         continue;
                     }
@@ -871,6 +869,7 @@ void TableEntry::OptimizeIndex(Txn *txn) {
 
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
+                        // why not add segment index entry in chunk index entry, next_chunk_id changed
                         txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
                         old_chunks.push_back(chunk_index_entry.get());
                     }

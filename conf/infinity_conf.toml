@@ -27,6 +27,7 @@ data_dir                 = "/var/infinity/data"
 # s means seconds, for example "60s", 60 seconds
 # m means minutes, for example "60m", 60 minutes
 # h means hours, for example "1h", 1 hour
+optimize_interval        = "10s"
 cleanup_interval         = "60s"
 compact_interval         = "120s"
 

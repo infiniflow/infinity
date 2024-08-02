@@ -34,10 +34,10 @@ import chunk_index_entry;
 import memory_indexer;
 import default_values;
 import statement_common;
+import txn;
 
 namespace infinity {
 
-class Txn;
 class TxnTableStore;
 struct TableIndexEntry;
 struct BlockEntry;
@@ -125,7 +125,7 @@ public:
     // Dump or spill the memory indexer
     SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false, SizeT *dump_size = nullptr);
 
-    void AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn);
+    void AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn, Vector<ChunkID> chunk_ids = {});
 
     // Init the mem index from previously spilled one.
     void MemIndexLoad(const String &base_name, RowID base_row_id);
@@ -141,13 +141,13 @@ public:
 
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def);
 
-    void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries, TxnTimeStamp begin_ts = MAX_TIMESTAMP) {
+    void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries, Txn *txn = nullptr) {
         std::shared_lock lock(rw_locker_);
         chunk_index_entries.clear();
         SizeT num = chunk_index_entries_.size();
         for (SizeT i = 0; i < num; i++) {
             auto &chunk_index_entry = chunk_index_entries_[i];
-            if (chunk_index_entry->CheckVisibleByTS(begin_ts)) {
+            if (chunk_index_entry->CheckVisible(txn)) {
                 chunk_index_entries.push_back(chunk_index_entry);
             }
         }
@@ -169,7 +169,7 @@ public:
 
     void ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
                                   SharedPtr<ChunkIndexEntry> merged_chunk_index_entry,
-                                  Vector<ChunkIndexEntry *> &&old_chunks);
+                                  Vector<ChunkIndexEntry *> old_chunks);
 
     ChunkIndexEntry *RebuildChunkIndexEntries(TxnTableStore *txn_table_store, SegmentEntry *segment_entry);
 
@@ -241,6 +241,8 @@ public:
                                                         TxnTimeStamp commit_ts,
                                                         TxnTimeStamp deprecate_ts,
                                                         BufferManager *buffer_mgr);
+
+    ChunkIndexEntry *GetChunkIndexEntry(ChunkID chunk_id);
 
     // only for unittest
     MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }

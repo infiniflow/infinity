@@ -44,14 +44,20 @@ void MemIndexTracer::UnregisterMemIndex(BaseMemIndex *memindex, SizeT mem_used) 
 
 void MemIndexTracer::DumpDone(SizeT actual_dump_size, int dump_task_id) {
     std::lock_guard lck(mtx_);
-    auto remove_n = proposed_dump_.erase(dump_task_id);
-    if (remove_n == 0) {
+    auto iter = proposed_dump_.find(dump_task_id);
+    if (iter == proposed_dump_.end()) {
         UnrecoverableException(fmt::format("Dump task {} is not found", dump_task_id));
     }
     SizeT old_index_memory = cur_index_memory_.fetch_sub(actual_dump_size);
     if (old_index_memory < actual_dump_size) {
         UnrecoverableException(fmt::format("Dump size {} is larger than current index memory {}", actual_dump_size, old_index_memory));
     }
+    const auto &[proposed_dump_size, dumped_base_memindex] = iter->second;
+    if (proposed_dump_size > actual_dump_size) {
+        UnrecoverableException(fmt::format("Dump size {} is larger than proposed dump size {}", actual_dump_size, proposed_dump_size));
+    }
+    acc_proposed_dump_.fetch_sub(proposed_dump_size);
+    proposed_dump_.erase(iter);
 }
 
 void MemIndexTracer::DumpFail(int dump_task_id) {
@@ -61,7 +67,7 @@ void MemIndexTracer::DumpFail(int dump_task_id) {
         UnrecoverableException(fmt::format("Dump task {} is not found", dump_task_id));
     }
     const auto &[proposed_dump_size, dumped_base_memindex] = iter->second;
-    cur_index_memory_.fetch_add(proposed_dump_size);
+    acc_proposed_dump_.fetch_sub(proposed_dump_size);
     memindexes_.insert(dumped_base_memindex);
 
     proposed_dump_.erase(iter);
@@ -85,6 +91,9 @@ UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
     for (auto iter = memindexes_.begin(); iter != memindexes_.end(); ++iter) {
         info_vec.emplace_back((*iter)->GetInfo(), iter);
     }
+    if (info_vec.empty()) {
+        UnrecoverableException("No memindex to dump");
+    }
     SizeT dump_idx = ChooseDump(info_vec);
     const auto &[info, max_iter] = info_vec[dump_idx];
 
@@ -94,7 +103,7 @@ UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
     auto *dumped_base_memindex = *max_iter;
     memindexes_.erase(max_iter);
 
-    accumulate_dump_size_ += info.mem_used_;
+    acc_proposed_dump_.fetch_add(info.mem_used_);
     proposed_dump_[id] = {info.mem_used_, dumped_base_memindex};
     return dump_task;
 }

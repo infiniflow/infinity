@@ -190,6 +190,7 @@ SharedPtr<ChunkIndexEntry> HnswIndexInMem::Finish(SegmentIndexEntry *segment_ind
     SizeT row_count = 0;
     SizeT index_size = 0;
     SizeT dump_size = 0;
+    trace_ = false;
     std::visit(
         [&](auto &&index) {
             using T = std::decay_t<decltype(index)>;
@@ -211,7 +212,6 @@ SharedPtr<ChunkIndexEntry> HnswIndexInMem::Finish(SegmentIndexEntry *segment_ind
     if (dump_size_ptr != nullptr) {
         *dump_size_ptr = dump_size;
     }
-    trace_ = false;
 
     BufferHandle handle = new_chunk_indey_entry->GetIndex();
     auto *data_ptr = static_cast<AbstractHnsw *>(handle.GetDataMut());

@@ -193,8 +193,7 @@ TEST_F(OptimizeKnnTest, test1) {
             ASSERT_TRUE(status.ok());
 
             TxnTableStore *txn_table_store = txn->GetTxnTableStore(table_entry);
-            TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
-            table_index_entry->MemIndexDump(txn_index_store, true /*spill*/);
+            table_index_entry->MemIndexDump(txn, txn_table_store, true /*spill*/);
 
             txn_mgr->CommitTxn(txn);
         }
@@ -296,8 +295,7 @@ TEST_F(OptimizeKnnTest, test_secondary_index_optimize) {
             auto [table_index_entry, status] = txn->GetIndexByName(*db_name, *table_name, *index_name);
             ASSERT_TRUE(status.ok());
             TxnTableStore *txn_table_store = txn->GetTxnTableStore(table_entry);
-            TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry);
-            table_index_entry->MemIndexDump(txn_index_store, true /*spill*/);
+            table_index_entry->MemIndexDump(txn, txn_table_store, true /*spill*/);
             txn_mgr->CommitTxn(txn);
         }
     }

@@ -183,7 +183,7 @@ Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPt
         case IndexType::kFullText:
         case IndexType::kEMVB:
         case IndexType::kSecondary:
-        case IndexType::kBMP: 
+        case IndexType::kBMP:
         case IndexType::kDiskAnn: {
             // these indexes don't use BufferManager
             return vector_file_worker;
@@ -421,7 +421,7 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
     return chunk_index_entry;
 }
 
-void SegmentIndexEntry::AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn) {
+void SegmentIndexEntry::AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn, Vector<ChunkID> deprecate_chunk_ids) {
     Vector<WalChunkIndexInfo> chunk_infos;
     chunk_infos.emplace_back(dumped_index_entry);
 
@@ -429,7 +429,7 @@ void SegmentIndexEntry::AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn
     const auto &db_name = *table_entry->GetDBName();
     const auto &table_name = *table_entry->GetTableName();
     const auto &index_name = *table_index_entry_->GetIndexName();
-    txn->AddWalCmd(MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id_, std::move(chunk_infos)));
+    txn->AddWalCmd(MakeShared<WalCmdDumpIndex>(db_name, table_name, index_name, segment_id_, std::move(chunk_infos), std::move(deprecate_chunk_ids)));
 }
 
 void SegmentIndexEntry::MemIndexLoad(const String &base_name, RowID base_row_id) {
@@ -889,7 +889,7 @@ SegmentIndexEntry::GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT se
 
 void SegmentIndexEntry::ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
                                                  SharedPtr<ChunkIndexEntry> merged_chunk_index_entry,
-                                                 Vector<ChunkIndexEntry *> &&old_chunks) {
+                                                 Vector<ChunkIndexEntry *> old_chunks) {
     TxnIndexStore *txn_index_store = txn_table_store->GetIndexStore(table_index_entry_);
     chunk_index_entries_.push_back(merged_chunk_index_entry);
     txn_index_store->optimize_data_.emplace_back(this, merged_chunk_index_entry.get(), std::move(old_chunks));
@@ -903,17 +903,19 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
 
     BufferManager *buffer_mgr = txn->buffer_mgr();
     Vector<ChunkIndexEntry *> old_chunks;
+    Vector<ChunkID> old_ids;
     u32 row_count = 0;
     {
         std::shared_lock lock(rw_locker_);
-        if (chunk_index_entries_.size() <= 1) { // TODO
-            return nullptr;
-        }
         for (const auto &chunk_index_entry : chunk_index_entries_) {
             if (chunk_index_entry->CheckVisible(txn)) {
                 row_count += chunk_index_entry->row_count_;
                 old_chunks.push_back(chunk_index_entry.get());
+                old_ids.push_back(chunk_index_entry->chunk_id_);
             }
+        }
+        if (old_chunks.size() <= 1) { // TODO
+            return nullptr;
         }
     }
     RowID base_rowid(segment_id_, 0);
@@ -984,7 +986,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
         }
     }
     ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
-    txn_table_store->AddChunkIndexStore(table_index_entry_, merged_chunk_index_entry.get());
+    AddWalIndexDump(merged_chunk_index_entry.get(), txn, std::move(old_ids));
     return merged_chunk_index_entry.get();
 }
 
@@ -1043,6 +1045,9 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplayWal(ChunkI
                                                                           TxnTimeStamp commit_ts,
                                                                           TxnTimeStamp deprecate_ts,
                                                                           BufferManager *buffer_mgr) {
+    if (chunk_id != next_chunk_id_) {
+        UnrecoverableError(fmt::format("Chunk id: {} is not equal to next chunk id: {}", chunk_id, next_chunk_id_));
+    }
     auto ret = this->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
     ++next_chunk_id_;
     return ret;
@@ -1068,6 +1073,16 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::AddChunkIndexEntryReplay(ChunkID c
         UpdateFulltextColumnLenInfo(column_length_sum, row_count);
     };
     return chunk_index_entry;
+}
+
+ChunkIndexEntry *SegmentIndexEntry::GetChunkIndexEntry(ChunkID chunk_id) {
+    std::shared_lock lock(rw_locker_);
+    for (auto &chunk_index_entry : chunk_index_entries_) {
+        if (chunk_index_entry->chunk_id_ == chunk_id) {
+            return chunk_index_entry.get();
+        }
+    }
+    return nullptr;
 }
 
 nlohmann::json SegmentIndexEntry::Serialize(TxnTimeStamp max_commit_ts) {

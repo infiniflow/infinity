@@ -1193,6 +1193,11 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
             if (add_segment_op->status_ == SegmentStatus::kDeprecated) {
                 add_segment_op->merge_flag_ = MergeFlag::kDelete;
             }
+        } else if (new_op->type_ == CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {
+            auto *add_chunk_index_op = static_cast<AddChunkIndexEntryOp *>(new_op.get());
+            if (add_chunk_index_op->deprecate_ts_ != UNCOMMIT_TS) {
+                add_chunk_index_op->merge_flag_ = MergeFlag::kDelete;
+            }
         }
         const String &encode = *new_op->encode_;
         if (encode.empty()) {

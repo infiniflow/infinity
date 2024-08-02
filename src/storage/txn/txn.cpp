@@ -305,7 +305,6 @@ Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_
     {
         std::lock_guard guard(txn_store_.mtx_);
         auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
-        txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
         for (auto &segment_index_entry : segment_index_entries) {
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
             segment_index_entry->GetChunkIndexEntries(chunk_index_entries);

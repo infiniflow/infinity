@@ -69,7 +69,7 @@ private:
 
     i64 dump_task_id_ = 0;
     HashMap<int, Pair<SizeT, BaseMemIndex *>> proposed_dump_{};
-    Atomic<SizeT> accumulate_dump_size_ = 0;
+    Atomic<SizeT> acc_proposed_dump_ = 0;
 };
 
 inline void MemIndexTracer::AddMemUsed(SizeT add) {
@@ -77,8 +77,8 @@ inline void MemIndexTracer::AddMemUsed(SizeT add) {
         return;
     }
     SizeT old_index_memory = cur_index_memory_.fetch_add(add);
-    if (old_index_memory + add > index_memory_limit_) {
-        if (old_index_memory + add > index_memory_limit_ - accumulate_dump_size_.load()) {
+    if (SizeT new_index_memory = old_index_memory + add; new_index_memory > index_memory_limit_) {
+        if (new_index_memory > index_memory_limit_ + acc_proposed_dump_.load()) {
             auto dump_task = MakeDumpTask();
             TriggerDump(std::move(dump_task));
         }
