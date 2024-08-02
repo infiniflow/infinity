@@ -62,8 +62,10 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(config.BufferManagerSize(), 8 * 1024l * 1024l * 1024l);
     EXPECT_EQ(config.LRUNum(), 7);
     EXPECT_EQ(config.TempDir(), "/var/infinity/tmp");
-
     EXPECT_EQ(config.MemIndexMemoryQuota(), 4 * 1024l * 1024l * 1024l);
+
+    // index
+    EXPECT_EQ(config.HnswBlockSize(), 8192l);
 }
 
 TEST_F(ConfigTest, test2) {
@@ -99,6 +101,8 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.BufferManagerSize(), 3 * 1024l * 1024l * 1024l);
     EXPECT_EQ(config.LRUNum(), 8);
     EXPECT_EQ(config.TempDir(), "/tmp");
-
     EXPECT_EQ(config.MemIndexMemoryQuota(), 2 * 1024l * 1024l * 1024l);
+
+    // index
+    EXPECT_EQ(config.HnswBlockSize(), 1024l);
 }

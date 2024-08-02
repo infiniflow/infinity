@@ -55,6 +55,8 @@ GlobalOptions::GlobalOptions() {
     name2index_[String(PERSISTENCE_DIR_OPTION_NAME)] = GlobalOptionIndex::kPersistenceDir;
     name2index_[String(PERSISTENCE_OBJECT_SIZE_LIMIT_OPTION_NAME)] = GlobalOptionIndex::kPersistenceObjectSizeLimit;
 
+    name2index_[String(HNSW_BLOCK_SIZE_OPTION_NAME)] = GlobalOptionIndex::kHnswBlockSize;
+
     name2index_[String(BUFFER_MANAGER_SIZE_OPTION_NAME)] = GlobalOptionIndex::kBufferManagerSize;
     name2index_[String(LRU_NUM_OPTION_NAME)] = GlobalOptionIndex::kLRUNum;
     name2index_[String(TEMP_DIR_OPTION_NAME)] = GlobalOptionIndex::kTempDir;

@@ -26,6 +26,8 @@ import segment_entry;
 import table_index_entry;
 import table_entry;
 import memindex_tracer;
+import default_values;
+import infinity_context;
 
 namespace infinity {
 
@@ -61,8 +63,11 @@ HnswIndexInMem::HnswIndexInMem(RowID begin_row_id,
     : begin_row_id_(begin_row_id), hnsw_(InitAbstractIndex(index_base, column_def)), segment_index_entry_(segment_index_entry), trace_(trace) {
     const auto *index_hnsw = static_cast<const IndexHnsw *>(index_base);
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(column_def->type()->type_info().get());
-    SizeT chunk_size = 8192;
-    SizeT max_chunk_num = 1024;
+
+    auto *config = InfinityContext::instance().config();
+    SizeT chunk_size = config->HnswBlockSize();
+    SizeT max_chunk_num = (DEFAULT_SEGMENT_CAPACITY - 1) / chunk_size + 1;
+
     SizeT dim = embedding_info->Dimension();
     SizeT M = index_hnsw->M_;
     SizeT ef_construction = index_hnsw->ef_construction_;
