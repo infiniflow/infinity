@@ -84,6 +84,7 @@ void InfinityContext::UnInit() {
     task_scheduler_.reset();
 
     resource_manager_.reset();
+    persistence_manager_.reset();
 
     Logger::Shutdown();
     persistence_manager_.reset();
