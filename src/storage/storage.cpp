@@ -163,14 +163,13 @@ void Storage::Init() {
 }
 
 void Storage::UnInit() {
-    LOG_INFO("Close storage ...\n");
+    LOG_INFO("Close storage ...");
     periodic_trigger_thread_->Stop();
     if (compact_processor_.get() != nullptr) {
         compact_processor_->Stop();
     }
     bg_processor_->Stop();
     wal_mgr_->Stop();
-    txn_mgr_->Stop();
 
     txn_mgr_.reset();
     if (compact_processor_.get() != nullptr) {
