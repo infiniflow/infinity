@@ -306,6 +306,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kJSON", CopyFileType::kJSON)
         .value("kJSONL", CopyFileType::kJSONL)
         .value("kFVECS", CopyFileType::kFVECS)
+        .value("kCSR", CopyFileType::kCSR)
+        .value("kBVECS", CopyFileType::kBVECS)
         .value("kInvalid", CopyFileType::kInvalid);
 
     nb::class_<InitParameter>(m, "InitParameter")
