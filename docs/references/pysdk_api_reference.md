@@ -635,7 +635,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
     - `"pq_subspace_bits"`: *Required*
       - `"8"` (recommended)
       - `"16"`
-  - Parameter settings for a full text index: 
+  - Parameter settings for a full-text index: 
     - `"ANALYZER"`: *Optional* 
       - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs.
       - `"chinese"`: Chinese
@@ -713,7 +713,7 @@ table_obj = db_obj.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,
 # - "ef_construction": "50",
 # - "ef": "50", 
 # - "encode": "plain"
-# Only the metric parameter is explicitly set to L2 distance. 
+# Only the "metric" parameter (required) is explicitly set to L2 distance. 
 table_obj.create_index("my_index",[IndexInfo("c1", IndexType.Hnsw, [InitParameter("metric", "l2")])], None)
 ```
 
@@ -730,7 +730,7 @@ table_obj = db_obj.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,
 table_obj.create_index(
     "my_index",
     [
-        infinity.index.IndexInfo(
+        IndexInfo(
             "c1",
             IndexType.Hnsw,
             [
@@ -748,52 +748,115 @@ table_obj.create_index(
 
 #### Create a full-text index
 
-```python {1,2}
+```python {15}
+from infinity.index import IndexInfo
 from infinity.index import IndexType
+from infinity.index import InitParameter
 from infinity import index
-# Create a table named "test_index_fulltext" with a varchar column "c1"
-table_obj = db_obj.create_table("test_index_fulltext", {"c1": {"type": "varchar"}}, None)
-# Create a full-text index named "my_index" on column "c1"
+# Create a table named "test_index_fulltext" with a varchar column "body"
+table_obj = db_obj.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
+# Create a full-text index named "my_index" on column "body" with default parameter settings:
+# - "ANALYZER": "standard"
 table_obj.create_index(
     "my_index",
     [
-        index.IndexInfo("body", IndexType.FullText, []),
-        index.IndexInfo("doctitle", IndexType.FullText, []),
-        index.IndexInfo("docdate", IndexType.FullText, []),
+        IndexInfo(
+          "body", 
+          IndexType.FullText, 
+          []
+        ),
     ],
     None
 )
 ```
 
-```python
+```python {16}
+from infinity.index import IndexInfo
 from infinity.index import IndexType
+from infinity.index import InitParameter
 from infinity import index
-# Create a table named "test_index_fulltext" with a varchar column "c1"
-table_obj = db_obj.create_table("test_index_fulltext", {"c1": {"type": "varchar"}}, None)
-# Create a full-text index named "my_index" on column "c1"
+# Create a table named "test_index_fulltext" with a varchar column "body"
+table_obj = db_obj.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
+# Create a full-text index named "my_index" on column "body"
+# Setting "ANALYZER" to "standard" (same as the above)
 table_obj.create_index(
     "my_index",
     [
-        index.IndexInfo("body", IndexType.FullText, []),
-        index.IndexInfo("doctitle", IndexType.FullText, []),
-        index.IndexInfo("docdate", IndexType.FullText, []),
+        IndexInfo(
+          "body", 
+          IndexType.FullText, 
+          [
+            InitParameter("ANALYZER", "standard")
+          ]
+        ),
     ],
     None
 )
 ```
+
+```python {14-16}
+from infinity.index import IndexInfo
+from infinity.index import IndexType
+from infinity.index import InitParameter
+from infinity import index
+# In the following code snippet, you will see an index built on three columns
+# IMPORTANT: For now, multi-column index works with full-text index ONLY. 
+# Create a table named "test_index_fulltext" with three varchar columns "doctitle", "docdate", and "body"
+table_obj = db_obj.create_table("test_index_fulltext", {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}}, None)
+# Create a full-text index named "my_index" on three columns "doctitle", "docdate", and "body" with default parameter settings:
+# - "ANALYZER": "standard"
+table_obj.create_index(
+    "my_index",
+    [
+        IndexInfo("doctitle", IndexType.FullText, []),
+        IndexInfo("docdate", IndexType.FullText, []),
+        IndexInfo("body", IndexType.FullText, []),
+    ],
+    None
+)
+```
+
 
 #### Create an IVFFlat index
 
-```python
+```python {17}
+from infinity.index import IndexInfo
 from infinity.index import IndexType
+from infinity.index import InitParameter
+from infinity import index
+# Create a table named "test_index_ivfflat" with a vector column "c1"
+table_ojbect = db_obj.create_table("test_index_ivfflat", {"c1": {"type": "vector,1024,float"}}, None)
+# Create an IVFFlat index named "my_index" on column "c1" with default parameter settings:
+# - "centroids_count": "128"
+# Only the metric parameter (required) is explicitly set to L2 distance. 
+table_obj.create_index(
+    "my_index",
+    [
+        IndexInfo(
+            "c1",
+            IndexType.IVFFlat,
+            [
+                InitParameter("metric", "l2")
+            ]
+        )
+    ],
+    None
+)
+```
+
+```python {16,17}
+from infinity.index import IndexInfo
+from infinity.index import IndexType
+from infinity.index import InitParameter
 from infinity import index
 # Create a table named "test_index_ivfflat" with a vector column "c1"
 table_ojbect = db_obj.create_table("test_index_ivfflat", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an IVFFlat index named "my_index" on column "c1"
+# Explicitly settings "centroids_count" to "128" and "metric" to "l2" (same as above)
 table_obj.create_index(
     "my_index",
     [
-        index.IndexInfo(
+        IndexInfo(
             "c1",
             IndexType.IVFFlat,
             [
@@ -808,23 +871,70 @@ table_obj.create_index(
 
 #### Create a secondary index
 
+```python {14}
+from infinity.index import IndexInfo
+from infinity.index import IndexType
+from infinity.index import InitParameter
+from infinity import index
+# Create a table named "test_index_fulltext" with a varchar column "body"
+table_obj = db_obj.create_table("test_index_secondary", {"c1": {"type": "varchar"}}, None)
+# Create a full-text index named "my_index" on column "c1"
+table_obj.create_index(
+    "my_index",
+    [
+        IndexInfo(
+          "c1", 
+          IndexType.Secondary, 
+          []
+        ),
+    ],
+    None
+)
+
 #### Create a BMP index
 
-```python
+```python {16}
+from infinity.index import IndexInfo
 from infinity.index import IndexType
+from infinity.index import InitParameter
+from infinity import index
+# Create a table named "test_index_bmp" with a sparse vector column "c1"
+table_obj = db_obj.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
+# Create a BMP index named "my_index" on column "c1" with default parameter settings:
+# - "block_size": "16"
+# - "compress_type": "compress"
+table_obj.create_index(
+    "my_index",
+    [
+        IndexInfo(
+            "c1",
+            IndexType.BMP,
+            []
+        )
+    ],
+    None
+)
+```
+
+
+```python {16,17}
+from infinity.index import IndexInfo
+from infinity.index import IndexType
+from infinity.index import InitParameter
 from infinity import index
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
 table_obj = db_obj.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
 # Create a BMP index named "my_index" on column "c1"
+# Settings for "block_size" and "compress_type" are the same as above
 table_obj.create_index(
     "my_index",
     [
-        index.IndexInfo(
+        IndexInfo(
             "c1",
             IndexType.BMP,
             [
-                index.InitParameter("block_size", "16"),
-                index.InitParameter("compress_type", "compress")
+                InitParameter("block_size", "16"),
+                InitParameter("compress_type", "compress")
             ]
         )
     ],
