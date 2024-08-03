@@ -137,8 +137,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: A `LocalDatabase` object in Python module mode or a `RemoteDatabase` object in client-server mode. Both objects contain these attributes:  
-  - `db_name`: The database name.
+- Success: An `infinity.local_infinity.db.LocalDatabase` object in Python module mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode. 
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value: A specific error condition occurs.
   - `error_msg`: `str` The error message providing additional details.
@@ -275,8 +274,7 @@ Name of the database. Must not be empty.
 
 ### Returns
 
-- Success: A `LocalDatabase` object in Python module mode or a `RemoteDatabase` object in client-server mode. Both objects contain these attributes:  
-  - `db_name`: The database name.
+- Success: An `infinity.local_infinity.db.LocalDatabase` object in Python module mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode. 
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value: A specific error condition occurs.
   - `error_msg`: `str` The error message providing additional details.
@@ -370,9 +368,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: A `LocalTable` object in Python module mode or a `RemoteTable` object in client-server mode. Both objects contain these attributes:  
-  - `db_name`: The database name.
-  - `table_name`: The table name.
+- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode. 
 - Failure: `InfinityException`:
   - `error_code`: `int` A non-zero value: A specific error condition occurs.
   - `error_msg`: `str` The error message providing additional details.
@@ -539,9 +535,7 @@ Name of the table to retrieve. Must not be empty.
 
 ### Returns
 
-- Success: A `LocalTable` object in Python module mode or a `RemoteTable` object in client-server mode. Both objects contain these attributes:  
-  - `db_name`: The database name.
-  - `table_name`: The table name.
+- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode. 
 - Failure: `InfinityException`:
   - `error_code`: `int` A non-zero value: A specific error condition occurs.
   - `error_msg`: `str` The error message providing additional details.
@@ -604,7 +598,7 @@ The name of the index. `index_name` requirements:
   - Digits (0-9)
   - "_" (underscore)
 
-#### index_infos: `list[index.IndexInfo()]`, *Required*
+#### index_infos: `list[IndexInfo()]`, *Required*
 
 An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and `index_param_list`.
     
@@ -635,7 +629,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
     - `"pq_subspace_num"`: *Required*
       - `"8"` 
       - `"16"` (recommended) 
-      - `"32"` (recommended) 
+      - `"32"`
       - `"64"`
       - `"128"`
     - `"pq_subspace_bits"`: *Required*
@@ -643,11 +637,11 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"16"`
   - Parameter settings for a full text index: 
     - `"ANALYZER"`: *Optional* 
-      - `"standard"`: (Default) Standard
+      - `"standard"`: (Default) Standard analyzer, segmented by tokens, lowercase processing, provides stemming outputs.
       - `"chinese"`: Chinese
       - `"tradition"`: Traditional Chinese
       - `"japanese"`: Japanese
-      - `"ngram"`: Ngram
+      - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
   - Parameter settings for an IVFFlat index:  
     - `"centroids_count"`: *Optional* - Defaults to`"128"` 
     - `"metric"`: *Required - The distance metric to use in similarity search.
@@ -663,10 +657,12 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"raw"`: Store the block max without compression.
 
 :::tip NOTE
-You may want to import the `infinity.index` package to set `IndexType` and the `infinity` package to set `index.IndexInfo()` and `index.InitParameter()`:
+- Import the `infinity.index` package to set `IndexInfo`, `IndexType`, and `InitParameter`.
+- Import the `infinity` package to set `index.IndexInfo()`.
 
 ```python
 from infinity.index import IndexType
+from infinity.index import InitParameter
 from infinity import index
 ```
 :::
@@ -705,8 +701,10 @@ A `LocalQueryResult` object in Python module mode or a `CommonResponse` object i
 
 #### Create an HNSW index
 
-```python {1,2,14,16,18}
+```python {1-4}
+from infinity.index import IndexInfo
 from infinity.index import IndexType
+from infinity.index import InitParameter
 from infinity import index
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
 table_obj = db_obj.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
@@ -716,39 +714,31 @@ table_obj = db_obj.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,
 # - "ef": "50", 
 # - "encode": "plain"
 # Only the metric parameter is explicitly set to L2 distance. 
-table_obj.create_index(
-    "my_index",
-    [
-        index.IndexInfo(
-            "c1",
-            IndexType.Hnsw,
-            [
-                index.InitParameter("metric", "l2")
-            ]
-        )
-    ],
-    None
-)
+table_obj.create_index("my_index",[IndexInfo("c1", IndexType.Hnsw, [InitParameter("metric", "l2")])], None)
 ```
 
-```python {9,11,17}
+```python {1-4}
+from infinity.index import IndexInfo
+from infinity.index import IndexType
+from infinity.index import InitParameter
+from infinity import index
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
 table_obj = db_obj.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an HNSW index named "my_index" on column "c1"
-# Settings to "M", "ef_construction", "ef", and "metric" are the same as above, except that
-# "encoding" is set to "lvq". 
+# Settings for "M", "ef_construction", "ef", and "metric" are the same as above, except:
+# "encoding" is set to "lvq" 
 table_obj.create_index(
     "my_index",
     [
         infinity.index.IndexInfo(
             "c1",
-            infinity.index.IndexType.Hnsw,
+            IndexType.Hnsw,
             [
-                infinity.index.InitParameter("M", "16"),
-                infinity.index.InitParameter("ef_construction", "50"),
-                infinity.index.InitParameter("ef", "50"),
-                infinity.index.InitParameter("metric", "l2")
-                infinity.index.InitParameter("encode", "lvq") # "lvq" applies to float vector element only
+                InitParameter("M", "16"),
+                InitParameter("ef_construction", "50"),
+                InitParameter("ef", "50"),
+                InitParameter("metric", "l2")
+                InitParameter("encode", "lvq") # "lvq" applies to float vector element only
             ]
         )
     ],
