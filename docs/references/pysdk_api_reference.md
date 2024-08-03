@@ -876,9 +876,9 @@ from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
 from infinity import index
-# Create a table named "test_index_fulltext" with a varchar column "body"
+# Create a table named "test_index_secondary" with a varchar column "body"
 table_obj = db_obj.create_table("test_index_secondary", {"c1": {"type": "varchar"}}, None)
-# Create a full-text index named "my_index" on column "c1"
+# Create a secondary index named "my_index" on column "c1"
 table_obj.create_index(
     "my_index",
     [
