@@ -609,7 +609,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_fulltext_match_with_invalid_analyzer", ConflictType.Ignore)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_create_index_on_deleted_table(self):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(

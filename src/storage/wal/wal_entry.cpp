@@ -36,6 +36,7 @@ import block_entry;
 import segment_entry;
 import segment_index_entry;
 import chunk_index_entry;
+import block_version;
 import local_file_system;
 import index_defines;
 import create_index_info;
@@ -53,7 +54,11 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
         for (u32 layer_n = 0; layer_n < 2; ++layer_n) {
             col_i_outline_info.emplace_back(column->OutlineBufferCount(layer_n), column->LastChunkOff(layer_n));
         }
+        paths_.push_back(column->FilePath());
     }
+    String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
+    String version_file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
+    paths_.push_back(version_file_path);
 }
 
 bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
@@ -66,6 +71,12 @@ i32 WalBlockInfo::GetSizeInBytes() const {
     size += sizeof(i32);
     for (const auto &v : outline_infos_) {
         size += sizeof(i32) + v.size() * (sizeof(u32) + sizeof(u64));
+    }
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        size += pm->GetSizeInBytes(paths_);
     }
     return size;
 }
@@ -81,6 +92,11 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
             WriteBufAdv(buf, idx);
             WriteBufAdv(buf, off);
         }
+    }
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        pm->WriteBufAdv(buf, paths_);
     }
 }
 
@@ -100,6 +116,11 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
             const auto last_chunk_offset = ReadBufAdv<u64>(ptr);
             outline_info[j] = {buffer_cnt, last_chunk_offset};
         }
+    }
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        pm->ReadBufAdv(ptr);
     }
     return block_info;
 }
@@ -186,17 +207,29 @@ String WalSegmentInfo::ToString() const {
 WalChunkIndexInfo::WalChunkIndexInfo(ChunkIndexEntry *chunk_index_entry)
     : chunk_id_(chunk_index_entry->chunk_id_), base_name_(chunk_index_entry->base_name_), base_rowid_(chunk_index_entry->base_rowid_),
       row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {
-    IndexType index_type = chunk_index_entry->segment_index_entry_->table_index_entry()->index_base()->index_type_;
+    SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
+    IndexType index_type = segment_index_entry->table_index_entry()->index_base()->index_type_;
     switch (index_type) {
         case IndexType::kFullText: {
-            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(chunk_index_entry->segment_index_entry_->index_dir()));
+            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
             paths_.push_back(full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX);
             paths_.push_back(full_path + chunk_index_entry->base_name_ + DICT_SUFFIX);
             paths_.push_back(full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
             break;
         }
-        default: {
+        case IndexType::kHnsw:
+        case IndexType::kEMVB:
+        case IndexType::kSecondary:
+        case IndexType::kBMP: {
+            String full_dir = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
+            String file_name = ChunkIndexEntry::IndexFileName(segment_index_entry->segment_id(), chunk_index_entry->chunk_id_);
+            String full_path = fmt::format("{}/{}", full_dir, file_name);
+            paths_.push_back(full_path);
             break;
+        }
+        default: {
+            String error_message = "Unsupported index type when add wal.";
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -207,7 +240,13 @@ bool WalChunkIndexInfo::operator==(const WalChunkIndexInfo &other) const {
 }
 
 i32 WalChunkIndexInfo::GetSizeInBytes() const {
-    return sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(deprecate_ts_);
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    SizeT size = 0;
+    if (use_object_cache) {
+        size = pm->GetSizeInBytes(paths_);
+    }
+    return size + sizeof(ChunkID) + sizeof(i32) + base_name_.size() + sizeof(base_rowid_) + sizeof(row_count_) + sizeof(deprecate_ts_);
 }
 
 void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
@@ -220,12 +259,7 @@ void WalChunkIndexInfo::WriteBufferAdv(char *&buf) const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        WriteBufAdv(buf, paths_.size());
-        for (auto &path : paths_) {
-            ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
-            WriteBufAdv(buf, path);
-            obj_addr.WriteBuf(buf);
-        }
+        pm->WriteBufAdv(buf, paths_);
     }
 }
 
@@ -240,13 +274,7 @@ WalChunkIndexInfo WalChunkIndexInfo::ReadBufferAdv(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        SizeT size = ReadBufAdv<SizeT>(ptr);
-        for (SizeT i = 0; i < size; i++) {
-            String path = ReadBufAdv<String>(ptr);
-            ObjAddr obj_addr;
-            obj_addr.ReadBuf(ptr);
-            pm->SaveLocalPath(path, obj_addr);
-        }
+        pm->ReadBufAdv(ptr);
     }
     return chunk_index_info;
 }

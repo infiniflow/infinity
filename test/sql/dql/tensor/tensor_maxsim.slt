@@ -11,14 +11,14 @@ COPY sqllogic_tensor_maxsim FROM '/var/infinity/test_data/tensor_maxsim.csv' WIT
 query I
 SELECT * FROM sqllogic_tensor_maxsim;
 ----
-test00 2 [0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3] this
-test11 4 [0.2,0.1,0.3,0.4] tree
-test22 6 [0.3,0.2,-11.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3] tell off
-test33 8 [0.4,0.3,0.2,0.1] that
-test44 12 [0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3] time off
-test55 14 [0.2,0.1,0.3,0.4],[-0.4,0.3,0.2,0.1],[0,0.2,-0.3,-0.2],[0.3,-0.2,0.2,0.3] where
-test66 16 [0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3],[0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3] on
-test77 18 [0.4,-0.3,0.2,0.1],[-0.4,0.3,0.2,0.1] off
+test00 2 [[0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]] this
+test11 4 [[0.2,0.1,0.3,0.4]] tree
+test22 6 [[0.3,0.2,-11.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3]] tell off
+test33 8 [[0.4,0.3,0.2,0.1]] that
+test44 12 [[0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]] time off
+test55 14 [[0.2,0.1,0.3,0.4],[-0.4,0.3,0.2,0.1],[0,0.2,-0.3,-0.2],[0.3,-0.2,0.2,0.3]] where
+test66 16 [[0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3],[0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3]] on
+test77 18 [[0.4,-0.3,0.2,0.1],[-0.4,0.3,0.2,0.1]] off
 
 query I
 EXPLAIN SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim') WHERE 10 > num;
@@ -104,7 +104,7 @@ test11 -9.660001
 
 # filter
 query I
-SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0, -10, 0, 1], [9, 46, -56, 4]], 'int8', 'maxsim') WHERE 10 > num;
+SELECT title, SCORE() FROM sqllogic_tensor_maxsim SEARCH MATCH TENSOR (t, [[0, -10, 0, 1], [9, 46, -56, 4]], 'float16', 'maxsim') WHERE 10 > num;
 ----
 test22 639.399963
 test33 3.700001

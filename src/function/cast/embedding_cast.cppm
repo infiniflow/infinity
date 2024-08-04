@@ -69,6 +69,9 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
         RecoverableError(status);
     }
     switch (source_info->Type()) {
+        case EmbeddingDataType::kElemBit: {
+            return BindEmbeddingCast<BooleanT>(target_info);
+        }
         case EmbeddingDataType::kElemUInt8: {
             return BindEmbeddingCast<u8>(target_info);
         }
@@ -90,8 +93,14 @@ export inline BoundCastFunc BindEmbeddingCast(const DataType &source, const Data
         case EmbeddingDataType::kElemDouble: {
             return BindEmbeddingCast<DoubleT>(target_info);
         }
-        default: {
-            String error_message = fmt::format("Can't cast from {} to Embedding type", target.ToString());
+        case EmbeddingDataType::kElemFloat16: {
+            return BindEmbeddingCast<Float16T>(target_info);
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            return BindEmbeddingCast<BFloat16T>(target_info);
+        }
+        case EmbeddingDataType::kElemInvalid: {
+            String error_message = "Unreachable code";
             UnrecoverableError(error_message);
         }
     }
@@ -125,8 +134,14 @@ inline BoundCastFunc BindEmbeddingCast(const EmbeddingInfo *target) {
         case EmbeddingDataType::kElemDouble: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, DoubleT, EmbeddingTryCastToFixlen>);
         }
-        default: {
-            String error_message = fmt::format("Can't cast from Embedding type to {}", target->ToString());
+        case EmbeddingDataType::kElemFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, Float16T, EmbeddingTryCastToFixlen>);
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVectorEmbedding<SourceElemType, BFloat16T, EmbeddingTryCastToFixlen>);
+        }
+        case EmbeddingDataType::kElemInvalid: {
+            String error_message = "Unreachable code";
             UnrecoverableError(error_message);
         }
     }
@@ -140,7 +155,8 @@ struct EmbeddingTryCastToFixlen {
             if constexpr (!(std::is_same_v<SourceElemType, u8> || std::is_same_v<SourceElemType, TinyIntT> ||
                             std::is_same_v<SourceElemType, SmallIntT> || std::is_same_v<SourceElemType, IntegerT> ||
                             std::is_same_v<SourceElemType, BigIntT> || std::is_same_v<SourceElemType, FloatT> ||
-                            std::is_same_v<SourceElemType, DoubleT>)) {
+                            std::is_same_v<SourceElemType, DoubleT> || std::is_same_v<SourceElemType, Float16T> ||
+                            std::is_same_v<SourceElemType, BFloat16T>)) {
                 String error_message = fmt::format("Not support to cast from {} to {}",
                                                    DataType::TypeToString<SourceElemType>(),
                                                    DataType::TypeToString<TargetElemType>());
@@ -158,7 +174,8 @@ struct EmbeddingTryCastToFixlen {
             if constexpr (!(std::is_same_v<TargetElemType, u8> || std::is_same_v<TargetElemType, TinyIntT> ||
                             std::is_same_v<TargetElemType, SmallIntT> || std::is_same_v<TargetElemType, IntegerT> ||
                             std::is_same_v<TargetElemType, BigIntT> || std::is_same_v<TargetElemType, FloatT> ||
-                            std::is_same_v<TargetElemType, DoubleT>)) {
+                            std::is_same_v<TargetElemType, DoubleT> || std::is_same_v<TargetElemType, Float16T> ||
+                            std::is_same_v<TargetElemType, BFloat16T>)) {
                 String error_message = fmt::format("Not support to cast from {} to {}",
                                                    DataType::TypeToString<SourceElemType>(),
                                                    DataType::TypeToString<TargetElemType>());
@@ -166,7 +183,16 @@ struct EmbeddingTryCastToFixlen {
             }
             const auto *src = reinterpret_cast<const u8 *>(source);
             for (SizeT i = 0; i < len; ++i) {
-                target[i] = (src[i / 8] & (1u << (i % 8))) ? 1 : 0;
+                if constexpr (std::is_same_v<TargetElemType, u8> || std::is_same_v<TargetElemType, TinyIntT> ||
+                              std::is_same_v<TargetElemType, SmallIntT> || std::is_same_v<TargetElemType, IntegerT> ||
+                              std::is_same_v<TargetElemType, BigIntT>) {
+                    target[i] = (src[i / 8] & (1u << (i % 8))) ? 1 : 0;
+                } else if constexpr (std::is_same_v<TargetElemType, FloatT> || std::is_same_v<TargetElemType, DoubleT> ||
+                                     std::is_same_v<TargetElemType, Float16T> || std::is_same_v<TargetElemType, BFloat16T>) {
+                    target[i] = (src[i / 8] & (1u << (i % 8))) ? 1.0f : 0.0f;
+                } else {
+                    static_assert(false, "Some case not handled!");
+                }
             }
             return true;
         } else if constexpr (std::is_same<SourceElemType, u8>() || std::is_same<SourceElemType, TinyIntT>() ||
@@ -178,7 +204,8 @@ struct EmbeddingTryCastToFixlen {
                 }
             }
             return true;
-        } else if constexpr (std::is_same<SourceElemType, FloatT>() || std::is_same<SourceElemType, DoubleT>()) {
+        } else if constexpr (std::is_same<SourceElemType, FloatT>() || std::is_same<SourceElemType, DoubleT>() ||
+                             std::is_same_v<SourceElemType, Float16T> || std::is_same_v<SourceElemType, BFloat16T>) {
             for (SizeT i = 0; i < len; ++i) {
                 if (!FloatTryCastToFixlen::Run(source[i], target[i])) {
                     return false;
@@ -292,6 +319,10 @@ void EmbeddingTryCastToTensorImpl(const EmbeddingT &source,
             EmbeddingTryCastToTensorImpl<TargetValueType, BooleanT>(source, source_embedding_dim, target, target_vector_ptr);
             break;
         }
+        case EmbeddingDataType::kElemUInt8: {
+            EmbeddingTryCastToTensorImpl<TargetValueType, u8>(source, source_embedding_dim, target, target_vector_ptr);
+            break;
+        }
         case EmbeddingDataType::kElemInt8: {
             EmbeddingTryCastToTensorImpl<TargetValueType, TinyIntT>(source, source_embedding_dim, target, target_vector_ptr);
             break;
@@ -316,8 +347,16 @@ void EmbeddingTryCastToTensorImpl(const EmbeddingT &source,
             EmbeddingTryCastToTensorImpl<TargetValueType, DoubleT>(source, source_embedding_dim, target, target_vector_ptr);
             break;
         }
-        default: {
-            String error_message = fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(src_type));
+        case EmbeddingDataType::kElemFloat16: {
+            EmbeddingTryCastToTensorImpl<TargetValueType, Float16T>(source, source_embedding_dim, target, target_vector_ptr);
+            break;
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            EmbeddingTryCastToTensorImpl<TargetValueType, BFloat16T>(source, source_embedding_dim, target, target_vector_ptr);
+            break;
+        }
+        case EmbeddingDataType::kElemInvalid: {
+            String error_message = "Unreachable code";
             UnrecoverableError(error_message);
         }
     }
@@ -332,6 +371,10 @@ void EmbeddingTryCastToTensor(const EmbeddingT &source,
     switch (dst_type) {
         case EmbeddingDataType::kElemBit: {
             EmbeddingTryCastToTensorImpl<BooleanT>(source, src_type, source_embedding_dim, target, target_vector_ptr);
+            break;
+        }
+        case EmbeddingDataType::kElemUInt8: {
+            EmbeddingTryCastToTensorImpl<u8>(source, src_type, source_embedding_dim, target, target_vector_ptr);
             break;
         }
         case EmbeddingDataType::kElemInt8: {
@@ -358,8 +401,16 @@ void EmbeddingTryCastToTensor(const EmbeddingT &source,
             EmbeddingTryCastToTensorImpl<DoubleT>(source, src_type, source_embedding_dim, target, target_vector_ptr);
             break;
         }
-        default: {
-            String error_message = fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(dst_type));
+        case EmbeddingDataType::kElemFloat16: {
+            EmbeddingTryCastToTensorImpl<Float16T>(source, src_type, source_embedding_dim, target, target_vector_ptr);
+            break;
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            EmbeddingTryCastToTensorImpl<BFloat16T>(source, src_type, source_embedding_dim, target, target_vector_ptr);
+            break;
+        }
+        case EmbeddingDataType::kElemInvalid: {
+            String error_message = "Unreachable code";
             UnrecoverableError(error_message);
         }
     }
