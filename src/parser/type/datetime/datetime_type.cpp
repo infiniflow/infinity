@@ -85,7 +85,7 @@ int64_t DateTimeType::GetDateTimePart(DateTimeType input, TimeUnit unit) {
 }
 
 int64_t DateTimeType::GetEpochTime() const {
-    constexpr int32_t TotalSecondsInDay = 24 * 60 * 60;
+    constexpr int64_t TotalSecondsInDay = 24 * 60 * 60;
     return date.GetValue() * TotalSecondsInDay + time.GetValue();
 }
 
