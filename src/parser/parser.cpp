@@ -775,7 +775,7 @@ union yyalloc
 /* YYNRULES -- Number of rules.  */
 #define YYNRULES  458
 /* YYNSTATES -- Number of states.  */
-#define YYNSTATES  952
+#define YYNSTATES  953
 
 /* YYMAXUTOK -- Last valid token kind.  */
 #define YYMAXUTOK   439
@@ -870,24 +870,24 @@ static const yytype_int16 yyrline[] =
     1942,  1947,  1953,  1959,  1967,  1973,  1979,  1985,  1991,  1999,
     2005,  2011,  2017,  2023,  2031,  2037,  2044,  2057,  2061,  2066,
     2072,  2079,  2087,  2096,  2106,  2116,  2127,  2138,  2150,  2162,
-    2172,  2183,  2194,  2206,  2210,  2215,  2220,  2231,  2235,  2240,
-    2244,  2271,  2277,  2281,  2282,  2283,  2284,  2285,  2287,  2290,
-    2296,  2299,  2300,  2301,  2302,  2303,  2304,  2305,  2306,  2307,
-    2308,  2310,  2313,  2319,  2338,  2380,  2426,  2444,  2462,  2470,
-    2481,  2487,  2496,  2502,  2514,  2517,  2520,  2523,  2526,  2529,
-    2533,  2537,  2542,  2550,  2558,  2567,  2574,  2581,  2588,  2595,
-    2602,  2610,  2618,  2626,  2634,  2642,  2650,  2658,  2666,  2674,
-    2682,  2690,  2698,  2728,  2736,  2745,  2753,  2762,  2770,  2776,
-    2783,  2789,  2796,  2801,  2808,  2815,  2823,  2847,  2853,  2859,
-    2866,  2874,  2881,  2888,  2893,  2903,  2908,  2913,  2918,  2923,
-    2928,  2933,  2938,  2943,  2948,  2951,  2954,  2958,  2961,  2964,
-    2967,  2971,  2974,  2977,  2981,  2985,  2990,  2995,  2998,  3002,
-    3006,  3013,  3020,  3024,  3031,  3038,  3042,  3046,  3050,  3053,
-    3057,  3061,  3066,  3071,  3075,  3080,  3085,  3091,  3097,  3103,
-    3109,  3115,  3121,  3127,  3133,  3139,  3145,  3151,  3162,  3166,
-    3171,  3201,  3211,  3216,  3221,  3226,  3232,  3236,  3237,  3239,
-    3240,  3242,  3243,  3255,  3263,  3267,  3270,  3274,  3277,  3281,
-    3285,  3290,  3296,  3306,  3313,  3324,  3328,  3336,  3390
+    2172,  2183,  2195,  2208,  2212,  2217,  2222,  2233,  2237,  2242,
+    2246,  2273,  2279,  2283,  2284,  2285,  2286,  2287,  2289,  2292,
+    2298,  2301,  2302,  2303,  2304,  2305,  2306,  2307,  2308,  2309,
+    2310,  2312,  2315,  2321,  2340,  2382,  2428,  2446,  2464,  2472,
+    2483,  2489,  2498,  2504,  2516,  2519,  2522,  2525,  2528,  2531,
+    2535,  2539,  2544,  2552,  2560,  2569,  2576,  2583,  2590,  2597,
+    2604,  2612,  2620,  2628,  2636,  2644,  2652,  2660,  2668,  2676,
+    2684,  2692,  2700,  2730,  2738,  2747,  2755,  2764,  2772,  2778,
+    2785,  2791,  2798,  2803,  2810,  2817,  2825,  2849,  2855,  2861,
+    2868,  2876,  2883,  2890,  2895,  2905,  2910,  2915,  2920,  2925,
+    2930,  2935,  2940,  2945,  2950,  2953,  2956,  2960,  2963,  2966,
+    2969,  2973,  2976,  2979,  2983,  2987,  2992,  2997,  3000,  3004,
+    3008,  3015,  3022,  3026,  3033,  3040,  3044,  3048,  3052,  3055,
+    3059,  3063,  3068,  3073,  3077,  3082,  3087,  3093,  3099,  3105,
+    3111,  3117,  3123,  3129,  3135,  3141,  3147,  3153,  3164,  3168,
+    3173,  3203,  3213,  3218,  3223,  3228,  3234,  3238,  3239,  3241,
+    3242,  3244,  3245,  3257,  3265,  3269,  3272,  3276,  3279,  3283,
+    3287,  3292,  3298,  3308,  3315,  3326,  3330,  3338,  3392
 };
 #endif
 
@@ -1082,9 +1082,9 @@ static const yytype_int16 yypact[] =
     -522,  -522,  -522,  -522,  -522,  -522,  -522,  -522,  -522,  -522,
     -522,  -522,  -522,  -522,  -522,  1057,  -522,  1063,   640,  1062,
     1064,  1066,  -522,  -522,  -522,  -522,  -522,   460,   925,  -522,
-     927,   465,   482,   640,  1070,  1065,   929,   640,  1071,  -522,
-    1073,  -522,  -522,   931,  -522,  -522,  -522,  -522,  1040,   640,
-    -522,  -522
+     927,  1070,   463,   640,  1071,  1065,   929,   640,   484,  1073,
+    -522,  -522,   931,  -522,  -522,  -522,  1074,  -522,  1040,   640,
+    -522,  -522,  -522
 };
 
 /* YYDEFACT[STATE-NUM] -- Default reduction number in state STATE-NUM.
@@ -1185,26 +1185,26 @@ static const yytype_int16 yydefact[] =
      107,   104,   105,   108,   109,   110,   103,    89,    90,    87,
       88,    91,    92,    93,    86,     0,   319,     0,   446,     0,
        0,     0,   274,   273,   279,    77,   102,     0,   312,   317,
-       0,   280,   275,   446,     0,     0,     0,   446,     0,   281,
-       0,   276,   315,     0,   311,   313,   316,   282,   277,   446,
-     278,   314
+       0,   280,   275,   446,     0,     0,     0,   446,     0,     0,
+     276,   315,     0,   311,   313,   316,     0,   281,   277,   446,
+     282,   278,   314
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int16 yypgoto[] =
 {
-    -522,  -522,  -522,   983,  -522,  1048,  -522,   556,  -522,   546,
-    -522,   477,   488,  -522,  -403,  1049,  1050,   932,  -522,  -522,
-    1053,  -522,   818,  1067,  1068,   -59,  1083,   -16,   829,   950,
+    -522,  -522,  -522,   996,  -522,  1048,  -522,   556,  -522,   546,
+    -522,   490,   482,  -522,  -403,  1049,  1050,   932,  -522,  -522,
+    1053,  -522,   818,  1067,  1068,   -59,  1090,   -16,   837,   961,
       31,  -522,  -522,   636,  -522,  -522,  -522,  -522,  -522,  -522,
     -179,  -522,  -522,  -522,  -522,   545,  -115,    27,   471,  -522,
-    -522,   971,  -522,  -522,  1072,  1074,  1075,  1076,  1077,  -522,
+    -522,   978,  -522,  -522,  1072,  1075,  1076,  1077,  1078,  -522,
     -167,  -522,   819,  -191,  -192,  -522,  -474,  -455,  -454,  -453,
-    -448,  -439,   467,  -522,  -522,  -522,  -522,  -522,  -522,   821,
-    -522,  -522,   700,   420,  -215,  -522,  -522,  -522,   495,  -522,
-    -522,  -522,  -522,   496,   822,   824,   -24,  -522,  -522,  -522,
-    -522,   933,  -411,   511,  -117,   276,   487,  -522,  -522,  -521,
-    -522,   427,   489,  -522,   736
+    -448,  -439,   468,  -522,  -522,  -522,  -522,  -522,  -522,   821,
+    -522,  -522,   700,   428,  -215,  -522,  -522,  -522,   491,  -522,
+    -522,  -522,  -522,   497,   822,   824,   -24,  -522,  -522,  -522,
+    -522,   934,  -411,   513,  -117,   276,   487,  -522,  -522,  -521,
+    -522,   427,   489,  -522,   739
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
@@ -1270,8 +1270,8 @@ static const yytype_int16 yytable[] =
      432,   744,   654,   745,   746,   196,   197,   198,   199,   566,
      567,   670,   671,   672,   673,   674,   114,   929,   675,   676,
      624,   157,   651,   413,   200,   201,   120,   677,   548,    14,
-      14,   625,   942,   202,   350,   203,   946,   158,   159,   160,
-     552,   678,   553,   632,   432,   583,   633,   121,   951,   126,
+      14,   625,   941,   202,   350,   203,   945,   158,   159,   160,
+     552,   678,   553,   632,   432,   583,   633,   121,   952,   126,
      731,   204,   205,   206,   571,   634,   127,   207,   633,   679,
      680,   681,   682,   683,   128,   635,   684,   685,   350,   144,
      726,   142,    38,    39,    40,   686,   149,   200,   201,   722,
@@ -1280,9 +1280,9 @@ static const yytype_int16 yytable[] =
      197,   198,   199,   211,   204,   205,   206,    83,    84,    85,
      207,    44,    45,    46,   333,    15,   334,   335,   336,   653,
      695,   154,   350,    47,    48,   212,   212,   213,   213,   214,
-     214,   938,   939,    16,   208,   209,   210,   215,   216,   217,
+     214,   939,   940,    16,   208,   209,   210,   215,   216,   217,
      658,   156,   218,   659,   219,    17,   108,   109,   110,   111,
-     940,   941,   196,   197,   198,   199,   211,   696,   697,   698,
+     946,   947,   196,   197,   198,   199,   211,   696,   697,   698,
      699,   700,   155,   719,   701,   702,   413,   741,   751,   752,
      350,   318,   319,   650,   758,   803,   161,   759,   413,   212,
      202,   213,   203,   214,   162,   818,   806,   703,   164,   350,
@@ -1335,15 +1335,15 @@ static const yytype_int16 yytable[] =
      847,   848,   849,   850,   851,   852,   853,   854,   855,   856,
      857,   858,   859,   860,   861,   864,   865,   866,   867,   350,
      872,   869,   873,   874,   875,   876,   877,   880,   889,   878,
-     879,   927,   881,   882,   883,   884,   885,   928,   930,   944,
-     931,   886,   932,   887,   888,   890,   943,   947,   891,   948,
-     163,   892,   893,   894,   895,   896,   623,   897,   898,   899,
-     900,   950,   901,   715,   902,   903,   637,   904,   905,   906,
-      94,   907,   908,   909,   910,   911,   717,   386,   292,   912,
-     913,   130,   131,   132,   914,   283,   133,   916,   418,   915,
-     925,   917,   926,   937,   935,   945,   279,   949,   605,   662,
-     134,   135,   750,   754,   802,   137,   560,   138,   139,   140,
-     141,   734,   735,   331,   723,   429,   533,   804,   747,     0,
+     879,   927,   881,   882,   883,   884,   885,   928,   930,   943,
+     931,   886,   932,   887,   888,   890,   938,   942,   891,   948,
+     950,   892,   893,   894,   895,   896,   623,   897,   898,   899,
+     900,   951,   901,   163,   902,   903,   637,   904,   905,   906,
+     717,   907,   908,   909,   910,   911,   715,    94,   292,   912,
+     913,   130,   131,   132,   914,   386,   133,   916,   418,   915,
+     925,   917,   926,   937,   935,   944,   283,   949,   605,   662,
+     134,   135,   750,   279,   754,   137,   560,   734,   138,   139,
+     140,   141,   802,   735,   331,   429,   723,   804,   747,   533,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,   444,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
@@ -1405,9 +1405,9 @@ static const yytype_int16 yycheck[] =
        4,     5,     6,   154,   102,   103,   104,   156,   157,   158,
      108,    29,    30,    31,   120,   165,   122,   123,   124,   196,
      121,    57,   199,    41,    42,   177,   177,   179,   179,   181,
-     181,    46,    47,   183,   132,   133,   134,   188,   189,   190,
+     181,    48,    49,   183,   132,   133,   134,   188,   189,   190,
      196,     6,   193,   199,   195,   195,    39,    40,    41,    42,
-      48,    49,     3,     4,     5,     6,   154,    91,    92,    93,
+      46,    47,     3,     4,     5,     6,   154,    91,    92,    93,
       94,    95,   199,   196,    98,    99,   199,   196,   663,   664,
      199,    75,    76,   569,   196,   196,   196,   199,   199,   177,
       84,   179,    86,   181,   196,   756,   196,   121,    21,   199,
@@ -1462,13 +1462,13 @@ static const yytype_int16 yycheck[] =
      196,     6,   196,   196,   196,   196,   196,     6,     6,   196,
      196,     4,   196,   196,   196,   196,   196,     4,     6,     4,
        6,   196,     6,   196,   196,   196,     6,     6,   196,     6,
-      97,   196,   196,   196,   196,   196,   530,   196,   196,   196,
-     196,    51,   196,   616,   196,   196,   550,   196,   196,   196,
-      17,   196,   196,   196,   196,   196,   618,   278,   176,   196,
-     196,    63,    63,    63,   196,   165,    63,   196,   300,   199,
-     196,   199,   196,   196,   199,   196,   155,   196,   492,   584,
-      63,    63,   661,   666,   714,    63,   436,    63,    63,    63,
-      63,   646,   646,   210,   633,   324,   410,   720,   659,    -1,
+       6,   196,   196,   196,   196,   196,   530,   196,   196,   196,
+     196,    51,   196,    97,   196,   196,   550,   196,   196,   196,
+     618,   196,   196,   196,   196,   196,   616,    17,   176,   196,
+     196,    63,    63,    63,   196,   278,    63,   196,   300,   199,
+     196,   199,   196,   196,   199,   196,   165,   196,   492,   584,
+      63,    63,   661,   155,   666,    63,   436,   646,    63,    63,
+      63,    63,   714,   646,   210,   324,   633,   720,   659,   410,
       -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
       -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,   350,
       -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,    -1,
@@ -1574,9 +1574,9 @@ static const yytype_int16 yystos[] =
      196,   196,   196,   196,   196,   196,   196,   196,   196,   196,
      196,   196,   196,   196,   196,   199,   196,   199,   196,   199,
       42,    46,    47,    51,    52,   196,   196,     4,     4,   310,
-       6,     6,     6,   196,   199,   199,   266,   196,    46,    47,
-      48,    49,   310,     6,     4,   196,   310,     6,     6,   196,
-      51,   310
+       6,     6,     6,   196,   199,   199,   266,   196,     6,    48,
+      49,   310,     6,     4,   196,   310,    46,    47,     6,   196,
+       6,    51,   310
 };
 
 /* YYR1[RULE-NUM] -- Symbol kind of the left-hand side of rule RULE-NUM.  */
@@ -1661,7 +1661,7 @@ static const yytype_int8 yyr2[] =
        4,     4,     4,     4,     4,     4,     4,     4,     4,     4,
        4,     4,     4,     4,     4,     4,     3,     3,     4,     6,
        7,     9,    10,    12,    12,    13,    14,    15,    16,    12,
-      13,    14,    15,     3,     4,     5,     6,     1,     3,     3,
+      13,    15,    16,     3,     4,     5,     6,     1,     3,     3,
        5,     3,     1,     1,     1,     1,     1,     1,     3,     3,
        1,     1,     1,     1,     1,     1,     1,     1,     1,     1,
        1,     2,     0,    12,    14,    12,    12,    10,     7,     9,
@@ -6253,113 +6253,115 @@ yyreduce:
      (yyval.admin_stmt)->database_entry_index_ = (yyvsp[-5].long_value);
      (yyval.admin_stmt)->table_meta_index_ = (yyvsp[-3].long_value);
      (yyval.admin_stmt)->table_entry_index_ = (yyvsp[-2].long_value);
-     (yyval.admin_stmt)->index_index_ = (yyvsp[0].long_value);
+     (yyval.admin_stmt)->index_meta_index_ = (yyvsp[0].long_value);
 }
 #line 6259 "parser.cpp"
     break;
 
-  case 281: /* admin_statement: ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEX LONG_VALUE SEGMENTS  */
+  case 281: /* admin_statement: ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEX LONG_VALUE LONG_VALUE SEGMENTS  */
 #line 2183 "parser.y"
-                                                                                                                                {
+                                                                                                                                           {
      (yyval.admin_stmt) = new infinity::AdminStatement();
      (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kListIndexSegments;
-     (yyval.admin_stmt)->catalog_file_start_index_ = (yyvsp[-10].long_value);
-     (yyval.admin_stmt)->catalog_file_end_index_ = (yyvsp[-9].long_value);
-     (yyval.admin_stmt)->database_meta_index_ = (yyvsp[-7].long_value);
-     (yyval.admin_stmt)->database_entry_index_ = (yyvsp[-6].long_value);
-     (yyval.admin_stmt)->table_meta_index_ = (yyvsp[-4].long_value);
-     (yyval.admin_stmt)->table_entry_index_ = (yyvsp[-3].long_value);
-     (yyval.admin_stmt)->index_index_ = (yyvsp[-1].long_value);
-}
-#line 6275 "parser.cpp"
-    break;
-
-  case 282: /* admin_statement: ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEX LONG_VALUE SEGMENT LONG_VALUE  */
-#line 2194 "parser.y"
-                                                                                                                                          {
-     (yyval.admin_stmt) = new infinity::AdminStatement();
-     (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kShowIndexSegment;
      (yyval.admin_stmt)->catalog_file_start_index_ = (yyvsp[-11].long_value);
      (yyval.admin_stmt)->catalog_file_end_index_ = (yyvsp[-10].long_value);
      (yyval.admin_stmt)->database_meta_index_ = (yyvsp[-8].long_value);
      (yyval.admin_stmt)->database_entry_index_ = (yyvsp[-7].long_value);
      (yyval.admin_stmt)->table_meta_index_ = (yyvsp[-5].long_value);
      (yyval.admin_stmt)->table_entry_index_ = (yyvsp[-4].long_value);
-     (yyval.admin_stmt)->index_index_ = (yyvsp[-2].long_value);
+     (yyval.admin_stmt)->index_meta_index_ = (yyvsp[-2].long_value);
+     (yyval.admin_stmt)->index_entry_index_ = (yyvsp[-1].long_value);
+}
+#line 6276 "parser.cpp"
+    break;
+
+  case 282: /* admin_statement: ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEX LONG_VALUE LONG_VALUE SEGMENT LONG_VALUE  */
+#line 2195 "parser.y"
+                                                                                                                                                     {
+     (yyval.admin_stmt) = new infinity::AdminStatement();
+     (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kShowIndexSegment;
+     (yyval.admin_stmt)->catalog_file_start_index_ = (yyvsp[-12].long_value);
+     (yyval.admin_stmt)->catalog_file_end_index_ = (yyvsp[-11].long_value);
+     (yyval.admin_stmt)->database_meta_index_ = (yyvsp[-9].long_value);
+     (yyval.admin_stmt)->database_entry_index_ = (yyvsp[-8].long_value);
+     (yyval.admin_stmt)->table_meta_index_ = (yyvsp[-6].long_value);
+     (yyval.admin_stmt)->table_entry_index_ = (yyvsp[-5].long_value);
+     (yyval.admin_stmt)->index_meta_index_ = (yyvsp[-3].long_value);
+     (yyval.admin_stmt)->index_entry_index_ = (yyvsp[-2].long_value);
      (yyval.admin_stmt)->segment_index_ = (yyvsp[0].long_value);
 }
-#line 6292 "parser.cpp"
+#line 6294 "parser.cpp"
     break;
 
   case 283: /* admin_statement: ADMIN SHOW LOGS  */
-#line 2206 "parser.y"
+#line 2208 "parser.y"
                   {
      (yyval.admin_stmt) = new infinity::AdminStatement();
      (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kListLogFiles;
 }
-#line 6301 "parser.cpp"
+#line 6303 "parser.cpp"
     break;
 
   case 284: /* admin_statement: ADMIN SHOW LOG LONG_VALUE  */
-#line 2210 "parser.y"
+#line 2212 "parser.y"
                             {
      (yyval.admin_stmt) = new infinity::AdminStatement();
      (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kShowLogFile;
      (yyval.admin_stmt)->log_file_index_ = (yyvsp[0].long_value);
 }
-#line 6311 "parser.cpp"
+#line 6313 "parser.cpp"
     break;
 
   case 285: /* admin_statement: ADMIN SHOW LOG LONG_VALUE INDEXES  */
-#line 2215 "parser.y"
+#line 2217 "parser.y"
                                     {
      (yyval.admin_stmt) = new infinity::AdminStatement();
      (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kListLogIndexes;
      (yyval.admin_stmt)->log_file_index_ = (yyvsp[-1].long_value);
 }
-#line 6321 "parser.cpp"
+#line 6323 "parser.cpp"
     break;
 
   case 286: /* admin_statement: ADMIN SHOW LOG LONG_VALUE INDEX LONG_VALUE  */
-#line 2220 "parser.y"
+#line 2222 "parser.y"
                                              {
      (yyval.admin_stmt) = new infinity::AdminStatement();
      (yyval.admin_stmt)->admin_type_ = infinity::AdminStmtType::kShowLogIndex;
      (yyval.admin_stmt)->log_file_index_ = (yyvsp[-2].long_value);
      (yyval.admin_stmt)->log_index_in_file_ = (yyvsp[0].long_value);
 }
-#line 6332 "parser.cpp"
+#line 6334 "parser.cpp"
     break;
 
   case 287: /* expr_array: expr_alias  */
-#line 2231 "parser.y"
+#line 2233 "parser.y"
                         {
     (yyval.expr_array_t) = new std::vector<infinity::ParsedExpr*>();
     (yyval.expr_array_t)->emplace_back((yyvsp[0].expr_t));
 }
-#line 6341 "parser.cpp"
+#line 6343 "parser.cpp"
     break;
 
   case 288: /* expr_array: expr_array ',' expr_alias  */
-#line 2235 "parser.y"
+#line 2237 "parser.y"
                             {
     (yyvsp[-2].expr_array_t)->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_array_t) = (yyvsp[-2].expr_array_t);
 }
-#line 6350 "parser.cpp"
+#line 6352 "parser.cpp"
     break;
 
   case 289: /* expr_array_list: '(' expr_array ')'  */
-#line 2240 "parser.y"
+#line 2242 "parser.y"
                                      {
     (yyval.expr_array_list_t) = new std::vector<std::vector<infinity::ParsedExpr*>*>();
     (yyval.expr_array_list_t)->push_back((yyvsp[-1].expr_array_t));
 }
-#line 6359 "parser.cpp"
+#line 6361 "parser.cpp"
     break;
 
   case 290: /* expr_array_list: expr_array_list ',' '(' expr_array ')'  */
-#line 2244 "parser.y"
+#line 2246 "parser.y"
                                          {
     if(!(yyvsp[-4].expr_array_list_t)->empty() && (yyvsp[-4].expr_array_list_t)->back()->size() != (yyvsp[-1].expr_array_t)->size()) {
         yyerror(&yyloc, scanner, result, "The expr_array in list shall have the same size.");
@@ -6375,73 +6377,73 @@ yyreduce:
     (yyvsp[-4].expr_array_list_t)->push_back((yyvsp[-1].expr_array_t));
     (yyval.expr_array_list_t) = (yyvsp[-4].expr_array_list_t);
 }
-#line 6379 "parser.cpp"
+#line 6381 "parser.cpp"
     break;
 
   case 291: /* expr_alias: expr AS IDENTIFIER  */
-#line 2271 "parser.y"
+#line 2273 "parser.y"
                                 {
     (yyval.expr_t) = (yyvsp[-2].expr_t);
     ParserHelper::ToLower((yyvsp[0].str_value));
     (yyval.expr_t)->alias_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 }
-#line 6390 "parser.cpp"
+#line 6392 "parser.cpp"
     break;
 
   case 292: /* expr_alias: expr  */
-#line 2277 "parser.y"
+#line 2279 "parser.y"
        {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 6398 "parser.cpp"
+#line 6400 "parser.cpp"
     break;
 
   case 298: /* operand: '(' expr ')'  */
-#line 2287 "parser.y"
+#line 2289 "parser.y"
                       {
     (yyval.expr_t) = (yyvsp[-1].expr_t);
 }
-#line 6406 "parser.cpp"
+#line 6408 "parser.cpp"
     break;
 
   case 299: /* operand: '(' select_without_paren ')'  */
-#line 2290 "parser.y"
+#line 2292 "parser.y"
                                {
     infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
     subquery_expr->subquery_type_ = infinity::SubqueryType::kScalar;
     subquery_expr->select_ = (yyvsp[-1].select_stmt);
     (yyval.expr_t) = subquery_expr;
 }
-#line 6417 "parser.cpp"
+#line 6419 "parser.cpp"
     break;
 
   case 300: /* operand: constant_expr  */
-#line 2296 "parser.y"
+#line 2298 "parser.y"
                 {
     (yyval.expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 6425 "parser.cpp"
+#line 6427 "parser.cpp"
     break;
 
   case 311: /* extra_match_tensor_option: ',' STRING  */
-#line 2310 "parser.y"
+#line 2312 "parser.y"
                                        {
     (yyval.str_value) = (yyvsp[0].str_value);
 }
-#line 6433 "parser.cpp"
+#line 6435 "parser.cpp"
     break;
 
   case 312: /* extra_match_tensor_option: %empty  */
-#line 2313 "parser.y"
+#line 2315 "parser.y"
   {
     (yyval.str_value) = nullptr;
 }
-#line 6441 "parser.cpp"
+#line 6443 "parser.cpp"
     break;
 
   case 313: /* match_tensor_expr: MATCH TENSOR '(' column_expr ',' common_array_expr ',' STRING ',' STRING extra_match_tensor_option ')'  */
-#line 2319 "parser.y"
+#line 2321 "parser.y"
                                                                                                                            {
     auto match_tensor_expr = std::make_unique<infinity::MatchTensorExpr>();
     // search column
@@ -6458,11 +6460,11 @@ yyreduce:
     }
     (yyval.expr_t) = match_tensor_expr.release();
 }
-#line 6462 "parser.cpp"
+#line 6464 "parser.cpp"
     break;
 
   case 314: /* match_vector_expr: MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ',' LONG_VALUE ')' with_index_param_list  */
-#line 2338 "parser.y"
+#line 2340 "parser.y"
                                                                                                                         {
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     (yyval.expr_t) = match_vector_expr;
@@ -6504,11 +6506,11 @@ Error1:
 Return1:
     ;
 }
-#line 6508 "parser.cpp"
+#line 6510 "parser.cpp"
     break;
 
   case 315: /* match_vector_expr: MATCH VECTOR '(' expr ',' array_expr ',' STRING ',' STRING ')' with_index_param_list  */
-#line 2380 "parser.y"
+#line 2382 "parser.y"
                                                                                      {
     infinity::KnnExpr* match_vector_expr = new infinity::KnnExpr();
     (yyval.expr_t) = match_vector_expr;
@@ -6551,11 +6553,11 @@ Error2:
 Return2:
     ;
 }
-#line 6555 "parser.cpp"
+#line 6557 "parser.cpp"
     break;
 
   case 316: /* match_sparse_expr: MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ',' LONG_VALUE ')' with_index_param_list  */
-#line 2426 "parser.y"
+#line 2428 "parser.y"
                                                                                                                           {
     auto match_sparse_expr = new infinity::MatchSparseExpr();
     (yyval.expr_t) = match_sparse_expr;
@@ -6573,11 +6575,11 @@ Return2:
     // topn and options
     match_sparse_expr->SetOptParams((yyvsp[-2].long_value), (yyvsp[0].with_index_param_list_t));
 }
-#line 6577 "parser.cpp"
+#line 6579 "parser.cpp"
     break;
 
   case 317: /* match_sparse_expr: MATCH SPARSE '(' expr ',' common_sparse_array_expr ',' STRING ')' with_index_param_list  */
-#line 2444 "parser.y"
+#line 2446 "parser.y"
                                                                                         {
     auto match_sparse_expr = new infinity::MatchSparseExpr();
     (yyval.expr_t) = match_sparse_expr;
@@ -6595,11 +6597,11 @@ Return2:
     // topn and options
     match_sparse_expr->SetOptParams(infinity::DEFAULT_MATCH_SPARSE_TOP_N, (yyvsp[0].with_index_param_list_t));
 }
-#line 6599 "parser.cpp"
+#line 6601 "parser.cpp"
     break;
 
   case 318: /* match_text_expr: MATCH TEXT '(' STRING ',' STRING ')'  */
-#line 2462 "parser.y"
+#line 2464 "parser.y"
                                                        {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->fields_ = std::string((yyvsp[-3].str_value));
@@ -6608,11 +6610,11 @@ Return2:
     free((yyvsp[-1].str_value));
     (yyval.expr_t) = match_text_expr;
 }
-#line 6612 "parser.cpp"
+#line 6614 "parser.cpp"
     break;
 
   case 319: /* match_text_expr: MATCH TEXT '(' STRING ',' STRING ',' STRING ')'  */
-#line 2470 "parser.y"
+#line 2472 "parser.y"
                                                   {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->fields_ = std::string((yyvsp[-5].str_value));
@@ -6623,22 +6625,22 @@ Return2:
     free((yyvsp[-1].str_value));
     (yyval.expr_t) = match_text_expr;
 }
-#line 6627 "parser.cpp"
+#line 6629 "parser.cpp"
     break;
 
   case 320: /* query_expr: QUERY '(' STRING ')'  */
-#line 2481 "parser.y"
+#line 2483 "parser.y"
                                   {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->matching_text_ = std::string((yyvsp[-1].str_value));
     free((yyvsp[-1].str_value));
     (yyval.expr_t) = match_text_expr;
 }
-#line 6638 "parser.cpp"
+#line 6640 "parser.cpp"
     break;
 
   case 321: /* query_expr: QUERY '(' STRING ',' STRING ')'  */
-#line 2487 "parser.y"
+#line 2489 "parser.y"
                                   {
     infinity::MatchExpr* match_text_expr = new infinity::MatchExpr();
     match_text_expr->matching_text_ = std::string((yyvsp[-3].str_value));
@@ -6647,22 +6649,22 @@ Return2:
     free((yyvsp[-1].str_value));
     (yyval.expr_t) = match_text_expr;
 }
-#line 6651 "parser.cpp"
+#line 6653 "parser.cpp"
     break;
 
   case 322: /* fusion_expr: FUSION '(' STRING ')'  */
-#line 2496 "parser.y"
+#line 2498 "parser.y"
                                     {
     infinity::FusionExpr* fusion_expr = new infinity::FusionExpr();
     fusion_expr->method_ = std::string((yyvsp[-1].str_value));
     free((yyvsp[-1].str_value));
     (yyval.expr_t) = fusion_expr;
 }
-#line 6662 "parser.cpp"
+#line 6664 "parser.cpp"
     break;
 
   case 323: /* fusion_expr: FUSION '(' STRING ',' STRING ')'  */
-#line 2502 "parser.y"
+#line 2504 "parser.y"
                                    {
     auto fusion_expr = std::make_unique<infinity::FusionExpr>();
     fusion_expr->method_ = std::string((yyvsp[-3].str_value));
@@ -6674,77 +6676,77 @@ Return2:
     fusion_expr->JobAfterParser();
     (yyval.expr_t) = fusion_expr.release();
 }
-#line 6678 "parser.cpp"
+#line 6680 "parser.cpp"
     break;
 
   case 324: /* sub_search: match_vector_expr  */
-#line 2514 "parser.y"
+#line 2516 "parser.y"
                                {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 6686 "parser.cpp"
+#line 6688 "parser.cpp"
     break;
 
   case 325: /* sub_search: match_text_expr  */
-#line 2517 "parser.y"
+#line 2519 "parser.y"
                   {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 6694 "parser.cpp"
+#line 6696 "parser.cpp"
     break;
 
   case 326: /* sub_search: match_tensor_expr  */
-#line 2520 "parser.y"
+#line 2522 "parser.y"
                     {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 6702 "parser.cpp"
+#line 6704 "parser.cpp"
     break;
 
   case 327: /* sub_search: match_sparse_expr  */
-#line 2523 "parser.y"
+#line 2525 "parser.y"
                     {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 6710 "parser.cpp"
+#line 6712 "parser.cpp"
     break;
 
   case 328: /* sub_search: query_expr  */
-#line 2526 "parser.y"
+#line 2528 "parser.y"
              {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 6718 "parser.cpp"
+#line 6720 "parser.cpp"
     break;
 
   case 329: /* sub_search: fusion_expr  */
-#line 2529 "parser.y"
+#line 2531 "parser.y"
               {
     (yyval.expr_t) = (yyvsp[0].expr_t);
 }
-#line 6726 "parser.cpp"
+#line 6728 "parser.cpp"
     break;
 
   case 330: /* sub_search_array: sub_search  */
-#line 2533 "parser.y"
+#line 2535 "parser.y"
                               {
     (yyval.expr_array_t) = new std::vector<infinity::ParsedExpr*>();
     (yyval.expr_array_t)->emplace_back((yyvsp[0].expr_t));
 }
-#line 6735 "parser.cpp"
+#line 6737 "parser.cpp"
     break;
 
   case 331: /* sub_search_array: sub_search_array ',' sub_search  */
-#line 2537 "parser.y"
+#line 2539 "parser.y"
                                   {
     (yyvsp[-2].expr_array_t)->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_array_t) = (yyvsp[-2].expr_array_t);
 }
-#line 6744 "parser.cpp"
+#line 6746 "parser.cpp"
     break;
 
   case 332: /* function_expr: IDENTIFIER '(' ')'  */
-#line 2542 "parser.y"
+#line 2544 "parser.y"
                                    {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower((yyvsp[-2].str_value));
@@ -6753,11 +6755,11 @@ Return2:
     func_expr->arguments_ = nullptr;
     (yyval.expr_t) = func_expr;
 }
-#line 6757 "parser.cpp"
+#line 6759 "parser.cpp"
     break;
 
   case 333: /* function_expr: IDENTIFIER '(' expr_array ')'  */
-#line 2550 "parser.y"
+#line 2552 "parser.y"
                                 {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower((yyvsp[-3].str_value));
@@ -6766,11 +6768,11 @@ Return2:
     func_expr->arguments_ = (yyvsp[-1].expr_array_t);
     (yyval.expr_t) = func_expr;
 }
-#line 6770 "parser.cpp"
+#line 6772 "parser.cpp"
     break;
 
   case 334: /* function_expr: IDENTIFIER '(' DISTINCT expr_array ')'  */
-#line 2558 "parser.y"
+#line 2560 "parser.y"
                                          {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower((yyvsp[-4].str_value));
@@ -6780,11 +6782,11 @@ Return2:
     func_expr->distinct_ = true;
     (yyval.expr_t) = func_expr;
 }
-#line 6784 "parser.cpp"
+#line 6786 "parser.cpp"
     break;
 
   case 335: /* function_expr: operand IS NOT NULLABLE  */
-#line 2567 "parser.y"
+#line 2569 "parser.y"
                           {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "is_not_null";
@@ -6792,11 +6794,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[-3].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6796 "parser.cpp"
+#line 6798 "parser.cpp"
     break;
 
   case 336: /* function_expr: operand IS NULLABLE  */
-#line 2574 "parser.y"
+#line 2576 "parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "is_null";
@@ -6804,11 +6806,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[-2].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6808 "parser.cpp"
+#line 6810 "parser.cpp"
     break;
 
   case 337: /* function_expr: NOT operand  */
-#line 2581 "parser.y"
+#line 2583 "parser.y"
               {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "not";
@@ -6816,11 +6818,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6820 "parser.cpp"
+#line 6822 "parser.cpp"
     break;
 
   case 338: /* function_expr: '-' operand  */
-#line 2588 "parser.y"
+#line 2590 "parser.y"
               {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "-";
@@ -6828,11 +6830,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6832 "parser.cpp"
+#line 6834 "parser.cpp"
     break;
 
   case 339: /* function_expr: '+' operand  */
-#line 2595 "parser.y"
+#line 2597 "parser.y"
               {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "+";
@@ -6840,11 +6842,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6844 "parser.cpp"
+#line 6846 "parser.cpp"
     break;
 
   case 340: /* function_expr: operand '-' operand  */
-#line 2602 "parser.y"
+#line 2604 "parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "-";
@@ -6853,11 +6855,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6857 "parser.cpp"
+#line 6859 "parser.cpp"
     break;
 
   case 341: /* function_expr: operand '+' operand  */
-#line 2610 "parser.y"
+#line 2612 "parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "+";
@@ -6866,11 +6868,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6870 "parser.cpp"
+#line 6872 "parser.cpp"
     break;
 
   case 342: /* function_expr: operand '*' operand  */
-#line 2618 "parser.y"
+#line 2620 "parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "*";
@@ -6879,11 +6881,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6883 "parser.cpp"
+#line 6885 "parser.cpp"
     break;
 
   case 343: /* function_expr: operand '/' operand  */
-#line 2626 "parser.y"
+#line 2628 "parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "/";
@@ -6892,11 +6894,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6896 "parser.cpp"
+#line 6898 "parser.cpp"
     break;
 
   case 344: /* function_expr: operand '%' operand  */
-#line 2634 "parser.y"
+#line 2636 "parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "%";
@@ -6905,11 +6907,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6909 "parser.cpp"
+#line 6911 "parser.cpp"
     break;
 
   case 345: /* function_expr: operand '=' operand  */
-#line 2642 "parser.y"
+#line 2644 "parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "=";
@@ -6918,11 +6920,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6922 "parser.cpp"
+#line 6924 "parser.cpp"
     break;
 
   case 346: /* function_expr: operand EQUAL operand  */
-#line 2650 "parser.y"
+#line 2652 "parser.y"
                         {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "=";
@@ -6931,11 +6933,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6935 "parser.cpp"
+#line 6937 "parser.cpp"
     break;
 
   case 347: /* function_expr: operand NOT_EQ operand  */
-#line 2658 "parser.y"
+#line 2660 "parser.y"
                          {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "<>";
@@ -6944,11 +6946,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6948 "parser.cpp"
+#line 6950 "parser.cpp"
     break;
 
   case 348: /* function_expr: operand '<' operand  */
-#line 2666 "parser.y"
+#line 2668 "parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "<";
@@ -6957,11 +6959,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6961 "parser.cpp"
+#line 6963 "parser.cpp"
     break;
 
   case 349: /* function_expr: operand '>' operand  */
-#line 2674 "parser.y"
+#line 2676 "parser.y"
                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = ">";
@@ -6970,11 +6972,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6974 "parser.cpp"
+#line 6976 "parser.cpp"
     break;
 
   case 350: /* function_expr: operand LESS_EQ operand  */
-#line 2682 "parser.y"
+#line 2684 "parser.y"
                           {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "<=";
@@ -6983,11 +6985,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 6987 "parser.cpp"
+#line 6989 "parser.cpp"
     break;
 
   case 351: /* function_expr: operand GREATER_EQ operand  */
-#line 2690 "parser.y"
+#line 2692 "parser.y"
                              {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = ">=";
@@ -6996,11 +6998,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 7000 "parser.cpp"
+#line 7002 "parser.cpp"
     break;
 
   case 352: /* function_expr: EXTRACT '(' STRING FROM operand ')'  */
-#line 2698 "parser.y"
+#line 2700 "parser.y"
                                       {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     ParserHelper::ToLower((yyvsp[-3].str_value));
@@ -7031,11 +7033,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[-1].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 7035 "parser.cpp"
+#line 7037 "parser.cpp"
     break;
 
   case 353: /* function_expr: operand LIKE operand  */
-#line 2728 "parser.y"
+#line 2730 "parser.y"
                        {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "like";
@@ -7044,11 +7046,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 7048 "parser.cpp"
+#line 7050 "parser.cpp"
     break;
 
   case 354: /* function_expr: operand NOT LIKE operand  */
-#line 2736 "parser.y"
+#line 2738 "parser.y"
                            {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "not_like";
@@ -7057,11 +7059,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 7061 "parser.cpp"
+#line 7063 "parser.cpp"
     break;
 
   case 355: /* conjunction_expr: expr AND expr  */
-#line 2745 "parser.y"
+#line 2747 "parser.y"
                                 {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "and";
@@ -7070,11 +7072,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 7074 "parser.cpp"
+#line 7076 "parser.cpp"
     break;
 
   case 356: /* conjunction_expr: expr OR expr  */
-#line 2753 "parser.y"
+#line 2755 "parser.y"
                {
     infinity::FunctionExpr* func_expr = new infinity::FunctionExpr();
     func_expr->func_name_ = "or";
@@ -7083,11 +7085,11 @@ Return2:
     func_expr->arguments_->emplace_back((yyvsp[0].expr_t));
     (yyval.expr_t) = func_expr;
 }
-#line 7087 "parser.cpp"
+#line 7089 "parser.cpp"
     break;
 
   case 357: /* between_expr: operand BETWEEN operand AND operand  */
-#line 2762 "parser.y"
+#line 2764 "parser.y"
                                                   {
     infinity::BetweenExpr* between_expr = new infinity::BetweenExpr();
     between_expr->value_ = (yyvsp[-4].expr_t);
@@ -7095,44 +7097,44 @@ Return2:
     between_expr->upper_bound_ = (yyvsp[0].expr_t);
     (yyval.expr_t) = between_expr;
 }
-#line 7099 "parser.cpp"
+#line 7101 "parser.cpp"
     break;
 
   case 358: /* in_expr: operand IN '(' expr_array ')'  */
-#line 2770 "parser.y"
+#line 2772 "parser.y"
                                        {
     infinity::InExpr* in_expr = new infinity::InExpr(true);
     in_expr->left_ = (yyvsp[-4].expr_t);
     in_expr->arguments_ = (yyvsp[-1].expr_array_t);
     (yyval.expr_t) = in_expr;
 }
-#line 7110 "parser.cpp"
+#line 7112 "parser.cpp"
     break;
 
   case 359: /* in_expr: operand NOT IN '(' expr_array ')'  */
-#line 2776 "parser.y"
+#line 2778 "parser.y"
                                     {
     infinity::InExpr* in_expr = new infinity::InExpr(false);
     in_expr->left_ = (yyvsp[-5].expr_t);
     in_expr->arguments_ = (yyvsp[-1].expr_array_t);
     (yyval.expr_t) = in_expr;
 }
-#line 7121 "parser.cpp"
+#line 7123 "parser.cpp"
     break;
 
   case 360: /* case_expr: CASE expr case_check_array END  */
-#line 2783 "parser.y"
+#line 2785 "parser.y"
                                           {
     infinity::CaseExpr* case_expr = new infinity::CaseExpr();
     case_expr->expr_ = (yyvsp[-2].expr_t);
     case_expr->case_check_array_ = (yyvsp[-1].case_check_array_t);
     (yyval.expr_t) = case_expr;
 }
-#line 7132 "parser.cpp"
+#line 7134 "parser.cpp"
     break;
 
   case 361: /* case_expr: CASE expr case_check_array ELSE expr END  */
-#line 2789 "parser.y"
+#line 2791 "parser.y"
                                            {
     infinity::CaseExpr* case_expr = new infinity::CaseExpr();
     case_expr->expr_ = (yyvsp[-4].expr_t);
@@ -7140,32 +7142,32 @@ Return2:
     case_expr->else_expr_ = (yyvsp[-1].expr_t);
     (yyval.expr_t) = case_expr;
 }
-#line 7144 "parser.cpp"
+#line 7146 "parser.cpp"
     break;
 
   case 362: /* case_expr: CASE case_check_array END  */
-#line 2796 "parser.y"
+#line 2798 "parser.y"
                             {
     infinity::CaseExpr* case_expr = new infinity::CaseExpr();
     case_expr->case_check_array_ = (yyvsp[-1].case_check_array_t);
     (yyval.expr_t) = case_expr;
 }
-#line 7154 "parser.cpp"
+#line 7156 "parser.cpp"
     break;
 
   case 363: /* case_expr: CASE case_check_array ELSE expr END  */
-#line 2801 "parser.y"
+#line 2803 "parser.y"
                                       {
     infinity::CaseExpr* case_expr = new infinity::CaseExpr();
     case_expr->case_check_array_ = (yyvsp[-3].case_check_array_t);
     case_expr->else_expr_ = (yyvsp[-1].expr_t);
     (yyval.expr_t) = case_expr;
 }
-#line 7165 "parser.cpp"
+#line 7167 "parser.cpp"
     break;
 
   case 364: /* case_check_array: WHEN expr THEN expr  */
-#line 2808 "parser.y"
+#line 2810 "parser.y"
                                       {
     (yyval.case_check_array_t) = new std::vector<infinity::WhenThen*>();
     infinity::WhenThen* when_then_ptr = new infinity::WhenThen();
@@ -7173,11 +7175,11 @@ Return2:
     when_then_ptr->then_ = (yyvsp[0].expr_t);
     (yyval.case_check_array_t)->emplace_back(when_then_ptr);
 }
-#line 7177 "parser.cpp"
+#line 7179 "parser.cpp"
     break;
 
   case 365: /* case_check_array: case_check_array WHEN expr THEN expr  */
-#line 2815 "parser.y"
+#line 2817 "parser.y"
                                        {
     infinity::WhenThen* when_then_ptr = new infinity::WhenThen();
     when_then_ptr->when_ = (yyvsp[-2].expr_t);
@@ -7185,11 +7187,11 @@ Return2:
     (yyvsp[-4].case_check_array_t)->emplace_back(when_then_ptr);
     (yyval.case_check_array_t) = (yyvsp[-4].case_check_array_t);
 }
-#line 7189 "parser.cpp"
+#line 7191 "parser.cpp"
     break;
 
   case 366: /* cast_expr: CAST '(' expr AS column_type ')'  */
-#line 2823 "parser.y"
+#line 2825 "parser.y"
                                             {
     std::shared_ptr<infinity::TypeInfo> type_info_ptr{nullptr};
     switch((yyvsp[-1].column_type_t).logical_type_) {
@@ -7213,33 +7215,33 @@ Return2:
     cast_expr->expr_ = (yyvsp[-3].expr_t);
     (yyval.expr_t) = cast_expr;
 }
-#line 7217 "parser.cpp"
+#line 7219 "parser.cpp"
     break;
 
   case 367: /* subquery_expr: EXISTS '(' select_without_paren ')'  */
-#line 2847 "parser.y"
+#line 2849 "parser.y"
                                                    {
     infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
     subquery_expr->subquery_type_ = infinity::SubqueryType::kExists;
     subquery_expr->select_ = (yyvsp[-1].select_stmt);
     (yyval.expr_t) = subquery_expr;
 }
-#line 7228 "parser.cpp"
+#line 7230 "parser.cpp"
     break;
 
   case 368: /* subquery_expr: NOT EXISTS '(' select_without_paren ')'  */
-#line 2853 "parser.y"
+#line 2855 "parser.y"
                                           {
     infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
     subquery_expr->subquery_type_ = infinity::SubqueryType::kNotExists;
     subquery_expr->select_ = (yyvsp[-1].select_stmt);
     (yyval.expr_t) = subquery_expr;
 }
-#line 7239 "parser.cpp"
+#line 7241 "parser.cpp"
     break;
 
   case 369: /* subquery_expr: operand IN '(' select_without_paren ')'  */
-#line 2859 "parser.y"
+#line 2861 "parser.y"
                                           {
     infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
     subquery_expr->subquery_type_ = infinity::SubqueryType::kIn;
@@ -7247,11 +7249,11 @@ Return2:
     subquery_expr->select_ = (yyvsp[-1].select_stmt);
     (yyval.expr_t) = subquery_expr;
 }
-#line 7251 "parser.cpp"
+#line 7253 "parser.cpp"
     break;
 
   case 370: /* subquery_expr: operand NOT IN '(' select_without_paren ')'  */
-#line 2866 "parser.y"
+#line 2868 "parser.y"
                                               {
     infinity::SubqueryExpr* subquery_expr = new infinity::SubqueryExpr();
     subquery_expr->subquery_type_ = infinity::SubqueryType::kNotIn;
@@ -7259,11 +7261,11 @@ Return2:
     subquery_expr->select_ = (yyvsp[-1].select_stmt);
     (yyval.expr_t) = subquery_expr;
 }
-#line 7263 "parser.cpp"
+#line 7265 "parser.cpp"
     break;
 
   case 371: /* column_expr: IDENTIFIER  */
-#line 2874 "parser.y"
+#line 2876 "parser.y"
                          {
     infinity::ColumnExpr* column_expr = new infinity::ColumnExpr();
     ParserHelper::ToLower((yyvsp[0].str_value));
@@ -7271,11 +7273,11 @@ Return2:
     free((yyvsp[0].str_value));
     (yyval.expr_t) = column_expr;
 }
-#line 7275 "parser.cpp"
+#line 7277 "parser.cpp"
     break;
 
   case 372: /* column_expr: column_expr '.' IDENTIFIER  */
-#line 2881 "parser.y"
+#line 2883 "parser.y"
                              {
     infinity::ColumnExpr* column_expr = (infinity::ColumnExpr*)(yyvsp[-2].expr_t);
     ParserHelper::ToLower((yyvsp[0].str_value));
@@ -7283,21 +7285,21 @@ Return2:
     free((yyvsp[0].str_value));
     (yyval.expr_t) = column_expr;
 }
-#line 7287 "parser.cpp"
+#line 7289 "parser.cpp"
     break;
 
   case 373: /* column_expr: '*'  */
-#line 2888 "parser.y"
+#line 2890 "parser.y"
       {
     infinity::ColumnExpr* column_expr = new infinity::ColumnExpr();
     column_expr->star_ = true;
     (yyval.expr_t) = column_expr;
 }
-#line 7297 "parser.cpp"
+#line 7299 "parser.cpp"
     break;
 
   case 374: /* column_expr: column_expr '.' '*'  */
-#line 2893 "parser.y"
+#line 2895 "parser.y"
                       {
     infinity::ColumnExpr* column_expr = (infinity::ColumnExpr*)(yyvsp[-2].expr_t);
     if(column_expr->star_) {
@@ -7307,232 +7309,232 @@ Return2:
     column_expr->star_ = true;
     (yyval.expr_t) = column_expr;
 }
-#line 7311 "parser.cpp"
+#line 7313 "parser.cpp"
     break;
 
   case 375: /* constant_expr: STRING  */
-#line 2903 "parser.y"
+#line 2905 "parser.y"
                       {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kString);
     const_expr->str_value_ = (yyvsp[0].str_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7321 "parser.cpp"
+#line 7323 "parser.cpp"
     break;
 
   case 376: /* constant_expr: TRUE  */
-#line 2908 "parser.y"
+#line 2910 "parser.y"
        {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kBoolean);
     const_expr->bool_value_ = true;
     (yyval.const_expr_t) = const_expr;
 }
-#line 7331 "parser.cpp"
+#line 7333 "parser.cpp"
     break;
 
   case 377: /* constant_expr: FALSE  */
-#line 2913 "parser.y"
+#line 2915 "parser.y"
         {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kBoolean);
     const_expr->bool_value_ = false;
     (yyval.const_expr_t) = const_expr;
 }
-#line 7341 "parser.cpp"
+#line 7343 "parser.cpp"
     break;
 
   case 378: /* constant_expr: DOUBLE_VALUE  */
-#line 2918 "parser.y"
+#line 2920 "parser.y"
                {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDouble);
     const_expr->double_value_ = (yyvsp[0].double_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7351 "parser.cpp"
+#line 7353 "parser.cpp"
     break;
 
   case 379: /* constant_expr: LONG_VALUE  */
-#line 2923 "parser.y"
+#line 2925 "parser.y"
              {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInteger);
     const_expr->integer_value_ = (yyvsp[0].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7361 "parser.cpp"
+#line 7363 "parser.cpp"
     break;
 
   case 380: /* constant_expr: DATE STRING  */
-#line 2928 "parser.y"
+#line 2930 "parser.y"
               {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDate);
     const_expr->date_value_ = (yyvsp[0].str_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7371 "parser.cpp"
+#line 7373 "parser.cpp"
     break;
 
   case 381: /* constant_expr: TIME STRING  */
-#line 2933 "parser.y"
+#line 2935 "parser.y"
               {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kTime);
     const_expr->date_value_ = (yyvsp[0].str_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7381 "parser.cpp"
+#line 7383 "parser.cpp"
     break;
 
   case 382: /* constant_expr: DATETIME STRING  */
-#line 2938 "parser.y"
+#line 2940 "parser.y"
                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDateTime);
     const_expr->date_value_ = (yyvsp[0].str_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7391 "parser.cpp"
+#line 7393 "parser.cpp"
     break;
 
   case 383: /* constant_expr: TIMESTAMP STRING  */
-#line 2943 "parser.y"
+#line 2945 "parser.y"
                    {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kTimestamp);
     const_expr->date_value_ = (yyvsp[0].str_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7401 "parser.cpp"
+#line 7403 "parser.cpp"
     break;
 
   case 384: /* constant_expr: INTERVAL interval_expr  */
-#line 2948 "parser.y"
+#line 2950 "parser.y"
                          {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7409 "parser.cpp"
+#line 7411 "parser.cpp"
     break;
 
   case 385: /* constant_expr: interval_expr  */
-#line 2951 "parser.y"
+#line 2953 "parser.y"
                 {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7417 "parser.cpp"
+#line 7419 "parser.cpp"
     break;
 
   case 386: /* constant_expr: common_array_expr  */
-#line 2954 "parser.y"
+#line 2956 "parser.y"
                     {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7425 "parser.cpp"
+#line 7427 "parser.cpp"
     break;
 
   case 387: /* common_array_expr: array_expr  */
-#line 2958 "parser.y"
+#line 2960 "parser.y"
                               {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7433 "parser.cpp"
+#line 7435 "parser.cpp"
     break;
 
   case 388: /* common_array_expr: subarray_array_expr  */
-#line 2961 "parser.y"
+#line 2963 "parser.y"
                       {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7441 "parser.cpp"
+#line 7443 "parser.cpp"
     break;
 
   case 389: /* common_array_expr: sparse_array_expr  */
-#line 2964 "parser.y"
+#line 2966 "parser.y"
                     {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7449 "parser.cpp"
+#line 7451 "parser.cpp"
     break;
 
   case 390: /* common_array_expr: empty_array_expr  */
-#line 2967 "parser.y"
+#line 2969 "parser.y"
                    {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7457 "parser.cpp"
+#line 7459 "parser.cpp"
     break;
 
   case 391: /* common_sparse_array_expr: sparse_array_expr  */
-#line 2971 "parser.y"
+#line 2973 "parser.y"
                                             {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7465 "parser.cpp"
+#line 7467 "parser.cpp"
     break;
 
   case 392: /* common_sparse_array_expr: array_expr  */
-#line 2974 "parser.y"
+#line 2976 "parser.y"
              {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7473 "parser.cpp"
+#line 7475 "parser.cpp"
     break;
 
   case 393: /* common_sparse_array_expr: empty_array_expr  */
-#line 2977 "parser.y"
+#line 2979 "parser.y"
                    {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7481 "parser.cpp"
+#line 7483 "parser.cpp"
     break;
 
   case 394: /* subarray_array_expr: unclosed_subarray_array_expr ']'  */
-#line 2981 "parser.y"
+#line 2983 "parser.y"
                                                       {
     (yyval.const_expr_t) = (yyvsp[-1].const_expr_t);
 }
-#line 7489 "parser.cpp"
+#line 7491 "parser.cpp"
     break;
 
   case 395: /* unclosed_subarray_array_expr: '[' common_array_expr  */
-#line 2985 "parser.y"
+#line 2987 "parser.y"
                                                     {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kSubArrayArray);
     const_expr->sub_array_array_.emplace_back((yyvsp[0].const_expr_t));
     (yyval.const_expr_t) = const_expr;
 }
-#line 7499 "parser.cpp"
+#line 7501 "parser.cpp"
     break;
 
   case 396: /* unclosed_subarray_array_expr: unclosed_subarray_array_expr ',' common_array_expr  */
-#line 2990 "parser.y"
+#line 2992 "parser.y"
                                                      {
     (yyvsp[-2].const_expr_t)->sub_array_array_.emplace_back((yyvsp[0].const_expr_t));
     (yyval.const_expr_t) = (yyvsp[-2].const_expr_t);
 }
-#line 7508 "parser.cpp"
+#line 7510 "parser.cpp"
     break;
 
   case 397: /* sparse_array_expr: long_sparse_array_expr  */
-#line 2995 "parser.y"
+#line 2997 "parser.y"
                                           {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7516 "parser.cpp"
+#line 7518 "parser.cpp"
     break;
 
   case 398: /* sparse_array_expr: double_sparse_array_expr  */
-#line 2998 "parser.y"
+#line 3000 "parser.y"
                            {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7524 "parser.cpp"
+#line 7526 "parser.cpp"
     break;
 
   case 399: /* long_sparse_array_expr: unclosed_long_sparse_array_expr ']'  */
-#line 3002 "parser.y"
+#line 3004 "parser.y"
                                                             {
     (yyval.const_expr_t) = (yyvsp[-1].const_expr_t);
 }
-#line 7532 "parser.cpp"
+#line 7534 "parser.cpp"
     break;
 
   case 400: /* unclosed_long_sparse_array_expr: '[' int_sparse_ele  */
-#line 3006 "parser.y"
+#line 3008 "parser.y"
                                                     {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kLongSparseArray);
     const_expr->long_sparse_array_.first.emplace_back((yyvsp[0].int_sparse_ele_t)->first);
@@ -7540,30 +7542,30 @@ Return2:
     delete (yyvsp[0].int_sparse_ele_t);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7544 "parser.cpp"
+#line 7546 "parser.cpp"
     break;
 
   case 401: /* unclosed_long_sparse_array_expr: unclosed_long_sparse_array_expr ',' int_sparse_ele  */
-#line 3013 "parser.y"
+#line 3015 "parser.y"
                                                      {
     (yyvsp[-2].const_expr_t)->long_sparse_array_.first.emplace_back((yyvsp[0].int_sparse_ele_t)->first);
     (yyvsp[-2].const_expr_t)->long_sparse_array_.second.emplace_back((yyvsp[0].int_sparse_ele_t)->second);
     delete (yyvsp[0].int_sparse_ele_t);
     (yyval.const_expr_t) = (yyvsp[-2].const_expr_t);
 }
-#line 7555 "parser.cpp"
+#line 7557 "parser.cpp"
     break;
 
   case 402: /* double_sparse_array_expr: unclosed_double_sparse_array_expr ']'  */
-#line 3020 "parser.y"
+#line 3022 "parser.y"
                                                                 {
     (yyval.const_expr_t) = (yyvsp[-1].const_expr_t);
 }
-#line 7563 "parser.cpp"
+#line 7565 "parser.cpp"
     break;
 
   case 403: /* unclosed_double_sparse_array_expr: '[' float_sparse_ele  */
-#line 3024 "parser.y"
+#line 3026 "parser.y"
                                                         {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDoubleSparseArray);
     const_expr->double_sparse_array_.first.emplace_back((yyvsp[0].float_sparse_ele_t)->first);
@@ -7571,266 +7573,266 @@ Return2:
     delete (yyvsp[0].float_sparse_ele_t);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7575 "parser.cpp"
+#line 7577 "parser.cpp"
     break;
 
   case 404: /* unclosed_double_sparse_array_expr: unclosed_double_sparse_array_expr ',' float_sparse_ele  */
-#line 3031 "parser.y"
+#line 3033 "parser.y"
                                                          {
     (yyvsp[-2].const_expr_t)->double_sparse_array_.first.emplace_back((yyvsp[0].float_sparse_ele_t)->first);
     (yyvsp[-2].const_expr_t)->double_sparse_array_.second.emplace_back((yyvsp[0].float_sparse_ele_t)->second);
     delete (yyvsp[0].float_sparse_ele_t);
     (yyval.const_expr_t) = (yyvsp[-2].const_expr_t);
 }
-#line 7586 "parser.cpp"
+#line 7588 "parser.cpp"
     break;
 
   case 405: /* empty_array_expr: '[' ']'  */
-#line 3038 "parser.y"
+#line 3040 "parser.y"
                           {
     (yyval.const_expr_t) = new infinity::ConstantExpr(infinity::LiteralType::kEmptyArray);
 }
-#line 7594 "parser.cpp"
+#line 7596 "parser.cpp"
     break;
 
   case 406: /* int_sparse_ele: LONG_VALUE ':' LONG_VALUE  */
-#line 3042 "parser.y"
+#line 3044 "parser.y"
                                           {
     (yyval.int_sparse_ele_t) = new std::pair<int64_t, int64_t>{(yyvsp[-2].long_value), (yyvsp[0].long_value)};
 }
-#line 7602 "parser.cpp"
+#line 7604 "parser.cpp"
     break;
 
   case 407: /* float_sparse_ele: LONG_VALUE ':' DOUBLE_VALUE  */
-#line 3046 "parser.y"
+#line 3048 "parser.y"
                                               {
     (yyval.float_sparse_ele_t) = new std::pair<int64_t, double>{(yyvsp[-2].long_value), (yyvsp[0].double_value)};
 }
-#line 7610 "parser.cpp"
+#line 7612 "parser.cpp"
     break;
 
   case 408: /* array_expr: long_array_expr  */
-#line 3050 "parser.y"
+#line 3052 "parser.y"
                             {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7618 "parser.cpp"
+#line 7620 "parser.cpp"
     break;
 
   case 409: /* array_expr: double_array_expr  */
-#line 3053 "parser.y"
+#line 3055 "parser.y"
                     {
     (yyval.const_expr_t) = (yyvsp[0].const_expr_t);
 }
-#line 7626 "parser.cpp"
+#line 7628 "parser.cpp"
     break;
 
   case 410: /* long_array_expr: unclosed_long_array_expr ']'  */
-#line 3057 "parser.y"
+#line 3059 "parser.y"
                                               {
     (yyval.const_expr_t) = (yyvsp[-1].const_expr_t);
 }
-#line 7634 "parser.cpp"
+#line 7636 "parser.cpp"
     break;
 
   case 411: /* unclosed_long_array_expr: '[' LONG_VALUE  */
-#line 3061 "parser.y"
+#line 3063 "parser.y"
                                          {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kIntegerArray);
     const_expr->long_array_.emplace_back((yyvsp[0].long_value));
     (yyval.const_expr_t) = const_expr;
 }
-#line 7644 "parser.cpp"
+#line 7646 "parser.cpp"
     break;
 
   case 412: /* unclosed_long_array_expr: unclosed_long_array_expr ',' LONG_VALUE  */
-#line 3066 "parser.y"
+#line 3068 "parser.y"
                                           {
     (yyvsp[-2].const_expr_t)->long_array_.emplace_back((yyvsp[0].long_value));
     (yyval.const_expr_t) = (yyvsp[-2].const_expr_t);
 }
-#line 7653 "parser.cpp"
+#line 7655 "parser.cpp"
     break;
 
   case 413: /* double_array_expr: unclosed_double_array_expr ']'  */
-#line 3071 "parser.y"
+#line 3073 "parser.y"
                                                   {
     (yyval.const_expr_t) = (yyvsp[-1].const_expr_t);
 }
-#line 7661 "parser.cpp"
+#line 7663 "parser.cpp"
     break;
 
   case 414: /* unclosed_double_array_expr: '[' DOUBLE_VALUE  */
-#line 3075 "parser.y"
+#line 3077 "parser.y"
                                              {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kDoubleArray);
     const_expr->double_array_.emplace_back((yyvsp[0].double_value));
     (yyval.const_expr_t) = const_expr;
 }
-#line 7671 "parser.cpp"
+#line 7673 "parser.cpp"
     break;
 
   case 415: /* unclosed_double_array_expr: unclosed_double_array_expr ',' DOUBLE_VALUE  */
-#line 3080 "parser.y"
+#line 3082 "parser.y"
                                               {
     (yyvsp[-2].const_expr_t)->double_array_.emplace_back((yyvsp[0].double_value));
     (yyval.const_expr_t) = (yyvsp[-2].const_expr_t);
 }
-#line 7680 "parser.cpp"
+#line 7682 "parser.cpp"
     break;
 
   case 416: /* interval_expr: LONG_VALUE SECONDS  */
-#line 3085 "parser.y"
+#line 3087 "parser.y"
                                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kSecond;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7691 "parser.cpp"
+#line 7693 "parser.cpp"
     break;
 
   case 417: /* interval_expr: LONG_VALUE SECOND  */
-#line 3091 "parser.y"
+#line 3093 "parser.y"
                     {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kSecond;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7702 "parser.cpp"
+#line 7704 "parser.cpp"
     break;
 
   case 418: /* interval_expr: LONG_VALUE MINUTES  */
-#line 3097 "parser.y"
+#line 3099 "parser.y"
                      {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMinute;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7713 "parser.cpp"
+#line 7715 "parser.cpp"
     break;
 
   case 419: /* interval_expr: LONG_VALUE MINUTE  */
-#line 3103 "parser.y"
+#line 3105 "parser.y"
                     {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMinute;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7724 "parser.cpp"
+#line 7726 "parser.cpp"
     break;
 
   case 420: /* interval_expr: LONG_VALUE HOURS  */
-#line 3109 "parser.y"
+#line 3111 "parser.y"
                    {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kHour;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7735 "parser.cpp"
+#line 7737 "parser.cpp"
     break;
 
   case 421: /* interval_expr: LONG_VALUE HOUR  */
-#line 3115 "parser.y"
+#line 3117 "parser.y"
                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kHour;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7746 "parser.cpp"
+#line 7748 "parser.cpp"
     break;
 
   case 422: /* interval_expr: LONG_VALUE DAYS  */
-#line 3121 "parser.y"
+#line 3123 "parser.y"
                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kDay;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7757 "parser.cpp"
+#line 7759 "parser.cpp"
     break;
 
   case 423: /* interval_expr: LONG_VALUE DAY  */
-#line 3127 "parser.y"
+#line 3129 "parser.y"
                  {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kDay;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7768 "parser.cpp"
+#line 7770 "parser.cpp"
     break;
 
   case 424: /* interval_expr: LONG_VALUE MONTHS  */
-#line 3133 "parser.y"
+#line 3135 "parser.y"
                     {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMonth;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7779 "parser.cpp"
+#line 7781 "parser.cpp"
     break;
 
   case 425: /* interval_expr: LONG_VALUE MONTH  */
-#line 3139 "parser.y"
+#line 3141 "parser.y"
                    {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kMonth;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7790 "parser.cpp"
+#line 7792 "parser.cpp"
     break;
 
   case 426: /* interval_expr: LONG_VALUE YEARS  */
-#line 3145 "parser.y"
+#line 3147 "parser.y"
                    {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kYear;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7801 "parser.cpp"
+#line 7803 "parser.cpp"
     break;
 
   case 427: /* interval_expr: LONG_VALUE YEAR  */
-#line 3151 "parser.y"
+#line 3153 "parser.y"
                   {
     infinity::ConstantExpr* const_expr = new infinity::ConstantExpr(infinity::LiteralType::kInterval);
     const_expr->interval_type_ = infinity::TimeUnit::kYear;
     const_expr->integer_value_ = (yyvsp[-1].long_value);
     (yyval.const_expr_t) = const_expr;
 }
-#line 7812 "parser.cpp"
+#line 7814 "parser.cpp"
     break;
 
   case 428: /* copy_option_list: copy_option  */
-#line 3162 "parser.y"
+#line 3164 "parser.y"
                                {
     (yyval.copy_option_array) = new std::vector<infinity::CopyOption*>();
     (yyval.copy_option_array)->push_back((yyvsp[0].copy_option_t));
 }
-#line 7821 "parser.cpp"
+#line 7823 "parser.cpp"
     break;
 
   case 429: /* copy_option_list: copy_option_list ',' copy_option  */
-#line 3166 "parser.y"
+#line 3168 "parser.y"
                                    {
     (yyvsp[-2].copy_option_array)->push_back((yyvsp[0].copy_option_t));
     (yyval.copy_option_array) = (yyvsp[-2].copy_option_array);
 }
-#line 7830 "parser.cpp"
+#line 7832 "parser.cpp"
     break;
 
   case 430: /* copy_option: FORMAT IDENTIFIER  */
-#line 3171 "parser.y"
+#line 3173 "parser.y"
                                 {
     (yyval.copy_option_t) = new infinity::CopyOption();
     (yyval.copy_option_t)->option_type_ = infinity::CopyOptionType::kFormat;
@@ -7861,11 +7863,11 @@ Return2:
         YYERROR;
     }
 }
-#line 7865 "parser.cpp"
+#line 7867 "parser.cpp"
     break;
 
   case 431: /* copy_option: DELIMITER STRING  */
-#line 3201 "parser.y"
+#line 3203 "parser.y"
                    {
     (yyval.copy_option_t) = new infinity::CopyOption();
     (yyval.copy_option_t)->option_type_ = infinity::CopyOptionType::kDelimiter;
@@ -7876,83 +7878,83 @@ Return2:
     }
     free((yyvsp[0].str_value));
 }
-#line 7880 "parser.cpp"
+#line 7882 "parser.cpp"
     break;
 
   case 432: /* copy_option: HEADER  */
-#line 3211 "parser.y"
+#line 3213 "parser.y"
          {
     (yyval.copy_option_t) = new infinity::CopyOption();
     (yyval.copy_option_t)->option_type_ = infinity::CopyOptionType::kHeader;
     (yyval.copy_option_t)->header_ = true;
 }
-#line 7890 "parser.cpp"
+#line 7892 "parser.cpp"
     break;
 
   case 433: /* copy_option: OFFSET LONG_VALUE  */
-#line 3216 "parser.y"
+#line 3218 "parser.y"
                     {
     (yyval.copy_option_t) = new infinity::CopyOption();
     (yyval.copy_option_t)->option_type_ = infinity::CopyOptionType::kOffset;
     (yyval.copy_option_t)->offset_ = (yyvsp[0].long_value);
 }
-#line 7900 "parser.cpp"
+#line 7902 "parser.cpp"
     break;
 
   case 434: /* copy_option: LIMIT LONG_VALUE  */
-#line 3221 "parser.y"
+#line 3223 "parser.y"
                    {
     (yyval.copy_option_t) = new infinity::CopyOption();
     (yyval.copy_option_t)->option_type_ = infinity::CopyOptionType::kLimit;
     (yyval.copy_option_t)->limit_ = (yyvsp[0].long_value);
 }
-#line 7910 "parser.cpp"
+#line 7912 "parser.cpp"
     break;
 
   case 435: /* copy_option: ROWLIMIT LONG_VALUE  */
-#line 3226 "parser.y"
+#line 3228 "parser.y"
                       {
     (yyval.copy_option_t) = new infinity::CopyOption();
     (yyval.copy_option_t)->option_type_ = infinity::CopyOptionType::kRowLimit;
     (yyval.copy_option_t)->row_limit_ = (yyvsp[0].long_value);
 }
-#line 7920 "parser.cpp"
+#line 7922 "parser.cpp"
     break;
 
   case 436: /* file_path: STRING  */
-#line 3232 "parser.y"
+#line 3234 "parser.y"
                    {
     (yyval.str_value) = (yyvsp[0].str_value);
 }
-#line 7928 "parser.cpp"
+#line 7930 "parser.cpp"
     break;
 
   case 437: /* if_exists: IF EXISTS  */
-#line 3236 "parser.y"
+#line 3238 "parser.y"
                      { (yyval.bool_value) = true; }
-#line 7934 "parser.cpp"
+#line 7936 "parser.cpp"
     break;
 
   case 438: /* if_exists: %empty  */
-#line 3237 "parser.y"
+#line 3239 "parser.y"
   { (yyval.bool_value) = false; }
-#line 7940 "parser.cpp"
+#line 7942 "parser.cpp"
     break;
 
   case 439: /* if_not_exists: IF NOT EXISTS  */
-#line 3239 "parser.y"
+#line 3241 "parser.y"
                               { (yyval.bool_value) = true; }
-#line 7946 "parser.cpp"
+#line 7948 "parser.cpp"
     break;
 
   case 440: /* if_not_exists: %empty  */
-#line 3240 "parser.y"
+#line 3242 "parser.y"
   { (yyval.bool_value) = false; }
-#line 7952 "parser.cpp"
+#line 7954 "parser.cpp"
     break;
 
   case 443: /* if_not_exists_info: if_not_exists IDENTIFIER  */
-#line 3255 "parser.y"
+#line 3257 "parser.y"
                                               {
     (yyval.if_not_exists_info_t) = new infinity::IfNotExistsInfo();
     (yyval.if_not_exists_info_t)->exists_ = true;
@@ -7961,80 +7963,80 @@ Return2:
     (yyval.if_not_exists_info_t)->info_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 }
-#line 7965 "parser.cpp"
+#line 7967 "parser.cpp"
     break;
 
   case 444: /* if_not_exists_info: %empty  */
-#line 3263 "parser.y"
+#line 3265 "parser.y"
   {
     (yyval.if_not_exists_info_t) = new infinity::IfNotExistsInfo();
 }
-#line 7973 "parser.cpp"
+#line 7975 "parser.cpp"
     break;
 
   case 445: /* with_index_param_list: WITH '(' index_param_list ')'  */
-#line 3267 "parser.y"
+#line 3269 "parser.y"
                                                       {
     (yyval.with_index_param_list_t) = (yyvsp[-1].index_param_list_t);
 }
-#line 7981 "parser.cpp"
+#line 7983 "parser.cpp"
     break;
 
   case 446: /* with_index_param_list: %empty  */
-#line 3270 "parser.y"
+#line 3272 "parser.y"
   {
     (yyval.with_index_param_list_t) = new std::vector<infinity::InitParameter*>();
 }
-#line 7989 "parser.cpp"
+#line 7991 "parser.cpp"
     break;
 
   case 447: /* optional_table_properties_list: PROPERTIES '(' index_param_list ')'  */
-#line 3274 "parser.y"
+#line 3276 "parser.y"
                                                                      {
     (yyval.with_index_param_list_t) = (yyvsp[-1].index_param_list_t);
 }
-#line 7997 "parser.cpp"
+#line 7999 "parser.cpp"
     break;
 
   case 448: /* optional_table_properties_list: %empty  */
-#line 3277 "parser.y"
+#line 3279 "parser.y"
   {
     (yyval.with_index_param_list_t) = nullptr;
 }
-#line 8005 "parser.cpp"
+#line 8007 "parser.cpp"
     break;
 
   case 449: /* index_param_list: index_param  */
-#line 3281 "parser.y"
+#line 3283 "parser.y"
                                {
     (yyval.index_param_list_t) = new std::vector<infinity::InitParameter*>();
     (yyval.index_param_list_t)->push_back((yyvsp[0].index_param_t));
 }
-#line 8014 "parser.cpp"
+#line 8016 "parser.cpp"
     break;
 
   case 450: /* index_param_list: index_param_list ',' index_param  */
-#line 3285 "parser.y"
+#line 3287 "parser.y"
                                    {
     (yyvsp[-2].index_param_list_t)->push_back((yyvsp[0].index_param_t));
     (yyval.index_param_list_t) = (yyvsp[-2].index_param_list_t);
 }
-#line 8023 "parser.cpp"
+#line 8025 "parser.cpp"
     break;
 
   case 451: /* index_param: IDENTIFIER  */
-#line 3290 "parser.y"
+#line 3292 "parser.y"
                          {
     ParserHelper::ToLower((yyvsp[0].str_value));
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 }
-#line 8034 "parser.cpp"
+#line 8036 "parser.cpp"
     break;
 
   case 452: /* index_param: IDENTIFIER '=' IDENTIFIER  */
-#line 3296 "parser.y"
+#line 3298 "parser.y"
                             {
     ParserHelper::ToLower((yyvsp[-2].str_value));
     ParserHelper::ToLower((yyvsp[0].str_value));
@@ -8045,11 +8047,11 @@ Return2:
     (yyval.index_param_t)->param_value_ = (yyvsp[0].str_value);
     free((yyvsp[0].str_value));
 }
-#line 8049 "parser.cpp"
+#line 8051 "parser.cpp"
     break;
 
   case 453: /* index_param: IDENTIFIER '=' LONG_VALUE  */
-#line 3306 "parser.y"
+#line 3308 "parser.y"
                             {
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[-2].str_value);
@@ -8057,11 +8059,11 @@ Return2:
 
     (yyval.index_param_t)->param_value_ = std::to_string((yyvsp[0].long_value));
 }
-#line 8061 "parser.cpp"
+#line 8063 "parser.cpp"
     break;
 
   case 454: /* index_param: IDENTIFIER '=' DOUBLE_VALUE  */
-#line 3313 "parser.y"
+#line 3315 "parser.y"
                               {
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[-2].str_value);
@@ -8069,20 +8071,20 @@ Return2:
 
     (yyval.index_param_t)->param_value_ = std::to_string((yyvsp[0].double_value));
 }
-#line 8073 "parser.cpp"
+#line 8075 "parser.cpp"
     break;
 
   case 455: /* index_info_list: index_info_list_one_pack  */
-#line 3324 "parser.y"
+#line 3326 "parser.y"
                                            {
     (yyval.index_info_list_t) = (yyvsp[0].index_info_list_t);
     (yyvsp[0].index_info_list_t) = nullptr;
 }
-#line 8082 "parser.cpp"
+#line 8084 "parser.cpp"
     break;
 
   case 456: /* index_info_list: index_info_list index_info_list_one_pack  */
-#line 3328 "parser.y"
+#line 3330 "parser.y"
                                            {
     (yyval.index_info_list_t) = (yyvsp[-1].index_info_list_t);
     (yyvsp[-1].index_info_list_t) = nullptr;
@@ -8090,11 +8092,11 @@ Return2:
     delete (yyvsp[0].index_info_list_t);
     (yyvsp[0].index_info_list_t) = nullptr;
 }
-#line 8094 "parser.cpp"
+#line 8096 "parser.cpp"
     break;
 
   case 457: /* index_info_list_one_pack: '(' identifier_array ')' USING IDENTIFIER with_index_param_list  */
-#line 3336 "parser.y"
+#line 3338 "parser.y"
                                                                                            {
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -8149,11 +8151,11 @@ Return2:
     }
     delete (yyvsp[-4].identifier_array_t);
 }
-#line 8153 "parser.cpp"
+#line 8155 "parser.cpp"
     break;
 
   case 458: /* index_info_list_one_pack: '(' identifier_array ')'  */
-#line 3390 "parser.y"
+#line 3392 "parser.y"
                            {
     infinity::IndexType index_type = infinity::IndexType::kSecondary;
     size_t index_count = (yyvsp[-1].identifier_array_t)->size();
@@ -8167,11 +8169,11 @@ Return2:
     }
     delete (yyvsp[-1].identifier_array_t);
 }
-#line 8171 "parser.cpp"
+#line 8173 "parser.cpp"
     break;
 
 
-#line 8175 "parser.cpp"
+#line 8177 "parser.cpp"
 
       default: break;
     }
@@ -8400,7 +8402,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 3404 "parser.y"
+#line 3406 "parser.y"
 
 
 void

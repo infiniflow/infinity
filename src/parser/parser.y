@@ -2178,9 +2178,9 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->database_entry_index_ = $8;
      $$->table_meta_index_ = $10;
      $$->table_entry_index_ = $11;
-     $$->index_index_ = $13;
+     $$->index_meta_index_ = $13;
 }
-| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEX LONG_VALUE SEGMENTS {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEX LONG_VALUE LONG_VALUE SEGMENTS {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kListIndexSegments;
      $$->catalog_file_start_index_ = $4;
@@ -2189,9 +2189,10 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->database_entry_index_ = $8;
      $$->table_meta_index_ = $10;
      $$->table_entry_index_ = $11;
-     $$->index_index_ = $13;
+     $$->index_meta_index_ = $13;
+     $$->index_entry_index_ = $14;
 }
-| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEX LONG_VALUE SEGMENT LONG_VALUE {
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEX LONG_VALUE LONG_VALUE SEGMENT LONG_VALUE {
      $$ = new infinity::AdminStatement();
      $$->admin_type_ = infinity::AdminStmtType::kShowIndexSegment;
      $$->catalog_file_start_index_ = $4;
@@ -2200,8 +2201,9 @@ admin_statement: ADMIN SHOW CATALOGS {
      $$->database_entry_index_ = $8;
      $$->table_meta_index_ = $10;
      $$->table_entry_index_ = $11;
-     $$->index_index_ = $13;
-     $$->segment_index_ = $15;
+     $$->index_meta_index_ = $13;
+     $$->index_entry_index_ = $14;
+     $$->segment_index_ = $16;
 }
 | ADMIN SHOW LOGS {
      $$ = new infinity::AdminStatement();

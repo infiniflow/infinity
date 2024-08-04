@@ -59,7 +59,8 @@ public:
     std::optional<int64_t> segment_index_{};
     std::optional<int64_t> block_index_{};
     std::optional<int64_t> column_index_{};
-    std::optional<int64_t> index_index_{};
+    std::optional<int64_t> index_meta_index_{};
+    std::optional<int64_t> index_entry_index_{};
     std::optional<int64_t> log_file_index_{};
     std::optional<int64_t> log_index_in_file_{};
 };

@@ -90,6 +90,9 @@ public:
 
     TableIndexEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    List<SharedPtr<TableIndexEntry>> GetAllEntries() const {
+        return index_entry_list_.GetAllEntries();
+    }
 private:
     SharedPtr<String> ToString();
 
