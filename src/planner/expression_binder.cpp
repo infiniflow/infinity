@@ -557,6 +557,65 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildInExpr(const InExpr &expr, Bind
     return in_expression_ptr;
 }
 
+inline bool EmbeddingEmbeddingQueryTypeValidated(const EmbeddingDataType column_embedding_type, const EmbeddingDataType query_embedding_type) {
+    switch (column_embedding_type) {
+        case EmbeddingDataType::kElemBit: {
+            // accept all query embedding types
+            return query_embedding_type != EmbeddingDataType::kElemInvalid;
+        }
+        case EmbeddingDataType::kElemUInt8:
+        case EmbeddingDataType::kElemInt8: {
+            // expect query embedding to be the same type
+            if (query_embedding_type == column_embedding_type) {
+                return true;
+            }
+            Status status = Status::SyntaxError(fmt::format("Query embedding with data type: {} which doesn't match with column embedding type {}.",
+                                                            EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
+                                                            EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
+            RecoverableError(std::move(status));
+            return false;
+        }
+        case EmbeddingDataType::kElemInt16:
+        case EmbeddingDataType::kElemInt32:
+        case EmbeddingDataType::kElemInt64: {
+            // TODO: not supported yet
+            Status status = Status::SyntaxError(
+                fmt::format("Cannot query on column with embedding data type: {}.", EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
+
+            RecoverableError(std::move(status));
+            return false;
+        }
+        case EmbeddingDataType::kElemFloat:
+        case EmbeddingDataType::kElemDouble:
+        case EmbeddingDataType::kElemFloat16:
+        case EmbeddingDataType::kElemBFloat16: {
+            // expect query embedding to be also float type
+            switch (query_embedding_type) {
+                case EmbeddingDataType::kElemFloat:
+                case EmbeddingDataType::kElemDouble:
+                case EmbeddingDataType::kElemFloat16:
+                case EmbeddingDataType::kElemBFloat16: {
+                    return true;
+                }
+                default: {
+                    Status status =
+                        Status::SyntaxError(fmt::format("Query embedding with int data type: {} which doesn't match with column embedding type {}.",
+                                                        EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
+                                                        EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
+                    RecoverableError(std::move(status));
+                    return false;
+                }
+            }
+            break;
+        }
+        case EmbeddingDataType::kElemInvalid: {
+            UnrecoverableError("Invalid embedding data type");
+            return false;
+        }
+    }
+    return false;
+}
+
 SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_knn_expr, BindContext *bind_context_ptr, i64 depth, bool) {
     // Bind KNN expression
     Vector<SharedPtr<BaseExpression>> arguments;
@@ -585,10 +644,11 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
                                                             embedding_info->Dimension()));
             RecoverableError(status);
         }
-        if (parsed_knn_expr.embedding_data_type_ != embedding_info->Type()) {
+        if (const auto column_embedding_type = embedding_info->Type(), query_embedding_type = parsed_knn_expr.embedding_data_type_;
+            !EmbeddingEmbeddingQueryTypeValidated(column_embedding_type, query_embedding_type)) {
             Status status = Status::SyntaxError(fmt::format("Query embedding with data type: {} which doesn't match with column embedding type {}.",
-                                                            EmbeddingInfo::EmbeddingDataTypeToString(parsed_knn_expr.embedding_data_type_),
-                                                            EmbeddingInfo::EmbeddingDataTypeToString(embedding_info->Type())));
+                                                            EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
+                                                            EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
             RecoverableError(std::move(status));
         }
     }
@@ -627,8 +687,16 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildMatchTensorExpr(const MatchTens
             const auto error_info = "The tensor column basic embedding dimension should be greater than 0";
             UnrecoverableError(error_info);
         }
+        // check if query embedding type and column embedding type can be matched
+        if (const auto column_embedding_type = embedding_info->Type(), query_embedding_type = expr.embedding_data_type_;
+            !EmbeddingEmbeddingQueryTypeValidated(column_embedding_type, query_embedding_type)) {
+            Status status = Status::SyntaxError(fmt::format("Query embedding with data type: {} which doesn't match with column embedding type {}.",
+                                                            EmbeddingInfo::EmbeddingDataTypeToString(query_embedding_type),
+                                                            EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
+            RecoverableError(std::move(status));
+        }
     } else {
-        const auto error_info = fmt::format("Expect the column search is an tensor column, but got: {}", column_data_type.ToString());
+        const auto error_info = fmt::format("Expect the column search is an tensor / tensorarray column, but got: {}", column_data_type.ToString());
         RecoverableError(Status::SyntaxError(error_info));
     }
     Vector<SharedPtr<BaseExpression>> arguments;

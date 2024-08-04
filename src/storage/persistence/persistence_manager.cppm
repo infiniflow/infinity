@@ -34,9 +34,9 @@ export struct ObjAddr {
 
     void Deserialize(const nlohmann::json &obj);
 
-    void WriteBuf(char *buf) const;
+    void WriteBufAdv(char *&buf) const;
 
-    void ReadBuf(const char *buf);
+    void ReadBufAdv(char *&buf);
 };
 
 export struct Range {
@@ -56,6 +56,14 @@ export struct ObjStat {
     int ref_count_{};
     SizeT deleted_size_{};
     Set<Range> deleted_ranges_{};
+
+    nlohmann::json Serialize() const;
+
+    void Deserialize(const nlohmann::json &obj);
+
+    void WriteBufAdv(char *&buf) const;
+
+    void ReadBufAdv(char *&buf);
 };
 
 export class PersistenceManager {
@@ -82,8 +90,6 @@ public:
     // Decrease refcount
     void PutObjCache(const String &file_path);
 
-    void SaveLocalPath(const String &local_path, const ObjAddr &object_addr);
-
     ObjAddr ObjCreateRefCount(const String &file_path);
 
     void Cleanup(const String &file_path);
@@ -93,6 +99,12 @@ public:
     void Deserialize(const nlohmann::json &obj);
 
     SizeT SumRefCounts();
+  
+    void WriteBufAdv(char *&buf, const Vector<String> &local_paths);
+
+    void ReadBufAdv(char *&buf);
+
+    SizeT GetSizeInBytes(const Vector<String> &local_paths);
 
 private:
     String ObjCreate();
@@ -111,6 +123,12 @@ private:
     void CleanupNoLock(const ObjAddr &object_addr);
 
     String RemovePrefix(const String &path);
+
+    ObjStat GetObjStatByObjAddr(const ObjAddr &obj_addr);
+
+    void SaveLocalPath(const String &local_path, const ObjAddr &object_addr);
+
+    void SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat);
 
     String workspace_;
     String local_data_dir_;

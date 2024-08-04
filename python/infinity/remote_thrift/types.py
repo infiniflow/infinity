@@ -89,6 +89,10 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
                         return object
                     case ttypes.ElementType.ElementFloat64:
                         return object
+                    case ttypes.ElementType.ElementFloat16:
+                        return object
+                    case ttypes.ElementType.ElementBFloat16:
+                        return object
                     case ttypes.ElementType.ElementBit:
                         return object
                     case _:
@@ -137,6 +141,10 @@ def logic_type_to_pl_type(ttype: ttypes.DataType):
                     case ttypes.ElementType.ElementInt32:
                         return pl.List
                     case ttypes.ElementType.ElementFloat32:
+                        return pl.List
+                    case ttypes.ElementType.ElementFloat16:
+                        return pl.List
+                    case ttypes.ElementType.ElementBFloat16:
                         return pl.List
                     case ttypes.ElementType.ElementFloat64:
                         return pl.List
@@ -198,6 +206,16 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat64:
                 all_list = list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+            elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat16:
+                all_list = list(struct.unpack('<{}e'.format(len(column_vector) // 2), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+            elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBFloat16:
+                tmp_u16 = np.frombuffer(column_vector, dtype='<i2')
+                result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+                result_arr[1::2] = tmp_u16
+                view_float32 = result_arr.view('<f4')
+                all_list = list(view_float32)
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBit:
                 all_list = list(struct.unpack('<{}B'.format(len(column_vector)), column_vector))
@@ -302,6 +320,16 @@ def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[
     elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat64:
         all_list = list(struct.unpack('<{}d'.format(len(binary_data) // 8), binary_data))
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat16:
+        all_list = list(struct.unpack('<{}e'.format(len(binary_data) // 2), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBFloat16:
+        tmp_u16 = np.frombuffer(binary_data, dtype='<i2')
+        result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+        result_arr[1::2] = tmp_u16
+        view_float32 = result_arr.view('<f4')
+        all_list = list(view_float32)
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     else:
         raise NotImplementedError(
             f"Unsupported type {column_data_type.physical_type.embedding_type.element_type}")
@@ -356,6 +384,16 @@ def parse_sparse_bytes(column_data_type: ttypes.DataType, column_vector):
             case ttypes.ElementType.ElementFloat64:
                 values = struct.unpack('<{}d'.format(nnz), column_vector[offset:offset + nnz * 8])
                 offset += nnz * 8
+            case ttypes.ElementType.ElementFloat16:
+                values = struct.unpack('<{}e'.format(nnz), column_vector[offset:offset + nnz * 2])
+                offset += nnz * 2
+            case ttypes.ElementType.ElementBFloat16:
+                tmp_u16 = np.frombuffer(column_vector[offset:offset + nnz * 2], dtype='<i2')
+                result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+                result_arr[1::2] = tmp_u16
+                view_float32 = result_arr.view('<f4')
+                values = list(view_float32)
+                offset += nnz * 2
             case ttypes.ElementType.ElementBit:
                 raise NotImplementedError(f"Unsupported type {element_type}")
             case _:
@@ -425,6 +463,12 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
     elif embedding_data_type in ['double', 'float64', 'f64']:
         elem_type = ElementType.ElementFloat64
         data.f64_array_value = np.asarray(embedding_data, dtype=np.float64).flatten()
+    elif embedding_data_type in ['float16', 'fp16', 'f16']:
+        elem_type = ElementType.ElementFloat16
+        data.f16_array_value = np.asarray(embedding_data, dtype=np.float16).flatten()
+    elif embedding_data_type in ['bfloat16', 'bf16']:
+        elem_type = ElementType.ElementBFloat16
+        data.bf16_array_value = np.asarray(embedding_data, dtype=np.float32).flatten()
     else:
         raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
