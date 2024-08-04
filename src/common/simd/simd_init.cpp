@@ -18,6 +18,7 @@ module simd_init;
 import stl;
 import distance_simd_functions;
 import hnsw_simd_func;
+import maxsim_simd_funcs;
 import emvb_simd_funcs;
 import search_top_1_sgemm;
 
@@ -519,6 +520,48 @@ U8CosDistanceFuncType Get_HNSW_U8Cos_ptr() {
     }
 #endif
     return &U8CosBF;
+}
+
+MaxSimF32BitIPFuncType GetMaxSimF32BitIPFuncPtr() {
+#if defined(__AVX512F__)
+    if (IsAVX512Supported()) {
+        return &maxsim_f32_bit_ip_avx512;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &maxsim_f32_bit_ip_avx2;
+    }
+#endif
+    return &maxsim_f32_bit_ip_plain;
+}
+
+MaxSimI32BitIPFuncType GetMaxSimI32BitIPFuncPtr() {
+#if defined(__AVX512F__)
+    if (IsAVX512Supported()) {
+        return &maxsim_i32_bit_ip_avx512;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &maxsim_i32_bit_ip_avx2;
+    }
+#endif
+    return &maxsim_i32_bit_ip_plain;
+}
+
+MaxSimI64BitIPFuncType GetMaxSimI64BitIPFuncPtr() {
+#if defined(__AVX512F__)
+    if (IsAVX512Supported()) {
+        return &maxsim_i64_bit_ip_avx512;
+    }
+#endif
+#if defined(__AVX2__)
+    if (IsAVX2Supported()) {
+        return &maxsim_i64_bit_ip_avx2;
+    }
+#endif
+    return &maxsim_i64_bit_ip_plain;
 }
 
 FilterScoresOutputIdsFuncType GetFilterScoresOutputIdsFuncPtr() {

@@ -99,7 +99,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         if (!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
             // Build logical aggregate
-            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
+            auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
             auto aggregate = MakeShared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
                                                           base_table_ref,
                                                           group_by_expressions_,
@@ -129,7 +129,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                 root = sort;
             } else {
                 SharedPtr<LogicalNode> top = MakeShared<LogicalTop>(bind_context->GetNewLogicalNodeId(),
-                                                                    static_pointer_cast<BaseTableRef>(table_ref_ptr_),
+                                                                    std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
                                                                     limit_expression_,
                                                                     offset_expression_,
                                                                     order_by_expressions_,
@@ -167,7 +167,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             String error_message = "Not base table reference";
             UnrecoverableError(error_message);
         }
-        auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
+        auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
         // FIXME: need check if there is subquery inside the where conditions
         auto filter_expr = ComposeExpressionWithDelimiter(where_conditions_, ConjunctionType::kAnd);
         auto common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());

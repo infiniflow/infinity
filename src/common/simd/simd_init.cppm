@@ -32,6 +32,9 @@ export using I8DistanceFuncType = i32(*)(const i8 *, const i8 *, SizeT);
 export using I8CosDistanceFuncType = f32(*)(const i8 *, const i8 *, SizeT);
 export using U8DistanceFuncType = i32(*)(const u8 *, const u8 *, SizeT);
 export using U8CosDistanceFuncType = f32(*)(const u8 *, const u8 *, SizeT);
+export using MaxSimF32BitIPFuncType = f32(*)(const f32 *, const u8 *, SizeT);
+export using MaxSimI32BitIPFuncType = i32(*)(const i32 *, const u8 *, SizeT);
+export using MaxSimI64BitIPFuncType = i64(*)(const i64 *, const u8 *, SizeT);
 export using FilterScoresOutputIdsFuncType = u32 * (*)(u32 *, f32, const f32 *, u32);
 export using SearchTop1WithDisF32U32FuncType = void(*)(u32, u32, const f32 *, u32, const f32 *, u32 *, f32 *);
 
@@ -66,6 +69,10 @@ export U8DistanceFuncType Get_HNSW_U8IP_16_ptr();
 export U8DistanceFuncType Get_HNSW_U8IP_32_ptr();
 export U8DistanceFuncType Get_HNSW_U8IP_64_ptr();
 export U8CosDistanceFuncType Get_HNSW_U8Cos_ptr();
+// MaxSim IP
+export MaxSimF32BitIPFuncType GetMaxSimF32BitIPFuncPtr();
+export MaxSimI32BitIPFuncType GetMaxSimI32BitIPFuncPtr();
+export MaxSimI64BitIPFuncType GetMaxSimI64BitIPFuncPtr();
 // EMVB
 export FilterScoresOutputIdsFuncType GetFilterScoresOutputIdsFuncPtr();
 // K-means

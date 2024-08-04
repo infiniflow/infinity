@@ -85,7 +85,9 @@ struct ElementType {
     ElementInt32 = 4,
     ElementInt64 = 5,
     ElementFloat32 = 6,
-    ElementFloat64 = 7
+    ElementFloat64 = 7,
+    ElementFloat16 = 8,
+    ElementBFloat16 = 9
   };
 };
 
@@ -119,10 +121,12 @@ struct LiteralType {
     Null = 4,
     IntegerArray = 5,
     DoubleArray = 6,
-    IntegerTensorArray = 7,
-    DoubleTensorArray = 8,
-    SparseIntegerArray = 9,
-    SparseDoubleArray = 10
+    IntegerTensor = 7,
+    DoubleTensor = 8,
+    IntegerTensorArray = 9,
+    DoubleTensorArray = 10,
+    SparseIntegerArray = 11,
+    SparseDoubleArray = 12
   };
 };
 
@@ -1058,7 +1062,7 @@ void swap(ColumnExpr &a, ColumnExpr &b);
 std::ostream& operator<<(std::ostream& out, const ColumnExpr& obj);
 
 typedef struct _EmbeddingData__isset {
-  _EmbeddingData__isset() : bool_array_value(false), u8_array_value(false), i8_array_value(false), i16_array_value(false), i32_array_value(false), i64_array_value(false), f32_array_value(false), f64_array_value(false) {}
+  _EmbeddingData__isset() : bool_array_value(false), u8_array_value(false), i8_array_value(false), i16_array_value(false), i32_array_value(false), i64_array_value(false), f32_array_value(false), f64_array_value(false), f16_array_value(false), bf16_array_value(false) {}
   bool bool_array_value :1;
   bool u8_array_value :1;
   bool i8_array_value :1;
@@ -1067,6 +1071,8 @@ typedef struct _EmbeddingData__isset {
   bool i64_array_value :1;
   bool f32_array_value :1;
   bool f64_array_value :1;
+  bool f16_array_value :1;
+  bool bf16_array_value :1;
 } _EmbeddingData__isset;
 
 class EmbeddingData : public virtual ::apache::thrift::TBase {
@@ -1086,6 +1092,8 @@ class EmbeddingData : public virtual ::apache::thrift::TBase {
   std::vector<int64_t>  i64_array_value;
   std::vector<double>  f32_array_value;
   std::vector<double>  f64_array_value;
+  std::vector<double>  f16_array_value;
+  std::vector<double>  bf16_array_value;
 
   _EmbeddingData__isset __isset;
 
@@ -1104,6 +1112,10 @@ class EmbeddingData : public virtual ::apache::thrift::TBase {
   void __set_f32_array_value(const std::vector<double> & val);
 
   void __set_f64_array_value(const std::vector<double> & val);
+
+  void __set_f16_array_value(const std::vector<double> & val);
+
+  void __set_bf16_array_value(const std::vector<double> & val);
 
   bool operator == (const EmbeddingData & rhs) const
   {
@@ -1138,6 +1150,14 @@ class EmbeddingData : public virtual ::apache::thrift::TBase {
     if (__isset.f64_array_value != rhs.__isset.f64_array_value)
       return false;
     else if (__isset.f64_array_value && !(f64_array_value == rhs.f64_array_value))
+      return false;
+    if (__isset.f16_array_value != rhs.__isset.f16_array_value)
+      return false;
+    else if (__isset.f16_array_value && !(f16_array_value == rhs.f16_array_value))
+      return false;
+    if (__isset.bf16_array_value != rhs.__isset.bf16_array_value)
+      return false;
+    else if (__isset.bf16_array_value && !(bf16_array_value == rhs.bf16_array_value))
       return false;
     return true;
   }
@@ -1208,7 +1228,7 @@ void swap(InitParameter &a, InitParameter &b);
 std::ostream& operator<<(std::ostream& out, const InitParameter& obj);
 
 typedef struct _ConstantExpr__isset {
-  _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false), i64_tensor_array_value(false), f64_tensor_array_value(false), i64_array_idx(false) {}
+  _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false), i64_tensor_value(false), f64_tensor_value(false), i64_tensor_array_value(false), f64_tensor_array_value(false), i64_array_idx(false) {}
   bool literal_type :1;
   bool bool_value :1;
   bool i64_value :1;
@@ -1216,6 +1236,8 @@ typedef struct _ConstantExpr__isset {
   bool str_value :1;
   bool i64_array_value :1;
   bool f64_array_value :1;
+  bool i64_tensor_value :1;
+  bool f64_tensor_value :1;
   bool i64_tensor_array_value :1;
   bool f64_tensor_array_value :1;
   bool i64_array_idx :1;
@@ -1246,6 +1268,8 @@ class ConstantExpr : public virtual ::apache::thrift::TBase {
   std::string str_value;
   std::vector<int64_t>  i64_array_value;
   std::vector<double>  f64_array_value;
+  std::vector<std::vector<int64_t> >  i64_tensor_value;
+  std::vector<std::vector<double> >  f64_tensor_value;
   std::vector<std::vector<std::vector<int64_t> > >  i64_tensor_array_value;
   std::vector<std::vector<std::vector<double> > >  f64_tensor_array_value;
   std::vector<int64_t>  i64_array_idx;
@@ -1265,6 +1289,10 @@ class ConstantExpr : public virtual ::apache::thrift::TBase {
   void __set_i64_array_value(const std::vector<int64_t> & val);
 
   void __set_f64_array_value(const std::vector<double> & val);
+
+  void __set_i64_tensor_value(const std::vector<std::vector<int64_t> > & val);
+
+  void __set_f64_tensor_value(const std::vector<std::vector<double> > & val);
 
   void __set_i64_tensor_array_value(const std::vector<std::vector<std::vector<int64_t> > > & val);
 
@@ -1299,6 +1327,14 @@ class ConstantExpr : public virtual ::apache::thrift::TBase {
     if (__isset.f64_array_value != rhs.__isset.f64_array_value)
       return false;
     else if (__isset.f64_array_value && !(f64_array_value == rhs.f64_array_value))
+      return false;
+    if (__isset.i64_tensor_value != rhs.__isset.i64_tensor_value)
+      return false;
+    else if (__isset.i64_tensor_value && !(i64_tensor_value == rhs.i64_tensor_value))
+      return false;
+    if (__isset.f64_tensor_value != rhs.__isset.f64_tensor_value)
+      return false;
+    else if (__isset.f64_tensor_value && !(f64_tensor_value == rhs.f64_tensor_value))
       return false;
     if (__isset.i64_tensor_array_value != rhs.__isset.i64_tensor_array_value)
       return false;

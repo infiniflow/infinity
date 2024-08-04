@@ -40,7 +40,7 @@ import column_vector;
 
 namespace infinity {
 
-void PhysicalMergeKnn::Init() {}
+void PhysicalMergeKnn::Init() { left()->Init(); }
 
 bool PhysicalMergeKnn::Execute(QueryContext *query_context, OperatorState *operator_state) {
     auto merge_knn_op_state = static_cast<MergeKnnOperatorState *>(operator_state);
