@@ -54,9 +54,9 @@ String MatchTensorExpression::ToString() const {
     auto tensor_str =
         TensorT::Tensor2String(query_embedding_.ptr, embedding_data_type_, tensor_basic_embedding_dimension_, num_of_embedding_in_query_tensor_);
     if (options_text_.empty()) {
-        return fmt::format("MATCH TENSOR ({}, [{}], {})", column_expr_->Name(), tensor_str, MethodToString(search_method_));
+        return fmt::format("MATCH TENSOR ({}, {}, {})", column_expr_->Name(), tensor_str, MethodToString(search_method_));
     }
-    return fmt::format("MATCH TENSOR ({}, [{}], {}, '{}')", column_expr_->Name(), tensor_str, MethodToString(search_method_), options_text_);
+    return fmt::format("MATCH TENSOR ({}, {}, {}, '{}')", column_expr_->Name(), tensor_str, MethodToString(search_method_), options_text_);
 }
 
 } // namespace infinity

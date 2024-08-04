@@ -12,27 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "embedding_type.h"
-#include <cstring>
+module;
+
+#include "simd_common_intrin_include.h"
+
+module simd_common_tools;
+
+import stl;
+import infinity_exception;
 
 namespace infinity {
 
-size_t EmbeddingType::embedding_type_width[] = {
-    0, // bit
-    1, // int8
-    2, // int16
-    4, // int32
-    8, // int64
-    4, // float32
-    8, // double64
-    1, // uint8
-    2, // float16
-    2, // bfloat16
+struct U8MaskArray {
+    alignas(64) u32 masks[256][8] = {};
+    U8MaskArray() {
+        for (u32 i = 0; i < 256; ++i) {
+            for (u32 j = 0; j < 8; ++j) {
+                masks[i][j] = (i & (1u << j)) ? std::numeric_limits<u32>::max() : 0;
+            }
+        }
+    }
 };
 
-void EmbeddingType::Init(const void *from_ptr, size_t size) {
-    // User need to guarantee the size is matched.
-    memcpy(ptr, from_ptr, size);
+U8MaskPtr GetU8MasksForAVX2() {
+    static U8MaskArray u8_mask_array;
+    return u8_mask_array.masks;
 }
+
 
 } // namespace infinity

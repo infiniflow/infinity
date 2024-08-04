@@ -11,13 +11,13 @@ COPY fusion_rerank_tensor_array_maxsim FROM '/var/infinity/test_data/tensor_arra
 query I
 SELECT * FROM fusion_rerank_tensor_array_maxsim;
 ----
-test00 2 [[10000000],[01000000]],[[00100000]] this
-test11 4 [[00010000],[00001000]],[[00000100]] tree
-test22 6 [[00000010],[00000001]],[[00000011]] tell off
-test33 8 [[00000111]] that
-test44 12 [[11000000]] time off now
-test55 14 [[00000000]] where
-test77 18 [[11111111]] off
+test00 2 [[[10000000],[01000000]],[[00100000]]] this
+test11 4 [[[00010000],[00001000]],[[00000100]]] tree
+test22 6 [[[00000010],[00000001]],[[00000011]]] tell off
+test33 8 [[[00000111]]] that
+test44 12 [[[11000000]]] time off now
+test55 14 [[[00000000]]] where
+test77 18 [[[11111111]]] off
 
 statement ok
 CREATE INDEX ft_index ON fusion_rerank_tensor_array_maxsim(body) USING FULLTEXT;

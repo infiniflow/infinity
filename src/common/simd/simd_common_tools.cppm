@@ -20,6 +20,10 @@ import stl;
 
 namespace infinity {
 
+using U8MaskPtr = const u32 (*)[8];
+
+export U8MaskPtr GetU8MasksForAVX2();
+
 #ifdef __SSE__
 // https://stackoverflow.com/questions/6996764/fastest-way-to-do-horizontal-sse-vector-sum-or-other-reduction/35270026#35270026
 export inline float hsum_ps_sse1(__m128 v) {                    // v = [ D C | B A ]

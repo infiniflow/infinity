@@ -48,40 +48,34 @@ namespace infinity {
 ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto constant_expr = new ConstantExpr(literal_type);
+    auto constant_expr = MakeUnique<ConstantExpr>(literal_type);
     switch (literal_type) {
         case LiteralType::kBoolean: {
             constant_expr->bool_value_ = bool_value;
-            return constant_expr;
+            break;
         }
         case LiteralType::kDouble: {
             constant_expr->double_value_ = f64_value;
-            return constant_expr;
+            break;
         }
         case LiteralType::kString: {
             constant_expr->str_value_ = strdup(str_value.c_str());
-            return constant_expr;
+            break;
         }
         case LiteralType::kInteger: {
             constant_expr->integer_value_ = i64_value;
-            return constant_expr;
+            break;
         }
         case LiteralType::kNull: {
-            return constant_expr;
+            break;
         }
         case LiteralType::kIntegerArray: {
-            constant_expr->long_array_.reserve(i64_array_value.size());
-            for (SizeT i = 0; i < i64_array_value.size(); ++i) {
-                constant_expr->long_array_.emplace_back(i64_array_value[i]);
-            }
-            return constant_expr;
+            constant_expr->long_array_ = i64_array_value;
+            break;
         }
         case LiteralType::kDoubleArray: {
-            constant_expr->double_array_.reserve(f64_array_value.size());
-            for (SizeT i = 0; i < f64_array_value.size(); ++i) {
-                constant_expr->double_array_.emplace_back(f64_array_value[i]);
-            }
-            return constant_expr;
+            constant_expr->double_array_ = f64_array_value;
+            break;
         }
         case LiteralType::kLongSparseArray: {
             constant_expr->long_sparse_array_.first.reserve(i64_array_idx.size());
@@ -90,7 +84,7 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
                 constant_expr->long_sparse_array_.first.emplace_back(i64_array_idx[i]);
                 constant_expr->long_sparse_array_.second.emplace_back(i64_array_value[i]);
             }
-            return constant_expr;
+            break;
         }
         case LiteralType::kDoubleSparseArray: {
             constant_expr->double_sparse_array_.first.reserve(i64_array_idx.size());
@@ -99,67 +93,68 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
                 constant_expr->double_sparse_array_.first.emplace_back(i64_array_idx[i]);
                 constant_expr->double_sparse_array_.second.emplace_back(f64_array_value[i]);
             }
-            return constant_expr;
+            break;
         }
         case LiteralType::kEmptyArray: {
-            return constant_expr;
+            break;
         }
         case LiteralType::kSubArrayArray: {
-            if (i64_tensor_array_value.empty() == f64_tensor_array_value.empty()) {
-                status = Status::InvalidConstantType();
-                delete constant_expr;
-                constant_expr = nullptr;
-                return nullptr;
-            }
-            auto create_vvv = [&constant_expr, &status](const auto &vvv, LiteralType basic_type) {
-                constant_expr->sub_array_array_.reserve(vvv.size());
-                for (const auto &value_1 : vvv) {
-                    auto parsed_expr_1 = MakeUnique<ConstantExpr>(LiteralType::kSubArrayArray);
-                    parsed_expr_1->sub_array_array_.reserve(value_1.size());
-                    for (const auto &value_2 : value_1) {
-                        auto parsed_expr_2 = MakeUnique<ConstantExpr>(basic_type);
-                        switch (basic_type) {
-                            case LiteralType::kIntegerArray: {
-                                parsed_expr_2->long_array_.reserve(value_2.size());
-                                for (const auto &value_3 : value_2) {
-                                    parsed_expr_2->long_array_.emplace_back(value_3);
-                                }
-                                break;
-                            }
-                            case LiteralType::kDoubleArray: {
-                                parsed_expr_2->double_array_.reserve(value_2.size());
-                                for (const auto &value_3 : value_2) {
-                                    parsed_expr_2->double_array_.emplace_back(value_3);
-                                }
-                                break;
-                            }
-                            default: {
-                                status = Status::InvalidConstantType();
-                                delete constant_expr;
-                                constant_expr = nullptr;
-                                UnrecoverableError("Unexpected usage!");
-                            }
-                        }
-                        parsed_expr_1->sub_array_array_.emplace_back(parsed_expr_2.release());
+            auto create_vv = []<typename T>(const std::vector<std::vector<T>> &vv, ConstantExpr *output_constant_expr) {
+                static_assert(std::is_same_v<T, int64_t> || std::is_same_v<T, double>);
+                constexpr auto basic_type = [] {
+                    if constexpr (std::is_same_v<T, int64_t>) {
+                        return LiteralType::kIntegerArray;
+                    } else if constexpr (std::is_same_v<T, double>) {
+                        return LiteralType::kDoubleArray;
+                    } else {
+                        static_assert(false, "unexpected type");
+                        return LiteralType::kEmptyArray;
                     }
-                    constant_expr->sub_array_array_.emplace_back(parsed_expr_1.release());
+                }();
+                output_constant_expr->sub_array_array_.reserve(vv.size());
+                for (const auto &value_2 : vv) {
+                    auto parsed_expr_2 = MakeShared<ConstantExpr>(basic_type);
+                    if constexpr (std::is_same_v<T, int64_t>) {
+                        parsed_expr_2->long_array_ = value_2;
+                    } else if constexpr (std::is_same_v<T, double>) {
+                        parsed_expr_2->double_array_ = value_2;
+                    } else {
+                        static_assert(false, "unexpected type");
+                    }
+                    output_constant_expr->sub_array_array_.emplace_back(std::move(parsed_expr_2));
                 }
             };
-            if (!i64_tensor_array_value.empty()) {
-                create_vvv(i64_tensor_array_value, LiteralType::kIntegerArray);
-            } else {
-                create_vvv(f64_tensor_array_value, LiteralType::kDoubleArray);
+            auto create_vvv = [&constant_expr, &create_vv](const auto &vvv) {
+                constant_expr->sub_array_array_.reserve(vvv.size());
+                for (const auto &value_1 : vvv) {
+                    auto parsed_expr_1 = MakeShared<ConstantExpr>(LiteralType::kSubArrayArray);
+                    create_vv(value_1, parsed_expr_1.get());
+                    constant_expr->sub_array_array_.emplace_back(std::move(parsed_expr_1));
+                }
+            };
+            const auto total_have_val = static_cast<int>(!i64_tensor_value.empty()) + static_cast<int>(!f64_tensor_value.empty()) +
+                                        static_cast<int>(!i64_tensor_array_value.empty()) + static_cast<int>(!f64_tensor_array_value.empty());
+            if (total_have_val != 1) {
+                status = Status::InvalidConstantType();
+                return nullptr;
             }
-            return constant_expr;
+            if (!i64_tensor_value.empty()) {
+                create_vv(i64_tensor_value, constant_expr.get());
+            } else if (!f64_tensor_value.empty()) {
+                create_vv(f64_tensor_value, constant_expr.get());
+            } else if (!i64_tensor_array_value.empty()) {
+                create_vvv(i64_tensor_array_value);
+            } else if (!f64_tensor_array_value.empty()) {
+                create_vvv(f64_tensor_array_value);
+            }
+            break;
         }
         default: {
             status = Status::InvalidConstantType();
-            delete constant_expr;
-            constant_expr = nullptr;
             return nullptr;
         }
     }
-    return constant_expr;
+    return constant_expr.release();
 }
 
 ParsedExpr *WrapColumnExpr::GetParsedExpr(Status &status) {
@@ -251,6 +246,20 @@ Tuple<void *, i64> GetEmbeddingDataTypeDataPtrFromProto(const EmbeddingData &emb
         return {(void *)embedding_data.f32_array_value.data(), embedding_data.f32_array_value.size()};
     } else if (embedding_data.f64_array_value.size() != 0) {
         return {(void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size()};
+    } else if (embedding_data.f16_array_value.size() != 0) {
+        auto ptr_double = (double *)(embedding_data.f16_array_value.data());
+        auto ptr_float16 = (Float16T *)(embedding_data.f16_array_value.data());
+        for (size_t i = 0; i < embedding_data.f16_array_value.size(); ++i) {
+            ptr_float16[i] = float(ptr_double[i]);
+        }
+        return {(void *)embedding_data.f16_array_value.data(), embedding_data.f16_array_value.size()};
+    } else if (embedding_data.bf16_array_value.size() != 0) {
+        auto ptr_double = (double *)(embedding_data.bf16_array_value.data());
+        auto ptr_bfloat16 = (BFloat16T *)(embedding_data.bf16_array_value.data());
+        for (size_t i = 0; i < embedding_data.bf16_array_value.size(); ++i) {
+            ptr_bfloat16[i] = float(ptr_double[i]);
+        }
+        return {(void *)embedding_data.bf16_array_value.data(), embedding_data.bf16_array_value.size()};
     } else {
         status = Status::InvalidEmbeddingDataType("unknown type");
         return {nullptr, 0};
@@ -848,10 +857,7 @@ void HandleBoolType(ColumnField &output_column_field, SizeT row_count, const Sha
 
 void HandlePodType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
-    String dst;
-    dst.resize(size);
-    std::memcpy(dst.data(), column_vector->data(), size);
-    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+    output_column_field.column_vectors.emplace_back(column_vector->data(), size);
 }
 
 void HandleVarcharType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
@@ -890,10 +896,7 @@ void HandleVarcharType(ColumnField &output_column_field, SizeT row_count, const 
 
 void HandleEmbeddingType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
-    String dst;
-    dst.resize(size);
-    std::memcpy(dst.data(), column_vector->data(), size);
-    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+    output_column_field.column_vectors.emplace_back(column_vector->data(), size);
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
@@ -995,10 +998,7 @@ void HandleSparseType(ColumnField &output_column_field, SizeT row_count, const S
 
 void HandleRowIDType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
-    String dst;
-    dst.resize(size);
-    std::memcpy(dst.data(), column_vector->data(), size);
-    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+    output_column_field.column_vectors.emplace_back(column_vector->data(), size);
     output_column_field.column_type = column_vector->data_type()->type();
 }
 

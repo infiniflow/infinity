@@ -228,6 +228,15 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
             String error_message = "Unimplemented";
             UnrecoverableError(error_message);
         }
+        case kElemUInt8: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, u8>(source_info,
+                                                                              source,
+                                                                              source_vector_ptr,
+                                                                              target_info,
+                                                                              target,
+                                                                              target_vector_ptr);
+            break;
+        }
         case kElemInt8: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, TinyIntT>(source_info,
                                                                                    source,
@@ -282,6 +291,24 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                                                                    target_vector_ptr);
             break;
         }
+        case kElemFloat16: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, Float16T>(source_info,
+                                                                                    source,
+                                                                                    source_vector_ptr,
+                                                                                    target_info,
+                                                                                    target,
+                                                                                    target_vector_ptr);
+            break;
+        }
+        case kElemBFloat16: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, BFloat16T>(source_info,
+                                                                                     source,
+                                                                                     source_vector_ptr,
+                                                                                     target_info,
+                                                                                     target,
+                                                                                     target_vector_ptr);
+            break;
+        }
         default: {
             String error_message = "Unreachable code";
             UnrecoverableError(error_message);
@@ -331,6 +358,10 @@ void SparseTryCastToSparseFun(const SparseInfo *source_info,
             SparseTryCastToSparseFunT1<BooleanT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
+        case kElemUInt8: {
+            SparseTryCastToSparseFunT1<u8>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
+            break;
+        }
         case kElemInt8: {
             SparseTryCastToSparseFunT1<TinyIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
@@ -353,6 +384,14 @@ void SparseTryCastToSparseFun(const SparseInfo *source_info,
         }
         case kElemDouble: {
             SparseTryCastToSparseFunT1<DoubleT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
+            break;
+        }
+        case kElemFloat16: {
+            SparseTryCastToSparseFunT1<Float16T>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
+            break;
+        }
+        case kElemBFloat16: {
+            SparseTryCastToSparseFunT1<BFloat16T>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
         default: {

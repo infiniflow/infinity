@@ -89,6 +89,8 @@ export struct WrapConstantExpr {
     String str_value;
     Vector<i64> i64_array_value;
     Vector<f64> f64_array_value;
+    Vector<Vector<i64>> i64_tensor_value;
+    Vector<Vector<f64>> f64_tensor_value;
     Vector<Vector<Vector<i64>>> i64_tensor_array_value;
     Vector<Vector<Vector<f64>>> f64_tensor_array_value;
     Vector<i64> i64_array_idx;
@@ -177,6 +179,8 @@ export struct EmbeddingData {
     Vector<int64_t> i64_array_value;
     Vector<double> f32_array_value;
     Vector<double> f64_array_value;
+    Vector<double> f16_array_value;
+    Vector<double> bf16_array_value;
 };
 
 export struct WrapKnnExpr {

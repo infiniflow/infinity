@@ -14,7 +14,9 @@
 
 module;
 
+#include <charconv>
 #include <ranges>
+#include <sstream>
 
 module value;
 
@@ -37,7 +39,12 @@ namespace {
 template <typename T>
 void Embedding2JsonInternal(const EmbeddingType &embedding, size_t dimension, nlohmann::json &embedding_json) {
     for (size_t i = 0; i < dimension; ++i) {
-        embedding_json.push_back(((T *)(embedding.ptr))[i]);
+        auto data = ((T *)(embedding.ptr))[i];
+        if constexpr (std::is_same_v<decltype(data), Float16T> || std::is_same_v<decltype(data), BFloat16T>) {
+            embedding_json.push_back(static_cast<f32>(data));
+        } else {
+            embedding_json.push_back(data);
+        }
     }
 }
 
@@ -59,38 +66,77 @@ void BitmapEmbedding2JsonInternal(const EmbeddingType &embedding, size_t dimensi
 
 void Embedding2Json(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, nlohmann::json &embedding_json) {
     switch (type) {
-        case kElemBit: {
+        case EmbeddingDataType::kElemBit: {
             BitmapEmbedding2JsonInternal(embedding, dimension, embedding_json);
             break;
         }
-        case kElemInt8: {
+        case EmbeddingDataType::kElemInt8: {
             Embedding2JsonInternal<int8_t>(embedding, dimension, embedding_json);
             break;
         }
-        case kElemInt16: {
+        case EmbeddingDataType::kElemInt16: {
             Embedding2JsonInternal<int16_t>(embedding, dimension, embedding_json);
             break;
         }
-        case kElemInt32: {
+        case EmbeddingDataType::kElemInt32: {
             Embedding2JsonInternal<int32_t>(embedding, dimension, embedding_json);
             break;
         }
-        case kElemInt64: {
+        case EmbeddingDataType::kElemInt64: {
             Embedding2JsonInternal<int64_t>(embedding, dimension, embedding_json);
             break;
         }
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat: {
             Embedding2JsonInternal<float>(embedding, dimension, embedding_json);
             break;
         }
-        case kElemDouble: {
+        case EmbeddingDataType::kElemDouble: {
             Embedding2JsonInternal<double>(embedding, dimension, embedding_json);
             break;
         }
-        default: {
+        case EmbeddingDataType::kElemUInt8: {
+            Embedding2JsonInternal<uint8_t>(embedding, dimension, embedding_json);
+            break;
+        }
+        case EmbeddingDataType::kElemFloat16: {
+            Embedding2JsonInternal<Float16T>(embedding, dimension, embedding_json);
+            break;
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            Embedding2JsonInternal<BFloat16T>(embedding, dimension, embedding_json);
+            break;
+        }
+        case EmbeddingDataType::kElemInvalid: {
             Status status = Status::SyntaxError("Unexpected embedding type");
             RecoverableError(status);
         }
+    }
+}
+
+void Tensor2Json(Span<char> data_span, const EmbeddingDataType type, const size_t embedding_dimension, nlohmann::json &tensor_json) {
+    const size_t data_bytes = data_span.size();
+    const size_t basic_embedding_bytes = EmbeddingT::EmbeddingSize(type, embedding_dimension);
+    if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
+        UnrecoverableError("Tensor data size mismatch.");
+    }
+    const size_t embedding_num = data_bytes / basic_embedding_bytes;
+    EmbeddingT embedding(nullptr, false);
+    for (size_t i = 0; i < embedding_num; ++i) {
+        embedding.ptr = data_span.data() + i * basic_embedding_bytes;
+        nlohmann::json embedding_json;
+        Embedding2Json(embedding, type, embedding_dimension, embedding_json);
+        tensor_json.emplace_back(std::move(embedding_json));
+    }
+}
+
+void TensorArray2Json(const Vector<Span<char>> &tensor_array,
+                      const EmbeddingDataType type,
+                      const size_t embedding_dimension,
+                      nlohmann::json &tensorarray_json) {
+    for (const auto tensor_span : tensor_array) {
+        nlohmann::json tensor_json;
+        Tensor2Json(tensor_span, type, embedding_dimension, tensor_json);
+        tensorarray_json.emplace_back(std::move(tensor_json));
     }
 }
 
@@ -100,38 +146,55 @@ void Sparse2JsonInternal1(const SparseValueInfo &sparse_value_info, nlohmann::js
     for (SizeT i = 0; i < nnz; ++i) {
         auto index = reinterpret_cast<IndexT *>(indice_span.data())[i];
         auto data = reinterpret_cast<DataType *>(data_span.data())[i];
-        sparse_json[std::to_string(index)] = data;
+        if constexpr (std::is_same_v<decltype(data), Float16T> || std::is_same_v<decltype(data), BFloat16T>) {
+            sparse_json[std::to_string(index)] = static_cast<f32>(data);
+        } else {
+            sparse_json[std::to_string(index)] = data;
+        }
     }
 }
 
 template <typename IndexT>
 void Sparse2JsonInternal(const SparseValueInfo &sparse_value_info, const SparseInfo *sparse_info, nlohmann::json &sparse_json) {
     switch (sparse_info->DataType()) {
-        case kElemInt8: {
+        case EmbeddingDataType::kElemInt8: {
             Sparse2JsonInternal1<IndexT, i8>(sparse_value_info, sparse_json);
             break;
         }
-        case kElemInt16: {
+        case EmbeddingDataType::kElemInt16: {
             Sparse2JsonInternal1<IndexT, i16>(sparse_value_info, sparse_json);
             break;
         }
-        case kElemInt32: {
+        case EmbeddingDataType::kElemInt32: {
             Sparse2JsonInternal1<IndexT, i32>(sparse_value_info, sparse_json);
             break;
         }
-        case kElemInt64: {
+        case EmbeddingDataType::kElemInt64: {
             Sparse2JsonInternal1<IndexT, i64>(sparse_value_info, sparse_json);
             break;
         }
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat: {
             Sparse2JsonInternal1<IndexT, f32>(sparse_value_info, sparse_json);
             break;
         }
-        case kElemDouble: {
+        case EmbeddingDataType::kElemDouble: {
             Sparse2JsonInternal1<IndexT, f64>(sparse_value_info, sparse_json);
             break;
         }
-        default: {
+        case EmbeddingDataType::kElemUInt8: {
+            Sparse2JsonInternal1<IndexT, u8>(sparse_value_info, sparse_json);
+            break;
+        }
+        case EmbeddingDataType::kElemFloat16: {
+            Sparse2JsonInternal1<IndexT, Float16T>(sparse_value_info, sparse_json);
+            break;
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            Sparse2JsonInternal1<IndexT, BFloat16T>(sparse_value_info, sparse_json);
+            break;
+        }
+        case EmbeddingDataType::kElemBit:
+        case EmbeddingDataType::kElemInvalid: {
             UnrecoverableError("Not implemented.");
         }
     }
@@ -139,19 +202,19 @@ void Sparse2JsonInternal(const SparseValueInfo &sparse_value_info, const SparseI
 
 void Sparse2Json(const SparseValueInfo &sparse_value_info, const SparseInfo *sparse_info, nlohmann::json &sparse_json) {
     switch (sparse_info->IndexType()) {
-        case kElemInt8: {
+        case EmbeddingDataType::kElemInt8: {
             Sparse2JsonInternal<i8>(sparse_value_info, sparse_info, sparse_json);
             break;
         }
-        case kElemInt16: {
+        case EmbeddingDataType::kElemInt16: {
             Sparse2JsonInternal<i16>(sparse_value_info, sparse_info, sparse_json);
             break;
         }
-        case kElemInt32: {
+        case EmbeddingDataType::kElemInt32: {
             Sparse2JsonInternal<i32>(sparse_value_info, sparse_info, sparse_json);
             break;
         }
-        case kElemInt64: {
+        case EmbeddingDataType::kElemInt64: {
             Sparse2JsonInternal<i64>(sparse_value_info, sparse_info, sparse_json);
             break;
         }
@@ -161,73 +224,91 @@ void Sparse2Json(const SparseValueInfo &sparse_value_info, const SparseInfo *spa
     }
 }
 
-// Need to move up
-// template <typename Builder>
-// void BitmapEmbedding2ArrowInternal(const EmbeddingType &embedding, size_t dimension, arrow::ArrayBuilder *array_builder) {
-//     if (dimension % 8 != 0) {
-//         Status status = Status::SyntaxError("Binary embedding dimension should be the times of 8.");
-//         LOG_ERROR(status.message());
-//         RecoverableError(status);
-//     }
-
-//     auto *list_builder = dynamic_cast<arrow::ListBuilder *>(array_builder);
-//     auto builder = dynamic_cast<arrow::UInt8Builder *>(list_builder->value_builder()); // FIXME
-//     auto *array = reinterpret_cast<const u8 *>(embedding.ptr);
-//     for (size_t i = 0; i < dimension; ++i) {
-//         auto status = builder->Append(array[i]);
-//     }
-// }
-
 void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, size_t dimension, arrow::ArrayBuilder *value_builder) {
     switch (type) {
-        case kElemBit: {
-            UnrecoverableError("Not implemented yet.");
-            // BitmapEmbedding2ArrowInternal<Builder>(embedding, dimension, array_builder);
+        case EmbeddingDataType::kElemBit: {
+            if (dimension % 8 != 0 || dimension == 0) {
+                Status status = Status::SyntaxError("Bit embedding dimension should be the times of 8.");
+                LOG_ERROR(status.message());
+                RecoverableError(std::move(status));
+            }
+            auto builder = dynamic_cast<arrow::BooleanBuilder *>(value_builder);
+            const size_t byte_cnt = dimension / 8;
+            for (size_t i = 0; i < byte_cnt; ++i) {
+                const u8 byte = reinterpret_cast<const u8 *>(embedding.ptr)[i];
+                for (size_t j = 0; j < 8; ++j) {
+                    const bool bit = (byte & (1u << j)) ? true : false;
+                    auto status = builder->Append(bit);
+                }
+            }
             break;
         }
-        case kElemInt8: {
+        case EmbeddingDataType::kElemInt8: {
             auto builder = dynamic_cast<arrow::Int8Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int8_t *)(embedding.ptr))[i]);
             }
             break;
         }
-        case kElemInt16: {
+        case EmbeddingDataType::kElemInt16: {
             auto builder = dynamic_cast<arrow::Int16Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int16_t *)(embedding.ptr))[i]);
             }
             break;
         }
-        case kElemInt32: {
+        case EmbeddingDataType::kElemInt32: {
             auto builder = dynamic_cast<arrow::Int32Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int32_t *)(embedding.ptr))[i]);
             }
             break;
         }
-        case kElemInt64: {
+        case EmbeddingDataType::kElemInt64: {
             auto builder = dynamic_cast<arrow::Int64Builder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((int64_t *)(embedding.ptr))[i]);
             }
             break;
         }
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat: {
             auto builder = dynamic_cast<arrow::FloatBuilder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((float *)(embedding.ptr))[i]);
             }
             break;
         }
-        case kElemDouble: {
+        case EmbeddingDataType::kElemDouble: {
             auto builder = dynamic_cast<arrow::DoubleBuilder *>(value_builder);
             for (size_t i = 0; i < dimension; ++i) {
                 auto status = builder->Append(((double *)(embedding.ptr))[i]);
             }
             break;
         }
-        default: {
+        case EmbeddingDataType::kElemUInt8: {
+            auto builder = dynamic_cast<arrow::UInt8Builder *>(value_builder);
+            for (size_t i = 0; i < dimension; ++i) {
+                auto status = builder->Append(((u8 *)(embedding.ptr))[i]);
+            }
+            break;
+        }
+        case EmbeddingDataType::kElemFloat16: {
+            auto builder = dynamic_cast<arrow::HalfFloatBuilder *>(value_builder);
+            for (size_t i = 0; i < dimension; ++i) {
+                const auto data = ((Float16T *)(embedding.ptr))[i];
+                auto status = builder->Append(data.raw);
+            }
+            break;
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            auto builder = dynamic_cast<arrow::FloatBuilder *>(value_builder);
+            for (size_t i = 0; i < dimension; ++i) {
+                const auto data = ((BFloat16T *)(embedding.ptr))[i];
+                auto status = builder->Append(static_cast<float>(data));
+            }
+            break;
+        }
+        case EmbeddingDataType::kElemInvalid: {
             Status status = Status::SyntaxError("Unexpected embedding type");
             LOG_ERROR(status.message());
             RecoverableError(status);
@@ -236,24 +317,26 @@ void Embedding2Arrow(const EmbeddingType &embedding, EmbeddingDataType type, siz
 }
 
 void Tensor2Arrow(Span<char> tensor, const EmbeddingInfo *embedding_info, arrow::ArrayBuilder *value_builder) {
-    auto type = embedding_info->Type();
-    auto dimension = embedding_info->Dimension();
-    auto embedding_size = embedding_info->Size();
-    Vector<EmbeddingT> embeddings;
-    auto embedding_num = tensor.size() / embedding_size;
-    for (SizeT i = 0; i < embedding_num; i++) {
-        embeddings.emplace_back(const_cast<char *>(tensor.data() + i * embedding_size), false);
+    const size_t data_bytes = tensor.size();
+    const size_t basic_embedding_bytes = embedding_info->Size();
+    if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
+        UnrecoverableError("Tensor data size mismatch.");
     }
+    const auto embedding_num = data_bytes / basic_embedding_bytes;
+    const auto type = embedding_info->Type();
+    const auto dimension = embedding_info->Dimension();
     auto *tensor_builder = dynamic_cast<arrow::FixedSizeListBuilder *>(value_builder);
-    for (const auto &embedding : embeddings) {
+    EmbeddingT embedding(nullptr, false);
+    for (SizeT i = 0; i < embedding_num; i++) {
+        embedding.ptr = tensor.data() + i * basic_embedding_bytes;
         auto status = tensor_builder->Append();
         Embedding2Arrow(embedding, type, dimension, tensor_builder->value_builder());
     }
 }
 
-void TensorArray2Arrow(Vector<Span<char>> tensor_array, const EmbeddingInfo *embedding_info, arrow::ArrayBuilder *value_builder) {
+void TensorArray2Arrow(const Vector<Span<char>> &tensor_array, const EmbeddingInfo *embedding_info, arrow::ArrayBuilder *value_builder) {
     auto *tensor_array_builder = dynamic_cast<arrow::ListBuilder *>(value_builder);
-    for (auto tensor : tensor_array) {
+    for (const auto tensor : tensor_array) {
         auto status = tensor_array_builder->Append();
         Tensor2Arrow(tensor, embedding_info, tensor_array_builder->value_builder());
     }
@@ -830,105 +913,106 @@ bool Value::operator==(const Value &other) const {
     if (this->type_.type() == LogicalType::kInvalid)
         return true;
     switch (this->type_.type()) {
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             return value_.boolean == other.value_.boolean;
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             return value_.tiny_int == other.value_.tiny_int;
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             return value_.small_int == other.value_.small_int;
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             return value_.integer == other.value_.integer;
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             return value_.big_int == other.value_.big_int;
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             return value_.huge_int == other.value_.huge_int;
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             return value_.float32 == other.value_.float32;
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             return value_.float64 == other.value_.float64;
         }
-        case kFloat16: {
+        case LogicalType::kFloat16: {
             return value_.float16 == other.value_.float16;
         }
-        case kBFloat16: {
+        case LogicalType::kBFloat16: {
             return value_.bfloat16 == other.value_.bfloat16;
         }
-        case kDecimal: {
+        case LogicalType::kDecimal: {
             return value_.decimal == other.value_.decimal;
         }
-        case kDate: {
+        case LogicalType::kDate: {
             return value_.date == other.value_.date;
         }
-        case kTime: {
+        case LogicalType::kTime: {
             return value_.time == other.value_.time;
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             return value_.datetime == other.value_.datetime;
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             return value_.timestamp == other.value_.timestamp;
         }
-        case kPoint: {
+        case LogicalType::kPoint: {
             return value_.point == other.value_.point;
         }
-        case kLine: {
+        case LogicalType::kLine: {
             return value_.line == other.value_.line;
         }
-        case kLineSeg: {
+        case LogicalType::kLineSeg: {
             return value_.line_segment == other.value_.line_segment;
         }
-        case kBox: {
+        case LogicalType::kBox: {
             return value_.box == other.value_.box;
         }
-        case kCircle: {
+        case LogicalType::kCircle: {
             return value_.circle == other.value_.circle;
         }
-        case kUuid: {
+        case LogicalType::kUuid: {
             return value_.uuid == other.value_.uuid;
         }
-        case kRowID: {
+        case LogicalType::kRowID: {
             return value_.row == other.value_.row;
         }
-        case kEmptyArray:
-        case kNull: {
+        case LogicalType::kEmptyArray:
+        case LogicalType::kNull: {
             return true;
         }
-        case kVarchar: {
+        case LogicalType::kVarchar: {
             const String &s1 = this->value_info_->Get<StringValueInfo>().GetString();
             const String &s2 = other.value_info_->Get<StringValueInfo>().GetString();
             return s1 == s2;
         }
-        case kEmbedding:
-        case kTensor: {
-            const Span<char> &data1 = this->GetEmbedding();
-            const Span<char> &data2 = other.GetEmbedding();
+        case LogicalType::kEmbedding:
+        case LogicalType::kTensor: {
+            const Span<char> data1 = this->GetEmbedding();
+            const Span<char> data2 = other.GetEmbedding();
             return std::ranges::equal(data1, data2);
         }
-        case kTensorArray: {
+        case LogicalType::kTensorArray: {
+            const auto &tensor_array1 = this->GetTensorArray();
+            const auto &tensor_array2 = other.GetTensorArray();
+            return std::ranges::equal(tensor_array1, tensor_array2, [](const auto &t1, const auto &t2) {
+                return std::ranges::equal(t1->GetData(), t2->GetData());
+            });
+        }
+        case LogicalType::kSparse: {
             // TODO
             String error_message = "Not implemented yet.";
             UnrecoverableError(error_message);
             break;
         }
-        case kSparse: {
-            // TODO
-            String error_message = "Not implemented yet.";
-            UnrecoverableError(error_message);
-            break;
-        }
-        case kInterval:
-        case kArray:
-        case kTuple:
-        case kMixed:
-        case kMissing:
-        case kInvalid: {
+        case LogicalType::kInterval:
+        case LogicalType::kArray:
+        case LogicalType::kTuple:
+        case LogicalType::kMixed:
+        case LogicalType::kMissing:
+        case LogicalType::kInvalid: {
             String error_message = "Unhandled cases.";
             UnrecoverableError(error_message);
             return false;
@@ -940,116 +1024,116 @@ bool Value::operator==(const Value &other) const {
 void Value::CopyUnionValue(const Value &other) {
     this->type_ = other.type_;
     switch (type_.type()) {
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             value_.boolean = other.value_.boolean;
             break;
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             value_.tiny_int = other.value_.tiny_int;
             break;
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             value_.small_int = other.value_.small_int;
             break;
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             value_.integer = other.value_.integer;
             break;
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             value_.big_int = other.value_.big_int;
             break;
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             value_.huge_int = other.value_.huge_int;
             break;
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             value_.float32 = other.value_.float32;
             break;
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             value_.float64 = other.value_.float64;
             break;
         }
-        case kFloat16: {
+        case LogicalType::kFloat16: {
             value_.float16 = other.value_.float16;
             break;
         }
-        case kBFloat16: {
+        case LogicalType::kBFloat16: {
             value_.bfloat16 = other.value_.bfloat16;
             break;
         }
-        case kDecimal: {
+        case LogicalType::kDecimal: {
             value_.decimal = other.value_.decimal;
             break;
         }
-        case kDate: {
+        case LogicalType::kDate: {
             value_.date = other.value_.date;
             break;
         }
-        case kTime: {
+        case LogicalType::kTime: {
             value_.time = other.value_.time;
             break;
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             value_.datetime = other.value_.datetime;
             break;
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             value_.timestamp = other.value_.timestamp;
             break;
         }
-        case kInterval: {
+        case LogicalType::kInterval: {
             value_.interval = other.value_.interval;
             break;
         }
-        case kPoint: {
+        case LogicalType::kPoint: {
             value_.point = other.value_.point;
             break;
         }
-        case kLine: {
+        case LogicalType::kLine: {
             value_.line = other.value_.line;
             break;
         }
-        case kLineSeg: {
+        case LogicalType::kLineSeg: {
             value_.line_segment = other.value_.line_segment;
             break;
         }
-        case kBox: {
+        case LogicalType::kBox: {
             value_.box = other.value_.box;
             break;
         }
-        case kCircle: {
+        case LogicalType::kCircle: {
             value_.circle = other.value_.circle;
             break;
         }
-        case kUuid: {
+        case LogicalType::kUuid: {
             value_.uuid = other.value_.uuid;
             break;
         }
-        case kRowID: {
+        case LogicalType::kRowID: {
             value_.row = other.value_.row;
             break;
         }
-        case kEmptyArray:
-        case kNull: {
+        case LogicalType::kEmptyArray:
+        case LogicalType::kNull: {
             // No value for null value.
             break;
         }
-        case kVarchar:
-        case kTensor:
-        case kTensorArray:
-        case kEmbedding:
-        case kSparse: {
+        case LogicalType::kVarchar:
+        case LogicalType::kTensor:
+        case LogicalType::kTensorArray:
+        case LogicalType::kEmbedding:
+        case LogicalType::kSparse: {
             this->value_info_ = other.value_info_;
             break;
         }
-        case kArray:
-        case kTuple:
-        case kMixed:
-        case kMissing:
-        case kInvalid: {
+        case LogicalType::kArray:
+        case LogicalType::kTuple:
+        case LogicalType::kMixed:
+        case LogicalType::kMissing:
+        case LogicalType::kInvalid: {
             String error_message = "Unhandled cases.";
             UnrecoverableError(error_message);
             break;
@@ -1060,116 +1144,116 @@ void Value::CopyUnionValue(const Value &other) {
 void Value::MoveUnionValue(Value &&other) noexcept {
     this->type_ = std::move(other.type_);
     switch (this->type_.type()) {
-        case kBoolean: {
+        case LogicalType::kBoolean: {
             this->value_.boolean = other.value_.boolean;
             break;
         }
-        case kTinyInt: {
+        case LogicalType::kTinyInt: {
             this->value_.tiny_int = other.value_.tiny_int;
             break;
         }
-        case kSmallInt: {
+        case LogicalType::kSmallInt: {
             this->value_.small_int = other.value_.small_int;
             break;
         }
-        case kInteger: {
+        case LogicalType::kInteger: {
             this->value_.integer = other.value_.integer;
             break;
         }
-        case kBigInt: {
+        case LogicalType::kBigInt: {
             this->value_.big_int = other.value_.big_int;
             break;
         }
-        case kHugeInt: {
+        case LogicalType::kHugeInt: {
             this->value_.huge_int = other.value_.huge_int;
             break;
         }
-        case kFloat: {
+        case LogicalType::kFloat: {
             this->value_.float32 = other.value_.float32;
             break;
         }
-        case kDouble: {
+        case LogicalType::kDouble: {
             this->value_.float64 = other.value_.float64;
             break;
         }
-        case kFloat16: {
+        case LogicalType::kFloat16: {
             this->value_.float16 = other.value_.float16;
             break;
         }
-        case kBFloat16: {
+        case LogicalType::kBFloat16: {
             this->value_.bfloat16 = other.value_.bfloat16;
             break;
         }
-        case kDecimal: {
+        case LogicalType::kDecimal: {
             this->value_.decimal = other.value_.decimal;
             break;
         }
-        case kDate: {
+        case LogicalType::kDate: {
             this->value_.date = other.value_.date;
             break;
         }
-        case kTime: {
+        case LogicalType::kTime: {
             this->value_.time = other.value_.time;
             break;
         }
-        case kDateTime: {
+        case LogicalType::kDateTime: {
             this->value_.datetime = other.value_.datetime;
             break;
         }
-        case kTimestamp: {
+        case LogicalType::kTimestamp: {
             this->value_.timestamp = other.value_.timestamp;
             break;
         }
-        case kInterval: {
+        case LogicalType::kInterval: {
             this->value_.interval = other.value_.interval;
             break;
         }
-        case kPoint: {
+        case LogicalType::kPoint: {
             this->value_.point = other.value_.point;
             break;
         }
-        case kLine: {
+        case LogicalType::kLine: {
             this->value_.line = other.value_.line;
             break;
         }
-        case kLineSeg: {
+        case LogicalType::kLineSeg: {
             this->value_.line_segment = other.value_.line_segment;
             break;
         }
-        case kBox: {
+        case LogicalType::kBox: {
             this->value_.box = other.value_.box;
             break;
         }
-        case kCircle: {
+        case LogicalType::kCircle: {
             this->value_.circle = other.value_.circle;
             break;
         }
-        case kUuid: {
+        case LogicalType::kUuid: {
             this->value_.uuid = std::move(other.value_.uuid);
             break;
         }
-        case kRowID: {
+        case LogicalType::kRowID: {
             value_.row = other.value_.row;
             break;
         }
-        case kEmptyArray:
-        case kNull: {
+        case LogicalType::kEmptyArray:
+        case LogicalType::kNull: {
             // No value for null type
             break;
         }
-        case kVarchar:
-        case kTensor:
-        case kTensorArray:
-        case kEmbedding:
-        case kSparse: {
+        case LogicalType::kVarchar:
+        case LogicalType::kTensor:
+        case LogicalType::kTensorArray:
+        case LogicalType::kEmbedding:
+        case LogicalType::kSparse: {
             this->value_info_ = std::move(other.value_info_);
             break;
         }
-        case kArray:
-        case kTuple:
-        case kMixed:
-        case kMissing:
-        case kInvalid: {
+        case LogicalType::kArray:
+        case LogicalType::kTuple:
+        case LogicalType::kMixed:
+        case LogicalType::kMissing:
+        case LogicalType::kInvalid: {
             String error_message = "Unhandled cases.";
             UnrecoverableError(error_message);
             break;
@@ -1203,16 +1287,44 @@ String Value::ToString() const {
             return value_.huge_int.ToString();
         }
         case LogicalType::kFloat: {
-            return fmt::format("{}", value_.float32);
+            char buffer[20];
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value_.float32);
+            if (ec != std::errc()) {
+                String error_message = "Float to string conversion failed.";
+                UnrecoverableError(error_message);
+            }
+            String result(buffer, ptr);
+            return result;
         }
         case LogicalType::kDouble: {
-            return fmt::format("{}", value_.float64);
+            char buffer[30];
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value_.float64);
+            if (ec != std::errc()) {
+                String error_message = "Double to string conversion failed.";
+                UnrecoverableError(error_message);
+            }
+            String result(buffer, ptr);
+            return result;
         }
         case LogicalType::kFloat16: {
-            return fmt::format("{}", static_cast<float>(value_.float16));
+            char buffer[20];
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), static_cast<float>(value_.float16));
+            if (ec != std::errc()) {
+                String error_message = "Float to string conversion failed.";
+                UnrecoverableError(error_message);
+            }
+            String result(buffer, ptr);
+            return result;
         }
         case LogicalType::kBFloat16: {
-            return fmt::format("{}", static_cast<float>(value_.bfloat16));
+            char buffer[20];
+            auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), static_cast<float>(value_.bfloat16));
+            if (ec != std::errc()) {
+                String error_message = "Float to string conversion failed.";
+                UnrecoverableError(error_message);
+            }
+            String result(buffer, ptr);
+            return result;
         }
         case LogicalType::kDate: {
             return value_.date.ToString();
@@ -1236,32 +1348,47 @@ String Value::ToString() const {
             return value_info_->Get<StringValueInfo>().GetString();
         }
         case LogicalType::kEmbedding: {
-            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             Span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
                 String error_message = "Embedding data size mismatch.";
                 UnrecoverableError(error_message);
             }
-            const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
+            const EmbeddingT embedding(data_span.data(), false);
             return EmbeddingT::Embedding2String(embedding, embedding_info->Type(), embedding_info->Dimension());
         }
         case LogicalType::kTensor: {
-            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             Span<char> data_span = this->GetEmbedding();
             SizeT data_bytes = data_span.size();
             const auto basic_embedding_bytes = embedding_info->Size();
             if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
-                String error_message = "Tensor data size mismatch.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Tensor data size mismatch.");
             }
             const auto embedding_num = data_bytes / basic_embedding_bytes;
-            return TensorT::Tensor2String(const_cast<char *>(data_span.data()), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
+            return TensorT::Tensor2String(data_span.data(), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
         }
         case LogicalType::kTensorArray: {
-            // TODO
-            String error_message = "Not implemented yet.";
-            UnrecoverableError(error_message);
-            return {};
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
+            const auto &embedding_value_infos = this->GetTensorArray();
+            const SizeT basic_embedding_bytes = embedding_info->Size();
+            std::ostringstream oss;
+            oss << '[';
+            for (SizeT i = 0; i < embedding_value_infos.size(); ++i) {
+                const auto &embedding_value_info = embedding_value_infos[i];
+                Span<char> data_span = embedding_value_info->GetData();
+                const SizeT data_bytes = data_span.size();
+                if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
+                    UnrecoverableError("TensorArray data size mismatch.");
+                }
+                const auto embedding_num = data_bytes / basic_embedding_bytes;
+                oss << TensorT::Tensor2String(data_span.data(), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
+                if (i != embedding_value_infos.size() - 1) {
+                    oss << ',';
+                }
+            }
+            oss << ']';
+            return std::move(oss).str();
         }
         case LogicalType::kSparse: {
             auto *sparse_info = static_cast<SparseInfo *>(type_.type_info().get());
@@ -1359,34 +1486,30 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
             return;
         }
         case LogicalType::kEmbedding: {
-            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
             Span<char> data_span = this->GetEmbedding();
             if (data_span.size() != embedding_info->Size()) {
-                String error_message = "Embedding data size mismatch.";
-                UnrecoverableError(error_message);
+                UnrecoverableError("Embedding data size mismatch.");
             }
-            const EmbeddingT embedding(const_cast<char *>(data_span.data()), false);
+            const EmbeddingT embedding(data_span.data(), false);
             Embedding2Json(embedding, embedding_info->Type(), embedding_info->Dimension(), json[name]);
             return;
         }
         case LogicalType::kTensor: {
-            EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(type_.type_info().get());
-            Span<char> data_span = this->GetEmbedding();
-            SizeT data_bytes = data_span.size();
-            const auto basic_embedding_bytes = embedding_info->Size();
-            if (data_bytes == 0 or data_bytes % basic_embedding_bytes != 0) {
-                String error_message = "Tensor data size mismatch.";
-                UnrecoverableError(error_message);
-            }
-            const auto embedding_num = data_bytes / basic_embedding_bytes;
-            json[name] =
-                TensorT::Tensor2String(const_cast<char *>(data_span.data()), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
+            Tensor2Json(this->GetEmbedding(), embedding_info->Type(), embedding_info->Dimension(), json[name]);
             return;
         }
         case LogicalType::kTensorArray: {
-            // TODO
-            String error_message = "Not implemented yet.";
-            UnrecoverableError(error_message);
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_.type_info().get());
+            const auto &embedding_value_infos = this->GetTensorArray();
+            Vector<Span<char>> tensor_array;
+            tensor_array.reserve(embedding_value_infos.size());
+            for (const auto &embedding_value_info : embedding_value_infos) {
+                tensor_array.emplace_back(embedding_value_info->GetData());
+            }
+            TensorArray2Json(tensor_array, embedding_info->Type(), embedding_info->Dimension(), json[name]);
+            return;
         }
         case LogicalType::kEmptyArray: {
             json[name] = "[]";
@@ -1401,7 +1524,20 @@ void Value::AppendToJson(const String &name, nlohmann::json &json) {
             json[name] = sparse_json;
             return;
         }
-        default: {
+        case LogicalType::kHugeInt:
+        case LogicalType::kDecimal:
+        case LogicalType::kArray:
+        case LogicalType::kTuple:
+        case LogicalType::kPoint:
+        case LogicalType::kLine:
+        case LogicalType::kLineSeg:
+        case LogicalType::kBox:
+        case LogicalType::kCircle:
+        case LogicalType::kUuid:
+        case LogicalType::kMixed:
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kInvalid: {
             String error_message = fmt::format("Value::AppendToJson() not implemented for type {}", type_.ToString());
             UnrecoverableError(error_message);
         }
@@ -1435,6 +1571,16 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
             auto status = builder->Append(value_.big_int);
             break;
         }
+        case LogicalType::kFloat16: {
+            auto builder = std::dynamic_pointer_cast<::arrow::HalfFloatBuilder>(array_builder);
+            auto status = builder->Append(value_.float16.raw);
+            break;
+        }
+        case LogicalType::kBFloat16: {
+            auto builder = std::dynamic_pointer_cast<::arrow::FloatBuilder>(array_builder);
+            auto status = builder->Append(static_cast<f32>(value_.bfloat16));
+            break;
+        }
         case LogicalType::kFloat: {
             auto builder = std::dynamic_pointer_cast<::arrow::FloatBuilder>(array_builder);
             auto status = builder->Append(value_.float32);
@@ -1457,12 +1603,12 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
         }
         case LogicalType::kDateTime: {
             auto builder = std::dynamic_pointer_cast<::arrow::TimestampBuilder>(array_builder);
-            auto status = builder->Append(value_.timestamp.GetEpochTime());
+            auto status = builder->Append(value_.datetime.GetEpochTime());
             break;
         }
-        case LogicalType::kInterval: {
-            auto builder = std::dynamic_pointer_cast<::arrow::DurationBuilder>(array_builder);
-            auto status = builder->Append(value_.interval.value);
+        case LogicalType::kTimestamp: {
+            auto builder = std::dynamic_pointer_cast<::arrow::TimestampBuilder>(array_builder);
+            auto status = builder->Append(value_.timestamp.GetEpochTime());
             break;
         }
         case LogicalType::kVarchar: {
@@ -1531,7 +1677,23 @@ void Value::AppendToArrowArray(const SharedPtr<DataType> &data_type, SharedPtr<a
             TensorArray2Arrow(tensor_array, embedding_info, list_builder->value_builder());
             break;
         }
-        default: {
+        case LogicalType::kRowID:
+        case LogicalType::kInterval:
+        case LogicalType::kHugeInt:
+        case LogicalType::kDecimal:
+        case LogicalType::kArray:
+        case LogicalType::kTuple:
+        case LogicalType::kPoint:
+        case LogicalType::kLine:
+        case LogicalType::kLineSeg:
+        case LogicalType::kBox:
+        case LogicalType::kCircle:
+        case LogicalType::kUuid:
+        case LogicalType::kMixed:
+        case LogicalType::kNull:
+        case LogicalType::kMissing:
+        case LogicalType::kEmptyArray:
+        case LogicalType::kInvalid: {
             String error_message = "Invalid data type";
             LOG_CRITICAL(error_message);
             UnrecoverableError(error_message);

@@ -150,6 +150,10 @@ def get_embedding_info(column_info, column_defs, column_name, index):
         embedding_type.element_type = ttypes.ElementType.ElementFloat32
     elif element_type == "float64" or element_type == "double":
         embedding_type.element_type = ttypes.ElementType.ElementFloat64
+    elif element_type == "float16":
+        embedding_type.element_type = ttypes.ElementType.ElementFloat16
+    elif element_type == "bfloat16":
+        embedding_type.element_type = ttypes.ElementType.ElementBFloat16
     elif element_type == "uint8":
         embedding_type.element_type = ttypes.ElementType.ElementUInt8
     elif element_type == "int8":
@@ -198,6 +202,10 @@ def get_sparse_info(column_info, column_defs, column_name, index):
         sparse_type.element_type = ttypes.ElementType.ElementFloat32
     elif value_type == "float64" or value_type == "double":
         sparse_type.element_type = ttypes.ElementType.ElementFloat64
+    elif value_type == "float16":
+        sparse_type.element_type = ttypes.ElementType.ElementFloat16
+    elif value_type == "bfloat16":
+        sparse_type.element_type = ttypes.ElementType.ElementBFloat16
     elif value_type == "uint8":
         sparse_type.element_type = ttypes.ElementType.ElementUInt8
     elif value_type == "int8":
