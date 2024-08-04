@@ -174,9 +174,10 @@ class http_adapter:
         conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
-        exists = baseCreateOptions.get(conflict_type, None)
-        if exists is not None:
-            copt = baseCreateOptions[conflict_type]
+        if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
+            exists = baseCreateOptions.get(conflict_type, None)
+            if exists is not None:
+                copt = baseCreateOptions[conflict_type]
 
         # parser
         fields = []
@@ -222,9 +223,10 @@ class http_adapter:
         conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
-        exists = baseDropOptions.get(conflict_type, None)
-        if exists is not None:
-            copt = baseDropOptions[conflict_type]
+        if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
+            exists = baseDropOptions.get(conflict_type, None)
+            if exists is not None:
+                copt = baseDropOptions[conflict_type]
 
         url = f"databases/{self.database_name}/tables/{table_name}"
         h = self.set_up_header(["accept", "content-type"])

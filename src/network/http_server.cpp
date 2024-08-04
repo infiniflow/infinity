@@ -263,7 +263,9 @@ public:
         auto properties = body_info_json["properties"];
 
         nlohmann::json json_response;
+        json_response["error_code"] = 0;
         HTTPStatus http_status;
+        http_status = HTTPStatus::CODE_200;
 
         if (!fields.is_array()) {
             infinity::Status status = infinity::Status::InvalidColumnDefinition("Expect json array in column definitions");
@@ -391,19 +393,21 @@ public:
             }
         }
 
-        auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
+        if(json_response["error_code"] == 0) {
+            auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
+        }
 
         column_definitions.clear();
         table_constraint.clear();
 
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
-        }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
@@ -423,6 +427,7 @@ public:
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
         nlohmann::json json_response;
+        json_response["error_code"] = 0;
 
         DropTableOptions options;
         if (body_info_json.contains("drop_option")) {
@@ -445,15 +450,16 @@ public:
             }
         }
 
-        auto result = infinity->DropTable(database_name, table_name, options);
-
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+        if (json_response["error_code"] == 0) {
+            auto result = infinity->DropTable(database_name, table_name, options);
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
