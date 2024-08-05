@@ -344,7 +344,7 @@ Definitions for all table columns as a dictionary. Each key in the dictionary is
 - **Data type** (`"type"`)  
   The data type of the column. 
 - **Default value** (`"default"`)  
-  The default column value that a cell takes if not explicitly set.  
+  The default value for unspecified cells in that column.  
 
 
 #### conflict_type: `ConflictType`, *Optional*
@@ -964,7 +964,7 @@ The name of the index to delete.
 Conflict policy in `enum` for handling situations where a specified index does not exist.
 
 - `Error`: Raise an error if an index with the specified name does not exist.
-- `Ignore`: Ignore the index creation requrest and keep the table with the same name as-is.
+- `Ignore`: Ignore the index creation requrest and keep the index with the same name as-is.
 
 :::tip NOTE
 You may want to import the `infinity.common` package to set `ConflictType`:
@@ -980,8 +980,13 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success:`True`
-- Failure: `Exception`
+A structure containing these attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.  
+  - `0`: The operation succeeds.  
+  - A non-zero value: A specific error condition occurs.  
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds.  
+
 
 ### Examples
 
@@ -1005,31 +1010,42 @@ Retrieves the metadata of an index by name.
 
 ### Returns
 
-- Success: `metadata` : `ShowIndexResponse`
-  the structure contains:
-    - **db_name: string** Name of the database
-    - **table_name: string**
-    - **index_name: string**
-    - **index_type: string**
-    - **index_column_names: string**
-    - **index_column_ids: string**
-    - **other_parameters: string** Parameters necessary for index creation.
-    - **store_dir: string**
-    - **segment_index_count: string**
+- Success: A `ShowIndexResponse` structure containing the following attributes: 
+    - **db_name**: `str` - The database name.
+    - **table_name**: `str` - The table name.
+    - **index_name**: `str` - The index name.
+    - **index_type**: `str` - The index type.
+    - **index_column_names**: `str` - Names of the columns for building the index.
+    - **index_column_ids**: `str` - IDs of the columns for building the index.
+    - **other_parameters**: `str` - Parameters necessary for index creation.
+    - **store_dir**: `str` - The directory holding the index files. 
+    - **segment_index_count**: `str` - Number of segments of the index.
 - Failure: `Exception`
 
 ### Examples
 
 ```python
-res = table_obj.create_index("my_index",[index.IndexInfo("c1",  index.IndexType.IVFFlat,
-        [index.InitParameter("centroids_count", "128"),index.  InitParameter("metric", "l2")])], 
-        ConflictType.Error)
-assert res.error_code == ErrorCode.OK
+table_obj.create_index(
+  "my_index",
+  [
+    IndexInfo(
+      "c1",  
+      IndexType.IVFFlat,
+      [
+        InitParameter("centroids_count", "128"),
+        InitParameter("metric", "l2")
+      ]
+    )
+  ], 
+  ConflictType.Error)
 res = table_obj.show_index("my_index")
 print(res)
-#ShowIndexResponse(error_code=0, error_msg='', db_name="default_db", table_name='test_create_index_show_index', index_name='my_index',
-#index_type='IVFFlat', index_column_names='c1', index_column_ids='0', other_parameters='metric = l2, centroids_count = 128', store_dir='/var/
-#infinity/data/7SJK3mOSl2_db_default/f3AsBt7SRC_table_test_create_index_show_index/1hbFtMVaRY_index_my_index', segment_index_count='0')
+
+# ShowIndexResponse(error_code=0, error_msg='', db_name="default_db", 
+# table_name='my_table', index_name='my_index', index_type='IVFFlat', index_column_names='c1', 
+# index_column_ids='0', other_parameters='metric = l2, centroids_count = 128', 
+# store_dir='/var/infinity/data/7SJK3mOSl2_db_default/f3AsBt7SRC_table_test_create_index_show_index/1hbFtMVaRY_index_my_index'
+# segment_index_count='0')
 ```
 
 ---
@@ -1037,15 +1053,23 @@ print(res)
 ## list_indexes
 
 ```python
-Table.list_indexes(index_name)
+table_obj.list_indexes()
 ```
 
-Lists the indexes built on the table.
+Lists the indexes built on the current table.
 
 ### Returns
 
 - Success: `metadata` : Metadata of the table. See `ListIndexResponse`. A field named index_name is a list of the retrieved index names.
 - Failure: `Exception`
+
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - A non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
+- `table_names`: `list[str]` A list of index names. 
 
 ### Examples
 
@@ -1059,7 +1083,7 @@ res.index_names # ['my_index']
 ## insert
 
 ```python
-Table.insert(data)
+table_obj.insert(data)
 ```
 
 Inserts rows of data into the current table. 
@@ -1080,8 +1104,12 @@ For information about setting default column values, see `create_table`.
 
 ### Returns
 
-- Success: `True`
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - A non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
 
 ### Examples
 
@@ -1351,6 +1379,7 @@ table_obj.output(["c1+5"])
 ### Parameters
 
 #### columns: `list[str]`, *Required* 
+
 Must not be empty. Supported aggragation functions:
     - count
     - min
@@ -1401,17 +1430,25 @@ Builds a KNN search expression. Find the top n closet rows to the given vector.
 
 ### Parameters
 
-- **vector_column_name : str**
-- **embedding_data : list/np.ndarray**
-- **embedding_data_type : str**
-- **distance_type : str**
-  -  `'l2'` 
-  - `'ip'`
-  - `'cosine'`
-  - `'hamming'`(not available)
+#### vector_column_name: `str`, *Required*
 
-- **topn : int**
-- **knn_params : list**
+The name of the vector column to search.
+
+#### embedding_data: `list/np.ndarray`, *Required*
+
+#### embedding_data_type: `str`, *Required*
+
+#### distance_type: `str`, *Required*
+
+The distance metric to use in similarity search.
+
+- `"ip"`: Inner product.
+- `"l2"`: Euclidean distance.
+- `"cosine"`: Cosine similarity. 
+
+#### topn: `int`
+
+#### knn_params: `list`, *Optional*
 
 ### Returns
 
@@ -1545,20 +1582,23 @@ Builds a fusion expression.
 
 ### Parameters
 
-- **method : str**
-    The supported methods are: rrf, weighted_sum, match_tensor
-- **options_text : str**
+#### method: `str`
 
-    Common options:
+The supported methods, including:
 
+- `"rrf"`
+- `"weighted_sum"`
+- `"match_tensor"`
+
+#### options_text: `str`
+
+- **Common options**:
     - 'topn=10': Retrieve the 10 most relevant rows. The defualt value is `100`.
 
-    Dedicated options of rrf:
-
+- **rrf-specific options**:
     - 'rank_constant=30': The default value is `60`.
 
-    Dedicated options of weighted_sum:
-
+- **weighted_sum-specific options**:
     - 'weights=1,2,0.5': The weights of children scorers. The default weight of each weight is `1.0`.
 
 ### Returns
