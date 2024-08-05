@@ -1,30 +1,36 @@
-# Copyright(C) 2024 InfiniFlow, Inc. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import os
 import pytest
-from infinity import index
-
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
-from internal.test_sdkbase import TestSdk
 
-from internal.utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
+from common.utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
     generate_commas_enwiki, read_fvecs_file
+from http_adapter import http_adapter
 
+
+@pytest.fixture(scope="class")
+def local_infinity(request):
+    return request.config.getoption("--local-infinity")
+
+@pytest.fixture(scope="class")
+def http(request):
+    return request.config.getoption("--http")
+
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
+    if local_infinity:
+        uri = common_values.TEST_LOCAL_PATH
+    else:
+        uri = common_values.TEST_LOCAL_HOST
+    request.cls.uri = uri
+    request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
+    yield
+    request.cls.infinity_obj.disconnect()
 
 def count_lines(file_path: str):
     with open(file_path, 'r') as file:
@@ -35,9 +41,14 @@ def delete_file(file_path: str):
     if os.path.exists(file_path):
         os.remove(file_path)
 
-class TestExport(TestSdk):
+@pytest.mark.usefixtures("setup_class")
+class TestInfinity:
+    @pytest.fixture
+    def skip_setup_marker(self, request):
+        request.node.skip_setup = True
 
-    def _test_export_csv(self):
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_export_csv(self):
         file_name = "enwiki_embedding_9999.csv"
         copy_data(file_name)
 
@@ -87,8 +98,8 @@ class TestExport(TestSdk):
         res = db_obj.drop_table("test_export_csv", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    def _test_export_jsonl(self):
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_export_jsonl(self):
         file_name = "enwiki_embedding_9999.csv"
         copy_data(file_name)
 
@@ -138,8 +149,8 @@ class TestExport(TestSdk):
         res = db_obj.drop_table("test_export_jsonl", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    def _test_export_fvecs(self):
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_export_fvecs(self):
         file_name = "enwiki_embedding_9999.csv"
         copy_data(file_name)
 

@@ -1,37 +1,43 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 import os
 import time
-
 import pandas as pd
 import pytest
 from numpy import dtype
-
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
-from internal.utils import trace_expected_exceptions
-from internal.test_sdkbase import TestSdk
+from common.utils import trace_expected_exceptions
+from http_adapter import http_adapter
 
 
-class TestUpdate(TestSdk):
+@pytest.fixture(scope="class")
+def local_infinity(request):
+    return request.config.getoption("--local-infinity")
 
-    # def _test_version(self):
-    #     print(infinity.__version__)
+@pytest.fixture(scope="class")
+def http(request):
+    return request.config.getoption("--http")
 
-    def _test_update(self):
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
+    if local_infinity:
+        uri = common_values.TEST_LOCAL_PATH
+    else:
+        uri = common_values.TEST_LOCAL_HOST
+    request.cls.uri = uri
+    request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
+    yield
+    request.cls.infinity_obj.disconnect()
+
+@pytest.mark.usefixtures("setup_class")
+class TestInfinity:
+    # def test_version(self):
+    #     self.test_infinity_obj._test_version()
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_update(self):
         """
         target: test table update apis
         method:
@@ -96,9 +102,8 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    # update empty table
-    def _test_update_empty_table(self):
+    @trace_expected_exceptions
+    def test_update_empty_table(self):
 
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
@@ -122,9 +127,7 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_empty_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    # update non-existent table
-    def _test_update_non_existent_table(self):
+    def test_update_non_existent_table(self):
 
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
@@ -148,9 +151,8 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_non_existent_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    # update table, no row is met the condition
-    def _test_update_no_row_is_met_the_condition(self):
+    @trace_expected_exceptions
+    def test_update_no_row_is_met_the_condition(self):
 
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
@@ -187,9 +189,8 @@ class TestUpdate(TestSdk):
         for i in range(len(common_values.types_array)):
             db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i), ConflictType.Error)
 
-
-    # update table, all rows are met the condition
-    def _test_update_all_row_is_met_the_condition(self):
+    @trace_expected_exceptions
+    def test_update_all_row_is_met_the_condition(self):
 
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
@@ -226,10 +227,7 @@ class TestUpdate(TestSdk):
         for i in range(len(common_values.types_array)):
             db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i), ConflictType.Error)
 
-
-    # update table with only one block
-
-    def _test_update_table_with_one_block(self):
+    def test_update_table_with_one_block(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_table_with_one_block", ConflictType.Ignore)
@@ -252,9 +250,7 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_table_with_one_block", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    # update table with multiple blocks, but only one segment
-    def _test_update_table_with_one_segment(self):
+    def test_update_table_with_one_segment(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_table_with_one_segment", ConflictType.Ignore)
@@ -277,9 +273,7 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_table_with_one_segment", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    # update before delete, select after delete and check the change.
-    def _test_update_before_delete(self):
+    def test_update_before_delete(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_before_delete", ConflictType.Ignore)
@@ -305,9 +299,7 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_before_delete", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    # update just inserted data and select to check
-    def _test_update_inserted_data(self):
+    def test_update_inserted_data(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_inserted_data", ConflictType.Ignore)
@@ -328,9 +320,9 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_inserted_data", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    # update inserted long before and select to check
-    def _test_update_inserted_long_before(self):
+    @pytest.mark.slow
+    @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Taking too much time.")
+    def test_update_inserted_long_before(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_inserted_long_before", ConflictType.Ignore)
@@ -354,9 +346,7 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_inserted_long_before", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    # update dropped table
-    def _test_update_dropped_table(self):
+    def test_update_dropped_table(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_dropped_table", ConflictType.Ignore)
@@ -374,9 +364,10 @@ class TestUpdate(TestSdk):
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
-
-    # update new value is invalid
-    def _test_update_invalid_value(self, types, types_example):
+    @pytest.mark.usefixtures("skip_if_http")
+    @pytest.mark.parametrize("types", ["varchar"])
+    @pytest.mark.parametrize("types_example", [[1, 2, 3]])
+    def test_update_invalid_value(self, types, types_example):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
@@ -390,9 +381,14 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_invalid_value", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    # update new value type is not match with table
-    def _test_update_new_value(self, types, types_example):
+    @pytest.mark.usefixtures("skip_if_http")
+    @pytest.mark.parametrize("types", ["int", "float"])
+    @pytest.mark.parametrize("types_example", [
+        1,
+        1.333,
+        "1",
+    ])
+    def test_update_new_value(self, types, types_example):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_new_value", ConflictType.Ignore)
@@ -407,8 +403,12 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_new_value", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    def _test_update_invalid_value(self, types, types_example):
+    @pytest.mark.usefixtures("skip_if_http")
+    @pytest.mark.parametrize("types", ["int", "float"])
+    @pytest.mark.parametrize("types_example", [
+        pytest.param([1, 2, 3])
+    ])
+    def test_update_invalid_value(self, types, types_example):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
@@ -428,8 +428,17 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_update_invalid_value", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-
-    def _test_valid_filter_expression(self, filter_list, types_example):
+    @pytest.mark.parametrize("filter_list", [
+        "c1 > 10",
+        "c2 > 1",
+        "c1 > 0.1 and c2 < 3.0",
+        "c1 > 0.1 and c2 < 1.0",
+        "c1 < 0.1 and c2 < 1.0",
+        "c1 < 0.1 and c1 > 1.0",
+        "c1 = 0",
+    ])
+    @pytest.mark.parametrize("types_example", [1, 1.333])
+    def test_valid_filter_expression(self, filter_list, types_example):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_filter_expression", ConflictType.Ignore)
@@ -451,7 +460,17 @@ class TestUpdate(TestSdk):
         res = db_obj.drop_table("test_filter_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_invalid_filter_expression(self, filter_list, types_example):
+    @pytest.mark.parametrize("filter_list", [
+        pytest.param("c1"),
+        pytest.param("_row_id"),
+        pytest.param("*"),
+        pytest.param("#@$%@#f"),
+        pytest.param("c1 + 0.1 and c2 - 1.0"),
+        pytest.param("c1 * 0.1 and c2 / 1.0"),
+        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
+    ])
+    @pytest.mark.parametrize("types_example", [1, 1.333])
+    def test_invalid_filter_expression(self, filter_list, types_example):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_invalid_filter_expression", ConflictType.Ignore)
@@ -475,5 +494,3 @@ class TestUpdate(TestSdk):
 
         res = db_obj.drop_table("test_invalid_filter_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-
-    # update empty table

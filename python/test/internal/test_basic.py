@@ -1,28 +1,13 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 import os
-
 import pandas as pd
-import pytest
 from numpy import dtype
+import pytest
 from common import common_values
 import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
-from internal.utils import copy_data
-from internal.test_sdkbase import TestSdk
+from http_adapter import http_adapter
 
 test_csv_file = "embedding_int_dim3.csv"
 test_export_csv_file = "export_embedding_int_dim3.csv"
@@ -30,12 +15,26 @@ test_export_csv_file_part = "export_embedding_int_dim3_part.csv"
 test_export_jsonl_file = "export_embedding_int_dim3.jsonl"
 test_export_jsonl_file_part = "export_embedding_int_dim3_part.jsonl"
 
-class TestCase(TestSdk):
-    # def _test_version(self):
-    #     print(infinity.__version__)
+@pytest.mark.usefixtures("local_infinity")
+@pytest.mark.usefixtures("http")
+class TestInfinity:
+    @pytest.fixture(autouse=True)
+    def setup(self, local_infinity, http):
+        if local_infinity:
+            self.uri = common_values.TEST_LOCAL_PATH
+        else:
+            self.uri = common_values.TEST_LOCAL_HOST
+        self.infinity_obj = infinity.connect(self.uri)
+        if http:
+            self.infinity_obj = http_adapter()
 
-    def _test_connection(self):
+    def teardown(self):
+        res = self.infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
 
+    # def test_version(self):
+    #     self.test_infinity_obj._test_version()
+    def test_connection(self):
         """
         target: test connect and disconnect server ok
         method: connect server
@@ -45,7 +44,7 @@ class TestCase(TestSdk):
         assert infinity_obj
         assert infinity_obj.disconnect()
 
-    def _test_create_db_with_invalid_name(self):
+    def test_create_db_with_invalid_name(self):
         """
         target: test db name limitation
         method: create db with empty name
@@ -60,7 +59,10 @@ class TestCase(TestSdk):
             db = infinity_obj.create_database("")
         assert infinity_obj.disconnect()
 
-    def _test_basic(self, check_data):
+    @pytest.mark.usefixtures("skip_if_http")
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_basic(self, check_data):
         """
         target: test basic operation
         method:
@@ -240,4 +242,3 @@ class TestCase(TestSdk):
         print(res)
         res = db_obj.drop_table("my_table4")
         assert res.error_code == ErrorCode.OK
-

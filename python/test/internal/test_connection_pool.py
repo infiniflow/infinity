@@ -1,12 +1,33 @@
+import pytest
 from common import common_values
 import time
 from infinity.connection_pool import ConnectionPool
 from infinity.common import ConflictType
-from internal.test_sdkbase import TestSdk
 
-class TestConnectionPool(TestSdk):
-    #test whether the connection get from the pool could work properly and the management of pool is correct.
-    def _test_basic(self):
+import infinity
+from infinity.errors import ErrorCode
+from http_adapter import http_adapter
+
+
+@pytest.mark.usefixtures("local_infinity")
+@pytest.mark.usefixtures("http")
+class TestInfinity:
+    @pytest.fixture(autouse=True)
+    def setup(self, local_infinity, http):
+        if local_infinity:
+            self.uri = common_values.TEST_LOCAL_PATH
+        else:
+            self.uri = common_values.TEST_LOCAL_HOST
+        self.infinity_obj = infinity.connect(self.uri)
+        if http:
+            self.infinity_obj = http_adapter()
+        assert self.infinity_obj
+
+    def teardown(self):
+        res = self.infinity_obj.disconnect()
+        assert res.error_code == ErrorCode.OK
+
+    def test_connection_pool(self):
         connection_pool = ConnectionPool(uri=self.uri, min_size=4, max_size=8)
         assert len(connection_pool.free_pool_) == 4
 
@@ -40,7 +61,7 @@ class TestConnectionPool(TestSdk):
             assert "no exception when double release" == 0
         connection_pool.destroy()
 
-    def _test_time_out(self):
+    def test_time_out(self):
         #test timeout is ok
         connection_pool = ConnectionPool(uri=self.uri, min_size=4, max_size=8, timeout=5.0)
         begin_time = time.time()

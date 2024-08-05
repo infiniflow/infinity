@@ -1,30 +1,30 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-import time
-
-import infinity
 import pytest
+import infinity
 from infinity.errors import ErrorCode
-
 from infinity.remote_thrift.client import ThriftInfinityClient
-
 from common import common_values
-from internal.test_sdkbase import TestSdk
+from http_adapter import http_adapter
 
-class InfinityTest(TestSdk):
 
-    def _test_get_database(self):
+@pytest.mark.usefixtures("local_infinity")
+@pytest.mark.usefixtures("http")
+class TestInfinity:
+    @pytest.fixture(autouse=True)
+    def setup(self, local_infinity, http):
+        if local_infinity:
+            self.uri = common_values.TEST_LOCAL_PATH
+        else:
+            self.uri = common_values.TEST_LOCAL_HOST
+        self.infinity_obj = infinity.connect(self.uri)
+        if http:
+            self.infinity_obj = http_adapter()
+        assert self.infinity_obj
+
+    def teardown(self):
+        self.infinity_obj.disconnect()
+
+    @pytest.mark.usefixtures("skip_if_local_infinity")
+    def test_get_infinity(self):
         infinity_obj = ThriftInfinityClient(common_values.TEST_LOCAL_HOST)
         database_res = infinity_obj.get_database("default_db")
         print(type(database_res))
@@ -33,7 +33,6 @@ class InfinityTest(TestSdk):
         res = infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def _test_list_database(self):
+    def test_list_infinity(self):
         database_res = self.infinity_obj.list_databases()
         assert "default_db" in database_res.db_names
-

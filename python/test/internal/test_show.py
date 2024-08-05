@@ -1,27 +1,36 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+import pytest
 import polars as pl
-
 from common import common_values
 from infinity.common import ConflictType
 from infinity.errors import ErrorCode
 import infinity
-from internal.test_sdkbase import TestSdk
+from http_adapter import http_adapter
 
 
-class TestDescribe(TestSdk):
 
+@pytest.fixture(scope="class")
+def local_infinity(request):
+    return request.config.getoption("--local-infinity")
+
+@pytest.fixture(scope="class")
+def http(request):
+    return request.config.getoption("--http")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
+    if local_infinity:
+        uri = common_values.TEST_LOCAL_PATH
+    else:
+        uri = common_values.TEST_LOCAL_HOST
+    request.cls.uri = uri
+    request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
+    yield
+    request.cls.infinity_obj.disconnect()
+
+@pytest.mark.usefixtures("setup_class")
+class TestInfinity:
     def _test_show_table(self):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_table", ConflictType.Ignore)
@@ -35,7 +44,6 @@ class TestDescribe(TestSdk):
 
         res = db_obj.drop_table("test_show_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-
     def _test_show_columns(self):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_show_columns", ConflictType.Ignore)
@@ -51,7 +59,6 @@ class TestDescribe(TestSdk):
 
         res = db_obj.drop_table("test_show_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-
     def _test_show_big_databases(self):
         for i in range(8193):
             self.infinity_obj.drop_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
@@ -64,3 +71,8 @@ class TestDescribe(TestSdk):
 
         for i in range(8193):
             self.infinity_obj.drop_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
+
+    def test_show(self):
+        self._test_show_table()
+        self._test_show_columns()
+        self._test_show_big_databases()

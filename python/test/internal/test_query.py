@@ -1,17 +1,4 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
+import pytest
 from common import common_values
 import infinity
 import infinity.index as index
@@ -21,11 +8,34 @@ from infinity.remote_thrift.db import RemoteDatabase
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from infinity.remote_thrift.table import RemoteTable
 from infinity.common import ConflictType
-from internal.test_sdkbase import TestSdk
+from http_adapter import http_adapter
 
 
-class TestQuery(TestSdk):
-    def _test_query(self):
+@pytest.fixture(scope="class")
+def local_infinity(request):
+    return request.config.getoption("--local-infinity")
+
+@pytest.fixture(scope="class")
+def http(request):
+    return request.config.getoption("--http")
+
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
+    if local_infinity:
+        uri = common_values.TEST_LOCAL_PATH
+    else:
+        uri = common_values.TEST_LOCAL_HOST
+    request.cls.uri = uri
+    request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
+    yield
+    request.cls.infinity_obj.disconnect()
+
+@pytest.mark.usefixtures("setup_class")
+class TestInfinity:
+    @pytest.mark.usefixtures("skip_if_local_infinity")
+    def test_query(self):
         conn = ThriftInfinityClient(common_values.TEST_LOCAL_HOST)
         db = RemoteDatabase(conn, "default_db")
         db.drop_table("my_table", conflict_type=ConflictType.Ignore)
@@ -71,7 +81,8 @@ class TestQuery(TestSdk):
         res = conn.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def _test_query_builder(self):
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_query_builder(self):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_query_builder",

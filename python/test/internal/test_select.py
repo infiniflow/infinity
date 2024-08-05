@@ -1,36 +1,39 @@
-# Copyright(C) 2023 InfiniFlow, Inc. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 import os
-
 import pandas as pd
 import pytest
-
 from common import common_values
 import infinity
 from numpy import dtype
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
-from internal.utils import copy_data
-from internal.test_sdkbase import TestSdk
+from http_adapter import http_adapter
 
+@pytest.fixture(scope="class")
+def local_infinity(request):
+    return request.config.getoption("--local-infinity")
 
-class TestSelect(TestSdk):
+@pytest.fixture(scope="class")
+def http(request):
+    return request.config.getoption("--http")
 
-    # def _test_version(self):
-    #     print(infinity.__version__)
+@pytest.fixture(scope="class")
+def setup_class(request, local_infinity, http):
+    if local_infinity:
+        uri = common_values.TEST_LOCAL_PATH
+    else:
+        uri = common_values.TEST_LOCAL_HOST
+    request.cls.uri = uri
+    request.cls.infinity_obj = infinity.connect(uri)
+    if http:
+        request.cls.infinity_obj = http_adapter()
+    yield
+    request.cls.infinity_obj.disconnect()
 
-    def _test_select(self):
+@pytest.mark.usefixtures("setup_class")
+class TestInfinity:
+    # def test_version(self):
+    #     self.test_infinity_obj._test_version()
+    def test_select(self):
         """
         target: test table select apis
         method:
@@ -155,7 +158,8 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_select", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_select_aggregate(self):
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_select_aggregate(self):
         """
         target: test table select apis
         methods:
@@ -229,7 +233,7 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_select_aggregate", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_select_varchar(self):
+    def test_select_varchar(self):
         """
         target: test table select apis
         method:
@@ -309,7 +313,7 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_select_varchar")
         assert res.error_code == ErrorCode.OK
 
-    def _test_select_big(self):
+    def test_select_big(self):
         db_obj = self.infinity_obj.get_database("default_db")
         res = db_obj.drop_table("test_select_big", ConflictType.Ignore)
         db_obj.create_table("test_select_big", {
@@ -325,7 +329,9 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_select_big", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_select_embedding_int32(self, check_data):
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_select_embedding_int32(self, check_data):
         """
         TestSelect.test_select_embedding()
         This method tests the functionality of selecting embeddings from a table in the database.
@@ -372,7 +378,9 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_select_embedding", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_select_embedding_float(self, check_data):
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_float_dim4.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_select_embedding_float(self, check_data):
         """
         Method: test_select_embedding_float
         This method performs a series of tests on the `test_select_embedding_float` table in the Infinity database.
@@ -425,7 +433,9 @@ class TestSelect(TestSdk):
             "test_select_embedding_float", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_select_big_embedding(self, check_data):
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    def test_select_big_embedding(self, check_data):
         """
         Method: test_select_big_embedding
 
@@ -466,7 +476,8 @@ class TestSelect(TestSdk):
             "test_select_big_embedding", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_select_same_output(self):
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_select_same_output(self):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_select_same_output", ConflictType.Ignore)
         db_obj.create_table("test_select_same_output", {
@@ -485,7 +496,8 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_select_same_output", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_empty_table(self):
+    @pytest.mark.usefixtures("skip_if_http")
+    def test_empty_table(self):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_empty_table", ConflictType.Ignore)
         db_obj.create_table("test_empty_table", {
@@ -506,7 +518,16 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table("test_empty_table", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_valid_filter_expression(self, filter_list):
+    @pytest.mark.parametrize("filter_list", [
+        "c1 > 10",
+        "c2 > 1",
+        "c1 > 0.1 and c2 < 3.0",
+        "c1 > 0.1 and c2 < 1.0",
+        "c1 < 0.1 and c2 < 1.0",
+        "c1 < 0.1 and c1 > 1.0",
+        "c1 = 0",
+    ])
+    def test_valid_filter_expression(self, filter_list):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_valid_filter_expression", ConflictType.Ignore)
@@ -525,7 +546,16 @@ class TestSelect(TestSdk):
             "test_valid_filter_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_invalid_filter_expression(self, filter_list):
+    @pytest.mark.parametrize("filter_list", [
+        pytest.param("c1"),
+        pytest.param("_row_id"),
+        pytest.param("*"),
+        pytest.param("#@$%@#f"),
+        pytest.param("c1 + 0.1 and c2 - 1.0"),
+        pytest.param("c1 * 0.1 and c2 / 1.0"),
+        pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
+    ])
+    def test_invalid_filter_expression(self, filter_list):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_invalid_filter_expression",
@@ -545,10 +575,3 @@ class TestSelect(TestSdk):
         res = db_obj.drop_table(
             "test_invalid_filter_expression", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-
-    # create a table with all types supported, each column can be output correctly.
-    # create a table, insert more than one data block, each column data is output correctly.
-    # create a table, one column data are all inline varchar, output correctly.
-    # create a table, one column data are all inline varchar, and more than one block, output correctly.
-    # create a table, one column data are all outline varchar, output correctly.
-    # create a table, one column data are all outline varchar, and more than one block, output correctly.
