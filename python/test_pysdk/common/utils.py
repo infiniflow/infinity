@@ -10,7 +10,6 @@ import numpy as np
 
 from common import common_values
 
-
 current_path = os.getcwd()
 data_dir = current_path + common_values.TEST_DATA_DIR
 copy_dir = common_values.TEST_TMP_DIR
@@ -80,7 +79,7 @@ def generate_big_columns_csv(num, filename):
 
 def generate_fvecs(num, dim, filename):
     with open(
-        os.getcwd() + common_values.TEST_DATA_DIR + "fvecs/" + filename, "wb"
+            os.getcwd() + common_values.TEST_DATA_DIR + "fvecs/" + filename, "wb"
     ) as fvecs_file:
         for _ in range(num):
             fvecs_file.write((dim).to_bytes(4, byteorder="little"))
@@ -91,7 +90,7 @@ def generate_fvecs(num, dim, filename):
 
 def generate_commas_enwiki(in_filename, out_filename, is_embedding):
     with open(
-        os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + in_filename, "r"
+            os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + in_filename, "r"
     ) as infile, open(
         os.getcwd() + common_values.TEST_DATA_DIR + "csv/" + out_filename, "w"
     ) as outfile:

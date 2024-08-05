@@ -6,7 +6,7 @@ from common import common_values
 from infinity.common import ConflictType, InfinityException
 import infinity
 from infinity.errors import ErrorCode
-from internal.utils import trace_expected_exceptions
+from common.utils import trace_expected_exceptions
 from http_adapter import http_adapter
 
 @pytest.fixture(scope="class")

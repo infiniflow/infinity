@@ -7,8 +7,8 @@ import infinity
 import infinity.index as index
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
-from internal.utils import copy_data
 from http_adapter import http_adapter
+from common.utils import copy_data
 
 test_csv_file = "embedding_int_dim3.csv"
 test_export_csv_file = "export_embedding_int_dim3.csv"
@@ -216,7 +216,7 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
         export_table_obj = db_obj.create_table("my_table_export", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
         assert export_table_obj is not None
-        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_jsonl_file, import_options = {"file_type":"jsonl"})
+        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_jsonl_file, import_options = {"file_type": "jsonl"})
         assert res.error_code == ErrorCode.OK
         res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
         print(res)
@@ -225,7 +225,7 @@ class TestInfinity:
 
         export_table_obj = db_obj.create_table("my_table_export", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
         assert export_table_obj is not None
-        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_csv_file, import_options = {"file_type":"csv"})
+        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_csv_file, import_options = {"file_type": "csv"})
         assert res.error_code == ErrorCode.OK
         res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
         print(res)

@@ -7,7 +7,7 @@ from common import common_values
 import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
-from internal.utils import trace_expected_exceptions
+from common.utils import trace_expected_exceptions
 from http_adapter import http_adapter
 
 

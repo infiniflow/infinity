@@ -7,7 +7,7 @@ from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
 from infinity.remote_thrift.types import make_match_tensor_expr as remote_make_match_tensor_expr
 from infinity.local_infinity.types import make_match_tensor_expr as local_make_match_tensor_expr
-from internal.utils import copy_data, generate_commas_enwiki
+from common.utils import copy_data, generate_commas_enwiki
 import pandas as pd
 from numpy import dtype
 from http_adapter import http_adapter

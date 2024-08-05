@@ -6,8 +6,8 @@ import infinity
 from numpy import dtype
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
-from internal.utils import copy_data
 from http_adapter import http_adapter
+from common.utils import copy_data
 
 @pytest.fixture(scope="class")
 def local_infinity(request):

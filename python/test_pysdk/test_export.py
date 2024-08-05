@@ -5,7 +5,7 @@ import infinity
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType, InfinityException
 
-from internal.utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
+from common.utils import generate_big_int_csv, copy_data, generate_big_rows_csv, generate_big_columns_csv, generate_fvecs, \
     generate_commas_enwiki, read_fvecs_file
 from http_adapter import http_adapter
 
