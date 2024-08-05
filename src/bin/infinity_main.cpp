@@ -28,6 +28,7 @@ import infinity_context;
 import thrift_server;
 import http_server;
 import logger;
+import simd_init;
 
 namespace {
 
@@ -188,6 +189,8 @@ auto main(int argc, char **argv) -> int {
                build_type(),
                git_branch_name(),
                git_commit_id());
+
+    fmt::print("Currently enabled SIMD support: {}\n", fmt::join(GetSupportedSimdTypesList(), ", "));
 
     http_server_thread = infinity::Thread([&]() { http_server.Start(InfinityContext::instance().config()->HTTPPort()); });
 
