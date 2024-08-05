@@ -1010,7 +1010,9 @@ Retrieves the metadata of an index by name.
 
 ### Returns
 
-- Success: A `ShowIndexResponse` structure containing the following attributes: 
+- Success: A structure containing the following attributes: 
+    - **err_code**: `int` - `0` indicating that the operation succeeds. 
+    - **err_msg**: `str` - An empty string.
     - **db_name**: `str` - The database name.
     - **table_name**: `str` - The table name.
     - **index_name**: `str` - The index name.
@@ -1026,18 +1028,19 @@ Retrieves the metadata of an index by name.
 
 ```python
 table_obj.create_index(
-  "my_index",
-  [
-    IndexInfo(
-      "c1",  
-      IndexType.IVFFlat,
-      [
-        InitParameter("centroids_count", "128"),
-        InitParameter("metric", "l2")
-      ]
-    )
-  ], 
-  ConflictType.Error)
+    "my_index",
+    [
+        IndexInfo(
+            "c1",  
+            IndexType.IVFFlat,
+            [
+                InitParameter("centroids_count", "128"),
+                InitParameter("metric", "l2")
+            ]
+        )
+    ], 
+    ConflictType.Error
+)
 res = table_obj.show_index("my_index")
 print(res)
 
