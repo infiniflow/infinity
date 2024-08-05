@@ -1635,7 +1635,15 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     AppendEmbedding<DoubleT>(ele_str_views, dst_off);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendEmbedding<Float16T>(ele_str_views, dst_off);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendEmbedding<BFloat16T>(ele_str_views, dst_off);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
@@ -1684,7 +1692,15 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     AppendTensor<DoubleT>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendTensor<Float16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendTensor<BFloat16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
@@ -1739,7 +1755,15 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     AppendTensorArray<DoubleT>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendTensorArray<Float16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendTensorArray<BFloat16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
@@ -1796,7 +1820,15 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     AppendSparse<DoubleT>(ele_str_views, index);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendSparse<Float16T>(ele_str_views, index);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendSparse<BFloat16T>(ele_str_views, index);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid sparse type";
                     UnrecoverableError(error_message);
                 }
