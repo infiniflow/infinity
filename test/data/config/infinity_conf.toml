@@ -23,9 +23,6 @@ log_level               = "trace"
 [storage]
 data_dir                = "/var/infinity/data"
 
-[index]
-hnsw_block_size         = 1024
-
 [buffer]
 buffer_manager_size        = "3GB"
 lru_num                  = 8

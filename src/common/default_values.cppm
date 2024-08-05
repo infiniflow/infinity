@@ -224,8 +224,6 @@ export {
     constexpr std::string_view TEMP_DIR_OPTION_NAME = "temp_dir";
     constexpr std::string_view MEMINDEX_MEMORY_QUOTA_OPTION_NAME = "memindex_memory_quota";
 
-    constexpr std::string_view HNSW_BLOCK_SIZE_OPTION_NAME = "hnsw_block_size";
-
     constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";
     constexpr std::string_view WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";
     constexpr std::string_view FULL_CHECKPOINT_INTERVAL_OPTION_NAME = "full_checkpoint_interval";

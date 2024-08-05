@@ -58,9 +58,6 @@ public:
     i64 ClientPort();
     i64 ConnectionPoolSize();
 
-    // index
-    i64 HnswBlockSize();
-
     // Log
     String LogFileName();
     String LogDir();

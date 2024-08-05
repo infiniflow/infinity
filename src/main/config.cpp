@@ -361,14 +361,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
             UnrecoverableError(status.message());
         }
 
-        i64 hnsw_block_size = HNSW_BLOCK_SIZE;
-        UniquePtr<IntegerOption> hnsw_block_size_option = MakeUnique<IntegerOption>(HNSW_BLOCK_SIZE_OPTION_NAME, hnsw_block_size, 1024, 1);
-        status = global_options_.AddOption(std::move(hnsw_block_size_option));
-        if(!status.ok()) {
-            fmt::print("Fatal: {}", status.message());
-            UnrecoverableError(status.message());
-        }
-
         // Temp Dir
         String temp_dir = "/var/infinity/tmp";
         UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
@@ -1216,43 +1208,6 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
             }
         }
 
-        // index
-        {
-            if (config_toml.contains("index")) {
-                auto index_config = config_toml["index"];
-                auto index_config_table = index_config.as_table();
-                for (const auto &elem : *index_config_table) {
-                    String var_name = String(elem.first);
-                    GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
-                    switch (option_index) {
-                        case GlobalOptionIndex::kHnswBlockSize: {
-                            i64 hnsw_block_size;
-                            if (elem.second.is_integer()) {
-                                hnsw_block_size = elem.second.value_or(HNSW_BLOCK_SIZE);
-                            } else {
-                                return Status::InvalidConfig("'hnsw_block_size' field isn't integer.");
-                            }
-                            UniquePtr<IntegerOption> hnsw_block_size_option = MakeUnique<IntegerOption>(HNSW_BLOCK_SIZE_OPTION_NAME, hnsw_block_size, 8192 * 16, 1);
-                            if (!hnsw_block_size_option->Validate()) {
-                                return Status::InvalidConfig(fmt::format("Invalid hnsw block size: {}", hnsw_block_size));
-                            }
-                            global_options_.AddOption(std::move(hnsw_block_size_option));
-                            break;
-                        }
-                        case GlobalOptionIndex::kInvalid:
-                        default: {
-                            return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'index' field", var_name));
-                        }
-                    }
-                }
-            }
-            if (global_options_.GetOptionByIndex(GlobalOptionIndex::kHnswBlockSize) == nullptr) {
-                i64 hnsw_block_size = HNSW_BLOCK_SIZE;
-                UniquePtr<IntegerOption> hnsw_block_size_option = MakeUnique<IntegerOption>(HNSW_BLOCK_SIZE_OPTION_NAME, hnsw_block_size, 1024, 1);
-                global_options_.AddOption(std::move(hnsw_block_size_option));
-            }
-        }
-
         // Persistence
         {
             if (config_toml.contains("persistence")) {
@@ -1884,12 +1839,6 @@ i64 Config::OptimizeIndexInterval() {
 i64 Config::MemIndexCapacity() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexCapacity);
-}
-
-// index
-i64 Config::HnswBlockSize() {
-    std::lock_guard<std::mutex> guard(mutex_);
-    return global_options_.GetIntegerValue(GlobalOptionIndex::kHnswBlockSize);
 }
 
 // Persistence
