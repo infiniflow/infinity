@@ -687,8 +687,8 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
                                               knn_expr->topn_,
                                               knn_expr->dimension_,
                                               1,
-                                              knn_expr->query_embedding_.ptr,
-                                              knn_expr->embedding_data_type_,
+                                              knn_scan_operator->real_knn_query_embedding_ptr_,
+                                              knn_scan_operator->real_knn_query_elem_type_,
                                               knn_expr->distance_type_);
             break;
         }
@@ -702,8 +702,8 @@ SizeT InitKnnScanFragmentContext(PhysicalKnnScan *knn_scan_operator, FragmentCon
                                               knn_expr->topn_,
                                               knn_expr->dimension_,
                                               1,
-                                              knn_expr->query_embedding_.ptr,
-                                              knn_expr->embedding_data_type_,
+                                              knn_scan_operator->real_knn_query_embedding_ptr_,
+                                              knn_scan_operator->real_knn_query_elem_type_,
                                               knn_expr->distance_type_);
             break;
         }

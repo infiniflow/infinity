@@ -260,13 +260,20 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     while (GetInflightTasks() > 0) {
         CommitSync(100);
     }
-    // LOG_INFO("MemoryIndexer::Dump begin");
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
     LocalFileSystem fs;
     String posting_file = index_prefix + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : "");
-    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
     String dict_file = index_prefix + DICT_SUFFIX + (spill ? SPILL_SUFFIX : "");
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr && !spill;
+    if (use_object_cache) {
+        pm->ObjCreateRefCount(posting_file);
+        pm->ObjCreateRefCount(dict_file);
+    }
+
+    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
 
@@ -297,6 +304,20 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
 
     String column_length_file = index_prefix + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : "");
+    if (use_object_cache) {
+        pm->ObjCreateRefCount(column_length_file);
+    }
+    DeferFn defer_fn([&]() {
+        if (!use_object_cache) {
+            return;
+        }
+        pm->PutObjCache(posting_file);
+        pm->PutObjCache(dict_file);
+        pm->PutObjCache(column_length_file);
+        std::filesystem::remove(posting_file);
+        std::filesystem::remove(dict_file);
+        std::filesystem::remove(column_length_file);
+    });
     auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
     if (!status.ok()) {
         UnrecoverableError(status.message());
@@ -308,16 +329,6 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
 
     is_spilled_ = spill;
     Reset();
-
-    // persist
-    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
-    if (pm && !spill) {
-        pm->Persist(posting_file);
-        pm->Persist(dict_file);
-        pm->Persist(column_length_file);
-    }
-
-    // LOG_INFO("MemoryIndexer::Dump end");
 }
 
 // Similar to DiskIndexSegmentReader::GetSegmentPosting

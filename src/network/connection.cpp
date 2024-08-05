@@ -265,43 +265,45 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
                 switch (embedding_info->Type()) {
 
-                    case kElemBit: {
+                    case EmbeddingDataType::kElemBit: {
                         object_id = 1000;
                         object_width = 1;
                         break;
                     }
-                    case kElemUInt8:
-                    case kElemInt8: {
+                    case EmbeddingDataType::kElemUInt8:
+                    case EmbeddingDataType::kElemInt8: {
                         object_id = 1002;
                         object_width = 1;
                         break;
                     }
-                    case kElemInt16: {
+                    case EmbeddingDataType::kElemInt16: {
                         object_id = 1005;
                         object_width = 2;
                         break;
                     }
-                    case kElemInt32: {
+                    case EmbeddingDataType::kElemInt32: {
                         object_id = 1007;
                         object_width = 4;
                         break;
                     }
-                    case kElemInt64: {
+                    case EmbeddingDataType::kElemInt64: {
                         object_id = 1016;
                         object_width = 8;
                         break;
                     }
-                    case kElemFloat: {
+                    case EmbeddingDataType::kElemFloat16:
+                    case EmbeddingDataType::kElemBFloat16:
+                    case EmbeddingDataType::kElemFloat: {
                         object_id = 1021;
                         object_width = 4;
                         break;
                     }
-                    case kElemDouble: {
+                    case EmbeddingDataType::kElemDouble: {
                         object_id = 1022;
                         object_width = 8;
                         break;
                     }
-                    case kElemInvalid: {
+                    case EmbeddingDataType::kElemInvalid: {
                         String error_message = "Invalid embedding data type";
                         UnrecoverableError(error_message);
                     }
@@ -315,43 +317,45 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 }
                 const auto *sparse_info = static_cast<SparseInfo *>(column_type->type_info().get());
                 switch (sparse_info->DataType()) {
-                    case kElemBit: {
+                    case EmbeddingDataType::kElemBit: {
                         object_id = 1000;
                         object_width = 1;
                         break;
                     }
-                    case kElemUInt8:
-                    case kElemInt8: {
+                    case EmbeddingDataType::kElemUInt8:
+                    case EmbeddingDataType::kElemInt8: {
                         object_id = 1002;
                         object_width = 1;
                         break;
                     }
-                    case kElemInt16: {
+                    case EmbeddingDataType::kElemInt16: {
                         object_id = 1005;
                         object_width = 2;
                         break;
                     }
-                    case kElemInt32: {
+                    case EmbeddingDataType::kElemInt32: {
                         object_id = 1007;
                         object_width = 4;
                         break;
                     }
-                    case kElemInt64: {
+                    case EmbeddingDataType::kElemInt64: {
                         object_id = 1016;
                         object_width = 8;
                         break;
                     }
-                    case kElemFloat: {
+                    case EmbeddingDataType::kElemFloat16:
+                    case EmbeddingDataType::kElemBFloat16:
+                    case EmbeddingDataType::kElemFloat: {
                         object_id = 1021;
                         object_width = 4;
                         break;
                     }
-                    case kElemDouble: {
+                    case EmbeddingDataType::kElemDouble: {
                         object_id = 1022;
                         object_width = 8;
                         break;
                     }
-                    default: {
+                    case EmbeddingDataType::kElemInvalid: {
                         String error_message = "Should not reach here";
                         UnrecoverableError(error_message);
                     }

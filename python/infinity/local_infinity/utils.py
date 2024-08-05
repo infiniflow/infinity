@@ -151,17 +151,17 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
     elif isinstance(value, np.floating):
         value = float(value)
     elif isinstance(value, list) and isinstance(value[0], np.ndarray):
-        value = [x.tolist() for x in value]
+        if value[0].ndim <= 2:
+            value = [x.tolist() for x in value]
+        else:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Invalid list member type: {type(value[0])}, ndarray dimension > 2")
     elif isinstance(value, np.ndarray):
         if value.ndim <= 2:
-            value = value.flatten().tolist()
+            value = value.tolist()
         else:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                     f"Invalid list type: {type(value)}, ndarray dimension > 2")
-    # flatten list[list] to list
-    match value:
-        case [[(int() | float()), *_], *_]:
-            value = [x for xs in value for x in xs]
     # match ConstantExpr
     constant_expression = WrapConstantExpr()
     match value:
@@ -183,6 +183,12 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
         case [float(), *_]:
             constant_expression.literal_type = LiteralType.kDoubleArray
             constant_expression.f64_array_value = value
+        case [[int(), *_], *_]:
+            constant_expression.literal_type = LiteralType.kSubArrayArray
+            constant_expression.i64_tensor_value = value
+        case [[float(), *_], *_]:
+            constant_expression.literal_type = LiteralType.kSubArrayArray
+            constant_expression.f64_tensor_value = value
         case [[[int(), *_], *_], *_]:
             constant_expression.literal_type = LiteralType.kSubArrayArray
             constant_expression.i64_tensor_array_value = value

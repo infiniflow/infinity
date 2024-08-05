@@ -47,6 +47,16 @@ KnnExpr::~KnnExpr() {
                 delete[] data_ptr;
                 break;
             }
+            case EmbeddingDataType::kElemFloat16: {
+                auto *data_ptr = reinterpret_cast<Float16T *>(embedding_data_ptr_);
+                delete[] data_ptr;
+                break;
+            }
+            case EmbeddingDataType::kElemBFloat16: {
+                auto *data_ptr = reinterpret_cast<BFloat16T *>(embedding_data_ptr_);
+                delete[] data_ptr;
+                break;
+            }
             case EmbeddingDataType::kElemBit:
             case EmbeddingDataType::kElemInt8: {
                 int8_t *data_ptr = reinterpret_cast<int8_t *>(embedding_data_ptr_);
@@ -140,6 +150,38 @@ bool KnnExpr::InitEmbedding(const char *data_type, const ConstantExpr *query_vec
             embedding_data_ptr_ = new float[dimension_];
             for (long i = 0; i < dimension_; ++i) {
                 ((float *)(embedding_data_ptr_))[i] = query_vec->long_array_[i];
+            }
+        }
+    } else if (strcmp(data_type, "float16") == 0 and distance_type_ != infinity::KnnDistanceType::kHamming) {
+        embedding_data_type_ = infinity::EmbeddingDataType::kElemFloat16;
+        if (!(query_vec->double_array_.empty())) {
+            dimension_ = query_vec->double_array_.size();
+            embedding_data_ptr_ = new Float16T[dimension_];
+            for (long i = 0; i < dimension_; ++i) {
+                ((Float16T *)(embedding_data_ptr_))[i] = static_cast<float>(query_vec->double_array_[i]);
+            }
+        }
+        if (!(query_vec->long_array_.empty())) {
+            dimension_ = query_vec->long_array_.size();
+            embedding_data_ptr_ = new Float16T[dimension_];
+            for (long i = 0; i < dimension_; ++i) {
+                ((Float16T *)(embedding_data_ptr_))[i] = static_cast<float>(query_vec->long_array_[i]);
+            }
+        }
+    } else if (strcmp(data_type, "bfloat16") == 0 and distance_type_ != infinity::KnnDistanceType::kHamming) {
+        embedding_data_type_ = infinity::EmbeddingDataType::kElemBFloat16;
+        if (!(query_vec->double_array_.empty())) {
+            dimension_ = query_vec->double_array_.size();
+            embedding_data_ptr_ = new BFloat16T[dimension_];
+            for (long i = 0; i < dimension_; ++i) {
+                ((BFloat16T *)(embedding_data_ptr_))[i] = static_cast<float>(query_vec->double_array_[i]);
+            }
+        }
+        if (!(query_vec->long_array_.empty())) {
+            dimension_ = query_vec->long_array_.size();
+            embedding_data_ptr_ = new BFloat16T[dimension_];
+            for (long i = 0; i < dimension_; ++i) {
+                ((BFloat16T *)(embedding_data_ptr_))[i] = static_cast<float>(query_vec->long_array_[i]);
             }
         }
     } else if (strcmp(data_type, "tinyint") == 0 and distance_type_ != infinity::KnnDistanceType::kHamming) {

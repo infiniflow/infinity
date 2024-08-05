@@ -30,14 +30,13 @@ struct DateTimeType {
 
     // epoch_time: seconds since 1970-01-01 00:00:00
     explicit constexpr DateTimeType(int64_t epoch_time) {
-        constexpr int32_t TotalSecondsInDay = 24 * 60 * 60;
-        auto seconds = static_cast<int32_t>(epoch_time % TotalSecondsInDay);
+        constexpr int64_t TotalSecondsInDay = 24 * 60 * 60;
+        int64_t seconds = epoch_time % TotalSecondsInDay;
         if (seconds < 0) {
             seconds += TotalSecondsInDay;
         }
-        auto days = static_cast<int32_t>((epoch_time - seconds) / TotalSecondsInDay);
-        date = DateType(days);
-        time = TimeType(seconds);
+        date = DateType(static_cast<int32_t>((epoch_time - seconds) / TotalSecondsInDay));
+        time = TimeType(static_cast<int32_t>(seconds));
     }
 
     inline void Reset() {

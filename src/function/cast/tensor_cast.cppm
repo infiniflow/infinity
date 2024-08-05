@@ -119,6 +119,10 @@ void TensorTryCastToTensorImpl(const u32 basic_embedding_dim,
             TensorTryCastToTensorImpl<TargetValueType, BooleanT>(basic_embedding_dim, source, source_vector_ptr, target, target_vector_ptr);
             break;
         }
+        case EmbeddingDataType::kElemUInt8: {
+            TensorTryCastToTensorImpl<TargetValueType, u8>(basic_embedding_dim, source, source_vector_ptr, target, target_vector_ptr);
+            break;
+        }
         case EmbeddingDataType::kElemInt8: {
             TensorTryCastToTensorImpl<TargetValueType, TinyIntT>(basic_embedding_dim, source, source_vector_ptr, target, target_vector_ptr);
             break;
@@ -143,7 +147,15 @@ void TensorTryCastToTensorImpl(const u32 basic_embedding_dim,
             TensorTryCastToTensorImpl<TargetValueType, DoubleT>(basic_embedding_dim, source, source_vector_ptr, target, target_vector_ptr);
             break;
         }
-        default: {
+        case EmbeddingDataType::kElemFloat16: {
+            TensorTryCastToTensorImpl<TargetValueType, Float16T>(basic_embedding_dim, source, source_vector_ptr, target, target_vector_ptr);
+            break;
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            TensorTryCastToTensorImpl<TargetValueType, BFloat16T>(basic_embedding_dim, source, source_vector_ptr, target, target_vector_ptr);
+            break;
+        }
+        case EmbeddingDataType::kElemInvalid: {
             String error_message = "Unreachable code";
             UnrecoverableError(error_message);
         }
@@ -160,6 +172,10 @@ void TensorTryCastToTensorFun(const u32 basic_embedding_dim,
     switch (dst_type) {
         case EmbeddingDataType::kElemBit: {
             TensorTryCastToTensorImpl<BooleanT>(basic_embedding_dim, source, src_type, source_vector_ptr, target, target_vector_ptr);
+            break;
+        }
+        case EmbeddingDataType::kElemUInt8: {
+            TensorTryCastToTensorImpl<u8>(basic_embedding_dim, source, src_type, source_vector_ptr, target, target_vector_ptr);
             break;
         }
         case EmbeddingDataType::kElemInt8: {
@@ -186,8 +202,16 @@ void TensorTryCastToTensorFun(const u32 basic_embedding_dim,
             TensorTryCastToTensorImpl<DoubleT>(basic_embedding_dim, source, src_type, source_vector_ptr, target, target_vector_ptr);
             break;
         }
-        default: {
-            String error_message = fmt::format("Can't cast from embedding to tensor with type {}", EmbeddingInfo::EmbeddingDataTypeToString(dst_type));
+        case EmbeddingDataType::kElemFloat16: {
+            TensorTryCastToTensorImpl<Float16T>(basic_embedding_dim, source, src_type, source_vector_ptr, target, target_vector_ptr);
+            break;
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            TensorTryCastToTensorImpl<BFloat16T>(basic_embedding_dim, source, src_type, source_vector_ptr, target, target_vector_ptr);
+            break;
+        }
+        case EmbeddingDataType::kElemInvalid: {
+            String error_message = "Unreachable code";
             UnrecoverableError(error_message);
         }
     }

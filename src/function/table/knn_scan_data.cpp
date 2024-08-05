@@ -158,7 +158,7 @@ KnnDistance1<i8, f32>::KnnDistance1(KnnDistanceType dist_type) {
 
 KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 current_parallel_idx, bool execute_block_scan_job)
     : knn_scan_shared_data_(shared_data), task_id_(current_parallel_idx), execute_block_scan_job_(execute_block_scan_job) {
-    switch (knn_scan_shared_data_->elem_type_) {
+    switch (knn_scan_shared_data_->query_elem_type_) {
         case EmbeddingDataType::kElemFloat: {
             Init<f32, f32>();
             break;
@@ -172,14 +172,14 @@ KnnScanFunctionData::KnnScanFunctionData(KnnScanSharedData *shared_data, u32 cur
             break;
         }
         default: {
-            Status status = Status::NotSupport(
-                fmt::format("EmbeddingDataType: {} is not support.", EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data_->elem_type_)));
+            Status status = Status::NotSupport(fmt::format("Query EmbeddingDataType: {} is not support.",
+                                                           EmbeddingType::EmbeddingDataType2String(knn_scan_shared_data_->query_elem_type_)));
             RecoverableError(status);
         }
     }
 }
 
-template <typename DataType, typename DistType>
+template <typename QueryDataType, typename DistDataType>
 void KnnScanFunctionData::Init() {
     switch (knn_scan_shared_data_->knn_distance_type_) {
         case KnnDistanceType::kInvalid: {
@@ -188,21 +188,21 @@ void KnnScanFunctionData::Init() {
         }
         case KnnDistanceType::kL2:
         case KnnDistanceType::kHamming: {
-            auto merge_knn_max = MakeUnique<MergeKnn<DataType, CompareMax, DistType>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
+            auto merge_knn_max = MakeUnique<MergeKnn<QueryDataType, CompareMax, DistDataType>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
             merge_knn_max->Begin();
             merge_knn_base_ = std::move(merge_knn_max);
             break;
         }
         case KnnDistanceType::kCosine:
         case KnnDistanceType::kInnerProduct: {
-            auto merge_knn_min = MakeUnique<MergeKnn<DataType, CompareMin, DistType>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
+            auto merge_knn_min = MakeUnique<MergeKnn<QueryDataType, CompareMin, DistDataType>>(knn_scan_shared_data_->query_count_, knn_scan_shared_data_->topk_);
             merge_knn_min->Begin();
             merge_knn_base_ = std::move(merge_knn_min);
             break;
         }
     }
 
-    knn_distance_ = MakeUnique<KnnDistance1<DataType, DistType>>(knn_scan_shared_data_->knn_distance_type_);
+    knn_distance_ = MakeUnique<KnnDistance1<QueryDataType, DistDataType>>(knn_scan_shared_data_->knn_distance_type_);
 }
 
 } // namespace infinity

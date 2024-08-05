@@ -67,7 +67,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
 
         def write_query():
             for row_id in range(row_n):
-                slt_file.write("{} ".format(row_id))
+                slt_file.write("{} [".format(row_id))
                 for i in range(len(data[row_id])):
                     slt_file.write("[")
                     for j in range(len(data[row_id][i])):
@@ -82,7 +82,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
                     slt_file.write("]")
                     if i != len(data[row_id]) - 1:
                         slt_file.write(",")
-                slt_file.write("\n")
+                slt_file.write("]\n")
             slt_file.write("\n")
 
         slt_file.write("statement ok\n")
