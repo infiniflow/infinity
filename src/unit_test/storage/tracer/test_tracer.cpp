@@ -67,6 +67,10 @@ class TestCatalog {
 public:
     void SetTracer(TestMemIndexTracer *tracer) { tracer_ = tracer; }
 
+private:
+    TestMemIndex *GetMemIndexInner(const String &index_name);
+
+public:
     TestMemIndex *GetMemIndex(const String &index_name);
 
     void AppendMemIndex(const String &index_name, SizeT mem_used, SizeT row_cnt);
@@ -87,8 +91,7 @@ private:
     HashMap<String, UniquePtr<TestMemIndex>> memindexes_;
 };
 
-TestMemIndex *TestCatalog::GetMemIndex(const String &index_name) {
-    std::lock_guard lck(mtx_);
+TestMemIndex *TestCatalog::GetMemIndexInner(const String &index_name) {
     auto iter = memindexes_.find(index_name);
     if (iter != memindexes_.end()) {
         return iter->second.get();
@@ -99,8 +102,14 @@ TestMemIndex *TestCatalog::GetMemIndex(const String &index_name) {
     return ret;
 }
 
+TestMemIndex *TestCatalog::GetMemIndex(const String &index_name) {
+    std::lock_guard lck(mtx_);
+    return GetMemIndexInner(index_name);
+}
+
 void TestCatalog::AppendMemIndex(const String &index_name, SizeT mem_used, SizeT row_cnt) {
-    auto *memindex = GetMemIndex(index_name);
+    std::lock_guard lck(mtx_);
+    auto *memindex = GetMemIndexInner(index_name);
     memindex->AddMemUsed(mem_used, row_cnt);
 }
 
