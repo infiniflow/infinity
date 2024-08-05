@@ -77,7 +77,7 @@ void Infinity::LocalInit(const String &path) {
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
         default_config->default_log_level_ = LogLevel::kInfo;
         default_config->default_log_to_stdout_ = false;
-        InfinityContext::instance().Init(nullptr, default_config.get());
+        InfinityContext::instance().Init(nullptr, false, default_config.get());
     }
 }
 
