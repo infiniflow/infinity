@@ -33,23 +33,27 @@ nlohmann::json EmbeddingInfo::Serialize() const {
 
 std::string EmbeddingInfo::EmbeddingDataTypeToString(EmbeddingDataType type) {
     switch (type) {
-        case kElemBit:
+        case EmbeddingDataType::kElemBit:
             return "bit";
-        case kElemInt8:
-            return "int8";
-        case kElemInt16:
-            return "int16";
-        case kElemInt32:
-            return "int32";
-        case kElemInt64:
-            return "int64";
-        case kElemFloat:
-            return "float";
-        case kElemDouble:
-            return "double";
-        case kElemUInt8:
+        case EmbeddingDataType::kElemUInt8:
             return "uint8";
-        default:
+        case EmbeddingDataType::kElemInt8:
+            return "int8";
+        case EmbeddingDataType::kElemInt16:
+            return "int16";
+        case EmbeddingDataType::kElemInt32:
+            return "int32";
+        case EmbeddingDataType::kElemInt64:
+            return "int64";
+        case EmbeddingDataType::kElemFloat:
+            return "float";
+        case EmbeddingDataType::kElemDouble:
+            return "double";
+        case EmbeddingDataType::kElemFloat16:
+            return "float16";
+        case EmbeddingDataType::kElemBFloat16:
+            return "bfloat16";
+        case EmbeddingDataType::kElemInvalid:
             ParserError("Unexpected embedding type");
     }
     return std::string();

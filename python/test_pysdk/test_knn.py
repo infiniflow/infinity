@@ -150,6 +150,37 @@ class TestInfinity:
         res = db_obj.drop_table("test_knn_u8", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+    @pytest.mark.usefixtures("skip_if_http")
+    @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("save_elem_type", ["float", "float16", "bfloat16"])
+    @pytest.mark.parametrize("query_elem_type", ["float", "float16", "bfloat16"])
+    def test_knn_fp16_bf16(self, check_data, save_elem_type, query_elem_type):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_knn_fp16_bf16", conflict_type=ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_knn_fp16_bf16", {
+            "c1": {"type": "int"},
+            "c2": {"type": f"vector,3,{save_elem_type}"}
+        }, ConflictType.Error)
+        test_csv_dir = "/var/infinity/test_data/embedding_int_dim3.csv"
+        if not check_data:
+            copy_data("embedding_int_dim3.csv")
+        print("import:", test_csv_dir, " start!")
+        table_obj.import_data(test_csv_dir, None)
+        table_obj.insert([{"c1": 11, "c2": [127, 128, 255]}])
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': (1, 5, 9, 11), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12], [127, 128, 255])}).astype(
+            {'c1': dtype('int32')}))
+        res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], query_elem_type, "l2", 10).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': (1, 5, 9, 11), 'DISTANCE': (29.0, 149.0, 365.0, 97538.0)}).astype(
+            {'c1': dtype('int32'), 'DISTANCE': dtype('float32')}))
+        res = db_obj.drop_table("test_knn_fp16_bf16", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def test_insert_multi_column(self):
         with pytest.raises(Exception, match=r".*value count mismatch*"):
             db_obj = self.infinity_obj.get_database("default_db")
@@ -919,13 +950,15 @@ class TestInfinity:
     @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_tensor_scan(self, check_data):
+    @pytest.mark.parametrize("save_elem_t", ["float32", "float16", "bfloat16"])
+    @pytest.mark.parametrize("query_elem_t", ["float32", "float16", "bfloat16"])
+    def test_tensor_scan(self, check_data, save_elem_t, query_elem_t):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_tensor_scan", ConflictType.Ignore)
         table_obj = db_obj.create_table("test_tensor_scan",
                                         {"title": {"type": "varchar"},
                                          "num": {"type": "int"},
-                                         "t": {"type": "tensor, 4, float"},
+                                         "t": {"type": f"tensor, 4, {save_elem_t}"},
                                          "body": {"type": "varchar"}})
         if not check_data:
             copy_data("tensor_maxsim.csv")
@@ -933,10 +966,13 @@ class TestInfinity:
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
         res = (table_obj
                .output(["*", "_row_id", "_score"])
-               .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', 'maxsim', 'topn=2')
+               .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], query_elem_t, 'maxsim', 'topn=3')
                .to_pl())
         print(res)
-
+        pd.testing.assert_frame_equal(
+            table_obj.output(["title"]).match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],
+                                                     query_elem_t, 'maxsim', 'topn=3').to_df(),
+            pd.DataFrame({'title': ["test22", "test55", "test66"]}))
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
