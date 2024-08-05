@@ -216,6 +216,8 @@ public:
 
     const String &db_name() const { return db_name_; }
 
+    void SetDBName(const String &db_name) { db_name_ = db_name; }
+
 private:
     void CheckTxnStatus();
 

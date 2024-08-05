@@ -64,9 +64,7 @@ public:
 
     void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp commit_ts) const;
 
-    void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
-
-    void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
+    void Commit(TransactionID txn_id, TxnTimeStamp commit_ts);
 
 public:
     TableIndexEntry *const table_index_entry_{};

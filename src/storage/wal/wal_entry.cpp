@@ -440,7 +440,17 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
             for (i32 i = 0; i < chunk_n; ++i) {
                 chunk_infos.push_back(WalChunkIndexInfo::ReadBufferAdv(ptr));
             }
-            cmd = MakeShared<WalCmdDumpIndex>(std::move(db_name), std::move(table_name), std::move(index_name), segment_id, std::move(chunk_infos));
+            i32 old_chunk_n = ReadBufAdv<i32>(ptr);
+            Vector<ChunkID> old_chunk_ids;
+            for (i32 i = 0; i < old_chunk_n; ++i) {
+                old_chunk_ids.push_back(ReadBufAdv<ChunkID>(ptr));
+            }
+            cmd = MakeShared<WalCmdDumpIndex>(std::move(db_name),
+                                              std::move(table_name),
+                                              std::move(index_name),
+                                              segment_id,
+                                              std::move(chunk_infos),
+                                              std::move(old_chunk_ids));
             break;
         }
         default: {
@@ -556,7 +566,8 @@ bool WalCmdOptimize::operator==(const WalCmd &other) const {
 bool WalCmdDumpIndex::operator==(const WalCmd &other) const {
     auto other_cmd = dynamic_cast<const WalCmdDumpIndex *>(&other);
     return other_cmd != nullptr && IsEqual(db_name_, other_cmd->db_name_) && IsEqual(table_name_, other_cmd->table_name_) &&
-           IsEqual(index_name_, other_cmd->index_name_) && segment_id_ == other_cmd->segment_id_ && chunk_infos_ == other_cmd->chunk_infos_;
+           IsEqual(index_name_, other_cmd->index_name_) && segment_id_ == other_cmd->segment_id_ && chunk_infos_ == other_cmd->chunk_infos_ &&
+           deprecate_ids_ == other_cmd->deprecate_ids_;
 }
 
 i32 WalCmdCreateDatabase::GetSizeInBytes() const {
@@ -645,6 +656,7 @@ i32 WalCmdDumpIndex::GetSizeInBytes() const {
     for (const auto &chunk_info : this->chunk_infos_) {
         size += chunk_info.GetSizeInBytes();
     }
+    size += sizeof(i32) + sizeof(ChunkID) * this->deprecate_ids_.size();
     return size;
 }
 
@@ -786,6 +798,10 @@ void WalCmdDumpIndex::WriteAdv(char *&buf) const {
     for (const auto &chunk_info : this->chunk_infos_) {
         chunk_info.WriteBufferAdv(buf);
     }
+    WriteBufAdv(buf, static_cast<i32>(this->deprecate_ids_.size()));
+    for (const auto &chunk_id : this->deprecate_ids_) {
+        WriteBufAdv(buf, chunk_id);
+    }
 }
 
 String WalCmdCreateDatabase::ToString() const {
@@ -916,9 +932,13 @@ String WalCmdDumpIndex::ToString() const {
     ss << "table name: " << table_name_ << std::endl;
     ss << "index name: " << index_name_ << std::endl;
     ss << "segment id: " << segment_id_ << std::endl;
-    ss << "index parameter: ";
+    ss << "chunk infos: ";
     for (auto &chunk_info : chunk_infos_) {
         ss << chunk_info.ToString() << " | ";
+    }
+    ss << "deprecated chunk ids: ";
+    for (auto &chunk_id : deprecate_ids_) {
+        ss << chunk_id << " | ";
     }
     return ss.str();
 }

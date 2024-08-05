@@ -1245,6 +1245,9 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kBuffer: {
             return BuildShowBuffer(statement, bind_context_ptr);
         }
+        case ShowStmtType::kMemIndex: {
+            return BuildShowMemIndex(statement, bind_context_ptr);
+        }
         case ShowStmtType::kLogs: {
             return BuildShowLogs(statement, bind_context_ptr);
         }
@@ -1583,6 +1586,16 @@ Status LogicalPlanner::BuildShowBuffer(const ShowStatement *statement, SharedPtr
                                                                   statement->var_name_,
                                                                   bind_context_ptr->GenerateTableIndex());
 
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowMemIndex(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowMemIndex,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
     this->logical_plan_ = logical_show;
     return Status::OK();
 }

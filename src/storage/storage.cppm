@@ -24,6 +24,7 @@ import background_process;
 import compaction_process;
 import periodic_trigger_thread;
 import log_file;
+import memindex_tracer;
 
 export module storage;
 
@@ -36,6 +37,8 @@ public:
     [[nodiscard]] inline Catalog *catalog() noexcept { return new_catalog_.get(); }
 
     [[nodiscard]] inline BufferManager *buffer_manager() noexcept { return buffer_mgr_.get(); }
+
+    [[nodiscard]] inline BGMemIndexTracer *memindex_tracer() noexcept { return memory_index_tracer_.get(); }
 
     [[nodiscard]] inline TxnManager *txn_manager() const noexcept { return txn_mgr_.get(); }
 
@@ -59,6 +62,7 @@ private:
     Config *config_ptr_{};
     UniquePtr<Catalog> new_catalog_{};
     UniquePtr<BufferManager> buffer_mgr_{};
+    UniquePtr<BGMemIndexTracer> memory_index_tracer_{};
     UniquePtr<TxnManager> txn_mgr_{};
     UniquePtr<WalManager> wal_mgr_{};
     UniquePtr<BGTaskProcessor> bg_processor_{};

@@ -416,9 +416,14 @@ export struct WalCmdOptimize final : public WalCmd {
 };
 
 export struct WalCmdDumpIndex final : public WalCmd {
-    WalCmdDumpIndex(String db_name, String table_name, String index_name, SegmentID segment_id, Vector<WalChunkIndexInfo> chunk_infos)
+    WalCmdDumpIndex(String db_name,
+                    String table_name,
+                    String index_name,
+                    SegmentID segment_id,
+                    Vector<WalChunkIndexInfo> chunk_infos,
+                    Vector<ChunkID> deprecate_ids)
         : db_name_(std::move(db_name)), table_name_(std::move(table_name)), index_name_(std::move(index_name)), segment_id_(segment_id),
-          chunk_infos_(std::move(chunk_infos)) {}
+          chunk_infos_(std::move(chunk_infos)), deprecate_ids_(std::move(deprecate_ids)) {}
 
     WalCommandType GetType() const final { return WalCommandType::DUMP_INDEX; }
     bool operator==(const WalCmd &other) const final;
@@ -432,6 +437,7 @@ export struct WalCmdDumpIndex final : public WalCmd {
     String index_name_{};
     SegmentID segment_id_{};
     Vector<WalChunkIndexInfo> chunk_infos_{};
+    Vector<ChunkID> deprecate_ids_{};
 };
 
 export struct WalEntryHeader {

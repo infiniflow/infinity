@@ -400,6 +400,8 @@ public:
 
     SizeT GetVecNum() const { return data_store_.cur_vec_num(); }
 
+    SizeT mem_usage() const { return data_store_.mem_usage(); }
+
 private:
     SizeT M_;
     SizeT ef_construction_;

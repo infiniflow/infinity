@@ -145,7 +145,8 @@ export enum class GlobalOptionIndex {
     kRecordRunningQuery = 30,
     kPersistenceDir = 31,
     kPersistenceObjectSizeLimit = 32,
-    kInvalid = 33
+    kMemIndexMemoryQuota = 33,
+    kInvalid = 34,
 };
 
 export struct GlobalOptions {
