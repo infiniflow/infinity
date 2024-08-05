@@ -75,6 +75,7 @@ namespace fmt {
 
 export using fmt::format;
 export using fmt::print;
+export using fmt::join;
 
 } // namespace fmt
 
