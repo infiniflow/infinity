@@ -1006,13 +1006,15 @@ Retrieves the metadata of an index by name.
 
 ### Parameters
 
-- **index_name : str** Name of the index to look up.
+#### index_name: `str`, *Required*
+
+The name of the index to look up.
 
 ### Returns
 
 - Success: A structure containing the following attributes: 
-    - **err_code**: `int` - `0` indicating that the operation succeeds. 
-    - **err_msg**: `str` - An empty string.
+    - **error_code**: `int` - `0` indicating that the operation succeeds. 
+    - **error_msg**: `str` - An empty string.
     - **db_name**: `str` - The database name.
     - **table_name**: `str` - The table name.
     - **index_name**: `str` - The index name.
@@ -1027,6 +1029,10 @@ Retrieves the metadata of an index by name.
 ### Examples
 
 ```python
+from infinity.index import IndexInfo
+from infinity.index import IndexType
+from infinity.index import InitParameter
+from infinity import index
 table_obj.create_index(
     "my_index",
     [
@@ -1043,12 +1049,6 @@ table_obj.create_index(
 )
 res = table_obj.show_index("my_index")
 print(res)
-
-# ShowIndexResponse(error_code=0, error_msg='', db_name="default_db", 
-# table_name='my_table', index_name='my_index', index_type='IVFFlat', index_column_names='c1', 
-# index_column_ids='0', other_parameters='metric = l2, centroids_count = 128', 
-# store_dir='/var/infinity/data/7SJK3mOSl2_db_default/f3AsBt7SRC_table_test_create_index_show_index/1hbFtMVaRY_index_my_index'
-# segment_index_count='0')
 ```
 
 ---
@@ -1223,8 +1223,12 @@ Example: `{"header":True, "delimiter": "\t", file_type}`
 
 ### Returns
 
-- Success: `True`
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - A non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
 
 ### Examples
 
@@ -1291,8 +1295,12 @@ Columns to export to the output file, for example, `["num", "name", "score"]`. I
 
 ### Returns
 
-- Success: `True`
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds. 
+  - A non-zero value: A specific error condition occurs. 
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
 
 ### Examples
 
