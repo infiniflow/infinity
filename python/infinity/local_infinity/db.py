@@ -134,11 +134,11 @@ def get_embedding_info(column_info, column_defs, column_name, index):
 
     match column_big_info[0]:
         case "vector":
-            column_type.logic_type = LogicalType.kEmbedding
+            column_type.logical_type = LogicalType.kEmbedding
         case "tensor":
-            column_type.logic_type = LogicalType.kTensor
+            column_type.logical_type = LogicalType.kTensor
         case "tensorarray":
-            column_type.logic_type = LogicalType.kTensorArray
+            column_type.logical_type = LogicalType.kTensorArray
         case _:
             raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}")
 
