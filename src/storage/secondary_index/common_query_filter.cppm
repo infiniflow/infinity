@@ -45,7 +45,7 @@ export struct CommonQueryFilter {
     HashMap<ColumnID, TableIndexEntry *> secondary_index_column_index_map_;
     Vector<FilterExecuteElem> filter_execute_command_;
 
-    // result
+    // result will not be populated if always_true_ be true
     atomic_flag finish_build_;
     std::mutex result_mutex_;
     Map<SegmentID, std::variant<Vector<u32>, Bitmask>> filter_result_;
@@ -91,6 +91,9 @@ export struct CommonQueryFilter {
     void TryApplyFastRoughFilterOptimizer();
     void TryApplySecondaryIndexFilterOptimizer(QueryContext *query_context);
 
+    // result will not be populated if always_true_ be true
+    bool AlwaysTrue() const { return always_true_; };
+
     // Check if given doc pass filter. Requires doc_id be in ascending order.
     bool PassFilter(RowID doc_id);
 
@@ -104,6 +107,7 @@ private:
     const Bitmask *doc_id_bitmask_ = nullptr;
     u32 doc_id_list_size_ = 0;
     u32 pos_ = 0; // index to doc_id_list_
+    bool always_true_ = false;
 };
 
 } // namespace infinity

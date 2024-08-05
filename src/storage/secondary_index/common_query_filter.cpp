@@ -131,6 +131,9 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
         }
         total_task_num_ = tasks_.size();
     }
+    always_true_ = original_filter_ == nullptr && !base_table_ref_->table_entry_ptr_->CheckAnyDelete(begin_ts_);
+    if (always_true_)
+        finish_build_.test_and_set(std::memory_order_release);
 }
 
 void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
@@ -202,6 +205,12 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
                             [&bitmask](Bitmask &m) { m.Merge(bitmask); }},
                    result_elem);
     }
+
+    // Remove deleted rows from the result
+    std::visit(Overload{[segment_entry, begin_ts](Vector<u32> &v) { segment_entry->CheckRowsVisible(v, begin_ts); },
+                        [segment_entry, begin_ts](Bitmask &b) { segment_entry->CheckRowsVisible(b, begin_ts); }},
+               result_elem);
+
     if (const SizeT result_count = std::visit(Overload{[](const Vector<u32> &v) -> SizeT { return v.size(); },
                                                        [segment_row_count](const Bitmask &m) -> SizeT {
                                                            if (m.GetData() == nullptr) {
@@ -248,7 +257,9 @@ void CommonQueryFilter::TryApplySecondaryIndexFilterOptimizer(QueryContext *quer
 }
 
 bool CommonQueryFilter::PassFilter(RowID doc_id) {
-    bool finish_build = finish_build_.test_and_set(std::memory_order_acquire);
+    if (always_true_) [[unlikely]]
+        return true;
+    bool finish_build = finish_build_.test();
     assert(finish_build);
     if (!finish_build)
         return false;

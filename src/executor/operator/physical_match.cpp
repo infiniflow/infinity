@@ -142,12 +142,15 @@ struct FilterQueryNode final : public QueryNode {
 
     std::unique_ptr<DocIterator>
     CreateSearch(const TableEntry *table_entry, IndexReader &index_reader, EarlyTermAlgo early_term_algo) const override {
-        if (common_query_filter_ == nullptr || common_query_filter_->filter_result_count_ == 0)
+        assert(common_query_filter_ != nullptr);
+        if (!common_query_filter_->AlwaysTrue() && common_query_filter_->filter_result_count_ == 0)
             return nullptr;
         auto search_iter = query_tree_->CreateSearch(table_entry, index_reader, early_term_algo);
         if (!search_iter) {
             return nullptr;
         }
+        if (common_query_filter_->AlwaysTrue())
+            return search_iter;
         return MakeUnique<FilterIterator>(common_query_filter_, std::move(search_iter));
     }
 

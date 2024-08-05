@@ -87,7 +87,8 @@ float OrIterator::BM25Score() {
     }
     float sum_score = 0;
     for (u32 i = 0; i < children_.size(); ++i) {
-        sum_score += children_[i]->BM25Score();
+        if (children_[i]->DocID() == doc_id_)
+            sum_score += children_[i]->BM25Score();
     }
     bm25_score_cache_docid_ = doc_id_;
     bm25_score_cache_ = sum_score;

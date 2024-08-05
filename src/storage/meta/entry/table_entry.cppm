@@ -313,6 +313,8 @@ private: // TODO: remove it
 public: // TODO: remove it?
 //    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
 
+    bool CheckAnyDelete(TxnTimeStamp check_ts) const;
+
 public:
     void PickCleanup(CleanupScanner *scanner) override;
 
