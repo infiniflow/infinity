@@ -653,8 +653,8 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
   - Parameter settings for a BMP index: 
     - `block_size`: *Optional* - The size of the block in a BMP index. Range: `"1"` ~ `"256"`. Defaults to `"16"`.
     - `"compress_type"`: *Optional*  
-      - `"compress"`: (Default) Store the block max in sparse format. Works best with small block size situations.
-      - `"raw"`: Store the block max without compression.
+      - `"compress"`: (Default) Store the block-max index in sparse format. Works best with small block size situations.
+      - `"raw"`: Store the block-max index without compression.
 
 :::tip NOTE
 - Import the `infinity.index` package to set `IndexInfo`, `IndexType`, and `InitParameter`.
@@ -880,15 +880,15 @@ from infinity import index
 table_obj = db_obj.create_table("test_index_secondary", {"c1": {"type": "varchar"}}, None)
 # Create a secondary index named "my_index" on column "c1"
 table_obj.create_index(
-    "my_index",
-    [
-        IndexInfo(
-          "c1", 
-          IndexType.Secondary, 
-          []
-        ),
-    ],
-    None
+  "my_index",
+  [
+    IndexInfo(
+      "c1", 
+      IndexType.Secondary, 
+      []
+    ),
+  ],
+  None
 )
 ```
 
@@ -905,15 +905,15 @@ table_obj = db_obj.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,
 # - "block_size": "16"
 # - "compress_type": "compress"
 table_obj.create_index(
-    "my_index",
-    [
-        IndexInfo(
-            "c1",
-            IndexType.BMP,
-            []
-        )
-    ],
-    None
+  "my_index",
+  [
+    IndexInfo(
+      "c1",
+      IndexType.BMP,
+      []
+    )
+  ],
+  None
 )
 ```
 
@@ -928,18 +928,18 @@ table_obj = db_obj.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,
 # Create a BMP index named "my_index" on column "c1"
 # Settings for "block_size" and "compress_type" are the same as above
 table_obj.create_index(
-    "my_index",
-    [
-        IndexInfo(
-            "c1",
-            IndexType.BMP,
-            [
-                InitParameter("block_size", "16"),
-                InitParameter("compress_type", "compress")
-            ]
-        )
-    ],
-    None
+  "my_index",
+  [
+    IndexInfo(
+      "c1",
+      IndexType.BMP,
+      [
+        InitParameter("block_size", "16"),
+        InitParameter("compress_type", "compress")
+      ]
+    )
+  ],
+  None
 )
 ```
 
