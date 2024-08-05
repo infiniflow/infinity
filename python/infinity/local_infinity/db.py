@@ -146,31 +146,31 @@ def get_embedding_info(column_info, column_defs, column_name, index):
 
     match element_type:
         case "bit":
-            embedding_type.element_type = ttypes.ElementType.ElementBit
+            embedding_type.element_type = EmbeddingDataType.kElemBit
         case "float32":
-            embedding_type.element_type = ttypes.ElementType.ElementFloat32
+            embedding_type.element_type = EmbeddingDataType.kElemFloat
         case "float":
-            embedding_type.element_type = ttypes.ElementType.ElementFloat32
+            embedding_type.element_type = EmbeddingDataType.kElemFloat
         case "float64":
-            embedding_type.element_type = ttypes.ElementType.ElementFloat64
+            embedding_type.element_type = EmbeddingDataType.kElemDouble
         case "double":
-            embedding_type.element_type = ttypes.ElementType.ElementFloat64
+            embedding_type.element_type = EmbeddingDataType.kElemDouble
         case "float16":
-            embedding_type.element_type = ttypes.ElementType.ElementFloat16
+            embedding_type.element_type = EmbeddingDataType.kElemFloat16
         case "bfloat16":
-            embedding_type.element_type = ttypes.ElementType.ElementBFloat16
+            embedding_type.element_type = EmbeddingDataType.kElemBFloat16
         case "uint8":
-            embedding_type.element_type = ttypes.ElementType.ElementUInt8
+            embedding_type.element_type = EmbeddingDataType.kElemUInt8
         case "int8":
-            embedding_type.element_type = ttypes.ElementType.ElementInt8
+            embedding_type.element_type = EmbeddingDataType.kElemInt8
         case "int16":
-            embedding_type.element_type = ttypes.ElementType.ElementInt16
+            embedding_type.element_type = EmbeddingDataType.kElemInt16
         case "int32":
-            embedding_type.element_type = ttypes.ElementType.ElementInt32
+            embedding_type.element_type = EmbeddingDataType.kElemInt32
         case "int":
-            embedding_type.element_type = ttypes.ElementType.ElementInt32
+            embedding_type.element_type = EmbeddingDataType.kElemInt32
         case "int64":
-            embedding_type.element_type = ttypes.ElementType.ElementInt64
+            embedding_type.element_type = EmbeddingDataType.kElemInt64
         case _:
             raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
 

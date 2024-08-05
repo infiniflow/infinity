@@ -385,9 +385,15 @@ SizeT PhysicalExport::ExportToFVECS(QueryContext *query_context, ExportOperatorS
     }
 
     EmbeddingInfo *embedding_type_info = static_cast<EmbeddingInfo *>(data_type->type_info().get());
-    if (embedding_type_info->Type() != EmbeddingDataType::kElemFloat) {
-        Status status = Status::NotSupport("Only float element type embedding is supported now.");
-        RecoverableError(status);
+    switch(embedding_type_info->Type()) {
+        case kElemFloat: {
+            // Supported
+            break;
+        }
+        default: {
+            Status status = Status::NotSupport(fmt::format("Type: {}, only float element type embedding is supported now", EmbeddingType::EmbeddingDataType2String(embedding_type_info->Type())));
+            RecoverableError(status);
+        }
     }
 
     i32 dimension = embedding_type_info->Dimension();
