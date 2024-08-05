@@ -77,7 +77,7 @@ void Infinity::LocalInit(const String &path) {
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
         default_config->default_log_level_ = LogLevel::kInfo;
         default_config->default_log_to_stdout_ = false;
-        InfinityContext::instance().Init(nullptr, default_config.get());
+        InfinityContext::instance().Init(nullptr, false, default_config.get());
     }
 }
 
@@ -87,7 +87,7 @@ SharedPtr<Infinity> Infinity::LocalConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
 
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    infinity_ptr->session_ = session_mgr->CreateLocalSession();
+    infinity_ptr->session_ = session_mgr->CreateLocalSession(InfinityContext::instance().MaintenanceMode());
     return infinity_ptr;
 }
 
@@ -98,7 +98,11 @@ void Infinity::LocalDisconnect() {
 SharedPtr<Infinity> Infinity::RemoteConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    infinity_ptr->session_ = session_mgr->CreateRemoteSession();
+    SharedPtr<RemoteSession> remote_session = session_mgr->CreateRemoteSession(InfinityContext::instance().MaintenanceMode());
+    if(remote_session == nullptr) {
+        return nullptr;
+    }
+    infinity_ptr->session_ = std::move(remote_session);
     return infinity_ptr;
 }
 

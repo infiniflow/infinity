@@ -57,7 +57,7 @@ void Storage::Init() {
                                             MakeShared<String>(config_ptr_->DataDir()),
                                             MakeShared<String>(config_ptr_->TempDir()),
                                             config_ptr_->LRUNum());
-
+    buffer_mgr_->Start();
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
                                       config_ptr_->WALDir(),
@@ -163,14 +163,13 @@ void Storage::Init() {
 }
 
 void Storage::UnInit() {
-    LOG_INFO("Close storage ...\n");
+    LOG_INFO("Close storage ...");
     periodic_trigger_thread_->Stop();
     if (compact_processor_.get() != nullptr) {
         compact_processor_->Stop();
     }
     bg_processor_->Stop();
     wal_mgr_->Stop();
-    txn_mgr_->Stop();
 
     txn_mgr_.reset();
     if (compact_processor_.get() != nullptr) {
@@ -179,6 +178,8 @@ void Storage::UnInit() {
     bg_processor_.reset();
     wal_mgr_.reset();
     new_catalog_.reset();
+
+    buffer_mgr_->Stop();
     buffer_mgr_.reset();
     config_ptr_ = nullptr;
     LOG_INFO("Close storage successfully\n");

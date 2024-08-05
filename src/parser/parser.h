@@ -75,6 +75,7 @@ extern int sqldebug;
 #include "statement/update_statement.h"
 #include "statement/command_statement.h"
 #include "statement/compact_statement.h"
+#include "statement/admin_statement.h"
 #include "table_reference/base_table_reference.h"
 #include "table_reference/join_reference.h"
 #include "table_reference/cross_product_reference.h"
@@ -116,7 +117,7 @@ struct SQL_LTYPE {
         }                                         \
     }
 
-#line 120 "parser.h"
+#line 121 "parser.h"
 
 /* Token kinds.  */
 #ifndef SQLTOKENTYPE
@@ -299,14 +300,16 @@ struct SQL_LTYPE {
     DELTA = 427,                   /* DELTA  */
     LOGS = 428,                    /* LOGS  */
     CATALOGS = 429,                /* CATALOGS  */
-    SEARCH = 430,                  /* SEARCH  */
-    MATCH = 431,                   /* MATCH  */
-    MAXSIM = 432,                  /* MAXSIM  */
-    QUERY = 433,                   /* QUERY  */
-    QUERIES = 434,                 /* QUERIES  */
-    FUSION = 435,                  /* FUSION  */
-    ROWLIMIT = 436,                /* ROWLIMIT  */
-    NUMBER = 437                   /* NUMBER  */
+    CATALOG = 430,                 /* CATALOG  */
+    SEARCH = 431,                  /* SEARCH  */
+    MATCH = 432,                   /* MATCH  */
+    MAXSIM = 433,                  /* MAXSIM  */
+    QUERY = 434,                   /* QUERY  */
+    QUERIES = 435,                 /* QUERIES  */
+    FUSION = 436,                  /* FUSION  */
+    ROWLIMIT = 437,                /* ROWLIMIT  */
+    ADMIN = 438,                   /* ADMIN  */
+    NUMBER = 439                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -315,7 +318,7 @@ struct SQL_LTYPE {
 #if ! defined SQLSTYPE && ! defined SQLSTYPE_IS_DECLARED
 union SQLSTYPE
 {
-#line 103 "parser.y"
+#line 104 "parser.y"
 
     bool    bool_value;
     char*   str_value;
@@ -339,6 +342,7 @@ union SQLSTYPE
     infinity::OptimizeStatement*  optimize_stmt;
     infinity::CommandStatement* command_stmt;
     infinity::CompactStatement* compact_stmt;
+    infinity::AdminStatement* admin_stmt;
 
     std::vector<infinity::BaseStatement*>* stmt_array;
 
@@ -392,7 +396,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 396 "parser.h"
+#line 400 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

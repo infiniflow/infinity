@@ -14,30 +14,13 @@
 
 module;
 
-import stl;
-import singleton;
-import boost;
-import connection;
+#include "admin_statement.h"
 
-export module pg_server;
+export module admin_statement;
 
 namespace infinity {
 
-export class PGServer {
-public:
-    void Run();
-
-    void Shutdown();
-
-private:
-    void CreateConnection();
-
-    void StartConnection(SharedPtr<Connection> &connection);
-
-    atomic_bool initialized_{false};
-    atomic_u64 running_connection_count_{0};
-    boost::asio::io_service io_service_{};
-    UniquePtr<boost::asio::ip::tcp::acceptor> acceptor_ptr_{};
-};
+export using infinity::AdminStatement;
+export using infinity::AdminStmtType;
 
 }

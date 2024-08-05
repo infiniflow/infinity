@@ -125,6 +125,8 @@ public:
 
     Status GetTablesDetail(Txn *txn, Vector<TableDetail> &output_table_array);
 
+    Tuple<Vector<String>, Vector<TableMeta*>, std::shared_lock<std::shared_mutex>> GetAllTableMetas() const;
+
 private:
     static SharedPtr<String> DetermineDBDir(const String &parent_dir, const String &db_name) {
         return DetermineRandomString(parent_dir, fmt::format("db_{}", db_name));

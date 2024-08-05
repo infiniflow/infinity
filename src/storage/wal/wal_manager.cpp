@@ -566,8 +566,8 @@ i64 WalManager::ReplayWalFile() {
         String error_message = fmt::format("Wal Replay: Parse catalog file failed, catalog_dir: {}", catalog_dir);
         UnrecoverableError(error_message);
     }
-    auto &[full_catalog_fileinfo, delta_catalog_fileinfos] = catalog_fileinfo.value();
-    storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfos, data_path_);
+    auto &[full_catalog_fileinfo, delta_catalog_fileinfo_array] = catalog_fileinfo.value();
+    storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfo_array, data_path_);
 
     // phase 3: replay the entries
     LOG_INFO(fmt::format("Replay phase 3: replay {} entries", replay_entries.size()));

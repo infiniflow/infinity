@@ -175,11 +175,17 @@ file(GLOB_RECURSE
         parser/*.cppm
 )
 
-#file(GLOB_RECURSE
-#        std_cppm
-#        CONFIGURE_DEPENDS
-#        third_party_modules/std_modules/*.cppm
-#)
+file(GLOB_RECURSE
+        admin_cpp
+        CONFIGURE_DEPENDS
+        admin/*.cpp
+)
+
+file(GLOB_RECURSE
+        admin_cppm
+        CONFIGURE_DEPENDS
+        admin/*.cppm
+)
 
 add_library(infinity_core
         ${infinity_cpp}
@@ -191,6 +197,7 @@ add_library(infinity_core
         ${executor_cpp}
         ${metrics_cpp}
         ${common_cpp}
+        ${admin_cpp}
         storage/buffer/file_worker/file_worker_type.cppm)
 
 target_sources(infinity_core
@@ -207,6 +214,7 @@ target_sources(infinity_core
         ${expression_cppm}
         ${executor_cppm}
         ${metrics_cppm}
+        ${admin_cppm}
 )
 
 add_dependencies(infinity_core thrift thriftnb parquet_static snappy)
@@ -458,6 +466,7 @@ add_executable(unit_test
         ${function_cpp}
         ${common_cpp}
         ${executor_cpp}
+        ${admin_cpp}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)

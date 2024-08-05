@@ -88,6 +88,17 @@ set(TEST_DATA_PATH ${CMAKE_SOURCE_DIR}/test/data)
 set(CSV_DATA_PATH ${CMAKE_SOURCE_DIR}/third_party/zsv/data)
 set(TMP_DATA_PATH ${CMAKE_SOURCE_DIR}/tmp)
 
+# You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
+option(ENABLE_JEMALLOC "Enable jemalloc support" OFF)
+if(ENABLE_JEMALLOC)
+    find_package(jemalloc REQUIRED)
+    set(JEMALLOC_STATIC_LIB "jemalloc.a")
+    if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
+        set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
+        set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
+    endif ()
+endif ()
+
 if (NOT CMAKE_BUILD_TYPE)
     if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
         set(default_build_type "RelWithDebInfo")
@@ -169,16 +180,7 @@ endif()
 # find_package(Boost REQUIRED)
 find_package(Lz4 REQUIRED)
 
-# You can disable jemalloc by passing the `-DENABLE_JEMALLOC=OFF` option to CMake.
-option(ENABLE_JEMALLOC "Enable jemalloc support" OFF)
-if(ENABLE_JEMALLOC)
-    find_package(jemalloc REQUIRED)
-    set(JEMALLOC_STATIC_LIB "jemalloc.a")
-    if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
-        set(CMAKE_C_FLAGS  "${CMAKE_C_FLAGS} -DENABLE_JEMALLOC_PROF")
-        set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -DENABLE_JEMALLOC_PROF")
-    endif ()
-endif ()
+
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 

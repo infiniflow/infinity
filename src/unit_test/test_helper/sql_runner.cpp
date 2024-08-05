@@ -60,7 +60,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     //    }
 
     //    UniquePtr<SessionManager> session_manager = MakeUnique<SessionManager>();
-    SharedPtr<RemoteSession> session_ptr = InfinityContext::instance().session_manager()->CreateRemoteSession();
+    SharedPtr<RemoteSession> session_ptr = InfinityContext::instance().session_manager()->CreateRemoteSession(InfinityContext::instance().MaintenanceMode());
 
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get());
     query_context_ptr->Init(InfinityContext::instance().config(),

@@ -54,12 +54,26 @@ Connection::~Connection() {
     session_mgr->RemoveSessionByID(session_->session_id());
 }
 
+void Connection::HandleError(const char* error_message) {
+    HashMap<PGMessageType, String> error_message_map;
+    error_message_map[PGMessageType::kHumanReadableError] = error_message;
+    LOG_ERROR(error_message);
+    pg_handler_->send_error_response(error_message_map);
+    pg_handler_->send_ready_for_query();
+}
+
 void Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
 
     SessionManager *session_manager = InfinityContext::instance().session_manager();
-    session_ = session_manager->CreateRemoteSession();
+    SharedPtr<RemoteSession> remote_session = session_manager->CreateRemoteSession(InfinityContext::instance().MaintenanceMode());
+    if(remote_session == nullptr) {
+        HandleError("Infinity is running under maintenance mode, only one connection is allowed.");
+        return ;
+    }
+
+    session_ = std::move(remote_session);
 
     HandleConnection();
 
@@ -72,17 +86,9 @@ void Connection::Run() {
             LOG_TRACE(fmt::format("Recoverable exception: {}", e.what()));
             return ;
         } catch (const infinity::UnrecoverableException& e) {
-            HashMap<PGMessageType, String> error_message_map;
-            error_message_map[PGMessageType::kHumanReadableError] = e.what();
-            LOG_ERROR(e.what());
-            pg_handler_->send_error_response(error_message_map);
-            pg_handler_->send_ready_for_query();
+            HandleError(e.what());
         } catch (const std::exception &e) {
-            HashMap<PGMessageType, String> error_message_map;
-            error_message_map[PGMessageType::kHumanReadableError] = e.what();
-            LOG_ERROR(e.what());
-            pg_handler_->send_error_response(error_message_map);
-            pg_handler_->send_ready_for_query();
+            HandleError(e.what());
         }
     }
 }
