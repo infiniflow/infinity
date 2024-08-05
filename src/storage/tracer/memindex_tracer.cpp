@@ -92,7 +92,7 @@ UniquePtr<DumpIndexTask> MemIndexTracer::MakeDumpTask() {
         info_vec.emplace_back((*iter)->GetInfo(), iter);
     }
     if (info_vec.empty()) {
-        UnrecoverableException("No memindex to dump");
+        return nullptr;
     }
     SizeT dump_idx = ChooseDump(info_vec);
     const auto &[info, max_iter] = info_vec[dump_idx];

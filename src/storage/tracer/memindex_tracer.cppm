@@ -24,6 +24,10 @@ namespace infinity {
 class BaseMemIndex;
 
 export struct MemIndexTracerInfo {
+public:
+    MemIndexTracerInfo(SharedPtr<String> index_name, SharedPtr<String> table_name, SharedPtr<String> db_name, SizeT mem_used, SizeT row_count)
+        : index_name_(std::move(index_name)), table_name_(std::move(table_name)), db_name_(std::move(db_name)), mem_used_(mem_used),
+          row_count_(row_count) {}
     SharedPtr<String> index_name_;
     SharedPtr<String> table_name_;
     SharedPtr<String> db_name_;
@@ -80,7 +84,9 @@ inline void MemIndexTracer::AddMemUsed(SizeT add) {
     if (SizeT new_index_memory = old_index_memory + add; new_index_memory > index_memory_limit_) {
         if (new_index_memory > index_memory_limit_ + acc_proposed_dump_.load()) {
             auto dump_task = MakeDumpTask();
-            TriggerDump(std::move(dump_task));
+            if (dump_task.get() != nullptr) {
+                TriggerDump(std::move(dump_task));
+            }
         }
     }
 }

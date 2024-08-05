@@ -237,7 +237,7 @@ MemIndexTracerInfo HnswIndexInMem::GetInfo() const {
             }
         },
         hnsw_);
-    return {index_name, table_name, db_name, mem_used, row_cnt};
+    return MemIndexTracerInfo(index_name, table_name, db_name, mem_used, row_cnt);
 }
 
 } // namespace infinity

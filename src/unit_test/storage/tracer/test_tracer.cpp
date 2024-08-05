@@ -21,6 +21,7 @@ import base_memindex;
 import bg_task;
 import blocking_queue;
 import third_party;
+import logger;
 
 using namespace infinity;
 
@@ -34,15 +35,17 @@ public:
 
     MemIndexTracerInfo GetInfo() const override {
         std::lock_guard lck(mtx_);
-        return {db_name_, table_name_, index_name_, mem_used_, row_count_};
+        return MemIndexTracerInfo(index_name_, table_name_, db_name_, mem_used_, row_count_);
     }
 
     void AddMemUsed(SizeT usage, SizeT row_cnt);
 
     void Dump(SizeT &usage, SizeT &row_cnt) && {
         std::lock_guard lck(mtx_);
-        std::exchange(mem_used_, 0);
-        std::exchange(row_count_, 0);
+        usage = mem_used_;
+        row_cnt = row_count_;
+        mem_used_ = 0;
+        row_count_ = 0;
         trace_ = false;
     }
 
@@ -131,6 +134,7 @@ public:
     virtual ~TestMemIndexTracer() {
         task_queue_.Enqueue(nullptr);
         dump_thread_.join();
+        EXPECT_EQ(this->cur_index_memory(), 0ul);
     }
 
     void TriggerDump(UniquePtr<DumpIndexTask> task) override { task_queue_.Enqueue(std::move(task)); }
@@ -211,9 +215,8 @@ TEST_F(MemIndexTracerTest, test1) {
 }
 
 TEST_F(MemIndexTracerTest, test2) {
-    GTEST_SKIP() << "tmp skip";
     auto Test = [](bool may_fail) {
-        int thread_n = 3;
+        int thread_n = 2;
         SizeT memory_limit = 50;
         TestCatalog catalog;
 
@@ -221,7 +224,7 @@ TEST_F(MemIndexTracerTest, test2) {
         catalog.SetTracer(&tracer);
         int index_n = 10;
         int max_append_mem = 10;
-        int iterate_n = 100;
+        int iterate_n = 1000;
 
         auto test_f = [&](int id) {
             for (int i = 0; i < iterate_n; ++i) {
@@ -241,6 +244,6 @@ TEST_F(MemIndexTracerTest, test2) {
         }
         catalog.reset();
     };
-    Test(true);
     Test(false);
+    Test(true);
 }
