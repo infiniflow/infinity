@@ -728,21 +728,21 @@ table_obj = db_obj.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,
 # Settings for "M", "ef_construction", "ef", and "metric" are the same as above, except:
 # "encoding" is set to "lvq" 
 table_obj.create_index(
-  "my_index",
-  [
-    IndexInfo(
-      "c1",
-      IndexType.Hnsw,
-      [
-        InitParameter("M", "16"),
-        InitParameter("ef_construction", "50"),
-        InitParameter("ef", "50"),
-        InitParameter("metric", "l2")
-        InitParameter("encode", "lvq") # "lvq" applies to float vector element only
-      ]
-    )
-  ],
-  None
+    "my_index",
+    [
+        IndexInfo(
+            "c1",
+            IndexType.Hnsw,
+            [
+                InitParameter("M", "16"),
+                InitParameter("ef_construction", "50"),
+                InitParameter("ef", "50"),
+                InitParameter("metric", "l2")
+                InitParameter("encode", "lvq") # "lvq" applies to float vector element only
+            ]
+        )
+    ],
+    None
 )
 ```
 
@@ -758,15 +758,15 @@ table_obj = db_obj.create_table("test_index_fulltext", {"body": {"type": "varcha
 # Create a full-text index named "my_index" on column "body" with default parameter settings:
 # - "ANALYZER": "standard"
 table_obj.create_index(
-  "my_index",
-  [
-    IndexInfo(
-      "body", 
-      IndexType.FullText, 
-      []
-    ),
-  ],
-  None
+    "my_index",
+    [
+        IndexInfo(
+            "body", 
+            IndexType.FullText, 
+            []
+        ),
+    ],
+    None
 )
 ```
 
@@ -780,17 +780,17 @@ table_obj = db_obj.create_table("test_index_fulltext", {"body": {"type": "varcha
 # Create a full-text index named "my_index" on column "body"
 # Setting "ANALYZER" to "standard" (same as the above)
 table_obj.create_index(
-  "my_index",
-  [
-    IndexInfo(
-      "body", 
-      IndexType.FullText, 
-      [
-        InitParameter("ANALYZER", "standard")
-      ]
-    ),
-  ],
-  None
+    "my_index",
+    [
+        IndexInfo(
+            "body", 
+            IndexType.FullText, 
+            [
+                InitParameter("ANALYZER", "standard")
+            ]
+        ),
+    ],
+    None
 )
 ```
 
@@ -806,13 +806,13 @@ table_obj = db_obj.create_table("test_index_fulltext", {"doctitle": {"type": "va
 # Create a full-text index named "my_index" on three columns "doctitle", "docdate", and "body" with default parameter settings:
 # - "ANALYZER": "standard"
 table_obj.create_index(
-  "my_index",
-  [
-    IndexInfo("doctitle", IndexType.FullText, []),
-    IndexInfo("docdate", IndexType.FullText, []),
-    IndexInfo("body", IndexType.FullText, []),
-  ],
-  None
+    "my_index",
+    [
+        IndexInfo("doctitle", IndexType.FullText, []),
+        IndexInfo("docdate", IndexType.FullText, []),
+        IndexInfo("body", IndexType.FullText, []),
+    ],
+    None
 )
 ```
 
@@ -830,17 +830,17 @@ table_ojbect = db_obj.create_table("test_index_ivfflat", {"c1": {"type": "vector
 # - "centroids_count": "128"
 # Only the metric parameter (required) is explicitly set to L2 distance. 
 table_obj.create_index(
-  "my_index",
-  [
-    IndexInfo(
-      "c1",
-      IndexType.IVFFlat,
-      [
-        InitParameter("metric", "l2")
-      ]
-    )
-  ],
-  None
+    "my_index",
+        [
+        IndexInfo(
+            "c1",
+            IndexType.IVFFlat,
+            [
+                InitParameter("metric", "l2")
+            ]
+        )
+        ],
+    None
 )
 ```
 
@@ -854,18 +854,18 @@ table_ojbect = db_obj.create_table("test_index_ivfflat", {"c1": {"type": "vector
 # Create an IVFFlat index named "my_index" on column "c1"
 # Explicitly settings "centroids_count" to "128" and "metric" to "l2" (same as above)
 table_obj.create_index(
-  "my_index",
-  [
-    IndexInfo(
-      "c1",
-      IndexType.IVFFlat,
-      [
-        index.InitParameter("centroids_count", "128"),
-        index.InitParameter("metric", "l2")
-      ]
-    )
-  ],
-  None
+    "my_index",
+    [
+        IndexInfo(
+            "c1",
+            IndexType.IVFFlat,
+            [
+                index.InitParameter("centroids_count", "128"),
+                index.InitParameter("metric", "l2")
+            ]
+        )
+    ],
+    None
 )
 ```
 
@@ -880,15 +880,15 @@ from infinity import index
 table_obj = db_obj.create_table("test_index_secondary", {"c1": {"type": "varchar"}}, None)
 # Create a secondary index named "my_index" on column "c1"
 table_obj.create_index(
-  "my_index",
-  [
-    IndexInfo(
-      "c1", 
-      IndexType.Secondary, 
-      []
-    ),
-  ],
-  None
+    "my_index",
+    [
+        IndexInfo(
+            "c1", 
+            IndexType.Secondary, 
+            []
+        ),
+    ],
+    None
 )
 ```
 
@@ -905,15 +905,15 @@ table_obj = db_obj.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,
 # - "block_size": "16"
 # - "compress_type": "compress"
 table_obj.create_index(
-  "my_index",
-  [
-    IndexInfo(
-      "c1",
-      IndexType.BMP,
-      []
-    )
-  ],
-  None
+    "my_index",
+    [
+        IndexInfo(
+            "c1",
+            IndexType.BMP,
+            []
+        )
+    ],
+    None
 )
 ```
 
@@ -928,18 +928,18 @@ table_obj = db_obj.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,
 # Create a BMP index named "my_index" on column "c1"
 # Settings for "block_size" and "compress_type" are the same as above
 table_obj.create_index(
-  "my_index",
-  [
-    IndexInfo(
-      "c1",
-      IndexType.BMP,
-      [
-        InitParameter("block_size", "16"),
-        InitParameter("compress_type", "compress")
-      ]
-    )
-  ],
-  None
+    "my_index",
+    [
+        IndexInfo(
+            "c1",
+            IndexType.BMP,
+            [
+                InitParameter("block_size", "16"),
+                InitParameter("compress_type", "compress")
+            ]
+        )
+    ],
+    None
 )
 ```
 
