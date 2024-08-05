@@ -53,7 +53,9 @@ This allows for bug fixes without requiring configuration file changes.
 ### Returns
 
 - Success: An Infinity object.
-- Failure: `Exception`
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value: A specific error condition occurs.
+  - `error_msg`: `str` The error message providing additional details.
 
 ### Examples
 
@@ -1024,7 +1026,9 @@ The name of the index to look up.
     - **other_parameters**: `str` - Parameters necessary for index creation.
     - **store_dir**: `str` - The directory holding the index files. 
     - **segment_index_count**: `str` - Number of segments of the index.
-- Failure: `Exception`
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value: A specific error condition occurs.
+  - `error_msg`: `str` The error message providing additional details.
 
 ### Examples
 
@@ -1064,7 +1068,9 @@ Lists the indexes built on the current table.
 ### Returns
 
 - Success: `metadata` : Metadata of the table. See `ListIndexResponse`. A field named index_name is a list of the retrieved index names.
-- Failure: `Exception`
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value: A specific error condition occurs.
+  - `error_msg`: `str` The error message providing additional details.
 
 A structure containing the following attributes:
 
