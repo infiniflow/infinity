@@ -39,6 +39,8 @@ import internal_types;
 import embedding_info;
 import infinity_context;
 import logger;
+import base_memindex;
+import memindex_tracer;
 
 namespace infinity {
 
@@ -61,11 +63,14 @@ export using AbstractHnsw = std::variant<KnnHnsw<PlainCosVecStoreType<float>, Se
                                          KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset> *,
                                          std::nullptr_t>;
 
-export struct HnswIndexInMem {
+export struct HnswIndexInMem : public BaseMemIndex {
 public:
     HnswIndexInMem() : hnsw_(nullptr) {}
 
-    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def);
+    static UniquePtr<HnswIndexInMem>
+    Make(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace = false);
+
+    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace);
 
 private:
     template <typename DataType>
@@ -94,23 +99,23 @@ private:
                 if constexpr (std::is_same_v<DataType, u8> || std::is_same_v<DataType, i8>) {
                     return nullptr;
                 } else {
-                switch (index_hnsw->metric_type_) {
-                    case MetricType::kMetricL2: {
-                        using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset>;
-                        return static_cast<HnswIndex *>(nullptr);
+                    switch (index_hnsw->metric_type_) {
+                        case MetricType::kMetricL2: {
+                            using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset>;
+                            return static_cast<HnswIndex *>(nullptr);
+                        }
+                        case MetricType::kMetricInnerProduct: {
+                            using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset>;
+                            return static_cast<HnswIndex *>(nullptr);
+                        }
+                        case MetricType::kMetricCosine: {
+                            using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset>;
+                            return static_cast<HnswIndex *>(nullptr);
+                        }
+                        default: {
+                            return nullptr;
+                        }
                     }
-                    case MetricType::kMetricInnerProduct: {
-                        using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset>;
-                        return static_cast<HnswIndex *>(nullptr);
-                    }
-                    case MetricType::kMetricCosine: {
-                        using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset>;
-                        return static_cast<HnswIndex *>(nullptr);
-                    }
-                    default: {
-                        return nullptr;
-                    }
-                }
                 }
             }
             default: {
@@ -120,10 +125,11 @@ private:
     }
 
     template <typename Iter, typename Index>
-    static void InsertVecs(Index &index, Iter iter, const HnswInsertConfig &config) {
+    static void InsertVecs(Index &index, Iter iter, const HnswInsertConfig &config, SizeT &mem_usage) {
         auto &thread_pool = InfinityContext::instance().GetHnswBuildThreadPool();
         using T = std::decay_t<decltype(index)>;
         if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+            SizeT mem1 = index->mem_usage();
             auto [start, end] = index->StoreData(std::move(iter), config);
             SizeT bucket_size = std::max(kBuildBucketSize, SizeT(end - start - 1) / thread_pool.size() + 1);
             SizeT bucket_n = (end - start - 1) / bucket_size + 1;
@@ -142,6 +148,8 @@ private:
             for (auto &fut : futs) {
                 fut.wait();
             }
+            SizeT mem2 = index->mem_usage();
+            mem_usage = mem2 - mem1;
         }
     }
 
@@ -151,7 +159,7 @@ public:
     HnswIndexInMem(const HnswIndexInMem &) = delete;
     HnswIndexInMem &operator=(const HnswIndexInMem &) = delete;
 
-    ~HnswIndexInMem();
+    virtual ~HnswIndexInMem();
 
     SizeT GetRowCount() const;
 
@@ -169,17 +177,23 @@ public:
                     bool check_ts,
                     const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
-    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr);
+    SharedPtr<ChunkIndexEntry> Finish(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr) &&;
 
     const AbstractHnsw &get() const { return hnsw_; }
 
     AbstractHnsw *get_ptr() { return &hnsw_; }
+
+protected:
+    MemIndexTracerInfo GetInfo() const override;
 
 private:
     static constexpr SizeT kBuildBucketSize = 1024;
 
     RowID begin_row_id_ = {};
     AbstractHnsw hnsw_ = nullptr;
+
+    SegmentIndexEntry *segment_index_entry_{};
+    bool trace_{};
 };
 
 } // namespace infinity

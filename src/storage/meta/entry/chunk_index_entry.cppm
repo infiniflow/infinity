@@ -29,10 +29,10 @@ import index_base;
 import buffer_handle;
 import default_values;
 import column_def;
+import txn;
 
 namespace infinity {
 
-class Txn;
 class SegmentIndexEntry;
 struct BlockEntry;
 class BufferManager;
@@ -131,12 +131,7 @@ public:
         deprecate_ts_.store(commit_ts);
     }
 
-    bool CheckVisibleByTS(TxnTimeStamp ts) { // FIXME: should overload BaseEntry::CheckVisible
-        TxnTimeStamp deprecate_ts = deprecate_ts_.load();
-        TxnTimeStamp commit_ts = commit_ts_.load();
-        assert(commit_ts == UNCOMMIT_TS || commit_ts < deprecate_ts);
-        return ts >= commit_ts && ts <= deprecate_ts;
-    }
+    bool CheckVisible(Txn *txn) const override;
 
     bool CheckDeprecate(TxnTimeStamp ts) {
         TxnTimeStamp deprecate_ts = deprecate_ts_.load();

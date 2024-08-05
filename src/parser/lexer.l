@@ -128,6 +128,7 @@ LOGICAL         { return LOGICAL; }
 LSEG            { return LSEG; }
 MATCH           { return MATCH; }
 MAXSIM          { return MAXSIM; }
+MEMINDEX        { return MEMINDEX; }
 MINUTE          { return MINUTE; }
 MINUTES         { return MINUTES; }
 MONTH           { return MONTH; }

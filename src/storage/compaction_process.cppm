@@ -52,6 +52,8 @@ private:
 
     void ScanAndOptimize();
 
+    void DoDump(DumpIndexTask *dump_task);
+
     void Process();
 
 private:

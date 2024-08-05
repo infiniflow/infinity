@@ -549,6 +549,10 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW BUFFER"));
             break;
         }
+        case ShowStmtType::kMemIndex: {
+            result->emplace_back(MakeShared<String>("SHOW MEMINDEX"));
+            break;
+        }
         case ShowStmtType::kTables: {
             result->emplace_back(MakeShared<String>("SHOW TABLES: "));
             intent_size += 2;

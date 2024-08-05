@@ -157,6 +157,7 @@ export {
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
     constexpr SizeT HNSW_EF = 200;
+    constexpr SizeT HNSW_BLOCK_SIZE = 8192;
 
     constexpr SizeT BMP_BLOCK_SIZE = 16;
 
@@ -176,6 +177,9 @@ export {
     constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 8 * 1024lu * 1024lu * 1024lu; // 8Gib
     constexpr SizeT DEFAULT_BUFFER_MANAGER_LRU_COUNT = 7;
     constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "8GB"; // 8Gib
+
+    constexpr SizeT DEFAULT_MEMINDEX_MEMORY_QUOTA = 4 * 1024lu * 1024lu * 1024lu; // 4GB
+    constexpr std::string_view DEFAULT_MEMINDEX_MEMORY_QUOTA_STR = "4GB"; // 4GB
 
     constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
     constexpr std::string_view DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
@@ -218,6 +222,8 @@ export {
     constexpr std::string_view BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
     constexpr std::string_view LRU_NUM_OPTION_NAME = "lru_num";
     constexpr std::string_view TEMP_DIR_OPTION_NAME = "temp_dir";
+    constexpr std::string_view MEMINDEX_MEMORY_QUOTA_OPTION_NAME = "memindex_memory_quota";
+
     constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";
     constexpr std::string_view WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";
     constexpr std::string_view FULL_CHECKPOINT_INTERVAL_OPTION_NAME = "full_checkpoint_interval";

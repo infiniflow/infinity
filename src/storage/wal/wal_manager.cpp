@@ -481,7 +481,7 @@ i64 WalManager::ReplayWalFile() {
     Vector<String> wal_list{};
     {
         auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
-        if (!wal_infos.empty()) {
+        if (wal_infos.size() > 1) {
             std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
                 return a.max_commit_ts_ > b.max_commit_ts_;
             });
@@ -1095,6 +1095,12 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
                                                          commit_ts,
                                                          chunk_info.deprecate_ts_,
                                                          buffer_mgr);
+    }
+    for (ChunkID old_chunk_id : cmd.deprecate_ids_) {
+        auto *old_chunk = segment_index_entry->GetChunkIndexEntry(old_chunk_id);
+        if (old_chunk != nullptr) {
+            old_chunk->DeprecateChunk(commit_ts);
+        }
     }
 }
 
