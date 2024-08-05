@@ -138,7 +138,7 @@ public:
                 return "FLOAT16";
             case kElemBFloat16:
                 return "BFLOAT16";
-            default: {
+            case kElemInvalid: {
                 ParserError("Unexpected embedding type");
             }
         }
@@ -194,7 +194,7 @@ public:
                 return Embedding2StringInternal<float16_t>(embedding, dimension);
             case kElemBFloat16:
                 return Embedding2StringInternal<bfloat16_t>(embedding, dimension);
-            default: {
+            case kElemInvalid: {
                 ParserError("Unexpected embedding type");
             }
         }
