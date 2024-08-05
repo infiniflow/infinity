@@ -77,6 +77,7 @@ ClientVersions::ClientVersions() {
     client_version_map_[9] = String("0.2.1.dev5");
     client_version_map_[10] = String("0.2.1");
     client_version_map_[11] = String("0.3.0.dev1");
+    client_version_map_[12] = String("0.3.0.dev3");
 }
 
 Pair<const char*, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -1575,9 +1576,12 @@ EmbeddingDataType InfinityThriftService::GetEmbeddingDataTypeFromProto(const inf
             return EmbeddingDataType::kElemFloat;
         case infinity_thrift_rpc::ElementType::ElementFloat64:
             return EmbeddingDataType::kElemDouble;
-        default:
-            return EmbeddingDataType::kElemInvalid;
+        case infinity_thrift_rpc::ElementType::ElementFloat16:
+            return EmbeddingDataType::kElemFloat16;
+        case infinity_thrift_rpc::ElementType::ElementBFloat16:
+            return EmbeddingDataType::kElemBFloat16;
     }
+    return EmbeddingDataType::kElemInvalid;
 }
 
 IndexType InfinityThriftService::GetIndexTypeFromProto(const infinity_thrift_rpc::IndexType::type &type) {
@@ -1630,17 +1634,31 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
         }
         case infinity_thrift_rpc::LiteralType::IntegerArray: {
             auto parsed_expr = new ConstantExpr(LiteralType::kIntegerArray);
-            parsed_expr->long_array_.reserve(expr.i64_array_value.size());
-            for (auto &value : expr.i64_array_value) {
-                parsed_expr->long_array_.emplace_back(value);
-            }
+            parsed_expr->long_array_ = expr.i64_array_value;
             return parsed_expr;
         }
         case infinity_thrift_rpc::LiteralType::DoubleArray: {
             auto parsed_expr = new ConstantExpr(LiteralType::kDoubleArray);
-            parsed_expr->double_array_.reserve(expr.f64_array_value.size());
-            for (auto &value : expr.f64_array_value) {
-                parsed_expr->double_array_.emplace_back(value);
+            parsed_expr->double_array_ = expr.f64_array_value;
+            return parsed_expr;
+        }
+        case infinity_thrift_rpc::LiteralType::IntegerTensor: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
+            parsed_expr->sub_array_array_.reserve(expr.i64_tensor_value.size());
+            for (auto &value_2 : expr.i64_tensor_value) {
+                auto parsed_expr_2 = MakeShared<ConstantExpr>(LiteralType::kIntegerArray);
+                parsed_expr_2->long_array_ = value_2;
+                parsed_expr->sub_array_array_.emplace_back(std::move(parsed_expr_2));
+            }
+            return parsed_expr;
+        }
+        case infinity_thrift_rpc::LiteralType::DoubleTensor: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
+            parsed_expr->sub_array_array_.reserve(expr.f64_tensor_value.size());
+            for (auto &value_2 : expr.f64_tensor_value) {
+                auto parsed_expr_2 = MakeShared<ConstantExpr>(LiteralType::kDoubleArray);
+                parsed_expr_2->double_array_ = value_2;
+                parsed_expr->sub_array_array_.emplace_back(std::move(parsed_expr_2));
             }
             return parsed_expr;
         }
@@ -1648,17 +1666,14 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
             auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
             parsed_expr->sub_array_array_.reserve(expr.i64_tensor_array_value.size());
             for (auto &value_1 : expr.i64_tensor_array_value) {
-                auto parsed_expr_1 = new ConstantExpr(LiteralType::kSubArrayArray);
+                auto parsed_expr_1 = MakeShared<ConstantExpr>(LiteralType::kSubArrayArray);
                 parsed_expr_1->sub_array_array_.reserve(value_1.size());
                 for (auto &value_2 : value_1) {
-                    auto parsed_expr_2 = new ConstantExpr(LiteralType::kIntegerArray);
-                    parsed_expr_2->long_array_.reserve(value_2.size());
-                    for (auto &value_3 : value_2) {
-                        parsed_expr_2->long_array_.emplace_back(value_3);
-                    }
-                    parsed_expr_1->sub_array_array_.emplace_back(parsed_expr_2);
+                    auto parsed_expr_2 = MakeShared<ConstantExpr>(LiteralType::kIntegerArray);
+                    parsed_expr_2->long_array_ = value_2;
+                    parsed_expr_1->sub_array_array_.emplace_back(std::move(parsed_expr_2));
                 }
-                parsed_expr->sub_array_array_.emplace_back(parsed_expr_1);
+                parsed_expr->sub_array_array_.emplace_back(std::move(parsed_expr_1));
             }
             return parsed_expr;
         }
@@ -1666,17 +1681,14 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
             auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
             parsed_expr->sub_array_array_.reserve(expr.f64_tensor_array_value.size());
             for (auto &value_1 : expr.f64_tensor_array_value) {
-                auto parsed_expr_1 = new ConstantExpr(LiteralType::kSubArrayArray);
+                auto parsed_expr_1 = MakeShared<ConstantExpr>(LiteralType::kSubArrayArray);
                 parsed_expr_1->sub_array_array_.reserve(value_1.size());
                 for (auto &value_2 : value_1) {
-                    auto parsed_expr_2 = new ConstantExpr(LiteralType::kDoubleArray);
-                    parsed_expr_2->double_array_.reserve(value_2.size());
-                    for (auto &value_3 : value_2) {
-                        parsed_expr_2->double_array_.emplace_back(value_3);
-                    }
-                    parsed_expr_1->sub_array_array_.emplace_back(parsed_expr_2);
+                    auto parsed_expr_2 = MakeShared<ConstantExpr>(LiteralType::kDoubleArray);
+                    parsed_expr_2->double_array_ = value_2;
+                    parsed_expr_1->sub_array_array_.emplace_back(std::move(parsed_expr_2));
                 }
-                parsed_expr->sub_array_array_.emplace_back(parsed_expr_1);
+                parsed_expr->sub_array_array_.emplace_back(std::move(parsed_expr_1));
             }
             return parsed_expr;
         }
@@ -1985,6 +1997,20 @@ Tuple<void *, i64, Status> InfinityThriftService::GetEmbeddingDataTypeDataPtrFro
         return {(void *)embedding_data.f32_array_value.data(), embedding_data.f32_array_value.size(), Status::OK()};
     } else if (embedding_data.__isset.f64_array_value) {
         return {(void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size(), Status::OK()};
+    } else if (embedding_data.__isset.f16_array_value) {
+        auto ptr_double = (double *)(embedding_data.f16_array_value.data());
+        auto ptr_float16 = (Float16T *)(embedding_data.f16_array_value.data());
+        for (size_t i = 0; i < embedding_data.f16_array_value.size(); ++i) {
+            ptr_float16[i] = float(ptr_double[i]);
+        }
+        return {(void *)embedding_data.f16_array_value.data(), embedding_data.f16_array_value.size(), Status::OK()};
+    } else if (embedding_data.__isset.bf16_array_value) {
+        auto ptr_double = (double *)(embedding_data.bf16_array_value.data());
+        auto ptr_bfloat16 = (BFloat16T *)(embedding_data.bf16_array_value.data());
+        for (size_t i = 0; i < embedding_data.bf16_array_value.size(); ++i) {
+            ptr_bfloat16[i] = float(ptr_double[i]);
+        }
+        return {(void *)embedding_data.bf16_array_value.data(), embedding_data.bf16_array_value.size(), Status::OK()};
     } else {
         return {nullptr, 0, Status::InvalidEmbeddingDataType("unknown type")};
     }
@@ -2178,6 +2204,10 @@ infinity_thrift_rpc::ElementType::type InfinityThriftService::EmbeddingDataTypeT
             return infinity_thrift_rpc::ElementType::ElementFloat32;
         case EmbeddingDataType::kElemDouble:
             return infinity_thrift_rpc::ElementType::ElementFloat64;
+        case EmbeddingDataType::kElemFloat16:
+            return infinity_thrift_rpc::ElementType::ElementFloat16;
+        case EmbeddingDataType::kElemBFloat16:
+            return infinity_thrift_rpc::ElementType::ElementBFloat16;
         case EmbeddingDataType::kElemInvalid: {
             String error_message = fmt::format("Invalid embedding element data type: {}", static_cast<i8>(embedding_data_type));
             UnrecoverableError(error_message);

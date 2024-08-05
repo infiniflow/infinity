@@ -1,0 +1,20 @@
+[general]
+version = "0.3.0"
+time_zone = "utc-8"
+
+[network]
+[log]
+
+[storage]
+cleanup_interval = "0s"
+# close auto compaction
+compact_interval = "0s"
+
+[wal]
+#short checkpoint interval to allow quick cleanup
+delta_checkpoint_interval = "5s"
+
+[buffer]
+[resource]
+[persistence]
+persistence_dir          = "/var/infinity/persistence"

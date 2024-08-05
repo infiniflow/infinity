@@ -29,6 +29,7 @@ void yyerror(YYLTYPE * llocp, void* lexer, infinity::ParserResult* result, const
 #include "statement/update_statement.h"
 #include "statement/command_statement.h"
 #include "statement/compact_statement.h"
+#include "statement/admin_statement.h"
 #include "table_reference/base_table_reference.h"
 #include "table_reference/join_reference.h"
 #include "table_reference/cross_product_reference.h"
@@ -123,6 +124,7 @@ struct SQL_LTYPE {
     infinity::OptimizeStatement*  optimize_stmt;
     infinity::CommandStatement* command_stmt;
     infinity::CompactStatement* compact_stmt;
+    infinity::AdminStatement* admin_stmt;
 
     std::vector<infinity::BaseStatement*>* stmt_array;
 
@@ -385,9 +387,10 @@ struct SQL_LTYPE {
 %token PRIMARY KEY UNIQUE NULLABLE IS DEFAULT
 %token TRUE FALSE INTERVAL SECOND SECONDS MINUTE MINUTES HOUR HOURS DAY DAYS MONTH MONTHS YEAR YEARS
 %token EQUAL NOT_EQ LESS_EQ GREATER_EQ BETWEEN AND OR EXTRACT LIKE
-%token DATA LOG BUFFER TRANSACTIONS TRANSACTION
-%token USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS
+%token DATA LOG BUFFER TRANSACTIONS TRANSACTION MEMINDEX
+%token USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
+%token ADMIN
 
 %token NUMBER
 
@@ -408,6 +411,7 @@ struct SQL_LTYPE {
 %type <optimize_stmt>     optimize_statement
 %type <command_stmt>      command_statement
 %type <compact_stmt>      compact_statement
+%type <admin_stmt>        admin_statement
 
 %type <stmt_array>        statement_list
 
@@ -519,6 +523,7 @@ statement : create_statement { $$ = $1; }
 | optimize_statement { $$ = $1; }
 | command_statement { $$ = $1; }
 | compact_statement { $$ = $1; }
+| admin_statement { $$ = $1; }
 
 explainable_statement : create_statement { $$ = $1; }
 | drop_statement { $$ = $1; }
@@ -808,6 +813,8 @@ BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, in
 | EMBEDDING '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt64}; }
 | EMBEDDING '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemFloat}; }
 | EMBEDDING '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemDouble}; }
+| EMBEDDING '(' FLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemFloat16}; }
+| EMBEDDING '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemBFloat16}; }
 | EMBEDDING '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $6, 0, 0, infinity::kElemUInt8}; }
 | TENSOR '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemBit}; }
 | TENSOR '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensor, $5, 0, 0, infinity::kElemInt8}; }
@@ -825,6 +832,9 @@ BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, in
 | TENSORARRAY '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemInt64}; }
 | TENSORARRAY '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemFloat}; }
 | TENSORARRAY '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemDouble}; }
+| TENSORARRAY '(' FLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemFloat16}; }
+| TENSORARRAY '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $5, 0, 0, infinity::kElemBFloat16}; }
+| TENSORARRAY '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kTensorArray, $6, 0, 0, infinity::kElemUInt8}; }
 | VECTOR '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemBit}; }
 | VECTOR '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt8}; }
 | VECTOR '(' SMALLINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt16}; }
@@ -833,6 +843,8 @@ BOOLEAN { $$ = infinity::ColumnType{infinity::LogicalType::kBoolean, 0, 0, 0, in
 | VECTOR '(' BIGINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemInt64}; }
 | VECTOR '(' FLOAT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemFloat}; }
 | VECTOR '(' DOUBLE ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemDouble}; }
+| VECTOR '(' FLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemFloat16}; }
+| VECTOR '(' BFLOAT16 ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $5, 0, 0, infinity::kElemBFloat16}; }
 | VECTOR '(' UNSIGNED TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kEmbedding, $6, 0, 0, infinity::kElemUInt8}; }
 | SPARSE '(' BIT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemBit}; }
 | SPARSE '(' TINYINT ',' LONG_VALUE ')' { $$ = infinity::ColumnType{infinity::LogicalType::kSparse, $5, 0, 0, infinity::kElemInt8}; }
@@ -1676,6 +1688,10 @@ show_statement: SHOW DATABASES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kBuffer;
 }
+| SHOW MEMINDEX {
+    $$ = new infinity::ShowStatement();
+    $$->show_type_ = infinity::ShowStmtType::kMemIndex;
+}
 | SHOW QUERIES {
     $$ = new infinity::ShowStatement();
     $$->show_type_ = infinity::ShowStmtType::kQueries;
@@ -2047,6 +2063,178 @@ compact_statement: COMPACT TABLE table_name {
 
     $$ = new infinity::ManualCompactStatement(std::move(schema_name), std::move(table_name));
     delete $3;
+}
+
+admin_statement: ADMIN SHOW CATALOGS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListCatalogs;
+}
+| ADMIN SHOW CATALOG LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowCatalog;
+     $$->catalog_file_index_ = $4;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASES {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListDatabases;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowDatabase;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLES {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListTables;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowTable;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+     $$->table_meta_index_ = $10;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE COLUMNS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowColumn;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+     $$->table_meta_index_ = $10;
+     $$->table_entry_index_ = $11;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE SEGMENTS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListSegments;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+     $$->table_meta_index_ = $10;
+     $$->table_entry_index_ = $11;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE SEGMENT LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowSegment;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+     $$->table_meta_index_ = $10;
+     $$->table_entry_index_ = $11;
+     $$->segment_index_ = $13;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE SEGMENT LONG_VALUE BLOCKS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListBlocks;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+     $$->table_meta_index_ = $10;
+     $$->table_entry_index_ = $11;
+     $$->segment_index_ = $13;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE SEGMENT LONG_VALUE BLOCK LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowBlock;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+     $$->table_meta_index_ = $10;
+     $$->table_entry_index_ = $11;
+     $$->segment_index_ = $13;
+     $$->block_index_ = $15;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE SEGMENT LONG_VALUE BLOCK LONG_VALUE COLUMNS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListColumns;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+     $$->table_meta_index_ = $10;
+     $$->table_entry_index_ = $11;
+     $$->segment_index_ = $13;
+     $$->block_index_ = $15;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEXES {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListIndexes;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+     $$->table_meta_index_ = $10;
+     $$->table_entry_index_ = $11;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEX LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowIndex;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+     $$->table_meta_index_ = $10;
+     $$->table_entry_index_ = $11;
+     $$->index_meta_index_ = $13;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEX LONG_VALUE LONG_VALUE SEGMENTS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListIndexSegments;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+     $$->table_meta_index_ = $10;
+     $$->table_entry_index_ = $11;
+     $$->index_meta_index_ = $13;
+     $$->index_entry_index_ = $14;
+}
+| ADMIN SHOW CATALOG LONG_VALUE LONG_VALUE DATABASE LONG_VALUE LONG_VALUE TABLE LONG_VALUE LONG_VALUE INDEX LONG_VALUE LONG_VALUE SEGMENT LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowIndexSegment;
+     $$->catalog_file_start_index_ = $4;
+     $$->catalog_file_end_index_ = $5;
+     $$->database_meta_index_ = $7;
+     $$->database_entry_index_ = $8;
+     $$->table_meta_index_ = $10;
+     $$->table_entry_index_ = $11;
+     $$->index_meta_index_ = $13;
+     $$->index_entry_index_ = $14;
+     $$->segment_index_ = $16;
+}
+| ADMIN SHOW LOGS {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListLogFiles;
+}
+| ADMIN SHOW LOG LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowLogFile;
+     $$->log_file_index_ = $4;
+}
+| ADMIN SHOW LOG LONG_VALUE INDEXES {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kListLogIndexes;
+     $$->log_file_index_ = $4;
+}
+| ADMIN SHOW LOG LONG_VALUE INDEX LONG_VALUE {
+     $$ = new infinity::AdminStatement();
+     $$->admin_type_ = infinity::AdminStmtType::kShowLogIndex;
+     $$->log_file_index_ = $4;
+     $$->log_index_in_file_ = $6;
 }
 
 /*

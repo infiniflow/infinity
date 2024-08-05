@@ -264,12 +264,13 @@ void TableIndexEntry::MemIndexCommit() {
     }
 }
 
-SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(Txn *txn, TxnIndexStore *txn_index_store, bool spill) {
-    SharedPtr<ChunkIndexEntry> chunk_index_entry = nullptr;
-    if (last_segment_.get() != nullptr) {
-        chunk_index_entry = last_segment_->MemIndexDump();
-        txn_index_store->chunk_index_entries_.push_back(chunk_index_entry.get());
+SharedPtr<ChunkIndexEntry> TableIndexEntry::MemIndexDump(Txn *txn, TxnTableStore *txn_table_store, bool spill, SizeT *dump_size) {
+    if (last_segment_.get() == nullptr) {
+        return nullptr;
     }
+    auto chunk_index_entry = last_segment_->MemIndexDump(spill, dump_size);
+    txn_table_store->AddChunkIndexStore(this, chunk_index_entry.get());
+    last_segment_->AddWalIndexDump(chunk_index_entry.get(), txn);
     return chunk_index_entry;
 }
 

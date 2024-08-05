@@ -352,6 +352,15 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
             UnrecoverableError(status.message());
         }
 
+        i64 memindex_memory_quota = DEFAULT_MEMINDEX_MEMORY_QUOTA;
+        UniquePtr<IntegerOption> memindex_memory_quota_option = MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME,
+                                                                                          memindex_memory_quota, std::numeric_limits<i64>::max(), 0);
+        status = global_options_.AddOption(std::move(memindex_memory_quota_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Temp Dir
         String temp_dir = "/var/infinity/tmp";
         UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
@@ -1325,6 +1334,22 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                             global_options_.AddOption(std::move(temp_dir_option));
                             break;
                         }
+                        case GlobalOptionIndex::kMemIndexMemoryQuota: {
+                            i64 mem_index_memory_quota = DEFAULT_MEMINDEX_MEMORY_QUOTA;
+                            if (elem.second.is_string()) {
+                                String mem_index_memory_quota_str = elem.second.value_or(DEFAULT_MEMINDEX_MEMORY_QUOTA_STR.data());
+                                auto res = ParseByteSize(mem_index_memory_quota_str, mem_index_memory_quota);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'mem_index_memory_quota' field isn't string.");
+                            }
+                            UniquePtr<IntegerOption> mem_index_memory_quota_option =
+                                MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME, mem_index_memory_quota, std::numeric_limits<i64>::max(), 0);
+                            global_options_.AddOption(std::move(mem_index_memory_quota_option));
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'buffer' field", var_name));
                         }
@@ -1356,6 +1381,16 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                     String temp_dir = "/var/infinity/tmp";
                     UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
                     Status status = global_options_.AddOption(std::move(temp_dir_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kMemIndexMemoryQuota) == nullptr) {
+                    // Mem Index Memory Quota
+                    i64 mem_index_memory_quota = DEFAULT_MEMINDEX_MEMORY_QUOTA;
+                    UniquePtr<IntegerOption> mem_index_memory_quota_option =
+                        MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME, mem_index_memory_quota, std::numeric_limits<i64>::max(), 0);
+                    Status status = global_options_.AddOption(std::move(mem_index_memory_quota_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -1831,6 +1866,11 @@ SizeT Config::LRUNum() {
 String Config::TempDir() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetStringValue(GlobalOptionIndex::kTempDir);
+}
+
+i64 Config::MemIndexMemoryQuota() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexMemoryQuota);
 }
 
 // WAL

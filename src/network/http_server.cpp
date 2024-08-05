@@ -263,7 +263,9 @@ public:
         auto properties = body_info_json["properties"];
 
         nlohmann::json json_response;
+        json_response["error_code"] = 0;
         HTTPStatus http_status;
+        http_status = HTTPStatus::CODE_200;
 
         if (!fields.is_array()) {
             infinity::Status status = infinity::Status::InvalidColumnDefinition("Expect json array in column definitions");
@@ -391,19 +393,21 @@ public:
             }
         }
 
-        auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
+        if(json_response["error_code"] == 0) {
+            auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
+        }
 
         column_definitions.clear();
         table_constraint.clear();
 
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
-        }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
 };
@@ -423,6 +427,7 @@ public:
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
         nlohmann::json json_response;
+        json_response["error_code"] = 0;
 
         DropTableOptions options;
         if (body_info_json.contains("drop_option")) {
@@ -445,15 +450,16 @@ public:
             }
         }
 
-        auto result = infinity->DropTable(database_name, table_name, options);
-
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+        if (json_response["error_code"] == 0) {
+            auto result = infinity->DropTable(database_name, table_name, options);
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
@@ -1237,34 +1243,55 @@ public:
             nlohmann::json http_body_json = nlohmann::json::parse(data_body);
 
             const String filter_string = http_body_json["filter"];
+            if(filter_string != "") {
+                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+                ExprParser expr_parser;
+                expr_parser.Parse(filter_string, expr_parsed_result.get());
+                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
+                    json_response["error_code"] = ErrorCode::kInvalidFilterExpression;
+                    json_response["error_message"] = fmt::format("Invalid filter expression: {}", filter_string);
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
 
-            UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
-            ExprParser expr_parser;
-            expr_parser.Parse(filter_string, expr_parsed_result.get());
-            if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
-                json_response["error_code"] = ErrorCode::kInvalidFilterExpression;
-                json_response["error_message"] = fmt::format("Invalid filter expression: {}", filter_string);
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                const QueryResult result = infinity->Delete(database_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
+                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+
+                if (result.IsOk()) {
+                    json_response["error_code"] = 0;
+                    http_status = HTTPStatus::CODE_200;
+
+                    // Only one block
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    // Get sum delete rows
+                    Value value = data_block->GetValue(1, 0);
+                    json_response["delete_row_count"] = value.value_.big_int;
+                } else {
+                    json_response["error_code"] = result.ErrorCode();
+                    json_response["error_message"] = result.ErrorMsg();
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
+            else {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                const QueryResult result = infinity->Delete(database_name, table_name, nullptr);
 
-            auto database_name = request->getPathVariable("database_name");
-            auto table_name = request->getPathVariable("table_name");
-            const QueryResult result = infinity->Delete(database_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
-            expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+                if (result.IsOk()) {
+                    json_response["error_code"] = 0;
+                    http_status = HTTPStatus::CODE_200;
 
-            if (result.IsOk()) {
-                json_response["error_code"] = 0;
-                http_status = HTTPStatus::CODE_200;
-
-                // Only one block
-                DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-                // Get sum delete rows
-                Value value = data_block->GetValue(1, 0);
-                json_response["delete_row_count"] = value.value_.big_int;
-            } else {
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
-                http_status = HTTPStatus::CODE_500;
+                    // Only one block
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    // Get sum delete rows
+                    Value value = data_block->GetValue(1, 0);
+                    json_response["delete_row_count"] = value.value_.big_int;
+                } else {
+                    json_response["error_code"] = result.ErrorCode();
+                    json_response["error_message"] = result.ErrorMsg();
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
         } catch (nlohmann::json::exception &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;

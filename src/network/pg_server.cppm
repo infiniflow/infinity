@@ -23,10 +23,6 @@ export module pg_server;
 
 namespace infinity {
 
-export struct StartupParameter {
-    SharedPtr<String> config_path{};
-};
-
 export class PGServer {
 public:
     void Run();

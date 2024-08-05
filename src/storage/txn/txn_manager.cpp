@@ -229,7 +229,7 @@ void TxnManager::Stop() {
         ++it;
     }
     txn_map_.clear();
-    LOG_INFO("TxnManager is stopped");
+    LOG_INFO("Txn manager is stopped");
 }
 
 bool TxnManager::Stopped() { return !is_running_.load(); }

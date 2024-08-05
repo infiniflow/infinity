@@ -69,6 +69,7 @@ public:
     inline BufferObj *buffer() const { return buffer_; }
     inline u64 column_id() const { return column_id_; }
     inline const SharedPtr<String> &base_dir() const { return base_dir_; }
+    inline const SharedPtr<String> &filename() const { return file_name_; }
     inline const BlockEntry *block_entry() const { return block_entry_; }
 
     SharedPtr<String> OutlineFilename(u32 buffer_group_id, SizeT file_idx) const;

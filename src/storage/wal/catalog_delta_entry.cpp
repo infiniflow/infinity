@@ -29,6 +29,7 @@ import parsed_expr;
 import constant_expr;
 import stl;
 import data_type;
+import block_version;
 import create_index_info;
 import infinity_context;
 import index_defines;
@@ -82,6 +83,12 @@ String ToString(CatalogDeltaOpType op_type) {
 SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     SizeT size = sizeof(TxnTimeStamp) + sizeof(merge_flag_) + sizeof(TransactionID) + sizeof(TxnTimeStamp);
     size += sizeof(i32) + encode_->size();
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        size += pm->GetSizeInBytes(GetFilePaths());
+    }
     return size;
 }
 
@@ -95,13 +102,7 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        Vector<String> paths = GetFilePaths();
-        WriteBufAdv(buf, paths.size());
-        for (auto &path : paths) {
-            ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
-            WriteBufAdv(buf, path);
-            obj_addr.WriteBuf(buf);
-        }
+        pm->WriteBufAdv(buf, GetFilePaths());
     }
 }
 
@@ -115,13 +116,7 @@ void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        SizeT size = ReadBufAdv<SizeT>(ptr);
-        for (SizeT i = 0; i < size; ++i) {
-            String path = ReadBufAdv<String>(ptr);
-            ObjAddr obj_addr;
-            obj_addr.ReadBuf(ptr);
-            pm->SaveLocalPath(path, obj_addr);
-        }
+        pm->ReadBufAdv(ptr);
     }
 }
 
@@ -368,13 +363,18 @@ AddBlockEntryOp::AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, block_entry, commit_ts), block_entry_(block_entry),
       row_capacity_(block_entry->row_capacity()), row_count_(block_entry->row_count()), min_row_ts_(block_entry->min_row_ts()),
       max_row_ts_(block_entry->max_row_ts()), checkpoint_ts_(block_entry->checkpoint_ts()),
-      checkpoint_row_count_(block_entry->checkpoint_row_count()), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
+      checkpoint_row_count_(block_entry->checkpoint_row_count()), block_filter_binary_data_(std::move(block_filter_binary_data)) {
+    String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
+    String file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
+    local_paths_.push_back(file_path);
+}
 
 AddColumnEntryOp::AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts) {
     for (u32 layer = 0; layer < 2; ++layer) {
         outline_infos_.emplace_back(column_entry->OutlineBufferCount(layer), column_entry->LastChunkOff(layer));
     }
+    local_paths_.push_back(column_entry->FilePath());
 }
 
 AddTableIndexEntryOp::AddTableIndexEntryOp(TableIndexEntry *table_index_entry, TxnTimeStamp commit_ts)
@@ -388,17 +388,29 @@ AddSegmentIndexEntryOp::AddSegmentIndexEntryOp(SegmentIndexEntry *segment_index_
 AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry, commit_ts), base_name_(chunk_index_entry->base_name_),
       base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {
-    IndexType index_type = chunk_index_entry->segment_index_entry_->table_index_entry()->index_base()->index_type_;
+    SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
+    IndexType index_type = segment_index_entry->table_index_entry()->index_base()->index_type_;
     switch (index_type) {
         case IndexType::kFullText: {
-            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(chunk_index_entry->segment_index_entry_->index_dir()));
+            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
             local_paths_.push_back(full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX);
             local_paths_.push_back(full_path + chunk_index_entry->base_name_ + DICT_SUFFIX);
             local_paths_.push_back(full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
             break;
         }
-        default: {
+        case IndexType::kHnsw:
+        case IndexType::kEMVB:
+        case IndexType::kSecondary:
+        case IndexType::kBMP: {
+            String full_dir = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
+            String file_name = ChunkIndexEntry::IndexFileName(segment_index_entry->segment_id(), chunk_index_entry->chunk_id_);
+            String full_path = fmt::format("{}/{}", full_dir, file_name);
+            local_paths_.push_back(full_path);
             break;
+        }
+        default: {
+            String error_message = "Unsupported index type when add delta catalog op.";
+            UnrecoverableError(error_message);
         }
     }
 }
@@ -1180,6 +1192,11 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
             auto *add_segment_op = static_cast<AddSegmentEntryOp *>(new_op.get());
             if (add_segment_op->status_ == SegmentStatus::kDeprecated) {
                 add_segment_op->merge_flag_ = MergeFlag::kDelete;
+            }
+        } else if (new_op->type_ == CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {
+            auto *add_chunk_index_op = static_cast<AddChunkIndexEntryOp *>(new_op.get());
+            if (add_chunk_index_op->deprecate_ts_ != UNCOMMIT_TS) {
+                add_chunk_index_op->merge_flag_ = MergeFlag::kDelete;
             }
         }
         const String &encode = *new_op->encode_;

@@ -341,8 +341,8 @@ inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, ColumnVe
 #define BFLOAT16_TRY_CAST_TO_FIXLEN_REUSE(TARGET_TYPE) FLOAT_TRY_CAST_TO_FIXLEN_REUSE(BFloat16T, TARGET_TYPE)
 
 // apply
-FOR_EACH(FLOAT16_TRY_CAST_TO_FIXLEN_REUSE, TinyIntT, SmallIntT, IntegerT, BigIntT, HugeIntT, DoubleT, BFloat16T, DecimalT)
-FOR_EACH(BFLOAT16_TRY_CAST_TO_FIXLEN_REUSE, TinyIntT, SmallIntT, IntegerT, BigIntT, HugeIntT, DoubleT, Float16T, DecimalT)
+FOR_EACH(FLOAT16_TRY_CAST_TO_FIXLEN_REUSE, u8, TinyIntT, SmallIntT, IntegerT, BigIntT, HugeIntT, DoubleT, BFloat16T, DecimalT)
+FOR_EACH(BFLOAT16_TRY_CAST_TO_FIXLEN_REUSE, u8, TinyIntT, SmallIntT, IntegerT, BigIntT, HugeIntT, DoubleT, Float16T, DecimalT)
 
 template <>
 inline bool FloatTryCastToFixlen::Run(Float16T source, FloatT &target) {

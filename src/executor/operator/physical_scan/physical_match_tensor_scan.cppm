@@ -28,6 +28,7 @@ import common_query_filter;
 import physical_filter_scan_base;
 import global_block_id;
 import logical_match_tensor_scan;
+import internal_types;
 
 namespace infinity {
 struct LoadMeta;
@@ -74,7 +75,7 @@ public:
 
     [[nodiscard]] inline u64 table_index() const { return table_index_; }
 
-    [[nodiscard]] inline MatchTensorExpression *match_tensor_expr() const { return match_tensor_expr_.get(); }
+    [[nodiscard]] inline MatchTensorExpression *match_tensor_expr() const { return src_match_tensor_expr_.get(); }
 
     [[nodiscard]] inline const CommonQueryFilter *common_query_filter() const { return common_query_filter_.get(); }
 
@@ -82,7 +83,12 @@ public:
 
 private:
     u64 table_index_ = 0;
-    SharedPtr<MatchTensorExpression> match_tensor_expr_;
+    SharedPtr<MatchTensorExpression> src_match_tensor_expr_;
+
+    // real MatchTensorExpression used in calculation
+    SharedPtr<void> calc_match_tensor_aligned_holder_;
+    UniquePtr<MatchTensorExpression> calc_match_tensor_expr_holder_;
+    MatchTensorExpression *calc_match_tensor_expr_ = nullptr;
 
     // extra options from match_tensor_expr_
     u32 topn_ = 0;
@@ -105,6 +111,11 @@ export void CalculateFusionMatchTensorRerankerScores(Vector<MatchTensorRerankDoc
                                                      const DataType *column_data_type,
                                                      ColumnID column_id,
                                                      const BlockIndex *block_index,
-                                                     const MatchTensorExpression &match_tensor_expr);
+                                                     MatchTensorExpression &src_match_tensor_expr);
+
+// u8, i8, i16, i32 -> i32
+// i64 -> i64
+// f32, f64, float16, bfloat16 -> f32
+export void *GetAlignedCast(char *src_embedding_ptr, u32 dim, EmbeddingDataType src_embedding_data_type, EmbeddingDataType new_embedding_data_type);
 
 } // namespace infinity

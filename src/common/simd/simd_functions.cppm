@@ -56,6 +56,11 @@ export struct SIMD_FUNCTIONS {
     U8DistanceFuncType HNSW_U8IP_64_ptr_ = Get_HNSW_U8IP_64_ptr();
     U8CosDistanceFuncType HNSW_U8Cos_ptr_ = Get_HNSW_U8Cos_ptr();
 
+    // MaxSim IP
+    MaxSimF32BitIPFuncType MaxSimF32BitIP_func_ptr_ = GetMaxSimF32BitIPFuncPtr();
+    MaxSimI32BitIPFuncType MaxSimI32BitIP_func_ptr_ = GetMaxSimI32BitIPFuncPtr();
+    MaxSimI64BitIPFuncType MaxSimI64BitIP_func_ptr_ = GetMaxSimI64BitIPFuncPtr();
+
     // EMVB
     FilterScoresOutputIdsFuncType FilterScoresOutputIds_func_ptr_ = GetFilterScoresOutputIdsFuncPtr();
 

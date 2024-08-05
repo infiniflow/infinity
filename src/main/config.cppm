@@ -89,6 +89,8 @@ public:
     SizeT LRUNum();
     String TempDir();
 
+    i64 MemIndexMemoryQuota();
+
     // WAL
     String WALDir();
 

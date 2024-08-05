@@ -29,6 +29,7 @@ import optimizer;
 import status;
 import query_result;
 import base_statement;
+import admin_statement;
 
 export module query_context;
 
@@ -128,6 +129,9 @@ public:
             query_profiler_->Flush(std::move(profiler));
         }
     }
+
+private:
+    QueryResult HandleAdminStatement(const AdminStatement* admin_statement);
 
 private:
     inline void CreateQueryProfiler() {

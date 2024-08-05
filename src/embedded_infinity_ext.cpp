@@ -36,7 +36,6 @@ namespace nb = nanobind;
 using namespace infinity;
 
 NB_MODULE(embedded_infinity_ext, m) {
-    nb::bytes a;
     nb::class_<WrapUpdateExpr>(m, "WrapUpdateExpr")
         .def(nb::init<>())
         .def_rw("column_name", &WrapUpdateExpr::column_name)
@@ -79,6 +78,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("str_value", &WrapConstantExpr::str_value)
         .def_rw("i64_array_value", &WrapConstantExpr::i64_array_value)
         .def_rw("f64_array_value", &WrapConstantExpr::f64_array_value)
+        .def_rw("i64_tensor_value", &WrapConstantExpr::i64_tensor_value)
+        .def_rw("f64_tensor_value", &WrapConstantExpr::f64_tensor_value)
         .def_rw("i64_tensor_array_value", &WrapConstantExpr::i64_tensor_array_value)
         .def_rw("f64_tensor_array_value", &WrapConstantExpr::f64_tensor_array_value)
         .def_rw("i64_array_idx", &WrapConstantExpr::i64_array_idx);
@@ -148,6 +149,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("i16_array_value", &EmbeddingData::i16_array_value)
         .def_rw("i32_array_value", &EmbeddingData::i32_array_value)
         .def_rw("i64_array_value", &EmbeddingData::i64_array_value)
+        .def_rw("f16_array_value", &EmbeddingData::f16_array_value)
+        .def_rw("bf16_array_value", &EmbeddingData::bf16_array_value)
         .def_rw("f32_array_value", &EmbeddingData::f32_array_value)
         .def_rw("f64_array_value", &EmbeddingData::f64_array_value);
 
@@ -678,6 +681,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kElemInt64", EmbeddingDataType::kElemInt64)
         .value("kElemFloat", EmbeddingDataType::kElemFloat)
         .value("kElemDouble", EmbeddingDataType::kElemDouble)
+        .value("kElemFloat16", EmbeddingDataType::kElemFloat16)
+        .value("kElemBFloat16", EmbeddingDataType::kElemBFloat16)
         .value("kElemInvalid", EmbeddingDataType::kElemInvalid)
         .export_values();
 
@@ -692,4 +697,11 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kFragment", ExplainType::kFragment)
         .value("kInvalid", ExplainType::kInvalid)
         .export_values();
+
+    m.def("test_helper_float32_to_chars", [](float x) -> std::string {
+        char buffer[30];
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), x);
+        std::string result(buffer, ptr);
+        return result;
+    });
 }
