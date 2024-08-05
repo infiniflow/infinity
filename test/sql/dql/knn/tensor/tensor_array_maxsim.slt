@@ -1,0 +1,167 @@
+
+statement ok
+DROP TABLE IF EXISTS tensor_array_maxsim;
+
+statement ok
+CREATE TABLE tensor_array_maxsim (c1 int, c2 TensorArray(float,8));
+
+statement ok
+COPY tensor_array_maxsim FROM '/var/infinity/test_data/tensor_array_float_dim8.csv' WITH (DELIMITER ',', FORMAT CSV);
+
+query I
+SELECT * FROM tensor_array_maxsim;
+----
+2 [[[0.1,0.2,0.3,0,0.3,0,0.2,0.3]]]
+4 [[[0.2,0.1,0.3,0.4,0,0.3,0.2,0.1]],[[0,0.2,0,0,0.3,0,0.2,0.3]]]
+6 [[[0.3,0.2,0.1,0.4,0.4,0.3,0.2,0],[0.1,0,9.4,0.3,0.3,0.2,0.1,0.4]],[[0.4,0.3,0.2,0,0.1,0,9.4,0.3]]]
+8 [[[0.4,0,0.2,0.1,0,0.3,0.2,0.1]]]
+
+# default top 10
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim');
+----
+6 7.910000
+8 2.940001
+4 2.150001
+2 -9.349999
+
+# default top 10
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [5, -10, 0, 0, 0, 0, 11, 0], 'double', 'maxsim');
+----
+6 102.399994
+8 4.200000
+4 2.200000
+2 0.700000
+
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [1, 0, 0, 0, 0, 0, 0, 1], 'float16', 'maxsim');
+----
+6 0.700000
+8 0.500000
+2 0.400000
+4 0.300000
+
+# default top 10
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [[5, -10, 0, 0, 0, 0, 11, 0],[1, 0, 0, 0, 0, 0, 0, 1]], 'bfloat16', 'maxsim');
+----
+6 103.099991
+8 4.700000
+4 2.500000
+2 1.100000
+
+# option top 2
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [1, 0, 0, 0, 0, 0, 0, 1], 'bfloat16', 'maxsim', 'topn=2');
+----
+6 0.700000
+8 0.500000
+
+# Cleanup
+statement ok
+DROP TABLE tensor_array_maxsim;
+
+statement ok
+CREATE TABLE tensor_array_maxsim (c1 int, c2 TensorArray(float16,8));
+
+statement ok
+COPY tensor_array_maxsim FROM '/var/infinity/test_data/tensor_array_float_dim8.csv' WITH (DELIMITER ',', FORMAT CSV);
+
+# default top 10
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim');
+----
+6 7.909277
+8 2.944849
+4 2.155041
+2 -9.346167
+
+# default top 10
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [5, -10, 0, 0, 0, 0, 11, 0], 'double', 'maxsim');
+----
+6 102.381836
+8 4.198975
+4 2.199463
+2 0.699829
+
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [1, 0, 0, 0, 0, 0, 0, 1], 'float16', 'maxsim');
+----
+6 0.699951
+8 0.499878
+2 0.400024
+4 0.300049
+
+# default top 10
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [[5, -10, 0, 0, 0, 0, 11, 0],[1, 0, 0, 0, 0, 0, 0, 1]], 'bfloat16', 'maxsim');
+----
+6 103.081787
+8 4.698853
+4 2.499390
+2 1.099854
+
+# option top 2
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [1, 0, 0, 0, 0, 0, 0, 1], 'bfloat16', 'maxsim', 'topn=2');
+----
+6 0.699951
+8 0.499878
+
+# Cleanup
+statement ok
+DROP TABLE tensor_array_maxsim;
+
+statement ok
+CREATE TABLE tensor_array_maxsim (c1 int, c2 TensorArray(bfloat16,8));
+
+statement ok
+COPY tensor_array_maxsim FROM '/var/infinity/test_data/tensor_array_float_dim8.csv' WITH (DELIMITER ',', FORMAT CSV);
+
+# default top 10
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [0.0, -10.0, 0.0, 0.7, 9.2, 45.6, -55.8, 3.5], 'float', 'maxsim');
+----
+6 7.879101
+8 2.928515
+4 2.141601
+2 -9.313477
+
+# default top 10
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [5, -10, 0, 0, 0, 0, 11, 0], 'double', 'maxsim');
+----
+6 102.128906
+8 4.183594
+4 2.191406
+2 0.697266
+
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [1, 0, 0, 0, 0, 0, 0, 1], 'float16', 'maxsim');
+----
+6 0.697266
+8 0.498047
+2 0.398438
+4 0.298828
+
+# default top 10
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [[5, -10, 0, 0, 0, 0, 11, 0],[1, 0, 0, 0, 0, 0, 0, 1]], 'bfloat16', 'maxsim');
+----
+6 102.826172
+8 4.681641
+4 2.490234
+2 1.095703
+
+# option top 2
+query I
+SELECT c1, SCORE() FROM tensor_array_maxsim SEARCH MATCH TENSOR (c2, [1, 0, 0, 0, 0, 0, 0, 1], 'bfloat16', 'maxsim', 'topn=2');
+----
+6 0.697266
+8 0.498047
+
+# Cleanup
+statement ok
+DROP TABLE tensor_array_maxsim;

@@ -453,16 +453,16 @@ struct MaxSimOp<bool, bool> {
                 u32 maxsim_score = 0;
                 for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
                     const auto query_ptr = query_tensor_u32_ptr + query_i * u32_cnt;
-                    u32 max_score_i = 0;
+                    auto min_score_i = std::numeric_limits<u32>::max();
                     for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
                         const auto target_ptr = target_tensor_u32_ptr + target_j * u32_cnt;
                         u32 score_ij = 0;
                         for (u32 k = 0; k < u32_cnt; ++k) {
                             score_ij += std::popcount(query_ptr[k] ^ target_ptr[k]);
                         }
-                        max_score_i = std::max(max_score_i, score_ij);
+                        min_score_i = std::min(min_score_i, score_ij);
                     }
-                    maxsim_score += max_score_i;
+                    maxsim_score += min_score_i;
                 }
                 // hamming distance, higher score means more different
                 return -static_cast<float>(maxsim_score);
@@ -475,16 +475,16 @@ struct MaxSimOp<bool, bool> {
         u32 maxsim_score = 0;
         for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
             const auto query_ptr = query_tensor_ptr + query_i * unit_embedding_bytes;
-            u32 max_score_i = 0;
+            auto min_score_i = std::numeric_limits<u32>::max();
             for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
                 const auto target_ptr = target_tensor_ptr + target_j * unit_embedding_bytes;
                 u32 score_ij = 0;
                 for (u32 k = 0; k < unit_embedding_bytes; ++k) {
                     score_ij += std::popcount(static_cast<u32>(query_ptr[k] ^ target_ptr[k]));
                 }
-                max_score_i = std::max(max_score_i, score_ij);
+                min_score_i = std::min(min_score_i, score_ij);
             }
-            maxsim_score += max_score_i;
+            maxsim_score += min_score_i;
         }
         // hamming distance, higher score means more different
         return -static_cast<float>(maxsim_score);

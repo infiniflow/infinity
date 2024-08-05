@@ -227,25 +227,66 @@ class TestInfinity:
         res = db_obj.drop_table("test_insert_embedding", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
+        embedding_insert_float = [[1.1, 2.2, 3.3], [4.4, 5.5, 6.6], [7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]]
         db_obj.drop_table("test_insert_embedding_2", ConflictType.Ignore)
         db_obj.create_table("test_insert_embedding_2", {"c1": {"type": "vector,3,float"}}, ConflictType.Error)
         table_obj = db_obj.get_table("test_insert_embedding_2")
         assert table_obj
-        res = table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
+        res = table_obj.insert([{"c1": embedding_insert_float[0]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [4.4, 5.5, 6.6]}])
+        res = table_obj.insert([{"c1": embedding_insert_float[1]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [7.7, 8.8, 9.9]}])
+        res = table_obj.insert([{"c1": embedding_insert_float[2]}])
         assert res.error_code == ErrorCode.OK
-        res = table_obj.insert([{"c1": [-7.7, -8.8, -9.9]}])
+        res = table_obj.insert([{"c1": embedding_insert_float[3]}])
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame(
-            {'c1': ([1.1, 2.2, 3.3], [4.4, 5.5, 6.6], [7.7, 8.8, 9.9], [-7.7, -8.8, -9.9])}))
+            {'c1': embedding_insert_float}))
 
         res = db_obj.drop_table("test_insert_embedding_2", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+        db_obj.drop_table("test_insert_embedding_3", ConflictType.Ignore)
+        db_obj.create_table("test_insert_embedding_3", {"c1": {"type": "vector,3,float16"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_insert_embedding_3")
+        assert table_obj
+        res = table_obj.insert([{"c1": embedding_insert_float[0]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": embedding_insert_float[1]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": embedding_insert_float[2]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": embedding_insert_float[3]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+        pd.testing.assert_frame_equal(res, pd.DataFrame(
+            {'c1': [np.array(x).astype(np.float16).tolist() for x in embedding_insert_float]}))
+        res = db_obj.drop_table("test_insert_embedding_3", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        db_obj.drop_table("test_insert_embedding_4", ConflictType.Ignore)
+        db_obj.create_table("test_insert_embedding_4", {"c1": {"type": "vector,3,bfloat16"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_insert_embedding_4")
+        assert table_obj
+        res = table_obj.insert([{"c1": embedding_insert_float[0]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": embedding_insert_float[1]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": embedding_insert_float[2]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.insert([{"c1": embedding_insert_float[3]}])
+        assert res.error_code == ErrorCode.OK
+        res = table_obj.output(["*"]).to_df()
+        print(res)
+        tmp_bf16 = np.array(embedding_insert_float).astype('<f4')
+        tmp_bf16.view('<i2')[:, ::2] = 0
+        pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': tmp_bf16.tolist()}))
+        res = db_obj.drop_table("test_insert_embedding_4", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
     def _test_insert_big_embedding(self):
         """
         target: test insert embedding with big dimension
