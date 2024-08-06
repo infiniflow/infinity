@@ -1411,7 +1411,7 @@ table_obj.delete("c1 >= 70 and c1 <= 90")
 ## update
 
 ```python
-table_obj.update(cond = None)
+table_obj.update(cond = None, data)
 ```
 
 Searches for rows that match the specified condition and updates them accordingly.
