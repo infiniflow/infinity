@@ -47,7 +47,6 @@ class TestInfinity:
     def skip_setup_marker(self, request):
         request.node.skip_setup = True
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_export_csv(self):
         file_name = "enwiki_embedding_9999.csv"
         copy_data(file_name)
@@ -98,7 +97,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_export_csv", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_export_jsonl(self):
         file_name = "enwiki_embedding_9999.csv"
         copy_data(file_name)
@@ -149,7 +147,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_export_jsonl", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_export_fvecs(self):
         file_name = "enwiki_embedding_9999.csv"
         copy_data(file_name)
