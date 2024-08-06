@@ -452,7 +452,6 @@ class TestInfinity:
         print(res)
         db_obj.drop_table("test_import_exceeding_columns", ConflictType.Error)
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "test_default.jsonl",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_jsonl_file_with_default(self, check_data):
@@ -489,7 +488,6 @@ class TestInfinity:
         print(res)
         db_obj.drop_table("test_import_jsonl_file_with_default", ConflictType.Error)
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_import_default.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_csv_file_with_default(self, check_data):
@@ -522,7 +520,6 @@ class TestInfinity:
         print(res)
         db_obj.drop_table("test_import_csv_file_with_default", ConflictType.Error)
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_default.json",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_import_json_file_with_default(self, check_data):
