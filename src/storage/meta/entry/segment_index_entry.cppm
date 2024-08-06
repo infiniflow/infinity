@@ -273,6 +273,8 @@ private:
     ChunkID next_chunk_id_{0};
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
+
+    std::mutex mem_index_locker_{};
     SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
     SharedPtr<MemoryIndexer> memory_indexer_{};
     SharedPtr<SecondaryIndexInMem> memory_secondary_index_{};

@@ -284,6 +284,7 @@ void SegmentIndexEntry::MemIndexInsert(SharedPtr<BlockEntry> block_entry,
             break;
         }
         case IndexType::kHnsw: {
+            std::lock_guard lck(mem_index_locker_);
             if (memory_hnsw_index_.get() == nullptr) {
                 std::unique_lock<std::shared_mutex> lck(rw_locker_);
                 memory_hnsw_index_ = HnswIndexInMem::Make(begin_row_id, index_base.get(), column_def.get(), this, true /*trace*/);
@@ -355,12 +356,13 @@ SharedPtr<ChunkIndexEntry> SegmentIndexEntry::MemIndexDump(bool spill, SizeT *du
     const IndexBase *index_base = table_index_entry_->index_base();
     switch (index_base->index_type_) {
         case IndexType::kHnsw: {
-            if (memory_hnsw_index_.get() == nullptr) {
-                break;
-            }
             {
-                std::unique_lock lck(rw_locker_);
-                chunk_index_entry = std::move(*memory_hnsw_index_).Finish(this, buffer_manager_, dump_size);
+                std::lock_guard lck(mem_index_locker_);
+                if (memory_hnsw_index_.get() == nullptr) {
+                    break;
+                }
+                chunk_index_entry = memory_hnsw_index_->Dump(this, buffer_manager_, dump_size);
+                std::unique_lock lck2(rw_locker_);
                 chunk_index_entries_.push_back(chunk_index_entry);
                 memory_hnsw_index_.reset();
             }
@@ -511,13 +513,17 @@ void SegmentIndexEntry::PopulateEntirely(const SegmentEntry *segment_entry, Txn 
             break;
         }
         case IndexType::kHnsw: {
-            memory_hnsw_index_ = HnswIndexInMem::Make(base_row_id, index_base, column_def.get(), this);
-
+            auto memory_hnsw_index = HnswIndexInMem::Make(base_row_id, index_base, column_def.get(), this);
             HnswInsertConfig insert_config;
             insert_config.optimize_ = true;
-            memory_hnsw_index_->InsertVecs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_, insert_config);
+            memory_hnsw_index->InsertVecs(segment_entry, buffer_mgr, column_def->id(), begin_ts, config.check_ts_, insert_config);
 
-            dumped_memindex_entry = MemIndexDump();
+            dumped_memindex_entry = memory_hnsw_index->Dump(this, buffer_manager_);
+            dumped_memindex_entry->SaveIndexFile();
+            {
+                std::unique_lock lck(rw_locker_);
+                chunk_index_entries_.push_back(dumped_memindex_entry);
+            }
             break;
         }
         case IndexType::kSecondary: {
@@ -940,7 +946,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                     }
                 },
                 abstract_hnsw);
-            merged_chunk_index_entry = std::move(*memory_hnsw_index).Finish(this, buffer_mgr);
+            merged_chunk_index_entry = memory_hnsw_index->Dump(this, buffer_mgr);
             break;
         }
         case IndexType::kBMP: {
