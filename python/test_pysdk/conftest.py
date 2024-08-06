@@ -19,11 +19,17 @@ current_path = os.path.abspath(os.path.dirname(__file__))
 parent = os.path.join(os.getcwd(), os.pardir)
 pparent = os.path.join(parent, os.pardir)
 local_infinity_path = os.path.abspath(pparent)
+current_python_path = os.path.abspath(pparent) + '/python'
 
 print(current_path, local_infinity_path)
 
 if local_infinity_path in sys.path:
     sys.path.remove(local_infinity_path)
+
+if current_python_path in sys.path:
+    sys.path.remove(current_python_path)
+
+print(sys.path)
 
 import infinity
 import pytest

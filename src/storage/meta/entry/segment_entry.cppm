@@ -145,6 +145,7 @@ public:
     void LoadFilterBinaryData(const String &segment_filter_data);
     static String SegmentStatusToString(const SegmentStatus &type);
 
+    String ToString() const;
 public:
     // Const getter
     const TableEntry *GetTableEntry() const { return table_entry_; }
