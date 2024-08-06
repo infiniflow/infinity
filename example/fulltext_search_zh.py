@@ -18,6 +18,11 @@ This example is to connect local infinity instance, create table, insert data, s
 
 import infinity
 
+"""
+Checkout https://github.com/infiniflow/resource.git under /var/infinity (defined by 'resource_dir' of config file). The jieba dict is
+/var/infinity/resource/jieba/dict/jieba.dict.utf8
+"""
+
 try:
     # open a local directory to store the data
     infinity_instance = infinity.connect("/var/infinity")

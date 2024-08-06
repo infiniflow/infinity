@@ -1925,7 +1925,6 @@ i64 Config::FullCheckpointInterval() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kFullCheckpointInterval);
 }
 
-
 void Config::SetFullCheckpointInterval(i64 interval) {
     std::lock_guard<std::mutex> guard(mutex_);
     BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kFullCheckpointInterval);

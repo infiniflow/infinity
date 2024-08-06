@@ -83,7 +83,7 @@ class LocalInfinityClient:
 
     def create_table(self, db_name: str, table_name: str, column_defs: list[WrapColumnDef],
                      conflict_type: ConflictType = ConflictType.kError, properties: list = None):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         create_table_options = WrapCreateTableOptions()
         create_table_options.conflict_type = conflict_type
@@ -93,30 +93,30 @@ class LocalInfinityClient:
                                                         create_table_options))
 
     def drop_table(self, db_name: str, table_name: str, conflict_type: ConflictType = ConflictType.kError):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         drop_table_options = DropTableOptions()
         drop_table_options.conflict_type = conflict_type
         return self.convert_res(self.client.DropTable(db_name, table_name, drop_table_options))
 
     def get_table(self, db_name: str, table_name: str):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.GetTable(db_name, table_name))
 
     def list_tables(self, db_name: str):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ListTables(db_name), has_table_names=True)
 
     def show_table(self, db_name: str, table_name: str):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowTable(db_name, table_name))
 
     def create_index(self, db_name: str, table_name: str, index_name: str, index_info_list: list[WrapIndexInfo],
                      conflict_type: ConflictType = ConflictType.kError):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         create_index_options = CreateIndexOptions()
         create_index_options.conflict_type = conflict_type
@@ -124,25 +124,25 @@ class LocalInfinityClient:
             self.client.CreateIndex(db_name, table_name, index_name, index_info_list, create_index_options))
 
     def show_index(self, db_name: str, table_name: str, index_name: str):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowIndex(db_name, table_name, index_name))
 
     def list_indexes(self, db_name: str, table_name: str):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ListTableIndexes(db_name, table_name))
 
     def drop_index(self, db_name: str, table_name: str, index_name: str,
                    conflict_type: ConflictType = ConflictType.kError):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         drop_index_options = DropIndexOptions()
         drop_index_options.conflict_type = conflict_type
         return self.convert_res(self.client.DropIndex(db_name, table_name, index_name, drop_index_options))
 
     def insert(self, db_name: str, table_name: str, column_names: list[str], fields):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         retry = 0
         inner_ex = None
@@ -156,18 +156,18 @@ class LocalInfinityClient:
         return PyErrorCode.TOO_MANY_CONNECTIONS, "insert failed with exception: " + str(inner_ex)
 
     def import_data(self, db_name: str, table_name: str, file_name: str, import_options):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.Import(db_name, table_name, file_name, import_options))
 
     def export_data(self, db_name: str, table_name: str, file_name: str, export_options, columns: list[str]):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.Export(db_name, table_name, columns, file_name, export_options))
 
     def select(self, db_name: str, table_name: str, select_list: list[WrapParsedExpr], search_expr,
                where_expr, limit_expr, offset_expr, group_by_list=None):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.Search(db_name, table_name, select_list,
                                                    wrap_search_expr=search_expr, where_expr=where_expr,
@@ -176,54 +176,54 @@ class LocalInfinityClient:
 
     def explain(self, db_name: str, table_name: str, explain_type, select_list, search_expr,
                 where_expr, group_by_list, limit_expr, offset_expr):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.Explain(db_name, table_name, explain_type, select_list,
                                                     search_expr, where_expr),
                                 has_result_data=True)
 
     def delete(self, db_name: str, table_name: str, where_expr):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.Delete(db_name, table_name, where_expr))
 
     def update(self, db_name: str, table_name: str, where_expr, update_expr_array):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.Update(db_name, table_name, where_expr, update_expr_array))
 
     def show_tables(self, db_name: str):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowTables(db_name), has_result_data=True)
 
     def show_columns(self, db_name: str, table_name: str):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowColumns(db_name, table_name), has_result_data=True)
 
     def show_segments(self, db_name: str, table_name: str):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowSegments(db_name, table_name))
 
     def show_segment(self, db_name: str, table_name: str, segment_id: int):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowSegment(db_name, table_name, segment_id))
 
     def show_blocks(self, db_name: str, table_name: str, segment_id: int):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowBlocks(db_name, table_name, segment_id))
 
     def show_block(self, db_name: str, table_name: str, segment_id: int, block_id: int):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowBlock(db_name, table_name, segment_id, block_id))
 
     def show_block_column(self, db_name: str, table_name: str, segment_id: int, block_id: int, column_id: int):
-        if self.client == None:
+        if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowBlockColumn(db_name, table_name, segment_id, block_id, column_id))
     
