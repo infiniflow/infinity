@@ -25,7 +25,7 @@ class BufferManager;
 class ColumnDef;
 class ChunkIndexEntry;
 class SegmentIndexEntry;
-class SegmentEntry;
+struct SegmentEntry;
 class IndexBase;
 class EMVBIndex;
 struct Bitmask;

@@ -155,6 +155,56 @@ bool PhysicalCommand::Execute(QueryContext *query_context, OperatorState *operat
                             config->SetRecordRunningQuery(flag);
                             break;
                         }
+                        case GlobalOptionIndex::kCleanupInterval: {
+                            i64 interval = set_command->value_int();
+                            if(interval < 0) {
+                                Status status = Status::InvalidCommand(fmt::format("Attempt to set cleanup interval: {}", interval));
+                                RecoverableError(status);
+                            }
+                            query_context->storage()->periodic_trigger_thread()->cleanup_trigger_->UpdateInternal(interval);
+                            config->SetCleanupInterval(interval);
+                            break;
+                        }
+                        case GlobalOptionIndex::kFullCheckpointInterval: {
+                            i64 interval = set_command->value_int();
+                            if(interval < 0) {
+                                Status status = Status::InvalidCommand(fmt::format("Attempt to set full checkpoint interval: {}", interval));
+                                RecoverableError(status);
+                            }
+                            query_context->storage()->periodic_trigger_thread()->full_checkpoint_trigger_->UpdateInternal(interval);
+                            config->SetFullCheckpointInterval(interval);
+                            break;
+                        }
+                        case GlobalOptionIndex::kDeltaCheckpointInterval: {
+                            i64 interval = set_command->value_int();
+                            if(interval < 0) {
+                                Status status = Status::InvalidCommand(fmt::format("Attempt to set delta checkpoint interval: {}", interval));
+                                RecoverableError(status);
+                            }
+                            query_context->storage()->periodic_trigger_thread()->delta_checkpoint_trigger_->UpdateInternal(interval);
+                            config->SetDeltaCheckpointInterval(interval);
+                            break;
+                        }
+                        case GlobalOptionIndex::kCompactInterval: {
+                            i64 interval = set_command->value_int();
+                            if(interval < 0) {
+                                Status status = Status::InvalidCommand(fmt::format("Attempt to set compact segment interval: {}", interval));
+                                RecoverableError(status);
+                            }
+                            query_context->storage()->periodic_trigger_thread()->compact_segment_trigger_->UpdateInternal(interval);
+                            config->SetCompactInterval(interval);
+                            break;
+                        }
+                        case GlobalOptionIndex::kOptimizeIndexInterval: {
+                            i64 interval = set_command->value_int();
+                            if(interval < 0) {
+                                Status status = Status::InvalidCommand(fmt::format("Attempt to set optimize interval interval: {}", interval));
+                                RecoverableError(status);
+                            }
+                            query_context->storage()->periodic_trigger_thread()->optimize_index_trigger_->UpdateInternal(interval);
+                            config->SetOptimizeInterval(interval);
+                            break;
+                        }
                         case GlobalOptionIndex::kInvalid: {
                             Status status = Status::InvalidCommand(fmt::format("Unknown config: {}", set_command->var_name()));
                             RecoverableError(status);
