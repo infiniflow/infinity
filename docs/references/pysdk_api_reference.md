@@ -598,7 +598,7 @@ res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 ## create_index
 
 ```python
-Table.create_index(index_name, index_infos, conflict_type = ConflictType.Error)
+table_obj.create_index(index_name, index_infos, conflict_type = ConflictType.Error)
 ```
 
 Creates index on a specified column or on multiple columns.  
@@ -972,7 +972,7 @@ table_obj.create_index(
 ## drop_index
 
 ```python
-Table.drop_index(index_name, conflict_type = ConflictType.Error)
+table_obj.drop_index(index_name, conflict_type = ConflictType.Error)
 ```
 
 Deletes an index by its name.
@@ -1023,7 +1023,7 @@ table_obj.drop_index("my_index")
 ## show_index
 
 ```python
-Table.show_index(index_name)
+table_obj.show_index(index_name)
 ```
 
 Retrieves the metadata of an specified index.
@@ -1212,7 +1212,7 @@ table_obj.insert([{"tensor_array_column": [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0]
 ## import_data
 
 ```python
-Table.import_data(filepath, import_options)
+table_obj.import_data(filepath, import_options)
 ```
 
 Imports data from a specified file into the current table. 
@@ -1272,7 +1272,7 @@ table_obj.import_data(os.getcwd() + "/your_file.jsonl", {"file_type": "csv"})
 ## export_data
 
 ```python
-Table.export_data(filepath, export_options, columns = None)
+table_obj.export_data(filepath, export_options, columns = None)
 ```
 
 Exports the current table to a specified file. 
@@ -1344,10 +1344,10 @@ table_obj.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl",
 ## delete
 
 ```python
-Table.delete(cond = None)
+table_obj.delete(cond = None)
 ```
 
-Deletes rows by condition.
+Deletes rows from the table based on the specified condition.
 
 ### Parameters
 
@@ -1356,7 +1356,7 @@ Deletes rows by condition.
 A condition or filter that determines which rows to delete from the table. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
 
 :::tip NOTE
-- The `cond` parameter currently supports 'and' and 'or' logical expressions only. Additional expressions like 'between' and 'in' will be available soon.
+- The `cond` parameter currently supports 'and' and 'or' logical expressions only. Additional expressions like 'between' and 'in' will be available in future updates.
 - `cond` must not be an empty string.
 :::
 
@@ -1392,25 +1392,13 @@ table_obj.delete(None)
 # - Vector column "vec"
 table_obj = db_instance.create_table("my_table", {"c1": {"type": "integer"}, "vec": {"type": "vector,4,float"},})
 # Insert two rows of data into the "my_table"
-table_obj.insert(
-[
-        {
-            "c1": 90,
-            "vec": [1.0, 1.2, 0.8, 0.9],
-        },
-        {
-            "c1": 80,
-            "vec": [4.0, 4.2, 4.3, 4.5],
-        },
-    ]
-)
+table_obj.insert([{"c1": 90, "vec": [1.0, 1.2, 0.8, 0.9],}, {"c1": 80, "vec": [4.0, 4.2, 4.3, 4.5],},])
 # Delete rows where "c1" equals 1
 table_obj.delete("c1 = 90")
 ```
 
 ```python
-# Create a table named "my_table" with one column:
-# - Integer column "c1"
+# Create a table named "my_table" with one integer column "c1"
 table_obj = db_instance.create_table("my_table", {"c1": {"type": "integer"}})
 # Insert three rows of data into the "my_table"
 table_obj.insert([{"c1": 90}, {"c1": 80}, {"c1": 95}])
@@ -1423,22 +1411,20 @@ table_obj.delete("c1 >= 70 and c1 <= 90")
 ## update
 
 ```python
-Table.update(cond = None)
+table_obj.update(cond = None, data)
 ```
 
 Searches for rows that match the specified condition and updates them accordingly.
 
 ### Parameters
 
-#### cond: `str` (not empty), *Required* 
+#### cond: `str` (not empty), *Required*
 
-A condition that specifies which rows to update. This parameter should be a non-empty string representing a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated. 
+A condition that specifies which rows to update. This parameter should be a non-empty string representing a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated.
 
-#### data: `list[dict[str, Union[str, int, float]]]`
+#### data: `list[dict[str, Any]]]` (not empty), *Required*
 
-A list of dict where key indicates column, value indicates new value. Must not be empty.
-
-> Infinity does not support updating column with vector data type.
+A list of dictionaries where each key indicates a column name and each value indicates the new value for the corresponding cell. This list must not be empty.
 
 ### Returns
 
@@ -1466,13 +1452,13 @@ table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 ## output
 
 ```python
-Table.output(columns)
+table_obj.output(columns)
 ```
 Specify the columns to display in the search output, or perform aggregation operations or arithmetic calculations. 
 
 ### Parameters
 
-#### columns: `list[str]`, *Required* 
+#### columns: `list[str]`, *Required*
 
 Must not be empty. Supported aggragation functions:
 
@@ -1484,8 +1470,7 @@ Must not be empty. Supported aggragation functions:
   
 ### Returns
 
-- Success: self `Table`
-- Failure: `Exception`
+An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
 ### Examples
 
@@ -1502,7 +1487,7 @@ table_obj.output(["c1+5"])
 ## filter
 
 ```python
-Table.filter(cond)
+table_obj.filter(cond)
 ```
 
 Creates a filtering condition expression.
@@ -1528,10 +1513,10 @@ table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 ## knn
 
 ```python
-Table.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
+table_obj.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
 ```
 
-Builds a KNN search expression. Find the top n closet rows to the given vector.
+Conducts a KNN vector search, finding the top n closet rows to the given vector.
 
 ### Parameters
 
@@ -1572,7 +1557,7 @@ table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 ## match sparse
 
 ```python
-Table.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params = None)
+table_obj.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params = None)
 ```
 
 ### Parameters
@@ -1645,7 +1630,7 @@ for question in questions:
 ## match tensor
 
 ```python
-Table.match_tensor(vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)
+table_obj.match_tensor(vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)
 ```
 
 Builds a KNN tensor search expression. Find the top n closet rows to the given tensor according to chosen method.
@@ -1695,7 +1680,7 @@ match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim
 ## fusion
 
 ```python
-Table.fusion(method, options_text = '')
+table_obj.fusion(method, options_text = '')
 ```
 
 Builds a fusion expression.
@@ -1754,7 +1739,7 @@ table_obj.fusion('match_tensor', 'topn=2', make_match_tensor_expr('t', [[0.0, -1
 ## optimize
 
 ```python
-Table.optimize(index_name, opt_params)
+table_obj.optimize(index_name, opt_params)
 ```
 
 ### Parameters
@@ -1782,19 +1767,19 @@ table_obj.optimize('bmp_index_name', {'topk': '10'})
 ## get result
 
 ```python
-Table.to_result()
+table_obj.to_result()
 ```
 
 ```python
-Table.to_df()
+table_obj.to_df()
 ```
 
 ```python
-Table.to_pl()
+table_obj.to_pl()
 ```
 
 ```python
-Table.to_arrow()
+table_obj.to_arrow()
 ```
 
 After querying, these four methods above can get result into specific type. 
