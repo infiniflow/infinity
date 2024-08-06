@@ -415,7 +415,7 @@ class http_adapter:
         self.raise_exception(r)
         return self
 
-    def export_data(self,data_path = "", export_options = {}):
+    def export_data(self,data_path = "", export_options = {}, columns = []):
         data = {}
         data["file_path"] = data_path
         data["file_type"] = "csv"
@@ -427,11 +427,19 @@ class http_adapter:
             data["header"] = export_options["header"]
         if "delimiter" in export_options:
             data["delimiter"] = export_options["delimiter"]
+        if "offset" in export_options:
+            data["offset"] = export_options["offset"]
+        if "limit" in export_options:
+            data["limit"] = export_options["limit"]
+        if "row_limit" in export_options:
+            data["row_limit"] = export_options["row_limit"]
 
-        url = f"databases/{self.database_name}/tables/{self.table_name}"
+        data["columns"] = columns
+
+        url = f"databases/{self.database_name}/table/{self.table_name}"
         h = self.set_up_header(["accept", "content-type"])
         d = self.set_up_data([], data)
-        r = self.request(url, "put", h, d)
+        r = self.request(url, "get", h, d)
         self.raise_exception(r)
         return self
 

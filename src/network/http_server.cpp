@@ -571,13 +571,16 @@ public:
                 export_options.copy_file_type_ = CopyFileType::kCSV;
             } else if (file_type_str == "jsonl") {
                 export_options.copy_file_type_ = CopyFileType::kJSONL;
-            } else {
+            } else if (file_type_str == "fvecs"){
+                export_options.copy_file_type_ = CopyFileType::kFVECS;
+            }
+            else {
                 json_response["error_code"] = ErrorCode::kNotSupported;
                 json_response["error_message"] = fmt::format("Not supported file type {}", file_type_str);
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
-            if (export_options.copy_file_type_ == CopyFileType::kCSV) {
+            if (json_response["error_code"] != ErrorCode::kNotSupported) {
                 if (http_body_json.contains("header")) {
                     export_options.header_ = http_body_json["header"];
                 }
@@ -603,7 +606,6 @@ public:
                 }
             }
             String file_path = http_body_json["file_path"];
-
             Vector<ParsedExpr *> *export_columns{nullptr};
             DeferFn defer_fn([&]() {
                 if (export_columns != nullptr) {
