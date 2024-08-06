@@ -116,14 +116,23 @@ Creates a database with a specified name.
 
 #### db_name: `str`, *Required*
 
-Name of the database. Must not be empty. 
+The name of the database. `database_name` requirements:
+
+- Maximum 65,535 characters.
+- Must not be empty.
+- Case-insensitive.
+- Must begin with an English letter or underscore.
+- Allowed characters:
+  - English letters (a-z, A-Z)
+  - Digits (0-9)
+  - "_" (underscore)
 
 #### conflict_type: `ConflictType`, *Optional*
 
 Conflict policy in `enum` for handling situations where a database with the same name exists. 
 
-  - `Error`: Raise an error if a database with the same name exists.
-  - `Ignore`: Ignore the database creation requrest and keep the database with the same name as-is.
+- `Error`: Raise an error if a database with the same name exists.
+- `Ignore`: Ignore the database creation requrest and keep the database with the same name as-is.
 
 :::tip NOTE
 You may want to import the `infinity.common` package to set `ConflictType`:
@@ -247,9 +256,9 @@ A structure containing the following attributes:
 
 - `db_names`: `list[str]` A list of all database names.
 - `error_code`: `int` An error code indicating the result of the operation.
-  - `0`: The operation succeeds. 
-  - A non-zero value: A specific error condition occurs. 
-- `error_msg`: `str` The error message providing additional details. 
+  - `0`: The operation succeeds.
+  - A non-zero value: A specific error condition occurs.
+- `error_msg`: `str` The error message providing additional details.
 
 ### Examples
 
@@ -337,7 +346,16 @@ Creates a table with a specified name and defined columns.
 
 #### table_name: `str`, *Required*
 
-Name of the table. Must not be empty.
+The name of the table. `table_name` requirements: 
+
+- Maximum 65,535 characters.
+- Must not be empty.
+- Case-insensitive.
+- Must begin with an English letter or underscore.
+- Allowed characters: 
+  - English letters (a-z, A-Z)
+  - Digits (0-9)
+  - "_" (underscore)
 
 #### columns_definition: `dict[str, dict[str, Any]]`, *Required*
 
@@ -583,7 +601,11 @@ res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 Table.create_index(index_name, index_infos, conflict_type = ConflictType.Error)
 ```
 
-Creates index on a specified column.  
+Creates index on a specified column or on multiple columns.  
+
+:::danger NOTE
+For now, it is only possible to create a full-text index on multiple columns.
+:::
 
 ### Parameters
 
@@ -1004,7 +1026,7 @@ table_obj.drop_index("my_index")
 Table.show_index(index_name)
 ```
 
-Retrieves the metadata of an index by name.
+Retrieves the metadata of an specified index.
 
 ### Parameters
 
@@ -1014,18 +1036,18 @@ The name of the index to look up.
 
 ### Returns
 
-- Success: A structure containing the following attributes: 
-    - **error_code**: `int` - `0` indicating that the operation succeeds. 
-    - **error_msg**: `str` - An empty string.
-    - **db_name**: `str` - The database name.
-    - **table_name**: `str` - The table name.
-    - **index_name**: `str` - The index name.
-    - **index_type**: `str` - The index type.
-    - **index_column_names**: `str` - Names of the columns for building the index.
-    - **index_column_ids**: `str` - IDs of the columns for building the index.
-    - **other_parameters**: `str` - Parameters necessary for index creation.
-    - **store_dir**: `str` - The directory holding the index files. 
-    - **segment_index_count**: `str` - Number of segments of the index.
+- Success: A structure containing the following attributes:
+    - `error_code`: `int` - `0` indicating that the operation succeeds.
+    - `error_msg`: `str` - An empty string.
+    - `db_name`: `str` - The database name.
+    - `table_name`: `str` - The table name.
+    - `index_name`: `str` - The index name.
+    - `index_type`: `str` - The index type.
+    - `index_column_names`: `str` - Names of the columns for building the index.
+    - `index_column_ids`: `str` - IDs of the columns for building the index.
+    - `other_parameters`: `str` - Parameters necessary for creating the index.
+    - `store_dir`: `str` - The directory holding the index files.
+    - `segment_index_count`: `str` - Number of segments of the index.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value: A specific error condition occurs.
   - `error_msg`: `str` The error message providing additional details.
@@ -1067,24 +1089,19 @@ Lists the indexes built on the current table.
 
 ### Returns
 
-- Success: `metadata` : Metadata of the table. See `ListIndexResponse`. A field named index_name is a list of the retrieved index names.
-- Failure: `InfinityException`
-  - `error_code`: `int` A non-zero value: A specific error condition occurs.
-  - `error_msg`: `str` The error message providing additional details.
-
 A structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
   - `0`: The operation succeeds. 
-  - A non-zero value: A specific error condition occurs. 
+  - A non-zero value: A specific error condition occurs.
 - `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
-- `table_names`: `list[str]` A list of index names. 
+- `table_names`: `list[str]` A list of index names.
 
 ### Examples
 
 ```python
 res = table_obj.list_indexes()
-res.index_names # ['my_index']
+res.index_names # ['my_index', 'tensor_index', 'sparse_index']
 ```
 
 ---
@@ -1106,7 +1123,7 @@ Data to insert. Infinity supports inserting multiple rows to a table at one time
 Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at once. 
 :::
 
-:::note
+:::tip NOTE
 When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table`. Otherwise, an error will occur.  
 For information about setting default column values, see `create_table`.
 :::
@@ -1334,8 +1351,11 @@ Deletes rows by condition.The condition is similar to the WHERE conditions in SQ
 
 ### Parameters
 
-- **cond : str**
-`note : cond has only supported 'and' and 'or' conjunction expression by now. more functions like 'between and', 'in' are comming soon` 
+#### cond: `str`, *Optional*
+
+:::tip NOTE
+cond has only supported 'and' and 'or' conjunction expression by now. more functions like 'between and', 'in' are comming soon`.
+:::
 
 ### Returns
 
@@ -1343,6 +1363,7 @@ Deletes rows by condition.The condition is similar to the WHERE conditions in SQ
 - Failure: `Exception`
 
 ### Examples
+
 ```python
 table_obj.delete("c1 = 1")
 table_obj.delete()
@@ -1360,10 +1381,15 @@ Searches for rows that match the specified condition and update them accordingly
 
 ### Parameters
 
-#### cond: `str` (not empty)
-- **data : list[dict[str, Union[str, int, float]]](not empty)**
-a list of dict where key indicates column, value indicates new value.
-> Infinity does not support updating column with vector datatype.
+#### cond: `str` 
+
+Must not be empty.
+
+#### data: `list[dict[str, Union[str, int, float]]]`
+
+A list of dict where key indicates column, value indicates new value. Must not be empty.
+
+> Infinity does not support updating column with vector data type.
 
 ### Returns
 
@@ -1383,8 +1409,28 @@ table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 
 ```python
 Table.output(columns)
-Specify the columns to display in the search output, or perform aggregation operations or arithmetic calculations. 
 ```
+Specify the columns to display in the search output, or perform aggregation operations or arithmetic calculations. 
+
+### Parameters
+
+#### columns: `list[str]`, *Required* 
+
+Must not be empty. Supported aggragation functions:
+
+- count
+- min
+- max
+- sum
+- avg
+  
+### Returns
+
+- Success: self `Table`
+- Failure: `Exception`
+
+### Examples
+
 ```python
 table_obj.output(["*"])
 table_obj.output(["num", "body"])
@@ -1392,22 +1438,6 @@ table_obj.output(["_row_id"])
 table_obj.output(["avg(c2)"])
 table_obj.output(["c1+5"])
 ```
-
-### Parameters
-
-#### columns: `list[str]`, *Required* 
-
-Must not be empty. Supported aggragation functions:
-    - count
-    - min
-    - max
-    - sum
-    - avg
-  
-### Returns
-
-- Success: self `Table`
-- Failure: `Exception`
 
 ---
 
@@ -1421,7 +1451,7 @@ Creates a filtering condition expression.
 
 ### Parameters
 
-- **cond : str**
+#### cond: `str`
 `cond` has only supported 'and' and 'or' conjunction expression for now. 
 
 ### Returns
@@ -1489,11 +1519,14 @@ Table.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_par
 
 ### Parameters
 
-- **vector_column_name : str**
-- **sparse_data** : `{"indices": list[int], "values": Union(list[int], list[float])}`
-- **distance_type : str**
+#### vector_column_name: `str`
+
+#### sparse_data: `{"indices": list[int], "values": Union(list[int], list[float])}`
+
+#### distance_type: `str`
   -  `'ip'`
-- **topn : int**
+
+#### topn: `int`
 - **opt_params : dict[str, str]**
     common options:
       - 'alpha=0.0~1.0'(default: 1.0): A "Termination Conditions" parameter. The smaller the value, the more aggressive the pruning.
@@ -1518,10 +1551,13 @@ Creates a full-text search expression.
 
 ### Parameters
 
-- **fields : str**
-    The column where text is searched, and has create full-text index on it before. 
-- **matching_text : str**
-- **options_text : str**
+#### fields: `str`
+
+The column where text is searched, and has create full-text index on it before. 
+
+#### matching_text: `str`
+
+#### options_text: `str`
     'topn=2': Retrieve the two most relevant rows. The `topn` is `10` by default.
 
 ### Returns
@@ -1560,13 +1596,22 @@ For example, find k most match tensors generated by ColBERT.
 
 ### Parameters
 
-- **vector_column_name : str**
-- **tensor_data : list/np.ndarray**
-- **tensor_data_type : str**
-- **method_type : str**
-    -  `'maxsim'`
+#### vector_column_name: `str`
 
-- **extra_option : str** options seperated by ';'
+
+#### tensor_data: `list/np.ndarray`
+
+
+#### tensor_data_type: `str`
+
+
+#### method_type: `str`
+
+-  `'maxsim'`
+
+#### extra_option: `str` 
+
+Options seperated by ';'
     - `'topn'`
     - **EMVB index options**
         - `'emvb_centroid_nprobe'`
@@ -1609,13 +1654,13 @@ The supported methods, including:
 
 #### options_text: `str`
 
-- **Common options**:
+- `Common options`:
     - 'topn=10': Retrieve the 10 most relevant rows. The defualt value is `100`.
 
-- **rrf-specific options**:
+- `rrf-specific options`:
     - 'rank_constant=30': The default value is `60`.
 
-- **weighted_sum-specific options**:
+- `weighted_sum-specific options`:
     - 'weights=1,2,0.5': The weights of children scorers. The default weight of each weight is `1.0`.
 
 ### Returns
@@ -1656,9 +1701,11 @@ Table.optimize(index_name, opt_params)
 
 ### Parameters
 
-- **index_name : str**
-- **opt_params : dict[str, str]**
-    Common options:
+#### index_name: `str`
+
+#### opt_params: `dict[str, str]`
+    
+#### Common options: `str`
   - 'topk=10': Optimize the BMP index for top 10. Used only when the index is BMP.
 
 ### Returns
