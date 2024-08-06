@@ -1036,10 +1036,6 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp &max_commit_ts, String &delta_catalo
     delta_catalog_name = CatalogFile::DeltaCheckpointFilename(max_commit_ts);
     String full_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
 
-    if (flush_delta_entry->operations().empty()) {
-        LOG_TRACE("Save delta catalog ops is empty. Skip flush.");
-        return true;
-    }
     LOG_DEBUG(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
 
     for (auto &op : flush_delta_entry->operations()) {

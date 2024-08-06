@@ -535,11 +535,7 @@ TxnTimeStamp Txn::DeltaCheckpoint() {
     String delta_path, delta_name;
     // only save the catalog delta entry
     TxnTimeStamp max_commit_ts = 0; // the max_commit_ts is determined by the max commit ts of flushed delta entry
-    bool skip = catalog_->SaveDeltaCatalog(max_commit_ts, delta_path, delta_name);
-    if (skip) {
-        LOG_INFO("No delta catalog file is written");
-        return 0;
-    }
+    catalog_->SaveDeltaCatalog(max_commit_ts, delta_path, delta_name);
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path, delta_name));
     return max_commit_ts;
 }

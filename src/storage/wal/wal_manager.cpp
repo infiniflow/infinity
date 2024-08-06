@@ -356,12 +356,11 @@ void WalManager::DeltaCheckpointInner(Txn *txn) {
                               txn->BeginTS(),
                               max_commit_ts));
         auto new_max_commit_ts = txn->DeltaCheckpoint();
-        if (new_max_commit_ts == 0) {
-            last_ckp_ts_ = max_commit_ts;
-            return;
+        if (new_max_commit_ts != 0) {
+            max_commit_ts = new_max_commit_ts;
+            SetLastCkpWalSize(wal_size);
         }
-        max_commit_ts = new_max_commit_ts;
-        SetLastCkpWalSize(wal_size);
+        
 
         LOG_DEBUG(fmt::format("Delta Checkpoint is done for commit_ts <= {}", max_commit_ts));
     } catch (RecoverableException &e) {
