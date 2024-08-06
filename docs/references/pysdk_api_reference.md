@@ -1424,7 +1424,7 @@ A condition that specifies which rows to update. This parameter should be a non-
 
 #### data: `list[dict[str, Any]]]` (not empty), *Required*
 
-A list of dictionaries where each key indicates a column name and each value indicates the new value for the corresponding cell. This list must not be empty. Note that updating columns with a vector data type is not yet supported.
+A list of dictionaries where each key indicates a column name and each value indicates the new value for the corresponding cell. This list must not be empty.
 
 ### Returns
 
