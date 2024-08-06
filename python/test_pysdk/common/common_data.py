@@ -2,6 +2,7 @@ from infinity.common import ConflictType, InfinityException
 import infinity.index as index
 from numpy import dtype
 import ast
+from enum import Enum
 
 default_url = "http://localhost:23820/"
 
@@ -26,6 +27,7 @@ unsupport_output = ["_similarity", "_row_id", "_score", "_distance"]
 
 type_transfrom = {
     "int":"integer",
+    "uint8":"uint8",
     "int8":"tinyint",
     "int16":"smallint",
     "int32":"integer",
@@ -136,4 +138,57 @@ tableDefaultData = {
                     "score"
                 }
         }
+}
+
+
+'''
+enum class LiteralType : int32_t {
+    kBoolean,
+    kDouble,
+    kString,
+    kInteger,
+    kNull,
+    kDate,
+    kTime,
+    kDateTime,
+    kTimestamp,
+    kIntegerArray,
+    kDoubleArray,
+    kSubArrayArray,
+    kInterval,
+    kLongSparseArray,
+    kDoubleSparseArray,
+    kEmptyArray,
+};
+'''
+class literaltype(Enum):
+    kBoolean = 0
+    kDouble = 1
+    kString = 2
+    kInteger = 3
+    kNull = 4
+    kDate = 5
+    kTime= 6
+    kDateTime = 7
+    kTimestamp = 8
+    kIntegerArray = 9
+    kDoubleArray = 10
+    kSubArrayArray = 11
+    kInterval = 12
+    kLongSparseArray = 13
+    kDoubleSparseArray = 14
+    kEmptyArray = 15
+
+type_to_literaltype = {
+    "boolean" : literaltype.kBoolean.value,
+    "int" : literaltype.kInteger.value,
+    "integer" : literaltype.kInteger.value,
+    "float" : literaltype.kDouble.value,
+    "double": literaltype.kDouble.value
+}
+
+type_to_vector_literaltype = {
+    "integer": literaltype.kIntegerArray.value,
+    "float": literaltype.kDoubleArray.value,
+    "double": literaltype.kDoubleArray.value
 }
