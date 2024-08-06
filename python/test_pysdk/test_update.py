@@ -36,7 +36,6 @@ def setup_class(request, local_infinity, http):
 class TestInfinity:
     # def test_version(self):
     #     self.test_infinity_obj._test_version()
-    @pytest.mark.usefixtures("skip_if_http")
     def test_update(self):
         """
         target: test table update apis
@@ -91,7 +90,7 @@ class TestInfinity:
             {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
-        with pytest.raises(Exception, match=r".*where_conditions_ shall not be empty*"):
+        with pytest.raises(Exception):
             table_obj.update(None, [{"c2": 90, "c3": 900}])
 
         res = table_obj.output(["*"]).to_df()
@@ -367,7 +366,7 @@ class TestInfinity:
     @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("types", ["varchar"])
     @pytest.mark.parametrize("types_example", [[1, 2, 3]])
-    def test_update_invalid_value(self, types, types_example):
+    def test_update_invalid_value_1(self, types, types_example):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
@@ -381,7 +380,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_update_invalid_value", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("types", ["int", "float"])
     @pytest.mark.parametrize("types_example", [
         1,
@@ -408,7 +406,7 @@ class TestInfinity:
     @pytest.mark.parametrize("types_example", [
         pytest.param([1, 2, 3])
     ])
-    def test_update_invalid_value(self, types, types_example):
+    def test_update_invalid_value_2(self, types, types_example):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)

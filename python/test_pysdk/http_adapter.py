@@ -212,7 +212,7 @@ class http_adapter:
                 else:
                     tmp[param_name] = columns_definition[col][param_name]
             fields.append(tmp)
-        print(fields)
+        #print(fields)
 
         url = f"databases/{self.database_name}/tables/{table_name}"
         h = self.set_up_header(["accept", "content-type"])
@@ -226,7 +226,7 @@ class http_adapter:
         r = self.request(url, "post", h, d)
         self.raise_exception(r)
         self.table_name = table_name
-        return self
+        return database_result(database_name=self.database_name, table_name=self.table_name)
 
 
     def drop_table(
@@ -262,7 +262,7 @@ class http_adapter:
         r = self.request(url, "get", h)
         self.raise_exception(r)
         self.table_name = table_name
-        return self
+        return database_result(database_name=self.database_name, table_name=self.table_name)
 
     def get_all_tables(self):
         url = f"databases/{self.database_name}/tables"
@@ -329,8 +329,8 @@ class http_adapter:
         index["type"] = index_type_transfrom[index_info[0].index_type]
         for param in index_info[0].params:
             index[param.param_name] = param.param_value
-        print(fields)
-        print(index)
+        #print(fields)
+        #print(index)
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
         h = self.set_up_header(
@@ -453,7 +453,7 @@ class http_adapter:
             tmp.update({"fusion": self._fusion})
         if len(self._knn):
             tmp.update({"knn": self._knn})
-        print(tmp)
+        #print(tmp)
         d = self.set_up_data([], tmp)
         r = self.request(url, "get", h, d)
         self.raise_exception(r)
@@ -508,6 +508,12 @@ class http_adapter:
         for output_col in self._output:
             if output_col in col_types:
                 df_dict[output_col] = ()
+        #when output["*"] and output_res is empty
+        for output_col in self._output:
+            if output_col == "*":
+                for col in col_types:
+                    df_dict[col] = ()
+
         for res in self.output_res:
             for k in res:
                 if k not in df_dict:
@@ -520,8 +526,9 @@ class http_adapter:
                 else:
                     new_tup = tup + (res[k],)
                 df_dict[k] = new_tup
-        print(self.output_res)
-        print(df_dict)
+        #print(self.output_res)
+        #print(df_dict)
+
         df_type = {}
         for k in df_dict:
             if k in col_types:# might be object
@@ -530,10 +537,15 @@ class http_adapter:
             k1 = k.replace("(", "")
             k1 = k1.replace(")", "")
             cols = k1.split("+") + k1.split("-") #["c1 ", " c2", "c1 + c2"]
-            print(cols)
+            #print(cols)
+            #haven't considered data type priority
             for col in cols:
                 if col.strip() in col_types:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
+                if col.strip().isdigit():
+                    df_type[k] = dtype('int32')
+                if isfloat(col.strip()):
+                    df_type[k] = dtype('float64')
         return pd.DataFrame(df_dict).astype(df_type)
 
     def to_arrow(self):
