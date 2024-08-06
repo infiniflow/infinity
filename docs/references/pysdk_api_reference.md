@@ -1351,12 +1351,13 @@ Deletes rows by condition.
 
 ### Parameters
 
-#### cond: `str`, *Optional*
+#### cond: `str` (not empty), *Optional*
 
 A condition or filter that determines which rows to delete from the table. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
 
 :::tip NOTE
-The `cond` parameter currently supports 'and' and 'or' logical expressions only. Additional expressions like 'between' and 'in' will be available soon.
+- The `cond` parameter currently supports 'and' and 'or' logical expressions only. Additional expressions like 'between' and 'in' will be available soon.
+- `cond` must not be an empty string.
 :::
 
 ### Returns
@@ -1394,20 +1395,30 @@ table_obj = db_instance.create_table("my_table", {"c1": {"type": "integer"}, "ve
 table_obj.insert(
 [
         {
-            "c1": 1,
+            "c1": 90,
             "vec": [1.0, 1.2, 0.8, 0.9],
         },
         {
-            "c1": 2,
+            "c1": 80,
             "vec": [4.0, 4.2, 4.3, 4.5],
         },
     ]
 )
-# Delete rows whose "c1" equal 1
-table_obj.delete("c1 = 1")
+# Delete rows where "c1" equals 1
+table_obj.delete("c1 = 90")
 ```
 
-
+```python
+a = 90
+c = 70
+# Create a table named "my_table" with one column:
+# - Integer column "c1"
+table_obj = db_instance.create_table("my_table", {"c1": {"type": "integer"}})
+# Insert three rows of data into the "my_table"
+table_obj.insert([{"c1": 90}, {"c1": 80}, {"c1": 95}])
+# Delete rows where "c1" is between 70 and 90 (inclusive)
+table_obj.delete(f"c1 >= {c} and c1 <= {a}")
+```
 
 ---
 
@@ -1417,13 +1428,13 @@ table_obj.delete("c1 = 1")
 Table.update(cond = None)
 ```
 
-Searches for rows that match the specified condition and update them accordingly.
+Searches for rows that match the specified condition and updates them accordingly.
 
 ### Parameters
 
-#### cond: `str` 
+#### cond: `str` (not empty), *Optional* 
 
-Must not be empty.
+A condition that specifies which rows to update. This parameter should be a non-empty string representing a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated. If `cond` is not provided or set to `None`, the method will not perform any updates.
 
 #### data: `list[dict[str, Union[str, int, float]]]`
 
@@ -1433,13 +1444,22 @@ A list of dict where key indicates column, value indicates new value. Must not b
 
 ### Returns
 
-- Success: `True`
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds.
+  - A non-zero value: A specific error condition occurs.
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds.
 
 ### Examples
 
 ```python
+# Update rows where column "c1" equals 1, setting "c2" to 90 and "c3" to 900
 table_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
+```
+
+```python
+# Update rows where column "c1" is greater than 2, setting "c2" to 100 and "c3" to 1,000
 table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 ```
 
