@@ -88,6 +88,8 @@ public:
 
     const SharedPtr<ColumnVector> &column_vector(SizeT col_id) const { return block_iter_->column_vector(col_id); }
 
+    SizeT offset() const { return block_idx_ * DEFAULT_BLOCK_CAPACITY + block_iter_->offset(); }
+
 private:
     const SegmentEntry *const entry_;
     BufferManager *const buffer_mgr_;
@@ -114,8 +116,27 @@ public:
         return None;
     }
 
+    SizeT offset() const { return segment_iter_.offset(); }
+
 private:
     SegmentIter<CheckTS> segment_iter_;
+};
+
+export template <typename DataType, bool CheckTS>
+class CappedOneColumnIterator : public OneColumnIterator<DataType, CheckTS> {
+public:
+    CappedOneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts, SizeT cap)
+        : OneColumnIterator<DataType, CheckTS>(entry, buffer_mgr, column_id, iterate_ts), cap_(cap) {}
+
+    Optional<Pair<const DataType *, SegmentOffset>> Next() {
+        if (this->offset() >= cap_) {
+            return None;
+        }
+        return OneColumnIterator<DataType, CheckTS>::Next();
+    }
+
+private:
+    SizeT cap_;
 };
 
 export template <typename DataType, typename IdxType, bool CheckTS>
@@ -150,6 +171,23 @@ public:
 
 private:
     SegmentIter<CheckTS> segment_iter_;
+};
+
+export template <typename DataType, typename IdxType, bool CheckTS>
+class CappedOneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS> : public OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS> {
+public:
+    CappedOneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts, SizeT cap)
+        : OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS>(entry, buffer_mgr, column_id, iterate_ts), cap_(cap) {}
+
+    Optional<Pair<SparseVecRef<DataType, IdxType>, SegmentOffset>> Next() {
+        if (this->offset() >= cap_) {
+            return None;
+        }
+        return OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS>::Next();
+    }
+
+private:
+    SizeT cap_;
 };
 
 } // namespace infinity

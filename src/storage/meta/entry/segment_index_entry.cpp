@@ -948,7 +948,7 @@ ChunkIndexEntry *SegmentIndexEntry::RebuildChunkIndexEntries(TxnTableStore *txn_
                     } else {
                         using IndexT = std::decay_t<decltype(*index)>;
                         using DataType = typename IndexT::DataType;
-                        OneColumnIterator<DataType, true /*check ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts);
+                        CappedOneColumnIterator<DataType, true /*check ts*/> iter(segment_entry, buffer_mgr, column_def->id(), begin_ts, row_count);
                         HnswInsertConfig insert_config;
                         insert_config.optimize_ = true;
                         index->InsertVecs(std::move(iter), insert_config);

@@ -9,6 +9,7 @@ class TestMemIdx:
     def test_mem_hnsw(self, infinity_runner: InfinityRunner):
         config1 = "test/data/config/restart_test/test_memidx/1.toml"
         config2 = "test/data/config/restart_test/test_memidx/2.toml"
+        config3 = "test/data/config/restart_test/test_memidx/3.toml"
         uri = common_values.TEST_LOCAL_HOST
         infinity_runner.clear()
 
@@ -77,20 +78,27 @@ class TestMemIdx:
         infinity_runner.uninit()
 
         # 2. recover by delta ckp & dumpindex wal & memindex recovery
-        infinity_runner.init(config1)
+        infinity_runner.init(config3)
         time.sleep(1)
         infinity_obj = infinity.connect(uri)
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("test_memidx1")
-        data_dict, data_type_dict = (
-            table_obj.output(["c1"])
-            .knn("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6)
-            .to_result()
-        )
-        assert data_dict["c1"] == [8, 6, 6, 4, 4, 4]
 
-        data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
-        assert data_dict["count(star)"] == [13]
+        def check():
+            data_dict, data_type_dict = (
+                table_obj.output(["c1"])
+                .knn("c2", [0.3, 0.3, 0.2, 0.2], "float", "l2", 6)
+                .to_result()
+            )
+            assert data_dict["c1"] == [8, 6, 6, 4, 4, 4]
+
+            data_dict, data_type_dict = table_obj.output(["count(*)"]).to_result()
+            assert data_dict["count(star)"] == [13]
+
+        check()
+        # wait for optimize
+        time.sleep(3)
+        check()
 
         infinity_obj.disconnect()
         infinity_runner.uninit()
