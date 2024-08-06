@@ -1347,27 +1347,67 @@ table_obj.export_data(os.getcwd() + "/export_data.jsonl", {"file_type": "jsonl",
 Table.delete(cond = None)
 ```
 
-Deletes rows by condition.The condition is similar to the WHERE conditions in SQL. If  `cond` is not specified, all the data will be removed in the table object.
+Deletes rows by condition.
 
 ### Parameters
 
 #### cond: `str`, *Optional*
 
+A condition or filter that determines which rows to delete from the table. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
+
 :::tip NOTE
-cond has only supported 'and' and 'or' conjunction expression by now. more functions like 'between and', 'in' are comming soon`.
+The `cond` parameter currently supports 'and' and 'or' logical expressions only. Additional expressions like 'between' and 'in' will be available soon.
 :::
 
 ### Returns
 
-- Success: `True`
-- Failure: `Exception`
+A structure containing the following attributes:
+
+- `error_code`: `int` An error code indicating the result of the operation.
+  - `0`: The operation succeeds.
+  - A non-zero value: A specific error condition occurs.
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds.
 
 ### Examples
 
+#### Remove all rows in the table
+
 ```python
-table_obj.delete("c1 = 1")
+# Clear all data in the current table
 table_obj.delete()
 ```
+
+```python
+# Clear all data in the current table
+table_obj.delete(None)
+
+```
+
+#### Conditional row deletion
+
+```python
+# Create a table named "my_table" with two columns:
+# - Integer column "c1"
+# - Vector column "vec"
+table_obj = db_instance.create_table("my_table", {"c1": {"type": "integer"}, "vec": {"type": "vector,4,float"},})
+# Insert two rows of data into the "my_table"
+table_obj.insert(
+[
+        {
+            "c1": 1,
+            "vec": [1.0, 1.2, 0.8, 0.9],
+        },
+        {
+            "c1": 2,
+            "vec": [4.0, 4.2, 4.3, 4.5],
+        },
+    ]
+)
+# Delete rows whose "c1" equal 1
+table_obj.delete("c1 = 1")
+```
+
+
 
 ---
 
