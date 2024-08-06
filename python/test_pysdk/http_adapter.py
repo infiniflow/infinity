@@ -185,7 +185,7 @@ class http_adapter:
             tmp = {}
             tmp["name"] = col
             for param_name in columns_definition[col]:
-                if param_name.lower() != "constraints" and param_name.lower() != "default": # not constraint
+                if param_name.lower() != "constraints" and param_name.lower() != "default": # not constraint and default, should be type
                     params = columns_definition[col][param_name].split(",")
                     if params[0].strip().lower() == "vector":
                         tmp["type"] = params[0].strip()
@@ -196,7 +196,19 @@ class http_adapter:
                     elif params[0].strip().lower() == "sparse":
                         pass
                     else:
-                        tmp[param_name] = type_transfrom[columns_definition[col][param_name]]
+                        tmp[param_name.lower()] = type_transfrom[columns_definition[col][param_name]]
+                elif param_name.lower() == "default":
+                    default_field = {}
+                    if tmp["type"] == "vector":
+                        default_field["type"] = type_to_vector_literaltype[tmp["element_type"]]
+                    elif tmp["type"] == "tensor":
+                        pass
+                    elif tmp["type"] == "sparse":
+                        pass
+                    else:
+                        default_field["type"] = type_to_literaltype[tmp["type"]]
+                    default_field["value"] = columns_definition[col][param_name]
+                    tmp["default"] = default_field
                 else:
                     tmp[param_name] = columns_definition[col][param_name]
             fields.append(tmp)
@@ -275,7 +287,7 @@ class http_adapter:
         r = self.request(url, "get", h)
         self.raise_exception(r)
         res = {"column_name":[], "column_type":[], "constraint":[], "default":[]}
-        #print(r.json())
+        print(r.json())
         for col in r.json()["columns"]:
             res["column_name"].append(col["column_name"])
             res["column_type"].append(col["column_type"])
