@@ -76,6 +76,8 @@ public:
                                                                    TxnTimeStamp begin_ts,
                                                                    TxnTimeStamp commit_ts);
 
+    void UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> new_entry);
+
     static Vector<UniquePtr<IndexFileWorker>> CreateFileWorkers(SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id);
 
     static String IndexFileName(SegmentID segment_id);

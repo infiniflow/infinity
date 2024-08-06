@@ -173,6 +173,15 @@ SharedPtr<SegmentIndexEntry> SegmentIndexEntry::NewReplaySegmentIndexEntry(Table
     return segment_index_entry;
 }
 
+void SegmentIndexEntry::UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> new_entry) {
+    assert(new_entry->segment_id_ == segment_id_);
+    assert(new_entry->table_index_entry_ == table_index_entry_);
+    assert(new_entry->index_dir_ == index_dir_);
+    min_ts_ = new_entry->min_ts_;
+    max_ts_ = new_entry->max_ts_;
+    next_chunk_id_ = new_entry->next_chunk_id_;
+}
+
 Vector<UniquePtr<IndexFileWorker>> SegmentIndexEntry::CreateFileWorkers(SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id) {
     Vector<UniquePtr<IndexFileWorker>> vector_file_worker;
     // reference file_worker will be invalidated when vector_file_worker is resized

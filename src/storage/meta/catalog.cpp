@@ -885,10 +885,19 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                                              txn_id,
                                                                                              begin_ts,
                                                                                              commit_ts);
-                    bool insert_ok = table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)}).second;
-                    if (!insert_ok) {
-                        String error_message = fmt::format("Segment index {} is already in the catalog", segment_id);
-                        UnrecoverableError(error_message);
+                    if (merge_flag == MergeFlag::kNew) {
+                        bool insert_ok = table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)}).second;
+                        if (!insert_ok) {
+                            String error_message = fmt::format("Segment index {} is already in the catalog", segment_id);
+                            UnrecoverableError(error_message);
+                        }
+                    } else if (merge_flag == MergeFlag::kUpdate) {
+                        auto iter = table_index_entry->index_by_segment().find(segment_id);
+                        if (iter == table_index_entry->index_by_segment().end()) {
+                            String error_message = fmt::format("Segment index {} is not found", segment_id);
+                            UnrecoverableError(error_message);
+                        }
+                        iter->second->UpdateSegmentIndexReplay(segment_index_entry);
                     }
                 }
                 break;
