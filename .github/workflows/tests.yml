@@ -145,15 +145,6 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "git config --global safe.directory \"*\" && cd /infinity && rm -fr cmake-build-release && mkdir -p cmake-build-release && cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_JOB_POOLS:STRING=link=8 -S /infinity -B /infinity/cmake-build-release && cmake --build /infinity/cmake-build-release --target infinity test_main knn_import_benchmark knn_query_benchmark"
 
-      - name: Run restart test
-        if: ${{ !cancelled() && !failure() }}
-        run : sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_python_restart_test.py --infinity_path=cmake-build-release/src/infinity"
-
-      - name: Collect restart test output
-        if: ${{ !cancelled() }} # always run this step even if previous steps failed
-        # find all log file like [debug.log.*] in directory, and cat to stdout
-        run: find . -name "restart_test.log.*" -exec cat {} \;
-
       - name: Unit test release version
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "mkdir -p /var/infinity && cd /infinity/ && cmake-build-release/src/test_main > unittest_release.log 2>&1"
@@ -195,6 +186,15 @@ jobs:
         if: ${{ !cancelled() }} # always run this step even if previous steps failed
         # GitHub Actions interprets output lines starting with "Error" as error messages, and it automatically sets the step status to failed when such lines are detected. 
         run: cat release.log 2>/dev/null || true
+
+      - name: Run restart test
+        if: ${{ !cancelled() && !failure() }}
+        run : sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && python3 tools/run_restart_test.py --infinity_path=cmake-build-release/src/infinity"
+
+      - name: Collect restart test output
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        # find all log file like [debug.log.*] in directory, and cat to stdout
+        run: find . -name "restart_test.log.*" -exec cat {} \;
 
       - name: Prepare sift dataset
         if: ${{ !cancelled() && !failure() }}
