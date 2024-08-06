@@ -1470,10 +1470,7 @@ Must not be empty. Supported aggragation functions:
   
 ### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode. 
-- Failure: `InfinityException`
-  - `error_code`: `int` A non-zero value: A specific error condition occurs.
-  - `error_msg`: `str` The error message providing additional details.
+An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
 ### Examples
 
