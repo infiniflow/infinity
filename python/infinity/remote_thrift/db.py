@@ -66,24 +66,16 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                         proto_column_type.logic_type = ttypes.LogicType.TinyInt
                     case "int16":
                         proto_column_type.logic_type = ttypes.LogicType.SmallInt
-                    case "int32":
-                        proto_column_type.logical_type = ttypes.LogicType.Integer
-                    case "int":
-                        proto_column_type.logical_type = ttypes.LogicType.Integer
-                    case "integer":
+                    case "integer" | "int32" | "int":
                         proto_column_type.logical_type = ttypes.LogicType.Integer
                     case "int64":
                         proto_column_type.logic_type = ttypes.LogicType.BigInt
                     case "int128":
                         proto_column_type.logic_type = ttypes.LogicType.HugeInt
-                    case "float":
+                    case "float" | "float32":
                         proto_column_type.logic_type = ttypes.LogicType.Float
-                    case "float32":
-                        proto_column_type.logical_type = ttypes.LogicType.Float
-                    case "double":
+                    case "double" | "float64":
                         proto_column_type.logical_type = ttypes.LogicType.Double
-                    case "float64":
-                        proto_column_type.logic_type = ttypes.LogicType.Double
                     case "float16":
                         proto_column_type.logic_type = ttypes.LogicType.Float16
                     case "bfloat16":

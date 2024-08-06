@@ -147,13 +147,9 @@ def get_embedding_info(column_info, column_defs, column_name, index):
     match element_type:
         case "bit":
             embedding_type.element_type = EmbeddingDataType.kElemBit
-        case "float32":
+        case "float32" | "float":
             embedding_type.element_type = EmbeddingDataType.kElemFloat
-        case "float":
-            embedding_type.element_type = EmbeddingDataType.kElemFloat
-        case "float64":
-            embedding_type.element_type = EmbeddingDataType.kElemDouble
-        case "double":
+        case "float64" | "double":
             embedding_type.element_type = EmbeddingDataType.kElemDouble
         case "float16":
             embedding_type.element_type = EmbeddingDataType.kElemFloat16
@@ -165,9 +161,7 @@ def get_embedding_info(column_info, column_defs, column_name, index):
             embedding_type.element_type = EmbeddingDataType.kElemInt8
         case "int16":
             embedding_type.element_type = EmbeddingDataType.kElemInt16
-        case "int32":
-            embedding_type.element_type = EmbeddingDataType.kElemInt32
-        case "int":
+        case "int32" | "int":
             embedding_type.element_type = EmbeddingDataType.kElemInt32
         case "int64":
             embedding_type.element_type = EmbeddingDataType.kElemInt64
