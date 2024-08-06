@@ -66,7 +66,7 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
                         proto_column_type.logic_type = ttypes.LogicType.TinyInt
                     case "int16":
                         proto_column_type.logic_type = ttypes.LogicType.SmallInt
-                    case "int32" | "int" | "integer":
+                    case "integer" | "int32" | "int":
                         proto_column_type.logic_type = ttypes.LogicType.Integer
                     case "int64":
                         proto_column_type.logic_type = ttypes.LogicType.BigInt

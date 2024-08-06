@@ -1826,14 +1826,50 @@ i64 Config::CleanupInterval() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kCleanupInterval);
 }
 
+void Config::SetCleanupInterval(i64 interval) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kCleanupInterval);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
+        String error_message = "Attempt to set non-integer value to cleanup interval";
+        UnrecoverableError(error_message);
+    }
+    IntegerOption *cleanup_interval_option = static_cast<IntegerOption *>(base_option);
+    cleanup_interval_option->value_ = interval;
+    return ;
+}
+
 i64 Config::CompactInterval() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kCompactInterval);
 }
 
+void Config::SetCompactInterval(i64 interval) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kCompactInterval);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
+        String error_message = "Attempt to set non-integer value to compact segment interval";
+        UnrecoverableError(error_message);
+    }
+    IntegerOption *compact_interval_option = static_cast<IntegerOption *>(base_option);
+    compact_interval_option->value_ = interval;
+    return ;
+}
+
 i64 Config::OptimizeIndexInterval() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kOptimizeIndexInterval);
+}
+
+void Config::SetOptimizeInterval(i64 interval) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kOptimizeIndexInterval);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
+        String error_message = "Attempt to set non-integer value to optimize interval";
+        UnrecoverableError(error_message);
+    }
+    IntegerOption *optimize_interval_option = static_cast<IntegerOption *>(base_option);
+    optimize_interval_option->value_ = interval;
+    return ;
 }
 
 i64 Config::MemIndexCapacity() {
@@ -1889,9 +1925,33 @@ i64 Config::FullCheckpointInterval() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kFullCheckpointInterval);
 }
 
+void Config::SetFullCheckpointInterval(i64 interval) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kFullCheckpointInterval);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
+        String error_message = "Attempt to set non-integer value to full checkpoint interval";
+        UnrecoverableError(error_message);
+    }
+    IntegerOption *full_checkpoint_interval_option = static_cast<IntegerOption *>(base_option);
+    full_checkpoint_interval_option->value_ = interval;
+    return ;
+}
+
 i64 Config::DeltaCheckpointInterval() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointInterval);
+}
+
+void Config::SetDeltaCheckpointInterval(i64 interval) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kDeltaCheckpointInterval);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
+        String error_message = "Attempt to set non-integer value to delta checkpoint interval";
+        UnrecoverableError(error_message);
+    }
+    IntegerOption *delta_checkpoint_interval_option = static_cast<IntegerOption *>(base_option);
+    delta_checkpoint_interval_option->value_ = interval;
+    return ;
 }
 
 i64 Config::DeltaCheckpointThreshold() {

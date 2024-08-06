@@ -37,6 +37,7 @@ import defer_op;
 import bg_query_state;
 import txn_store;
 import memindex_tracer;
+import segment_entry;
 
 namespace infinity {
 
@@ -122,6 +123,11 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
                 if (compact_segments.empty()) {
                     txn_mgr_->RollBackTxn(txn);
                     break;
+                }
+
+                LOG_TRACE("Construct compact task: ");
+                for(SegmentEntry* segment_ptr: compact_segments) {
+                    LOG_TRACE(fmt::format("To compact segment: {}", segment_ptr->ToString()));
                 }
 
                 compaction_tasks.emplace_back(MakeUnique<AutoCompactStatement>(table_entry, std::move(compact_segments)), txn);
