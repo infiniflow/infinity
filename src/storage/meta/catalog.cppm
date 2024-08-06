@@ -304,7 +304,7 @@ private: // TODO: remove this
     void MemIndexCommitLoop();
 
 public:
-    void MemIndexRecover(BufferManager *buffer_manager);
+    void MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts);
 
     void PickCleanup(CleanupScanner *scanner);
 
