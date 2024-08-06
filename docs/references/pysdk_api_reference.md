@@ -1409,15 +1409,13 @@ table_obj.delete("c1 = 90")
 ```
 
 ```python
-a = 90
-c = 70
 # Create a table named "my_table" with one column:
 # - Integer column "c1"
 table_obj = db_instance.create_table("my_table", {"c1": {"type": "integer"}})
 # Insert three rows of data into the "my_table"
 table_obj.insert([{"c1": 90}, {"c1": 80}, {"c1": 95}])
 # Delete rows where "c1" is between 70 and 90 (inclusive)
-table_obj.delete(f"c1 >= {c} and c1 <= {a}")
+table_obj.delete("c1 >= 70 and c1 <= 90")
 ```
 
 ---
@@ -1432,9 +1430,9 @@ Searches for rows that match the specified condition and updates them accordingl
 
 ### Parameters
 
-#### cond: `str` (not empty), *Optional* 
+#### cond: `str` (not empty), *Required* 
 
-A condition that specifies which rows to update. This parameter should be a non-empty string representing a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated. If `cond` is not provided or set to `None`, the method will not perform any updates.
+A condition that specifies which rows to update. This parameter should be a non-empty string representing a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated. 
 
 #### data: `list[dict[str, Union[str, int, float]]]`
 
