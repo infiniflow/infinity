@@ -1799,7 +1799,9 @@ public:
         nlohmann::json body_info_json = nlohmann::json::parse(body_info);
 
         nlohmann::json json_response;
+        json_response["error_code"] = 0;
         HTTPStatus http_status;
+        http_status = HTTPStatus::CODE_500;
         DropIndexOptions options{ConflictType::kInvalid};
         if (body_info_json.contains("drop_option")) {
             auto drop_option = body_info_json["drop_option"];
@@ -1821,15 +1823,16 @@ public:
             }
         }
 
-        auto result = infinity->DropIndex(database_name, table_name, index_name, options);
-
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+        if(json_response["error_code"] == 0) {
+            auto result = infinity->DropIndex(database_name, table_name, index_name, options);
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
@@ -1849,7 +1852,9 @@ public:
         nlohmann::json body_info_json = nlohmann::json::parse(body_info_str);
 
         nlohmann::json json_response;
+        json_response["error_code"] = 0;
         HTTPStatus http_status;
+        http_status = HTTPStatus::CODE_200;
 
         CreateIndexOptions options;
         if (body_info_json.contains("create_option")) {
@@ -1928,15 +1933,16 @@ public:
             index_info_list->push_back(index_info);
         }
 
-        auto result = infinity->CreateIndex(database_name, table_name, index_name, index_info_list, options);
-
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+        if(json_response["error_code"] == 0) {
+            auto result = infinity->CreateIndex(database_name, table_name, index_name, index_info_list, options);
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
