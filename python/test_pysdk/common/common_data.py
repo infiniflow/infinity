@@ -2,6 +2,7 @@ from infinity.common import ConflictType, InfinityException
 import infinity.index as index
 from numpy import dtype
 import ast
+from enum import Enum
 
 default_url = "http://localhost:23820/"
 
@@ -26,11 +27,14 @@ unsupport_output = ["_similarity", "_row_id", "_score", "_distance"]
 
 type_transfrom = {
     "int":"integer",
+    "uint8":"uint8",
     "int8":"tinyint",
     "int16":"smallint",
     "int32":"integer",
     "integer":"integer",
     "int64":"bigint", # hugeint unsupport
+    "float16":"float16",
+    "bfloat16":"bfloat16",
     "float":"float",
     "float32":"float",
     "float64":"double",
@@ -45,6 +49,8 @@ type_transfrom = {
 def type_to_dtype(type):
     match type.lower():
         case "bool":
+            return dtype('bool')
+        case "boolean":
             return dtype('bool')
         case "tinyint":
             return dtype('int8')
@@ -64,6 +70,10 @@ def type_to_dtype(type):
             return dtype('float32')
         case "float64":
             return dtype('float64')
+        case "float16":
+            return dtype('float32')
+        case "bfloat16":
+            return dtype('float32')
         case "double":
             return dtype('float64')
         case "varchar":
@@ -71,7 +81,7 @@ def type_to_dtype(type):
         case _:
             return object
 
-def isfloat(str):
+def is_float(str):
     try:
         float(str)
         return True
@@ -84,6 +94,9 @@ def is_list(str):
         return isinstance(result, list)
     except:
         return False
+
+def is_bool(str):
+    return str.lower() == "true" or str.lower() == "false"
 
 index_type_transfrom = {
     index.IndexType.IVFFlat:"IVFFlat",
@@ -136,4 +149,60 @@ tableDefaultData = {
                     "score"
                 }
         }
+}
+
+
+'''
+enum class LiteralType : int32_t {
+    kBoolean,
+    kDouble,
+    kString,
+    kInteger,
+    kNull,
+    kDate,
+    kTime,
+    kDateTime,
+    kTimestamp,
+    kIntegerArray,
+    kDoubleArray,
+    kSubArrayArray,
+    kInterval,
+    kLongSparseArray,
+    kDoubleSparseArray,
+    kEmptyArray,
+};
+'''
+class literaltype(Enum):
+    kBoolean = 0
+    kDouble = 1
+    kString = 2
+    kInteger = 3
+    kNull = 4
+    kDate = 5
+    kTime= 6
+    kDateTime = 7
+    kTimestamp = 8
+    kIntegerArray = 9
+    kDoubleArray = 10
+    kSubArrayArray = 11
+    kInterval = 12
+    kLongSparseArray = 13
+    kDoubleSparseArray = 14
+    kEmptyArray = 15
+
+type_to_literaltype = {
+    "boolean" : literaltype.kBoolean.value,
+    "tinyint" : literaltype.kInteger.value,
+    "smallint" : literaltype.kInteger.value,
+    "int" : literaltype.kInteger.value,
+    "integer" : literaltype.kInteger.value,
+    "bigint" : literaltype.kInteger.value,
+    "float" : literaltype.kDouble.value,
+    "double": literaltype.kDouble.value
+}
+
+type_to_vector_literaltype = {
+    "integer": literaltype.kIntegerArray.value,
+    "float": literaltype.kDoubleArray.value,
+    "double": literaltype.kDoubleArray.value
 }
