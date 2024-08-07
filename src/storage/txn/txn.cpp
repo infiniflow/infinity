@@ -530,14 +530,16 @@ void Txn::AddWalCmd(const SharedPtr<WalCmd> &cmd) {
     wal_entry_->cmds_.push_back(cmd);
 }
 
+// the max_commit_ts is determined by the max commit ts of flushed delta entry
 // Incremental checkpoint contains only the difference in status between the last checkpoint and this checkpoint (that is, "increment")
-TxnTimeStamp Txn::DeltaCheckpoint() {
+bool Txn::DeltaCheckpoint(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts) {
     String delta_path, delta_name;
     // only save the catalog delta entry
-    TxnTimeStamp max_commit_ts = 0; // the max_commit_ts is determined by the max commit ts of flushed delta entry
-    catalog_->SaveDeltaCatalog(max_commit_ts, delta_path, delta_name);
+    if (!catalog_->SaveDeltaCatalog(last_ckp_ts, max_commit_ts, delta_path, delta_name)) {
+        return false;
+    }
     wal_entry_->cmds_.push_back(MakeShared<WalCmdCheckpoint>(max_commit_ts, false, delta_path, delta_name));
-    return max_commit_ts;
+    return true;
 }
 
 // those whose commit_ts is <= max_commit_ts will be checkpointed

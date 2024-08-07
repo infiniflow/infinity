@@ -1028,9 +1028,12 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 }
 
 // called by bg_task
-bool Catalog::SaveDeltaCatalog(TxnTimeStamp &max_commit_ts, String &delta_catalog_path, String &delta_catalog_name) {
+bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts, String &delta_catalog_path, String &delta_catalog_name) {
     // Pick the delta entry to flush and set the max commit ts.
     UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
+    if (last_ckp_ts >= max_commit_ts) {
+        return false;
+    }
 
     delta_catalog_path = *catalog_dir_;
     delta_catalog_name = CatalogFile::DeltaCheckpointFilename(max_commit_ts);
@@ -1086,7 +1089,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp &max_commit_ts, String &delta_catalo
     // }
     LOG_DEBUG(fmt::format("Save delta catalog to: {}, size: {}.", full_path, act_size));
 
-    return false;
+    return true;
 }
 
 void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry)); }
