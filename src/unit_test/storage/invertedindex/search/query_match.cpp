@@ -42,25 +42,38 @@ import column_index_reader;
 
 using namespace infinity;
 
-class QueryMatchTest : public BaseTest {
+class QueryMatchTest : public BaseTestParamStr {
 protected:
     void SetUp() override {
-        BaseTest::SetUp();
-        BaseTest::RemoveDbDirs();
+        BaseTestParamStr::SetUp();
+        BaseTestParamStr::RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        infinity::InfinityContext::instance().Init(MakeShared<String>(config_path_));
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        config_path_ = GetParam();
+        SharedPtr<String> config_path = nullptr;
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = MakeShared<String>(config_path_);
+        }
+        infinity::InfinityContext::instance().Init(config_path);
         InitData();
     }
     void TearDown() override {
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            if (InfinityContext::instance().persistence_manager() != nullptr) {
+                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
+            }
+        }
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 
     void CreateDBAndTable(const String& db_name, const String& table_name);
@@ -86,10 +99,19 @@ public:
     const String db_name_ = "default_db";
     const String table_name_ = "test_table";
     const String index_name_ = "test_fulltext_index";
-    const String config_path_ = data_path_ + "/config/test_catalog_delta.toml";
+    String config_path_{};
     TxnTimeStamp last_commit_ts_ = 0;
     Vector<Vector<String>> datas_;
 };
+
+INSTANTIATE_TEST_SUITE_P(
+    TestWithDifferentParams,
+    QueryMatchTest,
+    ::testing::Values(
+        BaseTestParamStr::NULL_CONFIG_PATH,
+        BaseTestParamStr::VFS_CONFIG_PATH
+    )
+);
 
 void QueryMatchTest::InitData() {
     datas_ = {
@@ -108,7 +130,7 @@ void QueryMatchTest::InitData() {
     };
 }
 
-TEST_F(QueryMatchTest, basic_term) {
+TEST_P(QueryMatchTest, basic_term) {
     CreateDBAndTable(db_name_, table_name_);
     CreateIndex(db_name_, table_name_, index_name_, "standard");
     InsertData(db_name_, table_name_);
@@ -126,7 +148,7 @@ TEST_F(QueryMatchTest, basic_term) {
     }
 }
 
-TEST_F(QueryMatchTest, phrase) {
+TEST_P(QueryMatchTest, phrase) {
     CreateDBAndTable(db_name_, table_name_);
     Vector<String> analyzers = {String("standard")};
     for (auto &analyzer : analyzers) {

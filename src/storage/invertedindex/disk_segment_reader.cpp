@@ -48,6 +48,7 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     String dict_file = dict_file_;
     if (nullptr != pm) {
+
         dict_file = pm->GetObjCache(dict_file);
     }
     dict_reader_ = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag));
@@ -79,8 +80,8 @@ DiskIndexSegmentReader::~DiskIndexSegmentReader() {
         RecoverableError(status);
     }
     if (nullptr != pm) {
-        pm->PutObjCache(dict_file_);
-        pm->PutObjCache(posting_file_);
+        pm->PutObjCache(dict_file_, true);
+        pm->PutObjCache(posting_file_, true);
     }
 }
 

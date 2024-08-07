@@ -63,9 +63,9 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
         if (!use_object_cache) {
             return;
         }
-        pm->PutObjCache(posting_file);
-        pm->PutObjCache(dict_file);
-        pm->PutObjCache(column_length_file);
+        pm->PutObjCache(posting_file, true);
+        pm->PutObjCache(dict_file, true);
+        pm->PutObjCache(column_length_file, true);
         std::filesystem::remove(posting_file);
         std::filesystem::remove(dict_file);
         std::filesystem::remove(column_length_file);
@@ -122,7 +122,7 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
 
             if (use_object_cache) {
                 column_len_file = (Path(index_dir_) / base_names[i]).string() + LENGTH_SUFFIX;
-                pm->PutObjCache(column_len_file);
+                pm->PutObjCache(column_len_file, true);
             }
         }
 

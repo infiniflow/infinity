@@ -88,7 +88,7 @@ public:
     ObjAddr GetObjFromLocalPath(const String &file_path);
 
     // Decrease refcount
-    void PutObjCache(const String &file_path);
+    void PutObjCache(const String &file_path, bool is_linked_file = false);
 
     ObjAddr ObjCreateRefCount(const String &file_path);
 

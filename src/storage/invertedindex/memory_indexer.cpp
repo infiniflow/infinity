@@ -311,9 +311,9 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
         if (!use_object_cache) {
             return;
         }
-        pm->PutObjCache(posting_file);
-        pm->PutObjCache(dict_file);
-        pm->PutObjCache(column_length_file);
+        pm->PutObjCache(posting_file, true);
+        pm->PutObjCache(dict_file, true);
+        pm->PutObjCache(column_length_file, true);
         std::filesystem::remove(posting_file);
         std::filesystem::remove(dict_file);
         std::filesystem::remove(column_length_file);
@@ -489,9 +489,9 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
         if (!use_object_cache) {
             return;
         }
-        InfinityContext::instance().persistence_manager()->PutObjCache(posting_file);
-        InfinityContext::instance().persistence_manager()->PutObjCache(dict_file);
-        InfinityContext::instance().persistence_manager()->PutObjCache(column_length_file);
+        InfinityContext::instance().persistence_manager()->PutObjCache(posting_file, true);
+        InfinityContext::instance().persistence_manager()->PutObjCache(dict_file, true);
+        InfinityContext::instance().persistence_manager()->PutObjCache(column_length_file, true);
         std::filesystem::remove(posting_file);
         std::filesystem::remove(dict_file);
         std::filesystem::remove(column_length_file);

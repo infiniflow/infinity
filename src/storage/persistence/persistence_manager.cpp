@@ -154,6 +154,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
             UnrecoverableError(error_message);
         }
         local_path_obj_[local_path] = obj_addr;
+        fmt::print("Persist {} to {}\n", file_path, obj_key);
         return obj_addr;
     } else {
         std::lock_guard<std::mutex> lock(mtx_);
@@ -169,6 +170,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
             UnrecoverableError(error_message);
         }
         local_path_obj_[local_path] = obj_addr;
+        fmt::print("Append {} to {}\n", file_path, current_object_key_);
         return obj_addr;
     }
 }
@@ -245,6 +247,7 @@ String PersistenceManager::GetObjCache(const String &file_path) {
     auto oit = objects_.find(it->second.obj_key_);
     if (oit != objects_.end()) {
         oit->second.ref_count_++;
+        fmt::print("get obj cache {}, key = {}, ref_count = {}\n", file_path, it->second.obj_key_, oit->second.ref_count_);
     }
     return fs::path(workspace_).append(it->second.obj_key_).string();
 }
@@ -264,7 +267,7 @@ ObjAddr PersistenceManager::GetObjFromLocalPath(const String &file_path) {
     return it->second;
 }
 
-void PersistenceManager::PutObjCache(const String &file_path) {
+void PersistenceManager::PutObjCache(const String &file_path, bool is_linked_file) {
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         String error_message = fmt::format("Failed to find local path of {}", local_path);
@@ -281,7 +284,18 @@ void PersistenceManager::PutObjCache(const String &file_path) {
     if (oit == objects_.end()) {
         return;
     }
+
     oit->second.ref_count_--;
+    // For large files linked, fill in the file size when putting to ensure obj valid
+    if (is_linked_file) {
+        String obj_full_path = fs::path(workspace_).append(it->second.obj_key_).string();
+        oit->second.obj_size_ = fs::file_size(obj_full_path);
+        it->second.part_size_ = oit->second.obj_size_;
+        fmt::print("put link file {}, key = {}, size = {}\n", file_path, it->second.obj_key_, oit->second.obj_size_);
+    }
+    fmt::print("PutObjCache {}, obj = {}, ref_count {}\n", file_path, it->second.obj_key_, oit->second.ref_count_);
+    auto it1 = objects_.find(it->second.obj_key_);
+    fmt::print("after put ref_count {}, size = {}, key = {}\n", it1->second.ref_count_, it1->second.obj_size_, it->second.obj_key_);
 }
 
 String PersistenceManager::ObjCreate() { return UUID().to_string(); }
@@ -424,6 +438,7 @@ String PersistenceManager::RemovePrefix(const String &path) {
 SizeT PersistenceManager::SumRefCounts() {
     SizeT ref_counts = 0;
     for (auto& [key, obj_stat] : objects_) {
+        fmt::print("key = {}, ref count = {}\n", key, obj_stat.ref_count_);
         ref_counts += obj_stat.ref_count_;
     }
     return ref_counts;
