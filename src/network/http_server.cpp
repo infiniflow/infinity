@@ -51,6 +51,7 @@ import column_expr;
 import type_info;
 import logical_type;
 import embedding_info;
+import sparse_info;
 import decimal_info;
 import status;
 import constant_expr;
@@ -327,6 +328,10 @@ public:
                     e_data_type = EmbeddingDataType::kElemFloat;
                 } else if (etype == "double") {
                     e_data_type = EmbeddingDataType::kElemDouble;
+                } else if (etype == "float16") {
+                    e_data_type = EmbeddingDataType::kElemFloat16;
+                } else if (etype == "bfloat16") {
+                    e_data_type = EmbeddingDataType::kElemBFloat16;
                 } else {
                     infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
                     json_response["error_code"] = status.code();
@@ -337,7 +342,80 @@ public:
                 }
                 type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
                 column_type = std::make_shared<DataType>(LogicalType::kEmbedding, type_info);
-            } else if (value_type == "decimal") {
+            } else if (value_type == "sparse") {
+                String dtype = field_element["data_type"];
+                String itype = field_element["index_type"];
+                int dimension = field_element["dimension"];
+                EmbeddingDataType d_data_type;
+                EmbeddingDataType i_data_type;
+                if (dtype == "float") {
+                    d_data_type = EmbeddingDataType::kElemFloat;
+                } else if (dtype == "double") {
+                    d_data_type = EmbeddingDataType::kElemDouble;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(dtype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+
+                if (itype == "tinyint") {
+                    i_data_type = EmbeddingDataType::kElemInt8;
+                } else if (itype == "smallint") {
+                    i_data_type = EmbeddingDataType::kElemInt16;
+                } else if (itype == "integer") {
+                    i_data_type = EmbeddingDataType::kElemInt32;
+                } else if (itype == "bigint") {
+                    i_data_type = EmbeddingDataType::kElemInt64;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(itype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+                type_info = SparseInfo::Make(d_data_type, i_data_type, size_t(dimension), SparseStoreType::kSort);
+                column_type = std::make_shared<DataType>(LogicalType::kSparse, type_info);
+            } else if (value_type == "tensor") {
+                String etype = field_element["element_type"];
+                int dimension = field_element["dimension"];
+                EmbeddingDataType e_data_type;
+                if (etype == "float") {
+                    e_data_type = EmbeddingDataType::kElemFloat;
+                } else if (etype == "double") {
+                    e_data_type = EmbeddingDataType::kElemDouble;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
+                column_type = std::make_shared<DataType>(LogicalType::kTensor, type_info);
+            } else if(value_type == "tensorarray") {
+                String etype = field_element["element_type"];
+                int dimension = field_element["dimension"];
+                EmbeddingDataType e_data_type;
+                if (etype == "float") {
+                    e_data_type = EmbeddingDataType::kElemFloat;
+                } else if (etype == "double") {
+                    e_data_type = EmbeddingDataType::kElemDouble;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
+                column_type = std::make_shared<DataType>(LogicalType::kTensorArray, type_info);
+            }else if (value_type == "decimal") {
                 type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
                 column_type = std::make_shared<DataType>(LogicalType::kDecimal, type_info);
             } else if (value_type == "array") {

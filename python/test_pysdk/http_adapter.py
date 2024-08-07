@@ -187,14 +187,15 @@ class http_adapter:
             for param_name in columns_definition[col]:
                 if param_name.lower() != "constraints" and param_name.lower() != "default": # not constraint and default, should be type
                     params = columns_definition[col][param_name].split(",")
-                    if params[0].strip().lower() == "vector":
+                    if params[0].strip().lower() == "vector" or params[0].strip().lower() == "tensor" or params[0].strip().lower() == "tensorarray":
                         tmp["type"] = params[0].strip()
                         tmp["dimension"] = int(params[1].strip())
                         tmp["element_type"] = type_transfrom[params[2].strip()]
-                    elif params[0].strip().lower() == "tensor":
-                        pass
                     elif params[0].strip().lower() == "sparse":
-                        pass
+                        tmp["type"] = params[0].strip()
+                        tmp["dimension"] = int(params[1].strip())
+                        tmp["data_type"] = type_transfrom[params[2].strip()]
+                        tmp["index_type"] = type_transfrom[params[3].strip()]
                     else:
                         tmp[param_name.lower()] = type_transfrom[columns_definition[col][param_name]]
                 elif param_name.lower() == "default":
@@ -519,11 +520,15 @@ class http_adapter:
                 if k not in df_dict:
                     df_dict[k] = ()
                 tup = df_dict[k]
-                if res[k].isdigit() or isfloat(res[k]):
+                if res[k].isdigit() or is_float(res[k]):
                     new_tup = tup + (eval(res[k]), )
                 elif is_list(res[k]):
                     new_tup = tup + (ast.literal_eval(res[k]), )
                 else:
+                    if res[k].lower() == 'true':
+                        res[k] = True
+                    elif res[k].lower() == 'false':
+                        res[k] = False
                     new_tup = tup + (res[k],)
                 df_dict[k] = new_tup
         #print(self.output_res)
@@ -544,7 +549,7 @@ class http_adapter:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
                 if col.strip().isdigit():
                     df_type[k] = dtype('int32')
-                if isfloat(col.strip()):
+                if is_float(col.strip()):
                     df_type[k] = dtype('float64')
         return pd.DataFrame(df_dict).astype(df_type)
 
