@@ -21,10 +21,10 @@ from infinity.common import CommonMatchTensorExpr
 
 try:
     # open a local directory to store the data
-    # infinity_instance = infinity.connect("/var/infinity")
+    infinity_instance = infinity.connect("/var/infinity")
 
     # connect to server with 127.0.0.1
-    infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")

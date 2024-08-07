@@ -407,6 +407,7 @@ private:
 
     Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
     HashSet<TransactionID> txn_ids_;
+    TxnTimeStamp max_commit_ts_ = 0;
     // update by add delta entry, read by bg_process::checkpoint
     TxnTimeStamp last_full_ckp_ts_{0};
 

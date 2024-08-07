@@ -58,6 +58,8 @@ public:
 
     const SharedPtr<ColumnVector> &column_vector() const { return column_vector_; }
 
+    BlockOffset offset() const { return offset_; }
+
 private:
     const BlockEntry *const block_entry_;
     const SharedPtr<ColumnVector> column_vector_;
@@ -86,6 +88,8 @@ public:
     const void *data() const { return column_vector_->data(); }
 
     const SharedPtr<ColumnVector> &column_vector() const { return column_vector_; }
+
+    BlockOffset offset() const { return offset_; }
 
 private:
     const BlockEntry *const block_entry_;

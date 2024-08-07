@@ -76,6 +76,8 @@ public:
                                                                    TxnTimeStamp begin_ts,
                                                                    TxnTimeStamp commit_ts);
 
+    void UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> new_entry);
+
     static Vector<UniquePtr<IndexFileWorker>> CreateFileWorkers(SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id);
 
     static String IndexFileName(SegmentID segment_id);
@@ -273,6 +275,8 @@ private:
     ChunkID next_chunk_id_{0};
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
+
+    std::mutex mem_index_locker_{};
     SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
     SharedPtr<MemoryIndexer> memory_indexer_{};
     SharedPtr<SecondaryIndexInMem> memory_secondary_index_{};
