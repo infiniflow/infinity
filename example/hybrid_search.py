@@ -17,14 +17,15 @@ This example is to connect local infinity instance, create table, insert data, s
 """
 
 import infinity
-from infinity.remote_thrift.types import make_match_tensor_expr
+from infinity.local_infinity.types import make_make_tensor_expr
+# from infinity.remote_thrift.types import make_match_tensor_expr
 
 try:
     # open a local directory to store the data
-    # infinity_instance = infinity.connect("/var/infinity")
+    infinity_instance = infinity.connect("/var/infinity")
 
     # connect to server with 127.0.0.1
-    infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
+    # infinity_instance = infinity.connect(infinity.common.LOCAL_HOST)
 
     # 'default_db' is the default database
     db_instance = infinity_instance.get_database("default_db")
