@@ -194,7 +194,10 @@ class http_adapter:
                     elif params[0].strip().lower() == "tensor":
                         pass
                     elif params[0].strip().lower() == "sparse":
-                        pass
+                        tmp["type"] = params[0].strip()
+                        tmp["dimension"] = int(params[1].strip())
+                        tmp["data_type"] = type_transfrom[params[2].strip()]
+                        tmp["index_type"] = type_transfrom[params[3].strip()]
                     else:
                         tmp[param_name.lower()] = type_transfrom[columns_definition[col][param_name]]
                 elif param_name.lower() == "default":
@@ -212,7 +215,7 @@ class http_adapter:
                 else:
                     tmp[param_name] = columns_definition[col][param_name]
             fields.append(tmp)
-        #print(fields)
+        print(fields)
 
         url = f"databases/{self.database_name}/tables/{table_name}"
         h = self.set_up_header(["accept", "content-type"])

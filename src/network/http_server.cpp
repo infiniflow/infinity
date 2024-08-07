@@ -15,6 +15,7 @@ module;
 
 #include <cstring>
 #include <iostream>
+#include <type/info/sparse_info.h>
 
 module http_server;
 
@@ -337,6 +338,46 @@ public:
                 }
                 type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
                 column_type = std::make_shared<DataType>(LogicalType::kEmbedding, type_info);
+            } else if (value_type == "sparse") {
+                String dtype = field_element["data_type"];
+                String itype = field_element["index_type"];
+                int dimension = field_element["dimension"];
+                EmbeddingDataType d_data_type;
+                EmbeddingDataType i_data_type;
+                if (dtype == "float") {
+                    d_data_type = EmbeddingDataType::kElemFloat;
+                } else if (dtype == "double") {
+                    d_data_type = EmbeddingDataType::kElemDouble;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(dtype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+
+                if (itype == "tinyint") {
+                    d_data_type = EmbeddingDataType::kElemInt8;
+                } else if (itype == "smallint") {
+                    d_data_type = EmbeddingDataType::kElemInt16;
+                } else if (itype == "integer") {
+                    d_data_type = EmbeddingDataType::kElemInt32;
+                } else if (itype == "bigint") {
+                    d_data_type = EmbeddingDataType::kElemInt64;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(itype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+                printf("tag1\n");
+                type_info = SparseInfo::Make(d_data_type, i_data_type, size_t(dimension), SparseStoreType::kSort);
+                printf("tag2\n");
+                column_type = std::make_shared<DataType>(LogicalType::kSparse, type_info);
+                printf("tag3\n");
             } else if (value_type == "decimal") {
                 type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
                 column_type = std::make_shared<DataType>(LogicalType::kDecimal, type_info);
@@ -394,6 +435,7 @@ public:
         }
 
         if(json_response["error_code"] == 0) {
+            printf("creating\n");
             auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
             if (result.IsOk()) {
                 json_response["error_code"] = 0;
