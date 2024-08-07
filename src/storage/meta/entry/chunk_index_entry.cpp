@@ -349,6 +349,14 @@ void ChunkIndexEntry::LoadPartsReader(BufferManager *buffer_mgr) {
 
 BufferHandle ChunkIndexEntry::GetIndexPartAt(u32 i) { return part_buffer_objs_.at(i)->Load(); }
 
+bool ChunkIndexEntry::CheckVisible(Txn *txn) const {
+    if (txn == nullptr) {
+        return deprecate_ts_.load() == UNCOMMIT_TS;
+    }
+    TxnTimeStamp begin_ts = txn->BeginTS();
+    return begin_ts < deprecate_ts_.load() && BaseEntry::CheckVisible(txn);
+}
+
 void ChunkIndexEntry::Save() {
     if (buffer_obj_) {
         buffer_obj_->Save();

@@ -129,7 +129,8 @@ SharedPtr<IndexBase> IndexBase::ReadAdv(char *&ptr, int32_t maxbytes) {
             SizeT M = ReadBufAdv<SizeT>(ptr);
             SizeT ef_construction = ReadBufAdv<SizeT>(ptr);
             SizeT ef = ReadBufAdv<SizeT>(ptr);
-            res = MakeShared<IndexHnsw>(index_name, file_name, column_names, metric_type, encode_type, M, ef_construction, ef);
+            SizeT block_size = ReadBufAdv<SizeT>(ptr);
+            res = MakeShared<IndexHnsw>(index_name, file_name, column_names, metric_type, encode_type, M, ef_construction, ef, block_size);
             break;
         }
         case IndexType::kDiskAnn: {
@@ -221,9 +222,11 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             SizeT M = index_def_json["M"];
             SizeT ef_construction = index_def_json["ef_construction"];
             SizeT ef = index_def_json["ef"];
+            SizeT block_size = index_def_json["block_size"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             HnswEncodeType encode_type = StringToHnswEncodeType(index_def_json["encode_type"]);
-            auto ptr = MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef);
+            auto ptr =
+                MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef, block_size);
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }
@@ -234,7 +237,8 @@ SharedPtr<IndexBase> IndexBase::Deserialize(const nlohmann::json &index_def_json
             SizeT num_parts = index_def_json["num_parts"];
             MetricType metric_type = StringToMetricType(index_def_json["metric_type"]);
             DiskAnnEncodeType encode_type = StringToDiskAnnEncodeType(index_def_json["encode_type"]);
-            auto ptr = MakeShared<IndexDiskAnn>(index_name, file_name, std::move(column_names), metric_type, encode_type, R, L, num_pq_chunks, num_parts);
+            auto ptr =
+                MakeShared<IndexDiskAnn>(index_name, file_name, std::move(column_names), metric_type, encode_type, R, L, num_pq_chunks, num_parts);
             res = std::static_pointer_cast<IndexBase>(ptr);
             break;
         }

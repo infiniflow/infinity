@@ -10,10 +10,10 @@ COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim4.csv' WITH 
 query II
 SELECT c1, c2 FROM test_tensor_type;
 ----
-2 [0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]
-4 [0.2,0.1,0.3,0.4]
-6 [0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3]
-8 [0.4,0.3,0.2,0.1]
+2 [[0.1,0.2,0.3,-0.2],[0.3,-0.2,0.2,0.3]]
+4 [[0.2,0.1,0.3,0.4]]
+6 [[0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5],[0.1,-0.4,9.4,0.3]]
+8 [[0.4,0.3,0.2,0.1]]
 
 query II
 SELECT count(*) FROM test_tensor_type;
@@ -36,10 +36,10 @@ COPY test_tensor_type FROM '/var/infinity/test_data/tensor_float_dim8.csv' WITH 
 query II
 SELECT c1, c2 FROM test_tensor_type;
 ----
-2 [11101011]
-4 [11110111],[01001011]
-6 [11111110],[10111111],[11101011]
-8 [10110111]
+2 [[11101011]]
+4 [[11110111],[01001011]]
+6 [[11111110],[10111111],[11101011]]
+8 [[10110111]]
 
 query II
 SELECT count(*) FROM test_tensor_type;

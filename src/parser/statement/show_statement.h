@@ -42,6 +42,7 @@ enum class ShowStmtType {
     kGlobalVariables,
     kConfig,
     kBuffer,
+    kMemIndex,
     kQueries,
     kQuery,
     kTransactions,

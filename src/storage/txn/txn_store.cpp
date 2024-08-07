@@ -90,13 +90,15 @@ void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp 
     }
 }
 
-void TxnIndexStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
     for (auto [segment_index_entry, new_chunk, old_chunks] : optimize_data_) {
         segment_index_entry->CommitOptimize(new_chunk, old_chunks, commit_ts);
+        chunk_index_entries_.emplace_back(new_chunk);
+        for (auto *old_chunk : old_chunks) {
+            chunk_index_entries_.emplace_back(old_chunk);
+        }
+        index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
     }
-}
-
-void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
     for (const auto &[segment_id, segment_index_entry] : index_entry_map_) {
         segment_index_entry->CommitSegmentIndex(txn_id, commit_ts);
     }
@@ -194,6 +196,8 @@ void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, c
 
 void TxnTableStore::AddChunkIndexStore(TableIndexEntry *table_index_entry, ChunkIndexEntry *chunk_index_entry) {
     auto *txn_index_store = this->GetIndexStore(table_index_entry);
+    SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
+    txn_index_store->index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
     txn_index_store->chunk_index_entries_.push_back(chunk_index_entry);
 
     has_update_ = true;
@@ -375,10 +379,6 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
 
     Catalog::Delete(table_entry_, txn_id, this, commit_ts, delete_state_);
 
-    for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
-        txn_index_store->PrepareCommit(txn_id, commit_ts, buffer_mgr);
-    }
-
     for (auto *sealed_segment : set_sealed_segments_) {
         if (!sealed_segment->SetSealed()) {
             String error_message = fmt::format("Set sealed segment failed, segment id: {}", sealed_segment->segment_id());
@@ -531,6 +531,10 @@ void TxnStore::MaintainCompactionAlg() const {
 }
 
 bool TxnStore::CheckConflict(Catalog *catalog) {
+    if (txn_->db_name().empty() && !txn_tables_store_.empty()) {
+        const String &db_name = *txn_tables_store_.begin()->second->GetTableEntry()->GetDBName();
+        txn_->SetDBName(db_name);
+    }
     const String &db_name = txn_->db_name();
     for (const auto &[table_name, table_store] : txn_tables_store_) {
         auto [table_entry1, status] = catalog->GetTableByName(db_name, table_name, txn_->TxnID(), txn_->CommitTS());

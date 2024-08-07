@@ -54,12 +54,26 @@ Connection::~Connection() {
     session_mgr->RemoveSessionByID(session_->session_id());
 }
 
+void Connection::HandleError(const char* error_message) {
+    HashMap<PGMessageType, String> error_message_map;
+    error_message_map[PGMessageType::kHumanReadableError] = error_message;
+    LOG_ERROR(error_message);
+    pg_handler_->send_error_response(error_message_map);
+    pg_handler_->send_ready_for_query();
+}
+
 void Connection::Run() {
     // Disable Nagle's algorithm to reduce TCP latency, but will reduce the throughput.
     socket_->set_option(boost::asio::ip::tcp::no_delay(true));
 
     SessionManager *session_manager = InfinityContext::instance().session_manager();
-    session_ = session_manager->CreateRemoteSession();
+    SharedPtr<RemoteSession> remote_session = session_manager->CreateRemoteSession(InfinityContext::instance().MaintenanceMode());
+    if(remote_session == nullptr) {
+        HandleError("Infinity is running under maintenance mode, only one connection is allowed.");
+        return ;
+    }
+
+    session_ = std::move(remote_session);
 
     HandleConnection();
 
@@ -72,17 +86,9 @@ void Connection::Run() {
             LOG_TRACE(fmt::format("Recoverable exception: {}", e.what()));
             return ;
         } catch (const infinity::UnrecoverableException& e) {
-            HashMap<PGMessageType, String> error_message_map;
-            error_message_map[PGMessageType::kHumanReadableError] = e.what();
-            LOG_ERROR(e.what());
-            pg_handler_->send_error_response(error_message_map);
-            pg_handler_->send_ready_for_query();
+            HandleError(e.what());
         } catch (const std::exception &e) {
-            HashMap<PGMessageType, String> error_message_map;
-            error_message_map[PGMessageType::kHumanReadableError] = e.what();
-            LOG_ERROR(e.what());
-            pg_handler_->send_error_response(error_message_map);
-            pg_handler_->send_ready_for_query();
+            HandleError(e.what());
         }
     }
 }
@@ -265,43 +271,45 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(column_type->type_info().get());
                 switch (embedding_info->Type()) {
 
-                    case kElemBit: {
+                    case EmbeddingDataType::kElemBit: {
                         object_id = 1000;
                         object_width = 1;
                         break;
                     }
-                    case kElemUInt8:
-                    case kElemInt8: {
+                    case EmbeddingDataType::kElemUInt8:
+                    case EmbeddingDataType::kElemInt8: {
                         object_id = 1002;
                         object_width = 1;
                         break;
                     }
-                    case kElemInt16: {
+                    case EmbeddingDataType::kElemInt16: {
                         object_id = 1005;
                         object_width = 2;
                         break;
                     }
-                    case kElemInt32: {
+                    case EmbeddingDataType::kElemInt32: {
                         object_id = 1007;
                         object_width = 4;
                         break;
                     }
-                    case kElemInt64: {
+                    case EmbeddingDataType::kElemInt64: {
                         object_id = 1016;
                         object_width = 8;
                         break;
                     }
-                    case kElemFloat: {
+                    case EmbeddingDataType::kElemFloat16:
+                    case EmbeddingDataType::kElemBFloat16:
+                    case EmbeddingDataType::kElemFloat: {
                         object_id = 1021;
                         object_width = 4;
                         break;
                     }
-                    case kElemDouble: {
+                    case EmbeddingDataType::kElemDouble: {
                         object_id = 1022;
                         object_width = 8;
                         break;
                     }
-                    case kElemInvalid: {
+                    case EmbeddingDataType::kElemInvalid: {
                         String error_message = "Invalid embedding data type";
                         UnrecoverableError(error_message);
                     }
@@ -315,43 +323,45 @@ void Connection::SendTableDescription(const SharedPtr<DataTable> &result_table) 
                 }
                 const auto *sparse_info = static_cast<SparseInfo *>(column_type->type_info().get());
                 switch (sparse_info->DataType()) {
-                    case kElemBit: {
+                    case EmbeddingDataType::kElemBit: {
                         object_id = 1000;
                         object_width = 1;
                         break;
                     }
-                    case kElemUInt8:
-                    case kElemInt8: {
+                    case EmbeddingDataType::kElemUInt8:
+                    case EmbeddingDataType::kElemInt8: {
                         object_id = 1002;
                         object_width = 1;
                         break;
                     }
-                    case kElemInt16: {
+                    case EmbeddingDataType::kElemInt16: {
                         object_id = 1005;
                         object_width = 2;
                         break;
                     }
-                    case kElemInt32: {
+                    case EmbeddingDataType::kElemInt32: {
                         object_id = 1007;
                         object_width = 4;
                         break;
                     }
-                    case kElemInt64: {
+                    case EmbeddingDataType::kElemInt64: {
                         object_id = 1016;
                         object_width = 8;
                         break;
                     }
-                    case kElemFloat: {
+                    case EmbeddingDataType::kElemFloat16:
+                    case EmbeddingDataType::kElemBFloat16:
+                    case EmbeddingDataType::kElemFloat: {
                         object_id = 1021;
                         object_width = 4;
                         break;
                     }
-                    case kElemDouble: {
+                    case EmbeddingDataType::kElemDouble: {
                         object_id = 1022;
                         object_width = 8;
                         break;
                     }
-                    default: {
+                    case EmbeddingDataType::kElemInvalid: {
                         String error_message = "Should not reach here";
                         UnrecoverableError(error_message);
                     }

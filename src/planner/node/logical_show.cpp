@@ -74,6 +74,8 @@ String ToString(ShowType type) {
             return "Show config";
         case ShowType::kShowBuffer:
             return "Show buffer";
+        case ShowType::kShowMemIndex:
+            return "Sow memindex";
         case ShowType::kShowQueries:
             return "Show queries";
         case ShowType::kShowQuery:

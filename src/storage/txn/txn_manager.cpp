@@ -40,10 +40,8 @@ TxnManager::TxnManager(Catalog *catalog,
                        BGTaskProcessor *bg_task_processor,
                        WalManager *wal_mgr,
                        TransactionID start_txn_id,
-                       TxnTimeStamp start_ts,
-                       bool enable_compaction)
-    : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false),
-      enable_compaction_(enable_compaction) {}
+                       TxnTimeStamp start_ts)
+    : catalog_(catalog), buffer_mgr_(buffer_mgr), bg_task_processor_(bg_task_processor), wal_mgr_(wal_mgr), start_ts_(start_ts), is_running_(false) {}
 
 Txn *TxnManager::BeginTxn(UniquePtr<String> txn_text, bool ckp_txn) {
     // Check if the is_running_ is true
@@ -110,6 +108,7 @@ bool TxnManager::CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts) 
     return txn->CommitTS() < begin_ts;
 }
 
+// Prepare to commit ReadTxn
 TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
     std::lock_guard guard(locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
@@ -117,6 +116,7 @@ TxnTimeStamp TxnManager::GetCommitTimeStampR(Txn *txn) {
     return commit_ts;
 }
 
+// Prepare to commit WriteTxn
 TxnTimeStamp TxnManager::GetCommitTimeStampW(Txn *txn) {
     std::lock_guard guard(locker_);
     TxnTimeStamp commit_ts = ++start_ts_;
@@ -229,7 +229,7 @@ void TxnManager::Stop() {
         ++it;
     }
     txn_map_.clear();
-    LOG_INFO("TxnManager is stopped");
+    LOG_INFO("Txn manager is stopped");
 }
 
 bool TxnManager::Stopped() { return !is_running_.load(); }

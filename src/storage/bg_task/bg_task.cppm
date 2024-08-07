@@ -35,6 +35,7 @@ export enum class BGTaskType {
     kNotifyOptimize,
     kCleanup,
     kUpdateSegmentBloomFilterData, // Not used
+    kDumpIndex,
     kInvalid
 };
 
@@ -79,8 +80,7 @@ export struct StopProcessorTask final : public BGTask {
 };
 
 export struct AddDeltaEntryTask final : public BGTask {
-    AddDeltaEntryTask(UniquePtr<CatalogDeltaEntry> delta_entry)
-        : BGTask(BGTaskType::kAddDeltaEntry, false), delta_entry_(std::move(delta_entry)) {}
+    AddDeltaEntryTask(UniquePtr<CatalogDeltaEntry> delta_entry) : BGTask(BGTaskType::kAddDeltaEntry, false), delta_entry_(std::move(delta_entry)) {}
 
     String ToString() const final { return fmt::format("DeltaLog: {}", delta_entry_->ToString()); }
 
@@ -95,7 +95,7 @@ export struct CheckpointTask final : public CheckpointTaskBase {
     CheckpointTask(bool full_checkpoint) : CheckpointTaskBase(BGTaskType::kCheckpoint, false), is_full_checkpoint_(full_checkpoint) {}
 
     String ToString() const final {
-        if(is_full_checkpoint_) {
+        if (is_full_checkpoint_) {
             return "Full checkpoint";
         } else {
             return "Delta checkpoint";
@@ -112,7 +112,7 @@ export struct ForceCheckpointTask final : public CheckpointTaskBase {
     ~ForceCheckpointTask() = default;
 
     String ToString() const override {
-        if(is_full_checkpoint_) {
+        if (is_full_checkpoint_) {
             return fmt::format("Force full checkpoint, txn: ", txn_->TxnID());
         } else {
             return fmt::format("Force delta checkpoint, txn: ", txn_->TxnID());
@@ -132,9 +132,7 @@ public:
 public:
     ~CleanupTask() override = default;
 
-    String ToString() const override {
-        return fmt::format("CleanupTask, visible timestamp: {}", visible_ts_);
-    }
+    String ToString() const override { return fmt::format("CleanupTask, visible timestamp: {}", visible_ts_); }
 
     void Execute() {
         CleanupScanner scanner(catalog_, visible_ts_, buffer_mgr_);
@@ -167,6 +165,24 @@ public:
     ~NotifyOptimizeTask() override = default;
 
     String ToString() const override { return "NotifyOptimizeTask"; }
+};
+
+export class DumpIndexTask final : public BGTask {
+public:
+    DumpIndexTask(i64 id, SharedPtr<String> db_name, SharedPtr<String> table_name, SharedPtr<String> index_name)
+        : BGTask(BGTaskType::kDumpIndex, true), task_id_(id), db_name_(db_name), table_name_(table_name), index_name_(index_name) {}
+
+    ~DumpIndexTask() override = default;
+
+    String ToString() const override {
+        return fmt::format("DumpIndexTask, index: {}, table: {}, db: {}", index_name_->c_str(), table_name_->c_str(), db_name_->c_str());
+    }
+
+public:
+    i64 task_id_{};
+    SharedPtr<String> db_name_;
+    SharedPtr<String> table_name_;
+    SharedPtr<String> index_name_;
 };
 
 } // namespace infinity

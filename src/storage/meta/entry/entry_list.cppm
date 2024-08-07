@@ -133,6 +133,10 @@ public:
             return entry_left->commit_ts_ > entry_right->commit_ts_;
         });
     }
+
+    List<SharedPtr<Entry>> GetAllEntries() const {
+        return entry_list_;
+    }
 private:
     // helper
     FindResult FindEntryNoLock(TransactionID txn_id, TxnTimeStamp begin_ts, TxnManager *txn_mgr);

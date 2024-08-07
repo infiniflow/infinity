@@ -54,6 +54,7 @@ export enum class ShowType {
     kShowGlobalVariables,
     kShowConfig,
     kShowBuffer,
+    kShowMemIndex,
     kShowLogs,
     kShowDeltaLogs,
     kShowCatalogs,

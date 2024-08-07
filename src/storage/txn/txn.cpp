@@ -305,7 +305,6 @@ Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_
     {
         std::lock_guard guard(txn_store_.mtx_);
         auto *txn_table_store = txn_store_.GetTxnTableStore(table_entry);
-        txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
         for (auto &segment_index_entry : segment_index_entries) {
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
             segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
@@ -459,9 +458,8 @@ TxnTimeStamp Txn::Commit() {
     std::unique_lock<std::mutex> lk(commit_lock_);
     commit_cv_.wait(lk, [this] { return commit_bottom_done_; });
 
-    if (txn_mgr_->enable_compaction()) {
-        txn_store_.MaintainCompactionAlg();
-    }
+    txn_store_.MaintainCompactionAlg();
+
     if (!txn_delta_ops_entry_->operations().empty()) {
         txn_mgr_->AddDeltaEntry(std::move(txn_delta_ops_entry_));
     }

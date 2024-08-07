@@ -182,17 +182,17 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
     elif isinstance(value, np.floating):
         value = float(value)
     elif isinstance(value, list) and isinstance(value[0], np.ndarray):
-        value = [x.tolist() for x in value]
+        if value[0].ndim <= 2:
+            value = [x.tolist() for x in value]
+        else:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Invalid list member type: {type(value[0])}, ndarray dimension > 2")
     elif isinstance(value, np.ndarray):
         if value.ndim <= 2:
-            value = value.flatten().tolist()
+            value = value.tolist()
         else:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION,
                                     f"Invalid list type: {type(value)}, ndarray dimension > 2")
-    # flatten list[list] to list
-    match value:
-        case [[(int() | float()), *_], *_]:
-            value = [x for xs in value for x in xs]
     # match ConstantExpr
     match value:
         case str():
@@ -209,6 +209,12 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
         case [float(), *_]:
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
                                                       f64_array_value=value)
+        case [[int(), *_], *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerTensor,
+                                                      i64_tensor_value=value)
+        case [[float(), *_], *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleTensor,
+                                                      f64_tensor_value=value)
         case [[[int(), *_], *_], *_]:
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerTensorArray,
                                                       i64_tensor_array_value=value)

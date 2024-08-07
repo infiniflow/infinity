@@ -71,6 +71,9 @@ std::string StatementType2Str(StatementType statement_type) {
         case StatementType::kCompact: {
             return "COMPACT";
         }
+        case StatementType::kAdmin: {
+            return "ADMIN";
+        }
     }
 
     return "Error";

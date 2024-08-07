@@ -41,6 +41,7 @@ export enum class ErrorCode : long {
     kInsufficientPrivilege = 2002,
     kUnsupportedVersionIndex = 2003,
     kClientVersionMismatch = 2004,
+    kAdminOnlySupportInMaintenanceMode = 2005,
 
     // 3. syntax error or access rule violation
     kInvalidUsername = 3001,
@@ -127,6 +128,8 @@ export enum class ErrorCode : long {
     kChunkNotExist = 3082,
     kNameMismatched = 3083,
     kTransactionNotFound = 3084,
+    kInvalidDatabaseIndex = 3085,
+    kInvalidTableIndex = 3086,
 
     // 4. Txn fail
     kTxnRollback = 4001,
@@ -168,6 +171,8 @@ export enum class ErrorCode : long {
     kDuplicateEntry = 8002,
     kNotFoundEntry = 8003,
     kEmptyEntryList = 8004,
+    kNoWALEntryFound = 8005,
+    kWrongCheckpointType = 8006,
 };
 
 export class Status {
@@ -191,6 +196,7 @@ public:
     static Status InsufficientPrivilege(const String &user_name, const String &detailed_error);
     static Status UnsupportedVersionIndex(i64 given_index);
     static Status ClientVersionMismatch(const char* expected_version, const char* given_version);
+    static Status AdminOnlySupportInMaintenanceMode();
 
     // 3. Syntax error or access rule violation
     static Status InvalidUserName(const String &user_name);
@@ -273,6 +279,8 @@ public:
     static Status ChunkNotExist(ChunkID chunk_id);
     static Status NameMismatched(const String& name_left, const String& name_right);
     static Status TransactionNotFound(TransactionID txn_id);
+    static Status InvalidDatabaseIndex(u64 database_index, u64 capacity);
+    static Status InvalidTableIndex(u64 table_index, u64 capacity);
 
     // 4. TXN fail
     static Status TxnRollback(u64 txn_id, const String &rollback_reason = "no reanson gived");
@@ -313,6 +321,8 @@ public:
     static Status NotFoundEntry();
     static Status DuplicateEntry();
     static Status EmptyEntryList();
+    static Status NoWALEntryFound(const String& file_name, i64 index);
+    static Status WrongCheckpointType(const String& expect_type, const String& actual_type);
 
 public:
     Status() = default;

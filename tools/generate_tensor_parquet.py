@@ -58,7 +58,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
     with open(import_slt_path, "w") as slt_file:
         def write_query():
             for row_id in range(row_n):
-                slt_file.write("{} ".format(row_id))
+                slt_file.write("{} [".format(row_id))
                 for i in range(len(data[row_id])):
                     slt_file.write("[")
                     for j in range(dim):
@@ -68,7 +68,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
                     slt_file.write("]")
                     if i != len(data[row_id]) - 1:
                         slt_file.write(",")
-                slt_file.write("\n")
+                slt_file.write("]\n")
             slt_file.write("\n")
 
         slt_file.write("statement ok\n")

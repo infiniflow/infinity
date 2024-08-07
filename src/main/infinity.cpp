@@ -75,9 +75,15 @@ void Infinity::LocalInit(const String &path) {
         InfinityContext::instance().Init(config_path);
     } else {
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
+        default_config->default_log_dir_ = fmt::format("{}/log", path);
+        default_config->default_data_dir_ = fmt::format("{}/data", path);
+        default_config->default_wal_dir_ = fmt::format("{}/wal", path);
+        default_config->default_temp_dir_ = fmt::format("{}/tmp", path);
+        default_config->default_resource_dir_ = fmt::format("{}/resource", path);
+
         default_config->default_log_level_ = LogLevel::kInfo;
         default_config->default_log_to_stdout_ = false;
-        InfinityContext::instance().Init(nullptr, default_config.get());
+        InfinityContext::instance().Init(nullptr, false, default_config.get());
     }
 }
 
@@ -87,7 +93,7 @@ SharedPtr<Infinity> Infinity::LocalConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
 
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    infinity_ptr->session_ = session_mgr->CreateLocalSession();
+    infinity_ptr->session_ = session_mgr->CreateLocalSession(InfinityContext::instance().MaintenanceMode());
     return infinity_ptr;
 }
 
@@ -98,7 +104,11 @@ void Infinity::LocalDisconnect() {
 SharedPtr<Infinity> Infinity::RemoteConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    infinity_ptr->session_ = session_mgr->CreateRemoteSession();
+    SharedPtr<RemoteSession> remote_session = session_mgr->CreateRemoteSession(InfinityContext::instance().MaintenanceMode());
+    if(remote_session == nullptr) {
+        return nullptr;
+    }
+    infinity_ptr->session_ = std::move(remote_session);
     return infinity_ptr;
 }
 

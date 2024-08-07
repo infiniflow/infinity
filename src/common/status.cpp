@@ -111,14 +111,20 @@ Status Status::InsufficientPrivilege(const String &user_name, const String &deta
 }
 
 Status Status::UnsupportedVersionIndex(i64 given_index) {
-    return Status(ErrorCode::kUnsupportedVersionIndex,
-                  MakeUnique<String>(fmt::format("Index: {} isn't supported, you are using a deprecated version of Python SDK. Please install the corresponding version Python SDK.",
-                                                 given_index)));
+    return Status(
+        ErrorCode::kUnsupportedVersionIndex,
+        MakeUnique<String>(fmt::format(
+            "Index: {} isn't supported, you are using a deprecated version of Python SDK. Please install the corresponding version Python SDK.",
+            given_index)));
 }
 
-Status Status::ClientVersionMismatch(const char* expected_version, const char* given_version) {
-    return Status(ErrorCode::kClientVersionMismatch, MakeUnique<String>(fmt::format("Expected version index: {}, connecting version: {}",
-                                                                                    expected_version, given_version)));
+Status Status::ClientVersionMismatch(const char *expected_version, const char *given_version) {
+    return Status(ErrorCode::kClientVersionMismatch,
+                  MakeUnique<String>(fmt::format("Expected version index: {}, connecting version: {}", expected_version, given_version)));
+}
+
+Status Status::AdminOnlySupportInMaintenanceMode() {
+    return Status(ErrorCode::kAdminOnlySupportInMaintenanceMode, MakeUnique<String>("Only maintanence mode supports ADMIN command"));
 }
 
 // 3. Syntax error or access rule violation
@@ -326,7 +332,9 @@ Status Status::InvalidConstraintType() { return Status(ErrorCode::kInvalidConstr
 
 Status Status::InvalidKnnDistanceType() { return Status(ErrorCode::kInvalidKnnDistanceType, MakeUnique<String>("Invalid knn distance type.")); }
 
-Status Status::InvalidEmbeddingDataType(const String& type_str) { return Status(ErrorCode::kInvalidEmbeddingDataType, MakeUnique<String>(fmt::format("Invalid embedding data type: {}.", type_str))); }
+Status Status::InvalidEmbeddingDataType(const String &type_str) {
+    return Status(ErrorCode::kInvalidEmbeddingDataType, MakeUnique<String>(fmt::format("Invalid embedding data type: {}.", type_str)));
+}
 
 Status Status::InvalidConstantType() { return Status(ErrorCode::kInvalidConstantType, MakeUnique<String>("Invalid constant type.")); }
 
@@ -379,19 +387,17 @@ Status Status::InvalidCommand(const String &detailed_error) {
     return Status(ErrorCode::kInvalidCommand, MakeUnique<String>(fmt::format("Invalid command: {}", detailed_error)));
 }
 
-Status Status::AnalyzerNotFound(const String& name) {
+Status Status::AnalyzerNotFound(const String &name) {
     return Status(ErrorCode::kAnalyzerNotFound, MakeUnique<String>(fmt::format("Analyzer {} isn't found", name)));
 }
 
-Status Status::NotSupportedAnalyzer(const String& name) {
+Status Status::NotSupportedAnalyzer(const String &name) {
     return Status(ErrorCode::kNotSupportedAnalyzer, MakeUnique<String>(fmt::format("Analyzer {} isn't supported", name)));
 }
 
-Status Status::InvalidAnalyzerName(const String& name) {
-    return Status(ErrorCode::kInvalidAnalyzerName, MakeUnique<String>(name));
-}
+Status Status::InvalidAnalyzerName(const String &name) { return Status(ErrorCode::kInvalidAnalyzerName, MakeUnique<String>(name)); }
 
-Status Status::InvalidAnalyzerFile(const String& detailed_info) {
+Status Status::InvalidAnalyzerFile(const String &detailed_info) {
     return Status(ErrorCode::kInvalidAnalyzerName, MakeUnique<String>(fmt::format("Invalid analyzer file path: {}", detailed_info)));
 }
 
@@ -399,12 +405,20 @@ Status Status::ChunkNotExist(ChunkID chunk_id) {
     return Status(ErrorCode::kChunkNotExist, MakeUnique<String>(fmt::format("Index chunk: {} doesn't exist", chunk_id)));
 }
 
-Status Status::NameMismatched(const String& name_left, const String& name_right) {
+Status Status::NameMismatched(const String &name_left, const String &name_right) {
     return Status(ErrorCode::kNameMismatched, MakeUnique<String>(fmt::format("It is {}, expects {}", name_left, name_right)));
 }
 
 Status Status::TransactionNotFound(TransactionID txn_id) {
     return Status(ErrorCode::kTransactionNotFound, MakeUnique<String>(fmt::format("Transaction {} isn't found", txn_id)));
+}
+
+Status Status::InvalidDatabaseIndex(u64 database_index, u64 capacity) {
+    return Status(ErrorCode::kInvalidDatabaseIndex, MakeUnique<String>(fmt::format("Invalid database index: {} (0-{})", database_index, capacity - 1)));
+}
+
+Status Status::InvalidTableIndex(u64 table_index, u64 capacity) {
+    return Status(ErrorCode::kInvalidTableIndex, MakeUnique<String>(fmt::format("Invalid table index: {} (0-{})", table_index, capacity - 1)));
 }
 
 // 4. TXN fail
@@ -440,9 +454,7 @@ Status Status::QueryTooBig(const String &query_text, u64 ast_node) {
     return Status(ErrorCode::kQueryIsTooComplex, MakeUnique<String>(fmt::format("Query: {} is too complex with {} AST nodes", query_text, ast_node)));
 }
 
-Status Status::FailToGetSysInfo(const String &detailed_info) {
-    return Status(ErrorCode::kFailToGetSysInfo, MakeUnique<String>(detailed_info));
-}
+Status Status::FailToGetSysInfo(const String &detailed_info) { return Status(ErrorCode::kFailToGetSysInfo, MakeUnique<String>(detailed_info)); }
 
 // 6. Operation intervention
 Status Status::QueryCancelled(const String &query_text) {
@@ -468,7 +480,7 @@ Status Status::ConfigFileError(const String &path, const String &detailed_info) 
     return Status(ErrorCode::kConfigFileError, MakeUnique<String>(fmt::format("Config file: {}, {}", path, detailed_info)));
 }
 
-Status Status::LockFileError(const String &path, const String& error_msg) {
+Status Status::LockFileError(const String &path, const String &error_msg) {
     return Status(ErrorCode::kLockFileError, MakeUnique<String>(fmt::format("Lock file error: {}, {}", path, error_msg)));
 }
 
@@ -527,5 +539,14 @@ Status Status::NotFoundEntry() { return Status(ErrorCode::kNotFoundEntry, MakeUn
 Status Status::DuplicateEntry() { return Status(ErrorCode::kDuplicateEntry, MakeUnique<String>("Duplicate entry")); }
 
 Status Status::EmptyEntryList() { return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>("Empty entry list")); }
+
+Status Status::NoWALEntryFound(const String &file_name, i64 index) {
+    return Status(ErrorCode::kEmptyEntryList, MakeUnique<String>(fmt::format("No WAL entry: {} found in WAL file: {}", index, file_name)));
+}
+
+Status Status::WrongCheckpointType(const String &expect_type, const String &actual_type) {
+    return Status(ErrorCode::kWrongCheckpointType,
+                  MakeUnique<String>(fmt::format("Expect checkpoint type: {}, actual checkpoint type: {}", expect_type, actual_type)));
+}
 
 } // namespace infinity

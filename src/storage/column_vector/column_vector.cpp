@@ -849,15 +849,16 @@ String ColumnVector::ToString(SizeT row_index) const {
                                                  tensor_array_chunk_offset,
                                                  tensor_num * sizeof(TensorT));
             OStringStream oss;
+            oss << '[';
             for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
                 const auto &[embedding_num, chunk_id, chunk_offset] = tensor_array[tensor_id];
                 const char *raw_data_ptr = buffer_->fix_heap_mgr_1_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-                oss << "[" << TensorT::Tensor2String(const_cast<char *>(raw_data_ptr), embedding_data_type, unit_embedding_dimension, embedding_num)
-                    << "]";
+                oss << TensorT::Tensor2String(const_cast<char *>(raw_data_ptr), embedding_data_type, unit_embedding_dimension, embedding_num);
                 if (tensor_id != tensor_num - 1) {
-                    oss << ",";
+                    oss << ',';
                 }
             }
+            oss << ']';
             return std::move(oss).str();
         }
         case kSparse: {
@@ -1634,7 +1635,15 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     AppendEmbedding<DoubleT>(ele_str_views, dst_off);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendEmbedding<Float16T>(ele_str_views, dst_off);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendEmbedding<BFloat16T>(ele_str_views, dst_off);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
@@ -1683,7 +1692,15 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     AppendTensor<DoubleT>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendTensor<Float16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendTensor<BFloat16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
@@ -1738,7 +1755,15 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     AppendTensorArray<DoubleT>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendTensorArray<Float16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendTensorArray<BFloat16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
@@ -1795,7 +1820,15 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                     AppendSparse<DoubleT>(ele_str_views, index);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendSparse<Float16T>(ele_str_views, index);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendSparse<BFloat16T>(ele_str_views, index);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid sparse type";
                     UnrecoverableError(error_message);
                 }

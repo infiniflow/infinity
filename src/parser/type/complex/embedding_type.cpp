@@ -26,7 +26,12 @@ size_t EmbeddingType::embedding_type_width[] = {
     4, // float32
     8, // double64
     1, // uint8
+    2, // float16
+    2, // bfloat16
 };
+
+static_assert(std::size(EmbeddingType::embedding_type_width) == static_cast<size_t>(EmbeddingDataType::kElemInvalid),
+              "embedding_type_width size should be equal to EmbeddingDataType enum num.");
 
 void EmbeddingType::Init(const void *from_ptr, size_t size) {
     // User need to guarantee the size is matched.

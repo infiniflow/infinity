@@ -10,7 +10,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
+from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN, CommonMatchTensorExpr
 from infinity.embedded_infinity_ext import *
 from infinity.local_infinity.types import logic_type_to_dtype, make_match_tensor_expr
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
@@ -102,6 +102,9 @@ class InfinityLocalQueryBuilder(ABC):
                                    "smallint", "bigint"]:
             embedding_data = [int(x) for x in embedding_data]
 
+        if embedding_data_type in ["float", "float32", "double", "float64", "float16", "bfloat16"]:
+            embedding_data = [float(x) for x in embedding_data]
+
         data = EmbeddingData()
         elem_type = EmbeddingDataType.kElemFloat
         if embedding_data_type == "bit":
@@ -128,6 +131,12 @@ class InfinityLocalQueryBuilder(ABC):
         elif embedding_data_type in ["double", "float64"]:
             elem_type = EmbeddingDataType.kElemDouble
             data.f64_array_value = embedding_data
+        elif embedding_data_type in ["float16"]:
+            elem_type = EmbeddingDataType.kElemFloat16
+            data.f16_array_value = embedding_data
+        elif embedding_data_type in ["bfloat16"]:
+            elem_type = EmbeddingDataType.kElemBFloat16
+            data.bf16_array_value = embedding_data
         else:
             raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
@@ -258,7 +267,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._search.match_exprs += [match_tensor_expr]
         return self
 
-    def fusion(self, method: str, options_text: str = None, match_tensor_expr=None) -> InfinityLocalQueryBuilder:
+    def fusion(self, method: str, options_text: str = None, match_tensor_expr: CommonMatchTensorExpr = None) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
         fusion_expr = WrapFusionExpr()
@@ -267,7 +276,13 @@ class InfinityLocalQueryBuilder(ABC):
             fusion_expr.options_text = options_text
         if match_tensor_expr is not None:
             fusion_expr.has_match_tensor_expr = True
-            fusion_expr.match_tensor_expr = match_tensor_expr
+            fusion_expr.match_tensor_expr = make_match_tensor_expr(
+                match_tensor_expr.vector_column_name,
+                match_tensor_expr.embedding_data,
+                match_tensor_expr.embedding_data_type,
+                match_tensor_expr.method_type,
+                match_tensor_expr.extra_option
+            )
         else:
             fusion_expr.has_match_tensor_expr = False
 

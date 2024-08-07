@@ -30,7 +30,7 @@ class Storage;
 class BGTaskProcessor;
 class TableEntry;
 class Txn;
-class SegmentEntry;
+struct SegmentEntry;
 
 export class WalManager {
 public:
@@ -107,6 +107,7 @@ public:
     u64 cfg_delta_checkpoint_interval_wal_bytes_{};
 
     const String &wal_dir() const { return wal_dir_; }
+    const String &data_path() const { return data_path_; }
 
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue

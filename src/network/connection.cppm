@@ -56,6 +56,8 @@ private:
 
     void SendQueryResponse(const QueryResult &query_result);
 
+    void HandleError(const char* error_message);
+
 private:
     const SharedPtr<boost::asio::ip::tcp::socket> socket_{};
 

@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
+from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN, CommonMatchTensorExpr
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -119,6 +119,9 @@ class InfinityThriftQueryBuilder(ABC):
         if embedding_data_type in ["uint8", "int8", "int16", "int32", "int", "int64"]:
             embedding_data = [int(x) for x in embedding_data]
 
+        if embedding_data_type in ["float", "float32", "double", "float64", "float16", "bfloat16"]:
+            embedding_data = [float(x) for x in embedding_data]
+
         data = EmbeddingData()
         elem_type = ElementType.ElementFloat32
         if embedding_data_type == "bit":
@@ -145,6 +148,12 @@ class InfinityThriftQueryBuilder(ABC):
         elif embedding_data_type in ["double", "float64"]:
             elem_type = ElementType.ElementFloat64
             data.f64_array_value = embedding_data
+        elif embedding_data_type == "float16":
+            elem_type = ElementType.ElementFloat16
+            data.f16_array_value = embedding_data
+        elif embedding_data_type == "bfloat16":
+            elem_type = ElementType.ElementBFloat16
+            data.bf16_array_value = embedding_data
         else:
             raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
@@ -236,7 +245,7 @@ class InfinityThriftQueryBuilder(ABC):
         self,
         method: str,
         options_text: str = "",
-        match_tensor_expr: MatchTensorExpr = None,
+        match_tensor_expr: CommonMatchTensorExpr = None,
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
@@ -246,7 +255,13 @@ class InfinityThriftQueryBuilder(ABC):
         fusion_expr.method = method
         fusion_expr.options_text = options_text
         if match_tensor_expr is not None:
-            fusion_expr.optional_match_tensor_expr = match_tensor_expr
+            fusion_expr.optional_match_tensor_expr = make_match_tensor_expr(
+                match_tensor_expr.vector_column_name,
+                match_tensor_expr.embedding_data,
+                match_tensor_expr.embedding_data_type,
+                match_tensor_expr.method_type,
+                match_tensor_expr.extra_option
+            )
         elif fusion_expr.method == "match_tensor":
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Match tensor expression is required")
         self._search.fusion_exprs.append(fusion_expr)

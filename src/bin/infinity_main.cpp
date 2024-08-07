@@ -28,6 +28,7 @@ import infinity_context;
 import thrift_server;
 import http_server;
 import logger;
+import simd_init;
 
 namespace {
 
@@ -163,20 +164,19 @@ auto main(int argc, char **argv) -> int {
                "|  | |  |\\   | |  |     |  | |  |\\   | |  |     |  |         |  |     \n"
                "|__| |__| \\__| |__|     |__| |__| \\__| |__|     |__|         |__|     \n");
 
-    StartupParameter parameters;
     CLI::App app{"infinity_main"};
-    String config_path = "";
-    app.add_option("-f,--config", config_path, "Specify the config file path. No default config file");
+
+    SharedPtr<String> config_path = MakeShared<String>();
+    bool m_flag{false};
+    app.add_option("-f,--config", *config_path, "Specify the config file path. No default config file");
+    app.add_flag("-m,--maintenance", m_flag, "Start Infinity in maintenance mode");
     try {
         app.parse(argc, argv);
     } catch (const CLI::ParseError &e) {
         return app.exit(e);
     }
-    if (!config_path.empty()) {
-        parameters.config_path = MakeShared<String>(config_path);
-    }
 
-    InfinityContext::instance().Init(parameters.config_path);
+    InfinityContext::instance().Init(config_path, m_flag, nullptr);
 
     InfinityContext::instance().config()->PrintAll();
 
@@ -188,6 +188,8 @@ auto main(int argc, char **argv) -> int {
                build_type(),
                git_branch_name(),
                git_commit_id());
+
+    fmt::print("Currently enabled SIMD support: {}\n", fmt::join(GetSupportedSimdTypesList(), ", "));
 
     http_server_thread = infinity::Thread([&]() { http_server.Start(InfinityContext::instance().config()->HTTPPort()); });
 

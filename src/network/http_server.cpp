@@ -13,6 +13,7 @@
 // limitations under the License.
 module;
 
+#include <arrow/type_fwd.h>
 #include <cstring>
 #include <iostream>
 
@@ -51,6 +52,7 @@ import column_expr;
 import type_info;
 import logical_type;
 import embedding_info;
+import sparse_info;
 import decimal_info;
 import status;
 import constant_expr;
@@ -263,7 +265,9 @@ public:
         auto properties = body_info_json["properties"];
 
         nlohmann::json json_response;
+        json_response["error_code"] = 0;
         HTTPStatus http_status;
+        http_status = HTTPStatus::CODE_200;
 
         if (!fields.is_array()) {
             infinity::Status status = infinity::Status::InvalidColumnDefinition("Expect json array in column definitions");
@@ -325,6 +329,10 @@ public:
                     e_data_type = EmbeddingDataType::kElemFloat;
                 } else if (etype == "double") {
                     e_data_type = EmbeddingDataType::kElemDouble;
+                } else if (etype == "float16") {
+                    e_data_type = EmbeddingDataType::kElemFloat16;
+                } else if (etype == "bfloat16") {
+                    e_data_type = EmbeddingDataType::kElemBFloat16;
                 } else {
                     infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
                     json_response["error_code"] = status.code();
@@ -335,7 +343,80 @@ public:
                 }
                 type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
                 column_type = std::make_shared<DataType>(LogicalType::kEmbedding, type_info);
-            } else if (value_type == "decimal") {
+            } else if (value_type == "sparse") {
+                String dtype = field_element["data_type"];
+                String itype = field_element["index_type"];
+                int dimension = field_element["dimension"];
+                EmbeddingDataType d_data_type;
+                EmbeddingDataType i_data_type;
+                if (dtype == "float") {
+                    d_data_type = EmbeddingDataType::kElemFloat;
+                } else if (dtype == "double") {
+                    d_data_type = EmbeddingDataType::kElemDouble;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(dtype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+
+                if (itype == "tinyint") {
+                    i_data_type = EmbeddingDataType::kElemInt8;
+                } else if (itype == "smallint") {
+                    i_data_type = EmbeddingDataType::kElemInt16;
+                } else if (itype == "integer") {
+                    i_data_type = EmbeddingDataType::kElemInt32;
+                } else if (itype == "bigint") {
+                    i_data_type = EmbeddingDataType::kElemInt64;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(itype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+                type_info = SparseInfo::Make(d_data_type, i_data_type, size_t(dimension), SparseStoreType::kSort);
+                column_type = std::make_shared<DataType>(LogicalType::kSparse, type_info);
+            } else if (value_type == "tensor") {
+                String etype = field_element["element_type"];
+                int dimension = field_element["dimension"];
+                EmbeddingDataType e_data_type;
+                if (etype == "float") {
+                    e_data_type = EmbeddingDataType::kElemFloat;
+                } else if (etype == "double") {
+                    e_data_type = EmbeddingDataType::kElemDouble;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
+                column_type = std::make_shared<DataType>(LogicalType::kTensor, type_info);
+            } else if(value_type == "tensorarray") {
+                String etype = field_element["element_type"];
+                int dimension = field_element["dimension"];
+                EmbeddingDataType e_data_type;
+                if (etype == "float") {
+                    e_data_type = EmbeddingDataType::kElemFloat;
+                } else if (etype == "double") {
+                    e_data_type = EmbeddingDataType::kElemDouble;
+                } else {
+                    infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
+                    json_response["error_code"] = status.code();
+                    json_response["error_message"] = status.message();
+                    HTTPStatus http_status;
+                    http_status = HTTPStatus::CODE_500;
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
+                type_info = EmbeddingInfo::Make(e_data_type, size_t(dimension));
+                column_type = std::make_shared<DataType>(LogicalType::kTensorArray, type_info);
+            }else if (value_type == "decimal") {
                 type_info = DecimalInfo::Make(field_element["precision"], field_element["scale"]);
                 column_type = std::make_shared<DataType>(LogicalType::kDecimal, type_info);
             } else if (value_type == "array") {
@@ -391,18 +472,18 @@ public:
             }
         }
 
-        auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
-
-        column_definitions.clear();
-        table_constraint.clear();
-
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+        if(json_response["error_code"] == 0) {
+            auto result = infinity->CreateTable(database_name, table_name, column_definitions, table_constraint, options);
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
+            column_definitions.clear();
+            table_constraint.clear();
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
@@ -423,6 +504,7 @@ public:
         HTTPStatus http_status;
         http_status = HTTPStatus::CODE_200;
         nlohmann::json json_response;
+        json_response["error_code"] = 0;
 
         DropTableOptions options;
         if (body_info_json.contains("drop_option")) {
@@ -445,15 +527,16 @@ public:
             }
         }
 
-        auto result = infinity->DropTable(database_name, table_name, options);
-
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+        if (json_response["error_code"] == 0) {
+            auto result = infinity->DropTable(database_name, table_name, options);
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
@@ -565,13 +648,16 @@ public:
                 export_options.copy_file_type_ = CopyFileType::kCSV;
             } else if (file_type_str == "jsonl") {
                 export_options.copy_file_type_ = CopyFileType::kJSONL;
-            } else {
+            } else if (file_type_str == "fvecs"){
+                export_options.copy_file_type_ = CopyFileType::kFVECS;
+            }
+            else {
                 json_response["error_code"] = ErrorCode::kNotSupported;
                 json_response["error_message"] = fmt::format("Not supported file type {}", file_type_str);
                 return ResponseFactory::createResponse(http_status, json_response.dump());
             }
 
-            if (export_options.copy_file_type_ == CopyFileType::kCSV) {
+            if (json_response["error_code"] != ErrorCode::kNotSupported) {
                 if (http_body_json.contains("header")) {
                     export_options.header_ = http_body_json["header"];
                 }
@@ -597,7 +683,6 @@ public:
                 }
             }
             String file_path = http_body_json["file_path"];
-
             Vector<ParsedExpr *> *export_columns{nullptr};
             DeferFn defer_fn([&]() {
                 if (export_columns != nullptr) {
@@ -1237,34 +1322,55 @@ public:
             nlohmann::json http_body_json = nlohmann::json::parse(data_body);
 
             const String filter_string = http_body_json["filter"];
+            if(filter_string != "") {
+                UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+                ExprParser expr_parser;
+                expr_parser.Parse(filter_string, expr_parsed_result.get());
+                if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
+                    json_response["error_code"] = ErrorCode::kInvalidFilterExpression;
+                    json_response["error_message"] = fmt::format("Invalid filter expression: {}", filter_string);
+                    return ResponseFactory::createResponse(http_status, json_response.dump());
+                }
 
-            UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
-            ExprParser expr_parser;
-            expr_parser.Parse(filter_string, expr_parsed_result.get());
-            if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() != 1) {
-                json_response["error_code"] = ErrorCode::kInvalidFilterExpression;
-                json_response["error_message"] = fmt::format("Invalid filter expression: {}", filter_string);
-                return ResponseFactory::createResponse(http_status, json_response.dump());
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                const QueryResult result = infinity->Delete(database_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
+                expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+
+                if (result.IsOk()) {
+                    json_response["error_code"] = 0;
+                    http_status = HTTPStatus::CODE_200;
+
+                    // Only one block
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    // Get sum delete rows
+                    Value value = data_block->GetValue(1, 0);
+                    json_response["delete_row_count"] = value.value_.big_int;
+                } else {
+                    json_response["error_code"] = result.ErrorCode();
+                    json_response["error_message"] = result.ErrorMsg();
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
+            else {
+                auto database_name = request->getPathVariable("database_name");
+                auto table_name = request->getPathVariable("table_name");
+                const QueryResult result = infinity->Delete(database_name, table_name, nullptr);
 
-            auto database_name = request->getPathVariable("database_name");
-            auto table_name = request->getPathVariable("table_name");
-            const QueryResult result = infinity->Delete(database_name, table_name, expr_parsed_result->exprs_ptr_->at(0));
-            expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+                if (result.IsOk()) {
+                    json_response["error_code"] = 0;
+                    http_status = HTTPStatus::CODE_200;
 
-            if (result.IsOk()) {
-                json_response["error_code"] = 0;
-                http_status = HTTPStatus::CODE_200;
-
-                // Only one block
-                DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
-                // Get sum delete rows
-                Value value = data_block->GetValue(1, 0);
-                json_response["delete_row_count"] = value.value_.big_int;
-            } else {
-                json_response["error_code"] = result.ErrorCode();
-                json_response["error_message"] = result.ErrorMsg();
-                http_status = HTTPStatus::CODE_500;
+                    // Only one block
+                    DataBlock *data_block = result.result_table_->GetDataBlockById(0).get();
+                    // Get sum delete rows
+                    Value value = data_block->GetValue(1, 0);
+                    json_response["delete_row_count"] = value.value_.big_int;
+                } else {
+                    json_response["error_code"] = result.ErrorCode();
+                    json_response["error_message"] = result.ErrorMsg();
+                    http_status = HTTPStatus::CODE_500;
+                }
             }
         } catch (nlohmann::json::exception &e) {
             json_response["error_code"] = ErrorCode::kInvalidJsonFormat;
@@ -1692,7 +1798,9 @@ public:
         nlohmann::json body_info_json = nlohmann::json::parse(body_info);
 
         nlohmann::json json_response;
+        json_response["error_code"] = 0;
         HTTPStatus http_status;
+        http_status = HTTPStatus::CODE_500;
         DropIndexOptions options{ConflictType::kInvalid};
         if (body_info_json.contains("drop_option")) {
             auto drop_option = body_info_json["drop_option"];
@@ -1714,15 +1822,16 @@ public:
             }
         }
 
-        auto result = infinity->DropIndex(database_name, table_name, index_name, options);
-
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+        if(json_response["error_code"] == 0) {
+            auto result = infinity->DropIndex(database_name, table_name, index_name, options);
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }
@@ -1742,7 +1851,9 @@ public:
         nlohmann::json body_info_json = nlohmann::json::parse(body_info_str);
 
         nlohmann::json json_response;
+        json_response["error_code"] = 0;
         HTTPStatus http_status;
+        http_status = HTTPStatus::CODE_200;
 
         CreateIndexOptions options;
         if (body_info_json.contains("create_option")) {
@@ -1771,10 +1882,34 @@ public:
         auto index = body_info_json["index"];
 
         auto index_info_list = new Vector<IndexInfo *>();
+        DeferFn release_index_info([&]() {
+            if(index_info_list != nullptr) {
+                for (auto &index_info_ptr : *index_info_list) {
+                    delete index_info_ptr;
+                }
+                delete index_info_list;
+                index_info_list = nullptr;
+            }
+        });
         {
             auto index_info = new IndexInfo();
+            DeferFn release_index_info([&]() {
+                if(index_info != nullptr) {
+                    delete index_info;
+                    index_info = nullptr;
+                }
+            });
             index_info->column_name_ = fields[0];
             auto index_param_list = new Vector<InitParameter *>();
+            DeferFn release_index_param_list([&]() {
+                if(index_param_list != nullptr) {
+                    for (auto &index_param_ptr : *index_param_list) {
+                        delete index_param_ptr;
+                    }
+                    delete index_param_list;
+                    index_param_list = nullptr;
+                }
+            });
 
             for (auto &ele : index.items()) {
                 String name = ele.key();
@@ -1786,27 +1921,6 @@ public:
                 if (strcmp(name.c_str(), "type") == 0) {
                     index_info->index_type_ = IndexInfo::StringToIndexType(value);
                     if (index_info->index_type_ == IndexType::kInvalid) {
-                        {
-                            delete index_info;
-                            index_info = nullptr;
-                        }
-
-                        {
-                            for (auto &index_info_ptr : *index_info_list) {
-                                delete index_info_ptr;
-                            }
-                            delete index_info_list;
-                            index_info_list = nullptr;
-                        }
-
-                        {
-                            for (auto &index_param_ptr : *index_param_list) {
-                                delete index_param_ptr;
-                            }
-                            delete index_param_list;
-                            index_param_list = nullptr;
-                        }
-
                         json_response["error_code"] = ErrorCode::kInvalidIndexType;
                         json_response["error_message"] = fmt::format("Invalid index type: {}", name);
                         http_status = HTTPStatus::CODE_500;
@@ -1818,18 +1932,22 @@ public:
             }
 
             index_info->index_param_list_ = index_param_list;
+            index_param_list = nullptr;
             index_info_list->push_back(index_info);
+            index_info = nullptr;
         }
 
-        auto result = infinity->CreateIndex(database_name, table_name, index_name, index_info_list, options);
-
-        if (result.IsOk()) {
-            json_response["error_code"] = 0;
-            http_status = HTTPStatus::CODE_200;
-        } else {
-            json_response["error_code"] = result.ErrorCode();
-            json_response["error_message"] = result.ErrorMsg();
-            http_status = HTTPStatus::CODE_500;
+        if(json_response["error_code"] == 0) {
+            auto result = infinity->CreateIndex(database_name, table_name, index_name, index_info_list, options);
+            index_info_list = nullptr;
+            if (result.IsOk()) {
+                json_response["error_code"] = 0;
+                http_status = HTTPStatus::CODE_200;
+            } else {
+                json_response["error_code"] = result.ErrorCode();
+                json_response["error_message"] = result.ErrorMsg();
+                http_status = HTTPStatus::CODE_500;
+            }
         }
         return ResponseFactory::createResponse(http_status, json_response.dump());
     }

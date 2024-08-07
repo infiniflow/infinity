@@ -163,7 +163,7 @@ public:
     }
 
     template <typename LabelType, DataIteratorConcept<const DataType *, LabelType> Iterator>
-    void Optimize(Iterator &&query_iter, const Vector<Pair<Inner *, SizeT>> &inners) {
+    void Optimize(Iterator &&query_iter, const Vector<Pair<Inner *, SizeT>> &inners, SizeT &mem_usage) {
         auto new_mean = MakeUnique<MeanType[]>(dim_);
         auto temp_decompress = MakeUnique<DataType[]>(dim_);
         SizeT cur_vec_num = 0;
@@ -195,7 +195,7 @@ public:
         for (auto [inner, size] : inners) {
             for (SizeT i = 0; i < size; ++i) {
                 DecompressByMeanTo(inner->GetVec(i, *this), new_mean.get(), temp_decompress.get());
-                inner->SetVec(i, temp_decompress.get(), *this);
+                inner->SetVec(i, temp_decompress.get(), *this, mem_usage);
             }
         }
         global_cache_ = LVQCache::MakeGlobalCache(mean_.get(), dim_);
@@ -257,7 +257,11 @@ private:
 public:
     LVQVecStoreInner() = default;
 
-    static This Make(SizeT max_vec_num, const Meta &meta) { return This(max_vec_num, meta); }
+    static This Make(SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+        auto ret = This(max_vec_num, meta);
+        mem_usage += max_vec_num * meta.compress_data_size();
+        return ret;
+    }
 
     SizeT GetSizeInBytes(SizeT cur_vec_num, const Meta &meta) const { return cur_vec_num * meta.compress_data_size(); }
 
@@ -265,14 +269,15 @@ public:
         file_handler.Write(ptr_.get(), cur_vec_num * meta.compress_data_size());
     }
 
-    static This Load(FileHandler &file_handler, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta) {
+    static This Load(FileHandler &file_handler, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
         assert(cur_vec_num <= max_vec_num);
         This ret(max_vec_num, meta);
         file_handler.Read(ret.ptr_.get(), cur_vec_num * meta.compress_data_size());
+        mem_usage += max_vec_num * meta.compress_data_size();
         return ret;
     }
 
-    void SetVec(SizeT idx, const DataType *vec, const Meta &meta) { meta.CompressTo(vec, GetVecMut(idx, meta)); }
+    void SetVec(SizeT idx, const DataType *vec, const Meta &meta, SizeT &mem_usage) { meta.CompressTo(vec, GetVecMut(idx, meta)); }
 
     const LVQData *GetVec(SizeT idx, const Meta &meta) const {
         return reinterpret_cast<const LVQData *>(ptr_.get() + idx * meta.compress_data_size());
