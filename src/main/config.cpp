@@ -2038,6 +2038,7 @@ void Config::PrintAll() {
     // Buffer manager
     fmt::print(" - buffer_manager_size: {}\n", Utility::FormatByteSize(BufferManagerSize()));
     fmt::print(" - temp_dir: {}\n", TempDir());
+    fmt::print(" - memindex_memory_quota: {}\n", Utility::FormatByteSize(MemIndexMemoryQuota()));
 
     // WAL
     fmt::print(" - wal_dir: {}\n", WALDir());

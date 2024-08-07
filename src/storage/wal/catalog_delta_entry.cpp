@@ -1157,7 +1157,7 @@ UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStam
             max_ts = std::max(max_ts, delta_op->commit_ts_);
             flush_delta_entry->AddOperation(std::move(delta_op));
         }
-        max_commit_ts = max_ts;
+        max_commit_ts = std::max(max_ts, max_commit_ts_);
     }
 
     flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids.begin(), txn_ids.end()));
@@ -1186,6 +1186,7 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
         String error_message = "max_commit_ts == UNCOMMIT_TS";
         UnrecoverableError(error_message);
     }
+    max_commit_ts_ = std::max(max_commit_ts_, max_commit_ts);
 
     for (auto &new_op : delta_entry->operations()) {
         if (new_op->type_ == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {

@@ -77,7 +77,7 @@ private:
 };
 
 inline void MemIndexTracer::AddMemUsed(SizeT add) {
-    if (add == 0) {
+    if (add == 0 || index_memory_limit_ == 0) {
         return;
     }
     SizeT old_index_memory = cur_index_memory_.fetch_add(add);
