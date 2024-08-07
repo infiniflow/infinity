@@ -21,7 +21,7 @@ from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.embedded_infinity_ext import WrapIndexInfo, ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
-from infinity.common import INSERT_DATA, VEC, SPARSE, InfinityException
+from infinity.common import INSERT_DATA, VEC, SPARSE, InfinityException, CommonMatchTensorExpr
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
@@ -348,7 +348,7 @@ class LocalTable(Table, ABC):
         return self
 
     @params_type_check
-    def fusion(self, method: str, options_text: str = '', match_tensor_expr=None):
+    def fusion(self, method: str, options_text: str = '', match_tensor_expr: CommonMatchTensorExpr=None):
         self.query_builder.fusion(method, options_text, match_tensor_expr)
         return self
 
