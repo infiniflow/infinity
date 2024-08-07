@@ -18,18 +18,20 @@ from infinity.embedded_infinity_ext import *
 
 
 class LocalQueryResult:
-    def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, column_defs=None,
-                 column_fields=None, database_name=None, store_dir=None, table_count=None):
+    def __init__(self, error_code: PyErrorCode, error_msg: str, db_names=None, table_names=None, index_names=None,
+                 column_defs=None, column_fields=None, database_name=None, store_dir=None, table_count=None):
         self.error_code = error_code
         self.error_msg = error_msg
         self.db_names = db_names
         self.table_names = table_names
+        self.index_names = index_names
         # self.result_data = result_data
         self.column_defs = column_defs
         self.column_fields = column_fields
         self.database_name = database_name
         self.store_dir = store_dir
         self.table_count = table_count
+
 
 class LocalInfinityClient:
     def __init__(self, path: str = LOCAL_INFINITY_PATH):
@@ -48,8 +50,10 @@ class LocalInfinityClient:
 
     def hello(self):
         self.client.Hello()
+
     # convert embedded_error code to python error code
-    def convert_res(self, res, has_db_names=False, has_table_names=False, has_result_data=False, has_db_name=False):
+    def convert_res(self, res, has_db_names=False, has_table_names=False, has_result_data=False, has_db_name=False,
+                    has_index_names=False):
         if has_db_names:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, db_names=res.names)
         if has_table_names:
@@ -60,6 +64,8 @@ class LocalInfinityClient:
         if has_db_name:
             return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, database_name=res.database_name,
                                     store_dir=res.store_dir, table_count=res.table_count)
+        if has_index_names:
+            return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg, index_names=res.names)
         return LocalQueryResult(PyErrorCode(res.error_code.value), res.error_msg)
 
     def create_database(self, db_name: str, conflict_type: ConflictType = ConflictType.kError):
@@ -131,7 +137,7 @@ class LocalInfinityClient:
     def list_indexes(self, db_name: str, table_name: str):
         if self.client is None:
             raise Exception("Local infinity is not connected")
-        return self.convert_res(self.client.ListTableIndexes(db_name, table_name))
+        return self.convert_res(self.client.ListTableIndexes(db_name, table_name), has_index_names=True)
 
     def drop_index(self, db_name: str, table_name: str, index_name: str,
                    conflict_type: ConflictType = ConflictType.kError):
@@ -226,6 +232,6 @@ class LocalInfinityClient:
         if self.client is None:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowBlockColumn(db_name, table_name, segment_id, block_id, column_id))
-    
+
     def optimize(self, db_name: str, table_name: str, optimize_opt: WrapOptimizeOptions):
         return self.convert_res(self.client.Optimize(db_name, table_name, optimize_opt))
