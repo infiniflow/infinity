@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
+from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN, CommonMatchTensorExpr
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -245,7 +245,7 @@ class InfinityThriftQueryBuilder(ABC):
         self,
         method: str,
         options_text: str = "",
-        match_tensor_expr: MatchTensorExpr = None,
+        match_tensor_expr: CommonMatchTensorExpr = None,
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
@@ -255,7 +255,13 @@ class InfinityThriftQueryBuilder(ABC):
         fusion_expr.method = method
         fusion_expr.options_text = options_text
         if match_tensor_expr is not None:
-            fusion_expr.optional_match_tensor_expr = match_tensor_expr
+            fusion_expr.optional_match_tensor_expr = make_match_tensor_expr(
+                match_tensor_expr.vector_column_name,
+                match_tensor_expr.embedding_data,
+                match_tensor_expr.embedding_data_type,
+                match_tensor_expr.method_type,
+                match_tensor_expr.extra_option
+            )
         elif fusion_expr.method == "match_tensor":
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Match tensor expression is required")
         self._search.fusion_exprs.append(fusion_expr)

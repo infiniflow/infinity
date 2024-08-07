@@ -60,7 +60,6 @@ class TestInfinity:
             db = infinity_obj.create_database("")
         assert infinity_obj.disconnect()
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_basic(self, check_data):

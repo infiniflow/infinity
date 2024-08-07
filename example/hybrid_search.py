@@ -17,8 +17,7 @@ This example is to connect local infinity instance, create table, insert data, s
 """
 
 import infinity
-from infinity.local_infinity.types import make_make_tensor_expr
-# from infinity.remote_thrift.types import make_match_tensor_expr
+from infinity.common import CommonMatchTensorExpr
 
 try:
     # open a local directory to store the data
@@ -100,7 +99,7 @@ try:
         .fusion(
             "match_tensor",
             "topn=2",
-            make_match_tensor_expr(
+            CommonMatchTensorExpr(
                 "tensor",
                 [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
                 "float",

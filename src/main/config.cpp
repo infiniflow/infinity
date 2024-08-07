@@ -235,6 +235,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
 
         // Log dir
         String log_dir = "/var/infinity/log";
+        if(default_config != nullptr) {
+            log_dir = default_config->default_log_dir_;
+        }
         UniquePtr<StringOption> log_dir_option = MakeUnique<StringOption>(LOG_DIR_OPTION_NAME, log_dir);
         status = global_options_.AddOption(std::move(log_dir_option));
         if(!status.ok()) {
@@ -287,6 +290,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
 
         // Data Dir
         String data_dir = "/var/infinity/data";
+        if(default_config != nullptr) {
+            data_dir = default_config->default_data_dir_;
+        }
         UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
         status = global_options_.AddOption(std::move(data_dir_option));
         if(!status.ok()) {
@@ -363,6 +369,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
 
         // Temp Dir
         String temp_dir = "/var/infinity/tmp";
+        if(default_config != nullptr) {
+            temp_dir = default_config->default_temp_dir_;
+        }
         UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
         status = global_options_.AddOption(std::move(temp_dir_option));
         if(!status.ok()) {
@@ -372,6 +381,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
 
         // WAL Dir
         String wal_dir = "/var/infinity/wal";
+        if(default_config != nullptr) {
+            wal_dir = default_config->default_wal_dir_;
+        }
         UniquePtr<StringOption> wal_dir_option = MakeUnique<StringOption>(WAL_DIR_OPTION_NAME, wal_dir);
         status = global_options_.AddOption(std::move(wal_dir_option));
         if(!status.ok()) {
@@ -434,6 +446,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
 
         // Resource Dir
         String resource_dir = "/var/infinity/resource";
+        if(default_config != nullptr) {
+            resource_dir = default_config->default_resource_dir_;
+        }
         UniquePtr<StringOption> resource_dir_option = MakeUnique<StringOption>("resource_dir", resource_dir);
         status = global_options_.AddOption(std::move(resource_dir_option));
         if(!status.ok()) {
