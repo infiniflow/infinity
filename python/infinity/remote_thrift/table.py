@@ -21,7 +21,7 @@ from typing import Optional, Union, List, Any
 from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-from infinity.common import INSERT_DATA, VEC, InfinityException
+from infinity.common import INSERT_DATA, VEC, InfinityException, CommonMatchTensorExpr
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
@@ -361,7 +361,7 @@ class RemoteTable(Table, ABC):
         return self
 
     @params_type_check
-    def fusion(self, method: str, options_text: str = '', match_tensor_expr: ttypes.MatchTensorExpr = None):
+    def fusion(self, method: str, options_text: str = '', match_tensor_expr: CommonMatchTensorExpr = None):
         self.query_builder.fusion(method, options_text, match_tensor_expr)
         return self
 

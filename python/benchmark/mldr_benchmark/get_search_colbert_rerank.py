@@ -24,7 +24,7 @@ from mldr_common_tools import FakeJScoredDoc, get_queries_and_qids, save_result
 from mldr_common_tools import query_yields, apply_funcs
 from transformers import HfArgumentParser
 import infinity
-from infinity.common import LOCAL_HOST
+from infinity.common import LOCAL_HOST, CommonMatchTensorExpr
 from infinity.remote_thrift.types import make_match_tensor_expr
 
 
@@ -41,7 +41,7 @@ class RerankOption:
 
 def apply_colbert_rerank(result_table, rerank_tensor, max_hits: int, rerank_option):
     colbert_rerank_column_name = {'colbert': 'colbert_col', 'colbert_bit': 'colbert_bit_col'}
-    rerank_expr = make_match_tensor_expr(colbert_rerank_column_name[rerank_option], rerank_tensor, 'float', 'maxsim')
+    rerank_expr = CommonMatchTensorExpr(colbert_rerank_column_name[rerank_option], rerank_tensor, 'float', 'maxsim')
     return result_table.fusion('match_tensor', f'topn={max_hits}', rerank_expr)
 
 
