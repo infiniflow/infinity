@@ -1020,8 +1020,8 @@ Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at onc
 :::
 
 :::tip NOTE
-When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table`. Otherwise, an error will occur.  
-For information about setting default column values, see `create_table`.
+When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table()`. Otherwise, an error will occur.  
+For information about setting default column values, see `create_table()`.
 :::
 
 ### Returns
@@ -1350,11 +1350,7 @@ table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 ```python
 table_obj.output(columns)
 ```
-Specifies the columns to display in the search results or performs aggregation or arithmetic operations on them. This method allows you to customize the output of your query by selecting specific columns, applying aggregation functions, or performing arithmetic operations on the specified columns.
-
-:::tip NOTE
-This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, `to_arrow()`, or others that materialize the data.
-:::
+This method allows you to customize the output of your query by selecting specific columns, applying aggregation functions, or performing arithmetic operations.
 
 ### Parameters
 
@@ -1362,13 +1358,13 @@ This method specifies the projection columns for the current table but does not 
 
 A non-empty list of strings specifying the columns to include in the output. Each string in the list can represent:
 
-- A user-defined column name: Directly specify the names of the columns to include in the output, e.g., `"body"`.
+- A user-defined column name: The name of the column to include in the output, e.g., `"body"`.
 - All user-defined columns: Use a wildcard `"*"` to select all columns.
 - A special system column: system-generated columns include:
-  - `_row_id`
-  - `_score`
-  - `_similarity`
-  - `_distance`
+  - `_row_id`:  An automatically generated, unique identifier for each row in the table. It serves as a unique key for each row but does not necessarily correspond to the actual row number. When the data in a row is updated, the `_row_id` for that row is also changed to reflect the update.
+  - `_score`: A BM25 score used in full-text search.
+  - `_similarity`: Used by IP and cosine metric in dense or sparse vector search.
+  - `_distance`: Used by L2 metric in dense vector search. 
 - An aggregation function: Apply an aggregation operation on specified columns. Supported aggragation functions include:
   - `count`
   - `min`
@@ -1385,40 +1381,44 @@ The list must contain at least one element. Empty lists are not allowed.
 
 An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
+:::tip NOTE
+This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
+:::
+
 ### Examples
 
 #### Select columns to display
 
 ```python
 # Select all columns
-table_obj.output(["*"])
+table_obj.output(["*"]).to_pl()
 ```
 
 ```python
 # Select columns "num" and "body"
-table_obj.output(["num", "body"])
+table_obj.output(["num", "body"]).to_df()
 ```
 
 ```python
 # Select a system-generated column "_row_id"
-table_obj.output(["_row_id"])
+table_obj.output(["_row_id"]).to_result()
 ```
 
 #### Perform aggregation or arithmetic operations on selected columns
 
 ```python
 # Specify that the output should display the average value of all cells in column "c2"
-table_obj.output(["avg(c2)"])
+table_obj.output(["avg(c2)"]).to_result()
 ```
 
 ```python
 # Select column c1 and request all cells in this column to be displayed with their original values increased by 5
-table_obj.output(["c1+5"])
+table_obj.output(["c1+5"]).to_result()
 ```
 
 ```python
 # Specify that the output should display the result of an arithmetic operation combining two aggregation functions
-table_obj.output(["min(c1) + max(c2)"])
+table_obj.output(["min(c1) + max(c2)"]).to_result()
 ```
 
 ---
@@ -1429,11 +1429,7 @@ table_obj.output(["min(c1) + max(c2)"])
 table_obj.filter(cond)
 ```
 
-Creates a filtering condition expression for the current table. This method allows you to specify conditions to filter rows based on the values in the columns.
-
-:::tip NOTE
-This method specifies a filtering condition for the rows in the current table but does not directly produce displayable data. To display the query results, use `filter()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, `to_arrow()`, or others that materialize the data.
-:::
+Creates a filtering condition expression for the current table.
 
 ### Parameters
 
@@ -1449,14 +1445,18 @@ Currently, only 'and' and 'or' logical expressions are supported.
 
 An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
+:::tip NOTE
+This method specifies a filtering condition for the rows in the current table but does not directly produce displayable data. To display the query results, use `filter()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
+:::
+
 ### Examples
 
 ```python
-table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
+table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)").to_result()
 ```
 
 ```python
-table_obj.filter("c2 = 3")
+table_obj.filter("c2 = 3").to_result()
 ```
 
 ---
@@ -1467,7 +1467,7 @@ table_obj.filter("c2 = 3")
 table_obj.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
 ```
 
-Conducts a k-nearest neighbor (KNN) vector search, finding the top n closest rows to the given vector.
+Performs a k-nearest neighbor (KNN) or approximate nearest neighbor (ANN) vector search to find the top n closest rows to the given vector. Suitable for dense vectors (dense embeddings).
 
 ### Parameters
 
