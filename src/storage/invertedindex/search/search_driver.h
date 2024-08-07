@@ -17,19 +17,26 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <vector>
 
 namespace infinity {
 
 struct QueryNode;
+
+enum class FulltextQueryOperatorOption {
+    kInfinitySyntax, // use parser's syntax
+    kAnd,            // combine all terms with AND
+    kOr,             // combine all terms with OR
+};
 
 /**
  * Conducting the whole scanning and parsing.
  */
 class SearchDriver {
 public:
-    SearchDriver(const std::map<std::string, std::string> &field2analyzer, const std::string &default_field)
-        : field2analyzer_{field2analyzer}, default_field_{SearchDriver::Unescape(default_field)} {}
+    SearchDriver(const std::map<std::string, std::string> &field2analyzer,
+                 const std::string &default_field,
+                 const FulltextQueryOperatorOption operator_option = FulltextQueryOperatorOption::kInfinitySyntax)
+        : field2analyzer_{field2analyzer}, default_field_{SearchDriver::Unescape(default_field)}, operator_option_(operator_option) {}
 
     // used in PhysicalMatch
     [[nodiscard]] std::unique_ptr<QueryNode> ParseSingleWithFields(const std::string &fields_str, const std::string &query) const;
@@ -41,6 +48,9 @@ public:
     [[nodiscard]] std::unique_ptr<QueryNode>
     AnalyzeAndBuildQueryNode(const std::string &field, std::string &&text, bool from_quoted, unsigned long slop = 0) const;
 
+    // helper function for building query tree, used in search_parser.y and AnalyzeAndBuildQueryNode
+    [[nodiscard]] std::unique_ptr<QueryNode> GetMultiQueryNodeByOperatorOption() const;
+
     [[nodiscard]] static std::string Unescape(const std::string &text);
 
     /**
@@ -48,6 +58,7 @@ public:
      */
     const std::map<std::string, std::string> &field2analyzer_;
     const std::string default_field_;
+    const FulltextQueryOperatorOption operator_option_ = FulltextQueryOperatorOption::kInfinitySyntax;
 };
 
 } // namespace infinity

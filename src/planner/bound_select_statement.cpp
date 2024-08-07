@@ -225,7 +225,20 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                         match_node->top_n_ = DEFAULT_MATCH_TEXT_OPTION_TOP_N;
                     }
 
-                    SearchDriver search_driver(column2analyzer, default_field);
+                    auto query_operator_option = FulltextQueryOperatorOption::kInfinitySyntax;
+                    // option: operator
+                    if (iter = search_ops.options_.find("operator"); iter != search_ops.options_.end()) {
+                        ToLower(iter->second);
+                        if (iter->second == "and") {
+                            query_operator_option = FulltextQueryOperatorOption::kAnd;
+                        } else if (iter->second == "or") {
+                            query_operator_option = FulltextQueryOperatorOption::kOr;
+                        } else {
+                            RecoverableError(Status::SyntaxError(R"(operator option must be "and" or "or".)"));
+                        }
+                    }
+
+                    SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
                     UniquePtr<QueryNode> query_tree =
                         search_driver.ParseSingleWithFields(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
                     if (query_tree.get() == nullptr) {

@@ -4,10 +4,12 @@
 #include <iostream>
 #include <cstdlib>
 
-/* Implementation of yyFlexScanner */ 
-#include "search_scanner.h"
+/* Implementation of yyFlexScanner */
+#define SearchScannerDerived SearchScannerInfinitySyntax
+#include "search_scanner_derived.h"
+#undef SearchScannerDerived
 #undef  YY_DECL
-#define YY_DECL int infinity::SearchScanner::yylex(infinity::SearchParser::semantic_type * const lval, infinity::SearchParser::location_type *loc)
+#define YY_DECL int infinity::SearchScannerInfinitySyntax::yylex(infinity::SearchParser::semantic_type * const lval, infinity::SearchParser::location_type *loc)
 
 /* typedef to make the returns for the tokens shorter */
 using token = infinity::SearchParser::token;
@@ -27,8 +29,9 @@ static thread_local std::stringstream string_buffer;
 %}
 
 %option c++
-%option yyclass="infinity::SearchScanner"
+%option yyclass="infinity::SearchScannerInfinitySyntax"
 %option noyywrap nounput batch debug noinput
+%option prefix="SearchScannerInfinitySyntax"
 %option warn
 %option never-interactive
 

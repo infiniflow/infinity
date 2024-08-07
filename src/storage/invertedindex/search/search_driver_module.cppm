@@ -20,6 +20,7 @@ export module search_driver;
 
 namespace infinity {
 
+export using infinity::FulltextQueryOperatorOption;
 export using infinity::SearchDriver;
 
 }
