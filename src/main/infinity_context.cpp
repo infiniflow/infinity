@@ -87,7 +87,6 @@ void InfinityContext::UnInit() {
     persistence_manager_.reset();
 
     Logger::Shutdown();
-    persistence_manager_.reset();
 
     config_.reset();
 }

@@ -22,6 +22,7 @@ import uuid;
 import serialize;
 import third_party;
 import infinity_exception;
+import logger;
 
 namespace fs = std::filesystem;
 
@@ -126,6 +127,18 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
         local_data_dir_ += '/';
     }
 }
+
+PersistenceManager::~PersistenceManager() {
+    SizeT sum_ref_count = 0;
+    for (auto& [key, obj_stat] : objects_) {
+        if (obj_stat.ref_count_ > 0) {
+            LOG_ERROR(fmt::format("Object {} still has ref count {}", key, obj_stat.ref_count_));
+        }
+        sum_ref_count += obj_stat.ref_count_;
+    }
+    assert(sum_ref_count == 0);
+}
+
 
 ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose) {
     std::error_code ec;
