@@ -377,8 +377,14 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &file_path, SizeT f
 void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
     auto it = objects_.find(object_addr.obj_key_);
     if (it == objects_.end()) {
-        String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
-        UnrecoverableError(error_message);
+        if (object_addr.obj_key_ == current_object_key_) {
+            CurrentObjFinalizeNoLock();
+            it = objects_.find(object_addr.obj_key_);
+            assert(it != objects_.end());
+        } else {
+            String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
+            UnrecoverableError(error_message);
+        }
     }
     Range range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
     auto target_range = it->second.deleted_ranges_.lower_bound(range);

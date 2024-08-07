@@ -41,7 +41,7 @@ public:
 #endif
         system(("mkdir -p " + String(GetFullPersistDir())).c_str());
         system(("mkdir -p " + String(GetFullDataDir())).c_str());
-        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
         config_path_ = GetParam();
         std::shared_ptr<std::string> config_path = nullptr;
         if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {

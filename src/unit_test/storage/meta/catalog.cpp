@@ -34,14 +34,21 @@ import extra_ddl_info;
 
 import base_entry;
 
-class CatalogTest : public BaseTest {
+class CatalogTest : public BaseTestParamStr {
     void SetUp() override {
-        BaseTest::SetUp();
+        BaseTestParamStr::SetUp();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
         RemoveDbDirs();
+        system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + infinity::String(GetFullTmpDir())).c_str());
+        std::string config_path_str = GetParam();
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -52,13 +59,18 @@ class CatalogTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 };
 
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         CatalogTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
+                                           BaseTestParamStr::VFS_CONFIG_PATH));
+
 // txn1: create db1, get db1, delete db1, get db1, commit
 // txn2:             get db1,             get db1, commit
-TEST_F(CatalogTest, simple_test1) {
+TEST_P(CatalogTest, simple_test1) {
     using namespace infinity;
 
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
@@ -116,7 +128,7 @@ TEST_F(CatalogTest, simple_test1) {
 // txn1: create db1, commit.
 // txn2: start,              get db1, commit
 // txn3:                     start, get db1, delete db1, commit
-TEST_F(CatalogTest, simple_test2) {
+TEST_P(CatalogTest, simple_test2) {
     using namespace infinity;
 
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();
@@ -166,7 +178,7 @@ TEST_F(CatalogTest, simple_test2) {
     txn_mgr->CommitTxn(txn3);
 }
 
-TEST_F(CatalogTest, concurrent_test) {
+TEST_P(CatalogTest, concurrent_test) {
     using namespace infinity;
 
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();

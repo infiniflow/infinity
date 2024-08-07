@@ -135,14 +135,21 @@ auto get_random_doc_ids = [](std::mt19937 &rng, u32 param_len) -> Vector<RowID> 
 // 3. (((A or B) or C) and not D) and not E -> (A or B or C) and not (D, E)
 // 4. (((A and B) and not C) and D) and not E -> (A and B and D) and not (C, E)
 
-class QueryBuilderTest : public BaseTest {
+class QueryBuilderTest : public BaseTestParamStr {
     void SetUp() override {
-        BaseTest::SetUp();
+        BaseTestParamStr::SetUp();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
         RemoveDbDirs();
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        String config_path_str = GetParam();
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = MakeShared<String>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -153,9 +160,18 @@ class QueryBuilderTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 };
+
+INSTANTIATE_TEST_SUITE_P(
+    TestWithDifferentParams,
+    QueryBuilderTest,
+    ::testing::Values(
+        BaseTestParamStr::NULL_CONFIG_PATH,
+        BaseTestParamStr::VFS_CONFIG_PATH
+    )
+);
 
 union FakeQueryBuilder {
     char empty_space[2 * sizeof(QueryBuilder)];
@@ -165,7 +181,7 @@ union FakeQueryBuilder {
 };
 
 // 1. (A and B) and ((C and D) and E) -> A and B and C and D and E
-TEST_F(QueryBuilderTest, test_and) {
+TEST_P(QueryBuilderTest, test_and) {
     // prepare random seed
     std::random_device rd;
     std::mt19937 rng{rd()};
@@ -228,7 +244,7 @@ TEST_F(QueryBuilderTest, test_and) {
 }
 
 // 2. (A or B) or ((C or D) or E) -> A or B or C or D or E
-TEST_F(QueryBuilderTest, test_or) {
+TEST_P(QueryBuilderTest, test_or) {
     // prepare random seed
     std::random_device rd;
     std::mt19937 rng{rd()};
@@ -291,7 +307,7 @@ TEST_F(QueryBuilderTest, test_or) {
 }
 
 // 3. (((A or B) or C) and not D) and not E -> (A or B or C) and not (D, E)
-TEST_F(QueryBuilderTest, test_and_not) {
+TEST_P(QueryBuilderTest, test_and_not) {
     // prepare random seed
     std::random_device rd;
     std::mt19937 rng{rd()};
@@ -364,7 +380,7 @@ TEST_F(QueryBuilderTest, test_and_not) {
 }
 
 // 4. (((A and B) and not C) and D) and not E -> (A and B and D) and not (C, E)
-TEST_F(QueryBuilderTest, test_and_not2) {
+TEST_P(QueryBuilderTest, test_and_not2) {
     // prepare random seed
     std::random_device rd;
     std::mt19937 rng{rd()};

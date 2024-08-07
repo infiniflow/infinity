@@ -24,14 +24,22 @@ import logger;
 
 using namespace infinity;
 
-class QueryParserAndOptimizerTest : public BaseTest {
+class QueryParserAndOptimizerTest : public BaseTestParamStr {
     void SetUp() override {
-        BaseTest::SetUp();
+        BaseTestParamStr::SetUp();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
         RemoveDbDirs();
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        String config_path_str = GetParam();
+
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = MakeShared<String>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -42,9 +50,13 @@ class QueryParserAndOptimizerTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 };
+
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         QueryParserAndOptimizerTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_CONFIG_PATH));
 
 struct LogHelper {
     void Reset() {
@@ -97,7 +109,7 @@ int ParseAndOptimizeFromStream(const SearchDriver &driver, std::istream &ist) {
     return 0;
 }
 
-TEST_F(QueryParserAndOptimizerTest, test1) {
+TEST_P(QueryParserAndOptimizerTest, test1) {
     using namespace infinity;
 
     std::string row_quires = R"##(
