@@ -48,7 +48,7 @@ if (CLANG_VERSION_STRING VERSION_GREATER 16)
 
 else ()
 
-    message(FATAL_ERROR, "Please use clang version 17.0 and above, current version: ", ${CLANG_VERSION_STRING})
+    message(FATAL_ERROR "Please use clang version 17.0 and above, current version: ${CLANG_VERSION_STRING}")
 
 endif ()
 

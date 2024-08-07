@@ -213,7 +213,7 @@ class http_adapter:
                 else:
                     tmp[param_name] = columns_definition[col][param_name]
             fields.append(tmp)
-        print(fields)
+        #print(fields)
 
         url = f"databases/{self.database_name}/tables/{table_name}"
         h = self.set_up_header(["accept", "content-type"])
