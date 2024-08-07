@@ -31,6 +31,11 @@ export constexpr std::string_view log_level = "log_level";
 export struct DefaultConfig {
     LogLevel default_log_level_{LogLevel::kInfo};
     bool default_log_to_stdout_{false};
+    String default_log_dir_ = "/var/infinity/log";
+    String default_data_dir_ = "/var/infinity/data";
+    String default_wal_dir_ = "/var/infinity/wal";
+    String default_temp_dir_ = "/var/infinity/tmp";
+    String default_resource_dir_ = "/var/infinity/resource";
 };
 
 export struct Config {
