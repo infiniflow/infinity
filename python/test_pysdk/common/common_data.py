@@ -102,7 +102,7 @@ index_type_transfrom = {
     index.IndexType.IVFFlat:"IVFFlat",
     index.IndexType.Hnsw:"HNSW",
     index.IndexType.FullText:"FULLTEXT",
-    index.IndexType.Secondary:"Secondary",
+    index.IndexType.Secondary:"SECONDARY",
     index.IndexType.BMP:"BMP",
     index.IndexType.EMVB:"EMVB",
 }

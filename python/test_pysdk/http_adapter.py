@@ -318,12 +318,14 @@ class http_adapter:
         self,
         index_name,
         index_info = [],
-        opt=ConflictType.Error,
+        conflict_type=ConflictType.Error,
     ):
-        copt = opt
-        exists = baseCreateOptions.get(opt, None)
-        if exists is not None:
-            copt = baseCreateOptions[opt]
+        copt = conflict_type
+        if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
+            exists = baseCreateOptions.get(conflict_type, None)
+            if exists is not None:
+                copt = baseCreateOptions[conflict_type]
+
         fields = []
         index = {}
         fields.append(index_info[0].column_name)
@@ -347,12 +349,13 @@ class http_adapter:
     def drop_index(
         self,
         index_name,
-        opt=ConflictType.Error,
+        conflict_type=ConflictType.Error,
     ):
-        copt = opt
-        exists = baseDropOptions.get(opt, None)
-        if exists is not None:
-            copt = baseDropOptions[opt]
+        copt = conflict_type
+        if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
+            exists = baseDropOptions.get(conflict_type, None)
+            if exists is not None:
+                copt = baseDropOptions[conflict_type]
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
 
