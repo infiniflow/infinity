@@ -10,7 +10,7 @@ slug: /python_api_reference
 infinity.connect(uri)
 ```
 
-Connects to the Infinity server and gets an Infinity object. 
+Connects to the Infinity server and gets an Infinity object.
 
 ### Parameters
 
@@ -18,13 +18,13 @@ Connects to the Infinity server and gets an Infinity object.
 
 The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
 
-- `"/path/to/save/to"` (`str`): A local directory for storing the Infinity data. Used when Infinity is deployed as a Python module. 
+- `"/path/to/save/to"`: `str` - A local directory for storing the Infinity data. Used when Infinity is deployed as a Python module.
 - `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A `NetworkAddress` object comprises two fields:
-  - `"<SERVER_IP_ADDRESS>"` (`str`): The IP address of the Infinity server.  
-  - `<PORT>` (`int`): The port number on which Infinity is running. Defaults to 23817.
+  - `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
+  - `<PORT>`: `int` - The port number on which Infinity is running. Defaults to `23817`.
 
 :::caution IMPORTANT
-When connecting to Infinity in a client-server mode, ensure that the version of the client *exactly* matches the version of the server. For example: 
+When connecting to Infinity in client-server mode, ensure that the client version *exactly* matches the server version. For example:
 
 | **Client version** | **Server version** |
 | ------------------ | ------------------ |
@@ -34,14 +34,14 @@ When connecting to Infinity in a client-server mode, ensure that the version of 
 | v0.2.1             | v0.2.1             |
 
 
-If the versions do not match, please update your client or server accordingly to ensure compatibility. 
+If the versions do not match, please update your client or server to ensure compatibility.
 
-In client-server mode, also ensure that your server version matches the version specified in your configuration file. The matching rule is less strict than exact match: 
+In client-server mode, also ensure that your server version matches the version specified in your configuration file. Here, the matching rule is less strict than an exact match:
 
-- The major and minor versions *must* be identical. 
-- The patch version may differ. 
+- The major and minor versions *must* be identical.
+- The patch version may differ.
 
-This allows for bug fixes without requiring configuration file changes. 
+This allows for bug fixes without requiring changes to the configuration file.
 
 | **Configuration version** | **Compatible server version** |
 | ------------------------- | ----------------------------- |
@@ -81,20 +81,19 @@ infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 2
 ## disconnect
 
 ```python
-infinity.disconnect()
+infinity_obj.disconnect()
 ```
 
-Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is deployed as a Python module. 
+Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is deployed as a Python module.
 
 ### Returns
 
 A structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
-  - `0`: The operation succeeds. 
-  - A non-zero value: A specific error condition occurs. 
-- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
-
+  - `0`: The operation succeeds.
+  - A non-zero value: A specific error condition occurs.
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds.
 
 ### Examples
 
@@ -107,7 +106,7 @@ infinity_obj.disconnect()
 ## create_database
 
 ```python
-Infinity.create_database(db_name, conflict_type = ConflictType.Error)
+infinity_obj.create_database(db_name, conflict_type = ConflictType.Error)
 ```
 
 Creates a database with a specified name.
@@ -148,11 +147,10 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: An `infinity.local_infinity.db.LocalDatabase` object in Python module mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode. 
+- Success: An `infinity.local_infinity.db.LocalDatabase` object in Python module mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value: A specific error condition occurs.
   - `error_msg`: `str` The error message providing additional details.
-
 
 ### Examples
 
@@ -180,23 +178,23 @@ infinity_obj.create_database("my_database", ConflictType.Ignore)
 ## drop_database
 
 ```python
-Infinity.drop_database(db_name, conflict_type = ConflictType.Error)
+infinity_obj.drop_database(db_name, conflict_type = ConflictType.Error)
 ```
 
-Deletes a database by its name. 
+Deletes a database by its name.
 
 ### Parameters
 
 #### db_name: `str`, *Required*
 
-Name of the database to delete. Must not be empty. 
+Name of the database to delete. Must not be empty.
 
 #### conflict_type: `ConflictType`, *Optional*
 
-Conflict policy in `enum` for handling situations where a database with the specified name does not exist. 
+Conflict policy in `enum` for handling situations where a database with the specified name does not exist.
 
-  - `Error`: Raise an error if the specified database does not exist.
-  - `Ignore`: Ignore the operation and proceed regardless, if the specified database does not exist.
+- `Error`: Raise an error if the specified database does not exist.
+- `Ignore`: Ignore the operation and proceed regardless, if the specified database does not exist.
 
 :::tip NOTE
 You may want to import the `infinity.common` package to set `ConflictType`:
@@ -204,6 +202,7 @@ You may want to import the `infinity.common` package to set `ConflictType`:
 ```python
 from infinity.common import ConflictType
 ```
+
 :::
 
 :::tip NOTE
@@ -215,9 +214,9 @@ If `ConflictType` is not set, it defaults to `Error`.
 A structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
-  - `0`: The operation succeeds. 
-  - A non-zero value: A specific error condition occurs. 
-- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
+  - `0`: The operation succeeds.
+  - A non-zero value: A specific error condition occurs.
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds.
 
 ### Examples
 
@@ -281,11 +280,11 @@ Retrieves a database object by its name.
 
 #### db_name: `str`, *Required*
 
-Name of the database. Must not be empty. 
+Name of the database. Must not be empty.
 
 ### Returns
 
-- Success: An `infinity.local_infinity.db.LocalDatabase` object in Python module mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode. 
+- Success: An `infinity.local_infinity.db.LocalDatabase` object in Python module mode or an `infinity.remote_thrift.db.RemoteDatabase` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` A non-zero value: A specific error condition occurs.
   - `error_msg`: `str` The error message providing additional details.
@@ -301,27 +300,27 @@ db_obj=infinity_obj.get_database("my_database")
 ## show_database
 
 ```python
-Infinity.show_database(db_name)
+infinity_obj.show_database(db_name)
 ```
 
 Retrieves the metadata of a database by its name.
 
 ### Parameters
 
-#### db_name: `str` *Required*
+#### db_name: `str` (non-empty), *Required*
 
-Name of the database. Must not be empty. 
+Name of the database. Must not be empty.
 
 ### Returns
 
 A structure containing the following attributes:
 
 - `error_code`: `int` An error code indicating the result of the operation.
-  - `0`: The operation succeeds. 
-  - A non-zero value: A specific error condition occurs. 
-- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds. 
+  - `0`: The operation succeeds.
+  - A non-zero value: A specific error condition occurs.
+- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds.
 - `database_name`: `str` A list of all database names.
-- `store_dir`: `str` The directory holding the database files. 
+- `store_dir`: `str` The directory holding the database files.
 - `table_count`: `int` The number of tables in the database.
 
 ### Examples
@@ -346,13 +345,13 @@ Creates a table with a specified name and defined columns.
 
 #### table_name: `str`, *Required*
 
-The name of the table. `table_name` requirements: 
+The name of the table. `table_name` requirements:
 
 - Maximum 65,535 characters.
 - Must not be empty.
 - Case-insensitive.
 - Must begin with an English letter or underscore.
-- Allowed characters: 
+- Allowed characters:
   - English letters (a-z, A-Z)
   - Digits (0-9)
   - "_" (underscore)
@@ -388,7 +387,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 ### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode. 
+- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`:
   - `error_code`: `int` A non-zero value: A specific error condition occurs.
   - `error_msg`: `str` The error message providing additional details.
@@ -477,7 +476,7 @@ db_obj.create_table("my_table", {"c1": {"type": "tensorarray,6,float"}}, Conflic
 ## drop_table
 
 ```python
-Database.drop_table(table_name, conflict_type = ConflictType.Error)
+db_obj.drop_table(table_name, conflict_type = ConflictType.Error)
 ```
 
 Deletes a table from the database by its name.
@@ -542,7 +541,7 @@ db_obj.drop_table("my_table", ConflictType.Ignore)
 ## get_table
 
 ```python
-Database.get_table(table_name)
+db_obj.get_table(table_name)
 ```
 
 Retrieves a table object by its name.
@@ -571,7 +570,7 @@ table_obj = db_obj.get_table("my_table")
 ## list_tables
 
 ```python
-Database.list_tables()
+db_obj.list_tables()
 ```
 
 Lists the names of all tables in the current database.
