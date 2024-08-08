@@ -33,7 +33,6 @@ When connecting to Infinity in client-server mode, ensure that the client versio
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
 
-
 If the versions do not match, please update your client or server to ensure compatibility.
 
 In client-server mode, also ensure that your server version matches the version specified in your configuration file. Here, the matching rule is less strict than an exact match:
@@ -69,7 +68,7 @@ infinity_obj = infinity.connect("/path/to/save/to")
 
 #### Connect to Infinity in client-server mode
 
-If you have deployed Infinity as a separate server, connect to it via its IP address. Further, if your Infinity is running on your local machine, you can also use `infinity.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet. 
+If you have deployed Infinity as a separate server, connect to it via its IP address. Further, if your Infinity is running on your local machine, you can also use `infinity.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet.
 
 ```python
 # If Infinity is deployed on the local machine, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
