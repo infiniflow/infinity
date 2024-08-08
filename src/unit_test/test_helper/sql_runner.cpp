@@ -45,7 +45,7 @@ import query_result;
 import session_manager;
 import base_statement;
 import parser_result;
-import persistance_manager;
+import persistence_manager;
 
 namespace infinity {
 
