@@ -309,7 +309,6 @@ class TestInfinity:
         print(res)
         db_obj.drop_table("test_import_embedding_with_not_match_definition", ConflictType.Error)
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("types", [pytest.param("vector, 3, bool"),
@@ -328,7 +327,7 @@ class TestInfinity:
             assert res.error_code == ErrorCode.OK
             res = table_obj.output(["*"]).to_df()
             print(res)
-        db_obj.drop_table("test_import_embedding_with_not_match_definition", ConflictType.Error)
+        db_obj.drop_table("test_import_embedding_with_not_match_definition", ConflictType.Ignore)
 
     @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_varchar.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)

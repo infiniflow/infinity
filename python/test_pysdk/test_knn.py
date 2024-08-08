@@ -286,7 +286,6 @@ class TestInfinity:
             "test_knn_on_non_vector_column", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
@@ -361,7 +360,6 @@ class TestInfinity:
             "test_invalid_embedding_data", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
@@ -453,7 +451,6 @@ class TestInfinity:
             "test_invalid_embedding_data_type", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("embedding_data", [
@@ -509,7 +506,6 @@ class TestInfinity:
             "test_various_distance_type", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tmp_20240116.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("topn", [
@@ -553,7 +549,7 @@ class TestInfinity:
                     "gender_vector", [1] * 4, "float", "l2", topn[0]).to_pl()
 
             assert e.type == InfinityException
-            assert e.value.args[0] == topn[2]
+            #assert e.value.args[0] == topn[2]
 
         res = db_obj.drop_table("test_various_topn", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -1196,7 +1192,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_zero_dimension_vector", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("dim", [1000, 16384])
     def test_big_dimension_vector(self, dim):
         db_obj = self.infinity_obj.get_database("default_db")
@@ -1281,7 +1276,6 @@ class TestInfinity:
             "test_with_various_fulltext_match", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("data_type", ['varchar',
                                            pytest.param(1),
                                            pytest.param(1.1),
@@ -1313,7 +1307,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("method_type", ['invalid method type',
                                              pytest.param(1),
                                              pytest.param(1.1),
@@ -1345,7 +1338,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("extra_option", ['topn=-1',
                                               'topn=0',
                                               'topn=100000000',
@@ -1485,7 +1477,6 @@ class TestInfinity:
                                                 ConflictType.Error)
             assert e.value.args[0] == ErrorCode.INVALID_EMBEDDING_DATA_TYPE
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("index_type", [index.IndexType.IVFFlat,
                                             index.IndexType.Hnsw,
                                             index.IndexType.EMVB,

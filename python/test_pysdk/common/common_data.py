@@ -98,6 +98,18 @@ def is_list(str):
 def is_bool(str):
     return str.lower() == "true" or str.lower() == "false"
 
+def is_sparse(str):
+    tmp = str.replace("[", "")
+    tmp = tmp.replace("]", "")
+    pairs = tmp.split(",")
+    for pair in pairs:
+        t = pair.split(":")
+        if not (t[0].isdigit() or is_float(t[0])):
+            return False
+        if not (t[1].isdigit() or is_float(t[1])):
+            return False
+    return True
+
 def str2sparse(str):
     sparce_vec = {}
     sparce_vec["indices"] = []
