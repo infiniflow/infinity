@@ -1513,7 +1513,7 @@ table_obj.knn("vec", [0.1,0.2,0.3], "float", "l2", 100)
 ```python
 # Find the 2 nearest neighbors using inner product distance
 # If you use HNSW index, you can set ef in knn_params
-table_obj.knn('vec', [0.1,0.2,0.3], 'float', 'ip', 2, {'ef': '100'})
+table_obj.knn("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"})
 ```
 
 ```python
