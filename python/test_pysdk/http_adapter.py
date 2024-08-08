@@ -391,6 +391,17 @@ class http_adapter:
             pass
         else:
             values = [values]
+
+        for value in values:
+            if isinstance(value, dict):
+                for key in value:
+                    if isinstance(value[key], np.ndarray):#trans np array to list since http api can not parse np array
+                        value[key] = value[key].tolist()
+                    if isinstance(value[key], list):
+                        for idx in range(len(value[key])):
+                            if isinstance(value[key][idx], np.ndarray):
+                                value[key][idx] = value[key][idx].tolist()
+
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.set_up_header(["accept", "content-type"])
         r = self.request(url, "post", h, values)
