@@ -129,7 +129,7 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
 }
 
 PersistenceManager::~PersistenceManager() {
-    SizeT sum_ref_count = 0;
+    [[maybe_unused]] SizeT sum_ref_count = 0;
     for (auto& [key, obj_stat] : objects_) {
         if (obj_stat.ref_count_ > 0) {
             LOG_ERROR(fmt::format("Object {} still has ref count {}", key, obj_stat.ref_count_));
