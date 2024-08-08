@@ -88,7 +88,6 @@ void FileWorker::ReadFromFile(bool from_spill) {
     read_path = fmt::format("{}/{}", ChooseFileDir(from_spill), *file_name_);
     if (use_object_cache) {
         obj_addr_ = pm->GetObjFromLocalPath(read_path);
-        fmt::print("use object cache: valid = {}, read_path = {}, obj offset = {}, obj size = {}, key = {}\n", obj_addr_.Valid(), read_path, obj_addr_.part_offset_, obj_addr_.part_size_, obj_addr_.obj_key_);
         if (obj_addr_.Valid()) {
             read_path = pm->GetObjCache(read_path);
         }
