@@ -32,13 +32,20 @@ import status;
 import background_process;
 import bg_task;
 
-class BGProcessTest : public BaseTest {
+class BGProcessTest : public BaseTestParamStr {
     void SetUp() override {
         RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
+        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        std::string config_path_str = GetParam();
         std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -49,11 +56,15 @@ class BGProcessTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 };
 
-TEST_F(BGProcessTest, test1) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         BGProcessTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_CONFIG_PATH));
+
+TEST_P(BGProcessTest, test1) {
     using namespace infinity;
 
     BGTaskProcessor processor(infinity::InfinityContext::instance().storage()->wal_manager(), nullptr);

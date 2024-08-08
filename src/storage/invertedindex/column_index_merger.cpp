@@ -29,6 +29,7 @@ import vector_with_lock;
 import logger;
 import persistence_manager;
 import infinity_context;
+import defer_op;
 
 namespace infinity {
 ColumnIndexMerger::ColumnIndexMerger(const String &index_dir, optionflag_t flag) : index_dir_(index_dir), flag_(flag) {}
@@ -46,19 +47,36 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     String index_prefix = path.string();
     String dict_file = index_prefix + DICT_SUFFIX;
     String fst_file = dict_file + ".fst";
-    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs_, dict_file, 1024);
-    TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
     String posting_file = index_prefix + POSTING_SUFFIX;
-    posting_file_writer_ = MakeShared<FileWriter>(fs_, posting_file, 1024);
     String column_length_file = index_prefix + LENGTH_SUFFIX;
-
-    std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
-    OstreamWriter wtr(ofs);
-    FstBuilder fst_builder(wtr);
 
     // handle persistence obj_addrs
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        pm->ObjCreateRefCount(dict_file);
+        pm->ObjCreateRefCount(posting_file);
+        pm->ObjCreateRefCount(column_length_file);
+    }
+
+    DeferFn defer_fn([&]() {
+        if (!use_object_cache) {
+            return;
+        }
+        pm->PutObjCache(posting_file);
+        pm->PutObjCache(dict_file);
+        pm->PutObjCache(column_length_file);
+        std::filesystem::remove(posting_file);
+        std::filesystem::remove(dict_file);
+        std::filesystem::remove(column_length_file);
+    });
+
+    SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs_, dict_file, 1024);
+    TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
+    posting_file_writer_ = MakeShared<FileWriter>(fs_, posting_file, 1024);
+    std::ofstream ofs(fst_file.c_str(), std::ios::binary | std::ios::trunc);
+    OstreamWriter wtr(ofs);
+    FstBuilder fst_builder(wtr);
 
     SegmentTermPostingQueue term_posting_queue(index_dir_, base_names, base_rowids, flag_);
     String term;
@@ -132,12 +150,6 @@ void ColumnIndexMerger::Merge(const Vector<String> &base_names, const Vector<Row
     fst_builder.Finish();
     fs_.AppendFile(dict_file, fst_file);
     fs_.DeleteFile(fst_file);
-
-    if (use_object_cache) {
-        pm->Persist(posting_file);
-        pm->Persist(dict_file);
-        pm->Persist(column_length_file);
-    }
 }
 
 void ColumnIndexMerger::MergeTerm(const String &term,

@@ -71,7 +71,7 @@ public:
     // TODO: build cache from existing files under workspace
     PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit);
 
-    ~PersistenceManager() {}
+    ~PersistenceManager();
 
     // Create new object or append to current object, and returns the location.
     ObjAddr Persist(const String &file_path, bool allow_compose = true);
