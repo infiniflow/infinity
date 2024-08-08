@@ -44,7 +44,7 @@ export class ChunkIndexEntry : public BaseEntry, public EntryInterface {
 public:
     static Vector<std::string_view> DecodeIndex(std::string_view encode);
 
-    static String EncodeIndex(const ChunkID chunk_id, const SegmentIndexEntry *segment_index_entry);
+    static String EncodeIndex(const ChunkID chunk_id, const String &base_name, const SegmentIndexEntry *segment_index_entry);
 
     ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
 
@@ -129,6 +129,7 @@ public:
     void DeprecateChunk(TxnTimeStamp commit_ts) {
         assert(commit_ts_.load() < commit_ts);
         deprecate_ts_.store(commit_ts);
+        ResetOptimizing();
     }
 
     bool CheckVisible(Txn *txn) const override;
@@ -139,6 +140,10 @@ public:
     }
 
     void Save();
+
+    bool TrySetOptimizing();
+
+    void ResetOptimizing();
 
 public:
     ChunkID chunk_id_;
@@ -152,6 +157,7 @@ public:
 private:
     BufferObj *buffer_obj_{};
     Vector<BufferObj *> part_buffer_objs_;
+    Atomic<bool> optimizing_{false};
 };
 
 } // namespace infinity
