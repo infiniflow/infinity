@@ -24,14 +24,21 @@ import internal_types;
 import infinity_context;
 import global_resource_usage;
 
-class AnnIVFFlatL2Test : public BaseTest {
+class AnnIVFFlatL2Test : public BaseTestParamStr {
     void SetUp() override {
-        BaseTest::SetUp();
+        BaseTestParamStr::SetUp();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
         RemoveDbDirs();
+        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        std::string config_path_str = GetParam();
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -42,11 +49,15 @@ class AnnIVFFlatL2Test : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 };
 
-TEST_F(AnnIVFFlatL2Test, test1) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         AnnIVFFlatL2Test,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_CONFIG_PATH));
+
+TEST_P(AnnIVFFlatL2Test, test1) {
     using namespace infinity;
 
     i64 dimension = 4;

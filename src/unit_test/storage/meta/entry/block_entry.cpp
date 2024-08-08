@@ -31,20 +31,37 @@ import version_file_worker;
 
 using namespace infinity;
 
-class BlockVersionTest : public BaseTest {
+class BlockVersionTest : public BaseTestParamStr {
 protected:
-    void SetUp() override { InfinityContext::instance().Init(nullptr); }
+    void SetUp() override {
+        RemoveDbDirs();
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+
+        std::string config_path_str = GetParam();
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
+        InfinityContext::instance().Init(config_path);
+    }
 
     void TearDown() override { InfinityContext::instance().UnInit(); }
 };
 
-TEST_F(BlockVersionTest, SaveAndLoad) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         BlockVersionTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
+                                           BaseTestParamStr::VFS_CONFIG_PATH));
+
+TEST_P(BlockVersionTest, SaveAndLoad) {
     BlockVersion block_version(8192);
     block_version.created_.emplace_back(10, 3);
     block_version.created_.emplace_back(20, 6);
     block_version.deleted_[2] = 30;
     block_version.deleted_[5] = 40;
-    String version_path = String(GetFullTmpDir()) + "/block_version_test";
+    String version_path = String(GetFullDataDir()) + "/block_version_test";
     LocalFileSystem fs;
 
     {
@@ -65,8 +82,8 @@ TEST_F(BlockVersionTest, SaveAndLoad) {
     }
 }
 
-TEST_F(BlockVersionTest, SaveAndLoad2) {
-    auto data_dir = MakeShared<String>(String(GetFullTmpDir()) + "/block_version_test");
+TEST_P(BlockVersionTest, SaveAndLoad2) {
+    auto data_dir = MakeShared<String>(String(GetFullDataDir()) + "/block_version_test");
     auto temp_dir = MakeShared<String>(String(GetFullTmpDir()) + "/temp/block_version_test");
     auto block_dir = MakeShared<String>(*data_dir + "/block");
     auto version_file_name = MakeShared<String>("block_version_test");

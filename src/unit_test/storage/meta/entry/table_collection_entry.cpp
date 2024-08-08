@@ -43,14 +43,21 @@ import data_type;
 
 import table_entry;
 
-class TableEntryTest : public BaseTest {
+class TableEntryTest : public BaseTestParamStr {
     void SetUp() override {
-        BaseTest::SetUp();
+        BaseTestParamStr::SetUp();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
         std::shared_ptr<std::string> config_path = nullptr;
         RemoveDbDirs();
+        system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + infinity::String(GetFullTmpDir())).c_str());
+        std::string config_path_str = GetParam();
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -61,11 +68,17 @@ class TableEntryTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 };
 
-TEST_F(TableEntryTest, test1) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         TableEntryTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
+                                           BaseTestParamStr::VFS_CONFIG_PATH));
+
+
+TEST_P(TableEntryTest, test1) {
     using namespace infinity;
 
     SharedPtr<String> base_dir = MakeShared<String>(GetHomeDir());
@@ -113,7 +126,7 @@ TEST_F(TableEntryTest, test1) {
                                                                0 /*next_segment_id*/);
 }
 
-TEST_F(TableEntryTest, test2) {
+TEST_P(TableEntryTest, test2) {
     using namespace infinity;
 
     TxnManager *txn_mgr = infinity::InfinityContext::instance().storage()->txn_manager();

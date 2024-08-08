@@ -45,14 +45,33 @@ import logger;
 
 using namespace infinity;
 
-class SealingTaskTest : public BaseTest {
+class SealingTaskTest : public BaseTestParamStr {
     void SetUp() override {
         tree_cmd = "tree ";
         tree_cmd += GetHomeDir();
+#ifdef INFINITY_DEBUG
+        infinity::GlobalResourceUsage::Init();
+#endif
+        std::shared_ptr<std::string> config_path = nullptr;
+        RemoveDbDirs();
+        system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + infinity::String(GetFullTmpDir())).c_str());
+        std::string config_path_str = GetParam();
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
+        infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
         // system(tree_cmd.c_str());
+        infinity::InfinityContext::instance().UnInit();
+#ifdef INFINITY_DEBUG
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
+        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
+        infinity::GlobalResourceUsage::UnInit();
+#endif
     }
 
     String tree_cmd;
@@ -85,16 +104,15 @@ protected:
     }
 };
 
-TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         SealingTaskTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
+                                           BaseTestParamStr::VFS_CONFIG_PATH));
+
+
+TEST_P(SealingTaskTest, append_unsealed_segment_sealed) {
     {
         String table_name = "tbl1";
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
-        std::shared_ptr<std::string> config_path = nullptr;
-        RemoveDbDirs();
-        infinity::InfinityContext::instance().Init(config_path);
-
         Storage *storage = infinity::InfinityContext::instance().storage();
         BufferManager *buffer_manager = storage->buffer_manager();
         TxnManager *txn_mgr = storage->txn_manager();
@@ -146,12 +164,6 @@ TEST_F(SealingTaskTest, append_unsealed_segment_sealed) {
             EXPECT_EQ(sealed_cnt, 3);
             txn_mgr->CommitTxn(txn);
         }
-        infinity::InfinityContext::instance().UnInit();
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
     }
     /*
     ////////////////////////////////
