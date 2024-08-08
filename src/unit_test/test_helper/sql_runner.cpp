@@ -45,6 +45,7 @@ import query_result;
 import session_manager;
 import base_statement;
 import parser_result;
+import persistance_manager;
 
 namespace infinity {
 
@@ -60,15 +61,16 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
     //    }
 
     //    UniquePtr<SessionManager> session_manager = MakeUnique<SessionManager>();
-    SharedPtr<RemoteSession> session_ptr = InfinityContext::instance().session_manager()->CreateRemoteSession(InfinityContext::instance().MaintenanceMode());
+    SharedPtr<RemoteSession> session_ptr =
+        InfinityContext::instance().session_manager()->CreateRemoteSession(InfinityContext::instance().MaintenanceMode());
 
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_ptr.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().persistence_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     query_context_ptr->set_current_schema(session_ptr->current_database());
 
     SharedPtr<SQLParser> parser = MakeShared<SQLParser>();
