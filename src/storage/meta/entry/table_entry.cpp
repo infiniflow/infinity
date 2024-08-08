@@ -752,15 +752,30 @@ void TableEntry::MemIndexCommit() {
     }
 }
 
-void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
+void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts) {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[index_name, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
         if (!status.ok())
             continue;
-        for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
-            SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(segment_id, segment_index_entry->max_ts());
-            assert(segment_entry.get() != nullptr);
+        for (const auto &[segment_id, segment_entry] : segment_map_) {
+            auto iter = table_index_entry->index_by_segment().find(segment_id);
+            SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
+            if (iter == table_index_entry->index_by_segment().end()) {
+                segment_index_entry = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
+                                                                               this,
+                                                                               segment_id,
+                                                                               buffer_manager,
+                                                                               ts /*min_ts*/,
+                                                                               ts /*max_ts*/,
+                                                                               0 /*next_chunk_id*/,
+                                                                               0 /*txn_id*/,
+                                                                               ts /*begin_ts*/,
+                                                                               ts /*commit_ts*/);
+                table_index_entry->index_by_segment().emplace(segment_id, segment_index_entry);
+            } else {
+                segment_index_entry = iter->second;
+            }
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
             segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
 
@@ -1243,5 +1258,15 @@ Tuple<Vector<String>, Vector<TableIndexMeta *>, std::shared_lock<std::shared_mut
 }
 
 TableIndexMeta *TableEntry::GetIndexMetaPtrByName(const String &name) const { return index_meta_map_.GetMetaPtrByName(name); }
+
+bool TableEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
+    std::shared_lock lock(this->rw_locker_);
+    for (const auto &[_, segment] : segment_map_) {
+        if (segment->CheckAnyDelete(check_ts)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 } // namespace infinity

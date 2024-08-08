@@ -46,6 +46,8 @@ export {
     // column vector related constants
     constexpr i64 MAX_BLOCK_CAPACITY = 65536L;
     constexpr i64 DEFAULT_BLOCK_CAPACITY = 8192;
+    constexpr u64 BLOCK_OFFSET_SHIFT = 13;    // it should be adjusted together with DEFAULT_BLOCK_CAPACITY
+    constexpr u64 BLOCK_OFFSET_MASK = 0x1FFF; // it should be adjusted together with DEFAULT_BLOCK_CAPACITY
     constexpr i64 MIN_BLOCK_CAPACITY = 8192;
     constexpr i16 INVALID_BLOCK_ID = std::numeric_limits<i16>::max();
     constexpr i64 MAX_BLOCK_COUNT_IN_SEGMENT = 65536L;

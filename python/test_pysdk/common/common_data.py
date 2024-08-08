@@ -33,6 +33,8 @@ type_transfrom = {
     "int32":"integer",
     "integer":"integer",
     "int64":"bigint", # hugeint unsupport
+    "float16":"float16",
+    "bfloat16":"bfloat16",
     "float":"float",
     "float32":"float",
     "float64":"double",
@@ -47,6 +49,8 @@ type_transfrom = {
 def type_to_dtype(type):
     match type.lower():
         case "bool":
+            return dtype('bool')
+        case "boolean":
             return dtype('bool')
         case "tinyint":
             return dtype('int8')
@@ -66,6 +70,10 @@ def type_to_dtype(type):
             return dtype('float32')
         case "float64":
             return dtype('float64')
+        case "float16":
+            return dtype('float32')
+        case "bfloat16":
+            return dtype('float32')
         case "double":
             return dtype('float64')
         case "varchar":
@@ -73,7 +81,7 @@ def type_to_dtype(type):
         case _:
             return object
 
-def isfloat(str):
+def is_float(str):
     try:
         float(str)
         return True
@@ -87,11 +95,14 @@ def is_list(str):
     except:
         return False
 
+def is_bool(str):
+    return str.lower() == "true" or str.lower() == "false"
+
 index_type_transfrom = {
     index.IndexType.IVFFlat:"IVFFlat",
     index.IndexType.Hnsw:"HNSW",
     index.IndexType.FullText:"FULLTEXT",
-    index.IndexType.Secondary:"Secondary",
+    index.IndexType.Secondary:"SECONDARY",
     index.IndexType.BMP:"BMP",
     index.IndexType.EMVB:"EMVB",
 }
@@ -181,8 +192,11 @@ class literaltype(Enum):
 
 type_to_literaltype = {
     "boolean" : literaltype.kBoolean.value,
+    "tinyint" : literaltype.kInteger.value,
+    "smallint" : literaltype.kInteger.value,
     "int" : literaltype.kInteger.value,
     "integer" : literaltype.kInteger.value,
+    "bigint" : literaltype.kInteger.value,
     "float" : literaltype.kDouble.value,
     "double": literaltype.kDouble.value
 }

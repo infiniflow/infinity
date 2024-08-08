@@ -31,6 +31,7 @@ import value;
 import meta_entry_interface;
 import cleanup_scanner;
 import logger;
+import bitmask;
 
 namespace infinity {
 
@@ -124,6 +125,10 @@ public:
     static bool CheckDeleteConflict(Vector<Pair<SegmentEntry *, Vector<SegmentOffset>>> &&segments, TransactionID txn_id);
 
     bool CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts, bool check_append) const;
+
+    void CheckRowsVisible(Vector<u32> &segment_offsets, TxnTimeStamp check_ts) const;
+
+    void CheckRowsVisible(Bitmask &segment_offsets, TxnTimeStamp check_ts) const;
 
     virtual bool CheckVisible(Txn *txn) const override;
 

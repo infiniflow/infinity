@@ -187,14 +187,15 @@ class http_adapter:
             for param_name in columns_definition[col]:
                 if param_name.lower() != "constraints" and param_name.lower() != "default": # not constraint and default, should be type
                     params = columns_definition[col][param_name].split(",")
-                    if params[0].strip().lower() == "vector":
+                    if params[0].strip().lower() == "vector" or params[0].strip().lower() == "tensor" or params[0].strip().lower() == "tensorarray":
                         tmp["type"] = params[0].strip()
                         tmp["dimension"] = int(params[1].strip())
                         tmp["element_type"] = type_transfrom[params[2].strip()]
-                    elif params[0].strip().lower() == "tensor":
-                        pass
                     elif params[0].strip().lower() == "sparse":
-                        pass
+                        tmp["type"] = params[0].strip()
+                        tmp["dimension"] = int(params[1].strip())
+                        tmp["data_type"] = type_transfrom[params[2].strip()]
+                        tmp["index_type"] = type_transfrom[params[3].strip()]
                     else:
                         tmp[param_name.lower()] = type_transfrom[columns_definition[col][param_name]]
                 elif param_name.lower() == "default":
@@ -212,7 +213,7 @@ class http_adapter:
                 else:
                     tmp[param_name] = columns_definition[col][param_name]
             fields.append(tmp)
-        print(fields)
+        #print(fields)
 
         url = f"databases/{self.database_name}/tables/{table_name}"
         h = self.set_up_header(["accept", "content-type"])
@@ -226,7 +227,7 @@ class http_adapter:
         r = self.request(url, "post", h, d)
         self.raise_exception(r)
         self.table_name = table_name
-        return self
+        return database_result(database_name=self.database_name, table_name=self.table_name)
 
 
     def drop_table(
@@ -262,7 +263,7 @@ class http_adapter:
         r = self.request(url, "get", h)
         self.raise_exception(r)
         self.table_name = table_name
-        return self
+        return database_result(database_name=self.database_name, table_name=self.table_name)
 
     def get_all_tables(self):
         url = f"databases/{self.database_name}/tables"
@@ -317,20 +318,22 @@ class http_adapter:
         self,
         index_name,
         index_info = [],
-        opt=ConflictType.Error,
+        conflict_type=ConflictType.Error,
     ):
-        copt = opt
-        exists = baseCreateOptions.get(opt, None)
-        if exists is not None:
-            copt = baseCreateOptions[opt]
+        copt = conflict_type
+        if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
+            exists = baseCreateOptions.get(conflict_type, None)
+            if exists is not None:
+                copt = baseCreateOptions[conflict_type]
+
         fields = []
         index = {}
         fields.append(index_info[0].column_name)
         index["type"] = index_type_transfrom[index_info[0].index_type]
         for param in index_info[0].params:
             index[param.param_name] = param.param_value
-        print(fields)
-        print(index)
+        #print(fields)
+        #print(index)
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
         h = self.set_up_header(
@@ -346,12 +349,13 @@ class http_adapter:
     def drop_index(
         self,
         index_name,
-        opt=ConflictType.Error,
+        conflict_type=ConflictType.Error,
     ):
-        copt = opt
-        exists = baseDropOptions.get(opt, None)
-        if exists is not None:
-            copt = baseDropOptions[opt]
+        copt = conflict_type
+        if type(conflict_type) != type([]) and type(conflict_type) != type({}) and type(conflict_type) != type(()):
+            exists = baseDropOptions.get(conflict_type, None)
+            if exists is not None:
+                copt = baseDropOptions[conflict_type]
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
 
@@ -453,7 +457,7 @@ class http_adapter:
             tmp.update({"fusion": self._fusion})
         if len(self._knn):
             tmp.update({"knn": self._knn})
-        print(tmp)
+        #print(tmp)
         d = self.set_up_data([], tmp)
         r = self.request(url, "get", h, d)
         self.raise_exception(r)
@@ -508,20 +512,31 @@ class http_adapter:
         for output_col in self._output:
             if output_col in col_types:
                 df_dict[output_col] = ()
+        #when output["*"] and output_res is empty
+        for output_col in self._output:
+            if output_col == "*":
+                for col in col_types:
+                    df_dict[col] = ()
+
         for res in self.output_res:
             for k in res:
                 if k not in df_dict:
                     df_dict[k] = ()
                 tup = df_dict[k]
-                if res[k].isdigit() or isfloat(res[k]):
+                if res[k].isdigit() or is_float(res[k]):
                     new_tup = tup + (eval(res[k]), )
                 elif is_list(res[k]):
                     new_tup = tup + (ast.literal_eval(res[k]), )
                 else:
+                    if res[k].lower() == 'true':
+                        res[k] = True
+                    elif res[k].lower() == 'false':
+                        res[k] = False
                     new_tup = tup + (res[k],)
                 df_dict[k] = new_tup
-        print(self.output_res)
-        print(df_dict)
+        #print(self.output_res)
+        #print(df_dict)
+
         df_type = {}
         for k in df_dict:
             if k in col_types:# might be object
@@ -530,10 +545,15 @@ class http_adapter:
             k1 = k.replace("(", "")
             k1 = k1.replace(")", "")
             cols = k1.split("+") + k1.split("-") #["c1 ", " c2", "c1 + c2"]
-            print(cols)
+            #print(cols)
+            #haven't considered data type priority
             for col in cols:
                 if col.strip() in col_types:
                     df_type[k] = type_to_dtype(col_types[col.strip()])
+                if col.strip().isdigit():
+                    df_type[k] = dtype('int32')
+                if is_float(col.strip()):
+                    df_type[k] = dtype('float64')
         return pd.DataFrame(df_dict).astype(df_type)
 
     def to_arrow(self):

@@ -22,7 +22,6 @@ import stl;
 
 import doc_iterator;
 import column_index_reader;
-import match_data;
 import table_entry;
 import segment_index_entry;
 import internal_types;
@@ -31,59 +30,27 @@ import infinity_exception;
 import query_node;
 import base_table_ref;
 import segment_entry;
-import blockmax_term_doc_iterator;
+import term_doc_iterator;
 import logger;
 import third_party;
 
 namespace infinity {
 
-void QueryBuilder::Init(IndexReader index_reader) {
-    index_reader_ = index_reader;
-
-    u64 total_row_count = 0;
-    for (const auto &[segment_id, segment_info] : base_table_ref_->block_index_->segment_block_index_) {
-        total_row_count += segment_info.segment_offset_;
-    }
-
-    scorer_.Init(total_row_count, &index_reader_);
-}
+void QueryBuilder::Init(IndexReader index_reader) { index_reader_ = index_reader; }
 
 QueryBuilder::~QueryBuilder() {}
 
-UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context) {
+UniquePtr<DocIterator> QueryBuilder::CreateSearch(FullTextQueryContext &context, EarlyTermAlgo early_term_algo) {
     // Optimize the query tree.
     if (!context.optimized_query_tree_) {
         context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
     }
     // Create the iterator from the query tree.
-    UniquePtr<DocIterator> result = context.optimized_query_tree_->CreateSearch(table_entry_, index_reader_, &scorer_);
+    UniquePtr<DocIterator> result = context.optimized_query_tree_->CreateSearch(table_entry_, index_reader_, early_term_algo);
 #ifdef INFINITY_DEBUG
     {
         OStringStream oss;
         oss << "DocIterator:\n";
-        if (result) {
-            result->PrintTree(oss);
-        } else {
-            oss << "Empty tree!\n";
-        }
-        LOG_DEBUG(std::move(oss).str());
-    }
-#endif
-    return result;
-}
-
-UniquePtr<EarlyTerminateIterator> QueryBuilder::CreateEarlyTerminateSearch(FullTextQueryContext &context, EarlyTermAlgo early_term_algo) {
-    // Optimize the query tree.
-    if (!context.optimized_query_tree_) {
-        context.optimized_query_tree_ = QueryNode::GetOptimizedQueryTree(std::move(context.query_tree_));
-    }
-    // Create the iterator from the query tree.
-    UniquePtr<EarlyTerminateIterator> result =
-        context.optimized_query_tree_->CreateEarlyTerminateSearch(table_entry_, index_reader_, &scorer_, early_term_algo);
-#ifdef INFINITY_DEBUG
-    {
-        OStringStream oss;
-        oss << "EarlyTerminateIterator:\n";
         if (result) {
             result->PrintTree(oss);
         } else {

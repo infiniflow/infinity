@@ -188,7 +188,7 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
                     doc.from_input_data_block_id_ = fragment_id;
                     doc.from_block_idx_ = from_block_idx;
                     doc.from_row_idx_ = i;
-                    doc.child_scores_.resize(num_children, 0.0F);
+                    doc.child_scores_.resize(num_children, 0.0f);
                     doc.mask_.resize(num_children, false);
                     rescore_vec.push_back(doc);
                     rescore_map[docId] = rescore_vec.size() - 1;
@@ -213,7 +213,7 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
     // 2 calculate every doc's fusion_score
     if (fusion_method_ == FusionMethod::kRRF) {
         for (auto &doc : rescore_vec) {
-            doc.fusion_score_ = 0.0F;
+            doc.fusion_score_ = 0.0f;
             for (auto &rank : doc.child_scores_) {
                 if (rank < 1.0F)
                     continue;
@@ -256,7 +256,7 @@ void PhysicalFusion::ExecuteRRFWeighted(const Map<u64, Vector<UniquePtr<DataBloc
             }
         }
         for (auto &doc : rescore_vec) {
-            doc.fusion_score_ = 0.0F;
+            doc.fusion_score_ = 0.0f;
             for (SizeT i = 0; i < num_children; ++i) {
                 if (!doc.mask_[i])
                     continue;

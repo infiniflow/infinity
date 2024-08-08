@@ -75,6 +75,12 @@ void Infinity::LocalInit(const String &path) {
         InfinityContext::instance().Init(config_path);
     } else {
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
+        default_config->default_log_dir_ = fmt::format("{}/log", path);
+        default_config->default_data_dir_ = fmt::format("{}/data", path);
+        default_config->default_wal_dir_ = fmt::format("{}/wal", path);
+        default_config->default_temp_dir_ = fmt::format("{}/tmp", path);
+        default_config->default_resource_dir_ = fmt::format("{}/resource", path);
+
         default_config->default_log_level_ = LogLevel::kInfo;
         default_config->default_log_to_stdout_ = false;
         InfinityContext::instance().Init(nullptr, false, default_config.get());

@@ -63,14 +63,17 @@ This allows for bug fixes without requiring changes to the configuration file.
 From v0.2.1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed Infinity via `pip install infinity-sdk==<v0.2.1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
 ```python
+import infinity
 infinity_obj = infinity.connect("/path/to/save/to")
 ```
 
 #### Connect to Infinity in client-server mode
 
-If you have deployed Infinity as a separate server, connect to it via its IP address. Further, if your Infinity is running on your local machine, you can also use `infinity.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet.
+
+If you have deployed Infinity as a separate server, connect to it via its IP address. If your Infinity is running on your local machine, you can also use `infinity.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet. 
 
 ```python
+import infinity
 # If Infinity is deployed on the local machine, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
 infinity_obj = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
 ```
@@ -112,7 +115,7 @@ Creates a database with a specified name.
 
 ### Parameters
 
-#### db_name: `str`, *Required*
+#### db_name: `str` (non-empty), *Required*
 
 The name of the database. `database_name` requirements:
 
@@ -184,7 +187,7 @@ Deletes a database by its name.
 
 ### Parameters
 
-#### db_name: `str`, *Required*
+#### db_name: `str` (non-empty), *Required*
 
 Name of the database to delete. Must not be empty.
 
@@ -296,46 +299,10 @@ db_obj=infinity_obj.get_database("my_database")
 
 ---
 
-## show_database
-
-```python
-infinity_obj.show_database(db_name)
-```
-
-Retrieves the metadata of a database by its name.
-
-### Parameters
-
-#### db_name: `str` (non-empty), *Required*
-
-Name of the database. Must not be empty.
-
-### Returns
-
-A structure containing the following attributes:
-
-- `error_code`: `int` An error code indicating the result of the operation.
-  - `0`: The operation succeeds.
-  - A non-zero value: A specific error condition occurs.
-- `error_msg`: `str` The error message providing additional details. It is an empty string if the operation succeeds.
-- `database_name`: `str` A list of all database names.
-- `store_dir`: `str` The directory holding the database files.
-- `table_count`: `int` The number of tables in the database.
-
-### Examples
-
-```python
-metadata=infinity_obj.show_database("my_database")
-metadata.database_name  #'my_database'
-metadata.table_count  #0
-```
-
----
-
 ## create_table
 
 ```python
-Database.create_table(table_name, columns_definition, conflict_type = ConflictType.Error)
+db_obj.create_table(table_name, columns_definition, conflict_type = ConflictType.Error)
 ```
 
 Creates a table with a specified name and defined columns.
@@ -482,9 +449,9 @@ Deletes a table from the database by its name.
 
 ### Parameters
 
-#### table_name: `str`, *Required* 
+#### table_name: `str` (non-empty), *Required* 
 
-Name of the table to delete. Must not be empty. 
+Name of the table to delete. Must not be empty.
 
 #### conflict_type: `ConflictType`, *Optional*
 
@@ -679,13 +646,12 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"raw"`: Store the block-max index without compression.
 
 :::tip NOTE
-- Import the `infinity.index` package to set `IndexInfo`, `IndexType`, and `InitParameter`.
-- Import the `infinity` package to set `index.IndexInfo()`.
+Import the `infinity.index` package to set `IndexInfo`, `IndexType`, and `InitParameter`.
 
 ```python
+from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
-from infinity import index
 ```
 :::
 
@@ -723,11 +689,10 @@ A structure containing these attributes:
 
 #### Create an HNSW index
 
-```python {1-4}
+```python {1-3}
 from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
-from infinity import index
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
 table_obj = db_obj.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an HNSW index named "my_index" on column "c1" with default parameter settings:
@@ -739,11 +704,10 @@ table_obj = db_obj.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,
 table_obj.create_index("my_index",[IndexInfo("c1", IndexType.Hnsw, [InitParameter("metric", "l2")])], None)
 ```
 
-```python {1-4}
+```python {1-3}
 from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
-from infinity import index
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
 table_obj = db_obj.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an HNSW index named "my_index" on column "c1"
@@ -770,11 +734,10 @@ table_obj.create_index(
 
 #### Create a full-text index
 
-```python {15}
+```python {14}
 from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
-from infinity import index
 # Create a table named "test_index_fulltext" with a varchar column "body"
 table_obj = db_obj.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
 # Create a full-text index named "my_index" on column "body" with default parameter settings:
@@ -792,11 +755,10 @@ table_obj.create_index(
 )
 ```
 
-```python {16}
+```python {15}
 from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
-from infinity import index
 # Create a table named "test_index_fulltext" with a varchar column "body"
 table_obj = db_obj.create_table("test_index_fulltext", {"body": {"type": "varchar"}}, None)
 # Create a full-text index named "my_index" on column "body"
@@ -816,11 +778,10 @@ table_obj.create_index(
 )
 ```
 
-```python {14-16}
+```python {13-15}
 from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
-from infinity import index
 # In the following code snippet, you will see an index built on three columns
 # IMPORTANT: For now, multi-column index works with full-text index ONLY. 
 # Create a table named "test_index_fulltext" with three varchar columns "doctitle", "docdate", and "body"
@@ -841,11 +802,10 @@ table_obj.create_index(
 
 #### Create an IVFFlat index
 
-```python {17}
+```python {16}
 from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
-from infinity import index
 # Create a table named "test_index_ivfflat" with a vector column "c1"
 table_ojbect = db_obj.create_table("test_index_ivfflat", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an IVFFlat index named "my_index" on column "c1" with default parameter settings:
@@ -866,11 +826,10 @@ table_obj.create_index(
 )
 ```
 
-```python {16,17}
+```python {15,16}
 from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
-from infinity import index
 # Create a table named "test_index_ivfflat" with a vector column "c1"
 table_ojbect = db_obj.create_table("test_index_ivfflat", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an IVFFlat index named "my_index" on column "c1"
@@ -893,11 +852,10 @@ table_obj.create_index(
 
 #### Create a secondary index
 
-```python {14}
+```python {13}
 from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
-from infinity import index
 # Create a table named "test_index_secondary" with a varchar column "body"
 table_obj = db_obj.create_table("test_index_secondary", {"c1": {"type": "varchar"}}, None)
 # Create a secondary index named "my_index" on column "c1"
@@ -916,11 +874,10 @@ table_obj.create_index(
 
 #### Create a BMP index
 
-```python {16}
+```python {15}
 from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
-from infinity import index
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
 table_obj = db_obj.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
 # Create a BMP index named "my_index" on column "c1" with default parameter settings:
@@ -940,11 +897,10 @@ table_obj.create_index(
 ```
 
 
-```python {16,17}
+```python {15,16}
 from infinity.index import IndexInfo
 from infinity.index import IndexType
 from infinity.index import InitParameter
-from infinity import index
 # Create a table named "test_index_bmp" with a sparse vector column "c1"
 table_obj = db_obj.create_table("test_index_bmp", {"c1": {"type": "sparse,30000,float,int16"}}, None)
 # Create a BMP index named "my_index" on column "c1"
@@ -1018,65 +974,6 @@ table_obj.drop_index("my_index")
 
 ---
 
-## show_index
-
-```python
-table_obj.show_index(index_name)
-```
-
-Retrieves the metadata of an specified index.
-
-### Parameters
-
-#### index_name: `str`, *Required*
-
-The name of the index to look up.
-
-### Returns
-
-- Success: A structure containing the following attributes:
-    - `error_code`: `int` - `0` indicating that the operation succeeds.
-    - `error_msg`: `str` - An empty string.
-    - `db_name`: `str` - The database name.
-    - `table_name`: `str` - The table name.
-    - `index_name`: `str` - The index name.
-    - `index_type`: `str` - The index type.
-    - `index_column_names`: `str` - Names of the columns for building the index.
-    - `index_column_ids`: `str` - IDs of the columns for building the index.
-    - `other_parameters`: `str` - Parameters necessary for creating the index.
-    - `store_dir`: `str` - The directory holding the index files.
-    - `segment_index_count`: `str` - Number of segments of the index.
-- Failure: `InfinityException`
-  - `error_code`: `int` A non-zero value: A specific error condition occurs.
-  - `error_msg`: `str` The error message providing additional details.
-
-### Examples
-
-```python
-from infinity.index import IndexInfo
-from infinity.index import IndexType
-from infinity.index import InitParameter
-from infinity import index
-table_obj.create_index(
-    "my_index",
-    [
-        IndexInfo(
-            "c1",  
-            IndexType.IVFFlat,
-            [
-                InitParameter("centroids_count", "128"),
-                InitParameter("metric", "l2")
-            ]
-        )
-    ], 
-    ConflictType.Error
-)
-res = table_obj.show_index("my_index")
-print(res)
-```
-
----
-
 ## list_indexes
 
 ```python
@@ -1122,8 +1019,8 @@ Batch row limit: 8,192. You are allowed to insert a maximum of 8,192 rows at onc
 :::
 
 :::tip NOTE
-When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table`. Otherwise, an error will occur.  
-For information about setting default column values, see `create_table`.
+When inserting incomplete rows of data, ensure that all uninserted columns have default values when calling `create_table()`. Otherwise, an error will occur.  
+For information about setting default column values, see `create_table()`.
 :::
 
 ### Returns
@@ -1349,12 +1246,12 @@ Deletes rows from the table based on the specified condition.
 
 ### Parameters
 
-#### cond: `str` (not empty), *Optional*
+#### cond: `str` (non-empty), *Optional*
 
 A condition or filter that determines which rows to delete from the table. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
 
 :::tip NOTE
-- The `cond` parameter currently supports 'and' and 'or' logical expressions only. Additional expressions like 'between' and 'in' will be available in future updates.
+- The `cond` parameter currently supports 'and' and 'or' logical expressions only.
 - `cond` must not be an empty string.
 :::
 
@@ -1416,11 +1313,11 @@ Searches for rows that match the specified condition and updates them accordingl
 
 ### Parameters
 
-#### cond: `str` (not empty), *Required*
+#### cond: `str` (non-empty), *Required*
 
 A condition that specifies which rows to update. This parameter should be a non-empty string representing a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated.
 
-#### data: `list[dict[str, Any]]]` (not empty), *Required*
+#### data: `list[dict[str, Any]]]` (non-empty), *Required*
 
 A list of dictionaries where each key indicates a column name and each value indicates the new value for the corresponding cell. This list must not be empty.
 
@@ -1452,32 +1349,75 @@ table_obj.update("c1 > 2", [{"c2": 100, "c3": 1000}])
 ```python
 table_obj.output(columns)
 ```
-Specify the columns to display in the search output, or perform aggregation operations or arithmetic calculations. 
+This method allows you to customize the output of your query by selecting specific columns, applying aggregation functions, or performing arithmetic operations.
 
 ### Parameters
 
-#### columns: `list[str]`, *Required*
+#### columns: `list[str]` (non-empty), *Required*
 
-Must not be empty. Supported aggragation functions:
+A non-empty list of strings specifying the columns to include in the output. Each string in the list can represent:
 
-- count
-- min
-- max
-- sum
-- avg
+- A user-defined column name: The name of the column to include in the output, e.g., `"body"`.
+- All user-defined columns: Use a wildcard `"*"` to select all columns.
+- A special system column: system-generated columns include:
+  - `_row_id`:  An automatically generated, unique identifier for each row in the table. It serves as a unique key for each row but does not necessarily correspond to the actual row number. When the data in a row is updated, the `_row_id` for that row is also changed to reflect the update.
+  - `_score`: A BM25 score used in full-text search.
+  - `_similarity`: Used by IP and cosine metric in dense or sparse vector search.
+  - `_distance`: Used by L2 metric in dense vector search. 
+- An aggregation function: Apply an aggregation operation on specified columns. Supported aggragation functions include:
+  - `count`
+  - `min`
+  - `max`
+  - `sum`
+  - `avg`
+- An arithmetic function: Apply an arithmetic operation on specified columns (e.g., `c1+5`)
+
+:::tip NOTE
+The list must contain at least one element. Empty lists are not allowed.
+:::
   
 ### Returns
 
 An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
 
+:::tip NOTE
+This method specifies the projection columns for the current table but does not directly produce displayable data. To display the query results, use `output()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
+:::
+
 ### Examples
 
+#### Select columns to display
+
 ```python
-table_obj.output(["*"])
-table_obj.output(["num", "body"])
-table_obj.output(["_row_id"])
-table_obj.output(["avg(c2)"])
-table_obj.output(["c1+5"])
+# Select all columns
+table_obj.output(["*"]).to_pl()
+```
+
+```python
+# Select columns "num" and "body"
+table_obj.output(["num", "body"]).to_df()
+```
+
+```python
+# Select a system-generated column "_row_id"
+table_obj.output(["_row_id"]).to_result()
+```
+
+#### Perform aggregation or arithmetic operations on selected columns
+
+```python
+# Specify that the output should display the average value of all cells in column "c2"
+table_obj.output(["avg(c2)"]).to_result()
+```
+
+```python
+# Select column c1 and request all cells in this column to be displayed with their original values increased by 5
+table_obj.output(["c1+5"]).to_result()
+```
+
+```python
+# Specify that the output should display the result of an arithmetic operation combining two aggregation functions
+table_obj.output(["min(c1) + max(c2)"]).to_result()
 ```
 
 ---
@@ -1488,22 +1428,34 @@ table_obj.output(["c1+5"])
 table_obj.filter(cond)
 ```
 
-Creates a filtering condition expression.
+Creates a filtering condition expression for the current table.
 
 ### Parameters
 
-#### cond: `str`
-`cond` has only supported 'and' and 'or' conjunction expression for now. 
+#### cond: `str` (non-empty), *Required*
+
+A non-empty string representing the filter condition. It comprises one or multiple expressions combined by 'and' or 'or' logical operators, where each expression uses comparison operators to set criteria for keeping or removing rows.
+
+:::tip NOTE
+Currently, only 'and' and 'or' logical expressions are supported.
+:::
 
 ### Returns
 
-- Success: self `Table`
-- Failure: `Exception`
+An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+
+:::tip NOTE
+This method specifies a filtering condition for the rows in the current table but does not directly produce displayable data. To display the query results, use `filter()` in conjunction with methods like `to_result()`, `to_df()`, `to_pl()`, or `to_arrow()` to materialize the data.
+:::
 
 ### Examples
 
 ```python
-table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
+table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)").to_result()
+```
+
+```python
+table_obj.filter("c2 = 3").to_result()
 ```
 
 ---
@@ -1514,13 +1466,13 @@ table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)")
 table_obj.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
 ```
 
-Conducts a KNN vector search, finding the top n closet rows to the given vector.
+Performs a k-nearest neighbor (KNN) or approximate nearest neighbor (ANN) vector search to find the top n closest rows to the given vector. Suitable for dense vectors (dense embeddings).
 
 ### Parameters
 
 #### vector_column_name: `str`, *Required*
 
-The name of the vector column to search.
+The name of the vector column to search on.
 
 #### embedding_data: `list/np.ndarray`, *Required*
 
@@ -1540,13 +1492,20 @@ The distance metric to use in similarity search.
 
 ### Returns
 
-- Success: Self `Table`
-- Failure: `Exception`
+- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value: A specific error condition occurs.
+  - `error_msg`: `str` The error message providing additional details.
 
 ### Examples
 
 ```python
+# Find the 100 nearest neighbors using Euclidean distance
 table_obj.knn('col1', [0.1,0.2,0.3], 'float', 'l2', 100)
+```
+
+```python
+# Find the 2 nearest neighbors using inner product distance
 table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2)
 ```
 
@@ -1574,8 +1533,11 @@ table_obj.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt
       - 'beta=0.0~1.0'(default: 1.0): A "Query Term Pruning" parameter. The smaller the value, the more aggressive the pruning.
 
 ### Returns
-- Success: Self `Table`
-- Failure: `Exception`
+
+- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value: A specific error condition occurs.
+  - `error_msg`: `str` The error message providing additional details.
 
 ### Examples
 
@@ -1603,8 +1565,10 @@ The column where text is searched, and has create full-text index on it before.
 
 ### Returns
 
-- Success: Self `Table`
-- Failure: `Exception`
+- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value: A specific error condition occurs.
+  - `error_msg`: `str` The error message providing additional details.
 
 ### Examples
 
@@ -1663,8 +1627,10 @@ Options seperated by ';'
 
 ### Returns
 
-- Success: Self `Table`
-- Failure: `Exception`
+- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_thrift.table.RemoteTable` object in client-server mode.
+- Failure: `InfinityException`
+  - `error_code`: `int` A non-zero value: A specific error condition occurs.
+  - `error_msg`: `str` The error message providing additional details.
 
 ### Examples
 
@@ -1731,34 +1697,6 @@ table_obj.fusion('match_tensor', 'topn=2', make_match_tensor_expr('t', [[0.0, -1
 `rrf`:  Reciprocal rank fusion method.
 
 [Reciprocal rank fusion (RRF)](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) is a method that combines multiple result sets with different relevance indicators into one result set. RRF does not requires tuning, and the different relevance indicators do not have to be related to each other to achieve high-quality results.
-
----
-
-## optimize
-
-```python
-table_obj.optimize(index_name, opt_params)
-```
-
-### Parameters
-
-#### index_name: `str`
-
-#### opt_params: `dict[str, str]`
-    
-#### Common options: `str`
-  - 'topk=10': Optimize the BMP index for top 10. Used only when the index is BMP.
-
-### Returns
-
-- Success: `True`
-- Failure: `Exception`
-
-### Examples
-
-```python
-table_obj.optimize('bmp_index_name', {'topk': '10'})
-```
 
 ---
 

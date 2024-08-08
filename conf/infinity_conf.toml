@@ -16,8 +16,8 @@ log_to_stdout            = false
 log_file_max_size        = "10GB"
 log_file_rotate_count    = 10
 
-# trace/info/warning/error/critical 5 log levels, default: info
-log_level                = "info"
+# trace/debug/info/warning/error/critical 6 log levels, default: info
+log_level               = "info"
 
 [storage]
 data_dir                 = "/var/infinity/data"

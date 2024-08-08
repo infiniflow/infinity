@@ -32,6 +32,7 @@ import block_version;
 import fast_rough_filter;
 import value;
 import buffer_obj;
+import bitmask;
 
 namespace infinity {
 
@@ -147,6 +148,10 @@ public:
     Pair<BlockOffset, BlockOffset> GetVisibleRange(TxnTimeStamp begin_ts, BlockOffset block_offset_begin = 0) const;
 
     bool CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts, bool check_append) const;
+
+    void CheckRowsVisible(Vector<u32> &segment_offsets, TxnTimeStamp check_ts) const;
+
+    void CheckRowsVisible(Bitmask &segment_offsets, TxnTimeStamp check_ts) const;
 
     bool CheckDeleteConflict(const Vector<BlockOffset> &block_offsets) const;
 

@@ -436,33 +436,40 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             UnrecoverableError(fmt::format("IndexType: {} is not supported.", (i8)index_base->index_type_));
         }
 
-        auto it = common_query_filter_->filter_result_.find(segment_id);
-        if (it == common_query_filter_->filter_result_.end()) {
-            break;
-        }
-        SizeT segment_row_count = 0;
-        SegmentEntry *segment_entry = nullptr;
-        {
-            auto segment_it = block_index->segment_block_index_.find(segment_id);
-            if (segment_it == block_index->segment_block_index_.end()) {
-                UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
-            }
-            segment_entry = segment_it->second.segment_entry_;
-            segment_row_count = segment_it->second.segment_offset_;
-        }
+        bool has_some_result = false;
         Bitmask bitmask;
-        const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
-        if (std::holds_alternative<Vector<u32>>(filter_result)) {
-            const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-            bitmask.Initialize(std::ceil(segment_row_count));
-            bitmask.SetAllFalse();
-            for (u32 row_id : filter_result_vector) {
-                bitmask.SetTrue(row_id);
-            }
+        bool use_bitmask = false;
+        if (common_query_filter_->AlwaysTrue()) {
+            has_some_result = true;
+            bitmask.SetAllTrue();
         } else {
-            bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+            auto it = common_query_filter_->filter_result_.find(segment_id);
+            if (it != common_query_filter_->filter_result_.end()) {
+                SizeT segment_row_count = 0;
+                {
+                    auto segment_it = block_index->segment_block_index_.find(segment_id);
+                    if (segment_it == block_index->segment_block_index_.end()) {
+                        UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
+                    }
+                    segment_row_count = segment_it->second.segment_offset_;
+                }
+                const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
+                if (std::holds_alternative<Vector<u32>>(filter_result)) {
+                    const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
+                    bitmask.Initialize(std::ceil(segment_row_count));
+                    bitmask.SetAllFalse();
+                    for (u32 row_id : filter_result_vector) {
+                        bitmask.SetTrue(row_id);
+                    }
+                } else {
+                    bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+                }
+                has_some_result = true;
+                use_bitmask = !bitmask.IsAllTrue();
+            }
         }
-        bool use_bitmask = !bitmask.IsAllTrue();
+        if (!has_some_result)
+            break;
 
         auto bmp_search = [&](AbstractBMP index, SizeT query_id, bool with_lock, const auto &filter) {
             auto query = get_ele(query_vector, query_id);
@@ -507,21 +514,10 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         };
 
         if (use_bitmask) {
-            if (segment_entry->CheckAnyDelete(begin_ts)) {
-                DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
-                bmp_scan(filter);
-            } else {
-                BitmaskFilter<SegmentOffset> filter(bitmask);
-                bmp_scan(filter);
-            }
+            BitmaskFilter<SegmentOffset> filter(bitmask);
+            bmp_scan(filter);
         } else {
-            SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
-            if (segment_entry->CheckAnyDelete(begin_ts)) {
-                DeleteFilter filter(segment_entry, begin_ts, max_segment_offset);
-                bmp_scan(filter);
-            } else {
-                bmp_scan(nullptr);
-            }
+            bmp_scan(nullptr);
         }
 
         break;

@@ -14,7 +14,7 @@
 
 module;
 
-export module multi_query_iterator;
+export module multi_doc_iterator;
 
 import stl;
 
@@ -23,21 +23,9 @@ import doc_iterator;
 import term_doc_iterator;
 
 namespace infinity {
-export class MultiQueryDocIterator : public DocIterator {
+export class MultiDocIterator : public DocIterator {
 public:
-    explicit MultiQueryDocIterator(Vector<UniquePtr<DocIterator>> &&children) : children_(std::move(children)) {
-        for (u32 i = 0; i < children_.size(); ++i) {
-            if (auto term_doc_iter = dynamic_cast<TermDocIterator *>(children_[i].get()); term_doc_iter) {
-                term_doc_iter->DoSeek(0);
-            }
-        }
-    }
-
-    virtual bool IsAnd() const { return false; }
-
-    virtual bool IsAndNot() const { return false; }
-
-    virtual bool IsOr() const { return false; }
+    explicit MultiDocIterator(Vector<UniquePtr<DocIterator>> &&children) : children_(std::move(children)) {}
 
     const Vector<UniquePtr<DocIterator>> &GetChildren() { return children_; }
 

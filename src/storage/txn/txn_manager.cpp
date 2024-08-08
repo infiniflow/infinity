@@ -295,6 +295,9 @@ TxnTimeStamp TxnManager::GetCleanupScanTS() {
     for (auto *txn : finished_txns_) {
         res = std::min(res, txn->BeginTS());
     }
+    for (auto *txn : finishing_txns_) {
+        res = std::min(res, txn->BeginTS());
+    }
     return res;
 }
 

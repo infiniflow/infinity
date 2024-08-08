@@ -861,7 +861,6 @@ class TestInfinity:
         except Exception as e:
             print(e)
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_table(self):
         # self.test_infinity_obj._test_version()
         self._test_table()

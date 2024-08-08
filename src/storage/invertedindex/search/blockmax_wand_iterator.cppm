@@ -17,53 +17,34 @@ module;
 export module blockmax_wand_iterator;
 import stl;
 import index_defines;
-import early_terminate_iterator;
+import term_doc_iterator;
+import multi_doc_iterator;
 import internal_types;
 
 namespace infinity {
 
 // Refers to https://engineering.nyu.edu/~suel/papers/bmw.pdf
-export class BlockMaxWandIterator final : public EarlyTerminateIterator {
+export class BlockMaxWandIterator final : public MultiDocIterator {
 public:
-    explicit BlockMaxWandIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators);
+    explicit BlockMaxWandIterator(Vector<UniquePtr<DocIterator>> &&iterators);
 
     ~BlockMaxWandIterator() override;
 
-    void UpdateScoreThreshold(float threshold) override;
+    String Name() const override { return "BlockMaxWandIterator"; }
 
-    bool NextShallow(RowID doc_id) override;
+    void UpdateScoreThreshold(float threshold) override;
 
     bool Next(RowID doc_id) override;
 
-    bool BlockSkipTo(RowID doc_id, float threshold) override;
-
-    // following functions are available only after BlockSkipTo() is called
-
-    RowID BlockMinPossibleDocID() const override { return common_block_min_possible_doc_id_; }
-
-    RowID BlockLastDocID() const override { return common_block_last_doc_id_; }
-
-    float BlockMaxBM25Score() override { return common_block_max_bm25_score_; }
-
-    Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
-    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override;
     float BM25Score() override;
-
-    Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
-
-    bool NotPartCheckExist(RowID doc_id) override;
-
-    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
-        return MultiQueryEarlyTerminateIteratorCommonPrintTree(this, "BlockMaxWandIterator", sorted_iterators_, os, prefix, is_final);
-    }
 
 private:
     // block max info
     RowID common_block_min_possible_doc_id_{}; // not always exist
     RowID common_block_last_doc_id_{};
     float common_block_max_bm25_score_{};
-    Vector<UniquePtr<EarlyTerminateIterator>> sorted_iterators_; // sort by DocID(), in ascending order
-    Vector<UniquePtr<EarlyTerminateIterator>> backup_iterators_;
+    Vector<TermDocIterator *> sorted_iterators_; // sort by DocID(), in ascending order
+    Vector<TermDocIterator *> backup_iterators_;
     SizeT pivot_;
     // bm25 score cache
     bool bm25_score_cached_ = false;

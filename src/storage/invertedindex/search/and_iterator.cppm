@@ -18,23 +18,27 @@ export module and_iterator;
 
 import stl;
 import index_defines;
-import multi_query_iterator;
+import multi_doc_iterator;
 import internal_types;
 
 namespace infinity {
 
-export class AndIterator : public MultiQueryDocIterator {
+export class AndIterator : public MultiDocIterator {
 public:
     AndIterator(Vector<UniquePtr<DocIterator>> iterators);
 
-    bool IsAnd() const override { return true; }
+    String Name() const override { return "AndIterator"; }
 
-    void DoSeek(RowID doc_id) override;
+    /* pure virtual methods implementation */
+    bool Next(RowID doc_id) override;
 
-    u32 GetDF() const override { return and_iterator_df_; }
+    float BM25Score() override;
+
+    void UpdateScoreThreshold(float threshold) override;
 
 private:
-    Vector<DocIterator *> sorted_iterators_;
-    u32 and_iterator_df_{};
+    // bm25 score cache
+    RowID bm25_score_cache_docid_ = INVALID_ROWID;
+    float bm25_score_cache_ = 0.0f;
 };
 } // namespace infinity

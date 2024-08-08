@@ -154,6 +154,6 @@ public:
     void Cleanup() override;
 
     void MemIndexCommit();
-    void MemIndexRecover(BufferManager *buffer_manager);
+    void MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts);
 };
 } // namespace infinity

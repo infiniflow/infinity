@@ -38,7 +38,6 @@ class TestInfinity:
     def skip_setup_marker(self, request):
         request.node.skip_setup = True
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_delete(self):
         """
         target: test table delete apis
@@ -290,7 +289,6 @@ class TestInfinity:
         assert e.type == infinity.common.InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
-    @pytest.mark.usefixtures("skip_if_http")
     @trace_expected_exceptions
     @pytest.mark.parametrize('column_types', ["int", "int8", "int16", "int32", "int64", "integer",
                                               "float", "float32", "double", "float64",
@@ -303,7 +301,9 @@ class TestInfinity:
                                                       "^789$ test insert varchar",
                                                       True,
                                                       np.array([1.1, 2.2, 3.3]), [1, 2, 3]])
-    def test_various_expression_in_where_clause(self, column_types, column_types_example):
+    def test_various_expression_in_where_clause(self, column_types, column_types_example, http):
+        if column_types == "vector, 3, float" and column_types_example == [1, 2, 3] and http:
+            pytest.skip(reason = "bus error, core dumped")
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_various_expression_in_where_clause", ConflictType.Ignore)
