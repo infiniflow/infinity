@@ -168,6 +168,45 @@ bool BlockEntry::CheckRowVisible(BlockOffset block_offset, TxnTimeStamp check_ts
     return deleted[block_offset] == 0 || deleted[block_offset] > check_ts;
 }
 
+void BlockEntry::CheckRowsVisible(Vector<u32> &segment_offsets, TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
+    if (min_row_ts_ > check_ts)
+        return;
+
+    Vector<u32> segment_offsets2;
+    segment_offsets2.reserve(segment_offsets.size());
+    auto block_version_handle = this->block_version_->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
+
+    auto &deleted = block_version->deleted_;
+    for (const auto segment_offset : segment_offsets) {
+        BlockOffset off = segment_offset & BLOCK_OFFSET_MASK;
+        if (deleted[off] == 0 || deleted[off] > check_ts) {
+            segment_offsets2.push_back(segment_offset);
+        }
+    }
+    segment_offsets = std::move(segment_offsets2);
+}
+
+// Similar to SetDeleteBitmask but faster
+void BlockEntry::CheckRowsVisible(Bitmask &segment_offsets, TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
+    if (min_row_ts_ > check_ts)
+        return;
+
+    auto block_version_handle = this->block_version_->Load();
+    const auto *block_version = reinterpret_cast<const BlockVersion *>(block_version_handle.GetData());
+
+    auto &deleted = block_version->deleted_;
+    BlockOffset block_offset_end = block_version->GetRowCount(check_ts);
+    for (BlockOffset off = 0; off < block_offset_end; off++) {
+        if (deleted[off] != 0 && deleted[off] <= check_ts) {
+            SegmentOffset segment_offset = (SegmentOffset(block_id_) << BLOCK_OFFSET_SHIFT) | SegmentOffset(off);
+            segment_offsets.SetFalse(segment_offset);
+        }
+    }
+}
+
 bool BlockEntry::CheckDeleteConflict(const Vector<BlockOffset> &block_offsets) const {
     std::shared_lock lock(rw_locker_);
 

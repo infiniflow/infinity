@@ -658,7 +658,10 @@ std::variant<Vector<u32>, Bitmask> SolveSecondaryIndexFilter(const Vector<Filter
                                                              Txn *txn) {
     if (filter_execute_command.empty()) {
         // return all true
-        return std::variant<Vector<u32>, Bitmask>(std::in_place_type<Bitmask>);
+        auto res = std::variant<Vector<u32>, Bitmask>(std::in_place_type<Bitmask>);
+        auto &bitmask = std::get<Bitmask>(res);
+        bitmask.Initialize(DEFAULT_SEGMENT_CAPACITY);
+        return res;
     }
     auto result =
         SolveSecondaryIndexFilterInner(filter_execute_command, column_index_map, segment_id, segment_row_count, segment_row_actual_count, txn);

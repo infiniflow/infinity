@@ -22,9 +22,9 @@ import posting_iterator;
 import index_defines;
 import term_meta;
 import doc_iterator;
-import match_data;
 import internal_types;
 import doc_iterator;
+import column_length_io;
 import third_party;
 
 namespace infinity {
@@ -36,37 +36,75 @@ public:
         term_freq_ = 0;
     }
 
-    void DoSeek(RowID doc_id) override { doc_id_ = iter_->SeekDoc(doc_id); }
-
-    u32 GetDF() const override { return doc_freq_; }
-
-    bool GetTermMatchData(TermColumnMatchData &match_data, RowID doc_id) {
-        if (doc_id == doc_id_) {
-            match_data.doc_id_ = doc_id_;
-            iter_->GetTermMatchData(match_data);
-            term_freq_ += match_data.tf_;
-            return true;
-        }
-        return false;
-    }
+    ~TermDocIterator() override;
 
     float GetWeight() const { return weight_; }
 
-    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
-
-    DocIteratorType GetType() const override { return DocIteratorType::kTermIterator; }
+    void MultiplyWeight(float factor) { weight_ *= factor; }
 
     u64 GetTermFreq() const { return term_freq_; }
+
+    void InitBM25Info(UniquePtr<FullTextColumnLengthReader> &&column_length_reader);
+
+    RowID BlockMinPossibleDocID() const { return iter_->BlockLowestPossibleDocID(); }
+    RowID BlockLastDocID() const { return iter_->BlockLastDocID(); }
+    float BlockMaxBM25Score();
+
+    // Move block cursor to ensure its last_doc_id is no less than given doc_id.
+    // Returns false and update doc_id_ to INVALID_ROWID if the iterator is exhausted.
+    // Note that this routine decode skip_list only, and doesn't update doc_id_ when returns true.
+    // Caller may invoke BlockMaxBM25Score() after this routine.
+    bool NextShallow(RowID doc_id);
+
+    // Overriden methods
+    DocIteratorType GetType() const override { return DocIteratorType::kTermDocIterator; }
+
+    String Name() const override { return "TermDocIterator"; }
+
+    bool Next(RowID doc_id) override;
+
+    float BM25Score() override;
+
+    void UpdateScoreThreshold(float threshold) override {
+        if (threshold > threshold_)
+            threshold_ = threshold;
+    }
+
+    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override;
 
     // debug info
     const String *term_ptr_ = nullptr;
     const String *column_name_ptr_ = nullptr;
 
 private:
+    Pair<tf_t, u32> GetScoreData();
+
     u64 column_id_;
     UniquePtr<PostingIterator> iter_;
-    u32 doc_freq_;
-    float weight_;
+    float weight_ = 1.0f; // changed in MultiplyWeight()
     u64 term_freq_;
+
+    // for BM25 Score
+    float bm25_score_cache_ = 0.0f;
+    RowID bm25_score_cache_docid_ = INVALID_ROWID;
+    float f1 = 0.0f;
+    float f2 = 0.0f;
+    float f3 = 0.0f;
+    float avg_column_len_ = 0;
+    UniquePtr<FullTextColumnLengthReader> column_length_reader_ = nullptr;
+    float bm25_common_score_ = 0; // include: weight * smooth_idf * (k1 + 1.0F)
+    float block_max_bm25_score_cache_ = 0.0f;
+    RowID block_max_bm25_score_cache_end_id_ = INVALID_ROWID;
+
+    // debug info
+    u32 calc_score_cnt_ = 0;
+    u32 access_score_cnt_ = 0;
+    u32 calc_bm_score_cnt_ = 0;
+    u32 access_bm_score_cnt_ = 0;
+    u32 duplicate_calc_score_cnt_ = 0;
+    u32 seek_cnt_ = 0;
+    u32 peek_cnt_ = 0;
+    u32 block_skip_cnt_ = 0;
+    u32 block_skip_cnt_inner_ = 0;
 };
 } // namespace infinity

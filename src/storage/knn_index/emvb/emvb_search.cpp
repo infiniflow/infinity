@@ -404,23 +404,11 @@ Tuple<u32, UniquePtr<f32[]>, UniquePtr<u32[]>> EMVBSearch<FIXED_QUERY_TOKEN_NUM>
         }
     };
     if (const bool use_bitmask = !bitmask.IsAllTrue(); use_bitmask) {
-        if (segment_entry->CheckAnyDelete(begin_ts)) {
-            DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
-            filter_doc(filter);
-        } else {
-            BitmaskFilter<SegmentOffset> filter(bitmask);
-            filter_doc(filter);
-        }
+        BitmaskFilter<SegmentOffset> filter(bitmask);
+        filter_doc(filter);
     } else {
-        if (segment_entry->CheckAnyDelete(begin_ts)) {
-            const auto segment_id = segment_entry->segment_id();
-            const SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
-            DeleteFilter filter(segment_entry, begin_ts, max_segment_offset);
-            filter_doc(filter);
-        } else {
-            // no delete
-            candidate_docs_filtered = std::move(candidate_docs);
-        }
+        // no delete
+        candidate_docs_filtered = std::move(candidate_docs);
     }
     auto selected_cnt_and_docs = compute_hit_frequency(std::move(candidate_docs_filtered), n_doc_to_score, std::move(centroid_q_token_sim));
     auto selected_docs_centroid_scores =

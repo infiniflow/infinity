@@ -201,6 +201,8 @@ RUN --mount=type=bind,source=thrift-0.20.0.tar.gz,target=/root/thrift-0.20.0.tar
     && cp compiler/cpp/bin/thrift /usr/local/bin/thrift \
     && cd /root && rm -rf thrift-0.20.0
 
+RUN yum install -y graphviz && yum clean all
+
 ENV PATH="/usr/local/venv310/bin:$PATH"
 
 ENV CC=clang CXX=clang++ LZ4_ROOT=/usr/local

@@ -1259,4 +1259,14 @@ Tuple<Vector<String>, Vector<TableIndexMeta *>, std::shared_lock<std::shared_mut
 
 TableIndexMeta *TableEntry::GetIndexMetaPtrByName(const String &name) const { return index_meta_map_.GetMetaPtrByName(name); }
 
+bool TableEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
+    std::shared_lock lock(this->rw_locker_);
+    for (const auto &[_, segment] : segment_map_) {
+        if (segment->CheckAnyDelete(check_ts)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace infinity
