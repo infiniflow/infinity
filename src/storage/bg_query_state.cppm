@@ -54,7 +54,8 @@ export struct BGQueryContextWrapper {
                              InfinityContext::instance().task_scheduler(),
                              InfinityContext::instance().storage(),
                              InfinityContext::instance().resource_manager(),
-                             InfinityContext::instance().session_manager());
+                             InfinityContext::instance().session_manager(),
+                             InfinityContext::instance().persistence_manager());
         query_context_->SetTxn(txn);
     }
 

@@ -90,6 +90,12 @@ String ToString(ShowType type) {
             return "Show delta logs";
         case ShowType::kShowCatalogs:
             return "Show catalogs";
+        case ShowType::kShowPersistenceFiles:
+            return "Show persistence files";
+        case ShowType::kShowPersistenceObjects:
+            return "Show persistence objects";
+        case ShowType::kShowPersistenceObject:
+            return "Show persistence object";
         case ShowType::kInvalid: {
             String error_message = "Invalid chunk scan type";
             UnrecoverableError(error_message);

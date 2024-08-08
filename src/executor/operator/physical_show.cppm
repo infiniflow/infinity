@@ -143,6 +143,12 @@ private:
 
     void ExecuteShowCatalogs(QueryContext *query_context, ShowOperatorState *operator_state);
 
+    void ExecuteShowPersistenceFiles(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowPersistenceObjects(QueryContext *query_context, ShowOperatorState *operator_state);
+
+    void ExecuteShowPersistenceObject(QueryContext *query_context, ShowOperatorState *operator_state);
+
 private:
     ShowType show_type_{ShowType::kInvalid};
     String db_name_{};

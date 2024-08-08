@@ -58,6 +58,9 @@ export enum class ShowType {
     kShowLogs,
     kShowDeltaLogs,
     kShowCatalogs,
+    kShowPersistenceFiles,
+    kShowPersistenceObjects,
+    kShowPersistenceObject,
 };
 
 export String ToString(ShowType type);

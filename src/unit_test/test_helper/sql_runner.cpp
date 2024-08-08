@@ -67,6 +67,7 @@ SharedPtr<DataTable> SQLRunner::Run(const String &sql_text, bool print) {
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
+                            InfinityContext::instance().persistence_manager(),
                             InfinityContext::instance().session_manager());
     query_context_ptr->set_current_schema(session_ptr->current_database());
 
