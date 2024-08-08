@@ -44,7 +44,25 @@ import compaction_process;
 
 using namespace infinity;
 
-class CleanupTaskTest : public BaseTest {
+class CleanupTaskTest : public BaseTestParamStr {
+public:
+    void SetUp() override {
+        RemoveDbDirs();
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        std::string config_path_str = GetParam();
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
+        infinity::InfinityContext::instance().Init(config_path);
+    }
+
+    void TearDown() override {
+        infinity::InfinityContext::instance().UnInit();
+    }
+
 protected:
     void WaitCleanup(Storage *storage, TxnTimeStamp last_commit_ts) {
         Catalog *catalog = storage->catalog();
@@ -80,12 +98,13 @@ protected:
     }
 };
 
-TEST_F(CleanupTaskTest, test_delete_db_simple) {
-    // close auto cleanup task
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         CleanupTaskTest,
+                         ::testing::Values((std::string(test_data_path()) + "/config/test_cleanup_task.toml").c_str(),
+                                           BaseTestParamStr::VFS_CONFIG_PATH));
 
-    RemoveDbDirs();
-    InfinityContext::instance().Init(config_path);
+TEST_P(CleanupTaskTest, test_delete_db_simple) {
+    // close auto cleanup task
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
@@ -112,15 +131,10 @@ TEST_F(CleanupTaskTest, test_delete_db_simple) {
         EXPECT_EQ(db_entry, nullptr);
         txn_mgr->CommitTxn(txn);
     }
-    InfinityContext::instance().UnInit();
 }
 
-TEST_F(CleanupTaskTest, test_delete_db_complex) {
+TEST_P(CleanupTaskTest, test_delete_db_complex) {
     // close auto cleanup task
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
-
-    RemoveDbDirs();
-    InfinityContext::instance().Init(config_path);
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
@@ -162,15 +176,10 @@ TEST_F(CleanupTaskTest, test_delete_db_complex) {
         EXPECT_EQ(db_entry, nullptr);
         txn_mgr->CommitTxn(txn);
     }
-    InfinityContext::instance().UnInit();
 }
 
-TEST_F(CleanupTaskTest, test_delete_table_simple) {
+TEST_P(CleanupTaskTest, test_delete_table_simple) {
     // close auto cleanup task
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
-
-    RemoveDbDirs();
-    InfinityContext::instance().Init(config_path);
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
@@ -211,16 +220,10 @@ TEST_F(CleanupTaskTest, test_delete_table_simple) {
 
         txn_mgr->CommitTxn(txn);
     }
-
-    InfinityContext::instance().UnInit();
 }
 
-TEST_F(CleanupTaskTest, test_delete_table_complex) {
+TEST_P(CleanupTaskTest, test_delete_table_complex) {
     // close auto cleanup task
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
-
-    RemoveDbDirs();
-    InfinityContext::instance().Init(config_path);
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
@@ -281,19 +284,13 @@ TEST_F(CleanupTaskTest, test_delete_table_complex) {
 
         txn_mgr->CommitTxn(txn);
     }
-
-    InfinityContext::instance().UnInit();
 }
 
-TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
+TEST_P(CleanupTaskTest, test_compact_and_cleanup) {
     constexpr int kImportN = 5;
     constexpr int kImportSize = 100;
 
     // disable auto cleanup task
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
-
-    RemoveDbDirs();
-    InfinityContext::instance().Init(config_path);
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
@@ -363,19 +360,13 @@ TEST_F(CleanupTaskTest, test_compact_and_cleanup) {
         EXPECT_NE(last_commit_ts, 0u);
     }
     WaitCleanup(storage, last_commit_ts);
-
-    InfinityContext::instance().UnInit();
 }
 
-TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
+TEST_P(CleanupTaskTest, test_with_index_compact_and_cleanup) {
     constexpr int kImportN = 5;
     constexpr int kImportSize = 100;
 
     // close auto cleanup task
-    auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
-
-    RemoveDbDirs();
-    InfinityContext::instance().Init(config_path);
     Storage *storage = InfinityContext::instance().storage();
     EXPECT_NE(storage, nullptr);
 
@@ -466,6 +457,4 @@ TEST_F(CleanupTaskTest, test_with_index_compact_and_cleanup) {
     }
 
     WaitCleanup(storage, last_commit_ts);
-
-    InfinityContext::instance().UnInit();
 }

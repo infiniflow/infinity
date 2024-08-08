@@ -22,6 +22,7 @@ import uuid;
 import serialize;
 import third_party;
 import infinity_exception;
+import logger;
 
 namespace fs = std::filesystem;
 
@@ -126,6 +127,18 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
         local_data_dir_ += '/';
     }
 }
+
+PersistenceManager::~PersistenceManager() {
+    [[maybe_unused]] SizeT sum_ref_count = 0;
+    for (auto& [key, obj_stat] : objects_) {
+        if (obj_stat.ref_count_ > 0) {
+            LOG_ERROR(fmt::format("Object {} still has ref count {}", key, obj_stat.ref_count_));
+        }
+        sum_ref_count += obj_stat.ref_count_;
+    }
+    assert(sum_ref_count == 0);
+}
+
 
 ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose) {
     std::error_code ec;
@@ -281,7 +294,14 @@ void PersistenceManager::PutObjCache(const String &file_path) {
     if (oit == objects_.end()) {
         return;
     }
+
     oit->second.ref_count_--;
+    // For large files linked, fill in the file size when putting to ensure obj valid
+    if ( it->second.part_size_ == 0 && it->second.part_offset_ == 0) {
+        String obj_full_path = fs::path(workspace_).append(it->second.obj_key_).string();
+        oit->second.obj_size_ = fs::file_size(obj_full_path);
+        it->second.part_size_ = oit->second.obj_size_;
+    }
 }
 
 String PersistenceManager::ObjCreate() { return UUID().to_string(); }
@@ -350,8 +370,14 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &file_path, SizeT f
 void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
     auto it = objects_.find(object_addr.obj_key_);
     if (it == objects_.end()) {
-        String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
-        UnrecoverableError(error_message);
+        if (object_addr.obj_key_ == current_object_key_) {
+            CurrentObjFinalizeNoLock();
+            it = objects_.find(object_addr.obj_key_);
+            assert(it != objects_.end());
+        } else {
+            String error_message = fmt::format("Failed to find object {}", object_addr.obj_key_);
+            UnrecoverableError(error_message);
+        }
     }
     Range range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
     auto target_range = it->second.deleted_ranges_.lower_bound(range);

@@ -46,14 +46,21 @@ import background_process;
 
 using namespace infinity;
 
-class OptimizeKnnTest : public BaseTest {
+class OptimizeKnnTest : public BaseTestParamStr {
 protected:
     void SetUp() override {
         RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_optimize.toml");
+        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        std::string config_path_str = GetParam();
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -104,7 +111,12 @@ protected:
     }
 };
 
-TEST_F(OptimizeKnnTest, test1) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         OptimizeKnnTest,
+                         ::testing::Values((std::string(test_data_path()) + "/config/test_optimize.toml").c_str(),
+                                           BaseTestParamStr::VFS_CONFIG_PATH));
+
+TEST_P(OptimizeKnnTest, test1) {
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
 
@@ -234,7 +246,7 @@ TEST_F(OptimizeKnnTest, test1) {
     }
 }
 
-TEST_F(OptimizeKnnTest, test_secondary_index_optimize) {
+TEST_P(OptimizeKnnTest, test_secondary_index_optimize) {
     Storage *storage = InfinityContext::instance().storage();
     TxnManager *txn_mgr = storage->txn_manager();
 

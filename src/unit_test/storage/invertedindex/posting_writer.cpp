@@ -27,24 +27,50 @@ import internal_types;
 import segment_posting;
 import posting_iterator;
 import vector_with_lock;
+import infinity_context;
 
 using namespace infinity;
 
-class PostingWriterTest : public BaseTest {
+class PostingWriterTest : public BaseTestParamStr {
 public:
     PostingWriterTest() {}
 
-    void SetUp() override { file_ = String(GetFullTmpDir()) + "/posting_writer"; }
-    void TearDown() override {}
+    void SetUp() override {
+        CleanupDbDirs();
+        file_ = String(GetFullTmpDir()) + "/posting_writer";
+        config_path_ = GetParam();
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            std::shared_ptr<std::string> config_path = std::make_shared<std::string>(config_path_);
+            infinity::InfinityContext::instance().Init(config_path);
+        }
+    }
+    void TearDown() override {
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            if (InfinityContext::instance().persistence_manager() != nullptr) {
+                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
+            }
+            infinity::InfinityContext::instance().UnInit();
+        }
+    }
 
 protected:
     String file_;
     optionflag_t flag_{OPTION_FLAG_ALL};
     PostingFormat posting_format_{flag_};
     LocalFileSystem fs_;
+    String config_path_{};
 };
 
-TEST_F(PostingWriterTest, test1) {
+INSTANTIATE_TEST_SUITE_P(
+    TestWithDifferentParams,
+    PostingWriterTest,
+    ::testing::Values(
+        BaseTestParamStr::NULL_CONFIG_PATH,
+        BaseTestParamStr::VFS_CONFIG_PATH
+    )
+);
+
+TEST_P(PostingWriterTest, test1) {
     Vector<docid_t> expected = {1, 3, 5, 7, 9};
     VectorWithLock<u32> column_length_array(20, 10);
     {

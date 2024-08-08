@@ -31,6 +31,7 @@ import logical_type;
 import local_file_system;
 import segment_index_entry;
 import vector_with_lock;
+import persistence_manager;
 
 using namespace infinity;
 
