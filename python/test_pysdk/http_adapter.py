@@ -457,6 +457,10 @@ class http_adapter:
             tmp.update({"fusion": self._fusion})
         if len(self._knn):
             tmp.update({"knn": self._knn})
+        if len(self._match):
+            tmp.update({"match":self._match})
+        if len(self._match_tensor):
+            tmp.update({"match_tensor":self.match_tensor})
         #print(tmp)
         d = self.set_up_data([], tmp)
         r = self.request(url, "get", h, d)
@@ -478,29 +482,36 @@ class http_adapter:
         self._fusion = {}
         return self.select()
 
-    def match(self, fields, query, operator):
-        self._fusion["match"] = {}
-        self._fusion["match"]["fields"] = fields
-        self._fusion["match"]["query"] = query
-        self._fusion["match"]["operator"] = operator
+    def match(self, fields, query, operator="top=10"):
+        self._match = {}
+        self._match["fields"] = fields
+        self._match["query"] = query
+        self._match["operator"] = operator
         return self.select()
+
+    def match_tensor(self, vector_column_name, tensor_data, tensor_data_type, extra_option, method_type="maxsim"):
+        self._match_tensor = {}
+        self._match_tensor["search_method"] = method_type
+        self._match_tensor["fields"] = vector_column_name
+        self._match_tensor["query_tensor"] = tensor_data
+        self._match_tensor["options"] = extra_option
+        self._match_tensor["element_type"] = type_transfrom[tensor_data_type]
 
     def filter(self, filter):
         self._filter = filter
         return self.select()
 
     def knn(self, fields, query_vector, element_type, metric_type, top_k):
-        self._fusion["knn"] = {}
-        self._fusion["knn"]["fields"] = [fields]
-        self._fusion["knn"]["query_vector"] = query_vector
-        self._fusion["knn"]["element_type"] = type_transfrom[element_type]
-        self._fusion["knn"]["metric_type"] = metric_type
-        self._fusion["knn"]["top_k"] = top_k
-        #print(self._fusion["knn"])
+        self._knn = {}
+        self._knn["fields"] = [fields]
+        self._knn["query_vector"] = query_vector
+        self._knn["element_type"] = type_transfrom[element_type]
+        self._knn["metric_type"] = metric_type
+        self._knn["top_k"] = top_k
         return self.select()
 
-    def fusion(self, fusion):
-        self._fusion["method"] = fusion
+    def fusion(self, method):
+        self._fusion["method"] = method
         return self.select()
 
     def to_pl(self):
@@ -527,6 +538,9 @@ class http_adapter:
                     new_tup = tup + (eval(res[k]), )
                 elif is_list(res[k]):
                     new_tup = tup + (ast.literal_eval(res[k]), )
+                elif ":" in res[k]:# sparse vector
+                    sparse_vec = str2sparse(res[k])
+                    new_tup = tup + (sparse_vec, )
                 else:
                     if res[k].lower() == 'true':
                         res[k] = True
@@ -582,7 +596,7 @@ class http_adapter:
 
 class database_result(http_adapter):
     def __init__(self, list = [], error_code = ErrorCode.OK, database_name = "" ,columns=[], table_name = "",
-                 index_list = [], output = ["*"], filter="", fusion={}, knn={},output_res = []):
+                 index_list = [], output = ["*"], filter="", fusion={}, knn={}, match = {}, match_tensor = {}, output_res = []):
         self.db_names = list
         self.error_code = error_code
         self.database_name = database_name # get database
@@ -594,6 +608,8 @@ class database_result(http_adapter):
         self._filter = filter
         self._fusion = fusion
         self._knn = knn
+        self._match = match
+        self._match_tensor = match_tensor
         self.output_res = output_res
 
 
