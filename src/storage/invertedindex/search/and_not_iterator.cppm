@@ -18,19 +18,22 @@ export module and_not_iterator;
 
 import stl;
 import index_defines;
-import multi_query_iterator;
+import multi_doc_iterator;
 import doc_iterator;
 import internal_types;
 
 namespace infinity {
-export class AndNotIterator : public MultiQueryDocIterator {
+export class AndNotIterator : public MultiDocIterator {
 public:
     AndNotIterator(Vector<UniquePtr<DocIterator>> iterators);
 
-    bool IsAndNot() const override { return true; }
+    String Name() const override { return "AndNotIterator"; }
 
-    void DoSeek(RowID doc_id) override;
+    /* pure virtual methods implementation */
+    bool Next(RowID doc_id) override;
 
-    u32 GetDF() const override;
+    float BM25Score() override;
+
+    void UpdateScoreThreshold(float threshold) override;
 };
 } // namespace infinity

@@ -25,35 +25,48 @@ import and_iterator;
 import or_iterator;
 import and_not_iterator;
 import column_index_reader;
-import match_data;
 import query_builder;
 import query_node;
 import search_driver;
 import table_entry;
-import early_terminate_iterator;
 import infinity_context;
 import global_resource_usage;
+import third_party;
 import logger;
 
 namespace infinity {
 
 class MockVectorDocIterator : public DocIterator {
-private:
-    u32 GetDF() const override { return 0; }
-
 public:
-    MockVectorDocIterator(Vector<RowID> doc_ids) : doc_ids_(std::move(doc_ids)) { DoSeek(0); }
+    MockVectorDocIterator(Vector<RowID> doc_ids, const String &term, const String &column) : doc_ids_(std::move(doc_ids)), idx_(0) {
+        term_ = term;
+        column_ = column;
+    }
     ~MockVectorDocIterator() override = default;
-    void DoSeek(RowID doc_id) override {
+
+    DocIteratorType GetType() const override { return DocIteratorType::kDocIterator; }
+    String Name() const override { return "MockVectorDocIterator"; }
+
+    bool Next(RowID doc_id) override {
         while (idx_ < doc_ids_.size() and doc_ids_[idx_] < doc_id) {
             ++idx_;
         }
-        doc_id_ = idx_ < doc_ids_.size() ? doc_ids_[idx_] : INVALID_ROWID;
+        if (idx_ < doc_ids_.size()) {
+            doc_id_ = doc_ids_[idx_];
+            return true;
+        }
+        doc_id_ = INVALID_ROWID;
+        return false;
     }
+
+    float BM25Score() override { return 0.1f; }
+
+    void UpdateScoreThreshold(float threshold) override {}
+
     void PrintTree(std::ostream &os, const String &prefix, bool is_final = true) const override {
         os << prefix;
         os << (is_final ? "└──" : "├──");
-        os << "MockVectorDocIterator";
+        os << "MockVectorDocIterator (term: " << term_ << ", column: " << column_ << ")" << '\n';
         int print_child_num = std::min<int>(doc_ids_.size(), 5);
         os << " (first " << print_child_num << " doc_ids_: ";
         for (int i = 0; i < print_child_num; ++i) {
@@ -67,23 +80,21 @@ public:
     }
     Vector<RowID> doc_ids_;
     u32 idx_ = 0;
+    String term_;
+    String column_;
 };
 
 // treat it as TERM in optimization
 struct MockQueryNode : public TermQueryNode {
     Vector<RowID> doc_ids_;
-    MockQueryNode(Vector<RowID> doc_ids, const char *term, const char *column) : TermQueryNode(), doc_ids_(std::move(doc_ids)) {
+    MockQueryNode(Vector<RowID> doc_ids, const String &term, const String &column) : TermQueryNode(), doc_ids_(std::move(doc_ids)) {
         term_ = term;
         column_ = column;
     }
 
     void PushDownWeight(float factor) final { MultiplyWeight(factor); }
-    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, IndexReader &, Scorer *) const final {
-        return MakeUnique<MockVectorDocIterator>(std::move(doc_ids_));
-    }
-    std::unique_ptr<EarlyTerminateIterator>
-    CreateEarlyTerminateSearch(const TableEntry *, IndexReader &, Scorer *, EarlyTermAlgo early_term_algo) const final {
-        return nullptr;
+    std::unique_ptr<DocIterator> CreateSearch(const TableEntry *, IndexReader &, EarlyTermAlgo early_term_algo) const final {
+        return MakeUnique<MockVectorDocIterator>(std::move(doc_ids_), term_, column_);
     }
     void PrintTree(std::ostream &os, const std::string &prefix, bool is_final) const final {
         os << prefix;
@@ -220,26 +231,33 @@ TEST_P(QueryBuilderTest, test_and) {
         std::set_intersection(vec_AB_and.begin(), vec_AB_and.end(), vec_CDE_and.begin(), vec_CDE_and.end(), std::back_inserter(expect_result));
     }
     OStringStream oss;
-    oss << "QueryTree before optimization:" << std::endl;
+    oss << "QueryNode tree:" << std::endl;
     static_cast<QueryNode *>(and_root.get())->PrintTree(oss);
-    LOG_INFO(std::move(oss).str());
+    LOG_INFO(oss.str());
     // apply query builder
     FullTextQueryContext context;
     context.query_tree_ = std::move(and_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive);
+
+    oss.str("");
+    oss << "DocIterator tree after optimization:" << std::endl;
+    result_iter->PrintTree(oss);
+    LOG_INFO(oss.str());
+
     // check iter tree
     // A and B and C and D and E
     auto and_iter = dynamic_cast<AndIterator *>(result_iter.get());
     ASSERT_NE(and_iter, nullptr);
     ASSERT_EQ(and_iter->GetChildren().size(), u32(5));
     // check result
-    UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result));
+    UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result), "", "");
     for (RowID doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
-        result_iter->Seek(doc_id);
-        expect_iter_result->Seek(doc_id);
-        ASSERT_EQ(result_iter->Doc(), expect_iter_result->Doc());
+        bool ok1 = result_iter->Next(doc_id);
+        bool ok2 = expect_iter_result->Next(doc_id);
+        ASSERT_EQ(ok1, ok2);
+        ASSERT_EQ(result_iter->DocID(), expect_iter_result->DocID());
     }
 }
 
@@ -283,26 +301,35 @@ TEST_P(QueryBuilderTest, test_or) {
         std::set_union(vec_AB_or.begin(), vec_AB_or.end(), vec_CDE_or.begin(), vec_CDE_or.end(), std::back_inserter(expect_result));
     }
     OStringStream oss;
-    oss << "QueryTree before optimization:" << std::endl;
+    oss << "QueryNode tree:" << std::endl;
     static_cast<QueryNode *>(or_root.get())->PrintTree(oss);
-    LOG_INFO(std::move(oss).str());
+    LOG_INFO(oss.str());
     // apply query builder
     FullTextQueryContext context;
     context.query_tree_ = std::move(or_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive);
+
+    oss.str("");
+    oss << "DocIterator tree after optimization:" << std::endl;
+    result_iter->PrintTree(oss);
+    LOG_INFO(oss.str());
+
     // check iter tree
     // A or B or C or D or E
     auto or_iter = dynamic_cast<OrIterator *>(result_iter.get());
     ASSERT_NE(or_iter, nullptr);
     ASSERT_EQ(or_iter->GetChildren().size(), u32(5));
     // check result
-    UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result));
+    UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result), "", "");
     for (RowID doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
-        result_iter->Seek(doc_id);
-        expect_iter_result->Seek(doc_id);
-        ASSERT_EQ(result_iter->Doc(), expect_iter_result->Doc());
+        bool ok1 = result_iter->Next(doc_id);
+        bool ok2 = expect_iter_result->Next(doc_id);
+        ASSERT_EQ(ok1, ok2);
+        ASSERT_EQ(result_iter->DocID(), expect_iter_result->DocID());
+        if (!ok1 || !ok2)
+            break;
     }
 }
 
@@ -350,15 +377,21 @@ TEST_P(QueryBuilderTest, test_and_not) {
         and_not_root->Add(std::move(not_E));
     }
     OStringStream oss;
-    oss << "QueryTree before optimization:" << std::endl;
+    oss << "QueryNode tree:" << std::endl;
     static_cast<QueryNode *>(and_not_root.get())->PrintTree(oss);
-    LOG_INFO(std::move(oss).str());
+    LOG_INFO(oss.str());
     // apply query builder
     FullTextQueryContext context;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive);
+
+    oss.str("");
+    oss << "DocIterator tree after optimization:" << std::endl;
+    result_iter->PrintTree(oss);
+    LOG_INFO(oss.str());
+
     // check iter tree
     // (A or B or C) and not (D, E)
     // child: 1. (A or B or C), 2. D, 3. E
@@ -371,11 +404,14 @@ TEST_P(QueryBuilderTest, test_and_not) {
     ASSERT_NE(child_or_iter, nullptr);
     ASSERT_EQ(child_or_iter->GetChildren().size(), u32(3));
     // check result
-    UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result));
+    UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result), "", "");
     for (RowID doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
-        result_iter->Seek(doc_id);
-        expect_iter_result->Seek(doc_id);
-        ASSERT_EQ(result_iter->Doc(), expect_iter_result->Doc());
+        bool ok1 = result_iter->Next(doc_id);
+        bool ok2 = expect_iter_result->Next(doc_id);
+        ASSERT_EQ(ok1, ok2);
+        ASSERT_EQ(result_iter->DocID(), expect_iter_result->DocID());
+        if (!ok1 || !ok2)
+            break;
     }
 }
 
@@ -423,15 +459,21 @@ TEST_P(QueryBuilderTest, test_and_not2) {
         and_not_root->Add(std::move(not_E));
     }
     OStringStream oss;
-    oss << "QueryTree before optimization:" << std::endl;
+    oss << "QueryNode tree:" << std::endl;
     static_cast<QueryNode *>(and_not_root.get())->PrintTree(oss);
-    LOG_INFO(std::move(oss).str());
+    LOG_INFO(oss.str());
     // apply query builder
     FullTextQueryContext context;
     context.query_tree_ = std::move(and_not_root);
     FakeQueryBuilder fake_query_builder;
     QueryBuilder &builder = fake_query_builder.builder;
-    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context);
+    UniquePtr<DocIterator> result_iter = builder.CreateSearch(context, EarlyTermAlgo::kNaive);
+
+    oss.str("");
+    oss << "DocIterator tree after optimization:" << std::endl;
+    result_iter->PrintTree(oss);
+    LOG_INFO(oss.str());
+
     // check iter tree
     // (A and B and D) and not (C, E)
     // child: 1. (A and B and D), 2. C, 3. E
@@ -444,10 +486,13 @@ TEST_P(QueryBuilderTest, test_and_not2) {
     ASSERT_NE(child_and_iter, nullptr);
     ASSERT_EQ(child_and_iter->GetChildren().size(), u32(3));
     // check result
-    UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result));
+    UniquePtr<DocIterator> expect_iter_result = MakeUnique<MockVectorDocIterator>(std::move(expect_result), "", "");
     for (RowID doc_id = 0; doc_id < DocIDMaxN + 1'000; ++doc_id) {
-        result_iter->Seek(doc_id);
-        expect_iter_result->Seek(doc_id);
-        ASSERT_EQ(result_iter->Doc(), expect_iter_result->Doc());
+        bool ok1 = result_iter->Next(doc_id);
+        bool ok2 = expect_iter_result->Next(doc_id);
+        ASSERT_EQ(ok1, ok2);
+        ASSERT_EQ(result_iter->DocID(), expect_iter_result->DocID());
+        if (!ok1 || !ok2)
+            break;
     }
 }

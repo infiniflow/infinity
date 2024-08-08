@@ -67,6 +67,19 @@ public:
 
     const SharedPtr<ColumnVector> &column_vector(SizeT col_id) const { return column_iters_[col_id].column_vector(); }
 
+    BlockOffset offset() const {
+        BlockOffset offset = BlockOffset(-1);
+        for (auto &column_iter : column_iters_) {
+            if (offset == BlockOffset(-1)) {
+                offset = column_iter.offset();
+            } else if (offset != column_iter.offset()) {
+                String error_message = "ColumnIter return different offset";
+                UnrecoverableError(error_message);
+            }
+        }
+        return offset;
+    }
+
 private:
     Vector<BlockColumnIter<CheckTS>> column_iters_;
 };

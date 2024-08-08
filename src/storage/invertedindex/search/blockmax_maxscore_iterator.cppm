@@ -16,50 +16,32 @@ module;
 
 export module blockmax_maxscore_iterator;
 import stl;
-import index_defines;
-import early_terminate_iterator;
+import term_doc_iterator;
+import multi_doc_iterator;
 import internal_types;
+import index_defines;
 
 namespace infinity {
 
 // equivalent to "OR" iterator
-export class BlockMaxMaxscoreIterator final : public EarlyTerminateIterator {
+export class BlockMaxMaxscoreIterator final : public MultiDocIterator {
 public:
-    explicit BlockMaxMaxscoreIterator(Vector<UniquePtr<EarlyTerminateIterator>> iterators);
+    explicit BlockMaxMaxscoreIterator(Vector<UniquePtr<DocIterator>> &&iterators);
 
     ~BlockMaxMaxscoreIterator() override;
 
+    String Name() const override { return "BlockMaxMaxscoreIterator"; }
+
     void UpdateScoreThreshold(float threshold) override;
 
-    bool NextShallow(RowID doc_id) override{return false;}
+    bool Next(RowID doc_id) override;
 
-    bool Next(RowID doc_id) override{return false;}
-
-    bool BlockSkipTo(RowID doc_id, float threshold) override;
-
-    // following functions are available only after BlockSkipTo() is called
-
-    RowID BlockMinPossibleDocID() const override { return common_block_min_possible_doc_id_; }
-
-    RowID BlockLastDocID() const override { return common_block_last_doc_id_; }
-
-    float BlockMaxBM25Score() override { return common_block_max_bm25_score_; }
-
-    Pair<bool, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
-    Tuple<bool, float, RowID> SeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond, float threshold) override;
     float BM25Score() override;
 
-    Pair<bool, RowID> PeekInBlockRange(RowID doc_id, RowID doc_id_no_beyond) override;
-
-    bool NotPartCheckExist(RowID doc_id) override;
-
-    void PrintTree(std::ostream &os, const String &prefix, bool is_final) const override {
-        return MultiQueryEarlyTerminateIteratorCommonPrintTree(this, "BlockMaxMaxscoreIterator", sorted_iterators_, os, prefix, is_final);
-    }
-
 private:
+    void Init();
     // won't change after initialization
-    Vector<UniquePtr<EarlyTerminateIterator>> sorted_iterators_; // sort by BM25ScoreUpperBound, in descending order
+    Vector<TermDocIterator *> sorted_iterators_;                 // sort by BM25ScoreUpperBound, in descending order
     Vector<float> leftover_scores_upper_bound_;                  // value at i: upper bound of sum of BM25 scores for iter i + 1, i + 2, ..., n - 1
     // block max info
     RowID common_block_min_possible_doc_id_ = INVALID_ROWID;
@@ -82,7 +64,7 @@ private:
     bool bm25_score_cached_ = false;
     bool need_seek_after_must_ = false;
     bool need_seek_after_pivot_ = false;
-    float bm25_score_cache_ = 0.0F;
+    float bm25_score_cache_ = 0.0f;
     RowID prev_next_candidate_ = INVALID_ROWID;
 
     // debug info

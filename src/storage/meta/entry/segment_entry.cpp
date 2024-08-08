@@ -237,6 +237,39 @@ bool SegmentEntry::CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp ch
     return block_entry->CheckRowVisible(block_offset, check_ts, check_append);
 }
 
+void SegmentEntry::CheckRowsVisible(Vector<u32> &segment_offsets, TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
+    if (first_delete_ts_ >= check_ts)
+        return;
+
+    Vector<u32> segment_offsets2;
+    segment_offsets2.reserve(segment_offsets.size());
+    Map<BlockID, Vector<u32>> block_offsets_map;
+    for (const auto segment_offset : segment_offsets) {
+        BlockID block_id = segment_offset >> BLOCK_OFFSET_SHIFT;
+        block_offsets_map[block_id].push_back(segment_offset);
+    }
+
+    for (auto &[block_id, block_offsets] : block_offsets_map) {
+        auto *block_entry = GetBlockEntryByID(block_id).get();
+        if (block_entry == nullptr || block_entry->commit_ts_ > check_ts) {
+            continue;
+        }
+        block_entry->CheckRowsVisible(block_offsets, check_ts);
+        std::copy(block_offsets.begin(), block_offsets.end(), std::back_inserter(segment_offsets2));
+    }
+    segment_offsets = std::move(segment_offsets2);
+}
+
+void SegmentEntry::CheckRowsVisible(Bitmask &segment_offsets, TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
+    if (first_delete_ts_ >= check_ts)
+        return;
+    for (auto &block_entry : block_entries_) {
+        block_entry->CheckRowsVisible(segment_offsets, check_ts);
+    }
+}
+
 bool SegmentEntry::CheckVisible(Txn *txn) const {
     TxnTimeStamp begin_ts = txn->BeginTS();
     std::shared_lock lock(rw_locker_);
@@ -401,7 +434,7 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
         auto iter = delete_state->rows_.find(segment_id_);
         if (iter != delete_state->rows_.end()) {
             const auto &block_row_hashmap = iter->second;
-            if (this->first_delete_ts_ == UNCOMMIT_TS) {
+            if (!block_row_hashmap.empty() && this->first_delete_ts_ == UNCOMMIT_TS) {
                 this->first_delete_ts_ = commit_ts;
             }
             delete_txns_.erase(txn_id);

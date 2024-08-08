@@ -25,19 +25,14 @@ import chunk_index_entry;
 import memory_indexer;
 import buffer_obj;
 import buffer_handle;
+import column_index_reader;
 
 namespace infinity {
-class SegmentIndexEntry;
-class IndexReader;
 class FileSystem;
-class FileHandler;
 
 export class FullTextColumnLengthReader {
 public:
-    FullTextColumnLengthReader(UniquePtr<FileSystem> file_system,
-                               const String &index_dir,
-                               const Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries,
-                               SharedPtr<MemoryIndexer> memory_indexer);
+    explicit FullTextColumnLengthReader(ColumnIndexReader *reader);
 
     inline u32 GetColumnLength(RowID row_id) {
         if (row_id >= current_chunk_base_rowid_ && row_id < current_chunk_base_rowid_ + current_chunk_row_count_) [[likely]] {
@@ -54,27 +49,21 @@ public:
         return SeekFile(row_id);
     }
 
+    inline u64 GetTotalDF() const { return total_df_; }
+    inline float GetAvgColumnLength() const { return avg_column_len_; }
+
 private:
     u32 SeekFile(RowID row_id);
     UniquePtr<FileSystem> file_system_;
     const String &index_dir_;
     const Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries_; // must in ascending order
     SharedPtr<MemoryIndexer> memory_indexer_;
+    u64 total_df_;
+    float avg_column_len_;
     const u32 *column_lengths_{nullptr};
     RowID current_chunk_base_rowid_{(u64)0};
     u32 current_chunk_row_count_{0};
     BufferHandle current_chunk_buffer_handle_{};
-};
-
-export class ColumnLengthReader {
-    Vector<UniquePtr<FullTextColumnLengthReader>> column_length_vector_;
-
-public:
-    void AppendColumnLength(IndexReader *index_reader, const Vector<u64> &column_ids, Vector<float> &avg_column_length);
-
-    FullTextColumnLengthReader *GetColumnLengthReader(u32 scorer_column_idx) { return column_length_vector_[scorer_column_idx].get(); }
-
-    inline u32 GetColumnLength(u32 scorer_column_idx, RowID row_id) { return column_length_vector_[scorer_column_idx]->GetColumnLength(row_id); }
 };
 
 } // namespace infinity

@@ -20,13 +20,7 @@ module;
 module column_length_io;
 
 import stl;
-import index_defines;
-import internal_types;
-import infinity_exception;
-import logger;
 import column_index_reader;
-import file_system_type;
-import file_system;
 import local_file_system;
 import chunk_index_entry;
 import memory_indexer;
@@ -35,11 +29,13 @@ import buffer_handle;
 
 namespace infinity {
 
-FullTextColumnLengthReader::FullTextColumnLengthReader(UniquePtr<FileSystem> file_system,
-                                                       const String &index_dir,
-                                                       const Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries,
-                                                       SharedPtr<MemoryIndexer> memory_indexer)
-    : file_system_(std::move(file_system)), index_dir_(index_dir), chunk_index_entries_(chunk_index_entries), memory_indexer_(memory_indexer) {}
+FullTextColumnLengthReader::FullTextColumnLengthReader(ColumnIndexReader *reader)
+    : file_system_(MakeUnique<LocalFileSystem>()), index_dir_(reader->index_dir_), chunk_index_entries_(reader->chunk_index_entries_),
+      memory_indexer_(reader->memory_indexer_) {
+    Pair<u64, float> df_and_avg_column_len = reader->GetTotalDfAndAvgColumnLength();
+    total_df_ = df_and_avg_column_len.first;
+    avg_column_len_ = df_and_avg_column_len.second;
+}
 
 u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
     // determine the ChunkIndexEntry which contains row_id
@@ -69,15 +65,4 @@ u32 FullTextColumnLengthReader::SeekFile(RowID row_id) {
     current_chunk_row_count_ = chunk_index_entries_[current_chunk]->row_count_;
     return column_lengths_[row_id - current_chunk_base_rowid_];
 }
-
-void ColumnLengthReader::AppendColumnLength(IndexReader *index_reader, const Vector<u64> &column_ids, Vector<float> &avg_column_length) {
-    u64 column_id = column_ids.back();
-    ColumnIndexReader *reader = index_reader->GetColumnIndexReader(column_id);
-    column_length_vector_.emplace_back(MakeUnique<FullTextColumnLengthReader>(MakeUnique<LocalFileSystem>(),
-                                                                              reader->index_dir_,
-                                                                              reader->chunk_index_entries_,
-                                                                              reader->memory_indexer_));
-    avg_column_length.emplace_back(reader->GetAvgColumnLength());
-}
-
 } // namespace infinity

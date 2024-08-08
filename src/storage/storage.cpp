@@ -93,7 +93,7 @@ void Storage::Init() {
     wal_mgr_->Start();
 
     new_catalog_->StartMemoryIndexCommit();
-    new_catalog_->MemIndexRecover(buffer_mgr_.get());
+    new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
     bg_processor_->Start();
     if (compact_processor_.get() != nullptr) {

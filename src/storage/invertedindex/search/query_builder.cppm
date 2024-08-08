@@ -19,7 +19,6 @@ export module query_builder;
 import stl;
 import doc_iterator;
 import column_index_reader;
-import match_data;
 import table_entry;
 import internal_types;
 import default_values;
@@ -34,9 +33,6 @@ export struct FullTextQueryContext {
     UniquePtr<QueryNode> optimized_query_tree_;
 };
 
-class EarlyTerminateIterator;
-enum class EarlyTermAlgo;
-
 export class QueryBuilder {
 public:
     explicit QueryBuilder(BaseTableRef* base_table_ref)
@@ -48,16 +44,11 @@ public:
 
     const Map<String, String> &GetColumn2Analyzer() { return index_reader_.GetColumn2Analyzer(); }
 
-    UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context);
-
-    UniquePtr<EarlyTerminateIterator> CreateEarlyTerminateSearch(FullTextQueryContext &context, EarlyTermAlgo early_term_algo);
-
-    inline float Score(RowID doc_id) { return scorer_.Score(doc_id); }
+    UniquePtr<DocIterator> CreateSearch(FullTextQueryContext &context, EarlyTermAlgo early_term_algo);
 
 private:
     BaseTableRef* base_table_ref_{nullptr};
     TableEntry *table_entry_{nullptr};
     IndexReader index_reader_;
-    Scorer scorer_;
 };
 } // namespace infinity

@@ -201,7 +201,7 @@ public:
 
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);
 
-    TxnTimeStamp DeltaCheckpoint();
+    bool DeltaCheckpoint(TxnTimeStamp last_ckp_ts,TxnTimeStamp &max_commit_ts);
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 

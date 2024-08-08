@@ -63,16 +63,4 @@ private:
     const SegmentOffset max_segment_offset_;
 };
 
-export class DeleteWithBitmaskFilter final : public FilterBase<SegmentOffset> {
-public:
-    explicit DeleteWithBitmaskFilter(const Bitmask &bitmask, const SegmentEntry *segment, TxnTimeStamp query_ts)
-        : bitmask_filter_(bitmask), delete_filter_(segment, query_ts, 0) {}
-
-    bool operator()(const SegmentOffset &segment_offset) const final { return bitmask_filter_(segment_offset) && delete_filter_(segment_offset); }
-
-private:
-    BitmaskFilter<SegmentOffset> bitmask_filter_;
-    DeleteFilter delete_filter_;
-};
-
 } // namespace infinity

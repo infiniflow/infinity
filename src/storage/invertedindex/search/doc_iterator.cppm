@@ -23,50 +23,63 @@ import internal_types;
 
 namespace infinity {
 
+export enum class EarlyTermAlgo { kNaive, kBMM, kBMW, kCompare };
+
 export enum class DocIteratorType : u8 {
-    kInvalidIterator,
-    kTermIterator,
+    kDocIterator,
+    kTermDocIterator,
     kPhraseIterator,
-    kMultiQueryIterator
+    kAndIterator,
+    kAndNotIterator,
+    kOrIterator,
+    kBMMIterator,
+    kBMWIterator,
+    kFilterIterator,
 };
 
 export class DocIterator {
 public:
-    DocIterator() = default;
+    DocIterator() {}
 
-    virtual ~DocIterator() = default;
+    virtual ~DocIterator();
 
-    RowID Doc() { return doc_id_; }
+    RowID DocID() { return doc_id_; }
 
-    // Check if the given doc id is a hit. If it is a hit, the
-    // current doc id of this iterator is set to the given id,
-    // If it is not a hit, find the first doc id which is not less
-    // than the give doc id. If there is no such a doc id,
-    // INVALID_DOCID will be returned
-    bool Seek(RowID doc_id) {
-        if (doc_id > doc_id_) {
-            DoSeek(doc_id);
-        }
-        return doc_id == doc_id_;
+    inline u32 GetDF() const { return doc_freq_; }
+
+    // Update doc_id_ to one larger than previous one.
+    // If has_blockmax is true, it ensures its BM25 score be larger than current threshold.
+    // Note that this routine decode skip_list and doc_list, and doesn't decode tf_list.
+    // Caller may invoke BlockMaxBM25Score() and BM25Score() after this routine.
+    inline bool Next() {
+        RowID target_doc_id = (doc_id_ == INVALID_ROWID) ? 0 : (doc_id_ + 1);
+        return Next(target_doc_id);
     }
 
-    // for term iter
-    void PrepareFirstDoc();
+    inline float BM25ScoreUpperBound() const { return bm25_score_upper_bound_; }
 
-    RowID Next() {
-        DoSeek(doc_id_ + 1);
-        return doc_id_;
-    }
+    inline float Threshold() const { return threshold_; }
 
-    virtual void DoSeek(RowID doc_id) = 0;
+    /* virtual methods */
 
-    virtual u32 GetDF() const = 0;
+    virtual DocIteratorType GetType() const { return DocIteratorType::kDocIterator; }
+    virtual String Name() const = 0;
+
+    // Update doc_id_ to one no less than given doc_id.
+    // If has_blockmax is true, it ensures its BM25 score be larger than current threshold.
+    virtual bool Next(RowID doc_id) = 0;
+
+    virtual float BM25Score() = 0;
+
+    virtual void UpdateScoreThreshold(float threshold) = 0;
 
     // print the query tree, for debugging
     virtual void PrintTree(std::ostream &os, const String &prefix = "", bool is_final = true) const = 0;
 
-    virtual DocIteratorType GetType() const { return DocIteratorType::kInvalidIterator; }
 protected:
     RowID doc_id_{INVALID_ROWID};
+    u32 doc_freq_ = 0;
+    float threshold_ = 0.0f;
+    float bm25_score_upper_bound_ = std::numeric_limits<float>::max();
 };
 } // namespace infinity

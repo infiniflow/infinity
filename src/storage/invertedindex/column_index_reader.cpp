@@ -38,7 +38,7 @@ import create_index_info;
 import index_base;
 import index_full_text;
 import third_party;
-import blockmax_term_doc_iterator;
+import term_doc_iterator;
 import default_values;
 import logger;
 
@@ -89,38 +89,23 @@ UniquePtr<PostingIterator> ColumnIndexReader::Lookup(const String &term, bool fe
     return iter;
 }
 
-UniquePtr<BlockMaxTermDocIterator> ColumnIndexReader::LookupBlockMax(const String &term, float weight, bool fetch_position) {
-    SharedPtr<Vector<SegmentPosting>> seg_postings = MakeShared<Vector<SegmentPosting>>();
-    for (u32 i = 0; i < segment_readers_.size(); ++i) {
-        SegmentPosting seg_posting;
-        auto ret = segment_readers_[i]->GetSegmentPosting(term, seg_posting, fetch_position);
-        if (ret) {
-            seg_postings->push_back(seg_posting);
+Pair<u64, float> ColumnIndexReader::GetTotalDfAndAvgColumnLength() {
+    if (total_df_ == 0) {
+        u64 column_len_sum = 0;
+        u32 column_len_cnt = 0;
+        for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
+            auto [sum, cnt] = segment_index_entry->GetFulltextColumnLenInfo();
+            column_len_sum += sum;
+            column_len_cnt += cnt;
         }
+        if (column_len_cnt == 0) {
+            String error_message = "column_len_cnt is 0";
+            UnrecoverableError(error_message);
+        }
+        total_df_ = column_len_cnt;
+        avg_column_length_ = static_cast<float>(column_len_sum) / column_len_cnt;
     }
-    if (seg_postings->empty()) {
-        return nullptr;
-    }
-    auto result = MakeUnique<BlockMaxTermDocIterator>(flag_);
-    result->MultiplyWeight(weight);
-    u32 state_pool_size = 0; // TODO
-    result->InitPostingIterator(std::move(seg_postings), state_pool_size);
-    return result;
-}
-
-float ColumnIndexReader::GetAvgColumnLength() const {
-    u64 column_len_sum = 0;
-    u32 column_len_cnt = 0;
-    for (const auto &[segment_id, segment_index_entry] : index_by_segment_) {
-        auto [sum, cnt] = segment_index_entry->GetFulltextColumnLenInfo();
-        column_len_sum += sum;
-        column_len_cnt += cnt;
-    }
-    if (column_len_cnt == 0) {
-        String error_message = "column_len_cnt is 0";
-        UnrecoverableError(error_message);
-    }
-    return static_cast<float>(column_len_sum) / column_len_cnt;
+    return Pair<u64, float>(total_df_, avg_column_length_);
 }
 
 void TableIndexReaderCache::UpdateKnownUpdateTs(TxnTimeStamp ts, std::shared_mutex &segment_update_ts_mutex, TxnTimeStamp &segment_update_ts) {

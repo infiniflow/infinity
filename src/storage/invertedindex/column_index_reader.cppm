@@ -30,7 +30,7 @@ export module column_index_reader;
 
 namespace infinity {
 struct TableEntry;
-class BlockMaxTermDocIterator;
+class TermDocIterator;
 class Txn;
 
 export class ColumnIndexReader {
@@ -39,15 +39,15 @@ public:
 
     UniquePtr<PostingIterator> Lookup(const String &term, bool fetch_position = true);
 
-    UniquePtr<BlockMaxTermDocIterator> LookupBlockMax(const String &term, float weight, bool fetch_position = true);
-
-    float GetAvgColumnLength() const;
+    Pair<u64, float> GetTotalDfAndAvgColumnLength();
 
     optionflag_t GetOptionFlag() const { return flag_; }
 private:
     optionflag_t flag_;
     Vector<SharedPtr<IndexSegmentReader>> segment_readers_;
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> index_by_segment_;
+    u64 total_df_ = 0;
+    float avg_column_length_ = 0.0f;
 
 public:
     // for loading column length files
