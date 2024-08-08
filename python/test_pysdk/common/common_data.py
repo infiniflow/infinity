@@ -98,6 +98,20 @@ def is_list(str):
 def is_bool(str):
     return str.lower() == "true" or str.lower() == "false"
 
+def str2sparse(str):
+    sparce_vec = {}
+    sparce_vec["indices"] = []
+    sparce_vec["values"] = []
+    tmp = str.replace("[", "")
+    tmp = tmp.replace("]", "")
+    pairs = tmp.split(",")
+    for pair in pairs:
+        t = pair.split(":")
+        sparce_vec["indices"].append(eval(t[0]))
+        sparce_vec["values"].append(eval(t[1]))
+
+    return sparce_vec
+
 index_type_transfrom = {
     index.IndexType.IVFFlat:"IVFFlat",
     index.IndexType.Hnsw:"HNSW",
