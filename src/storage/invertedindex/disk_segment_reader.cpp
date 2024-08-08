@@ -80,8 +80,8 @@ DiskIndexSegmentReader::~DiskIndexSegmentReader() {
         RecoverableError(status);
     }
     if (nullptr != pm) {
-        pm->PutObjCache(dict_file_, true);
-        pm->PutObjCache(posting_file_, true);
+        pm->PutObjCache(dict_file_);
+        pm->PutObjCache(posting_file_);
     }
 }
 

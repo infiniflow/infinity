@@ -277,7 +277,7 @@ ObjAddr PersistenceManager::GetObjFromLocalPath(const String &file_path) {
     return it->second;
 }
 
-void PersistenceManager::PutObjCache(const String &file_path, bool is_linked_file) {
+void PersistenceManager::PutObjCache(const String &file_path) {
     String local_path = RemovePrefix(file_path);
     if (local_path.empty()) {
         String error_message = fmt::format("Failed to find local path of {}", local_path);
@@ -297,7 +297,7 @@ void PersistenceManager::PutObjCache(const String &file_path, bool is_linked_fil
 
     oit->second.ref_count_--;
     // For large files linked, fill in the file size when putting to ensure obj valid
-    if (is_linked_file) {
+    if ( it->second.part_size_ == 0 && it->second.part_offset_ == 0) {
         String obj_full_path = fs::path(workspace_).append(it->second.obj_key_).string();
         oit->second.obj_size_ = fs::file_size(obj_full_path);
         it->second.part_size_ = oit->second.obj_size_;

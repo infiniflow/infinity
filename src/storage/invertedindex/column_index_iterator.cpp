@@ -54,8 +54,8 @@ ColumnIndexIterator::~ColumnIndexIterator() {
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        pm->PutObjCache(dict_file_path_, true);
-        pm->PutObjCache(posting_file_path_, true);
+        pm->PutObjCache(dict_file_path_);
+        pm->PutObjCache(posting_file_path_);
     }
 }
 
