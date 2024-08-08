@@ -567,10 +567,17 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
             for (SizeT idx = 0; idx < dimension; ++idx) {
                 const auto &value_ref = json_object[idx];
                 const auto &value_type = value_ref.type();
-
                 switch (value_type) {
                     case nlohmann::json::value_t::number_float: {
                         embedding_data_ptr[idx] = value_ref.template get<double>();
+                        break;
+                    }
+                    case nlohmann::json::value_t::number_integer: {
+                        embedding_data_ptr[idx] = value_ref.template get<int>();
+                        break;
+                    }
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<unsigned>();
                         break;
                     }
                     default: {
