@@ -28,6 +28,10 @@ import default_values;
 namespace infinity {
 
 bool PhysicalFilterScanBase::CalculateFilterBitmask(SegmentID segment_id, BlockID block_id, BlockOffset row_count, Bitmask &bitmask) const {
+    if (common_query_filter_->AlwaysTrue()) {
+        bitmask.SetAllTrue();
+        return true;
+    }
     auto it_filter = common_query_filter_->filter_result_.find(segment_id);
     if (it_filter == common_query_filter_->filter_result_.end()) {
         return false;

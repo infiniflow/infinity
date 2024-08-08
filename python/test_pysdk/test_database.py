@@ -6,13 +6,16 @@ import infinity
 from infinity.errors import ErrorCode
 from http_adapter import http_adapter
 
+
 @pytest.fixture(scope="class")
 def local_infinity(request):
     return request.config.getoption("--local-infinity")
 
+
 @pytest.fixture(scope="class")
 def http(request):
     return request.config.getoption("--http")
+
 
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
@@ -26,6 +29,7 @@ def setup_class(request, local_infinity, http):
         request.cls.infinity_obj = http_adapter()
     yield
     request.cls.infinity_obj.disconnect()
+
 
 @pytest.mark.usefixtures("setup_class")
 class TestInfinity:
@@ -111,6 +115,7 @@ class TestInfinity:
 
         for db in db_names:
             assert db == "default_db"
+
     def _test_create_database_invalid_name(self):
         """
         create database with invalid name
@@ -128,6 +133,7 @@ class TestInfinity:
                 self.infinity_obj.create_database(db_name)
             assert e.type == infinity.common.InfinityException
             assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
+
     def _test_create_drop_show_1K_databases(self):
 
         """
@@ -169,6 +175,7 @@ class TestInfinity:
         for i in range(db_count):
             print('drop test_pysdk_db_name' + str(i))
             db = self.infinity_obj.drop_database('test_pysdk_db_name' + str(i))
+
     def _test_repeatedly_create_drop_show_databases(self):
 
         """
@@ -205,6 +212,7 @@ class TestInfinity:
 
             # 2.3 drop database
             self.infinity_obj.drop_database('test_pysdk_test_repeatedly_create_drop_show_databases')
+
     def _test_drop_database_with_invalid_name(self):
         """
         drop database with invalid name
@@ -221,6 +229,7 @@ class TestInfinity:
                 self.infinity_obj.drop_database(db_name)
             assert e.type == infinity.common.InfinityException
             assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
+
     def _test_get_db(self):
         """
         target: get db
@@ -263,6 +272,7 @@ class TestInfinity:
                 self.infinity_obj.drop_database(db_name)
             assert e.type == infinity.common.InfinityException
             assert e.value.args[0] == ErrorCode.INVALID_IDENTIFIER_NAME
+
     def _test_drop_non_existent_db(self):
 
         for db_name in common_values.invalid_name_array:
@@ -270,16 +280,19 @@ class TestInfinity:
                 res = self.infinity_obj.drop_database("my_database")
             assert e.type == infinity.common.InfinityException
             assert e.value.args[0] == ErrorCode.DB_NOT_EXIST
+
     def _test_get_drop_db_with_two_threads(self):
         # connect
         self.infinity_obj.drop_database("test_get_drop_db_with_two_thread", ConflictType.Ignore)
         self.infinity_obj.create_database("test_get_drop_db_with_two_thread")
 
-        thread1 = threading.Thread(target=self.infinity_obj.drop_database("test_get_drop_db_with_two_thread"), args=(1,))
+        thread1 = threading.Thread(target=self.infinity_obj.drop_database("test_get_drop_db_with_two_thread"),
+                                   args=(1,))
 
         with pytest.raises(InfinityException) as e:
             # with pytest.raises(Exception, match="ERROR:3021, Not existed entry*"):
-            thread2 = threading.Thread(target=self.infinity_obj.get_database("test_get_drop_db_with_two_thread"), args=(2,))
+            thread2 = threading.Thread(target=self.infinity_obj.get_database("test_get_drop_db_with_two_thread"),
+                                       args=(2,))
 
             thread1.start()
             thread2.start()
@@ -303,14 +316,17 @@ class TestInfinity:
 
         assert e.type == infinity.common.InfinityException
         assert e.value.args[0] == ErrorCode.DB_NOT_EXIST
+
     def _test_create_same_db_in_different_threads(self):
         # connect
 
         with pytest.raises(InfinityException) as e:
-            thread1 = threading.Thread(target=self.infinity_obj.create_database("test_create_same_db_in_different_threads"),
-                                       args=(1,))
-            thread2 = threading.Thread(target=self.infinity_obj.create_database("test_create_same_db_in_different_threads"),
-                                       args=(2,))
+            thread1 = threading.Thread(
+                target=self.infinity_obj.create_database("test_create_same_db_in_different_threads"),
+                args=(1,))
+            thread2 = threading.Thread(
+                target=self.infinity_obj.create_database("test_create_same_db_in_different_threads"),
+                args=(2,))
             thread1.start()
             thread2.start()
 
@@ -322,6 +338,7 @@ class TestInfinity:
 
         # drop
         self.infinity_obj.drop_database("test_create_same_db_in_different_threads")
+
     def _test_show_database(self):
         # create db
         self.infinity_obj.drop_database("test_show_database", ConflictType.Ignore)
@@ -547,3 +564,5 @@ class TestInfinity:
 
         db = self.infinity_obj.get_database(db_lower_name)
         db = self.infinity_obj.get_database(db_upper_name)
+        db = self.infinity_obj.get_database("default_db")
+        self.infinity_obj.drop_database(db_upper_name)

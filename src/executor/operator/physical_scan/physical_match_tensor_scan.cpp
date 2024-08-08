@@ -256,21 +256,35 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         } else {
             segment_entry = iter->second.segment_entry_;
         }
-        if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
-            LOG_TRACE(fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, index_entries_.size()));
-            const auto segment_row_count = segment_entry->row_count();
-            Bitmask segment_bitmask;
-            const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
-            if (std::holds_alternative<Vector<u32>>(filter_result)) {
-                const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-                segment_bitmask.Initialize(std::ceil(segment_row_count));
-                segment_bitmask.SetAllFalse();
-                for (u32 row_id : filter_result_vector) {
-                    segment_bitmask.SetTrue(row_id);
+
+        bool has_some_result = false;
+        Bitmask segment_bitmask;
+        if (common_query_filter_->AlwaysTrue()) {
+            has_some_result = true;
+            segment_bitmask.SetAllTrue();
+        } else {
+            auto it = common_query_filter_->filter_result_.find(segment_id);
+            if (it != common_query_filter_->filter_result_.end()) {
+                LOG_TRACE(fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, index_entries_.size()));
+
+                auto segment_row_count = segment_entry->row_count();
+                const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
+                if (std::holds_alternative<Vector<u32>>(filter_result)) {
+                    const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
+                    segment_bitmask.Initialize(std::ceil(segment_row_count));
+                    segment_bitmask.SetAllFalse();
+                    for (u32 row_id : filter_result_vector) {
+                        segment_bitmask.SetTrue(row_id);
+                    }
+                } else {
+                    segment_bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
                 }
-            } else {
-                segment_bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+                has_some_result = true;
             }
+        }
+
+        if (has_some_result) {
+            LOG_TRACE(fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, index_entries_.size()));
             // TODO: now only have EMVB index
             const Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<EMVBIndexInMem>> emvb_snapshot = index_entry->GetEMVBIndexSnapshot();
             // 1. in mem index

@@ -177,7 +177,7 @@ public:
                     bool check_ts,
                     const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
-    SharedPtr<ChunkIndexEntry> Finish(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr) &&;
+    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr);
 
     const AbstractHnsw &get() const { return hnsw_; }
 
@@ -194,6 +194,7 @@ private:
 
     SegmentIndexEntry *segment_index_entry_{};
     bool trace_{};
+    bool own_memory_{};
 };
 
 } // namespace infinity

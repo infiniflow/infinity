@@ -1,5 +1,6 @@
 module;
 
+#include <cassert>
 import stl;
 
 import byte_slice_reader;
@@ -10,7 +11,6 @@ import in_doc_pos_state;
 import multi_posting_decoder;
 import segment_posting;
 import index_defines;
-import match_data;
 import internal_types;
 import third_party;
 
@@ -88,31 +88,18 @@ public:
 
     bool HasPosition() const { return posting_option_.HasPositionList(); }
 
-    void GetTermMatchData(TermColumnMatchData &match_data, bool fetch_position = false) {
-        DecodeTFBuffer();
-        DecodeDocPayloadBuffer();
-        if (need_move_to_current_doc_) {
-            MoveToCurrentDoc(fetch_position);
-        }
-        if (posting_option_.HasTfList()) {
-            match_data.tf_ = tf_buffer_[GetDocOffsetInBuffer()];
-        }
-        if (posting_option_.HasDocPayload()) {
-            match_data.doc_payload_ = doc_payload_buffer_[GetDocOffsetInBuffer()];
-        }
-
-    }
-
 private:
     u32 GetCurrentSeekedDocCount() const { return posting_decoder_->InnerGetSeekedDocCount() + (GetDocOffsetInBuffer() + 1); }
 
     i32 GetDocOffsetInBuffer() const { return doc_buffer_cursor_ - doc_buffer_base_ - 1; }
 
     void DecodeTFBuffer() {
-        if (posting_option_.HasTfList()) {
-            if (posting_decoder_->DecodeCurrentTFBuffer(tf_buffer_)) {
-                tf_buffer_cursor_ = 0;
-            }
+        if (finish_decode_tf_)
+            return;
+        assert(posting_option_.HasTfList());
+        if (posting_decoder_->DecodeCurrentTFBuffer(tf_buffer_)) {
+            tf_buffer_cursor_ = 0;
+            finish_decode_tf_ = true;
         }
     }
 
@@ -145,6 +132,7 @@ private:
     docpayload_t *doc_payload_buffer_ = nullptr;
     MultiPostingDecoder *posting_decoder_ = nullptr;
     bool finish_decode_docid_ = false;
+    bool finish_decode_tf_ = false;
     bool need_move_to_current_doc_ = false;
     bool in_doc_pos_iter_inited_ = false;
     InDocPositionState state_ = posting_option_.GetPosListFormatOption();

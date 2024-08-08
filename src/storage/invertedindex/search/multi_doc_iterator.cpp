@@ -16,7 +16,7 @@ module;
 
 #include <iostream>
 
-module multi_query_iterator;
+module multi_doc_iterator;
 
 import stl;
 import infinity_exception;
@@ -24,21 +24,14 @@ import logger;
 
 namespace infinity {
 
-void MultiQueryDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
+void MultiDocIterator::PrintTree(std::ostream &os, const String &prefix, bool is_final) const {
     os << prefix;
     os << (is_final ? "└──" : "├──");
-    if (IsAnd()) {
-        os << "AndIterator";
-    } else if (IsAndNot()) {
-        os << "AndNotIterator";
-    } else if (IsOr()) {
-        os << "OrIterator";
-    } else {
-        String error_message = "Unknown query type";
-        UnrecoverableError(error_message);
-    }
-    os << " (children count: " << children_.size() << ")";
+    os << Name();
     os << " (doc_freq: " << GetDF() << ")";
+    os << " (bm25_score_upper_bound: " << BM25ScoreUpperBound() << ")";
+    os << " (threshold: " << Threshold() << ")";
+    os << " (children count: " << children_.size() << ")";
     os << '\n';
     std::string next_prefix = prefix + (is_final ? "    " : "│   ");
     for (u32 i = 0; i + 1 < children_.size(); ++i) {

@@ -885,10 +885,19 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                                              txn_id,
                                                                                              begin_ts,
                                                                                              commit_ts);
-                    bool insert_ok = table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)}).second;
-                    if (!insert_ok) {
-                        String error_message = fmt::format("Segment index {} is already in the catalog", segment_id);
-                        UnrecoverableError(error_message);
+                    if (merge_flag == MergeFlag::kNew) {
+                        bool insert_ok = table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)}).second;
+                        if (!insert_ok) {
+                            String error_message = fmt::format("Segment index {} is already in the catalog", segment_id);
+                            UnrecoverableError(error_message);
+                        }
+                    } else if (merge_flag == MergeFlag::kUpdate) {
+                        auto iter = table_index_entry->index_by_segment().find(segment_id);
+                        if (iter == table_index_entry->index_by_segment().end()) {
+                            String error_message = fmt::format("Segment index {} is not found", segment_id);
+                            UnrecoverableError(error_message);
+                        }
+                        iter->second->UpdateSegmentIndexReplay(segment_index_entry);
                     }
                 }
                 break;
@@ -1019,18 +1028,17 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 }
 
 // called by bg_task
-bool Catalog::SaveDeltaCatalog(TxnTimeStamp &max_commit_ts, String &delta_catalog_path, String &delta_catalog_name) {
+bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts, String &delta_catalog_path, String &delta_catalog_name) {
     // Pick the delta entry to flush and set the max commit ts.
     UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
+    if (last_ckp_ts >= max_commit_ts) {
+        return false;
+    }
 
     delta_catalog_path = *catalog_dir_;
     delta_catalog_name = CatalogFile::DeltaCheckpointFilename(max_commit_ts);
     String full_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
 
-    if (flush_delta_entry->operations().empty()) {
-        LOG_TRACE("Save delta catalog ops is empty. Skip flush.");
-        return true;
-    }
     LOG_DEBUG(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
 
     for (auto &op : flush_delta_entry->operations()) {
@@ -1081,7 +1089,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp &max_commit_ts, String &delta_catalo
     // }
     LOG_DEBUG(fmt::format("Save delta catalog to: {}, size: {}.", full_path, act_size));
 
-    return false;
+    return true;
 }
 
 void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry)); }
@@ -1113,12 +1121,12 @@ void Catalog::MemIndexCommitLoop() {
     }
 }
 
-void Catalog::MemIndexRecover(BufferManager *buffer_manager) {
+void Catalog::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts) {
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();
     for (auto &[_, db_meta] : *db_meta_map_guard) {
         auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
         if (status.ok()) {
-            db_entry->MemIndexRecover(buffer_manager);
+            db_entry->MemIndexRecover(buffer_manager, ts);
         }
     }
 }

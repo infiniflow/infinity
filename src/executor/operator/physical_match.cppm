@@ -34,7 +34,7 @@ import common_query_filter;
 import logger;
 import column_index_reader;
 import query_node;
-import early_terminate_iterator;
+import doc_iterator;
 
 namespace infinity {
 
