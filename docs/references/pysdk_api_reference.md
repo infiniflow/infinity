@@ -1404,15 +1404,13 @@ table_obj.output(["count(*)"]).to_result()
 
 ```python
 # Select column "num" and request all cells in this column to be displayed with their original values divided by 10
-q = 10
-table_obj.output([f"num/{q}"]).to_pl()
+table_obj.output(["num/10"]).to_pl()
 ```
 
 ```python
 # Specify that the output should display the result of three multiplied by five
 # Note that no columns are involved in this example!
 # Either of the following works: 
-# table_obj.output(["3*5"]).to_result()
 table_obj.output(["3 * 5"]).to_result()
 ```
 
@@ -1462,7 +1460,7 @@ table_obj.filter("c2 = 3").to_result()
 table_obj.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
 ```
 
-Performs a k-nearest neighbor (KNN) or approximate nearest neighbor (ANN) vector search to identify the top n closest rows to the given vector. Suitable for dense vectors (dense embeddings). This method is suitable for workign with dense vectors (dense embeddings).
+Performs a k-nearest neighbor (KNN) or approximate nearest neighbor (ANN) vector search to identify the top n closest rows to the given vector. Suitable for dense vectors (dense embeddings). This method is suitable for working with dense vectors (dense embeddings).
 
 ### Parameters
 
@@ -1472,18 +1470,14 @@ The name of the vector column to search on.
 
 #### embedding_data: `list/np.ndarray`, *Required*
 
-The query vector data to compare against. This should be provided as a list or a numpy array of numerical values.
-
-:::tip NOTE
-Currently, only one-dimensional NumPy arrays are supported.
-:::
+The query vector data to compare against. This should be provided as a list or a one-dimensional NumPy array of numerical values.
 
 #### embedding_data_type: `str`, *Required*
 
 Specifies the data type of the embedding vector. Commonly used types (values) include:
 
 - `"float"`
-- `"int"`.
+- `"uint8"`.
 
 #### distance_type: `str`, *Required*
 
@@ -1513,14 +1507,19 @@ Additional parameters for the KNN or ANN search.
 ```python
 # Find the 100 nearest neighbors using Euclidean distance
 # If you use brute-force search, set knn_params to None or leave it blank
-table_obj.knn('col1', [0.1,0.2,0.3], 'float', 'l2', 100)
+table_obj.knn("vec", [0.1,0.2,0.3], "float", "l2", 100)
 ```
 
 ```python
-ef = 100
 # Find the 2 nearest neighbors using inner product distance
 # If you use HNSW index, you can set ef in knn_params
-table_obj.knn('vec', [3.0] * 5, 'float', 'ip', 2, {"ef": str(ef)})
+table_obj.knn('vec', [0.1,0.2,0.3], 'float', 'ip', 2, {'ef': '100'})
+```
+
+```python
+# Find the 2 nearest neighbors using inner product distance
+# If you use HNSW index, you can set ef in knn_params
+table_obj.knn("vec", [1, 2, 3], "uint8", "cosine", 2, {"ef": "100"})
 ```
 
 ---
