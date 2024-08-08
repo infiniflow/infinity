@@ -110,7 +110,7 @@ protected:
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          CompactTaskTest,
                          ::testing::Values((std::string(test_data_path()) + "/config/test_cleanup_task.toml").c_str(),
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
+                                           (std::string(test_data_path()) + "/config/test_cleanup_task_vfs.toml").c_str()));
 
 
 class SilentLogTestCompactTaskTest : public CompactTaskTest {
@@ -196,8 +196,7 @@ TEST_P(CompactTaskTest, compact_to_single_segment) {
     }
 }
 
-// TODO fix
-TEST_P(CompactTaskTest, DISABLED_compact_to_two_segment) {
+TEST_P(CompactTaskTest, compact_to_two_segment) {
     {
         String table_name = "tbl1";
 
@@ -260,8 +259,8 @@ TEST_P(CompactTaskTest, DISABLED_compact_to_two_segment) {
         }
     }
 }
-// TODO fix
-TEST_P(CompactTaskTest, DISABLED_compact_with_delete) {
+
+TEST_P(CompactTaskTest, compact_with_delete) {
     {
         String table_name = "tbl1";
 
