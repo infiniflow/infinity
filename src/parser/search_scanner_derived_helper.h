@@ -19,8 +19,11 @@
 #define CONCAT(A, B) CONCAT_INNER(A, B)
 #define SearchScannerDerived CONCAT(SearchScanner, SearchScannerSuffix)
 #define yyFlexLexer CONCAT(SearchScannerDerived, FlexLexer)
+// clang-format off
+// the order of these includes is important
 #include <FlexLexer.h>
 #include "search_scanner_derived.h"
+// clang-format on
 #undef yyFlexLexer
 #undef SearchScannerDerived
 #undef CONCAT
