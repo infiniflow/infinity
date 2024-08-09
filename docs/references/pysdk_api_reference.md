@@ -1571,7 +1571,7 @@ The query sparse vector data to compare against. The `sparse_data` parameter sho
 
 #### distance_type: `str`, *Required*
 
- A non-empty string indicating the distance type for the search. Currently, only `"ip"` is supported.
+ A non-empty string indicating the distance type for the search. Currently, only `"ip"` (inner product) is supported.
 
 #### topn: `int`, *Required*
 
