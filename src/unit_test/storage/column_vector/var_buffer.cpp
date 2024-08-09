@@ -36,24 +36,18 @@ TEST_F(VarBufferTest, test1) {
     SizeT offset1 = var_buffer.Append(data.get(), 26);
     EXPECT_EQ(offset1, 0);
 
-    SizeT offset2 = var_buffer.Append(std::move(data), 26);
+    SizeT offset2 = var_buffer.Append(data.get(), 26);
     EXPECT_EQ(offset2, 26);
 
     auto test = [&](const VarBuffer &var_buffer) {
-        const auto *res1 = var_buffer.Get(10, 10);
-        EXPECT_EQ(std::string_view(res1, 10), "klmnopqrst");
+        const auto *res1 = var_buffer.Get(0, 26);
+        EXPECT_EQ(std::string_view(res1, 26), std::string_view(data.get(), 26));
 
-        const auto *res2 = var_buffer.Get(36, 10);
-        EXPECT_EQ(std::string_view(res2, 10), "klmnopqrst");
-
-        try {
-            [[maybe_unused]] const auto *res3 = var_buffer.Get(10, 26);
-            FAIL();
-        } catch (UnrecoverableException &e) {
-        }
+        const auto *res2 = var_buffer.Get(26, 26);
+        EXPECT_EQ(std::string_view(res2, 26), std::string_view(data.get(), 26));
 
         try {
-            [[maybe_unused]] const auto *res4 = var_buffer.Get(36, 10);
+            [[maybe_unused]] const auto *res3 = var_buffer.Get(52, 26);
             FAIL();
         } catch (UnrecoverableException &e) {
         }

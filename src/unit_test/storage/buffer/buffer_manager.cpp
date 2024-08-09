@@ -59,6 +59,10 @@ protected:
     SharedPtr<String> temp_dir_;
 
     void SetUp() override {
+        Config config;
+        config.Init(nullptr, nullptr);
+        Logger::Initialize(&config);
+
         data_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/data");
         temp_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/temp");
         fs.DeleteDirectory(*data_dir_);
