@@ -688,6 +688,18 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW CATALOGS"));
             break;
         }
+        case ShowStmtType::kPersistenceFiles: {
+            result->emplace_back(MakeShared<String>("SHOW PERSISTENCE FILES"));
+            break;
+        }
+        case ShowStmtType::kPersistenceObjects: {
+            result->emplace_back(MakeShared<String>("SHOW PERSISTENCE OBJECTS"));
+            break;
+        }
+        case ShowStmtType::kPersistenceObject: {
+            result->emplace_back(MakeShared<String>("SHOW PERSISTENCE OBJECT"));
+            break;
+        }
     }
 }
 

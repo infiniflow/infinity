@@ -160,7 +160,7 @@ class InfinityThriftQueryBuilder(ABC):
         dist_type = KnnDistanceType.L2
         if distance_type == "l2":
             dist_type = KnnDistanceType.L2
-        elif distance_type == "cosine":
+        elif distance_type == "cosine" or distance_type == "cos":
             dist_type = KnnDistanceType.Cosine
         elif distance_type == "ip":
             dist_type = KnnDistanceType.InnerProduct
@@ -170,7 +170,7 @@ class InfinityThriftQueryBuilder(ABC):
             raise InfinityException(ErrorCode.INVALID_KNN_DISTANCE_TYPE, f"Invalid distance type {distance_type}")
 
         knn_opt_params = []
-        if knn_params != None:
+        if knn_params is not None:
             for k, v in knn_params.items():
                 knn_opt_params.append(InitParameter(k, v))
 

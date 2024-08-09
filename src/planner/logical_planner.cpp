@@ -1257,6 +1257,15 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kCatalogs: {
             return BuildShowCatalogs(statement, bind_context_ptr);
         }
+        case ShowStmtType::kPersistenceFiles: {
+            return BuildShowPersistenceFiles(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kPersistenceObjects: {
+            return BuildShowPersistenceObjects(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kPersistenceObject: {
+            return BuildShowPersistenceObject(statement, bind_context_ptr);
+        }
         default: {
             String error_message = "Unexpected show statement type.";
             UnrecoverableError(error_message);
@@ -1632,6 +1641,40 @@ Status LogicalPlanner::BuildShowCatalogs(const ShowStatement *statement, SharedP
     this->logical_plan_ = logical_show;
     return Status::OK();
 }
+
+Status LogicalPlanner::BuildShowPersistenceFiles(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowPersistenceFiles,
+                                                                  "",
+                                                                  "",
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowPersistenceObjects(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowPersistenceObjects,
+                                                                  "",
+                                                                  "",
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowPersistenceObject(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowPersistenceObject,
+                                                                  "",
+                                                                  statement->file_name_.value(),
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
 
 Status LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     switch (statement->type()) {

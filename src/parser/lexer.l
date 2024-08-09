@@ -89,6 +89,7 @@ EXISTS          { return EXISTS; }
 EXPLAIN         { return EXPLAIN; }
 EXPORT          { return EXPORT; }
 FALSE           { return FALSE; }
+FILES           { return FILES; }
 FLOAT           { return FLOAT; }
 FLOAT16         { return FLOAT16; }
 FLUSH           { return FLUSH; }
@@ -136,6 +137,8 @@ MONTHS          { return MONTHS; }
 NATURAL         { return NATURAL; }
 NULL            { return NULLABLE; }
 NOT             { return NOT; }
+OBJECT          { return OBJECT; }
+OBJECTS         { return OBJECTS; }
 OFF             { return OFF; }
 OFFSET          { return OFFSET; }
 ON              { return ON; }
@@ -144,6 +147,7 @@ OR              { return OR; }
 ORDER           { return ORDER; }
 OUTER           { return OUTER; }
 PATH            { return PATH; }
+PERSISTENCE     { return PERSISTENCE; }
 PHYSICAL        { return PHYSICAL; }
 PIPELINE        { return PIPELINE; }
 POINT           { return POINT; }

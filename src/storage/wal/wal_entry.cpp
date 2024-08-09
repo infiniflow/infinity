@@ -460,7 +460,7 @@ SharedPtr<WalCmd> WalCmd::ReadAdv(char *&ptr, i32 max_bytes) {
     }
     max_bytes = ptr_end - ptr;
     if (max_bytes < 0) {
-        String error_message = "ptr goes out of range when reading WalCmd";
+        String error_message = fmt::format("ptr goes out of range when reading WalCmd: {}", WalCmd::WalCommandTypeToString(cmd_type));
         UnrecoverableError(error_message);
     }
     return cmd;

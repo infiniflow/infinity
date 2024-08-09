@@ -310,7 +310,11 @@ struct SQL_LTYPE {
     FUSION = 437,                  /* FUSION  */
     ROWLIMIT = 438,                /* ROWLIMIT  */
     ADMIN = 439,                   /* ADMIN  */
-    NUMBER = 440                   /* NUMBER  */
+    PERSISTENCE = 440,             /* PERSISTENCE  */
+    OBJECT = 441,                  /* OBJECT  */
+    OBJECTS = 442,                 /* OBJECTS  */
+    FILES = 443,                   /* FILES  */
+    NUMBER = 444                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -397,7 +401,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 401 "parser.h"
+#line 405 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

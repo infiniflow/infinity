@@ -22,6 +22,7 @@ import uuid;
 import serialize;
 import third_party;
 import infinity_exception;
+import local_file_system;
 import logger;
 
 namespace fs = std::filesystem;
@@ -125,6 +126,11 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
 
     if (local_data_dir_.empty() || local_data_dir_.back() != '/') {
         local_data_dir_ += '/';
+    }
+
+    LocalFileSystem fs;
+    if (!fs.Exists(workspace_)) {
+        fs.CreateDirectory(workspace_);
     }
 }
 
@@ -559,6 +565,16 @@ SizeT PersistenceManager::GetSizeInBytes(const Vector<String> &local_paths) {
         size += sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT) + obj_stat.deleted_ranges_.size() * (2 * sizeof(SizeT));
     }
     return size;
+}
+
+HashMap<String, ObjStat> PersistenceManager::GetAllObjects() const {
+    std::lock_guard<std::mutex> lock(mtx_);
+    return objects_;
+}
+
+HashMap<String, ObjAddr> PersistenceManager::GetAllFiles() const {
+    std::lock_guard<std::mutex> lock(mtx_);
+    return local_path_obj_;
 }
 
 } // namespace infinity

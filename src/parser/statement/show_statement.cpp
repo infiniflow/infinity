@@ -148,6 +148,18 @@ std::string ShowStatement::ToString() const {
             ss << "Show catalogs";
             break;
         }
+        case ShowStmtType::kPersistenceFiles: {
+            ss << "Show persistence files";
+            break;
+        }
+        case ShowStmtType::kPersistenceObjects: {
+            ss << "Show persistence objects";
+            break;
+        }
+        case ShowStmtType::kPersistenceObject: {
+            ss << "Show persistence object";
+            break;
+        }
     }
     return ss.str();
 }
