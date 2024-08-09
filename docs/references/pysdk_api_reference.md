@@ -1508,9 +1508,9 @@ A dictionary representing additional parameters for the KNN or ANN search.
 
 ```python
 # Find the 100 nearest neighbors using Euclidean distance
-# If no vector index is created on the column being queried, then the vector search is a brute-force search.
+# If no vector index is created on the column being queried, then the vector search defaults to a brute-force search.
 # In such case, set `knn_params` to `None` or leave it blank.
-table_obj.knn("vec_column", [0.1,0.2,0.3], "float", "l2", 100)
+table_obj.knn("vec", [0.1,0.2,0.3], "float", "l2", 100)
 ```
 
 :::caution NOTE
@@ -1523,19 +1523,23 @@ table_obj.knn("vec_column", [0.1,0.2,0.3], "float", "l2", 100)
 2. Set the `ef` value as follows:
 
 ```python
+from infinity.index import IndexInfo, IndexType, InitParameter
+table_obj.create_index("my_index", [IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")])])
 # Find the 2 nearest neighbors using cosine distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
 # If you leave `knn_params` blank, the search takes the `"ef"` value set in `create_index()`.
-table_obj.knn("vec_column_with_hnsw_index_built", [1, 2, 3], "uint8", "cosine", 2)
+table_obj.knn("vec", [1, 2, 3], "uint8", "cosine", 2)
 ```
 
 ```python
+from infinity.index import IndexInfo, IndexType, InitParameter
+table_obj.create_index("my_index", [IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")])])
 # Find the 2 nearest neighbors using inner product distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
 # You can specify the value of `"ef"` in `knn_params`, which overrides the value set in `create_index()`
-table_obj.knn("vec_column_with_hnsw_index_built", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"})
+table_obj.knn("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"})
 ```
 
 :::tip NOTE
@@ -1594,10 +1598,15 @@ A dictionary representing additional parameters for the sparse vector search. Fo
 #### Perform a brute-force sparse vector search
 
 ```python
-# Find the 100 nearest neighbors using inner product
-# If no sparse vector index is created on the column being queried, then the vector search is a brute-force search.
+# As demonstrated in the following example:
+# The sparse vector search is performed on column "sparse_column" to find the 100 nearest neighbors using inner product
+# {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]} represents the sparse vector to compare against:
+# - 0: the index of 0.1
+# - 10: the index of 0.2
+# - 20: the index of 0.3
+# If no sparse vector index is created on the column being queried, then the search defaults to a brute-force search.
 # In such case, set `opt_params` to `None` or leave it blank.
-table_obj.match_sparse('sparse_column', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100)
+table_obj.match_sparse('sparse', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100)
 ```
 
 :::caution NOTE
@@ -1607,19 +1616,23 @@ table_obj.match_sparse('sparse_column', {"indices": [0, 10, 20], "values": [0.1,
 #### Perform a sparse vector search in BMP
 
 ```python
+from infinity.index import IndexInfo, IndexType, InitParameter
+table_obj.create_index("my_index", [IndexInfo("sparse", IndexType.BMP, [InitParameter("block_size", "16"), InitParameter("compress_type", "compress")])])
 # Find the 100 nearest neighbors using inner product
 # If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
 # regardless of whether `opt_params` is set.
 # If you leave `opt_params` blank, the search takes the default settings for `"alpha"` and `"beta"`.
-table_obj.match_sparse('sparse_column_with_bmp_index_built', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
+table_obj.match_sparse('sparse', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
 ```
 
 ```python
+from infinity.index import IndexInfo, IndexType, InitParameter
+table_obj.create_index("my_index", [IndexInfo("sparse", IndexType.BMP, [InitParameter("block_size", "16"), InitParameter("compress_type", "compress")])])
 # Find the 100 nearest neighbors using inner product
 # If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
 # regardless of whether `opt_params` is set.
 # You can set the values of `"alpha"` or `"beta"` in `opt_params`, which overrides the default settings.
-table_obj.match_sparse('sparse_column_with_bmp_index_built', {"indices": [0, 10, 20], "values": [8, 10, 66]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
+table_obj.match_sparse('sparse', {"indices": [0, 10, 20], "values": [8, 10, 66]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
 ```
 
 ---
