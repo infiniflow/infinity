@@ -143,6 +143,18 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
             parsed_expr.type = parser_expr_type
 
             return parsed_expr
+    elif isinstance(cons, exp.Func):
+        arguments = []
+        for arg in cons.args.values():
+            if arg:
+                arguments.append(parse_expr(arg))
+        func_expr = ttypes.FunctionExpr(
+            function_name=cons.key,
+            arguments=arguments
+        )
+        expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+        parsed_expr = ttypes.ParsedExpr(type=expr_type)
+        return parsed_expr
     else:
         raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown condition type: {cons}")
 
@@ -151,19 +163,7 @@ def parse_expr(expr) -> ttypes.ParsedExpr:
     try:
         return traverse_conditions(expr, parse_expr)
     except:
-        if isinstance(expr, exp.Func):
-            arguments = []
-            for arg in expr.args.values():
-                if arg:
-                    arguments.append(parse_expr(arg))
-            func_expr = ttypes.FunctionExpr(
-                function_name=expr.key,
-                arguments=arguments
-            )
-            expr_type = ttypes.ParsedExprType(function_expr=func_expr)
-            parsed_expr = ttypes.ParsedExpr(type=expr_type)
-            return parsed_expr
-        elif isinstance(expr, exp.Star):
+        if isinstance(expr, exp.Star):
             column_expr = ttypes.ColumnExpr(
                 star=True,
                 column_name=[]

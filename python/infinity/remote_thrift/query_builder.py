@@ -89,7 +89,7 @@ class InfinityThriftQueryBuilder(ABC):
         embedding_data: VEC,
         embedding_data_type: str,
         distance_type: str,
-        topn: int = DEFAULT_MATCH_VECTOR_TOPN,
+        topn: int,
         knn_params: {} = None,
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:

@@ -112,6 +112,20 @@ def traverse_conditions(cons, fn=None):
             parsed_expr.constant_expr = constant_expr
 
             return parsed_expr
+    elif isinstance(cons, exp.Func):
+        arguments = []
+        for arg in cons.args.values():
+            if arg:
+                parsed_expr = parse_expr(arg)
+                arguments.append(parsed_expr)
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = cons.key
+        func_expr.arguments = arguments
+
+        parsed_expr = WrapParsedExpr()
+        parsed_expr.type = ParsedExprType.kFunction
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
     else:
         raise Exception(f"unknown condition type: {cons}")
 
@@ -120,21 +134,7 @@ def parse_expr(expr):
     try:
         return traverse_conditions(expr, parse_expr)
     except:
-        if isinstance(expr, exp.Func):
-            arguments = []
-            for arg in expr.args.values():
-                if arg:
-                    parsed_expr = parse_expr(arg)
-                    arguments.append(parsed_expr)
-            func_expr = WrapFunctionExpr()
-            func_expr.func_name = expr.key
-            func_expr.arguments = arguments
-
-            parsed_expr = WrapParsedExpr()
-            parsed_expr.type = ParsedExprType.kFunction
-            parsed_expr.function_expr = func_expr
-            return parsed_expr
-        elif isinstance(expr, exp.Star):
+        if isinstance(expr, exp.Star):
             column_expr = WrapColumnExpr()
             column_expr.star = True
             parsed_expr = WrapParsedExpr(ParsedExprType.kColumn)
