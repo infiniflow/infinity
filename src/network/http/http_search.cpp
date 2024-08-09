@@ -585,6 +585,15 @@ MatchSparseExpr *HTTPSearch::ParseMatchSparse(const nlohmann::json &json_object,
     auto match_sparse_expr = MakeUnique<MatchSparseExpr>();
     i64 topn = DEFAULT_MATCH_SPARSE_TOP_N;
     auto *opt_params_ptr = new Vector<InitParameter *>();
+    DeferFn release_opt([&]() {
+            if(opt_params_ptr != nullptr) {
+                for (auto &params_ptr : *opt_params_ptr) {
+                    delete params_ptr;
+                }
+                delete opt_params_ptr;
+                opt_params_ptr = nullptr;
+            }
+        });
     for (auto &field_json_obj : json_object.items()) {
         String key = field_json_obj.key();
         ToLower(key);
@@ -617,6 +626,7 @@ MatchSparseExpr *HTTPSearch::ParseMatchSparse(const nlohmann::json &json_object,
         }
     }
     match_sparse_expr->SetOptParams(topn, opt_params_ptr);
+    opt_params_ptr = nullptr;
     return match_sparse_expr.release();
 }
 
