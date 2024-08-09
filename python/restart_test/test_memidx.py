@@ -23,19 +23,17 @@ class TestMemIdx:
         )
         res = table_obj.create_index(
             "idx1",
-            [
-                index.IndexInfo(
-                    "c2",
-                    index.IndexType.Hnsw,
-                    [
-                        index.InitParameter("M", "16"),
-                        index.InitParameter("ef_construction", "20"),
-                        index.InitParameter("ef", "20"),
-                        index.InitParameter("metric", "l2"),
-                        index.InitParameter("block_size", "1"),
-                    ],
-                )
-            ],
+            index.IndexInfo(
+                "c2",
+                index.IndexType.Hnsw,
+                [
+                    index.InitParameter("M", "16"),
+                    index.InitParameter("ef_construction", "20"),
+                    index.InitParameter("ef", "20"),
+                    index.InitParameter("metric", "l2"),
+                    index.InitParameter("block_size", "1"),
+                ],
+            )
         )
         assert res.error_code == infinity.ErrorCode.OK
 

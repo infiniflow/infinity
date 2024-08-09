@@ -21,7 +21,7 @@ insert_delete_size = 100
 
 
 class TestIndexParallel:
-    #@pytest.mark.skip(reason="To pass benchmark, use wrong row count in knn scan")
+    # @pytest.mark.skip(reason="To pass benchmark, use wrong row count in knn scan")
     def test_chaos(self, get_infinity_connection_pool):
         data = read_out_data()
         connection_pool = get_infinity_connection_pool
@@ -34,17 +34,17 @@ class TestIndexParallel:
             "index": {"type": "int"}, "body": {"type": "varchar"}, "other_vector": {"type": "vector,4,float"}},
                                         ConflictType.Error)
         res = table_obj.create_index("body_index",
-                                     [index.IndexInfo("body",
-                                                      index.IndexType.FullText,
-                                                      [])])
+                                     index.IndexInfo("body",
+                                                     index.IndexType.FullText,
+                                                     []))
         assert res.error_code == ErrorCode.OK
         res = table_obj.create_index("other_index",
-                                     [index.IndexInfo("other_vector", index.IndexType.Hnsw,
-                                                      [index.InitParameter("M", "16"),
-                                                       index.InitParameter("ef_construction", "50"),
-                                                       index.InitParameter("ef", "50"),
-                                                       index.InitParameter("metric", "l2")
-                                                       ])], ConflictType.Error)
+                                     index.IndexInfo("other_vector", index.IndexType.Hnsw,
+                                                     [index.InitParameter("M", "16"),
+                                                      index.InitParameter("ef_construction", "50"),
+                                                      index.InitParameter("ef", "50"),
+                                                      index.InitParameter("metric", "l2")
+                                                      ]), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         connection_pool.release_conn(infinity_obj)
 

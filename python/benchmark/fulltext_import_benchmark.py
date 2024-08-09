@@ -28,7 +28,7 @@ def insert_data(db_obj, data):
     table_obj = db_obj.create_table("insert_benchmark",
                                     {"id": {"type": "varchar"}, "title": {"type": "varchar"},
                                      "text": {"type": "varchar"}}, ConflictType.Error)
-    res = table_obj.create_index("text_index", [index.IndexInfo("text", index.IndexType.FullText, [])])
+    res = table_obj.create_index("text_index", index.IndexInfo("text", index.IndexType.FullText, []))
     assert res.error_code == ErrorCode.OK
     inserted_records_num = 0
     while inserted_records_num < len(data):
@@ -50,7 +50,7 @@ def import_file(db_obj, path):
                                     {"id": {"type": "varchar"}, "title": {"type": "varchar"},
                                      "text": {"type": "varchar"}}, ConflictType.Error)
     assert table_obj
-    res = table_obj.create_index("text_index", [index.IndexInfo("text", index.IndexType.FullText, [])])
+    res = table_obj.create_index("text_index", index.IndexInfo("text", index.IndexType.FullText, []))
     assert res.error_code == ErrorCode.OK
     table_obj.import_data(path, {'file_type': 'jsonl'})
 
