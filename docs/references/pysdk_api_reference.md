@@ -630,7 +630,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
   - Parameter settings for an IVFFlat index:  
     - `"centroids_count"`: *Optional* - Defaults to`"128"`.
-    - `"metric"`: *Required - The distance metric to use in similarity search.
+    - `"metric"`: *Required* - The distance metric to use in similarity search.
       - `"ip"`: Inner product.
       - `"l2"`: Euclidean distance.
       - `"cosine"`: Cosine similarity.
@@ -1460,13 +1460,13 @@ table_obj.filter("c2 = 3").to_result()
 table_obj.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
 ```
 
-Performs a k-nearest neighbor (KNN) or approximate nearest neighbor (ANN) vector search to identify the top n closest rows to the given vector. Suitable for dense vectors (dense embeddings). This method is suitable for working with dense vectors (dense embeddings).
+Performs a k-nearest neighbor (KNN) or approximate nearest neighbor (ANN) vector search to identify the top n closest rows to the given vector. Suitable for working with dense vectors (dense embeddings).
 
 ### Parameters
 
 #### vector_column_name: `str`, *Required*
 
-The name of the vector column to search on.
+A non-empty string indicating the name of the vector column to search on.
 
 #### embedding_data: `list/np.ndarray`, *Required*
 
@@ -1489,11 +1489,11 @@ The distance metric to use in similarity search.
 
 #### topn: `int`, *Required*
 
-The number of nearest neighbours to return.
+An integer indicating the number of nearest neighbours to return.
 
 #### knn_params: `dict[str, str]`, *Optional*
 
-Additional parameters for the KNN or ANN search.
+A dictionary representing additional parameters for the KNN or ANN search.
 
 ### Returns
 
@@ -1507,27 +1507,39 @@ Additional parameters for the KNN or ANN search.
 #### Perform a brute-force vector search
 
 ```python
-# Precondition: No vector index is created on the column being queried
 # Find the 100 nearest neighbors using Euclidean distance
-# If using brute-force search, set knn_params to `None` or leave it blank
+# If no vector index is created on the column being queried, then the vector search defaults to a brute-force search.
+# In such case, set `knn_params` to `None` or leave it blank.
 table_obj.knn("vec", [0.1,0.2,0.3], "float", "l2", 100)
 ```
 
-#### Perform a search in HNSW
+:::caution NOTE
+`knn_params` settings will not take effect here because no index has been created.
+:::
+
+#### Perform a vector search in HNSW
 
 1. Ensure that you have successfully built an HNSW index. If you are uncertain, you can rebuild the index, setting `ConflictType` to `Ignore`.
 2. Set the `ef` value as follows:
 
 ```python
-# Find the 2 nearest neighbors using inner product distance
-# If using an HNSW index, set "ef" properly in `knn_params`
-table_obj.knn("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"})
+from infinity.index import IndexInfo, IndexType, InitParameter
+table_obj.create_index("my_index", [IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")])])
+# Find the 2 nearest neighbors using cosine distance
+# If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
+# regardless of whether `knn_params` is set.
+# If you leave `knn_params` blank, the search takes the `"ef"` value set in `create_index()`.
+table_obj.knn("vec", [1, 2, 3], "uint8", "cosine", 2)
 ```
 
 ```python
-# Find the 2 nearest neighbors using cosine distance
-# If using an HNSW index, set "ef" properly `in knn_params`
-table_obj.knn("vec", [1, 2, 3], "uint8", "cosine", 2, {"ef": "100"})
+from infinity.index import IndexInfo, IndexType, InitParameter
+table_obj.create_index("my_index", [IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")])])
+# Find the 2 nearest neighbors using inner product distance
+# If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
+# regardless of whether `knn_params` is set.
+# You can specify the value of `"ef"` in `knn_params`, which overrides the value set in `create_index()`
+table_obj.knn("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"})
 ```
 
 :::tip NOTE
@@ -1542,22 +1554,37 @@ If the HNSW index is not created successfully, the search will fall back to a br
 table_obj.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params = None)
 ```
 
+Performs a sparse vector search to to identify the top n closest rows to the given sparse vector. Suitable for working with sparse vectors (sparse embeddings).
+
 ### Parameters
 
 #### vector_column_name: `str`, *Required*
 
-#### sparse_data: `{"indices": list[int], "values": Union(list[int], list[float])}`
+A non-empty string indicating the name of the column to query on.
 
-#### distance_type: `str`
+#### sparse_data: `dict[str, list[int | float]]`, *Required*
 
-  -  `'ip'`
+The query sparse vector data to compare against. The `sparse_data` parameter should be provided as a dictionary like `{"indices": list[int], "values": list[int | float]}`:
 
-#### topn: `int`
+- `"indices"`: A list of the indices, each corresponding to a non-zero value in the sparse vector.
+- `"values"`: A list of non-zero values in the sparse vector.
 
-- **opt_params : dict[str, str]**
-    common options:
-      - 'alpha=0.0~1.0'(default: 1.0): A "Termination Conditions" parameter. The smaller the value, the more aggressive the pruning.
-      - 'beta=0.0~1.0'(default: 1.0): A "Query Term Pruning" parameter. The smaller the value, the more aggressive the pruning.
+#### distance_type: `str`, *Required*
+
+ A non-empty string indicating the distance type for the search. Currently, only `"ip"` (inner product) is supported.
+
+#### topn: `int`, *Required*
+
+An integer indicating the number of nearest neighbours to return.
+
+#### opt_params: `dict[str, str]`, *Required*
+
+A dictionary representing additional parameters for the sparse vector search. Following are parameters for the BMP index:
+
+- `"alpha"`: `str`  
+  `"0.0"` ~ `"1.0"` (default: `"1.0"`) - A "Termination Conditions" parameter. The smaller the value, the more aggressive the pruning.
+- `"beta"`: `str`  
+  `"0.0"` ~ `"1.0"` (default: `"1.0"`) - A "Query Term Pruning" parameter. The smaller the value, the more aggressive the pruning.
 
 ### Returns
 
@@ -1568,28 +1595,71 @@ table_obj.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt
 
 ### Examples
 
+#### Perform a brute-force sparse vector search
+
 ```python
-table_obj.match_sparse('col1', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100)
-table_obj.match_sparse('col1_with_bmp_index', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
+# As demonstrated in the following example:
+# The sparse vector search is performed on column "sparse_column" to find the 100 nearest neighbors using inner product
+# {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]} represents the sparse vector to compare against:
+# - 0: the index of 0.1
+# - 10: the index of 0.2
+# - 20: the index of 0.3
+# If no sparse vector index is created on the column being queried, then the search defaults to a brute-force search.
+# In such case, set `opt_params` to `None` or leave it blank.
+table_obj.match_sparse('sparse', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100)
+```
+
+:::caution NOTE
+`opt_params` settings will not take effect here because no index has been created.
+:::
+
+#### Perform a sparse vector search in BMP
+
+```python
+from infinity.index import IndexInfo, IndexType, InitParameter
+table_obj.create_index("my_index", [IndexInfo("sparse", IndexType.BMP, [])])
+# Find the 100 nearest neighbors using inner product
+# If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
+# regardless of whether `opt_params` is set.
+# If you leave `opt_params` blank, the search takes the default settings for `"alpha"` and `"beta"`.
+table_obj.match_sparse('sparse', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
+```
+
+```python
+from infinity.index import IndexInfo, IndexType, InitParameter
+table_obj.create_index("my_index", [IndexInfo("sparse", IndexType.BMP, [])])
+# Find the 100 nearest neighbors using inner product
+# If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
+# regardless of whether `opt_params` is set.
+# You can set the values of `"alpha"` or `"beta"` in `opt_params`, which overrides the default settings.
+table_obj.match_sparse('sparse', {"indices": [0, 10, 20], "values": [8, 10, 66]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
 ```
 
 ---
 
 ## match
 
+```python
+table_obj.match(fields, matching_text, distance_type, topn, opt_params = None)
+```
+
 Creates a full-text search expression.
 
 ### Parameters
 
-#### fields: `str`
+#### fields: `str`, *Required*
 
 The column where text is searched, and has create full-text index on it before.
 
-#### matching_text: `str`
+:::caution NOTE
+Ensure that you have created a full-text index on this column before performing a full-text search on it.
+:::
 
-#### options_text: `str`
+#### matching_text: `str`, *Required*
 
-    'topn=2': Retrieve the two most relevant rows. The `topn` is `10` by default.
+#### options_text: `str`, *Required*
+
+'topn=2': Retrieve the two most relevant rows. The `topn` is `10` by default.
 
 ### Returns
 
@@ -1632,7 +1702,7 @@ For example, find k most match tensors generated by ColBERT.
 #### vector_column_name: `str`
 
 
-#### tensor_data: `list/np.ndarray`
+#### tensor_data: `list/np.ndarray`, 
 
 
 #### tensor_data_type: `str`
