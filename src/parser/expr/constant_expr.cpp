@@ -89,28 +89,12 @@ std::string ConstantExpr::ToString() const {
             }
         }
         case LiteralType::kIntegerArray: {
-            std::stringstream ss;
-            size_t len = long_array_.size();
-            if (len <= 0) {
-                ParserError("Invalid long array length");
-            }
-            for (size_t i = 0; i < len - 1; ++i) {
-                ss << long_array_[i] << ',';
-            }
-            ss << long_array_.back();
-            return ss.str();
+            EmbeddingType embedding((char *)(long_array_.data()), false);
+            return EmbeddingType::Embedding2String(embedding, kElemInt64, long_array_.size());
         }
         case LiteralType::kDoubleArray: {
-            std::stringstream ss;
-            size_t len = double_array_.size();
-            if (len <= 0) {
-                ParserError("Invalid double array length");
-            }
-            for (size_t i = 0; i < len - 1; ++i) {
-                ss << double_array_[i] << ',';
-            }
-            ss << double_array_.back();
-            return ss.str();
+            EmbeddingType embedding((char *)(double_array_.data()), false);
+            return EmbeddingType::Embedding2String(embedding, kElemInt64, double_array_.size());
         }
         case LiteralType::kSubArrayArray: {
             std::stringstream ss;

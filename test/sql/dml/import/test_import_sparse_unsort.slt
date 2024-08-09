@@ -10,8 +10,8 @@ COPY test_import_sparse FROM '/var/infinity/test_data/sparse_float_unsort.csv' W
 query I
 SELECT * FROM test_import_sparse;
 ----
-1 10000: 1.000000, 20000: 2.000000
-3 3000: 3.000000, 4000: 4.000000, 5000: 5.000000
+1 [10000:1.000000,20000:2.000000]
+3 [3000:3.000000,4000:4.000000,5000:5.000000]
 0 (empty)
 
 statement ok
@@ -28,8 +28,8 @@ COPY test_import_sparse FROM '/var/infinity/test_data/sparse_float_unsort.jsonl'
 query I
 SELECT * FROM test_import_sparse;
 ----
-1 10000: 1.000000, 20000: 2.000000
-3 3000: 3.000000, 4000: 4.000000, 5000: 5.000000
+1 [10000:1.000000,20000:2.000000]
+3 [3000:3.000000,4000:4.000000,5000:5.000000]
 0 (empty)
 
 statement ok
