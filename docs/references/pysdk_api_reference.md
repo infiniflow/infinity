@@ -1639,6 +1639,10 @@ table_obj.match_sparse('sparse', {"indices": [0, 10, 20], "values": [8, 10, 66]}
 
 ## match
 
+```python
+table_obj.match(fields, matching_text, distance_type, topn, opt_params = None)
+```
+
 Creates a full-text search expression.
 
 ### Parameters
@@ -1648,10 +1652,10 @@ Creates a full-text search expression.
 The column where text is searched, and has create full-text index on it before.
 
 :::caution NOTE
-Ensure that you have created a full-text index on this column before conducting a full-text search on it
+Ensure that you have created a full-text index on this column before performing a full-text search on it.
 :::
 
-#### matching_text: `str`
+#### matching_text: `str`, *Required*
 
 #### options_text: `str`, *Required*
 
