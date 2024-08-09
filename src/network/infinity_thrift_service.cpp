@@ -1051,20 +1051,10 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
         return;
     }
 
-    auto *index_info_list_to_use = new Vector<IndexInfo *>();
+    auto *index_info_to_use = new IndexInfo();
     for (auto &index_info : request.index_info_list) {
-        auto index_info_to_use = new IndexInfo();
         index_info_to_use->index_type_ = GetIndexTypeFromProto(index_info.index_type);
         if (index_info_to_use->index_type_ == IndexType::kInvalid) {
-
-            if (index_info_list_to_use != nullptr) {
-                for (auto &index_info : *index_info_list_to_use) {
-                    delete index_info;
-                    index_info = nullptr;
-                }
-                delete index_info_list_to_use;
-                index_info_list_to_use = nullptr;
-            }
 
             delete index_info_to_use;
             index_info_to_use = nullptr;
@@ -1083,11 +1073,9 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
             index_param_list->emplace_back(init_parameter);
         }
         index_info_to_use->index_param_list_ = index_param_list;
-
-        index_info_list_to_use->emplace_back(index_info_to_use);
     }
 
-    QueryResult result = infinity->CreateIndex(request.db_name, request.table_name, request.index_name, index_info_list_to_use, create_index_opts);
+    QueryResult result = infinity->CreateIndex(request.db_name, request.table_name, request.index_name, index_info_to_use, create_index_opts);
     ProcessQueryResult(response, result);
 }
 

@@ -578,7 +578,7 @@ QueryResult Infinity::ListTableIndexes(const String &db_name, const String &tabl
 QueryResult Infinity::CreateIndex(const String &db_name,
                                   const String &table_name,
                                   const String &index_name,
-                                  Vector<IndexInfo *> *index_info_list,
+                                  IndexInfo *index_info_ptr,
                                   const CreateIndexOptions &create_index_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
@@ -600,14 +600,13 @@ QueryResult Infinity::CreateIndex(const String &db_name,
     create_index_info->index_name_ = index_name;
     ToLower(create_index_info->index_name_);
 
-    for(IndexInfo* index_info_ptr: *index_info_list) {
-        ToLower(index_info_ptr->column_name_);
-        for(InitParameter* init_param_ptr: *index_info_ptr->index_param_list_) {
-            ToLower(init_param_ptr->param_name_);
-            ToLower(init_param_ptr->param_value_);
-        }
+    ToLower(index_info_ptr->column_name_);
+    for(InitParameter* init_param_ptr: *index_info_ptr->index_param_list_) {
+        ToLower(init_param_ptr->param_name_);
+        ToLower(init_param_ptr->param_value_);
     }
-    create_index_info->index_info_ = (*index_info_list)[0];
+
+    create_index_info->index_info_ = index_info_ptr;
 
     create_statement->create_info_ = create_index_info;
     create_statement->create_info_->conflict_type_ = create_index_options.conflict_type_;
