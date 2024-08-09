@@ -1507,7 +1507,7 @@ Additional parameters for the KNN or ANN search.
 #### Perform a brute-force vector search
 
 ```python
-# Precondition: No vector index is created on the query columns
+# Precondition: No vector index is created on the column being queried
 # Find the 100 nearest neighbors using Euclidean distance
 # If using brute-force search, set knn_params to `None` or leave it blank
 table_obj.knn("vec", [0.1,0.2,0.3], "float", "l2", 100)
