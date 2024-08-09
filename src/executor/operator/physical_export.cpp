@@ -184,8 +184,9 @@ SizeT PhysicalExport::ExportToCSV(QueryContext *query_context, ExportOperatorSta
                 String line;
                 for(SizeT select_column_idx = 0; select_column_idx < select_column_count; ++ select_column_idx) {
                     Value v = column_vectors[select_column_idx].GetValue(row_idx);
-                    switch(v.type().type()) {
-                        case LogicalType::kEmbedding: {
+                    switch (v.type().type()) {
+                        case LogicalType::kEmbedding:
+                        case LogicalType::kSparse: {
                             line += fmt::format("\"{}\"", v.ToString());
                             break;
                         }

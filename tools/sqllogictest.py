@@ -164,7 +164,7 @@ if __name__ == "__main__":
     generate16(args.generate_if_exists, args.copy)
     generate17(args.generate_if_exists, args.copy)
     generate18(args.generate_if_exists, args.copy)
-    #generate19(args.generate_if_exists, args.copy)
+    # generate19(args.generate_if_exists, args.copy)
     # generate_wiki_embedding.generate()
 
     print("Generate file finshed.")
@@ -173,7 +173,6 @@ if __name__ == "__main__":
     if os.path.exists("/var/infinity/test_data/tmp"):
         os.system("rm -rf /var/infinity/test_data/tmp")
     os.makedirs("/var/infinity/test_data/tmp")
-
 
     print("Start copying data...")
     if args.just_copy_all_data is True:
