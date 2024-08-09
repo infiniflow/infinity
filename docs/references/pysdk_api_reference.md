@@ -1507,11 +1507,15 @@ A dictionary representing additional parameters for the KNN or ANN search.
 #### Perform a brute-force vector search
 
 ```python
-# Precondition: No vector index is created on the column being queried
 # Find the 100 nearest neighbors using Euclidean distance
-# To use brute-force search, set knn_params to `None` or leave it blank
+# If no vector index is created on the column being queried, then the vector search is a brute-force search.
+# In such case, set `knn_params` to `None` or leave it blank.
 table_obj.knn("vec_column", [0.1,0.2,0.3], "float", "l2", 100)
 ```
+
+:::caution NOTE
+`knn_params` settings will not take effect here because no index has been created.
+:::
 
 #### Perform a vector search in HNSW
 
@@ -1519,15 +1523,19 @@ table_obj.knn("vec_column", [0.1,0.2,0.3], "float", "l2", 100)
 2. Set the `ef` value as follows:
 
 ```python
-# Find the 2 nearest neighbors using inner product distance
-# To use an HNSW index, set "ef" properly in `knn_params`
-table_obj.knn("vec_column_with_hnsw_index_built", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"})
+# Find the 2 nearest neighbors using cosine distance
+# If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
+# regardless of whether `knn_params` is set.
+# If you leave `knn_params` blank, the search takes the `"ef"` value set in `create_index()`.
+table_obj.knn("vec_column_with_hnsw_index_built", [1, 2, 3], "uint8", "cosine", 2)
 ```
 
 ```python
-# Find the 2 nearest neighbors using cosine distance
-# To use an HNSW index, set "ef" properly in `knn_params`
-table_obj.knn("vec_column_with_hnsw_index_built", [1, 2, 3], "uint8", "cosine", 2, {"ef": "100"})
+# Find the 2 nearest neighbors using inner product distance
+# If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
+# regardless of whether `knn_params` is set.
+# You can specify the value of `"ef"` in `knn_params`, which overrides the value set in `create_index()`
+table_obj.knn("vec_column_with_hnsw_index_built", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"})
 ```
 
 :::tip NOTE
@@ -1567,7 +1575,7 @@ An integer indicating the number of nearest neighbours to return.
 
 #### opt_params: `dict[str, str]`, *Required*
 
-A dictionary representing additional parameters for the sparse vector search.
+A dictionary representing additional parameters for the sparse vector search. Following are parameters for the BMP index:
 
 - `"alpha"`: `str`  
   `"0.0"` ~ `"1.0"` (default: `"1.0"`) - A "Termination Conditions" parameter. The smaller the value, the more aggressive the pruning.
@@ -1586,17 +1594,31 @@ A dictionary representing additional parameters for the sparse vector search.
 #### Perform a brute-force sparse vector search
 
 ```python
+# Find the 100 nearest neighbors using inner product
+# If no sparse vector index is created on the column being queried, then the vector search is a brute-force search.
+# In such case, set `opt_params` to `None` or leave it blank.
 table_obj.match_sparse('sparse_column', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100)
 ```
+
+:::caution NOTE
+`opt_params` settings will not take effect here because no index has been created.
+:::
 
 #### Perform a sparse vector search in BMP
 
 ```python
+# Find the 100 nearest neighbors using inner product
+# If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
+# regardless of whether `opt_params` is set.
+# If you leave `opt_params` blank, the search takes the default settings for `"alpha"` and `"beta"`.
 table_obj.match_sparse('sparse_column_with_bmp_index_built', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
 ```
 
 ```python
-
+# Find the 100 nearest neighbors using inner product
+# If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
+# regardless of whether `opt_params` is set.
+# You can set the values of `"alpha"` or `"beta"` in `opt_params`, which overrides the default settings.
 table_obj.match_sparse('sparse_column_with_bmp_index_built', {"indices": [0, 10, 20], "values": [8, 10, 66]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
 ```
 
