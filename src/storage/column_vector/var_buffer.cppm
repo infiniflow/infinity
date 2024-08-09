@@ -22,16 +22,25 @@ import buffer_obj;
 namespace infinity {
 
 export class VarBuffer {
+    friend class VarFileWorker;
+
 public:
     VarBuffer() = default;
 
-    VarBuffer(BufferObj *buffer_obj) : buffer_obj_(buffer_obj) {}
+    VarBuffer(BufferObj *buffer_obj) : buffer_size_prefix_sum_({0}), buffer_obj_(buffer_obj) {}
 
-    SizeT Append(UniquePtr<char[]> buffer, SizeT size);
+    VarBuffer(BufferObj *buffer_obj, UniquePtr<char[]> buffer, SizeT size) : buffer_size_prefix_sum_({0, size}), buffer_obj_(buffer_obj) {
+        buffers_.push_back(std::move(buffer));
+    }
 
-    SizeT Append(const char *data, SizeT size);
+public:
+    SizeT Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success = nullptr);
+
+    SizeT Append(const char *data, SizeT size, bool *free_success = nullptr);
 
     const char *Get(SizeT offset, SizeT size) const;
+
+    Pair<SizeT, UniquePtr<char[]>> Finish() const;
 
 private:
     Vector<UniquePtr<char[]>> buffers_;

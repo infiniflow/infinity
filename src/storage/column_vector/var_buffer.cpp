@@ -24,20 +24,25 @@ import third_party;
 
 namespace infinity {
 
-SizeT VarBuffer::Append(UniquePtr<char[]> buffer, SizeT size) {
+SizeT VarBuffer::Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success_p) {
     buffers_.push_back(std::move(buffer));
     SizeT offset = buffer_size_prefix_sum_.back();
     buffer_size_prefix_sum_.push_back(offset + size);
+
+    bool free_success = true;
     if (buffer_obj_ != nullptr) {
-        buffer_obj_->AddBufferSize(size);
+        free_success = buffer_obj_->AddBufferSize(size);
+    }
+    if (free_success_p != nullptr) {
+        *free_success_p = free_success;
     }
     return offset;
 }
 
-SizeT VarBuffer::Append(const char *data, SizeT size) {
+SizeT VarBuffer::Append(const char *data, SizeT size, bool *free_success) {
     auto buffer = MakeUnique<char[]>(size);
     std::memcpy(buffer.get(), data, size);
-    return Append(std::move(buffer), size);
+    return Append(std::move(buffer), size, free_success);
 }
 
 const char *VarBuffer::Get(SizeT offset, SizeT size) const {
@@ -59,6 +64,19 @@ const char *VarBuffer::Get(SizeT offset, SizeT size) const {
         UnrecoverableError(error_msg);
     }
     return buffers_[i].get() + offset_in_buffer;
+}
+
+Pair<SizeT, UniquePtr<char[]>> VarBuffer::Finish() const {
+    SizeT total_size = buffer_size_prefix_sum_.back();
+    UniquePtr<char[]> buffer = MakeUnique<char[]>(total_size);
+    char *ptr = buffer.get();
+    for (SizeT i = 0; i < buffers_.size(); ++i) {
+        const auto &buffer = buffers_[i];
+        SizeT buffer_size = buffer_size_prefix_sum_[i + 1] - buffer_size_prefix_sum_[i];
+        std::memcpy(ptr, buffer.get(), buffer_size);
+        ptr += buffer_size;
+    }
+    return {total_size, std::move(buffer)};
 }
 
 } // namespace infinity
