@@ -845,7 +845,7 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts)
 void TableEntry::OptimizeIndex(Txn *txn) {
     TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
-    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+    for (auto &[index_name, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
         if (!status.ok()) {
             continue;
@@ -862,13 +862,16 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                         continue;
                     }
 
-                    String msg("merging");
+                    String msg = fmt::format("merging {}", index_name);
                     Vector<String> base_names;
                     Vector<RowID> base_rowids;
                     RowID base_rowid = chunk_index_entries[0]->base_rowid_;
                     u32 total_row_count = 0;
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
+                        if (!chunk_index_entry->TrySetOptimizing()) {
+                            chunk_index_entries.erase(chunk_index_entries.begin() + i);
+                        }
                         assert(chunk_index_entry->base_rowid_ == chunk_index_entries[0]->base_rowid_ + total_row_count);
                         msg += " " + chunk_index_entry->base_name_;
                         base_names.push_back(chunk_index_entry->base_name_);
@@ -884,8 +887,6 @@ void TableEntry::OptimizeIndex(Txn *txn) {
 
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
-                        // why not add segment index entry in chunk index entry, next_chunk_id changed
-                        txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
                         old_chunks.push_back(chunk_index_entry.get());
                     }
                     SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
@@ -893,7 +894,6 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                                                                                                                 base_rowid,
                                                                                                                 total_row_count,
                                                                                                                 txn->buffer_mgr());
-                    txn_table_store->AddChunkIndexStore(table_index_entry, merged_chunk_index_entry.get());
                     segment_index_entry->ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
                     // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());

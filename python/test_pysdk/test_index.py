@@ -539,7 +539,6 @@ class TestInfinity:
             "test_create_index_import_data", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("file_format", ["csv"])
     def test_insert_data_fulltext_index_search(self, file_format):
         # prepare data for insert

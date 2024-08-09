@@ -28,6 +28,7 @@ import search_expr;
 import match_tensor_expr;
 import fusion_expr;
 import column_expr;
+import function_expr;
 import constant_expr;
 import defer_op;
 import expr_parser;
@@ -266,17 +267,32 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
             return nullptr;
         }
 
-        UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
-        ExprParser expr_parser;
-        expr_parser.Parse(output_expr_str, expr_parsed_result.get());
-        if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() == 0) {
-            response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = fmt::format("Invalid expression: {}", output_expr_str);
-            return nullptr;
-        }
+        if(output_expr_str == "_row_id" or output_expr_str == "_similarity" or output_expr_str == "_distance" or output_expr_str == "_score") {
+            auto parsed_expr = new FunctionExpr();
+            if(output_expr_str == "_row_id") {
+                parsed_expr->func_name_ = "row_id";
+            } else if(output_expr_str == "_similarity") {
+                parsed_expr->func_name_ = "similarity";
+            } else if(output_expr_str == "_distance") {
+                parsed_expr->func_name_ = "distance";
+            } else if(output_expr_str == "_score") {
+                parsed_expr->func_name_ = "score";
+            }
+            output_columns->emplace_back(parsed_expr);
+            parsed_expr = nullptr;
+        } else {
+            UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+            ExprParser expr_parser;
+            expr_parser.Parse(output_expr_str, expr_parsed_result.get());
+            if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() == 0) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = fmt::format("Invalid expression: {}", output_expr_str);
+                return nullptr;
+            }
 
-        output_columns->emplace_back(expr_parsed_result->exprs_ptr_->at(0));
-        expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+            output_columns->emplace_back(expr_parsed_result->exprs_ptr_->at(0));
+            expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+        }
     }
 
     // Avoiding DeferFN auto free the output expressions
@@ -406,6 +422,10 @@ KnnExpr *HTTPSearch::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus 
             String element_type = knn_json_object["element_type"];
             if (IsEqual(element_type, "float")) {
                 knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
+            } else if(IsEqual(element_type, "float16")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat16;
+            } else if(IsEqual(element_type, "float16")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemBFloat16;
             } else {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = fmt::format("Not supported vector element type: {}", element_type);
@@ -592,6 +612,8 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
             embedding_data_ptr = nullptr;
             return {dimension, res};
         }
+        case EmbeddingDataType::kElemFloat16:
+        case EmbeddingDataType::kElemBFloat16:
         default: {
             response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
             response["error_message"] = fmt::format("Only support float as the embedding data type");
