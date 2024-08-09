@@ -114,7 +114,7 @@ Creates a database with a specified name.
 
 ### Parameters
 
-#### db_name: `str` (non-empty), *Required*
+#### db_name: `str`, *Required*
 
 A non-empty string indicating the name of the database, which must adhere to the following requirements:
 
@@ -185,7 +185,7 @@ Deletes a database by its name.
 
 ### Parameters
 
-#### db_name: `str` (non-empty), *Required*
+#### db_name: `str`, *Required*
 
 A non-empty string indicating the name of the database to delete.
 
@@ -247,13 +247,13 @@ infinity_obj.drop_database("my_database", ConflictType.Ignore)
 Infinity.list_databases()
 ```
 
-Gets the names of all databases.
+Retrieves a list of all available databases within the Infinity system.
 
 ### Returns
 
 A structure containing the following attributes:
 
-- `db_names`: `list[str]` A list of all database names.
+- `db_names`: `list[str]` A list of strings indicating the names of all available databases.
 - `error_code`: `int` An error code indicating the result of the operation.
   - `0`: The operation succeeds.
   - A non-zero value indicating a specific error condition.
@@ -280,7 +280,7 @@ Retrieves a database object by its name.
 
 #### db_name: `str`, *Required*
 
-Name of the database. Must not be empty.
+A non-empty string indicating the name of the database to retrieve.
 
 ### Returns
 
@@ -307,7 +307,7 @@ Creates a table with a specified name and defined columns.
 
 ### Parameters
 
-#### table_name: `str` (non-empty), *Required*
+#### table_name: `str`, *Required*
 
 A non-empty string indicating the name of the table, which must adhere to the following requirements:
 
@@ -446,7 +446,7 @@ Deletes a table from the database by its name.
 
 ### Parameters
 
-#### table_name: `str` (non-empty), *Required*
+#### table_name: `str`, *Required*
 
 A non-empty string indicating the name of the table to delete.
 
@@ -512,13 +512,13 @@ Retrieves a table object by its name.
 
 ### Parameters
 
-#### `table_name`: `str`(non-empty), *Required*
+#### `table_name`: `str`, *Required*
 
 A non-empty string indicating the name of the table to retrieve.
 
 ### Returns
 
-- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode. 
+- Success: An `infinity.local_infinity.table.LocalTable` object in Python module mode or an `infinity.remote_infinity.table.RemoteTable` object in client-server mode.
 - Failure: `InfinityException`:
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
@@ -537,7 +537,7 @@ table_obj = db_obj.get_table("my_table")
 db_obj.list_tables()
 ```
 
-Lists the names of all tables in the current database.
+Retrieves a list of all available tables within the current database.
 
 ### Returns
 
@@ -547,7 +547,7 @@ A structure containing the following attributes:
   - `0`: The operation succeeds.
   - A non-zero value indicating a specific error condition.
 - `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
-- `table_names`: `list[str]` - A list of table names.
+- `table_names`: `list[str]` - A list of strings indicating the names of all available tables in the current database.
 
 ### Examples
 
@@ -592,10 +592,10 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
   The name of the column to build index on. Must not be empty. 
 - **index_type**: `IndexType`, *Required*  
   Index type. You may want to import `infinity.index` to set `IndexType`: `from infinity.index import IndexType`  
-  - `Hnsw`: An HNSW index. 
+  - `Hnsw`: An HNSW index.
   - `EMVB`: An EMVB index. Works with tensors only.
   - `FullText`: A full-text index.  
-  - `IVFFlat`: An IVFFlat index. 
+  - `IVFFlat`: An IVFFlat index.
   - `Secondary`: A secondary index. Works with structured data only.
   - `BMP`: A Block-Max Pruning index. Works with sparse vectors only.
 - **index_param_list**: `list[InitParameter(str, str)]`  
@@ -629,7 +629,7 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
       - `"japanese"`: Japanese
       - `"ngram"`: [N-gram](https://en.wikipedia.org/wiki/N-gram)
   - Parameter settings for an IVFFlat index:  
-    - `"centroids_count"`: *Optional* - Defaults to`"128"` 
+    - `"centroids_count"`: *Optional* - Defaults to`"128"`.
     - `"metric"`: *Required - The distance metric to use in similarity search.
       - `"ip"`: Inner product.
       - `"l2"`: Euclidean distance.
@@ -821,8 +821,8 @@ table_obj.create_index(
             "c1",
             IndexType.IVFFlat,
             [
-                index.InitParameter("centroids_count", "128"),
-                index.InitParameter("metric", "l2")
+                InitParameter("centroids_count", "128"),
+                InitParameter("metric", "l2")
             ]
         )
     ],
@@ -908,7 +908,7 @@ Deletes an index by its name.
 
 #### index_name: `str`, *Required*
 
-The name of the index to delete.
+A non-empty string indicating the name of the index to delete.
 
 #### conflict_type: `ConflictType`, *Optional*
 
@@ -953,7 +953,7 @@ table_obj.drop_index("my_index")
 table_obj.list_indexes()
 ```
 
-Lists the indexes built on the current table.
+Retrieves a list of all available indexes built on the current table.
 
 ### Returns
 
@@ -963,7 +963,7 @@ A structure containing the following attributes:
   - `0`: The operation succeeds.
   - A non-zero value indicating a specific error condition.
 - `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
-- `table_names`: `list[str]` - A list of index names.
+- `table_names`: `list[str]` - A list of strings indicating the names of all available indexes.
 
 ### Examples
 
@@ -984,7 +984,7 @@ Inserts rows of data into the current table.
 
 ### Parameters
 
-#### data: `dict[str, Any]`, *Required* 
+#### data: `dict[str, Any]`, *Required*
 
 Data to insert. Infinity supports inserting multiple rows to a table at one time in the form of `dict[str, Any]` (one row) or `list[dict[str, Any]]` (multiple rows), with each key-value pair corresponding to a column name and table cell value.
 
@@ -1156,7 +1156,7 @@ Absolute path to the file for export. Supported file types include:
 - `csv`
 - `jsonl`
   
-#### export_options: `dict[str, Any]`
+#### export_options: `dict[str, Any]`, *Required*
 
 Example: `{"header": False, "delimiter": "\t", "file_type": "jsonl", "offset": 2, "limit": 5}`
 
@@ -1289,9 +1289,9 @@ Searches for rows that match the specified condition and updates them accordingl
 
 ### Parameters
 
-#### cond: `str` (non-empty), *Required*
+#### cond: `str`, *Required*
 
-A condition that specifies which rows to update. This parameter should be a non-empty string representing a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated.
+A non-empty string that defines the condition for selecting rows to update. It represents a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated.
 
 #### data: `list[dict[str, Any]]]` (non-empty), *Required*
 
@@ -1330,7 +1330,7 @@ This method allows you to customize the output of your query by selecting specif
 
 ### Parameters
 
-#### columns: `list[str]` (non-empty), *Required*
+#### columns: `list[str]`, *Required*
 
 A non-empty list of strings specifying the columns to include in the output. Each string in the list can represent:
 
@@ -1426,7 +1426,7 @@ Creates a filtering condition expression for the current table.
 
 ### Parameters
 
-#### cond: `str` (non-empty), *Required*
+#### cond: `str`, *Required*
 
 A non-empty string representing the filter condition. It comprises one or multiple expressions combined by 'and' or 'or' logical operators, where each expression uses comparison operators to set criteria for keeping or removing rows.
 
@@ -1504,27 +1504,39 @@ Additional parameters for the KNN or ANN search.
 
 ### Examples
 
+#### Perform a brute-force vector search
+
 ```python
+# Precondition: No vector index is created on the column being queried
 # Find the 100 nearest neighbors using Euclidean distance
-# If you use brute-force search, set knn_params to None or leave it blank
+# If using brute-force search, set knn_params to `None` or leave it blank
 table_obj.knn("vec", [0.1,0.2,0.3], "float", "l2", 100)
 ```
 
+#### Perform a search in HNSW
+
+1. Ensure that you have successfully built an HNSW index. If you are uncertain, you can rebuild the index, setting `ConflictType` to `Ignore`.
+2. Set the `ef` value as follows:
+
 ```python
 # Find the 2 nearest neighbors using inner product distance
-# If you use HNSW index, you can set ef in knn_params
+# If using an HNSW index, set "ef" properly in `knn_params`
 table_obj.knn("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"})
 ```
 
 ```python
-# Find the 2 nearest neighbors using inner product distance
-# If you use HNSW index, you can set ef in knn_params
+# Find the 2 nearest neighbors using cosine distance
+# If using an HNSW index, set "ef" properly `in knn_params`
 table_obj.knn("vec", [1, 2, 3], "uint8", "cosine", 2, {"ef": "100"})
 ```
 
+:::tip NOTE
+If the HNSW index is not created successfully, the search will fall back to a brute-force search.
+:::
+
 ---
 
-## match sparse
+## match_sparse
 
 ```python
 table_obj.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params = None)
@@ -1532,7 +1544,7 @@ table_obj.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt
 
 ### Parameters
 
-#### vector_column_name: `str`
+#### vector_column_name: `str`, *Required*
 
 #### sparse_data: `{"indices": list[int], "values": Union(list[int], list[float])}`
 
