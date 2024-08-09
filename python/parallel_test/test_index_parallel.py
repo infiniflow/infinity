@@ -79,9 +79,9 @@ class TestIndexParallel(TestSdk):
             "docdate": {"type": "varchar"}, "body": {"type": "varchar"}}, ConflictType.Error)
         table_obj.import_data(file_path, {"delimiter": "\t"})
         res = table_obj.create_index("body_index",
-                                     [index.IndexInfo("body",
-                                                      index.IndexType.FullText,
-                                                      [])])
+                                     index.IndexInfo("body",
+                                                     index.IndexType.FullText,
+                                                     []))
         assert res.error_code == ErrorCode.OK
 
         threads = []
@@ -133,18 +133,18 @@ class TestIndexParallel(TestSdk):
             "query_price": {"type": "float"}
         }, ConflictType.Error)
         res = table_obj.create_index("my_index",
-                                     [index.IndexInfo(index_column_name,
-                                                      index_type,
-                                                      [
-                                                          index.InitParameter(
-                                                              "M", "16"),
-                                                          index.InitParameter(
-                                                              "ef_construction", "50"),
-                                                          index.InitParameter(
-                                                              "ef", "50"),
-                                                          index.InitParameter(
-                                                              "metric", index_distance_type)
-                                                      ])], ConflictType.Error)
+                                     index.IndexInfo(index_column_name,
+                                                     index_type,
+                                                     [
+                                                         index.InitParameter(
+                                                             "M", "16"),
+                                                         index.InitParameter(
+                                                             "ef_construction", "50"),
+                                                         index.InitParameter(
+                                                             "ef", "50"),
+                                                         index.InitParameter(
+                                                             "metric", index_distance_type)
+                                                     ]), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         end_time = time.time() + running_time
@@ -234,18 +234,18 @@ class TestIndexParallel(TestSdk):
         }, ConflictType.Error)
         table_obj.import_data(file_path, None)
         res = table_obj.create_index("my_index",
-                                     [index.IndexInfo(index_column_name,
-                                                      index_type,
-                                                      [
-                                                          index.InitParameter(
-                                                              "M", "16"),
-                                                          index.InitParameter(
-                                                              "ef_construction", "50"),
-                                                          index.InitParameter(
-                                                              "ef", "50"),
-                                                          index.InitParameter(
-                                                              "metric", index_distance_type)
-                                                      ])], ConflictType.Error)
+                                     index.IndexInfo(index_column_name,
+                                                     index_type,
+                                                     [
+                                                         index.InitParameter(
+                                                             "M", "16"),
+                                                         index.InitParameter(
+                                                             "ef_construction", "50"),
+                                                         index.InitParameter(
+                                                             "ef", "50"),
+                                                         index.InitParameter(
+                                                             "metric", index_distance_type)
+                                                     ]), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         kInsertThreadNum = 4
         kRuningTime = 10

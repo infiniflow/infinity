@@ -103,19 +103,17 @@ def import_gist_1m(path, m: int, ef_construction: int, remote: bool):
 def create_index(table_obj, m: int, ef_construction: int, remote: bool):
     res = table_obj.create_index(
         "hnsw_index",
-        [
-            index.IndexInfo(
-                "col1",
-                index.IndexType.Hnsw,
-                [
-                    index.InitParameter("M", str(m)),
-                    index.InitParameter("ef_construction", str(ef_construction)),
-                    index.InitParameter("ef", str(ef_construction)),
-                    index.InitParameter("metric", "l2"),
-                    index.InitParameter("encode", "lvq"),
-                ],
-            )
-        ],
+        index.IndexInfo(
+            "col1",
+            index.IndexType.Hnsw,
+            [
+                index.InitParameter("M", str(m)),
+                index.InitParameter("ef_construction", str(ef_construction)),
+                index.InitParameter("ef", str(ef_construction)),
+                index.InitParameter("metric", "l2"),
+                index.InitParameter("encode", "lvq"),
+            ],
+        )
     )
 
     assert res.error_code == ErrorCode.OK

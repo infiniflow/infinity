@@ -138,7 +138,7 @@ def create_index(infinity_obj: RemoteThriftInfinityConnection):
                 index_on = fulltext_indexes_on[random.randint(0, len(fulltext_indexes_on) - 1)]
                 index_type = index.IndexType.FullText
                 index_option = []
-            table_obj.create_index(index_on, [index.IndexInfo(index_on, index_type, index_option)],
+            table_obj.create_index(index_on, index.IndexInfo(index_on, index_type, index_option),
                                    conflict_type=ConflictType.Ignore)
             res = table_obj.list_indexes()
             print(res)

@@ -92,10 +92,8 @@ try:
     # Create index on varchar column for full-text search and multiple way fusion.
     res = table_instance.create_index(
         "my_index",
-        [
-            infinity.index.IndexInfo("body", infinity.index.IndexType.FullText,
-                                     [infinity.index.InitParameter("ANALYZER", "chinese")])
-        ],
+        infinity.index.IndexInfo("body", infinity.index.IndexType.FullText,
+                                 [infinity.index.InitParameter("ANALYZER", "chinese")]),
         infinity.common.ConflictType.Error,
     )
 

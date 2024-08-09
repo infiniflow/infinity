@@ -320,7 +320,7 @@ export WrapQueryResult WrapCreateIndex(Infinity &instance,
                                        const String &db_name,
                                        const String &table_name,
                                        const String &index_name,
-                                       Vector<WrapIndexInfo> &wrap_index_info_list,
+                                       WrapIndexInfo &wrap_index_info,
                                        const CreateIndexOptions &create_index_options);
 
 export WrapQueryResult WrapDropIndex(Infinity &instance,

@@ -104,37 +104,37 @@ class InfinityClientForInsert:
         if lang == "zh":
             ft_params.append(index.InitParameter("analyzer", "chinese"))
         res = self.infinity_table.create_index("ft_index",
-                                               [index.IndexInfo("fulltext_col", index.IndexType.FullText, ft_params)],
+                                               index.IndexInfo("fulltext_col", index.IndexType.FullText, ft_params),
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         print("Finish creating fulltext index.")
         print("Start creating Hnsw index...")
-        res = self.infinity_table.create_index("hnsw_index", [index.IndexInfo("dense_col", index.IndexType.Hnsw,
-                                                                              [index.InitParameter("M", "16"),
-                                                                               index.InitParameter("ef_construction",
-                                                                                                   "200"),
-                                                                               index.InitParameter("ef", "200"),
-                                                                               index.InitParameter("metric", "ip"),
-                                                                               index.InitParameter("encode", "lvq")])],
+        res = self.infinity_table.create_index("hnsw_index", index.IndexInfo("dense_col", index.IndexType.Hnsw,
+                                                                             [index.InitParameter("M", "16"),
+                                                                              index.InitParameter("ef_construction",
+                                                                                                  "200"),
+                                                                              index.InitParameter("ef", "200"),
+                                                                              index.InitParameter("metric", "ip"),
+                                                                              index.InitParameter("encode", "lvq")]),
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         print("Finish creating Hnsw index.")
         print("Start creating BMP index...")
-        res = self.infinity_table.create_index("bmp_index", [index.IndexInfo("sparse_col", index.IndexType.BMP,
-                                                                             [index.InitParameter("block_size", "8"),
-                                                                              index.InitParameter("compress_type",
-                                                                                                  "compress")])],
+        res = self.infinity_table.create_index("bmp_index", index.IndexInfo("sparse_col", index.IndexType.BMP,
+                                                                            [index.InitParameter("block_size", "8"),
+                                                                             index.InitParameter("compress_type",
+                                                                                                 "compress")]),
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         self.infinity_table.optimize("bmp_index", {"topk": "1000", "bp_reorder": ""})
         print("Finish creating BMP index.")
         # print("Start creating EMVB index...")
         # res = self.infinity_table.create_index("emvb_index",
-        #                                        [index.IndexInfo("colbert_col",
-        #                                                         index.IndexType.EMVB,
-        #                                                         [index.InitParameter("pq_subspace_num", "32"),
-        #                                                          index.InitParameter("pq_subspace_bits", "8")]),
-        #                                         ], ConflictType.Error)
+        #                                        index.IndexInfo("colbert_col",
+        #                                                        index.IndexType.EMVB,
+        #                                                        [index.InitParameter("pq_subspace_num", "32"),
+        #                                                         index.InitParameter("pq_subspace_bits", "8")])
+        #                                        , ConflictType.Error)
         # assert res.error_code == ErrorCode.OK
         # print("Finish creating EMVB index.")
 

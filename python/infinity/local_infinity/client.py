@@ -120,14 +120,14 @@ class LocalInfinityClient:
             raise Exception("Local infinity is not connected")
         return self.convert_res(self.client.ShowTable(db_name, table_name))
 
-    def create_index(self, db_name: str, table_name: str, index_name: str, index_info_list: list[WrapIndexInfo],
+    def create_index(self, db_name: str, table_name: str, index_name: str, index_info: WrapIndexInfo,
                      conflict_type: ConflictType = ConflictType.kError):
         if self.client is None:
             raise Exception("Local infinity is not connected")
         create_index_options = CreateIndexOptions()
         create_index_options.conflict_type = conflict_type
         return self.convert_res(
-            self.client.CreateIndex(db_name, table_name, index_name, index_info_list, create_index_options))
+            self.client.CreateIndex(db_name, table_name, index_name, index_info, create_index_options))
 
     def show_index(self, db_name: str, table_name: str, index_name: str):
         if self.client is None:

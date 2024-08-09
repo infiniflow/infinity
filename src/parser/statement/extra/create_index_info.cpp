@@ -81,13 +81,9 @@ IndexInfo::~IndexInfo() {
 }
 
 CreateIndexInfo::~CreateIndexInfo() {
-    if (index_info_list_ != nullptr) {
-        for (auto &index_info : *index_info_list_) {
-            delete index_info;
-            index_info = nullptr;
-        }
-        delete index_info_list_;
-        index_info_list_ = nullptr;
+    if(index_info_ != nullptr) {
+        delete index_info_;
+        index_info_ = nullptr;
     }
 }
 
@@ -117,26 +113,18 @@ std::string CreateIndexInfo::ToString() const {
         ss << index_name_;
     }
     ss << " ON " << table_name_ << "(";
-    size_t index_count = index_info_list_->size();
-    if (index_count == 0) {
-        ParserError("No index info.");
-    }
-
-    for (size_t idx = 0; idx < index_count; ++idx) {
-        IndexInfo *index_info = (*index_info_list_)[idx];
-        ss << index_info->column_name_;
-        ss << " USING " << IndexInfo::IndexTypeToString(index_info->index_type_);
-        if (index_info->index_param_list_ != nullptr && !index_info->index_param_list_->empty()) {
-            ss << " WITH(";
-            size_t param_count = index_info->index_param_list_->size();
-            for (size_t param_idx = 0; param_idx < param_count; ++param_idx) {
-                ss << (*index_info->index_param_list_)[param_idx]->param_name_ << " " << (*index_info->index_param_list_)[param_idx]->param_value_;
-                if (param_idx != param_count - 1) {
-                    ss << ", ";
-                }
+    ss << index_info_->column_name_;
+    ss << " USING " << IndexInfo::IndexTypeToString(index_info_->index_type_);
+    if (index_info_->index_param_list_ != nullptr && !index_info_->index_param_list_->empty()) {
+        ss << " WITH(";
+        size_t param_count = index_info_->index_param_list_->size();
+        for (size_t param_idx = 0; param_idx < param_count; ++param_idx) {
+            ss << (*index_info_->index_param_list_)[param_idx]->param_name_ << " " << (*index_info_->index_param_list_)[param_idx]->param_value_;
+            if (param_idx != param_count - 1) {
+                ss << ", ";
             }
-            ss << ")";
         }
+        ss << ")";
     }
     ss << ";";
     return ss.str();

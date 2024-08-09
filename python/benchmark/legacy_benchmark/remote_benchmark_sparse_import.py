@@ -23,12 +23,12 @@ from infinity.errors import ErrorCode
 
 
 def import_data(
-    data_set: str,
-    block_size: int,
-    compress: bool,
-    opt_topk: int,
-    bp_reorder: bool,
-    remote: bool,
+        data_set: str,
+        block_size: int,
+        compress: bool,
+        opt_topk: int,
+        bp_reorder: bool,
+        remote: bool,
 ):
     current_path = os.getcwd()
     data_dir = current_path + "/test/data/benchmark/splade"
@@ -70,18 +70,16 @@ def import_data(
     start = time.time()
     res = table_obj.create_index(
         "splade_index",
-        [
-            index.IndexInfo(
-                "col1",
-                index.IndexType.BMP,
-                [
-                    index.InitParameter("block_size", str(block_size)),
-                    index.InitParameter(
-                        "compress_type", "compress" if compress else "raww"
-                    ),
-                ],
-            )
-        ],
+        index.IndexInfo(
+            "col1",
+            index.IndexType.BMP,
+            [
+                index.InitParameter("block_size", str(block_size)),
+                index.InitParameter(
+                    "compress_type", "compress" if compress else "raww"
+                ),
+            ],
+        )
     )
     assert res.error_code == ErrorCode.OK
     end = time.time()

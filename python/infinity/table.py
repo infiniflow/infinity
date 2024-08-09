@@ -68,7 +68,7 @@ class ExplainType(Enum):
 class Table(ABC):
 
     @abstractmethod
-    def create_index(self, index_name: str, index_infos: list[IndexInfo], options=None):
+    def create_index(self, index_name: str, index_info: IndexInfo, options=None):
         pass
 
     @abstractmethod

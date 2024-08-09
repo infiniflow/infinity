@@ -15,9 +15,11 @@ from http_adapter import http_adapter
 def local_infinity(request):
     return request.config.getoption("--local-infinity")
 
+
 @pytest.fixture(scope="class")
 def http(request):
     return request.config.getoption("--http")
+
 
 @pytest.fixture(scope="class")
 def setup_class(request, local_infinity, http):
@@ -31,6 +33,7 @@ def setup_class(request, local_infinity, http):
         request.cls.infinity_obj = http_adapter()
     yield
     request.cls.infinity_obj.disconnect()
+
 
 @pytest.mark.usefixtures("setup_class")
 class TestInfinity:
@@ -56,10 +59,10 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
         res = table.create_index("my_index",
-                                 [index.IndexInfo("body",
-                                                  index.IndexType.FullText,
-                                                  []),
-                                  ], ConflictType.Error)
+                                 index.IndexInfo("body",
+                                                 index.IndexType.FullText,
+                                                 []),
+                                 ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # select_res = table.query_builder().output(["*"]).to_df()

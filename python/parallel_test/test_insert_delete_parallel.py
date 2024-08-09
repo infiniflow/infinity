@@ -28,7 +28,7 @@ class TestInsertDeleteParallel:
             table_name, {"id": {"type": "int64"}, "text": {"type": "varchar"}}, ConflictType.Error
         )
         table_obj.create_index(
-            "text_index", [index.IndexInfo("text", index.IndexType.FullText, [])]
+            "text_index", index.IndexInfo("text", index.IndexType.FullText, [])
         )
         connection_pool.release_conn(infinity_obj)
 

@@ -16,6 +16,7 @@ test_export_csv_file_part = "export_embedding_int_dim3_part.csv"
 test_export_jsonl_file = "export_embedding_int_dim3.jsonl"
 test_export_jsonl_file_part = "export_embedding_int_dim3_part.jsonl"
 
+
 @pytest.mark.usefixtures("local_infinity")
 @pytest.mark.usefixtures("http")
 class TestInfinity:
@@ -124,10 +125,11 @@ class TestInfinity:
         assert table_obj
 
         res = table_obj.create_index("my_index",
-                                     [index.IndexInfo("c1",
-                                                      index.IndexType.IVFFlat,
-                                                      [index.InitParameter("centroids_count", "128"),
-                                                       index.InitParameter("metric", "l2")])], ConflictType.Error)
+                                     index.IndexInfo("c1",
+                                                     index.IndexType.IVFFlat,
+                                                     [index.InitParameter("centroids_count", "128"),
+                                                      index.InitParameter("metric", "l2")]),
+                                     ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.drop_index("my_index")
@@ -194,16 +196,20 @@ class TestInfinity:
 
         if os.path.exists(common_values.TEST_TMP_DIR + test_export_csv_file_part):
             os.remove(common_values.TEST_TMP_DIR + test_export_csv_file_part)
-        res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_csv_file_part, {"file_type": "csv"}, ["c2", "c1", "_row_id", "_create_timestamp", "_delete_timestamp"])
+        res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_csv_file_part, {"file_type": "csv"},
+                                    ["c2", "c1", "_row_id", "_create_timestamp", "_delete_timestamp"])
         assert res.error_code == ErrorCode.OK
 
         if os.path.exists(common_values.TEST_TMP_DIR + test_export_jsonl_file_part):
             os.remove(common_values.TEST_TMP_DIR + test_export_jsonl_file_part)
-        res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_jsonl_file_part, {"file_type": "jsonl"}, ["c2", "c1", "_row_id", "_create_timestamp", "_delete_timestamp"])
+        res = table_obj.export_data(common_values.TEST_TMP_DIR + test_export_jsonl_file_part, {"file_type": "jsonl"},
+                                    ["c2", "c1", "_row_id", "_create_timestamp", "_delete_timestamp"])
         assert res.error_code == ErrorCode.OK
 
         db_obj.drop_table("my_table_export", ConflictType.Ignore)
-        export_table_obj = db_obj.create_table("my_table_export", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
+        export_table_obj = db_obj.create_table("my_table_export",
+                                               {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+                                               ConflictType.Error)
         assert export_table_obj is not None
 
         res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_csv_file)
@@ -213,18 +219,24 @@ class TestInfinity:
 
         res = db_obj.drop_table("my_table_export")
         assert res.error_code == ErrorCode.OK
-        export_table_obj = db_obj.create_table("my_table_export", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
+        export_table_obj = db_obj.create_table("my_table_export",
+                                               {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+                                               ConflictType.Error)
         assert export_table_obj is not None
-        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_jsonl_file, import_options = {"file_type": "jsonl"})
+        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_jsonl_file,
+                                           import_options={"file_type": "jsonl"})
         assert res.error_code == ErrorCode.OK
         res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
         print(res)
         res = db_obj.drop_table("my_table_export")
         assert res.error_code == ErrorCode.OK
 
-        export_table_obj = db_obj.create_table("my_table_export", {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
+        export_table_obj = db_obj.create_table("my_table_export",
+                                               {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}},
+                                               ConflictType.Error)
         assert export_table_obj is not None
-        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_csv_file, import_options = {"file_type": "csv"})
+        res = export_table_obj.import_data(common_values.TEST_TMP_DIR + test_export_csv_file,
+                                           import_options={"file_type": "csv"})
         assert res.error_code == ErrorCode.OK
         res = table_obj.output(["c1"]).filter("c1 > 1").to_df()
         print(res)
