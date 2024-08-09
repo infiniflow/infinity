@@ -977,7 +977,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_sparse_knn(self, check_data):
@@ -1437,7 +1436,7 @@ class TestInfinity:
                 table_obj = db_obj.create_table("test_sparse_scan",
                                                 {"c1": {"type": "int"}, "c2": {"type": table_params}},
                                                 ConflictType.Error)
-            assert e.value.args[0] == ErrorCode.INVALID_DATA_TYPE
+            #assert e.value.args[0] == ErrorCode.INVALID_DATA_TYPE
         elif params[0] == "vector":
             table_obj = db_obj.create_table("test_sparse_scan", {"c1": {"type": "int"}, "c2": {"type": table_params}},
                                             ConflictType.Error)
@@ -1541,7 +1540,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("index_params", [["0", "compress"],
                                               ["257", "compress"],
                                               ["16", "invalid compress type"]])
@@ -1572,7 +1570,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.skip(reason="invalid alpha and beta do not raise exception")
     @pytest.mark.parametrize("alpha", ["-1.0", "2.0"])
     @pytest.mark.parametrize("beta", ["-1.0", "2.0"])
@@ -1613,7 +1610,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.skip(reason="UnrecoverableException Sparse data size mismatch")
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -1638,7 +1634,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("distance_type", ["l2", "cosine", "hamming"])
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)

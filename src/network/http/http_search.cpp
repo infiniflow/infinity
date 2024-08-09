@@ -14,6 +14,7 @@
 
 module;
 
+#include <expr/match_sparse_expr.h>
 #include <string>
 
 module http_search;
@@ -176,6 +177,20 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                 search_expr = new SearchExpr();
                 auto &match_json = elem.value();
                 const auto match_expr = ParseMatchTensor(match_json, http_status, response);
+                if (match_expr == nullptr) {
+                    return;
+                }
+                search_exprs->push_back(match_expr);
+            } else if (IsEqual(key, "match_sparse")) {
+                if (search_expr != nullptr) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] =
+                        "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
+                    return;
+                }
+                search_expr = new SearchExpr();
+                auto &match_json = elem.value();
+                const auto match_expr = ParseMatchSparse(match_json, http_status, response);
                 if (match_expr == nullptr) {
                     return;
                 }
@@ -559,6 +574,50 @@ MatchTensorExpr *HTTPSearch::ParseMatchTensor(const nlohmann::json &json_object,
     }
 
     return match_tensor_expr.release();
+}
+
+MatchSparseExpr *HTTPSearch::ParseMatchSparse(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+    if (!json_object.is_object()) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] = "MatchSparse field should be object";
+        return nullptr;
+    }
+    auto match_sparse_expr = MakeUnique<MatchSparseExpr>();
+    i64 topn = DEFAULT_MATCH_SPARSE_TOP_N;
+    auto *opt_params_ptr = new Vector<InitParameter *>();
+    for (auto &field_json_obj : json_object.items()) {
+        String key = field_json_obj.key();
+        ToLower(key);
+        if (IsEqual(key, "metric_type")) {
+            match_sparse_expr->SetMetricType(field_json_obj.value());
+        } else if (IsEqual(key, "fields")) {
+            auto column_expr = MakeUnique<ColumnExpr>();
+            const auto &fields_value = field_json_obj.value();
+            if (!fields_value.is_array()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "Fields should be array";
+                return nullptr;
+            }
+            for (SizeT i = 0; i < fields_value.size(); i++) {
+                column_expr->names_.emplace_back(fields_value[i]);
+            }
+            match_sparse_expr->column_expr_ = std::move(column_expr);
+        } else if (IsEqual(key, "query_sparse")) {
+            const auto sparse_expr = BuildConstantSparseExprFromJson(field_json_obj.value());
+            match_sparse_expr->SetQuerySparse(sparse_expr);
+        } else if (IsEqual(key, "topn")) {
+            topn = field_json_obj.value().get<i64>();
+        } else if (IsEqual(key, "opt_params")) {
+            for(auto &param : field_json_obj.value().items()) {
+                auto *init_parameter = new InitParameter();
+                init_parameter->param_name_ = param.key();
+                init_parameter->param_value_ = param.value();
+                opt_params_ptr->emplace_back(init_parameter);
+            }
+        }
+    }
+    match_sparse_expr->SetOptParams(topn, opt_params_ptr);
+    return match_sparse_expr.release();
 }
 
 Tuple<i64, void *>

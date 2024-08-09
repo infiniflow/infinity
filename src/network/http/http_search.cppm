@@ -23,6 +23,7 @@ import parsed_expr;
 import knn_expr;
 import match_expr;
 import match_tensor_expr;
+import match_sparse_expr;
 import infinity;
 import internal_types;
 
@@ -43,7 +44,7 @@ public:
     static KnnExpr *ParseKnn(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static MatchExpr *ParseMatch(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static MatchTensorExpr *ParseMatchTensor(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
-
+    static MatchSparseExpr *ParseMatchSparse(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static Tuple<i64, void *>
     ParseVector(const nlohmann::json &json_object, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response);
 };
