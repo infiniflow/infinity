@@ -87,7 +87,8 @@ private:
     friend class BufferObj;
 
     // BufferHandle calls it, before allocate memory. It will start GC if necessary.
-    void RequestSpace(SizeT need_size);
+    // Return whether need_size is freed successfully.
+    bool RequestSpace(SizeT need_size);
 
     // BufferHandle calls it, after unload.
     void PushGCQueue(BufferObj *buffer_obj);
@@ -103,6 +104,8 @@ private:
     void MoveTemp(BufferObj *buffer_obj);
 
     SizeT LRUIdx(BufferObj *buffer_obj) const;
+
+    UniquePtr<BufferObj> MakeBufferObj(UniquePtr<FileWorker> file_worker, bool is_ephemeral);
 
 private:
     SharedPtr<String> data_dir_;

@@ -24,6 +24,7 @@ export module buffer_obj;
 namespace infinity {
 
 class BufferManager;
+class VarBuffer;
 
 export enum class BufferStatus {
     kLoaded,
@@ -120,6 +121,10 @@ private:
 
     // called when BufferHandle destructs, to decrease rc_ by 1.
     void UnloadInner();
+
+    friend class VarBuffer;
+
+    bool AddBufferSize(SizeT add_size);
 
 public:
     // interface for unit test

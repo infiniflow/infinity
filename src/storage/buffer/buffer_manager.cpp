@@ -26,6 +26,8 @@ import logger;
 import specific_concurrent_queue;
 import infinity_exception;
 import buffer_obj;
+import file_worker_type;
+import var_file_worker;
 
 namespace infinity {
 
@@ -97,13 +99,11 @@ void BufferManager::Start() {
     fs.CleanupDirectory(*temp_dir_);
 }
 
-void BufferManager::Stop() {
-    RemoveClean();
-}
+void BufferManager::Stop() { RemoveClean(); }
 
 BufferObj *BufferManager::AllocateBufferObject(UniquePtr<FileWorker> file_worker) {
     String file_path = file_worker->GetFilePath();
-    auto buffer_obj = MakeUnique<BufferObj>(this, true, std::move(file_worker), buffer_id_++);
+    auto buffer_obj = MakeBufferObj(std::move(file_worker), true);
 
     BufferObj *res = buffer_obj.get();
     {
@@ -127,7 +127,7 @@ BufferObj *BufferManager::GetBufferObject(UniquePtr<FileWorker> file_worker) {
         return iter1->second.get();
     }
 
-    auto buffer_obj = MakeUnique<BufferObj>(this, false, std::move(file_worker), buffer_id_++);
+    auto buffer_obj = MakeBufferObj(std::move(file_worker), false);
 
     BufferObj *res = buffer_obj.get();
     buffer_map_.emplace(std::move(file_path), std::move(buffer_obj));
@@ -202,29 +202,33 @@ Vector<BufferObjectInfo> BufferManager::GetBufferObjectsInfo() {
     return result;
 }
 
-void BufferManager::RequestSpace(SizeT need_size) {
+bool BufferManager::RequestSpace(SizeT need_size) {
     std::unique_lock lock(gc_locker_);
     SizeT freed_space = 0;
     const SizeT free_space = memory_limit_ - current_memory_size_;
     if (free_space >= need_size) {
         [[maybe_unused]] auto cur_mem_size = current_memory_size_.fetch_add(need_size);
-        return;
+        return true;
     }
     SizeT round_robin = round_robin_;
     do {
         freed_space += lru_caches_[round_robin_].RequestSpace(need_size);
         round_robin_ = (round_robin_ + 1) % lru_caches_.size();
     } while (freed_space + free_space < need_size && round_robin_ != round_robin);
-    if (freed_space + free_space < need_size) {
-        String error_message = "Out of memory.";
-        UnrecoverableError(error_message);
-    }
+    bool free_success = freed_space + free_space >= need_size;
     [[maybe_unused]] auto cur_mem_size = current_memory_size_.fetch_add(need_size - freed_space);
+    return free_success;
 }
 
 void BufferManager::PushGCQueue(BufferObj *buffer_obj) {
     SizeT idx = LRUIdx(buffer_obj);
     lru_caches_[idx].PushGCQueue(buffer_obj);
+
+    if (auto mem_usage = memory_usage(); mem_usage > memory_limit_) {
+        SizeT need_size = mem_usage - memory_limit_;
+        // caller buffer obj is in kLoad state, and RequestSpace will lock those in kNew or kFree state, so no dead lock
+        RequestSpace(need_size);
+    }
 }
 
 bool BufferManager::RemoveFromGCQueue(BufferObj *buffer_obj) {
@@ -238,11 +242,10 @@ void BufferManager::AddToCleanList(BufferObj *buffer_obj, bool do_free) {
         clean_list_.emplace_back(buffer_obj);
     }
     if (do_free) {
-        [[maybe_unused]] auto memory_size = current_memory_size_.fetch_sub(buffer_obj->GetBufferSize());
-        if (memory_size < buffer_obj->GetBufferSize()) {
-            UnrecoverableError(fmt::format("BufferManager::AddToCleanList: memory_size < buffer_obj->GetBufferSize(): {} < {}",
-                                           memory_size,
-                                           buffer_obj->GetBufferSize()));
+        SizeT buffer_size = buffer_obj->GetBufferSize();
+        [[maybe_unused]] auto memory_size = current_memory_size_.fetch_sub(buffer_size);
+        if (memory_size < buffer_size) {
+            UnrecoverableError(fmt::format("BufferManager::AddToCleanList: memory_size < buffer_size: {} < {}", memory_size, buffer_size));
         }
         if (!RemoveFromGCQueue(buffer_obj)) {
             String error_message = fmt::format("attempt to buffer: {} status is UNLOADED, but not in GC queue", buffer_obj->GetFilename());
@@ -287,6 +290,16 @@ void BufferManager::MoveTemp(BufferObj *buffer_obj) {
 SizeT BufferManager::LRUIdx(BufferObj *buffer_obj) const {
     auto id = buffer_obj->id();
     return id % lru_caches_.size();
+}
+
+UniquePtr<BufferObj> BufferManager::MakeBufferObj(UniquePtr<FileWorker> file_worker, bool is_ephemeral) {
+    auto *file_worker_ptr = file_worker.get();
+    auto ret = MakeUnique<BufferObj>(this, is_ephemeral, std::move(file_worker), buffer_id_++);
+    if (file_worker_ptr->Type() == FileWorkerType::kVarFile) {
+        auto *var_file_worker = static_cast<VarFileWorker *>(file_worker_ptr);
+        var_file_worker->SetBufferObj(ret.get());
+    }
+    return ret;
 }
 
 } // namespace infinity
