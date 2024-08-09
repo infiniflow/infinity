@@ -140,5 +140,6 @@ private:
 };
 
 export SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_object);
+export  ConstantExpr * BuildConstantSparseExprFromJson(const nlohmann::json &json_object);
 
 } // namespace infinity

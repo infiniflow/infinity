@@ -180,39 +180,42 @@ class http_adapter:
                 copt = baseCreateOptions[conflict_type]
 
         # parser
-        fields = []
-        for col in columns_definition:
-            tmp = {}
-            tmp["name"] = col
-            for param_name in columns_definition[col]:
-                if param_name.lower() != "constraints" and param_name.lower() != "default": # not constraint and default, should be type
-                    params = columns_definition[col][param_name].split(",")
-                    if params[0].strip().lower() == "vector" or params[0].strip().lower() == "tensor" or params[0].strip().lower() == "tensorarray":
-                        tmp["type"] = params[0].strip()
-                        tmp["dimension"] = int(params[1].strip())
-                        tmp["element_type"] = type_transfrom[params[2].strip()]
-                    elif params[0].strip().lower() == "sparse":
-                        tmp["type"] = params[0].strip()
-                        tmp["dimension"] = int(params[1].strip())
-                        tmp["data_type"] = type_transfrom[params[2].strip()]
-                        tmp["index_type"] = type_transfrom[params[3].strip()]
+        try:
+            fields = []
+            for col in columns_definition:
+                tmp = {}
+                tmp["name"] = col
+                for param_name in columns_definition[col]:
+                    if param_name.lower() != "constraints" and param_name.lower() != "default": # not constraint and default, should be type
+                        params = columns_definition[col][param_name].split(",")
+                        if params[0].strip().lower() == "vector" or params[0].strip().lower() == "tensor" or params[0].strip().lower() == "tensorarray":
+                            tmp["type"] = params[0].strip()
+                            tmp["dimension"] = int(params[1].strip())
+                            tmp["element_type"] = type_transfrom[params[2].strip()]
+                        elif params[0].strip().lower() == "sparse":
+                            tmp["type"] = params[0].strip()
+                            tmp["dimension"] = int(params[1].strip())
+                            tmp["data_type"] = type_transfrom[params[2].strip()]
+                            tmp["index_type"] = type_transfrom[params[3].strip()]
+                        else:
+                            tmp[param_name.lower()] = type_transfrom[columns_definition[col][param_name]]
+                    elif param_name.lower() == "default":
+                        default_field = {}
+                        if tmp["type"] == "vector":
+                            default_field["type"] = type_to_vector_literaltype[tmp["element_type"]]
+                        elif tmp["type"] == "tensor":
+                            pass
+                        elif tmp["type"] == "sparse":
+                            pass
+                        else:
+                            default_field["type"] = type_to_literaltype[tmp["type"]]
+                        default_field["value"] = columns_definition[col][param_name]
+                        tmp["default"] = default_field
                     else:
-                        tmp[param_name.lower()] = type_transfrom[columns_definition[col][param_name]]
-                elif param_name.lower() == "default":
-                    default_field = {}
-                    if tmp["type"] == "vector":
-                        default_field["type"] = type_to_vector_literaltype[tmp["element_type"]]
-                    elif tmp["type"] == "tensor":
-                        pass
-                    elif tmp["type"] == "sparse":
-                        pass
-                    else:
-                        default_field["type"] = type_to_literaltype[tmp["type"]]
-                    default_field["value"] = columns_definition[col][param_name]
-                    tmp["default"] = default_field
-                else:
-                    tmp[param_name] = columns_definition[col][param_name]
-            fields.append(tmp)
+                        tmp[param_name] = columns_definition[col][param_name]
+                fields.append(tmp)
+        except:
+            raise InfinityException(ErrorCode.SYNTAX_ERROR, "http adapter create table parse error")
         #print(fields)
 
         url = f"databases/{self.database_name}/tables/{table_name}"
@@ -471,7 +474,9 @@ class http_adapter:
         if len(self._match):
             tmp.update({"match":self._match})
         if len(self._match_tensor):
-            tmp.update({"match_tensor":self.match_tensor})
+            tmp.update({"match_tensor":self._match_tensor})
+        if len(self._match_sparse):
+            tmp.update({"match_sparse":self._match_sparse})
         if len(self._output):
             tmp_output = []
             for col in self._output:
@@ -496,30 +501,52 @@ class http_adapter:
         self,
         output=[],
     ):
-        #output = [element for element in output if element not in unsupport_output]
+        self.output_res = []
         self._output = output
         self._filter = ""
         self._fusion = {}
-        return self.select()
+        self._knn = {}
+        self._match = {}
+        self._match_tensor = {}
+        self._match_sparse = {}
+        return self
 
     def match(self, fields, query, operator="top=10"):
         self._match = {}
         self._match["fields"] = fields
         self._match["query"] = query
         self._match["operator"] = operator
-        return self.select()
+        return self
 
-    def match_tensor(self, vector_column_name, tensor_data, tensor_data_type, extra_option, method_type="maxsim"):
+    def match_tensor(self, vector_column_name, tensor_data, tensor_data_type, method_type="maxsim",extra_option = "top=10"):
         self._match_tensor = {}
         self._match_tensor["search_method"] = method_type
+        if isinstance(vector_column_name, list):
+            pass
+        else:
+            vector_column_name = [vector_column_name]
         self._match_tensor["fields"] = vector_column_name
         self._match_tensor["query_tensor"] = tensor_data
         self._match_tensor["options"] = extra_option
         self._match_tensor["element_type"] = type_transfrom[tensor_data_type]
+        return self
+
+    def match_sparse(self, vector_column_name, sparse_data, distance_type="ip", topn=10, opt_params = {"alpha": "1.0", "beta": "1.0"}):
+        self._match_sparse = {}
+        if isinstance(vector_column_name, list):
+            pass
+        else:
+            vector_column_name = [vector_column_name]
+        self._match_sparse["fields"] = vector_column_name
+        self._match_sparse["query_sparse"] = sparse_data
+        self._match_sparse["metric_type"] = distance_type
+        self._match_sparse["topn"] = topn
+        self._match_sparse["opt_params"] = opt_params
+        return self
 
     def filter(self, filter):
         self._filter = filter
-        return self.select()
+        return self
 
     def knn(self, fields, query_vector, element_type, metric_type, top_k):
         self._knn = {}
@@ -528,16 +555,22 @@ class http_adapter:
         self._knn["element_type"] = type_transfrom[element_type]
         self._knn["metric_type"] = metric_type
         self._knn["top_k"] = top_k
-        return self.select()
+        return self
 
     def fusion(self, method):
         self._fusion["method"] = method
-        return self.select()
+        return self
+
+    def to_result(self):
+        self.select()
 
     def to_pl(self):
         return pl.from_pandas(self.to_df())
 
     def to_df(self):
+        if self.output_res == []:
+            self.select()
+
         df_dict = {}
         col_types = self.show_columns_type(self.table_name)
         for output_col in self._output:
@@ -618,7 +651,7 @@ class http_adapter:
 
 class database_result(http_adapter):
     def __init__(self, list = [], error_code = ErrorCode.OK, database_name = "" ,columns=[], table_name = "",
-                 index_list = [], output = ["*"], filter="", fusion={}, knn={}, match = {}, match_tensor = {}, output_res = []):
+                 index_list = [], output = ["*"], filter="", fusion={}, knn={}, match = {}, match_tensor = {}, match_sparse = {}, output_res = []):
         self.db_names = list
         self.error_code = error_code
         self.database_name = database_name # get database
@@ -632,6 +665,7 @@ class database_result(http_adapter):
         self._knn = knn
         self._match = match
         self._match_tensor = match_tensor
+        self._match_sparse = match_sparse
         self.output_res = output_res
 
 
