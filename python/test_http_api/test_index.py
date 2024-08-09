@@ -1044,7 +1044,7 @@ class TestIndex(HttpTest):
         ])
         self.drop_index(db_name, table_name, idxname)
 
-        index_distance_type = ["cosine", "hamming"]
+        index_distance_type = ["hamming"]
         for t in index_distance_type:
             self.create_index(db_name, table_name, idxname, ["c1"], {
                 "type": "HNSW",

@@ -143,7 +143,7 @@ class InfinityLocalQueryBuilder(ABC):
         dist_type = KnnDistanceType.kInvalid
         if distance_type == "l2":
             dist_type = KnnDistanceType.kL2
-        elif distance_type == "cosine" or distance_type == "cosine":
+        elif distance_type == "cosine" or distance_type == "cos":
             dist_type = KnnDistanceType.kCosine
         elif distance_type == "ip":
             dist_type = KnnDistanceType.kInnerProduct
