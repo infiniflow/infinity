@@ -461,7 +461,7 @@ class http_adapter:
     def select(self):
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.set_up_header(["accept", "content-type"])
-        tmp = {"output": self._output}
+        tmp = {}
         if len(self._filter):
             tmp.update({"filter": self._filter})
         if len(self._fusion):
@@ -472,6 +472,15 @@ class http_adapter:
             tmp.update({"match":self._match})
         if len(self._match_tensor):
             tmp.update({"match_tensor":self.match_tensor})
+        if len(self._output):
+            tmp_output = []
+            for col in self._output:
+                if col in ["_similarity","_score", "_distance"]:
+                    if len(self._fusion) or len(self._knn) or len(self._match) or len(self._match_tensor):
+                        tmp_output.append(col)
+                else:
+                    tmp_output.append(col)
+            tmp.update({"output":tmp_output})
         #print(tmp)
         d = self.set_up_data([], tmp)
         r = self.request(url, "get", h, d)
@@ -487,7 +496,7 @@ class http_adapter:
         self,
         output=[],
     ):
-        output = [element for element in output if element not in unsupport_output]
+        #output = [element for element in output if element not in unsupport_output]
         self._output = output
         self._filter = ""
         self._fusion = {}
@@ -549,7 +558,7 @@ class http_adapter:
                     new_tup = tup + (eval(res[k]), )
                 elif is_list(res[k]):
                     new_tup = tup + (ast.literal_eval(res[k]), )
-                elif ":" in res[k]:# sparse vector
+                elif is_sparse(res[k]):# sparse vector
                     sparse_vec = str2sparse(res[k])
                     new_tup = tup + (sparse_vec, )
                 else:
@@ -566,6 +575,8 @@ class http_adapter:
         for k in df_dict:
             if k in col_types:# might be object
                 df_type[k] = type_to_dtype(col_types[k])
+            if k in ["DISTANCE", "SCORE", "SIMILARITY"]:
+                df_type[k] = dtype('float32')
             #"(c1 + c2)"
             k1 = k.replace("(", "")
             k1 = k1.replace(")", "")
