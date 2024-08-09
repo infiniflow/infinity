@@ -1504,11 +1504,12 @@ Additional parameters for the KNN or ANN search.
 
 ### Examples
 
-#### Perform a brute-force KNN search
+#### Perform a brute-force vector search
 
 ```python
+# Precondition: No vector index is created on the query columns
 # Find the 100 nearest neighbors using Euclidean distance
-# If you use brute-force search, set knn_params to None or leave it blank
+# If using brute-force search, set knn_params to `None` or leave it blank
 table_obj.knn("vec", [0.1,0.2,0.3], "float", "l2", 100)
 ```
 
@@ -1530,7 +1531,7 @@ table_obj.knn("vec", [1, 2, 3], "uint8", "cosine", 2, {"ef": "100"})
 ```
 
 :::tip NOTE
-If the HNSW index is not created successfully or the HNSW parameter is not set correctly in `knn_params`, the search will fall back to a brute-force search.
+If the HNSW index is not created successfully, the search will fall back to a brute-force search.
 :::
 
 ---
