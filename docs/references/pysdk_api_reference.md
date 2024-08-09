@@ -1504,7 +1504,7 @@ Additional parameters for the KNN or ANN search.
 
 ### Examples
 
-#### Perform a brute-force KNN/ANN search
+#### Perform a brute-force KNN search
 
 ```python
 # Find the 100 nearest neighbors using Euclidean distance
