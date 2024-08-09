@@ -35,13 +35,20 @@ import array_info;
 import knn_expr;
 import data_type;
 
-class DataBlockTest : public BaseTest {
+class DataBlockTest : public BaseTestParamStr {
     void SetUp() override {
         RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
+        system(("mkdir -p " + infinity::String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + infinity::String(GetFullDataDir())).c_str());
+        infinity::String config_path_str = GetParam();
         std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<infinity::String>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -52,11 +59,20 @@ class DataBlockTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 };
 
-TEST_F(DataBlockTest, test1) {
+INSTANTIATE_TEST_SUITE_P(
+    TestWithDifferentParams,
+    DataBlockTest,
+    ::testing::Values(
+        BaseTestParamStr::NULL_CONFIG_PATH,
+        BaseTestParamStr::VFS_CONFIG_PATH
+    )
+);
+
+TEST_P(DataBlockTest, test1) {
     using namespace infinity;
 
     DataBlock data_block;
@@ -157,7 +173,7 @@ TEST_F(DataBlockTest, test1) {
     }
 }
 
-TEST_F(DataBlockTest, test2) {
+TEST_P(DataBlockTest, test2) {
     using namespace infinity;
 
     DataBlock data_block;
@@ -190,7 +206,7 @@ TEST_F(DataBlockTest, test2) {
     }
 }
 
-TEST_F(DataBlockTest, test3) {
+TEST_P(DataBlockTest, test3) {
     using namespace infinity;
 
     infinity::BaseProfiler profiler;
@@ -233,7 +249,7 @@ TEST_F(DataBlockTest, test3) {
     }
 }
 
-TEST_F(DataBlockTest, ReadWrite) {
+TEST_P(DataBlockTest, ReadWrite) {
     using namespace infinity;
 
     DataBlock data_block;

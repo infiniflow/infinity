@@ -31,13 +31,20 @@ import infinity_context;
 import data_type;
 import compilation_config;
 
-class ColumnVectorIntegerTest : public BaseTest {
+class ColumnVectorIntegerTest : public BaseTestParamStr {
     void SetUp() override {
         RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        auto config_path = std::make_shared<std::string>(std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml");
+        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        std::string config_path_str = GetParam();
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -48,11 +55,16 @@ class ColumnVectorIntegerTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 };
 
-TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         ColumnVectorIntegerTest,
+                         ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
+                                           BaseTestParamStr::VFS_CONFIG_PATH));
+
+TEST_P(ColumnVectorIntegerTest, flat_tinyint) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
@@ -150,7 +162,7 @@ TEST_F(ColumnVectorIntegerTest, flat_tinyint) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
+TEST_P(ColumnVectorIntegerTest, contant_tinyint) {
 
     using namespace infinity;
 
@@ -229,7 +241,7 @@ TEST_F(ColumnVectorIntegerTest, contant_tinyint) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, tinyint_column_vector_select) {
+TEST_P(ColumnVectorIntegerTest, tinyint_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
@@ -263,7 +275,7 @@ TEST_F(ColumnVectorIntegerTest, tinyint_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, tinyint_column_slice_init) {
+TEST_P(ColumnVectorIntegerTest, tinyint_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kTinyInt);
@@ -297,7 +309,7 @@ TEST_F(ColumnVectorIntegerTest, tinyint_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, flat_smallint) {
+TEST_P(ColumnVectorIntegerTest, flat_smallint) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
@@ -390,7 +402,7 @@ TEST_F(ColumnVectorIntegerTest, flat_smallint) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, contant_smallint) {
+TEST_P(ColumnVectorIntegerTest, contant_smallint) {
 
     using namespace infinity;
 
@@ -469,7 +481,7 @@ TEST_F(ColumnVectorIntegerTest, contant_smallint) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, smallint_column_vector_select) {
+TEST_P(ColumnVectorIntegerTest, smallint_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
@@ -503,7 +515,7 @@ TEST_F(ColumnVectorIntegerTest, smallint_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, smallint_column_slice_init) {
+TEST_P(ColumnVectorIntegerTest, smallint_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kSmallInt);
@@ -537,7 +549,7 @@ TEST_F(ColumnVectorIntegerTest, smallint_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, flat_int) {
+TEST_P(ColumnVectorIntegerTest, flat_int) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
@@ -630,7 +642,7 @@ TEST_F(ColumnVectorIntegerTest, flat_int) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, contant_int) {
+TEST_P(ColumnVectorIntegerTest, contant_int) {
 
     using namespace infinity;
 
@@ -709,7 +721,7 @@ TEST_F(ColumnVectorIntegerTest, contant_int) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, integer_column_vector_select) {
+TEST_P(ColumnVectorIntegerTest, integer_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
@@ -743,7 +755,7 @@ TEST_F(ColumnVectorIntegerTest, integer_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, integer_column_slice_init) {
+TEST_P(ColumnVectorIntegerTest, integer_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kInteger);
@@ -777,7 +789,7 @@ TEST_F(ColumnVectorIntegerTest, integer_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, flat_bigint) {
+TEST_P(ColumnVectorIntegerTest, flat_bigint) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
@@ -870,7 +882,7 @@ TEST_F(ColumnVectorIntegerTest, flat_bigint) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, contant_bigint) {
+TEST_P(ColumnVectorIntegerTest, contant_bigint) {
 
     using namespace infinity;
 
@@ -949,7 +961,7 @@ TEST_F(ColumnVectorIntegerTest, contant_bigint) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, bigint_column_vector_select) {
+TEST_P(ColumnVectorIntegerTest, bigint_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
@@ -983,7 +995,7 @@ TEST_F(ColumnVectorIntegerTest, bigint_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, bigint_column_slice_init) {
+TEST_P(ColumnVectorIntegerTest, bigint_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBigInt);
@@ -1017,7 +1029,7 @@ TEST_F(ColumnVectorIntegerTest, bigint_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
+TEST_P(ColumnVectorIntegerTest, flat_hugeint) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
@@ -1111,7 +1123,7 @@ TEST_F(ColumnVectorIntegerTest, flat_hugeint) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
+TEST_P(ColumnVectorIntegerTest, contant_hugeint) {
 
     using namespace infinity;
 
@@ -1191,7 +1203,7 @@ TEST_F(ColumnVectorIntegerTest, contant_hugeint) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, hugeint_column_vector_select) {
+TEST_P(ColumnVectorIntegerTest, hugeint_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);
@@ -1228,7 +1240,7 @@ TEST_F(ColumnVectorIntegerTest, hugeint_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorIntegerTest, hugeint_column_slice_init) {
+TEST_P(ColumnVectorIntegerTest, hugeint_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kHugeInt);

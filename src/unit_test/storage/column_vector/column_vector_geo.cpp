@@ -32,13 +32,20 @@ import logical_type;
 import data_type;
 import compilation_config;
 
-class ColumnVectorGeoTest : public BaseTest {
+class ColumnVectorGeoTest : public BaseTestParamStr {
     void SetUp() override {
         RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        auto config_path = std::make_shared<std::string>(std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml");
+        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        std::string config_path_str = GetParam();
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -49,11 +56,16 @@ class ColumnVectorGeoTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 };
 
-TEST_F(ColumnVectorGeoTest, flat_point) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         ColumnVectorGeoTest,
+                         ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
+                                           BaseTestParamStr::VFS_CONFIG_PATH));
+
+TEST_P(ColumnVectorGeoTest, flat_point) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
@@ -157,7 +169,7 @@ TEST_F(ColumnVectorGeoTest, flat_point) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, contant_point) {
+TEST_P(ColumnVectorGeoTest, contant_point) {
 
     using namespace infinity;
 
@@ -241,7 +253,7 @@ TEST_F(ColumnVectorGeoTest, contant_point) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, point_column_vector_select) {
+TEST_P(ColumnVectorGeoTest, point_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
@@ -279,7 +291,7 @@ TEST_F(ColumnVectorGeoTest, point_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, point_column_slice_init) {
+TEST_P(ColumnVectorGeoTest, point_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPoint);
@@ -316,7 +328,7 @@ TEST_F(ColumnVectorGeoTest, point_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, flat_line) {
+TEST_P(ColumnVectorGeoTest, flat_line) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
@@ -424,7 +436,7 @@ TEST_F(ColumnVectorGeoTest, flat_line) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, contant_line) {
+TEST_P(ColumnVectorGeoTest, contant_line) {
 
     using namespace infinity;
 
@@ -511,7 +523,7 @@ TEST_F(ColumnVectorGeoTest, contant_line) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, line_column_vector_select) {
+TEST_P(ColumnVectorGeoTest, line_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
@@ -551,7 +563,7 @@ TEST_F(ColumnVectorGeoTest, line_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, line_column_slice_init) {
+TEST_P(ColumnVectorGeoTest, line_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLine);
@@ -590,7 +602,7 @@ TEST_F(ColumnVectorGeoTest, line_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, flat_line_seg) {
+TEST_P(ColumnVectorGeoTest, flat_line_seg) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
@@ -706,7 +718,7 @@ TEST_F(ColumnVectorGeoTest, flat_line_seg) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, contant_line_seg) {
+TEST_P(ColumnVectorGeoTest, contant_line_seg) {
 
     using namespace infinity;
 
@@ -800,7 +812,7 @@ TEST_F(ColumnVectorGeoTest, contant_line_seg) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, line_seg_column_vector_select) {
+TEST_P(ColumnVectorGeoTest, line_seg_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
@@ -844,7 +856,7 @@ TEST_F(ColumnVectorGeoTest, line_seg_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, line_seg_column_slice_init) {
+TEST_P(ColumnVectorGeoTest, line_seg_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kLineSeg);
@@ -887,7 +899,7 @@ TEST_F(ColumnVectorGeoTest, line_seg_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, flat_box) {
+TEST_P(ColumnVectorGeoTest, flat_box) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
@@ -1004,7 +1016,7 @@ TEST_F(ColumnVectorGeoTest, flat_box) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, contant_box) {
+TEST_P(ColumnVectorGeoTest, contant_box) {
 
     using namespace infinity;
 
@@ -1098,7 +1110,7 @@ TEST_F(ColumnVectorGeoTest, contant_box) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, box_column_vector_select) {
+TEST_P(ColumnVectorGeoTest, box_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
@@ -1142,7 +1154,7 @@ TEST_F(ColumnVectorGeoTest, box_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, box_column_slice_init) {
+TEST_P(ColumnVectorGeoTest, box_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kBox);
@@ -1185,7 +1197,7 @@ TEST_F(ColumnVectorGeoTest, box_column_slice_init) {
     }
 }
 #if 0
-TEST_F(ColumnVectorGeoTest, flat_path) {
+TEST_P(ColumnVectorGeoTest, flat_path) {
 
     using namespace infinity;
 
@@ -1376,7 +1388,7 @@ TEST_F(ColumnVectorGeoTest, flat_path) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, contant_path) {
+TEST_P(ColumnVectorGeoTest, contant_path) {
 
     using namespace infinity;
 
@@ -1506,7 +1518,7 @@ TEST_F(ColumnVectorGeoTest, contant_path) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, path_column_vector_select) {
+TEST_P(ColumnVectorGeoTest, path_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPath);
@@ -1571,7 +1583,7 @@ TEST_F(ColumnVectorGeoTest, path_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, path_column_slice_init) {
+TEST_P(ColumnVectorGeoTest, path_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPath);
@@ -1635,7 +1647,7 @@ TEST_F(ColumnVectorGeoTest, path_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, flat_polygon) {
+TEST_P(ColumnVectorGeoTest, flat_polygon) {
 
     using namespace infinity;
 
@@ -1850,7 +1862,7 @@ TEST_F(ColumnVectorGeoTest, flat_polygon) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, contant_polygon) {
+TEST_P(ColumnVectorGeoTest, contant_polygon) {
 
     using namespace infinity;
 
@@ -1995,7 +2007,7 @@ TEST_F(ColumnVectorGeoTest, contant_polygon) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, polygon_column_vector_select) {
+TEST_P(ColumnVectorGeoTest, polygon_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPolygon);
@@ -2070,7 +2082,7 @@ TEST_F(ColumnVectorGeoTest, polygon_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, polygon_column_slice_init) {
+TEST_P(ColumnVectorGeoTest, polygon_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kPolygon);
@@ -2146,7 +2158,7 @@ TEST_F(ColumnVectorGeoTest, polygon_column_slice_init) {
     }
 }
 #endif
-TEST_F(ColumnVectorGeoTest, flat_circle) {
+TEST_P(ColumnVectorGeoTest, flat_circle) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
@@ -2258,7 +2270,7 @@ TEST_F(ColumnVectorGeoTest, flat_circle) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, contant_circle) {
+TEST_P(ColumnVectorGeoTest, contant_circle) {
 
     using namespace infinity;
 
@@ -2349,7 +2361,7 @@ TEST_F(ColumnVectorGeoTest, contant_circle) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, circle_column_vector_select) {
+TEST_P(ColumnVectorGeoTest, circle_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
@@ -2391,7 +2403,7 @@ TEST_F(ColumnVectorGeoTest, circle_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorGeoTest, circle_column_slice_init) {
+TEST_P(ColumnVectorGeoTest, circle_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kCircle);
