@@ -224,7 +224,8 @@ graphic cards
         int rc = ParseStream(driver, iss);
         EXPECT_EQ(rc, 0);
     } catch (RecoverableException &e) {
-        std::cerr << fmt::format("RecoverableException: {} {}\n", e.what(), long(e.ErrorCode()));
+        // catch because dict resource file does not exist in CI environment
+        std::cerr << fmt::format("RecoverableException: {}\n", e.what());
     }
 }
 
@@ -265,7 +266,8 @@ graphic cards
             int rc = ParseStream(driver, iss);
             EXPECT_EQ(rc, 0);
         } catch (RecoverableException &e) {
-            std::cerr << fmt::format("RecoverableException: {} {}\n", e.what(), long(e.ErrorCode()));
+            // catch because dict resource file does not exist in CI environment
+            std::cerr << fmt::format("RecoverableException: {}\n", e.what());
         }
     }
 }
