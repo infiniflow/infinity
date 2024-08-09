@@ -85,7 +85,7 @@ void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp 
     for (auto [segment_id, segment_index_entry] : index_entry_map_) {
         local_delta_ops->AddOperation(MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry, commit_ts));
     }
-    for (auto *chunk_index_entry : chunk_index_entries_) {
+    for (auto &[chunk_encode, chunk_index_entry] : chunk_index_entries_) {
         local_delta_ops->AddOperation(MakeUnique<AddChunkIndexEntryOp>(chunk_index_entry, commit_ts));
     }
 }
@@ -93,20 +93,28 @@ void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp 
 void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
     for (auto [segment_index_entry, new_chunk, old_chunks] : optimize_data_) {
         segment_index_entry->CommitOptimize(new_chunk, old_chunks, commit_ts);
-        chunk_index_entries_.emplace_back(new_chunk);
+        chunk_index_entries_.emplace(new_chunk->encode(), new_chunk);
         for (auto *old_chunk : old_chunks) {
-            chunk_index_entries_.emplace_back(old_chunk);
+            chunk_index_entries_.emplace(old_chunk->encode(), old_chunk);
         }
         index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
     }
     for (const auto &[segment_id, segment_index_entry] : index_entry_map_) {
         segment_index_entry->CommitSegmentIndex(txn_id, commit_ts);
     }
-    for (auto *chunk_index_entry : chunk_index_entries_) {
+    for (auto &[chunk_encode, chunk_index_entry] : chunk_index_entries_) {
         // uncommitted: insert or import, create index
         // committed: create index, insert or import
         if (!chunk_index_entry->Committed()) {
             chunk_index_entry->Commit(commit_ts);
+        }
+    }
+}
+
+void TxnIndexStore::Rollback() {
+    for (auto [segment_index_entry, new_chunk, old_chunks] : optimize_data_) {
+        for (auto *old_chunk : old_chunks) {
+            old_chunk->ResetOptimizing();
         }
     }
 }
@@ -198,7 +206,7 @@ void TxnTableStore::AddChunkIndexStore(TableIndexEntry *table_index_entry, Chunk
     auto *txn_index_store = this->GetIndexStore(table_index_entry);
     SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
     txn_index_store->index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
-    txn_index_store->chunk_index_entries_.push_back(chunk_index_entry);
+    txn_index_store->chunk_index_entries_.emplace(chunk_index_entry->encode(), chunk_index_entry);
 
     has_update_ = true;
 }
@@ -287,6 +295,9 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     for (auto &[table_index_entry, ptr_seq_n] : txn_indexes_) {
         table_index_entry->Cleanup();
         Catalog::RemoveIndexEntry(table_index_entry, txn_id); // fix me
+    }
+    for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
+        txn_index_store->Rollback();
     }
 }
 

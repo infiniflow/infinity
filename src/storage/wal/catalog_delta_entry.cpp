@@ -936,7 +936,10 @@ void AddSegmentIndexEntryOp::Merge(CatalogDeltaOperation &other) {
         String error_message = fmt::format("Merge failed, other type: {}", other.GetTypeStr());
         UnrecoverableError(error_message);
     }
-    *this = std::move(static_cast<AddSegmentIndexEntryOp &>(other));
+    auto &add_segment_index_op = static_cast<AddSegmentIndexEntryOp &>(other);
+    MergeFlag flag = this->NextDeleteFlag(add_segment_index_op.merge_flag_);
+    *this = std::move(add_segment_index_op);
+    this->merge_flag_ = flag;
 }
 
 void AddChunkIndexEntryOp::Merge(CatalogDeltaOperation &other) {
