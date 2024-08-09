@@ -607,7 +607,7 @@ QueryResult Infinity::CreateIndex(const String &db_name,
             ToLower(init_param_ptr->param_value_);
         }
     }
-    create_index_info->index_info_list_ = index_info_list;
+    create_index_info->index_info_ = (*index_info_list)[0];
 
     create_statement->create_info_ = create_index_info;
     create_statement->create_info_->conflict_type_ = create_index_options.conflict_type_;

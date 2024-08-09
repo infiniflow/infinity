@@ -170,7 +170,7 @@ struct SQL_LTYPE {
     std::vector<infinity::InitParameter*>* index_param_list_t;
     std::vector<infinity::InitParameter*>* with_index_param_list_t;
 
-    std::vector<infinity::IndexInfo*>* index_info_list_t;
+    infinity::IndexInfo* index_info_t;
 
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
@@ -180,14 +180,11 @@ struct SQL_LTYPE {
 }
 
 %destructor {
-    fprintf(stderr, "destroy index info list\n");
+    fprintf(stderr, "destroy index info\n");
     if (($$) != nullptr) {
-        for (auto ptr : *($$)) {
-            delete ptr;
-        }
         delete ($$);
     }
-} <index_info_list_t>
+} <index_info_t>
 
 %destructor {
     fprintf(stderr, "destroy create index param list\n");
@@ -466,7 +463,7 @@ struct SQL_LTYPE {
 %type <index_param_list_t> index_param_list
 %type <with_index_param_list_t> with_index_param_list optional_table_properties_list
 
-%type <index_info_list_t> index_info_list index_info_list_one_pack
+%type <index_info_t> index_info
 
 /* %type <if_exists_info_t> if_exists_info */
 %type <if_not_exists_info_t> if_not_exists_info 
@@ -640,7 +637,7 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
 }
 // TODO shenyushi 4: should support default index name if the name does not exist
 /* CREATE INDEX [[IF NOT EXISTS] index_name] ON table_name (column1[, ...column2]) USING method [WITH (param[, ...param])]; */
-| CREATE INDEX if_not_exists_info ON table_name index_info_list {
+| CREATE INDEX if_not_exists_info ON table_name index_info {
     std::shared_ptr<infinity::CreateIndexInfo> create_index_info = std::make_shared<infinity::CreateIndexInfo>();
     if($5->schema_name_ptr_ != nullptr) {
         create_index_info->schema_name_ = $5->schema_name_ptr_;
@@ -658,7 +655,7 @@ create_statement : CREATE DATABASE if_not_exists IDENTIFIER {
     }
     delete $3;
 
-    create_index_info->index_info_list_ = $6;
+    create_index_info->index_info_ = $6;
 
     if(create_index_info->index_name_.empty()) {
         yyerror(&yyloc, scanner, result, "No index name");
@@ -3354,20 +3351,7 @@ index_param : IDENTIFIER {
 
 /* CREATE INDEX [[IF NOT EXISTS] index_name] ON table_name
 (column1[, ...column2]) USING method [WITH (param[, ...param])] (column1[, ...column2]) USING method [WITH (param[, ...param])]; */
-
-index_info_list : index_info_list_one_pack {
-    $$ = $1;
-    $1 = nullptr;
-}
-| index_info_list index_info_list_one_pack {
-    $$ = $1;
-    $1 = nullptr;
-    $$->insert($$->end(), $2->begin(), $2->end());
-    delete $2;
-    $2 = nullptr;
-};
-
-index_info_list_one_pack : '(' identifier_array ')' USING IDENTIFIER with_index_param_list {
+index_info : '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list {
     ParserHelper::ToLower($5);
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
     if(strcmp($5, "fulltext") == 0) {
@@ -3384,55 +3368,25 @@ index_info_list_one_pack : '(' identifier_array ')' USING IDENTIFIER with_index_
         index_type = infinity::IndexType::kDiskAnn;
     } else {
         free($5);
-        delete $2;
+        free($2);
         delete $6;
         yyerror(&yyloc, scanner, result, "Unknown index type");
         YYERROR;
     }
     free($5);
 
-    size_t index_count = $2->size();
-    if(index_count == 0) {
-        delete $2;
-        delete $6;
-    }
-    $$ = new std::vector<infinity::IndexInfo*>();
-    $$->reserve(index_count);
+    $$ = new infinity::IndexInfo();
 
-    infinity::IndexInfo* index_info = new infinity::IndexInfo();
-    index_info->index_type_ = index_type;
-    index_info->column_name_ = (*$2)[0];
-    index_info->index_param_list_ = $6;
-    $$->emplace_back(index_info);
-
-    for(size_t idx = 1; idx < index_count; ++ idx) {
-        infinity::IndexInfo* index_info = new infinity::IndexInfo();
-        index_info->index_type_ = index_type;
-        index_info->column_name_ = (*$2)[idx];
-
-        size_t param_count = $6->size();
-        index_info->index_param_list_ = new std::vector<infinity::InitParameter*>();
-        index_info->index_param_list_->resize(param_count);
-        for(size_t param_idx = 0; param_idx < param_count; ++ param_idx) {
-            (*(index_info->index_param_list_))[param_idx] = new infinity::InitParameter();
-            *(*(index_info->index_param_list_))[param_idx] = *(*$6)[param_idx];
-        }
-        $$->emplace_back(index_info);
-    }
-    delete $2;
+    $$->index_type_ = index_type;
+    $$->column_name_ = $2;
+    $$->index_param_list_ = $6;
+    free($2);
 }
-| '(' identifier_array ')' {
-    infinity::IndexType index_type = infinity::IndexType::kSecondary;
-    size_t index_count = $2->size();
-    $$ = new std::vector<infinity::IndexInfo*>();
-    $$->reserve(index_count);
-    for(size_t idx = 0; idx < index_count; ++ idx) {
-        infinity::IndexInfo* index_info = new infinity::IndexInfo();
-        index_info->index_type_ = index_type;
-        index_info->column_name_ = (*$2)[idx];
-        $$->emplace_back(index_info);
-    }
-    delete $2;
+| '(' IDENTIFIER ')' {
+    $$ = new infinity::IndexInfo();
+    $$->index_type_ = infinity::IndexType::kSecondary;
+    $$->column_name_ = $2;
+    free($2);
 }
 
 %%
