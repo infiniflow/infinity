@@ -83,6 +83,7 @@ void BuiltinFunctions::RegisterScalarFunction() {
     AppendRegisterMinusFunction(catalog_ptr_);
     RegisterMulFunction(catalog_ptr_);
     RegisterDivFunction(catalog_ptr_);
+    RegisterModuloFunction(catalog_ptr_);
 
     // Logic functions
     RegisterAndFunction(catalog_ptr_);
