@@ -12,16 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-
-#include "search_parser.h"
-
-namespace infinity {
-
-class SearchScanner {
-public:
-    virtual ~SearchScanner() = default;
-    virtual int yylex(SearchParser::semantic_type *lval, SearchParser::location_type *location) = 0;
-};
-
-} // namespace infinity
+#ifndef SearchScannerSuffix
+#error "SearchScannerSuffix is not defined"
+#endif
+#define CONCAT_INNER(A, B) A##B
+#define CONCAT(A, B) CONCAT_INNER(A, B)
+#define SearchScannerDerived CONCAT(SearchScanner, SearchScannerSuffix)
+#define yyFlexLexer CONCAT(SearchScannerDerived, FlexLexer)
+// clang-format off
+// the order of these includes is important
+#include <FlexLexer.h>
+#include "search_scanner_derived.h"
+// clang-format on
+#undef yyFlexLexer
+#undef SearchScannerDerived
+#undef CONCAT
+#undef CONCAT_INNER
+#undef SearchScannerSuffix

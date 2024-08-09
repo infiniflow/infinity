@@ -288,7 +288,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             // TODO: now only have EMVB index
             const Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<EMVBIndexInMem>> emvb_snapshot = index_entry->GetEMVBIndexSnapshot();
             // 1. in mem index
-            if (const EMVBIndexInMem *emvb_index_in_mem = std::get<1>(emvb_snapshot).get(); emvb_index_in_mem) {
+            if (const EMVBIndexInMem *emvb_index_in_mem = std::get<SharedPtr<EMVBIndexInMem>>(emvb_snapshot).get(); emvb_index_in_mem) {
                 // TODO: fix the parameters
                 const auto result = emvb_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
                                                                          calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
@@ -341,7 +341,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                            result);
             }
             // 2. chunk index
-            for (const auto &chunk_index_entry : std::get<0>(emvb_snapshot)) {
+            for (const auto &chunk_index_entry : std::get<Vector<SharedPtr<ChunkIndexEntry>>>(emvb_snapshot)) {
                 if (chunk_index_entry->CheckVisible(txn)) {
                     const BufferHandle index_handle = chunk_index_entry->GetIndex();
                     const auto *emvb_index = static_cast<const EMVBIndex *>(index_handle.GetData());

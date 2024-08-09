@@ -20,7 +20,12 @@
 #include "query_node.h"
 #include "search_driver.h"
 #include "search_parser.h"
-#include "search_scanner.h"
+#define SearchScannerSuffix InfinitySyntax
+#include "search_scanner_derived_helper.h"
+#undef SearchScannerSuffix
+#define SearchScannerSuffix Plain
+#include "search_scanner_derived_helper.h"
+#undef SearchScannerSuffix
 
 import stl;
 import term;
@@ -120,7 +125,15 @@ std::unique_ptr<QueryNode> SearchDriver::ParseSingle(const std::string &query, c
     std::unique_ptr<SearchParser> parser;
     std::unique_ptr<QueryNode> result;
     try {
-        scanner = std::make_unique<SearchScanner>(&iss);
+        switch (operator_option_) {
+            case FulltextQueryOperatorOption::kInfinitySyntax:
+                scanner = std::make_unique<SearchScannerInfinitySyntax>(&iss);
+                break;
+            case FulltextQueryOperatorOption::kAnd:
+            case FulltextQueryOperatorOption::kOr:
+                scanner = std::make_unique<SearchScannerPlain>(&iss);
+                break;
+        }
         parser = std::make_unique<SearchParser>(*scanner, *this, *default_field_ptr, result);
     } catch (std::bad_alloc &ba) {
         std::cerr << "Failed to allocate: (" << ba.what() << "), exiting!!\n";
@@ -207,16 +220,33 @@ SearchDriver::AnalyzeAndBuildQueryNode(const std::string &field, std::string &&t
             result->slop_ = slop;
             return result;
         } else {
-            auto result = std::make_unique<OrQueryNode>();
+            auto result = GetMultiQueryNodeByOperatorOption();
+            auto *multi_query_ptr = dynamic_cast<MultiQueryNode *>(result.get());
             for (auto &term : terms) {
                 auto subquery = std::make_unique<TermQueryNode>();
                 subquery->term_ = std::move(term.text_);
                 subquery->column_ = field;
-                result->Add(std::move(subquery));
+                multi_query_ptr->Add(std::move(subquery));
             }
             return result;
         }
     }
+}
+
+std::unique_ptr<QueryNode> SearchDriver::GetMultiQueryNodeByOperatorOption() const {
+    switch (operator_option_) {
+        case FulltextQueryOperatorOption::kInfinitySyntax: // treat it as OR
+        case FulltextQueryOperatorOption::kOr: {
+            return std::make_unique<OrQueryNode>();
+            break;
+        }
+        case FulltextQueryOperatorOption::kAnd: {
+            return std::make_unique<AndQueryNode>();
+            break;
+        }
+    }
+    UnrecoverableError("Invalid switch case!");
+    return {};
 }
 
 // Unescape reserved characters per https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
