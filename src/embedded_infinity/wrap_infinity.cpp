@@ -658,25 +658,20 @@ WrapQueryResult WrapCreateIndex(Infinity &instance,
                                 const String &db_name,
                                 const String &table_name,
                                 const String &index_name,
-                                Vector<WrapIndexInfo> &wrap_index_info_list,
+                                WrapIndexInfo &wrap_index_info,
                                 const CreateIndexOptions &create_index_options) {
-    auto index_info_list = new Vector<IndexInfo *>();
-    for (SizeT i = 0; i < wrap_index_info_list.size(); ++i) {
-        auto wrap_index_info = wrap_index_info_list[i];
-        auto index_info = new IndexInfo();
-        index_info->index_type_ = wrap_index_info.index_type;
-        index_info->column_name_ = wrap_index_info.column_name;
-        {
-            auto index_param_list = new Vector<InitParameter *>();
-            for (SizeT j = 0; j < wrap_index_info.index_param_list.size(); ++j) {
-                auto &wrap_init_param = wrap_index_info.index_param_list[j];
-                index_param_list->emplace_back(new InitParameter(wrap_init_param.param_name_, wrap_init_param.param_value_));
-            }
-            index_info->index_param_list_ = index_param_list;
+    auto index_info = new IndexInfo();
+    index_info->index_type_ = wrap_index_info.index_type;
+    index_info->column_name_ = wrap_index_info.column_name;
+    {
+        auto index_param_list = new Vector<InitParameter *>();
+        for (SizeT j = 0; j < wrap_index_info.index_param_list.size(); ++j) {
+            auto &wrap_init_param = wrap_index_info.index_param_list[j];
+            index_param_list->emplace_back(new InitParameter(wrap_init_param.param_name_, wrap_init_param.param_value_));
         }
-        index_info_list->emplace_back(index_info);
+        index_info->index_param_list_ = index_param_list;
     }
-    auto query_result = instance.CreateIndex(db_name, table_name, index_name, index_info_list, create_index_options);
+    auto query_result = instance.CreateIndex(db_name, table_name, index_name, index_info, create_index_options);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 

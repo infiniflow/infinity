@@ -1052,28 +1052,27 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
     }
 
     auto *index_info_to_use = new IndexInfo();
-    for (auto &index_info : request.index_info_list) {
-        index_info_to_use->index_type_ = GetIndexTypeFromProto(index_info.index_type);
-        if (index_info_to_use->index_type_ == IndexType::kInvalid) {
 
-            delete index_info_to_use;
-            index_info_to_use = nullptr;
+    index_info_to_use->index_type_ = GetIndexTypeFromProto(request.index_info.index_type);
+    if (index_info_to_use->index_type_ == IndexType::kInvalid) {
 
-            ProcessStatus(response, Status::InvalidIndexType());
-            return;
-        }
+        delete index_info_to_use;
+        index_info_to_use = nullptr;
 
-        index_info_to_use->column_name_ = index_info.column_name;
-
-        auto *index_param_list = new Vector<InitParameter *>();
-        for (auto &index_param : index_info.index_param_list) {
-            auto init_parameter = new InitParameter();
-            init_parameter->param_name_ = index_param.param_name;
-            init_parameter->param_value_ = index_param.param_value;
-            index_param_list->emplace_back(init_parameter);
-        }
-        index_info_to_use->index_param_list_ = index_param_list;
+        ProcessStatus(response, Status::InvalidIndexType());
+        return;
     }
+
+    index_info_to_use->column_name_ = request.index_info.column_name;
+
+    auto *index_param_list = new Vector<InitParameter *>();
+    for (auto &index_param : request.index_info.index_param_list) {
+        auto init_parameter = new InitParameter();
+        init_parameter->param_name_ = index_param.param_name;
+        init_parameter->param_value_ = index_param.param_value;
+        index_param_list->emplace_back(init_parameter);
+    }
+    index_info_to_use->index_param_list_ = index_param_list;
 
     QueryResult result = infinity->CreateIndex(request.db_name, request.table_name, request.index_name, index_info_to_use, create_index_opts);
     ProcessQueryResult(response, result);
