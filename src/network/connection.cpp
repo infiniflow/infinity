@@ -114,7 +114,8 @@ void Connection::HandleRequest() {
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
 
     switch (cmd_type) {
         case PGMessageType::kBindCommand: {

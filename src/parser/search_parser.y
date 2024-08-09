@@ -29,7 +29,7 @@
         public:
             // Bison requires default constructor for inplace new
             InfString() = default;
-            InfString(const std::string &text, bool from_quoted) : text_{text}, from_quoted_{from_quoted} {}
+            InfString(std::string text, bool from_quoted) : text_{std::move(text)}, from_quoted_{from_quoted} {}
             std::string text_{};
             bool from_quoted_{};
         };
@@ -89,9 +89,10 @@ topLevelQuery
 query
 : clause { $$ = std::move($1); }
 | query clause {
-    auto query = std::make_unique<OrQueryNode>();
-    query->Add(std::move($1));
-    query->Add(std::move($2));
+    auto query = driver.GetMultiQueryNodeByOperatorOption();
+    auto *multi_query_ptr = dynamic_cast<MultiQueryNode *>(query.get());
+    multi_query_ptr->Add(std::move($1));
+    multi_query_ptr->Add(std::move($2));
     $$ = std::move(query);
 }
 | query OR clause {

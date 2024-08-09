@@ -71,7 +71,7 @@ public:
     // TODO: build cache from existing files under workspace
     PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit);
 
-    ~PersistenceManager() {}
+    ~PersistenceManager();
 
     // Create new object or append to current object, and returns the location.
     ObjAddr Persist(const String &file_path, bool allow_compose = true);
@@ -106,6 +106,9 @@ public:
 
     SizeT GetSizeInBytes(const Vector<String> &local_paths);
 
+    HashMap<String, ObjStat> GetAllObjects() const;
+    HashMap<String, ObjAddr> GetAllFiles() const;
+
 private:
     String ObjCreate();
 
@@ -134,7 +137,7 @@ private:
     String local_data_dir_;
     SizeT object_size_limit_;
 
-    std::mutex mtx_;
+    mutable std::mutex mtx_;
     HashMap<String, ObjStat> objects_;        // obj_key -> ObjStat
     HashMap<String, ObjAddr> local_path_obj_; // local_file_path -> ObjAddr
     // Current unsealed object key

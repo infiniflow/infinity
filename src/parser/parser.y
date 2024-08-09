@@ -391,6 +391,7 @@ struct SQL_LTYPE {
 %token USING SESSION GLOBAL OFF EXPORT PROFILE CONFIGS CONFIG PROFILES VARIABLES VARIABLE DELTA LOGS CATALOGS CATALOG
 %token SEARCH MATCH MAXSIM QUERY QUERIES FUSION ROWLIMIT
 %token ADMIN
+%token PERSISTENCE OBJECT OBJECTS FILES
 
 %token NUMBER
 
@@ -1895,6 +1896,20 @@ show_statement: SHOW DATABASES {
 | SHOW CATALOGS {
       $$ = new infinity::ShowStatement();
       $$->show_type_ = infinity::ShowStmtType::kCatalogs;
+};
+| SHOW PERSISTENCE FILES {
+      $$ = new infinity::ShowStatement();
+      $$->show_type_ = infinity::ShowStmtType::kPersistenceFiles;
+};
+| SHOW PERSISTENCE OBJECTS {
+      $$ = new infinity::ShowStatement();
+      $$->show_type_ = infinity::ShowStmtType::kPersistenceObjects;
+};
+| SHOW PERSISTENCE OBJECT STRING {
+      $$ = new infinity::ShowStatement();
+      $$->show_type_ = infinity::ShowStmtType::kPersistenceObject;
+      $$->file_name_ = $4;
+      free($4);
 };
 
 /*

@@ -66,11 +66,13 @@ public:
 
     void Commit(TransactionID txn_id, TxnTimeStamp commit_ts);
 
+    void Rollback();
+
 public:
     TableIndexEntry *const table_index_entry_{};
 
     HashMap<SegmentID, SegmentIndexEntry *> index_entry_map_{};
-    Vector<ChunkIndexEntry *> chunk_index_entries_{};
+    HashMap<String, ChunkIndexEntry *> chunk_index_entries_{};
 
     Vector<Tuple<SegmentIndexEntry *, ChunkIndexEntry *, Vector<ChunkIndexEntry *>>> optimize_data_;
 };

@@ -56,6 +56,7 @@ import bg_query_state;
 import show_statement;
 import admin_statement;
 import admin_executor;
+import persistence_manager;
 
 namespace infinity {
 
@@ -67,12 +68,14 @@ void QueryContext::Init(Config *global_config_ptr,
                         TaskScheduler *scheduler_ptr,
                         Storage *storage_ptr,
                         ResourceManager *resource_manager_ptr,
-                        SessionManager* session_manager) {
+                        SessionManager* session_manager,
+                        PersistenceManager* persistence_manager) {
     global_config_ = global_config_ptr;
     scheduler_ = scheduler_ptr;
     storage_ = storage_ptr;
     resource_manager_ = resource_manager_ptr;
     session_manager_ = session_manager;
+    persistence_manager_ = persistence_manager;
 
     initialized_ = true;
     cpu_number_limit_ = resource_manager_ptr->GetCpuResource();

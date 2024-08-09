@@ -1140,7 +1140,7 @@ class TestInfinity:
             "test_supported_vector_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.parametrize("index_distance_type", ["cosine", "hamming"])
+    @pytest.mark.parametrize("index_distance_type", ["hamming"])
     def test_unsupported_vector_index(self, index_distance_type):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(

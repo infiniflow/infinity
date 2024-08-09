@@ -58,13 +58,19 @@ Vector<std::string_view> ChunkIndexEntry::DecodeIndex(std::string_view encode) {
     return decodes;
 }
 
-String ChunkIndexEntry::EncodeIndex(const ChunkID chunk_id, const SegmentIndexEntry *segment_index_entry) {
+String ChunkIndexEntry::EncodeIndex(const ChunkID chunk_id, const String &base_name, const SegmentIndexEntry *segment_index_entry) {
+    if (!base_name.empty()) {
+        return fmt::format("{}#{}", segment_index_entry->encode(), base_name);
+    }
     return fmt::format("{}#{}", segment_index_entry->encode(), chunk_id);
 }
 
 ChunkIndexEntry::ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count)
-    : BaseEntry(EntryType::kChunkIndex, false, segment_index_entry->base_dir_, ChunkIndexEntry::EncodeIndex(chunk_id, segment_index_entry)),
-      chunk_id_(chunk_id), segment_index_entry_(segment_index_entry), base_name_(base_name), base_rowid_(base_rowid), row_count_(row_count){};
+    : BaseEntry(EntryType::kChunkIndex,
+                false,
+                segment_index_entry->base_dir_,
+                ChunkIndexEntry::EncodeIndex(chunk_id, base_name, segment_index_entry)),
+      chunk_id_(chunk_id), segment_index_entry_(segment_index_entry), base_name_(base_name), base_rowid_(base_rowid), row_count_(row_count) {};
 
 String ChunkIndexEntry::IndexFileName(SegmentID segment_id, ChunkID chunk_id) { return fmt::format("seg{}_chunk{}.idx", segment_id, chunk_id); }
 
@@ -360,6 +366,18 @@ bool ChunkIndexEntry::CheckVisible(Txn *txn) const {
 void ChunkIndexEntry::Save() {
     if (buffer_obj_) {
         buffer_obj_->Save();
+    }
+}
+
+bool ChunkIndexEntry::TrySetOptimizing() {
+    bool expected = false;
+    return optimizing_.compare_exchange_strong(expected, true);
+}
+
+void ChunkIndexEntry::ResetOptimizing() {
+    bool expected = true;
+    if (!optimizing_.compare_exchange_strong(expected, false)) {
+        UnrecoverableError(fmt::format("ResetOptimizing failed, {}", this->encode()));
     }
 }
 

@@ -120,18 +120,14 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (1, 5, 9, 11), 'DISTANCE': (29.0, 149.0, 365.0, 97538.0)}).astype(
             {'c1': dtype('int32'), 'DISTANCE': dtype('float32')}))
-        try:
-            res = table_obj.create_index("invalid_lvq", [index.IndexInfo("c2", index.IndexType.Hnsw, [
+        with pytest.raises(InfinityException):
+            table_obj.create_index("invalid_lvq", [index.IndexInfo("c2", index.IndexType.Hnsw, [
                 index.InitParameter("M", "16"),
                 index.InitParameter("ef_construction", "50"),
                 index.InitParameter("ef", "50"),
                 index.InitParameter("metric", "l2"),
                 index.InitParameter("encode", "lvq")
             ])], ConflictType.Error)
-        except InfinityException as e:
-            pass
-        else:
-            assert False, "should raise exception"
         res = table_obj.create_index("valid_lvq", [index.IndexInfo("c2", index.IndexType.Hnsw, [
             index.InitParameter("M", "16"),
             index.InitParameter("ef_construction", "50"),
@@ -144,12 +140,8 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (1, 5, 9, 11), 'DISTANCE': (29.0, 149.0, 365.0, 97538.0)}).astype(
             {'c1': dtype('int32'), 'DISTANCE': dtype('float32')}))
-        try:
-            res = table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "int8", "l2", 10).to_result()
-        except InfinityException as e:
-            pass
-        else:
-            assert False, "should raise exception"
+        with pytest.raises(InfinityException):
+            table_obj.output(["c1", "_distance"]).knn('c2', [0, 0, 0], "int8", "l2", 10).to_result()
         res = db_obj.drop_table("test_knn_u8", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -464,6 +456,7 @@ class TestInfinity:
     @pytest.mark.parametrize("distance_type", [
         ("l2", True),
         ("cosine", True),
+        ("cos", True),
         ("ip", True),
         ("hamming", False),
     ])
@@ -672,6 +665,40 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table("test_with_index_after", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.usefixtures("skip_if_http")
+    @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_99.csv", "data_dir": common_values.TEST_TMP_DIR}],
+                             indirect=True)
+    def test_fulltext_operator_option(self, check_data):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_fulltext_operator_option", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_fulltext_operator_option",
+                                        {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"},
+                                         "body": {"type": "varchar"}})
+        table_obj.create_index("my_index",
+                               [index.IndexInfo("body",
+                                                index.IndexType.FullText,
+                                                [index.InitParameter("ANALYZER", "standard")]),
+                                ], ConflictType.Error)
+        if not check_data:
+            copy_data("enwiki_99.csv")
+        test_csv_dir = common_values.TEST_TMP_DIR + "enwiki_99.csv"
+        table_obj.import_data(test_csv_dir, import_options={"delimiter": "\t"})
+        print('Test fulltext operator OR for query "TO BE OR NOT":')
+        print(table_obj.output(["*", "_row_id", "_score"]).match("doctitle,body^5", "TO BE OR NOT",
+                                                                 "topn=5;operator=or").to_pl())
+        print('Test fulltext operator AND for query "TO BE OR NOT":')
+        print(table_obj.output(["*", "_row_id", "_score"]).match("doctitle,body^5", "TO BE OR NOT",
+                                                                 "topn=5;operator=and").to_pl())
+        # expect throw
+        print('No operator option for query "TO BE OR NOT", expect throw:')
+        with pytest.raises(InfinityException) as e_info:
+            table_obj.output(["*", "_row_id", "_score"]).match("doctitle,body^5", "TO BE OR NOT", "topn=5").to_pl()
+        print(e_info.value.error_message)
+        res = table_obj.drop_index("my_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+        res = db_obj.drop_table("test_fulltext_operator_option", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.usefixtures("skip_if_http")
@@ -1068,8 +1095,8 @@ class TestInfinity:
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("index_column_name", ["gender_vector"])
     @pytest.mark.parametrize("knn_column_name", ["gender_vector"])
-    @pytest.mark.parametrize("index_distance_type", ["l2", "ip", "cosine"])
-    @pytest.mark.parametrize("knn_distance_type", ["l2", "ip", "cosine"])
+    @pytest.mark.parametrize("index_distance_type", ["l2", "ip", "cosine", "cos"])
+    @pytest.mark.parametrize("knn_distance_type", ["l2", "ip", "cosine", "cos"])
     @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw, index.IndexType.IVFFlat])
     def test_with_various_index_knn_distance_combination(self, check_data, index_column_name, knn_column_name,
                                                          index_distance_type, knn_distance_type, index_type):
@@ -1092,45 +1119,27 @@ class TestInfinity:
         test_csv_dir = "/var/infinity/test_data/pysdk_test_knn.csv"
         table_obj.import_data(test_csv_dir, None)
         if index_type == index.IndexType.Hnsw:
-            if index_distance_type == "cosine":
-                with pytest.raises(InfinityException) as e:
-                    res = table_obj.create_index("my_index",
-                                                 [index.IndexInfo(index_column_name,
-                                                                  index.IndexType.Hnsw,
-                                                                  [
-                                                                      index.InitParameter(
-                                                                          "M", "16"),
-                                                                      index.InitParameter(
-                                                                          "ef_construction", "50"),
-                                                                      index.InitParameter(
-                                                                          "ef", "50"),
-                                                                      index.InitParameter(
-                                                                          "metric", index_distance_type)
-                                                                  ])], ConflictType.Error)
-                assert e.type == InfinityException
-                assert e.value.args[0] == ErrorCode.INVALID_INDEX_PARAM
-            else:
-                res = table_obj.create_index("my_index",
-                                             [index.IndexInfo(index_column_name,
-                                                              index.IndexType.Hnsw,
-                                                              [
-                                                                  index.InitParameter(
-                                                                      "M", "16"),
-                                                                  index.InitParameter(
-                                                                      "ef_construction", "50"),
-                                                                  index.InitParameter(
-                                                                      "ef", "50"),
-                                                                  index.InitParameter(
-                                                                      "metric", index_distance_type)
-                                                              ])], ConflictType.Error)
-                assert res.error_code == ErrorCode.OK
-                res = table_obj.output(["variant_id"]).knn(
-                    knn_column_name, [1.0] * 4, "float", knn_distance_type, 5).to_pl()
-                print(res)
-                res = table_obj.drop_index("my_index", ConflictType.Error)
-                assert res.error_code == ErrorCode.OK
+            res = table_obj.create_index("my_index",
+                                         [index.IndexInfo(index_column_name,
+                                                          index.IndexType.Hnsw,
+                                                          [
+                                                              index.InitParameter(
+                                                                  "M", "16"),
+                                                              index.InitParameter(
+                                                                  "ef_construction", "50"),
+                                                              index.InitParameter(
+                                                                  "ef", "50"),
+                                                              index.InitParameter(
+                                                                  "metric", index_distance_type)
+                                                          ])], ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
+            res = table_obj.output(["variant_id"]).knn(
+                knn_column_name, [1.0] * 4, "float", knn_distance_type, 5).to_pl()
+            print(res)
+            res = table_obj.drop_index("my_index", ConflictType.Error)
+            assert res.error_code == ErrorCode.OK
         elif index_type == index.IndexType.IVFFlat:
-            if index_distance_type == "cosine":
+            if index_distance_type == "cosine" or index_distance_type == "cos":
                 with pytest.raises(InfinityException) as e:
                     res = table_obj.create_index("my_index",
                                                  [index.IndexInfo(index_column_name,
@@ -1140,7 +1149,7 @@ class TestInfinity:
                                                                                        index_distance_type)])],
                                                  ConflictType.Error)
                 assert e.type == InfinityException
-                assert e.value.args[0] == ErrorCode.LACK_INDEX_PARAM
+                assert e.value.args[0] == ErrorCode.NOT_SUPPORTED
             else:
                 res = table_obj.create_index("my_index",
                                              [index.IndexInfo(index_column_name,

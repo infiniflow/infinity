@@ -42,7 +42,7 @@ namespace infinity {
 String MetricTypeToString(MetricType metric_type) {
     switch (metric_type) {
         case MetricType::kMetricCosine: {
-            return "cos";
+            return "cosine";
         }
         case MetricType::kMetricInnerProduct: {
             return "ip";
@@ -57,7 +57,7 @@ String MetricTypeToString(MetricType metric_type) {
 }
 
 MetricType StringToMetricType(const String &str) {
-    if (str == "cos") {
+    if (str == "cos" or str == "cosine") {
         return MetricType::kMetricCosine;
     } else if (str == "ip") {
         return MetricType::kMetricInnerProduct;

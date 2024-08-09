@@ -20,18 +20,27 @@ import query_node;
 import infinity_exception;
 import global_resource_usage;
 import infinity_context;
+import third_party;
 import logger;
 
 using namespace infinity;
 
-class QueryParserAndOptimizerTest : public BaseTest {
+class QueryParserAndOptimizerTest : public BaseTestParamStr {
     void SetUp() override {
-        BaseTest::SetUp();
+        BaseTestParamStr::SetUp();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = nullptr;
         RemoveDbDirs();
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        String config_path_str = GetParam();
+
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = MakeShared<String>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -42,9 +51,17 @@ class QueryParserAndOptimizerTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
+
+public:
+    static constexpr FulltextQueryOperatorOption ops[] = {FulltextQueryOperatorOption::kOr, FulltextQueryOperatorOption::kAnd};
+    static constexpr const char *ops_chars[] = {"OR", "AND"};
 };
+
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         QueryParserAndOptimizerTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_CONFIG_PATH));
 
 struct LogHelper {
     void Reset() {
@@ -76,7 +93,6 @@ int ParseAndOptimizeFromStream(const SearchDriver &driver, std::istream &ist) {
             oss << "---parser accepted" << std::endl;
             oss << "---parser output tree:" << std::endl;
             parser_result->PrintTree(oss);
-            oss << std::endl;
             log_helper.Reset();
             std::unique_ptr<QueryNode> optimizer_result;
             bool recoverable_exception = false;
@@ -88,6 +104,8 @@ int ParseAndOptimizeFromStream(const SearchDriver &driver, std::istream &ist) {
             }
             if (optimizer_result) {
                 oss << "---optimizer accepted" << std::endl;
+                oss << "---optimizer output tree:" << std::endl;
+                optimizer_result->PrintTree(oss);
             } else if (!recoverable_exception) {
                 oss << "---optimizer failed" << std::endl;
                 return -1;
@@ -97,7 +115,7 @@ int ParseAndOptimizeFromStream(const SearchDriver &driver, std::istream &ist) {
     return 0;
 }
 
-TEST_F(QueryParserAndOptimizerTest, test1) {
+TEST_P(QueryParserAndOptimizerTest, test1) {
     using namespace infinity;
 
     std::string row_quires = R"##(
@@ -159,4 +177,83 @@ sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
     IStringStream iss(row_quires);
     int rc = ParseAndOptimizeFromStream(driver, iss);
     EXPECT_EQ(rc, 0);
+}
+
+TEST_P(QueryParserAndOptimizerTest, operator_option_test_standard) {
+    using namespace infinity;
+    std::string row_quires = R"##(
+#query
+dune god
+dune OR god
+name:star OR name:duna
+_exists_:"author" AND page_count:yyy AND (name:star OR name:duna)
+_exists_:"author" AND page_count:zzz^1.3 AND (name:star^0.1 OR name:duna^1.2)^1.2
+
+#test invalid not query
+NOT (name:god^2 || kddd:ss^4) OR ee:ff^1.2
+(NOT name:god^2 OR NOT kddd:ss^4) OR ee:ff^1.2
+(NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2
+(NOT name:god^2 AND NOT kddd:ss^4) OR NOT ee:ff^1.2
+
+#test optimization rules
+(dune^1.2 AND NOT name:god^2 AND NOT kddd:ss^4 OR ee:ff^1.2)^1.3
+(dune^1.2 AND NOT (name:god^2 || kddd:ss^4) OR ee:ff^1.2)^1.3
+(dune^1.2 AND (NOT name:god^2 || NOT kddd:ss^4) AND ee:ff^1.2)^1.3
+sda:rtw AND ((NOT name:god^2 AND NOT kddd:ss^4) OR NOT ee:ff^1.2)
+sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) AND NOT ee:ff^1.2)
+sda:rtw AND ((NOT name:god^2 AND NOT kddd:ss^4) AND NOT ee:ff^1.2)
+sda:rtw AND ((NOT name:god^2 OR NOT kddd:ss^4) OR NOT ee:ff^1.2)
+    )##";
+
+    const Map<String, String> column2analyzer;
+    const String default_field("body");
+    for (size_t i = 0; i < std::size(ops); ++i) {
+        const auto op = ops[i];
+        LOG_INFO(fmt::format("Test With Operator Option: {}", ops_chars[i]));
+        SearchDriver driver(column2analyzer, default_field, op);
+        IStringStream iss(row_quires);
+        int rc = ParseAndOptimizeFromStream(driver, iss);
+        EXPECT_EQ(rc, 0);
+    }
+}
+
+TEST_P(QueryParserAndOptimizerTest, operator_option_test_chinese) {
+    using namespace infinity;
+    std::string row_quires = R"##(
+#basic_filter_boost with explicit field
+name:芯片^1.2
+name:dune^1.2
+num:123.456^7.8
+
+#clause
+(邓肯 上帝) AND (foo bar)
+_exists_:"author" AND page_count:xxx AND name:star^1.3
+
+#query
+(邓肯^1.2 AND (NOT name:上帝^2 || NOT kddd:ss^4) AND ee:ff^1.2)^1.3
+
+#quote
+TO BE OR NOT TO BE
+吉祥物“羽宝”头部
+nanjing吉祥物"羽宝"头部head "DS-K3AJ303/Dm140"
+吉祥物nanjing"DS-K3AJ303/Dm140"头部
+graphic cards
+    )##";
+
+    Map<String, String> column2analyzer;
+    column2analyzer["body"] = "chinese";
+    const String default_field("body");
+    for (size_t i = 0; i < std::size(ops); ++i) {
+        const auto op = ops[i];
+        LOG_INFO(fmt::format("Test With Operator Option: {}", ops_chars[i]));
+        SearchDriver driver(column2analyzer, default_field, op);
+        IStringStream iss(row_quires);
+        try {
+            int rc = ParseAndOptimizeFromStream(driver, iss);
+            EXPECT_EQ(rc, 0);
+        } catch (RecoverableException &e) {
+            // catch because dict resource file does not exist in CI environment
+            std::cerr << fmt::format("RecoverableException: {}\n", e.what());
+        }
+    }
 }

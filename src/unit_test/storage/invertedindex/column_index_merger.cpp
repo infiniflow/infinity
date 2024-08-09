@@ -31,26 +31,38 @@ import global_resource_usage;
 import infinity_context;
 
 using namespace infinity;
-class ColumnIndexMergerTest : public BaseTest {
+class ColumnIndexMergerTest : public BaseTestParamStr {
 public:
     void SetUp() override {
-        BaseTest::SetUp();
-        BaseTest::RemoveDbDirs();
+        BaseTestParamStr::SetUp();
+        BaseTestParamStr::RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        config_path_ = GetParam();
         std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = std::make_shared<std::string>(config_path_);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
     void TearDown() override {
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            if (InfinityContext::instance().persistence_manager() != nullptr) {
+                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
+            }
+        }
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 
 public:
@@ -97,7 +109,17 @@ protected:
 protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     static constexpr SizeT BUFFER_SIZE_ = 1024;
+    String config_path_{};
 };
+
+INSTANTIATE_TEST_SUITE_P(
+    TestWithDifferentParams,
+    ColumnIndexMergerTest,
+    ::testing::Values(
+        BaseTestParamStr::NULL_CONFIG_PATH,
+        BaseTestParamStr::VFS_CONFIG_PATH
+    )
+);
 
 void ColumnIndexMergerTest::CreateIndex(const Vector<String>& paragraphs,
                                         const String& index_dir,
@@ -243,7 +265,7 @@ void ColumnIndexMergerTest::GenerateExpectedPosting(Map<String, Vector<int>> &te
     }
 }
 
-TEST_F(ColumnIndexMergerTest, GenerateParagraphsTest) {
+TEST_P(ColumnIndexMergerTest, GenerateParagraphsTest) {
     Vector<String> paragraphs;
     Vector<ExpectedPosting> expected_postings;
 
@@ -257,7 +279,7 @@ TEST_F(ColumnIndexMergerTest, GenerateParagraphsTest) {
     }
 }
 
-TEST_F(ColumnIndexMergerTest, BasicParagraphTest) {
+TEST_P(ColumnIndexMergerTest, BasicParagraphTest) {
     using namespace infinity;
     const char *paragraphs[] = {
         R"#(B A)#",
@@ -265,7 +287,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest) {
         R"#(A A A)#"
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetFullTmpDir();
+    const String index_dir = GetFullDataDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -278,14 +300,14 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest) {
     MergeAndCheckIndex(index_dir, base_names, base_row_ids, dst_base_name, expected_postings);
 }
 
-TEST_F(ColumnIndexMergerTest, BasicParagraphTest1) {
+TEST_P(ColumnIndexMergerTest, BasicParagraphTest1) {
     using namespace infinity;
     const char *paragraphs[] = {
         R"#(B A)#",
         R"#(A B A)#",
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetFullTmpDir();
+    const String index_dir = GetFullDataDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -298,7 +320,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest1) {
     MergeAndCheckIndex(index_dir, base_names, base_row_ids, dst_base_name, expected_postings);
 }
 
-TEST_F(ColumnIndexMergerTest, BasicParagraphTest2) {
+TEST_P(ColumnIndexMergerTest, BasicParagraphTest2) {
     using namespace infinity;
     // https://en.wikipedia.org/wiki/Finite-state_transducer
     const char *paragraphs[] = {
@@ -309,7 +331,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest2) {
         R"#(The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.)#",
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetFullTmpDir();
+    const String index_dir = GetFullDataDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -322,7 +344,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest2) {
     MergeAndCheckIndex(index_dir, base_names, base_row_ids, dst_base_name, expected_postings);
 }
 
-TEST_F(ColumnIndexMergerTest, BasicParagraphTest3) {
+TEST_P(ColumnIndexMergerTest, BasicParagraphTest3) {
     using namespace infinity;
     // https://en.wikipedia.org/wiki/Finite-state_transducer
     const char *paragraphs[] = {
@@ -333,7 +355,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest3) {
         R"#(The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.)#",
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetFullTmpDir();
+    const String index_dir = GetFullDataDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2", "chunk3"};
@@ -346,7 +368,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest3) {
     MergeAndCheckIndex(index_dir, base_names, base_row_ids, dst_base_name, expected_postings);
 }
 
-TEST_F(ColumnIndexMergerTest, BasicParagraphTest4) {
+TEST_P(ColumnIndexMergerTest, BasicParagraphTest4) {
     using namespace infinity;
     // https://en.wikipedia.org/wiki/Finite-state_transducer
     const char *paragraphs[] = {
@@ -357,7 +379,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest4) {
         R"#(The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.)#",
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetFullTmpDir();
+    const String index_dir = GetFullDataDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -370,7 +392,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest4) {
     MergeAndCheckIndex(index_dir, base_names, base_row_ids, dst_base_name, expected_postings);
 }
 
-TEST_F(ColumnIndexMergerTest, BasicParagraphTest5) {
+TEST_P(ColumnIndexMergerTest, BasicParagraphTest5) {
     using namespace infinity;
     // https://en.wikipedia.org/wiki/Finite-state_transducer
     const char *paragraphs[] = {
@@ -381,7 +403,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest5) {
         R"#(The two tapes of a transducer are typically viewed as an input tape and an output tape. On this view, a transducer is said to transduce (i.e., translate) the contents of its input tape to its output tape, by accepting a string on its input tape and generating another string on its output tape. It may do so nondeterministically and it may produce more than one output for each input string. A transducer may also produce no output for a given input string, in which case it is said to reject the input. In general, a transducer computes a relation between two formal languages.)#",
     };
     const SizeT num_paragraph = sizeof(paragraphs) / sizeof(char *);
-    const String index_dir = GetFullTmpDir();
+    const String index_dir = GetFullDataDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -395,7 +417,7 @@ TEST_F(ColumnIndexMergerTest, BasicParagraphTest5) {
 }
 
 
-TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest) {
+TEST_P(ColumnIndexMergerTest, GeneratePargraphsMergeTest) {
     using namespace infinity;
     Vector<String> paragraphs;
     Vector<ExpectedPosting> expected_postings;
@@ -405,7 +427,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest) {
     u32 word_num_pre_row = 5;
 
     GenerateParagraphs(term_num, row_num, word_num_pre_row, paragraphs, expected_postings);
-    const String index_dir = GetFullTmpDir();
+    const String index_dir = GetFullDataDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -417,7 +439,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest) {
     MergeAndCheckIndex(index_dir, base_names, base_row_ids, dst_base_name, expected_postings);
 }
 
-TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest1) {
+TEST_P(ColumnIndexMergerTest, GeneratePargraphsMergeTest1) {
     using namespace infinity;
     Vector<String> paragraphs;
     Vector<ExpectedPosting> expected_postings;
@@ -427,7 +449,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest1) {
     u32 word_num_pre_row = 40;
 
     GenerateParagraphs(term_num, row_num, word_num_pre_row, paragraphs, expected_postings);
-    const String index_dir = GetFullTmpDir();
+    const String index_dir = GetFullDataDir();
     const String dst_base_name = "merged_index";
 
     Vector<String> base_names = {"chunk1", "chunk2"};
@@ -441,7 +463,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest1) {
 
 // #define LOCAL_MERGER_TEST
 #ifdef LOCAL_MERGER_TEST
-TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest2) {
+TEST_P(ColumnIndexMergerTest, GeneratePargraphsMergeTest2) {
     using namespace infinity;
     Vector<String> paragraphs;
     Vector<ExpectedPosting> expected_postings;
@@ -451,7 +473,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest2) {
     u32 word_num_pre_row = 100;
 
     GenerateParagraphs(term_num, row_num, word_num_pre_row, paragraphs, expected_postings);
-    const String index_dir = GetFullTmpDir();
+    const String index_dir = GetFullDataDir();
     const String dst_base_name = "merged_index";
 
     u32 base_num = 10;
@@ -476,7 +498,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest2) {
     MergeAndCheckIndex(index_dir, base_names, base_row_ids, dst_base_name, expected_postings);
 }
 
-TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest3) {
+TEST_P(ColumnIndexMergerTest, GeneratePargraphsMergeTest3) {
     using namespace infinity;
     Vector<String> paragraphs;
     Vector<ExpectedPosting> expected_postings;
@@ -486,7 +508,7 @@ TEST_F(ColumnIndexMergerTest, GeneratePargraphsMergeTest3) {
     u32 word_num_pre_row = 100;
 
     GenerateParagraphs(term_num, row_num, word_num_pre_row, paragraphs, expected_postings);
-    const String index_dir = GetFullTmpDir();
+    const String index_dir = GetFullDataDir();
     const String dst_base_name = "merged_index";
 
     u32 base_num = 10;

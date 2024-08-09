@@ -127,6 +127,8 @@ bool KnnExpr::InitDistanceType(const char *distance_type) {
         distance_type_ = infinity::KnnDistanceType::kInnerProduct;
     } else if (strcmp(distance_type, "cosine") == 0) {
         distance_type_ = infinity::KnnDistanceType::kCosine;
+    } else if (strcmp(distance_type, "cos") == 0) {
+        distance_type_ = infinity::KnnDistanceType::kCosine;
     } else if (strcmp(distance_type, "hamming") == 0) {
         distance_type_ = infinity::KnnDistanceType::kHamming;
     } else {

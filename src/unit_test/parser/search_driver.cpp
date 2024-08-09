@@ -22,6 +22,8 @@ import analyzer;
 import infinity_exception;
 import global_resource_usage;
 import infinity_context;
+import logger;
+import third_party;
 
 using namespace infinity;
 
@@ -48,7 +50,19 @@ class SearchDriverTest : public BaseTest {
     }
 };
 
+struct LogHelper {
+    void Reset() {
+        LOG_INFO(std::move(oss).str());
+        oss.str("");
+        oss.clear();
+    }
+    ~LogHelper() { LOG_INFO(std::move(oss).str()); }
+    OStringStream oss;
+};
+
 int ParseStream(const SearchDriver &driver, std::istream &ist) {
+    LogHelper log_helper;
+    auto &oss = log_helper.oss;
     // read and parse line by line, ignoring empty lines and comments
     std::string line;
     while (std::getline(ist, line)) {
@@ -57,16 +71,16 @@ int ParseStream(const SearchDriver &driver, std::istream &ist) {
             continue;
         }
         line = line.substr(firstNonBlank);
-        std::cerr << "---query: ###" << line << "###" << std::endl;
+        oss << "---query: ###" << line << "###" << std::endl;
         std::unique_ptr<QueryNode> parser_result = driver.ParseSingle(line);
         if (!parser_result) {
-            std::cerr << "---failed" << std::endl;
+            oss << "---failed" << std::endl;
             return -1;
         } else {
-            std::cerr << "---accepted" << std::endl;
-            std::cerr << "---parser output tree:" << std::endl;
-            parser_result->PrintTree(std::cerr);
-            std::cerr << std::endl;
+            oss << "---accepted" << std::endl;
+            oss << "---parser output tree:" << std::endl;
+            parser_result->PrintTree(oss);
+            oss << std::endl;
         }
     }
     return 0;
@@ -78,15 +92,19 @@ TEST_F(SearchDriverTest, good_test1) {
     std::string row_quires = R"##(
 #basic_filter with implicit field
 dune
+123.456
 
 #basic_filter with explicit field
 name:dune
+num:123.456
 
 #basic_filter_boost with implicit field
 dune^1.2
+123.456^7.8
 
 #basic_filter_boost with explicit field
 name:dune^1.2
+num:123.456^7.8
 
 #term
 NOT name:microsoft^1.2
@@ -206,6 +224,50 @@ graphic cards
         int rc = ParseStream(driver, iss);
         EXPECT_EQ(rc, 0);
     } catch (RecoverableException &e) {
-        std::cerr << long(e.ErrorCode()) << " " << e.what() << std::endl;
+        // catch because dict resource file does not exist in CI environment
+        std::cerr << fmt::format("RecoverableException: {}\n", e.what());
+    }
+}
+
+TEST_F(SearchDriverTest, operator_option_test) {
+    using namespace infinity;
+    std::string row_quires = R"##(
+#basic_filter_boost with explicit field
+name:芯片^1.2
+name:dune^1.2
+num:123.456^7.8
+
+#clause
+(邓肯 上帝) AND (foo bar)
+_exists_:"author" AND page_count:xxx AND name:star^1.3
+
+#query
+(邓肯^1.2 AND (NOT name:上帝^2 || NOT kddd:ss^4) AND ee:ff^1.2)^1.3
+
+#quote
+TO BE OR NOT TO BE
+吉祥物“羽宝”头部
+nanjing吉祥物"羽宝"头部head "DS-K3AJ303/Dm140"
+吉祥物nanjing"DS-K3AJ303/Dm140"头部
+graphic cards
+    )##";
+
+    static constexpr FulltextQueryOperatorOption ops[] = {FulltextQueryOperatorOption::kOr, FulltextQueryOperatorOption::kAnd};
+    static constexpr const char *ops_chars[] = {"OR", "AND"};
+    Map<String, String> column2analyzer;
+    column2analyzer["body"] = "chinese";
+    String default_field("body");
+    for (size_t i = 0; i < std::size(ops); ++i) {
+        const auto op = ops[i];
+        LOG_INFO(fmt::format("Test With Operator Option: {}", ops_chars[i]));
+        SearchDriver driver(column2analyzer, default_field, op);
+        IStringStream iss(row_quires);
+        try {
+            int rc = ParseStream(driver, iss);
+            EXPECT_EQ(rc, 0);
+        } catch (RecoverableException &e) {
+            // catch because dict resource file does not exist in CI environment
+            std::cerr << fmt::format("RecoverableException: {}\n", e.what());
+        }
     }
 }
