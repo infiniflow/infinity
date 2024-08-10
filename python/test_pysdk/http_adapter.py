@@ -320,7 +320,7 @@ class http_adapter:
     def create_index(
         self,
         index_name,
-        index_info = [],
+        index_info,
         conflict_type=ConflictType.Error,
     ):
         copt = conflict_type
@@ -331,9 +331,9 @@ class http_adapter:
 
         fields = []
         index = {}
-        fields.append(index_info[0].column_name)
-        index["type"] = index_type_transfrom[index_info[0].index_type]
-        for param in index_info[0].params:
+        fields.append(index_info.column_name)
+        index["type"] = index_type_transfrom[index_info.index_type]
+        for param in index_info.params:
             index[param.param_name] = param.param_value
         #print(fields)
         #print(index)
