@@ -192,14 +192,12 @@ void BenchmarkCreateIndex(SharedPtr<Infinity> infinity,
                           const String &index_name) {
     BaseProfiler profiler;
     profiler.Begin();
-    auto index_info_list = new Vector<IndexInfo *>();
     auto index_info = new IndexInfo();
     index_info->index_type_ = IndexType::kFullText;
     index_info->column_name_ = "text";
     index_info->index_param_list_ = new Vector<InitParameter *>();
-    index_info_list->push_back(index_info);
 
-    auto r = infinity->CreateIndex(db_name, table_name, index_name, index_info_list, CreateIndexOptions());
+    auto r = infinity->CreateIndex(db_name, table_name, index_name, index_info, CreateIndexOptions());
     if (r.IsOk()) {
         r = infinity->Flush();
     } else {
@@ -207,7 +205,7 @@ void BenchmarkCreateIndex(SharedPtr<Infinity> infinity,
         return;
     }
 
-    // NOTE: ~CreateStatement() has already deleated or freed index_info_list, index_info, index_info->index_param_list_.
+    // NOTE: ~CreateStatement() has already deleted or freed index_info, index_info->index_param_list_.
     LOG_INFO(fmt::format("Create index cost: {}", profiler.ElapsedToString()));
     profiler.End();
 }
