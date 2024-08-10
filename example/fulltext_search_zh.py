@@ -93,7 +93,7 @@ try:
     res = table_instance.create_index(
         "my_index",
         infinity.index.IndexInfo("body", infinity.index.IndexType.FullText,
-                                 [infinity.index.InitParameter("ANALYZER", "chinese")]),
+                                 infinity.index.InitParameter("ANALYZER", "chinese")),
         infinity.common.ConflictType.Error,
     )
 

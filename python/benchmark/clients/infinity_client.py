@@ -82,7 +82,7 @@ class InfinityClient(BaseClient):
         # create index
         indexs = self._parse_index_schema(self.data["index"])
         for i, idx in enumerate(indexs):
-            table_obj.create_index(f"index{i}", [idx])
+            table_obj.create_index(f"index{i}", idx)
 
         inf_http_client = InfinityHttpClient("default_db", self.table_name)
 
