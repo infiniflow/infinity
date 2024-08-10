@@ -69,12 +69,12 @@ class InfinityHelperForColBERT:
         self.colbert_test_table = self.colbert_test_db.create_table(self.test_table_name, schema, ConflictType.Error)
         # NOTICE: the following statement is for english text
         self.colbert_test_table.create_index("test_ft_index",
-                                             [index.IndexInfo(self.inner_col_txt, index.IndexType.FullText, [])],
+                                             index.IndexInfo(self.inner_col_txt, index.IndexType.FullText, []),
                                              ConflictType.Error)
         # please enable the following statement to use chinese text
         # self.colbert_test_table.create_index("test_ft_index",
-        #                                      [index.IndexInfo(self.inner_col_txt, index.IndexType.FullText,
-        #                                                       [infinity.index.InitParameter("ANALYZER", "chinese")])],
+        #                                      index.IndexInfo(self.inner_col_txt, index.IndexType.FullText,
+        #                                                      infinity.index.InitParameter("ANALYZER", "chinese")),
         #                                      ConflictType.Error)
 
     # clear the test environment for ColBERT

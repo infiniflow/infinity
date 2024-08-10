@@ -83,10 +83,10 @@ TEST_F(QueryProfilerTest, test2) {
 TEST_F(QueryProfilerTest, test3) {
     infinity::QueryProfiler profiler;
     profiler.StartPhase(infinity::QueryPhase::kParser);
-    usleep(1000 * 1000);
+    usleep(1000);
     profiler.StopPhase(infinity::QueryPhase::kParser);
     profiler.StartPhase(infinity::QueryPhase::kLogicalPlan);
-    usleep(1000 * 1000);
+    usleep(1000);
     profiler.StopPhase(infinity::QueryPhase::kLogicalPlan);
     profiler.StartPhase(infinity::QueryPhase::kOptimizer);
     profiler.optimizer().StartRule("OptimizerRule1");
@@ -99,16 +99,16 @@ TEST_F(QueryProfilerTest, test3) {
     profiler.optimizer().StopRule();
     profiler.StopPhase(infinity::QueryPhase::kOptimizer);
     profiler.StartPhase(infinity::QueryPhase::kPhysicalPlan);
-    usleep(1000 * 1000);
+    usleep(1000);
     profiler.StopPhase(infinity::QueryPhase::kPhysicalPlan);
     profiler.StartPhase(infinity::QueryPhase::kPipelineBuild);
-    usleep(1000 * 1000);
+    usleep(1000);
     profiler.StopPhase(infinity::QueryPhase::kPipelineBuild);
     profiler.StartPhase(infinity::QueryPhase::kTaskBuild);
-    usleep(1000 * 1000);
+    usleep(1000);
     profiler.StopPhase(infinity::QueryPhase::kTaskBuild);
     profiler.StartPhase(infinity::QueryPhase::kExecution);
-    usleep(1000 * 1000);
+    usleep(1000);
     profiler.StopPhase(infinity::QueryPhase::kExecution);
 
     std::cout << profiler.ToString() << std::endl;

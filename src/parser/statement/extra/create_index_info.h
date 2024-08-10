@@ -39,7 +39,7 @@ struct IndexInfo {
     std::vector<InitParameter *> *index_param_list_{nullptr};
 
     static std::string IndexTypeToString(IndexType index_type);
-    static IndexType StringToIndexType(const std::string& index_type_str);
+    static IndexType StringToIndexType(const std::string &index_type_str);
 };
 
 class CreateIndexInfo final : public ExtraDDLInfo {
@@ -54,7 +54,7 @@ public:
     std::string table_name_{};
     std::string index_name_{};
 
-    std::vector<IndexInfo *> *index_info_list_{};
+    IndexInfo *index_info_{};
 };
 
 } // namespace infinity

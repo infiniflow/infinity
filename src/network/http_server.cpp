@@ -2693,24 +2693,14 @@ public:
         auto fields = body_info_json["fields"];
         auto index = body_info_json["index"];
 
-        auto index_info_list = new Vector<IndexInfo *>();
+        auto index_info = new IndexInfo();
         DeferFn release_index_info([&]() {
-            if(index_info_list != nullptr) {
-                for (auto &index_info_ptr : *index_info_list) {
-                    delete index_info_ptr;
-                }
-                delete index_info_list;
-                index_info_list = nullptr;
+            if(index_info != nullptr) {
+                delete index_info;
+                index_info = nullptr;
             }
         });
         {
-            auto index_info = new IndexInfo();
-            DeferFn release_index_info([&]() {
-                if(index_info != nullptr) {
-                    delete index_info;
-                    index_info = nullptr;
-                }
-            });
             index_info->column_name_ = fields[0];
             auto index_param_list = new Vector<InitParameter *>();
             DeferFn release_index_param_list([&]() {
@@ -2745,13 +2735,11 @@ public:
 
             index_info->index_param_list_ = index_param_list;
             index_param_list = nullptr;
-            index_info_list->push_back(index_info);
-            index_info = nullptr;
         }
 
         if(json_response["error_code"] == 0) {
-            auto result = infinity->CreateIndex(database_name, table_name, index_name, index_info_list, options);
-            index_info_list = nullptr;
+            auto result = infinity->CreateIndex(database_name, table_name, index_name, index_info, options);
+            index_info = nullptr;
             if (result.IsOk()) {
                 json_response["error_code"] = 0;
                 http_status = HTTPStatus::CODE_200;

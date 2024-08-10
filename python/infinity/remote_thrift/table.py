@@ -57,19 +57,14 @@ class RemoteTable(Table, ABC):
         return wrapper
 
     @name_validity_check("index_name", "Index")
-    def create_index(self, index_name: str, index_infos: list[IndexInfo],
+    def create_index(self, index_name: str, index_info: IndexInfo,
                      conflict_type: ConflictType = ConflictType.Error):
         index_name = index_name.strip()
 
-        index_info_list_to_use: list[ttypes.IndexInfo] = []
-
-        for index_info in index_infos:
-            index_info_to_use = ttypes.IndexInfo(column_name=index_info.column_name.strip(),
-                                                 index_type=index_info.index_type.to_ttype(),
-                                                 index_param_list=[init_param.to_ttype() for init_param in
-                                                                   index_info.params])
-
-            index_info_list_to_use.append(index_info_to_use)
+        index_info_to_use = ttypes.IndexInfo(column_name=index_info.column_name.strip(),
+                                             index_type=index_info.index_type.to_ttype(),
+                                             index_param_list=[init_param.to_ttype() for init_param in
+                                                               index_info.params])
 
         create_index_conflict: ttypes.CreateConflict
         if conflict_type == ConflictType.Error:
@@ -84,7 +79,7 @@ class RemoteTable(Table, ABC):
         res = self._conn.create_index(db_name=self._db_name,
                                       table_name=self._table_name,
                                       index_name=index_name,
-                                      index_info_list=index_info_list_to_use,
+                                      index_info=index_info_to_use,
                                       conflict_type=create_index_conflict)
 
         if res.error_code == ErrorCode.OK:

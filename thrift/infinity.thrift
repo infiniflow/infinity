@@ -421,7 +421,7 @@ struct CreateIndexRequest {
 1: string db_name,
 2: string table_name,
 3: string index_name,
-5: list<IndexInfo> index_info_list = [],
+5: IndexInfo index_info,
 6: i64 session_id,
 7: CreateOption create_option,
 }

@@ -60,7 +60,7 @@ class LocalTable(Table, ABC):
         return wrapper
 
     @name_validity_check("index_name", "Index")
-    def create_index(self, index_name: str, index_infos: list[IndexInfo],
+    def create_index(self, index_name: str, index_info: IndexInfo,
                      conflict_type: ConflictType = ConflictType.Error):
         index_name = index_name.strip()
 
@@ -74,20 +74,15 @@ class LocalTable(Table, ABC):
         else:
             raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
 
-        index_info_list_to_use: list[WrapIndexInfo] = []
-
-        for index_info in index_infos:
-            index_info_to_use = WrapIndexInfo()
-            index_info_to_use.index_type = index_info.index_type.to_local_type()
-            index_info_to_use.column_name = index_info.column_name.strip()
-            index_info_to_use.index_param_list = [init_param.to_local_type() for init_param in index_info.params]
-
-            index_info_list_to_use.append(index_info_to_use)
+        index_info_to_use = WrapIndexInfo()
+        index_info_to_use.index_type = index_info.index_type.to_local_type()
+        index_info_to_use.column_name = index_info.column_name.strip()
+        index_info_to_use.index_param_list = [init_param.to_local_type() for init_param in index_info.params]
 
         res = self._conn.create_index(db_name=self._db_name,
                                       table_name=self._table_name,
                                       index_name=index_name,
-                                      index_info_list=index_info_list_to_use,
+                                      index_info=index_info_to_use,
                                       conflict_type=create_index_conflict)
 
         if res.error_code == ErrorCode.OK:

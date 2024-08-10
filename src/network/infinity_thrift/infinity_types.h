@@ -3308,11 +3308,11 @@ void swap(IndexInfo &a, IndexInfo &b);
 std::ostream& operator<<(std::ostream& out, const IndexInfo& obj);
 
 typedef struct _CreateIndexRequest__isset {
-  _CreateIndexRequest__isset() : db_name(false), table_name(false), index_name(false), index_info_list(true), session_id(false), create_option(false) {}
+  _CreateIndexRequest__isset() : db_name(false), table_name(false), index_name(false), index_info(false), session_id(false), create_option(false) {}
   bool db_name :1;
   bool table_name :1;
   bool index_name :1;
-  bool index_info_list :1;
+  bool index_info :1;
   bool session_id :1;
   bool create_option :1;
 } _CreateIndexRequest__isset;
@@ -3327,14 +3327,13 @@ class CreateIndexRequest : public virtual ::apache::thrift::TBase {
                        table_name(),
                        index_name(),
                        session_id(0) {
-
   }
 
   virtual ~CreateIndexRequest() noexcept;
   std::string db_name;
   std::string table_name;
   std::string index_name;
-  std::vector<IndexInfo>  index_info_list;
+  IndexInfo index_info;
   int64_t session_id;
   CreateOption create_option;
 
@@ -3346,7 +3345,7 @@ class CreateIndexRequest : public virtual ::apache::thrift::TBase {
 
   void __set_index_name(const std::string& val);
 
-  void __set_index_info_list(const std::vector<IndexInfo> & val);
+  void __set_index_info(const IndexInfo& val);
 
   void __set_session_id(const int64_t val);
 
@@ -3360,7 +3359,7 @@ class CreateIndexRequest : public virtual ::apache::thrift::TBase {
       return false;
     if (!(index_name == rhs.index_name))
       return false;
-    if (!(index_info_list == rhs.index_info_list))
+    if (!(index_info == rhs.index_info))
       return false;
     if (!(session_id == rhs.session_id))
       return false;

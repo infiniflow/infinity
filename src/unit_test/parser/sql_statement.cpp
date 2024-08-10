@@ -181,7 +181,7 @@ TEST_F(StatementParsingTest, good_test1) {
     }
 
     {
-        String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (c1, c2) USING IVFFlat WITH(metric = l2);";
+        String input_sql = "CREATE INDEX IF NOT EXISTS idx1 ON t1 (c1) USING IVFFlat WITH(metric = l2);";
         parser->Parse(input_sql, result.get());
 
         EXPECT_TRUE(result->error_message_.empty());
@@ -198,21 +198,12 @@ TEST_F(StatementParsingTest, good_test1) {
         EXPECT_EQ(create_index_info->schema_name_, "");
         EXPECT_EQ(create_index_info->table_name_, "t1");
 
-        Vector<IndexInfo *>& index_info_list = *(create_index_info->index_info_list_);
-        EXPECT_EQ(index_info_list.size(), 2u);
-        IndexInfo * index_info1 = index_info_list[0];
+        IndexInfo * index_info1 = create_index_info->index_info_;
         EXPECT_EQ(index_info1->index_type_, IndexType::kIVFFlat);
         EXPECT_EQ(index_info1->column_name_, "c1");
         EXPECT_EQ(index_info1->index_param_list_->size(), 1u);
         EXPECT_EQ((*index_info1->index_param_list_)[0]->param_name_, "metric");
         EXPECT_EQ((*index_info1->index_param_list_)[0]->param_value_, "l2");
-
-        IndexInfo * index_info2 = index_info_list[1];
-        EXPECT_EQ(index_info2->index_type_, IndexType::kIVFFlat);
-        EXPECT_EQ(index_info2->column_name_, "c2");
-        EXPECT_EQ(index_info2->index_param_list_->size(), 1u);
-        EXPECT_EQ((*index_info2->index_param_list_)[0]->param_name_, "metric");
-        EXPECT_EQ((*index_info2->index_param_list_)[0]->param_value_, "l2");
 
         result->Reset();
     }
