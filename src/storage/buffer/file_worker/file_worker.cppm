@@ -49,8 +49,6 @@ public:
 
     void *GetData() { return data_; }
 
-    void SetData(void *data) { data_ = data; } // use for optimize hnsw index
-
     void SetBaseTempDir(SharedPtr<String> base_dir, SharedPtr<String> temp_dir) {
         base_dir_ = std::move(base_dir);
         temp_dir_ = std::move(temp_dir);
