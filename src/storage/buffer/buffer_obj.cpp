@@ -20,9 +20,10 @@ import buffer_handle;
 import buffer_manager;
 import infinity_exception;
 import logger;
-
+import var_file_worker;
 import third_party;
 import logger;
+import file_worker_type;
 
 module buffer_obj;
 
@@ -58,7 +59,11 @@ BufferHandle BufferObj::Load() {
             break;
         }
         case BufferStatus::kFreed: {
-            buffer_mgr_->RequestSpace(GetBufferSize());
+            bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
+            if (!free_success) {
+                String error_message = "Out of memory.";
+                UnrecoverableError(error_message);
+            }
             if (type_ == BufferType::kEphemeral) {
                 String error_message = "Invalid status";
                 UnrecoverableError(error_message);
@@ -69,7 +74,11 @@ BufferHandle BufferObj::Load() {
         }
         case BufferStatus::kNew: {
             LOG_TRACE(fmt::format("Request memory {}", GetBufferSize()));
-            buffer_mgr_->RequestSpace(GetBufferSize());
+            bool free_success = buffer_mgr_->RequestSpace(GetBufferSize());
+            if (!free_success) {
+                String error_message = "Out of memory.";
+                UnrecoverableError(error_message);
+            }
             file_worker_->AllocateInMemory();
             LOG_TRACE(fmt::format("Allocated memory {}", GetBufferSize()));
             break;
@@ -225,6 +234,21 @@ void BufferObj::UnloadInner() {
             UnrecoverableError(error_message);
         }
     }
+}
+
+bool BufferObj::AddBufferSize(SizeT add_size) {
+    if (file_worker_->Type() != FileWorkerType::kVarFile) {
+        UnrecoverableError("Invalid file worker type");
+    }
+    auto *var_file_worker = static_cast<VarFileWorker *>(file_worker_.get());
+
+    bool free_success = buffer_mgr_->RequestSpace(add_size);
+    if (!free_success) {
+        String warn_msg = fmt::format("Request memory {} failed, current memory usage: {}", add_size, buffer_mgr_->memory_usage());
+        LOG_WARN(warn_msg);
+    }
+    var_file_worker->AddBufferSize(add_size);
+    return free_success;
 }
 
 void BufferObj::CheckState() const {
