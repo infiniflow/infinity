@@ -4,7 +4,7 @@ import requests
 import logging
 import os
 from common.common_data import *
-from infinity.common import ConflictType, InfinityException
+from infinity.common import ConflictType, InfinityException, CommonMatchTensorExpr
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
@@ -478,15 +478,8 @@ class http_adapter:
         if len(self._match_sparse):
             tmp.update({"match_sparse":self._match_sparse})
         if len(self._output):
-            tmp_output = []
-            for col in self._output:
-                if col in ["_similarity","_score", "_distance"]:
-                    if len(self._fusion) or len(self._knn) or len(self._match) or len(self._match_tensor):
-                        tmp_output.append(col)
-                else:
-                    tmp_output.append(col)
-            tmp.update({"output":tmp_output})
-        #print(tmp)
+            tmp.update({"output":self._output})
+        print(tmp)
         d = self.set_up_data([], tmp)
         r = self.request(url, "get", h, d)
         self.raise_exception(r)
@@ -557,8 +550,41 @@ class http_adapter:
         self._knn["top_k"] = top_k
         return self
 
-    def fusion(self, method):
+    def fusion(self, method="", option="", optional_match_tensor: CommonMatchTensorExpr = None):
+        if len(self._fusion):
+            tmp = self._fusion
+            self._fusion = {}
+            self._fusion["fusion"] = tmp
+
         self._fusion["method"] = method
+        if len(option) :
+            self._fusion["option"] = option
+        if method == "match_tensor":
+            self._fusion["optional_match_tensor"] = {}
+            vector_column_name = optional_match_tensor.vector_column_name
+            if isinstance(vector_column_name, list):
+                pass
+            else:
+                vector_column_name = [vector_column_name]
+            self._fusion["optional_match_tensor"]["fields"] = vector_column_name
+            self._fusion["optional_match_tensor"]["query_tensor"] = optional_match_tensor.embedding_data
+            if optional_match_tensor.extra_option:
+                self._fusion["optional_match_tensor"]["options"] = optional_match_tensor.extra_option
+            self._fusion["optional_match_tensor"]["element_type"] = type_transfrom[optional_match_tensor.embedding_data_type]
+            self._fusion["optional_match_tensor"]["search_method"] = optional_match_tensor.method_type
+
+        if len(self._knn):
+            self._fusion["knn"] = self._knn
+            self._knn = {}
+        if len(self._match):
+            self._fusion["match"] = self._match
+            self._match = {}
+        if len(self._match_tensor):
+            self._fusion["match_tensor"] = self._match_tensor
+            self._match_tensor = {}
+        if len(self._match_sparse):
+            self._fusion["match_sparse"] = self._match_sparse
+            self._match_sparse = {}
         return self
 
     def to_result(self):

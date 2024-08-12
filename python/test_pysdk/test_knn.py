@@ -667,7 +667,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_with_index_after", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_99.csv", "data_dir": common_values.TEST_TMP_DIR}],
                              indirect=True)
     def test_fulltext_operator_option(self, check_data):
@@ -701,7 +700,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_fulltext_operator_option", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_1", ["doctitle,num,body^5"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
@@ -743,7 +741,6 @@ class TestInfinity:
             "test_with_fulltext_match_with_valid_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_1", [pytest.param(1),
                                                pytest.param(1.1),
                                                pytest.param([]),
@@ -791,7 +788,6 @@ class TestInfinity:
             "test_with_fulltext_match_with_invalid_columns", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_2", ["a word a segment",
                                                "body=Greek"])
     @pytest.mark.parametrize("check_data", [{"file_name": "enwiki_embedding_99_commas.csv",
@@ -834,7 +830,6 @@ class TestInfinity:
             "test_with_fulltext_match_with_valid_words", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_2", [pytest.param(1),
                                                pytest.param(1.1),
                                                pytest.param([]),
@@ -883,7 +878,6 @@ class TestInfinity:
             "test_with_fulltext_match_with_invalid_words", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_3", [pytest.param("@#$!#@$SDa^sdf3!@#$"),
                                                "topn=1",
                                                "1"])
@@ -927,7 +921,6 @@ class TestInfinity:
             "test_with_fulltext_match_with_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("match_param_3", [pytest.param(1),
                                                pytest.param(1.1),
                                                pytest.param([]),
@@ -1222,7 +1215,6 @@ class TestInfinity:
 
     # "^5" indicates the point that column "body" get multipy by 5, default is multipy by 1
     # refer to https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("fields_and_matching_text", [
         ["body", "black"],
         ["doctitle,num,body", "black"],
@@ -1422,7 +1414,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("table_params", [
         "vector,100,float,int8",
         "sparse,0,float,int8",
