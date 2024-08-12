@@ -66,9 +66,9 @@ IndexDiskAnn::Make(SharedPtr<String> index_name, const String &file_name, Vector
             metric_type = StringToMetricType(param->param_value_);
         } else if (param->param_name_ == "encode") {
             encode_type = StringToDiskAnnEncodeType(param->param_value_);
-        } else if (param->param_name_ == "R" or param->param_name_ == "r") {
+        } else if (param->param_name_ == "r") {
             R = std::stoul(param->param_value_);
-        } else if (param->param_name_ == "L" or param->param_name_ == "l") {
+        } else if (param->param_name_ == "l") {
             L = std::stoul(param->param_value_);
         } else if (param->param_name_ == "num_pq_chunks") {
             num_pq_chunks = std::stoul(param->param_value_);

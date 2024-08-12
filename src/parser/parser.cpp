@@ -894,7 +894,7 @@ static const yytype_int16 yyrline[] =
     3158,  3164,  3170,  3176,  3182,  3193,  3197,  3202,  3232,  3242,
     3247,  3252,  3257,  3263,  3267,  3268,  3270,  3271,  3273,  3274,
     3286,  3294,  3298,  3301,  3305,  3308,  3312,  3316,  3321,  3327,
-    3337,  3344,  3354,  3385
+    3337,  3345,  3356,  3387
 };
 #endif
 
@@ -8186,29 +8186,31 @@ Return2:
   case 470: /* index_param: IDENTIFIER '=' LONG_VALUE  */
 #line 3337 "parser.y"
                             {
+    ParserHelper::ToLower((yyvsp[-2].str_value));
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[-2].str_value);
     free((yyvsp[-2].str_value));
 
     (yyval.index_param_t)->param_value_ = std::to_string((yyvsp[0].long_value));
 }
-#line 8196 "parser.cpp"
+#line 8197 "parser.cpp"
     break;
 
   case 471: /* index_param: IDENTIFIER '=' DOUBLE_VALUE  */
-#line 3344 "parser.y"
+#line 3345 "parser.y"
                               {
+    ParserHelper::ToLower((yyvsp[-2].str_value));
     (yyval.index_param_t) = new infinity::InitParameter();
     (yyval.index_param_t)->param_name_ = (yyvsp[-2].str_value);
     free((yyvsp[-2].str_value));
 
     (yyval.index_param_t)->param_value_ = std::to_string((yyvsp[0].double_value));
 }
-#line 8208 "parser.cpp"
+#line 8210 "parser.cpp"
     break;
 
   case 472: /* index_info: '(' IDENTIFIER ')' USING IDENTIFIER with_index_param_list  */
-#line 3354 "parser.y"
+#line 3356 "parser.y"
                                                                        {
     ParserHelper::ToLower((yyvsp[-1].str_value));
     infinity::IndexType index_type = infinity::IndexType::kInvalid;
@@ -8240,22 +8242,22 @@ Return2:
     (yyval.index_info_t)->index_param_list_ = (yyvsp[0].with_index_param_list_t);
     free((yyvsp[-4].str_value));
 }
-#line 8244 "parser.cpp"
+#line 8246 "parser.cpp"
     break;
 
   case 473: /* index_info: '(' IDENTIFIER ')'  */
-#line 3385 "parser.y"
+#line 3387 "parser.y"
                      {
     (yyval.index_info_t) = new infinity::IndexInfo();
     (yyval.index_info_t)->index_type_ = infinity::IndexType::kSecondary;
     (yyval.index_info_t)->column_name_ = (yyvsp[-1].str_value);
     free((yyvsp[-1].str_value));
 }
-#line 8255 "parser.cpp"
+#line 8257 "parser.cpp"
     break;
 
 
-#line 8259 "parser.cpp"
+#line 8261 "parser.cpp"
 
       default: break;
     }
@@ -8484,7 +8486,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 3392 "parser.y"
+#line 3394 "parser.y"
 
 
 void

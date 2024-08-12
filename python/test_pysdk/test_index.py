@@ -49,8 +49,8 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index.IndexType.IVFFlat,
-                                                     [index.InitParameter("centroids_count", "128"),
-                                                      index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                     {"centroids_count": "128", "metric": "l2"}),
+                                     ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.drop_index("my_index", ConflictType.Error)
@@ -70,16 +70,12 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index.IndexType.Hnsw,
-                                                     [
-                                                         index.InitParameter(
-                                                             "M", "16"),
-                                                         index.InitParameter(
-                                                             "ef_construction", "50"),
-                                                         index.InitParameter(
-                                                             "ef", "50"),
-                                                         index.InitParameter(
-                                                             "metric", "l2")
-                                                     ]), ConflictType.Error)
+                                                     {
+                                                         "m": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "l2"
+                                                     }), ConflictType.Error)
 
         assert res.error_code == ErrorCode.OK
 
@@ -102,8 +98,7 @@ class TestInfinity:
         res = table_obj.create_index("idx1",
                                      index.IndexInfo("col2",
                                                      index.IndexType.BMP,
-                                                     [index.InitParameter("block_size", str(block_size)),
-                                                      index.InitParameter("compress_type", compress_type)]),
+                                                     {"block_size": str(block_size), "compress_type": compress_type}),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
@@ -125,8 +120,7 @@ class TestInfinity:
 
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("body",
-                                                     index.IndexType.FullText,
-                                                     []),
+                                                     index.IndexType.FullText),
                                      ConflictType.Error)
 
         assert res.error_code == ErrorCode.OK
@@ -148,14 +142,12 @@ class TestInfinity:
         assert table_obj is not None
         res = table_obj.create_index("my_index_1",
                                      index.IndexInfo("c1",
-                                                     index.IndexType.Secondary,
-                                                     []),
+                                                     index.IndexType.Secondary),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         res = table_obj.create_index("my_index_2",
                                      index.IndexInfo("body",
-                                                     index.IndexType.Secondary,
-                                                     []),
+                                                     index.IndexType.Secondary),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         res = table_obj.drop_index("my_index_1")
@@ -180,8 +172,7 @@ class TestInfinity:
         res = table_obj.create_index("my_index_1",
                                      index.IndexInfo("c2",
                                                      index.IndexType.EMVB,
-                                                     [index.InitParameter("pq_subspace_num", "32"),
-                                                      index.InitParameter("pq_subspace_bits", "8")]),
+                                                     {"pq_subspace_num": "32", "pq_subspace_bits": "8"}),
                                      ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         res = table_obj.drop_index("my_index_1")
@@ -247,8 +238,7 @@ class TestInfinity:
     ])
     @pytest.mark.parametrize("params", [
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False), ((1, 2), False), ({"1": 2}, False),
-        ([index.InitParameter("centroids_count", "128"),
-          index.InitParameter("metric", "l2")], True)
+        ({"centroids_count": "128", "metric": "l2"}, True)
     ])
     @pytest.mark.parametrize("types", ["vector, 3, float"])
     def test_create_drop_vector_index_invalid_options(self, column_name, index_type, params, types):
@@ -260,12 +250,13 @@ class TestInfinity:
         table_obj = db_obj.create_table("test_create_drop_vector_index_invalid_options", {"c1": {"type": types}},
                                         ConflictType.Error)
 
-        index_info = index.IndexInfo(column_name[0], index_type[0], params[0])
         if not column_name[1] or not index_type[1] or not params[1]:
             with pytest.raises(Exception):
+                index_info = index.IndexInfo(column_name[0], index_type[0], params[0])
                 table_obj.create_index(
                     "my_index", index_info, ConflictType.Error)
         else:
+            index_info = index.IndexInfo(column_name[0], index_type[0], params[0])
             table_obj.create_index("my_index", index_info, ConflictType.Error)
 
         res = db_obj.drop_table(
@@ -283,7 +274,7 @@ class TestInfinity:
     @pytest.mark.parametrize("index_type", [(index.IndexType.FullText, True)])
     @pytest.mark.parametrize("params", [
         (1, False), (2.2, False), ([1, 2], False), ("$#%dfva", False),
-        ((1, 2), False), ({"1": 2}, False), ([], True)
+        ((1, 2), False), ({"1": 2}, False), (None, True)
     ])
     @pytest.mark.parametrize("types", ["int", "int8", "int16", "int32", "int64", "integer",
                                        "float", "float32", "double", "float64",
@@ -299,12 +290,12 @@ class TestInfinity:
         table_obj = db_obj.create_table("test_create_drop_different_fulltext_index_invalid_options", {
             "c1": {"type": types}}, ConflictType.Error)
 
-        index_info = index.IndexInfo(column_name[0], index_type[0], params[0])
         if types != "varchar" or not column_name[1] or not index_type[1] or not params[1]:
             with pytest.raises(Exception):
-                table_obj.create_index(
-                    "my_index", index_info, ConflictType.Error)
+                index_info = index.IndexInfo(column_name[0], index_type[0], params[0])
+                table_obj.create_index("my_index", index_info, ConflictType.Error)
         else:
+            index_info = index.IndexInfo(column_name[0], index_type[0], params[0])
             table_obj.create_index("my_index", index_info, ConflictType.Error)
 
         res = db_obj.drop_table(
@@ -328,8 +319,7 @@ class TestInfinity:
             table_obj.create_index("my_index",
                                    index.IndexInfo("c1",
                                                    index.IndexType.IVFFlat,
-                                                   [index.InitParameter("centroids_count", "128"),
-                                                    index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                   {"centroids_count": "128", "metric": "l2"}), ConflictType.Error)
 
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
@@ -347,8 +337,7 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index.IndexType.IVFFlat,
-                                                     [index.InitParameter("centroids_count", "128"),
-                                                      index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                     {"centroids_count": "128", "metric": "l2"}), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         res = table_obj.show_index("my_index")
         print(res)
@@ -369,8 +358,7 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index.IndexType.IVFFlat,
-                                                     [index.InitParameter("centroids_count", "128"),
-                                                      index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                     {"centroids_count": "128", "metric": "l2"}), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.show_index("my_index")
@@ -407,8 +395,7 @@ class TestInfinity:
                 table_obj.create_index("my_index",
                                        index.IndexInfo("c1",
                                                        index_type[0],
-                                                       [index.InitParameter("centroids_count", "128"),
-                                                        index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                       {"centroids_count": "128", "metric": "l2"}), ConflictType.Error)
 
             assert e.type == InfinityException
             assert e.value.args[0] == index_type[2]
@@ -416,8 +403,8 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c1",
                                                          index_type[0],
-                                                         [index.InitParameter("centroids_count", "128"),
-                                                          index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                         {"centroids_count": "128", "metric": "l2"}),
+                                         ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table("test_create_index_on_different_type_of_column", ConflictType.Error)
@@ -438,8 +425,7 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index_type,
-                                                     [index.InitParameter("centroids_count", "128"),
-                                                      index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                     {"centroids_count": "128", "metric": "l2"}), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table("test_insert_data_create_index", ConflictType.Error)
@@ -467,16 +453,15 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c2",
                                                          index_type[0],
-                                                         [index.InitParameter("centroids_count", "128"),
-                                                          index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                         {"centroids_count": "128", "metric": "l2"}),
+                                         ConflictType.Error)
             assert res.error_code == ErrorCode.OK
         else:
             with pytest.raises(InfinityException) as e:
                 table_obj.create_index("my_index",
                                        index.IndexInfo("c2",
                                                        index_type[0],
-                                                       [index.InitParameter("centroids_count", "128"),
-                                                        index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                       {"centroids_count": "128", "metric": "l2"}), ConflictType.Error)
 
             assert e.type == InfinityException
             assert e.value.args[0] == index_type[2]
@@ -500,8 +485,7 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c2",
                                                      index_type,
-                                                     [index.InitParameter("centroids_count", "128"),
-                                                      index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                     {"centroids_count": "128", "metric": "l2"}), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         table_obj.import_data(os.getcwd() + TEST_DATA_DIR +
                               file_format + "/pysdk_test." + file_format)
@@ -528,8 +512,8 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c2",
                                                          index_type,
-                                                         [index.InitParameter("centroids_count", "128"),
-                                                          index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                         {"centroids_count": "128", "metric": "l2"}),
+                                         ConflictType.Error)
 
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_INDEX_DEFINITION
@@ -563,8 +547,7 @@ class TestInfinity:
         }, ConflictType.Error)
         res = table_obj.create_index("body_index",
                                      index.IndexInfo("body",
-                                                     index.IndexType.FullText,
-                                                     []))
+                                                     index.IndexType.FullText))
         assert res.error_code == ErrorCode.OK
 
         # Create 99*300/8192 = 3.6 BlockEntry to test MemIndexRecover and OptimizeIndex
@@ -599,7 +582,7 @@ class TestInfinity:
             table_obj.create_index("my_index",
                                    index.IndexInfo("body",
                                                    index.IndexType.FullText,
-                                                   [index.InitParameter("ANALYZER", "segmentation")]),
+                                                   {"ANALYZER": "segmentation"}),
                                    ConflictType.Error)
 
         assert e.type == InfinityException
@@ -631,8 +614,7 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index.IndexType.IVFFlat,
-                                                     [index.InitParameter("centroids_count", "128"),
-                                                      index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                     {"centroids_count": "128", "metric": "l2"}), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         res = table_obj.drop_index("my_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -689,16 +671,12 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index.IndexType.Hnsw,
-                                                     [
-                                                         index.InitParameter(
-                                                             "M", "16"),
-                                                         index.InitParameter(
-                                                             "ef_construction", "50"),
-                                                         index.InitParameter(
-                                                             "ef", "50"),
-                                                         index.InitParameter(
-                                                             "metric", "l2")
-                                                     ]), conflict_type)
+                                                     {
+                                                         "m": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "l2"
+                                                     }), conflict_type)
 
         assert res.error_code == ErrorCode.OK
         res = table_obj.drop_index("my_index", ConflictType.Error)
@@ -727,16 +705,12 @@ class TestInfinity:
             table_obj.create_index("my_index",
                                    index.IndexInfo("c1",
                                                    index.IndexType.Hnsw,
-                                                   [
-                                                       index.InitParameter(
-                                                           "M", "16"),
-                                                       index.InitParameter(
-                                                           "ef_construction", "50"),
-                                                       index.InitParameter(
-                                                           "ef", "50"),
-                                                       index.InitParameter(
-                                                           "metric", "l2")
-                                                   ]), conflict_type)
+                                                   {
+                                                       "m": "16",
+                                                       "ef_construction": "50",
+                                                       "ef": "50",
+                                                       "metric": "l2"
+                                                   }), conflict_type)
 
         assert e.type == InfinityException
         # assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
@@ -759,16 +733,12 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c1",
                                                          index.IndexType.Hnsw,
-                                                         [
-                                                             index.InitParameter(
-                                                                 "M", "16"),
-                                                             index.InitParameter(
-                                                                 "ef_construction", "50"),
-                                                             index.InitParameter(
-                                                                 "ef", "50"),
-                                                             index.InitParameter(
-                                                                 "metric", "l2")
-                                                         ]), conflict_type)
+                                                         {
+                                                             "m": "16",
+                                                             "ef_construction": "50",
+                                                             "ef": "50",
+                                                             "metric": "l2"
+                                                         }), conflict_type)
 
             assert res.error_code == ErrorCode.OK
 
@@ -797,16 +767,12 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index.IndexType.Hnsw,
-                                                     [
-                                                         index.InitParameter(
-                                                             "M", "16"),
-                                                         index.InitParameter(
-                                                             "ef_construction", "50"),
-                                                         index.InitParameter(
-                                                             "ef", "50"),
-                                                         index.InitParameter(
-                                                             "metric", "l2")
-                                                     ]), conflict_type)
+                                                     {
+                                                         "m": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "l2"
+                                                     }), conflict_type)
         assert res.error_code == ErrorCode.OK
 
         for i in range(10):
@@ -814,16 +780,12 @@ class TestInfinity:
                 table_obj.create_index("my_index",
                                        index.IndexInfo("c1",
                                                        index.IndexType.Hnsw,
-                                                       [
-                                                           index.InitParameter(
-                                                               "M", "16"),
-                                                           index.InitParameter(
-                                                               "ef_construction", "50"),
-                                                           index.InitParameter(
-                                                               "ef", "50"),
-                                                           index.InitParameter(
-                                                               "metric", "l2")
-                                                       ]), conflict_type)
+                                                       {
+                                                           "m": "16",
+                                                           "ef_construction": "50",
+                                                           "ef": "50",
+                                                           "metric": "l2"
+                                                       }), conflict_type)
 
             assert e.type == InfinityException
             assert e.value.args[0] == ErrorCode.DUPLICATE_INDEX_NAME
@@ -855,16 +817,12 @@ class TestInfinity:
             table_obj.create_index("my_index",
                                    index.IndexInfo("c1",
                                                    index.IndexType.Hnsw,
-                                                   [
-                                                       index.InitParameter(
-                                                           "M", "16"),
-                                                       index.InitParameter(
-                                                           "ef_construction", "50"),
-                                                       index.InitParameter(
-                                                           "ef", "50"),
-                                                       index.InitParameter(
-                                                           "metric", "l2")
-                                                   ]), conflict_type)
+                                                   {
+                                                       "m": "16",
+                                                       "ef_construction": "50",
+                                                       "ef": "50",
+                                                       "metric": "l2"
+                                                   }), conflict_type)
 
         assert e.type == InfinityException
         # assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
@@ -874,16 +832,12 @@ class TestInfinity:
                 table_obj.create_index("my_index",
                                        index.IndexInfo("c1",
                                                        index.IndexType.Hnsw,
-                                                       [
-                                                           index.InitParameter(
-                                                               "M", "16"),
-                                                           index.InitParameter(
-                                                               "ef_construction", "50"),
-                                                           index.InitParameter(
-                                                               "ef", "50"),
-                                                           index.InitParameter(
-                                                               "metric", "l2")
-                                                       ]), conflict_type)
+                                                       {
+                                                           "m": "16",
+                                                           "ef_construction": "50",
+                                                           "ef": "50",
+                                                           "metric": "l2"
+                                                       }), conflict_type)
 
             assert e.type == InfinityException
             # assert e.value.args[0] == ErrorCode.INVALID_CONFLICT_TYPE
@@ -903,16 +857,12 @@ class TestInfinity:
             res = table_obj.create_index("my_index_" + str(i),
                                          index.IndexInfo("c1",
                                                          index.IndexType.Hnsw,
-                                                         [
-                                                             index.InitParameter(
-                                                                 "M", "16"),
-                                                             index.InitParameter(
-                                                                 "ef_construction", "50"),
-                                                             index.InitParameter(
-                                                                 "ef", "50"),
-                                                             index.InitParameter(
-                                                                 "metric", "l2")
-                                                         ]), ConflictType.Error)
+                                                         {
+                                                             "m": "16",
+                                                             "ef_construction": "50",
+                                                             "ef": "50",
+                                                             "metric": "l2"
+                                                         }), ConflictType.Error)
             assert res.error_code == ErrorCode.OK
             res = table_obj.show_index("my_index_" + str(i))
             print(res)
@@ -936,16 +886,12 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index.IndexType.Hnsw,
-                                                     [
-                                                         index.InitParameter(
-                                                             "M", "16"),
-                                                         index.InitParameter(
-                                                             "ef_construction", "50"),
-                                                         index.InitParameter(
-                                                             "ef", "50"),
-                                                         index.InitParameter(
-                                                             "metric", "l2")
-                                                     ]), ConflictType.Error)
+                                                     {
+                                                         "m": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "l2"
+                                                     }), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         res = table_obj.show_index(index_name)
         print(res)
@@ -978,16 +924,12 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c1",
                                                          index.IndexType.Hnsw,
-                                                         [
-                                                             index.InitParameter(
-                                                                 "M", "16"),
-                                                             index.InitParameter(
-                                                                 "ef_construction", "50"),
-                                                             index.InitParameter(
-                                                                 "ef", "50"),
-                                                             index.InitParameter(
-                                                                 "metric", "l2")
-                                                         ]), ConflictType.Error)
+                                                         {
+                                                             "m": "16",
+                                                             "ef_construction": "50",
+                                                             "ef": "50",
+                                                             "metric": "l2"
+                                                         }), ConflictType.Error)
             assert res.error_code == ErrorCode.OK
             res = table_obj.show_index(index_name)
             print(res)
@@ -1007,16 +949,12 @@ class TestInfinity:
             res = table_obj.create_index("my_index_" + str(i),
                                          index.IndexInfo("c1",
                                                          index.IndexType.Hnsw,
-                                                         [
-                                                             index.InitParameter(
-                                                                 "M", "16"),
-                                                             index.InitParameter(
-                                                                 "ef_construction", "50"),
-                                                             index.InitParameter(
-                                                                 "ef", "50"),
-                                                             index.InitParameter(
-                                                                 "metric", "l2")
-                                                         ]), ConflictType.Error)
+                                                         {
+                                                             "m": "16",
+                                                             "ef_construction": "50",
+                                                             "ef": "50",
+                                                             "metric": "l2"
+                                                         }), ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
         res = table_obj.list_indexes()
@@ -1046,16 +984,12 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index.IndexType.Hnsw,
-                                                     [
-                                                         index.InitParameter(
-                                                             "M", "16"),
-                                                         index.InitParameter(
-                                                             "ef_construction", "50"),
-                                                         index.InitParameter(
-                                                             "ef", "50"),
-                                                         index.InitParameter(
-                                                             "metric", "l2")
-                                                     ]), ConflictType.Error)
+                                                     {
+                                                         "m": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "l2"
+                                                     }), ConflictType.Error)
 
         assert res.error_code == ErrorCode.OK
 
@@ -1084,16 +1018,12 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index.IndexType.Hnsw,
-                                                     [
-                                                         index.InitParameter(
-                                                             "M", "16"),
-                                                         index.InitParameter(
-                                                             "ef_construction", "50"),
-                                                         index.InitParameter(
-                                                             "ef", "50"),
-                                                         index.InitParameter(
-                                                             "metric", "l2")
-                                                     ]), ConflictType.Error)
+                                                     {
+                                                         "m": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "l2"
+                                                     }), ConflictType.Error)
 
         assert res.error_code == ErrorCode.OK
 
@@ -1121,16 +1051,12 @@ class TestInfinity:
         res = table_obj.create_index("my_index",
                                      index.IndexInfo("c1",
                                                      index.IndexType.Hnsw,
-                                                     [
-                                                         index.InitParameter(
-                                                             "M", "16"),
-                                                         index.InitParameter(
-                                                             "ef_construction", "50"),
-                                                         index.InitParameter(
-                                                             "ef", "50"),
-                                                         index.InitParameter(
-                                                             "metric", index_distance_type)
-                                                     ]), ConflictType.Error)
+                                                     {
+                                                         "m": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "l2"
+                                                     }), ConflictType.Error)
 
         assert res.error_code == ErrorCode.OK
 
@@ -1156,16 +1082,12 @@ class TestInfinity:
             table_obj.create_index("my_index",
                                    index.IndexInfo("c1",
                                                    index.IndexType.Hnsw,
-                                                   [
-                                                       index.InitParameter(
-                                                           "M", "16"),
-                                                       index.InitParameter(
-                                                           "ef_construction", "50"),
-                                                       index.InitParameter(
-                                                           "ef", "50"),
-                                                       index.InitParameter(
-                                                           "metric", index_distance_type)
-                                                   ]), ConflictType.Error)
+                                                   {
+                                                       "m": "16",
+                                                       "ef_construction": "50",
+                                                       "ef": "50",
+                                                       "metric": index_distance_type
+                                                   }), ConflictType.Error)
 
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.INVALID_INDEX_PARAM
@@ -1191,8 +1113,7 @@ class TestInfinity:
         res = table_obj.create_index(upper_name_index,
                                      index.IndexInfo("c1",
                                                      index.IndexType.IVFFlat,
-                                                     [index.InitParameter("centroids_count", "128"),
-                                                      index.InitParameter("metric", "l2")]), ConflictType.Error)
+                                                     {"centroids_count": "128", "metric": "l2"}), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         res = table_obj.show_index(lower_name_index)
@@ -1226,8 +1147,8 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c1",
                                                          index.IndexType.IVFFlat,
-                                                         [index.InitParameter("CENTROIDS_COUNT", "128"),
-                                                          index.InitParameter("METRIC", "l2")]), ConflictType.Error)
+                                                         {"CENTROIDS_COUNT": "128", "METRIC": "l2"}),
+                                         ConflictType.Error)
             assert res.error_code == ErrorCode.OK
         elif index_type == index.IndexType.Hnsw:
             table_obj = db_obj.create_table(
@@ -1237,16 +1158,12 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c1",
                                                          index.IndexType.Hnsw,
-                                                         [
-                                                             index.InitParameter(
-                                                                 "m", "16"),
-                                                             index.InitParameter(
-                                                                 "EF_CONSTRUCTION", "50"),
-                                                             index.InitParameter(
-                                                                 "EF", "50"),
-                                                             index.InitParameter(
-                                                                 "METRIC", "l2")
-                                                         ]), ConflictType.Error)
+                                                         {
+                                                             "m": "16",
+                                                             "EF_CONSTRUCTION": "50",
+                                                             "EF": "50",
+                                                             "METRIC": "l2"
+                                                         }), ConflictType.Error)
 
             assert res.error_code == ErrorCode.OK
         elif index_type == index.IndexType.BMP:
@@ -1259,8 +1176,7 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("col2",
                                                          index.IndexType.BMP,
-                                                         [index.InitParameter("BLOCK_SIZE", "8"),
-                                                          index.InitParameter("COMPRESS_TYPE", "compress")]),
+                                                         {"BLOCK_SIZE": "8", "COMPRESS_TYPE": "compress"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
         elif index_type == index.IndexType.FullText:
@@ -1273,7 +1189,7 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("body",
                                                          index.IndexType.FullText,
-                                                         [index.InitParameter('analyzer', 'standard')]),
+                                                         {"analyzer": "standard"}),
                                          ConflictType.Error)
 
             assert res.error_code == ErrorCode.OK
@@ -1286,8 +1202,7 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c2",
                                                          index.IndexType.EMVB,
-                                                         [index.InitParameter("PQ_SUBSPACE_NUM", "32"),
-                                                          index.InitParameter("PQ_SUBSPACE_BITS", "8")]),
+                                                         {"PQ_SUBSPACE_NUM": "32", "PQ_SUBSPACE_BITS": "8"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
         elif index_type == index.IndexType.Secondary:
@@ -1298,8 +1213,7 @@ class TestInfinity:
             assert table_obj is not None
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c1",
-                                                         index.IndexType.Secondary,
-                                                         []),
+                                                         index.IndexType.Secondary),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
@@ -1331,8 +1245,8 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c1",
                                                          index.IndexType.IVFFlat,
-                                                         [index.InitParameter("centroids_count", "128"),
-                                                          index.InitParameter("metric", "L2")]), ConflictType.Error)
+                                                         {"centroids_count": "128", "metric": "l2"}),
+                                         ConflictType.Error)
             assert res.error_code == ErrorCode.OK
         elif index_type == index.IndexType.Hnsw:
             table_obj = db_obj.create_table(
@@ -1342,16 +1256,12 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c1",
                                                          index.IndexType.Hnsw,
-                                                         [
-                                                             index.InitParameter(
-                                                                 "M", "16"),
-                                                             index.InitParameter(
-                                                                 "ef_construction", "50"),
-                                                             index.InitParameter(
-                                                                 "ef", "50"),
-                                                             index.InitParameter(
-                                                                 "metric", "L2")
-                                                         ]), ConflictType.Error)
+                                                         {
+                                                             "M": "16",
+                                                             "ef_construction": "50",
+                                                             "ef": "50",
+                                                             "metric": "L2"
+                                                         }), ConflictType.Error)
 
             assert res.error_code == ErrorCode.OK
         elif index_type == index.IndexType.BMP:
@@ -1364,8 +1274,7 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("col2",
                                                          index.IndexType.BMP,
-                                                         [index.InitParameter("block_size", "8"),
-                                                          index.InitParameter("compress_type", "COMPRESS")]),
+                                                         {"block_size": "8", "compress_type": "COMPRESS"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
         elif index_type == index.IndexType.FullText:
@@ -1378,7 +1287,7 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("body",
                                                          index.IndexType.FullText,
-                                                         [index.InitParameter('ANALYZER', 'STANDARD')]),
+                                                         {"ANALYZER": "STANDARD"}),
                                          ConflictType.Error)
 
             assert res.error_code == ErrorCode.OK
@@ -1391,8 +1300,7 @@ class TestInfinity:
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c2",
                                                          index.IndexType.EMVB,
-                                                         [index.InitParameter("pq_subspace_num", "32"),
-                                                          index.InitParameter("pq_subspace_bits", "8")]),
+                                                         {"pq_subspace_num": "32", "pq_subspace_bits": "8"}),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
         elif index_type == index.IndexType.Secondary:
@@ -1403,8 +1311,7 @@ class TestInfinity:
             assert table_obj is not None
             res = table_obj.create_index("my_index",
                                          index.IndexInfo("c1",
-                                                         index.IndexType.Secondary,
-                                                         []),
+                                                         index.IndexType.Secondary),
                                          ConflictType.Error)
             assert res.error_code == ErrorCode.OK
 
