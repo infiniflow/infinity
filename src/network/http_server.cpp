@@ -325,6 +325,8 @@ public:
                 EmbeddingDataType e_data_type;
                 if (etype == "integer") {
                     e_data_type = EmbeddingDataType::kElemInt32;
+                } else if (etype == "uint8") {
+                    e_data_type = EmbeddingDataType::kElemUInt8;
                 } else if (etype == "float") {
                     e_data_type = EmbeddingDataType::kElemFloat;
                 } else if (etype == "double") {
