@@ -135,8 +135,12 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
         data_ptr_ = buffer_->GetDataMut();
     } else {
         // Initialize after reset will come to this branch
-        if (const auto t = vector_buffer_types.first;
-            t == VectorBufferType::kHeap or t == VectorBufferType::kTensorHeap or t == VectorBufferType::kSparseHeap) {
+        if (const auto t = vector_buffer_types.first; t == VectorBufferType::kVarBuffer) {
+            if (buffer_->var_buffer_mgr_.get() != nullptr) {
+                String error_message = "Vector heap should be null.";
+                UnrecoverableError(error_message);
+            }
+        } else if (t == VectorBufferType::kHeap or t == VectorBufferType::kTensorHeap or t == VectorBufferType::kSparseHeap) {
             if (buffer_->fix_heap_mgr_.get() != nullptr or buffer_->fix_heap_mgr_1_.get() != nullptr) {
                 String error_message = "Vector heap should be null.";
                 UnrecoverableError(error_message);

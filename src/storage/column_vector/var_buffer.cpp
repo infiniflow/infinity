@@ -29,6 +29,7 @@ import logger;
 namespace infinity {
 
 SizeT VarBuffer::Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success_p) {
+    std::unique_lock lock(mtx_);
     buffers_.push_back(std::move(buffer));
     SizeT offset = buffer_size_prefix_sum_.back();
     buffer_size_prefix_sum_.push_back(offset + size);
@@ -47,6 +48,7 @@ SizeT VarBuffer::Append(const char *data, SizeT size, bool *free_success) {
 }
 
 const char *VarBuffer::Get(SizeT offset, SizeT size) const {
+    std::shared_lock lock(mtx_);
     // find the last index i such that buffer_size_prefix_sum_[i] <= offset
     auto it = std::upper_bound(buffer_size_prefix_sum_.begin(), buffer_size_prefix_sum_.end(), offset);
     if (it == buffer_size_prefix_sum_.end()) {
@@ -68,6 +70,7 @@ const char *VarBuffer::Get(SizeT offset, SizeT size) const {
 }
 
 SizeT VarBuffer::Write(char *ptr) const {
+    std::shared_lock lock(mtx_);
     char *start = ptr;
     for (SizeT i = 0; i < buffers_.size(); ++i) {
         const auto &buffer = buffers_[i];
@@ -79,6 +82,7 @@ SizeT VarBuffer::Write(char *ptr) const {
 }
 
 SizeT VarBuffer::Write(char *ptr, SizeT offset, SizeT size) const {
+    std::shared_lock lock(mtx_);
     const char *data = Get(offset, size);
     std::memcpy(ptr, data, size);
     ptr += size;

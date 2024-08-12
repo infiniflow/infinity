@@ -19,6 +19,7 @@ export module var_buffer;
 import stl;
 import buffer_obj;
 import buffer_handle;
+import logger;
 
 namespace infinity {
 
@@ -49,9 +50,14 @@ public:
 
     SizeT Write(char *ptr, SizeT offset, SizeT size) const;
 
-    SizeT TotalSize() const { return buffer_size_prefix_sum_.back(); }
+    SizeT TotalSize() const {
+        std::shared_lock lock(mtx_);
+        return buffer_size_prefix_sum_.back();
+    }
 
 private:
+    mutable std::shared_mutex mtx_;
+
     Vector<UniquePtr<char[]>> buffers_;
     Vector<SizeT> buffer_size_prefix_sum_ = {0};
 

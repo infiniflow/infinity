@@ -251,8 +251,8 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         // inline varchar
         std::memcpy(target.short_.data_, res.c_str(), target.length_);
     } else {
-        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            String error_message = fmt::format("Varchar column vector should use MemoryVectorBuffer.");
+        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
+            String error_message = fmt::format("Varchar column vector should use VarBuffer.");
             UnrecoverableError(error_message);
         }
 
