@@ -81,11 +81,9 @@ private:
                 if (v_ptr->IsInlined()) {
                     str = {v_ptr->short_.data_, v_ptr->length_};
                 } else {
+                    const char *data = column_vector->buffer_->var_buffer_mgr_->Get(v_ptr->vector1_.file_offset_, v_ptr->length_);
                     str.resize(v_ptr->length_);
-                    column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(str.data(),
-                                                                        v_ptr->vector_.chunk_id_,
-                                                                        v_ptr->vector_.chunk_offset_,
-                                                                        v_ptr->length_);
+                    std::memcpy(str.data(), data, v_ptr->length_);
                 }
                 const KeyType key = ConvertToOrderedKeyValue(str);
                 in_mem_secondary_index_.emplace(key, offset);

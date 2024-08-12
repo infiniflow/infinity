@@ -299,27 +299,27 @@ String FixHeapManager::Stats() const {
     return ss.str();
 }
 
-VarcharNextCharIterator::VarcharNextCharIterator(FixHeapManager *heap_mgr, const VarcharT &varchar) {
-    if (varchar.IsInlined()) {
-        data_ptr_ = varchar.short_.data_;
-        remain_size_ = varchar.length_;
-    } else {
-        heap_mgr_ = heap_mgr;
-        chunk_id_ = varchar.vector_.chunk_id_;
-        data_ptr_ = heap_mgr_->ReadChunk(chunk_id_).GetPtr() + varchar.vector_.chunk_offset_;
-        remain_size_ = heap_mgr_->current_chunk_size() - varchar.vector_.chunk_offset_;
-    }
-}
+// VarcharNextCharIterator::VarcharNextCharIterator(FixHeapManager *heap_mgr, const VarcharT &varchar) {
+//     if (varchar.IsInlined()) {
+//         data_ptr_ = varchar.short_.data_;
+//         remain_size_ = varchar.length_;
+//     } else {
+//         heap_mgr_ = heap_mgr;
+//         chunk_id_ = varchar.vector_.chunk_id_;
+//         data_ptr_ = heap_mgr_->ReadChunk(chunk_id_).GetPtr() + varchar.vector_.chunk_offset_;
+//         remain_size_ = heap_mgr_->current_chunk_size() - varchar.vector_.chunk_offset_;
+//     }
+// }
 
-[[nodiscard]] char VarcharNextCharIterator::GetNextChar() {
-    if (remain_size_ == 0) {
-        data_ptr_ = heap_mgr_->ReadChunk(++chunk_id_).GetPtr();
-        remain_size_ = heap_mgr_->current_chunk_size();
-    }
-    --remain_size_;
-    return *(data_ptr_++);
-}
+// [[nodiscard]] char VarcharNextCharIterator::GetNextChar() {
+//     if (remain_size_ == 0) {
+//         data_ptr_ = heap_mgr_->ReadChunk(++chunk_id_).GetPtr();
+//         remain_size_ = heap_mgr_->current_chunk_size();
+//     }
+//     --remain_size_;
+//     return *(data_ptr_++);
+// }
 
-VarcharNextCharIterator FixHeapManager::GetNextCharIterator(const VarcharT &varchar) { return VarcharNextCharIterator(this, varchar); }
+// VarcharNextCharIterator FixHeapManager::GetNextCharIterator(const VarcharT &varchar) { return VarcharNextCharIterator(this, varchar); }
 
 } // namespace infinity

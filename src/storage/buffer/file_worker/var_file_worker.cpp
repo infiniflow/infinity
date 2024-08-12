@@ -59,10 +59,13 @@ void VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
         UnrecoverableError(error_message);
     }
     const auto *buffer = static_cast<const VarBuffer *>(data_);
-    auto [data_size, data] = buffer->Finish();
+    SizeT data_size = buffer->TotalSize();
+    auto buffer_data = MakeUnique<char[]>(data_size);
+    char *ptr = buffer_data.get();
+    buffer->Write(ptr);
 
     LocalFileSystem fs;
-    u64 nbytes = fs.Write(*file_handler_, data.get(), data_size);
+    u64 nbytes = fs.Write(*file_handler_, buffer_data.get(), data_size);
     if (nbytes != data_size) {
         String error_message = fmt::format("Write {} bytes to file failed, only {} bytes written.", data_size, nbytes);
         UnrecoverableError(error_message);

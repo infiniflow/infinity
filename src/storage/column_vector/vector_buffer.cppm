@@ -21,6 +21,7 @@ import global_resource_usage;
 import heap_chunk;
 import fix_heap;
 import buffer_handle;
+import var_buffer;
 
 namespace infinity {
 
@@ -34,6 +35,8 @@ export enum class VectorBufferType {
     kCompactBit,
     kTensorHeap, // tensor, should be stored in one chunk
     kSparseHeap, // sparse, should be stored in one chunk
+
+    kVarBuffer, // new varchar
 };
 
 export class VectorBuffer {
@@ -113,6 +116,8 @@ public:
 
     UniquePtr<FixHeapManager> fix_heap_mgr_{nullptr};
     UniquePtr<FixHeapManager> fix_heap_mgr_1_{nullptr};
+
+    UniquePtr<VarBufferManager> var_buffer_mgr_{nullptr};
 };
 
 } // namespace infinity

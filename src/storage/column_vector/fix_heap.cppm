@@ -78,9 +78,9 @@ public:
 
 public:
     // Used when comparing two VarcharT variables.
-    // Only get next char, without copying it to buffer.
-    friend VarcharNextCharIterator;
-    [[nodiscard]] VarcharNextCharIterator GetNextCharIterator(const VarcharT &varchar);
+    // // Only get next char, without copying it to buffer.
+    // friend VarcharNextCharIterator;
+    // [[nodiscard]] VarcharNextCharIterator GetNextCharIterator(const VarcharT &varchar);
 
 private:
     VectorHeapChunk AllocateChunk();
@@ -106,17 +106,17 @@ private:
 };
 
 // can only move forward
-class VarcharNextCharIterator {
-public:
-    explicit VarcharNextCharIterator(FixHeapManager *heap_mgr, const VarcharT &varchar);
+// class VarcharNextCharIterator {
+// public:
+//     explicit VarcharNextCharIterator(FixHeapManager *heap_mgr, const VarcharT &varchar);
 
-    [[nodiscard]] char GetNextChar();
+//     [[nodiscard]] char GetNextChar();
 
-private:
-    const char *data_ptr_{nullptr};
-    u64 remain_size_{0};
-    FixHeapManager *heap_mgr_{nullptr};
-    ChunkId chunk_id_{0};
-};
+// private:
+//     const char *data_ptr_{nullptr};
+//     u64 remain_size_{0};
+//     FixHeapManager *heap_mgr_{nullptr};
+//     ChunkId chunk_id_{0};
+// };
 
 } // namespace infinity

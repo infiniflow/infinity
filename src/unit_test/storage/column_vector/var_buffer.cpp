@@ -54,8 +54,12 @@ TEST_F(VarBufferTest, test1) {
     };
 
     test(var_buffer);
-    auto [size, res4] = var_buffer.Finish();
+    auto size = var_buffer.TotalSize();
+    auto buffer = MakeUnique<char[]>(size);
+    auto *p = buffer.get();
+    p += var_buffer.Write(p);
+    EXPECT_EQ(p, buffer.get() + size);
     VarBuffer var_buffer2;
-    var_buffer2.Append(std::move(res4), size);
+    var_buffer2.Append(buffer.get(), size);
     test(var_buffer2);
 }

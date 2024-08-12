@@ -39,6 +39,7 @@ import constant_expr;
 import logger;
 import column_def;
 import logical_type;
+import var_buffer;
 
 namespace infinity {
 
@@ -505,7 +506,7 @@ void WriteToTensor<bool>(TensorT &target_tensor,
         target_fix_heap_manager->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), bit_bytes);
 }
 
-void CopyVarchar(VarcharT &dst_ref, FixHeapManager *dst_fix_heap_mgr, const VarcharT &src_ref, FixHeapManager *src_fix_heap_mgr);
+void CopyVarchar(VarcharT &dst_ref, VarBufferManager *dst_var_buffer, const VarcharT &src_ref, VarBufferManager *src_var_buffer);
 
 void CopyTensor(TensorT &dst_ref,
                 FixHeapManager *dst_fix_heap_mgr,
@@ -575,7 +576,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
         SizeT row_id = input_select[idx];
         VarcharT *dst_ptr = &(((VarcharT *)dst)[idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[row_id]);
-        CopyVarchar(*dst_ptr, dst_buf->fix_heap_mgr_.get(), *src_ptr, src_buf->fix_heap_mgr_.get());
+        CopyVarchar(*dst_ptr, dst_buf->var_buffer_mgr_.get(), *src_ptr, src_buf->var_buffer_mgr_.get());
     }
 }
 
@@ -778,7 +779,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
         VarcharT *dst_ptr = &(((VarcharT *)dst)[dest_start_idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[idx]);
-        CopyVarchar(*dst_ptr, dst_buf->fix_heap_mgr_.get(), *src_ptr, src_buf->fix_heap_mgr_.get());
+        CopyVarchar(*dst_ptr, dst_buf->var_buffer_mgr_.get(), *src_ptr, src_buf->var_buffer_mgr_.get());
         ++dest_start_idx;
     }
 }
@@ -981,7 +982,7 @@ ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, Size
     ptr_t dst = dst_buf->GetDataMut();
     VarcharT *dst_ptr = &(((VarcharT *)dst)[dst_idx]);
     const VarcharT *src_ptr = &(((const VarcharT *)src)[src_idx]);
-    CopyVarchar(*dst_ptr, dst_buf->fix_heap_mgr_.get(), *src_ptr, src_buf->fix_heap_mgr_.get());
+    CopyVarchar(*dst_ptr, dst_buf->var_buffer_mgr_.get(), *src_ptr, src_buf->var_buffer_mgr_.get());
 }
 
 template <>
@@ -1180,7 +1181,7 @@ class ColumnVectorPtrAndIdx<VarcharT> {
 
 public:
     explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col)
-        : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), fix_heap_mgr_(col->buffer_->fix_heap_mgr_.get()) {}
+        : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), var_buffer_mgr_(col->buffer_->var_buffer_mgr_.get()) {}
     auto &SetIndex(u32 index) {
         idx_ = index;
         return *this;
@@ -1192,9 +1193,15 @@ public:
         const VarcharT &right_value = right.data_ptr_[right.idx_];
         auto left_length = static_cast<u32>(left_value.length_);
         auto right_length = static_cast<u32>(right_value.length_);
-        auto left_char_iterator = left.fix_heap_mgr_->GetNextCharIterator(left_value);
-        auto right_char_iterator = right.fix_heap_mgr_->GetNextCharIterator(right_value);
-        return CompareCharArray(left_char_iterator, left_length, right_char_iterator, right_length);
+        const char *left_data = left_value.short_.data_;
+        if (!left_value.IsInlined()) {
+            left_data = left.var_buffer_mgr_->Get(left_value.vector1_.file_offset_, left_value.length_);
+        }
+        const char *right_data = right_value.short_.data_;
+        if (!right_value.IsInlined()) {
+            right_data = right.var_buffer_mgr_->Get(right_value.vector1_.file_offset_, right_value.length_);
+        }
+        return CompareCharArray(left_data, left_length, right_data, right_length);
     }
     friend bool CheckReaderValueEquality(const IteratorType &left, const IteratorType &right) {
         const VarcharT &left_value = left.data_ptr_[left.idx_];
@@ -1204,29 +1211,28 @@ public:
         if (left_length != right_length) {
             return false;
         }
-        auto left_char_iterator = left.fix_heap_mgr_->GetNextCharIterator(left_value);
-        auto right_char_iterator = right.fix_heap_mgr_->GetNextCharIterator(right_value);
-        for (u32 i = 0; i < left_length; ++i) {
-            if (left_char_iterator.GetNextChar() != right_char_iterator.GetNextChar()) {
-                return false;
-            }
+        const auto *left_data = left_value.short_.data_;
+        if (!left_value.IsInlined()) {
+            left_data = left.var_buffer_mgr_->Get(left_value.vector1_.file_offset_, left_length);
         }
-        return true;
+        const auto *right_data = right_value.short_.data_;
+        if (!right_value.IsInlined()) {
+            right_data = right.var_buffer_mgr_->Get(right_value.vector1_.file_offset_, right_length);
+        }
+        return std::strncmp(left_data, right_data, left_length) == 0;
     }
 
 private:
     const VarcharT *data_ptr_ = nullptr;
-    FixHeapManager *fix_heap_mgr_ = nullptr;
+    VarBufferManager *var_buffer_mgr_ = nullptr;
     u32 idx_ = {};
-    static std::strong_ordering CompareCharArray(auto &left_char_iterator, u32 left_len, auto &right_char_iterator, u32 right_len) {
-        for (u32 i = 0, com_len = std::min(left_len, right_len); i < com_len; ++i) {
-            char left_char = left_char_iterator.GetNextChar();
-            char right_char = right_char_iterator.GetNextChar();
-            if (left_char < right_char) {
-                return std::strong_ordering::less;
-            } else if (left_char > right_char) {
-                return std::strong_ordering::greater;
-            }
+
+    static std::strong_ordering CompareCharArray(const char *left_data, u32 left_len, const char *right_data, u32 right_len) {
+        int res = std::strncmp(left_data, right_data, std::min(left_len, right_len));
+        if (res < 0) {
+            return std::strong_ordering::less;
+        } else if (res > 0) {
+            return std::strong_ordering::greater;
         }
         return left_len <=> right_len;
     }
