@@ -18,10 +18,10 @@ Connects to the Infinity server and gets an Infinity object.
 
 The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
 
-- `"/path/to/save/to"`: `str` - A local directory for storing the Infinity data. Used when Infinity is deployed as a Python module.
+- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is deployed as a Python module.
 - `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A `NetworkAddress` object comprises two fields:
   - `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
-  - `<PORT>`: `int` - The port number on which Infinity is running. Defaults to `23817`.
+  - `<PORT>`: `int` - The port number on which the Infinity server is listening. Defaults to `23817`.
 
 :::caution IMPORTANT
 When connecting to Infinity in client-server mode, ensure that the client version *exactly* matches the server version. For example:
@@ -51,7 +51,7 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 ### Returns
 
-- Success: An Infinity object.
+- Success: An `infinity.local_infinity.infinity.LocalInfinityConnection` object in Python module mode or an `infinity.remote_thrift.infinity.RemoteThriftInfinityConnection` object in client-server mode.
 - Failure: `InfinityException`
   - `error_code`: `int` - A non-zero value indicating a specific error condition.
   - `error_msg`: `str` - A message providing additional details about the error.
@@ -69,7 +69,7 @@ infinity_obj = infinity.connect("/path/to/save/to")
 
 #### Connect to Infinity in client-server mode
 
-If you have deployed Infinity as a separate server, connect to it via its IP address. If your Infinity is running on your local machine, you can also use `infinity.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet.
+If you have deployed Infinity as a separate server, connect to it via its IP address. If your Infinity is running on your local machine, you can also use `infinity.common.LOCAL_HOST` to replace `"<SERVER_IP_ADDRESS>"` in the following code snippet.
 
 ```python
 import infinity
@@ -1408,6 +1408,11 @@ table_obj.output(["num/10"]).to_pl()
 ```
 
 ```python
+# Select column "num" and display all its cells as absolute values
+table_obj.output(["abs(num)"]).to_pl()
+```
+
+```python
 # Specify that the output should display the result of three multiplied by five
 # Note that no columns are involved in this example!
 # Either of the following works: 
@@ -1419,10 +1424,14 @@ table_obj.output(["3 * 5"]).to_result()
 ## filter
 
 ```python
-table_obj.filter(cond)
+table_obj.output(columns).filter(cond)
 ```
 
 Creates a filtering condition expression for the current table.
+
+:::tip NOTE
+Call `filter(cond)` in a chain after calling `output(columns)` on the same table object.
+:::
 
 ### Parameters
 
@@ -1445,11 +1454,11 @@ This method specifies a filtering condition for the rows in the current table bu
 ### Examples
 
 ```python
-table_obj.filter("(-7 < c1 or 9 >= c1) and (c2 = 3)").to_result()
+table_obj.output(["c1", "c2"]).filter("(-7 < c1 or 9 >= c1) and (c2 = 3)").to_pl()
 ```
 
 ```python
-table_obj.filter("c2 = 3").to_result()
+table_obj.output(["*"]).filter("c2 = 3").to_result()
 ```
 
 ---
@@ -1640,26 +1649,41 @@ table_obj.match_sparse('sparse', {"indices": [0, 10, 20], "values": [8, 10, 66]}
 ## match
 
 ```python
-table_obj.match(fields, matching_text, distance_type, topn, opt_params = None)
+table_obj.match(fields, matching_text, distance_type, options_text)
 ```
 
-Creates a full-text search expression.
+Performs a full-text search on the specified field(s)/column(s) and returns the most relevant rows to the provided matching text.
+
+:::danger NOTE  
+For now, it is only possible to create a full-text indext on multiple columns.
+:::
 
 ### Parameters
 
 #### fields: `str`, *Required*
 
-The column where text is searched, and has create full-text index on it before.
+A non-empty, comma-separated string of column names on which the full-text search will be performed.
 
-:::caution NOTE
-Ensure that you have created a full-text index on this column before performing a full-text search on it.
-:::
+
+:::tip NOTE
+Ensure that you have created a full-text index on these columns before executing a full-text search; otherwise, an error will occur.
 
 #### matching_text: `str`, *Required*
 
+A non-empty text string to search for. You can use various search options within the matching text, including:
+
+- Single terms: `"blooms"`
+- OR multiple terms: `"Bloom filter"`
+- Phrase search: `'"Bloom filter"'`
+- AND multiple terms: "space efficient"
+- Escaping reserved characters: "space\-efficient"
+- Sloppy phrase search: "harmful chemical"~10
+- Field-specific search: title:(quick OR brown) AND body:foobar
+
+
 #### options_text: `str`, *Required*
 
-'topn=2': Retrieve the two most relevant rows. The `topn` is `10` by default.
+Currently, only `topn` can be set in `options_text`, e.g., `"topn=10"` to retrieve the ten most relevant rows.
 
 ### Returns
 
@@ -1671,6 +1695,7 @@ Ensure that you have created a full-text index on this column before performing 
 ### Examples
 
 ```python
+
 questions = [
     r"blooms",  # single term
     r"Bloom filter",  # OR multiple terms
@@ -1693,19 +1718,19 @@ for question in questions:
 table_obj.match_tensor(vector_column_name, tensor_data, tensor_data_type, method_type, topn, extra_option)
 ```
 
-Builds a KNN tensor search expression. Find the top n closet rows to the given tensor according to chosen method.
+Builds a KNN tensor search expression. Find the top n closest rows to the given tensor according to chosen method.
 
 For example, find k most match tensors generated by ColBERT.
 
 ### Parameters
 
-#### vector_column_name: `str`
+#### vector_column_name: `str`, *Required*
 
 
-#### tensor_data: `list/np.ndarray`, 
+#### tensor_data: `list/np.ndarray`, *Required*
 
 
-#### tensor_data_type: `str`
+#### tensor_data_type: `str`, *Required*
 
 
 #### method_type: `str`
@@ -1798,44 +1823,97 @@ table_obj.fusion('match_tensor', 'topn=2', make_match_tensor_expr('t', [[0.0, -1
 
 ---
 
-## get result
+## to_result
+
 
 ```python
 table_obj.to_result()
 ```
 
+Returns the current table object as a tuple.
+
+:::tip NOTE
+Call `to_result()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
+:::
+
+:::caution NOTE
+We recommend calling `to_df()`, `to_pl()`, or `to_arrow()` to save your results.
+:::
+
+### Returns 
+
+`tuple[dict[str, list[Any]], dict[str, Any]]`
+
+## to_df
+
 ```python
 table_obj.to_df()
 ```
+
+Returns the current table object as a pandas DataFrame.
+
+:::tip NOTE
+Call `to_df()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
+:::
+
+### Examples
+
+```python
+# Save columns "c1" and C2" of the current table into a pandas DataFrame
+res = table_obj.output(["c1", "c2"]).to_df()
+```
+
+### Returns
+
+A `pandas.DataFrame` object.
+
+## to_pl
 
 ```python
 table_obj.to_pl()
 ```
 
-```python
-table_obj.to_arrow()
-```
+Returns the current table object as a Polas DataFrame.
 
-After querying, these four methods above can get result into specific type. 
-`Note: output method must be executed before get result`
+:::tip NOTE
+Call `to_pl()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
+:::
 
 ### Returns
 
-- **to_result() : tuple[dict[str, list[Any]], dict[str, Any]]**
-Python's built-in type
-- **to_df() : pandas.DataFrame**
-- **to_pl() : polars.DataFrame**
-- **to_arrow() : pyarrow.Table**
+A `polas.DataFrame` object.
 
 ### Examples
 
 ```python
-res = table_obj.output(['c1', 'c1']).to_df()
+# Save a vector search result into a Polas DataFrame. 
+res = table_obj.output(["*"])
+               .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10)
+               .to_pl()
+```
 
-res = table_obj.output(['*'])
-               .knn('vec', [3.0, 2.8, 2.7, 3.1], 'float', 'ip', 1)
-               .match('doctitle, num, body', 'word', match_param_3)
-               .fusion('rrf')
+## to_arrow
+
+```python
+table_obj.to_arrow()
+```
+
+Returns the current table object as an [Apache Arrow Table](https://arrow.apache.org/docs/python/generated/pyarrow.Table.html#pyarrow.Table).
+
+:::note
+Call `to_df()` in a chain after (not necessarily "immediately after") `output(columns)` on the same table object.
+:::
+
+### Returns
+
+A `pyarrow.Table` object.
+
+### Examples
+
+```python
+# Save the current table object into an Apache Arrow Table. 
+res = table_obj.output(["*"])
+               .filter("score >= 90")
                .to_pl()
 ```
 
