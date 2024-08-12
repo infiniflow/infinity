@@ -61,10 +61,7 @@ class RemoteTable(Table, ABC):
                      conflict_type: ConflictType = ConflictType.Error):
         index_name = index_name.strip()
 
-        index_info_to_use = ttypes.IndexInfo(column_name=index_info.column_name.strip(),
-                                             index_type=index_info.index_type.to_ttype(),
-                                             index_param_list=[init_param.to_ttype() for init_param in
-                                                               index_info.params])
+        index_info_to_use = index_info.to_ttype()
 
         create_index_conflict: ttypes.CreateConflict
         if conflict_type == ConflictType.Error:

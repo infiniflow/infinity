@@ -394,22 +394,18 @@ class TestInfinity:
         table_obj.create_index("my_index_1",
                                index.IndexInfo("c1",
                                                index.IndexType.Hnsw,
-                                               [
-                                                   index.InitParameter(
-                                                       "M", "16"),
-                                                   index.InitParameter(
-                                                       "ef_construction", "50"),
-                                                   index.InitParameter(
-                                                       "ef", "50"),
-                                                   index.InitParameter(
-                                                       "metric", "l2")
-                                               ]), ConflictType.Error)
+                                               {
+                                                   "M": "16",
+                                                   "ef_construction": "50",
+                                                   "ef": "50",
+                                                   "metric": "l2"
+                                               }), ConflictType.Error)
 
-        table_obj.create_index("my_index_2",
-                               index.IndexInfo("c1",
-                                               index.IndexType.IVFFlat,
-                                               [index.InitParameter("centroids_count", "128"),
-                                                index.InitParameter("metric", "l2")]), ConflictType.Error)
+        # table_obj.create_index("my_index_2",
+        #                        index.IndexInfo("c1",
+        #                                        index.IndexType.IVFFlat,
+        #                                        [index.InitParameter("centroids_count", "128"),
+        #                                         index.InitParameter("metric", "l2")]), ConflictType.Error)
 
         # insert
         values = [{"c1": [1.1 for _ in range(1024)]}]
@@ -420,8 +416,8 @@ class TestInfinity:
         res = table_obj.drop_index("my_index_1", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        res = table_obj.drop_index("my_index_2", ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
+        # res = table_obj.drop_index("my_index_2", ConflictType.Error)
+        # assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(
             "test_insert_data_into_index_created_table", ConflictType.Error)

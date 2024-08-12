@@ -32,7 +32,7 @@ namespace infinity {
 export template <typename CentroidsDataType, typename VectorDataType = CentroidsDataType>
 struct AnnIVFFlatIndexData {
     using CommonType = std::common_type_t<VectorDataType, CentroidsDataType>;
-    bool loaded_{false};
+    Atomic<bool> loaded_{false};
     MetricType metric_{MetricType::kInvalid};
     u32 dimension_{};
     u32 partition_num_{};

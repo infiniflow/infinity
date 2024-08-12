@@ -3335,6 +3335,7 @@ index_param : IDENTIFIER {
     free($3);
 }
 | IDENTIFIER '=' LONG_VALUE {
+    ParserHelper::ToLower($1);
     $$ = new infinity::InitParameter();
     $$->param_name_ = $1;
     free($1);
@@ -3342,6 +3343,7 @@ index_param : IDENTIFIER {
     $$->param_value_ = std::to_string($3);
 }
 | IDENTIFIER '=' DOUBLE_VALUE {
+    ParserHelper::ToLower($1);
     $$ = new infinity::InitParameter();
     $$->param_name_ = $1;
     free($1);

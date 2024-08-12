@@ -60,8 +60,7 @@ class TestInfinity:
 
         res = table.create_index("my_index",
                                  index.IndexInfo("body",
-                                                 index.IndexType.FullText,
-                                                 []),
+                                                 index.IndexType.FullText),
                                  ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
