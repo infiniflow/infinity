@@ -206,7 +206,6 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             search_expr->SetExprs(search_exprs);
             search_exprs = nullptr;
         }
-
         const QueryResult result = infinity_ptr->Search(db_name, table_name, search_expr, filter, output_columns);
 
         output_columns = nullptr;
@@ -367,6 +366,14 @@ bool HTTPSearch::ParseFusion(Vector<ParsedExpr *> &search_exprs,
                 return false;
             }
             search_exprs.push_back(match_tensor_expr);
+        } else if (IsEqual(key, "match_sparse")) {
+            ++child_match_cnt;
+            auto &match_sparse_json = expression.value();
+            const auto match_tensor_expr = ParseMatchSparse(match_sparse_json, http_status, response);
+            if (match_tensor_expr == nullptr) {
+                return false;
+            }
+            search_exprs.push_back(match_tensor_expr);
         } else if (IsEqual(key, "method")) {
             if (method_cnt++) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
@@ -382,6 +389,16 @@ bool HTTPSearch::ParseFusion(Vector<ParsedExpr *> &search_exprs,
                 fusion_expr = MakeUnique<FusionExpr>();
             }
             fusion_expr->SetOptions(expression.value());
+        } else if (IsEqual(key, "optional_match_tensor")) {
+            if (!fusion_expr) {
+                fusion_expr = MakeUnique<FusionExpr>();
+            }
+            auto &match_tensor_json = expression.value();
+            const auto match_tensor_expr = ParseMatchTensor(match_tensor_json, http_status, response);
+            if (match_tensor_expr == nullptr) {
+                return false;
+            }
+            fusion_expr->match_tensor_expr_.reset(match_tensor_expr);
         } else {
             response["error_code"] = ErrorCode::kInvalidExpression;
             response["error_message"] = "Error fusion clause";
@@ -399,7 +416,7 @@ bool HTTPSearch::ParseFusion(Vector<ParsedExpr *> &search_exprs,
             response["error_message"] = "Error fusion clause : empty method";
             return false;
         }
-        fusion_expr->JobAfterParser();
+        //fusion_expr->JobAfterParser();
         search_exprs.push_back(fusion_expr.release());
     }
     return true;
