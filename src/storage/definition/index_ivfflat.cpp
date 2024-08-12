@@ -52,7 +52,7 @@ SharedPtr<IndexBase> IndexIVFFlat::Make(SharedPtr<String> index_name,
     }
 
     if (metric_type == MetricType::kMetricCosine) {
-        Status status = Status::InvalidIndexDefinition("IVFFLAT index does not support cosine metric now.");
+        Status status = Status::NotSupport("IVFFLAT index does not support cosine metric now.");
         RecoverableError(status);
     }
 
