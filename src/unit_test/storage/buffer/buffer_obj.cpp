@@ -558,7 +558,7 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         Vector<InitParameter *> parameters1;
         parameters1.emplace_back(new InitParameter("metric", "l2"));
         parameters1.emplace_back(new InitParameter("encode", "plain"));
-        parameters1.emplace_back(new InitParameter("M", "16"));
+        parameters1.emplace_back(new InitParameter("m", "16"));
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
         parameters1.emplace_back(new InitParameter("ef", "200"));
 

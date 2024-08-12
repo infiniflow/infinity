@@ -1079,7 +1079,7 @@ class TestInfinity:
     @pytest.mark.parametrize("knn_column_name", ["gender_vector"])
     @pytest.mark.parametrize("index_distance_type", ["l2", "ip", "cosine", "cos"])
     @pytest.mark.parametrize("knn_distance_type", ["l2", "ip", "cosine", "cos"])
-    @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw]) # Remove index.IndexType.IVFFlat, after IVFFlat support cosine metric
+    @pytest.mark.parametrize("index_type", [index.IndexType.Hnsw, index.IndexType.IVFFlat]) # Remove index.IndexType.IVFFlat, after IVFFlat support cosine metric
     def test_with_various_index_knn_distance_combination(self, check_data, index_column_name, knn_column_name,
                                                          index_distance_type, knn_distance_type, index_type):
         db_obj = self.infinity_obj.get_database("default_db")
