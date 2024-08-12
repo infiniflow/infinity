@@ -94,7 +94,6 @@ class TestInfinity:
         res = db_obj.drop_table("fix_tmp_20240116", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_knn_u8(self, check_data):
@@ -145,7 +144,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_knn_u8", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("save_elem_type", ["float", "float16", "bfloat16"])
@@ -968,7 +966,6 @@ class TestInfinity:
             "test_with_fulltext_match_with_invalid_options", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     @pytest.mark.parametrize("save_elem_t", ["float32", "float16", "bfloat16"])
@@ -1391,7 +1388,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_tensor_scan", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("dim", [1, 10, 100])  # 1^3, 10^3, 100^3
     def test_big_dimension_tensor_scan(self, dim):
         db_obj = self.infinity_obj.get_database("default_db")
