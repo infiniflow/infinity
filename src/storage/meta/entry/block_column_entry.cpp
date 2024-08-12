@@ -71,7 +71,7 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
     DataType *column_type = block_column_entry->column_type_.get();
     SizeT row_capacity = block_entry->row_capacity();
     SizeT total_data_size = row_capacity * column_type->Size();
-    if (column_type->type() == kBoolean) {
+    if (column_type->type() == LogicalType::kBoolean) {
         // TODO
         total_data_size = (row_capacity + 7) / 8;
     }
@@ -97,8 +97,9 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     column_entry->commit_ts_ = commit_ts;
 
     DataType *column_type = column_entry->column_type_.get();
-    SizeT row_capacity = block_entry->row_capacity();
-    SizeT total_data_size = (column_type->type() == kBoolean) ? ((row_capacity + 7) / 8) : (row_capacity * column_type->Size());
+    const LogicalType column_data_logical_type = column_type->type();
+    const SizeT row_capacity = block_entry->row_capacity();
+    const SizeT total_data_size = (column_data_logical_type == LogicalType::kBoolean) ? ((row_capacity + 7) / 8) : (row_capacity * column_type->Size());
     auto file_worker = MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->file_name_, total_data_size);
 
     column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker));
@@ -208,31 +209,31 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
     // TODO: Opt, Flush certain row_count content
     DataType *column_type = block_column_entry->column_type_.get();
     switch (column_type->type()) {
-        case kBoolean:
-        case kTinyInt:
-        case kSmallInt:
-        case kInteger:
-        case kBigInt:
-        case kHugeInt:
-        case kDecimal:
-        case kFloat:
-        case kDouble:
-        case kFloat16:
-        case kBFloat16:
-        case kDate:
-        case kTime:
-        case kDateTime:
-        case kTimestamp:
-        case kInterval:
-        case kPoint:
-        case kLine:
-        case kLineSeg:
-        case kBox:
-        case kCircle:
+        case LogicalType::kBoolean:
+        case LogicalType::kTinyInt:
+        case LogicalType::kSmallInt:
+        case LogicalType::kInteger:
+        case LogicalType::kBigInt:
+        case LogicalType::kHugeInt:
+        case LogicalType::kDecimal:
+        case LogicalType::kFloat:
+        case LogicalType::kDouble:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
+        case LogicalType::kDate:
+        case LogicalType::kTime:
+        case LogicalType::kDateTime:
+        case LogicalType::kTimestamp:
+        case LogicalType::kInterval:
+        case LogicalType::kPoint:
+        case LogicalType::kLine:
+        case LogicalType::kLineSeg:
+        case LogicalType::kBox:
+        case LogicalType::kCircle:
             //        case kBitmap:
-        case kUuid:
-        case kEmbedding:
-        case kRowID: {
+        case LogicalType::kUuid:
+        case LogicalType::kEmbedding:
+        case LogicalType::kRowID: {
             //            SizeT buffer_size = row_count * column_type->Size();
             i64 address = (i64)(block_column_entry->buffer_);
             LOG_TRACE(fmt::format("Saving {} {}", block_column_entry->column_id(), address));
@@ -241,10 +242,11 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
 
             break;
         }
-        case kTensor:
-        case kSparse:
-        case kTensorArray:
-        case kVarchar: {
+        case LogicalType::kTensor:
+        case LogicalType::kSparse:
+        case LogicalType::kTensorArray:
+        case LogicalType::kMultiVector:
+        case LogicalType::kVarchar: {
             //            SizeT buffer_size = row_count * column_type->Size();
             LOG_TRACE(fmt::format("Saving column {}", block_column_entry->column_id()));
             block_column_entry->buffer_->Save();
@@ -258,20 +260,20 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
             }
             break;
         }
-        case kArray:
-        case kTuple:
+        case LogicalType::kArray:
+        case LogicalType::kTuple:
             //        case kPath:
             //        case kPolygon:
             //        case kBlob:
-        case kEmptyArray:
-        case kMixed:
-        case kNull: {
+        case LogicalType::kEmptyArray:
+        case LogicalType::kMixed:
+        case LogicalType::kNull: {
             LOG_ERROR(fmt::format("{} isn't supported", column_type->ToString()));
             String error_message = "Not implement: Invalid data type.";
             UnrecoverableError(error_message);
         }
-        case kMissing:
-        case kInvalid: {
+        case LogicalType::kMissing:
+        case LogicalType::kInvalid: {
             LOG_ERROR(fmt::format("Invalid data type {}", column_type->ToString()));
             String error_message = "Invalid data type.";
             UnrecoverableError(error_message);

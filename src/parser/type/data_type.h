@@ -322,6 +322,9 @@ template <>
 std::string DataType::TypeToString<TensorArrayT>();
 
 template <>
+std::string DataType::TypeToString<MultiVectorT>();
+
+template <>
 BooleanT DataType::StringToValue<BooleanT>(const std::string_view &str_view);
 
 template <>

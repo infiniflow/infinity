@@ -12,20 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef SearchScannerSuffix
-#error "SearchScannerSuffix is not defined"
-#endif
-#define INFINITY_CONCAT_INNER(A, B) A##B
-#define INFINITY_CONCAT(A, B) INFINITY_CONCAT_INNER(A, B)
-#define SearchScannerDerived INFINITY_CONCAT(SearchScanner, SearchScannerSuffix)
-#define yyFlexLexer INFINITY_CONCAT(SearchScannerDerived, FlexLexer)
-// clang-format off
-// the order of these includes is important
-#include <FlexLexer.h>
-#include "search_scanner_derived.h"
-// clang-format on
-#undef yyFlexLexer
-#undef SearchScannerDerived
-#undef INFINITY_CONCAT
-#undef INFINITY_CONCAT_INNER
-#undef SearchScannerSuffix
+#pragma once
+
+#include "tensor_type.h"
+
+namespace infinity {
+
+#pragma pack(1)
+
+struct MultiVectorType {
+    uint64_t embedding_num_ : 16 = 0;
+    uint64_t file_offset_ : 48 = 0;
+
+    [[nodiscard]] static std::string MultiVector2String(const char *multivec_ptr, EmbeddingDataType type, size_t embedding_dim, size_t embedding_num) {
+        return TensorType::Tensor2String(multivec_ptr, type, embedding_dim, embedding_num);
+    }
+};
+
+static_assert(sizeof(MultiVectorType) == sizeof(uint64_t));
+
+#pragma pack()
+
+} // namespace infinity

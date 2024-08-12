@@ -416,12 +416,6 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         RecoverableError(status);
     }
     const auto target_tensor_num = source_embedding_dim / target_embedding_dim;
-    // estimate the size of target tensor
-    if (const auto target_tensor_bytes = target_tensor_num * target_embedding_info->Size(); target_tensor_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
-        // TODO: better error message: tensor size overflow
-        Status status = Status::DataTypeMismatch(source_type.ToString(), target_type.ToString());
-        RecoverableError(status);
-    }
     target.embedding_num_ = target_tensor_num;
     if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
         String error_message = fmt::format("Tensor column vector should use kVarBuffer VectorBuffer.");
