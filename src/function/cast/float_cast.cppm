@@ -199,13 +199,13 @@ inline bool FloatTryCastToVarlen::Run(FloatT source, VarcharT &target, ColumnVec
     if (target.length_ <= VARCHAR_INLINE_LEN) {
         std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
-        std::memcpy(target.vector1_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
+        std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
             String error_message = "Varchar column vector should use MemoryVectorBuffer.";
             UnrecoverableError(error_message);
         }
         SizeT offset = vector_ptr->buffer_->var_buffer_mgr_->Append(tmp_str.c_str(), target.length_);
-        target.vector1_.file_offset_ = offset;
+        target.vector_.file_offset_ = offset;
     }
 
     return true;
@@ -305,13 +305,13 @@ inline bool FloatTryCastToVarlen::Run(DoubleT source, VarcharT &target, ColumnVe
     if (target.length_ <= VARCHAR_INLINE_LEN) {
         std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
-        std::memcpy(target.vector1_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
+        std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
         if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
             String error_message = "Varchar column vector should use MemoryVectorBuffer. ";
             UnrecoverableError(error_message);
         }
         SizeT offset = vector_ptr->buffer_->var_buffer_mgr_->Append(tmp_str.c_str(), target.length_);
-        target.vector1_.file_offset_ = offset;
+        target.vector_.file_offset_ = offset;
     }
 
     return true;

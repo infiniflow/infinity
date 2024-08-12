@@ -746,7 +746,7 @@ String ColumnVector::ToString(SizeT row_index) const {
                 return {varchar_ref.short_.data_, varchar_ref.length_};
             } else {
                 // Must be vector type
-                const char *data = buffer_->var_buffer_mgr_->Get(varchar_ref.vector1_.file_offset_, varchar_ref.length_);
+                const char *data = buffer_->var_buffer_mgr_->Get(varchar_ref.vector_.file_offset_, varchar_ref.length_);
                 String result_str(data, varchar_ref.length_);
                 return result_str;
             }
@@ -948,7 +948,7 @@ Value ColumnVector::GetValue(SizeT index) const {
             if (varchar.IsInlined()) {
                 return Value::MakeVarchar(((VarcharT *)data_ptr_)[index]);
             } else {
-                const char *data_ptr = buffer_->var_buffer_mgr_->Get(varchar.vector1_.file_offset_, varchar.length_);
+                const char *data_ptr = buffer_->var_buffer_mgr_->Get(varchar.vector_.file_offset_, varchar.length_);
                 return Value::MakeVarchar(data_ptr, varchar.length_);
             }
         }
@@ -1187,9 +1187,9 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
                 // Only prefix is enough to contain all string data.
                 std::memcpy(target_ref.short_.data_, src_str.c_str(), varchar_len);
             } else {
-                std::memcpy(target_ref.vector1_.prefix_, src_str.c_str(), VARCHAR_PREFIX_LEN);
+                std::memcpy(target_ref.vector_.prefix_, src_str.c_str(), VARCHAR_PREFIX_LEN);
                 SizeT file_offset = buffer_->var_buffer_mgr_->Append(src_str.c_str(), varchar_len);
-                target_ref.vector1_.file_offset_ = file_offset;
+                target_ref.vector_.file_offset_ = file_offset;
             }
             break;
         }
@@ -1769,9 +1769,9 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             if (sv.size() <= VARCHAR_INLINE_LEN) {
                 std::memcpy(varchar.short_.data_, sv.data(), sv.size());
             } else {
-                std::memcpy(varchar.vector1_.prefix_, sv.data(), VARCHAR_PREFIX_LEN);
+                std::memcpy(varchar.vector_.prefix_, sv.data(), VARCHAR_PREFIX_LEN);
                 SizeT file_offset = buffer_->var_buffer_mgr_->Append(sv.data(), sv.size());
-                varchar.vector1_.file_offset_ = file_offset;
+                varchar.vector_.file_offset_ = file_offset;
             }
             break;
         }
@@ -2151,8 +2151,8 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
                 if (0 != memcmp(lhs->short_.data_, rhs->short_.data_, lhs->length_))
                     return false;
             } else {
-                const char *data1 = buffer_->var_buffer_mgr_->Get(lhs->vector1_.file_offset_, lhs->length_);
-                const char *data2 = other.buffer_->var_buffer_mgr_->Get(rhs->vector1_.file_offset_, rhs->length_);
+                const char *data1 = buffer_->var_buffer_mgr_->Get(lhs->vector_.file_offset_, lhs->length_);
+                const char *data2 = other.buffer_->var_buffer_mgr_->Get(rhs->vector_.file_offset_, rhs->length_);
                 if (0 != memcmp(data1, data2, lhs->length_))
                     return false;
             }
@@ -2312,10 +2312,10 @@ void CopyVarchar(VarcharT &dst_ref, VarBufferManager *dst_var_buffer, const Varc
         // Only prefix is enough to contain all string data.
         std::memcpy(dst_ref.short_.data_, src_ref.short_.data_, varchar_len);
     } else {
-        std::memcpy(dst_ref.vector1_.prefix_, src_ref.vector1_.prefix_, VARCHAR_PREFIX_LEN);
-        const char *src_data = src_var_buffer->Get(src_ref.vector1_.file_offset_, varchar_len);
+        std::memcpy(dst_ref.vector_.prefix_, src_ref.vector_.prefix_, VARCHAR_PREFIX_LEN);
+        const char *src_data = src_var_buffer->Get(src_ref.vector_.file_offset_, varchar_len);
         SizeT dst_offset = dst_var_buffer->Append(src_data, varchar_len);
-        dst_ref.vector1_.file_offset_ = dst_offset;
+        dst_ref.vector_.file_offset_ = dst_offset;
     }
 }
 

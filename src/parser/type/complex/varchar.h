@@ -32,13 +32,7 @@ struct InlineVarchar {
     char data_[VARCHAR_INLINE_LENGTH]{};
 };
 
-// struct VectorVarchar {
-//     char prefix_[VARCHAR_PREFIX_LENGTH]{};
-//     uint32_t chunk_id_{0};
-//     uint32_t chunk_offset_{0};
-// };
-
-struct VectorVarchar1 {
+struct VectorVarchar {
     char prefix_[VARCHAR_PREFIX_LENGTH]{};
     uint64_t file_offset_{0};
 };
@@ -62,8 +56,7 @@ struct Varchar {
     uint64_t length_ : 23 = 0;
     union {
         InlineVarchar short_;
-        // VectorVarchar vector_;
-        VectorVarchar1 vector1_;
+        VectorVarchar vector_;
     };
 
     // only for unit test
@@ -71,7 +64,7 @@ struct Varchar {
         if (IsInlined()) {
             return std::string{short_.data_, static_cast<size_t>(length_)};
         }
-        return std::string{vector1_.prefix_, static_cast<size_t>(VARCHAR_PREFIX_LENGTH)};
+        return std::string{vector_.prefix_, static_cast<size_t>(VARCHAR_PREFIX_LENGTH)};
     }
 };
 

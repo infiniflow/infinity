@@ -883,7 +883,7 @@ void HandleVarcharType(ColumnField &output_column_field, SizeT row_count, const 
             std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
             std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
         } else {
-            const char *data = column_vector->buffer_->var_buffer_mgr_->Get(varchar.vector1_.file_offset_, varchar.length_);
+            const char *data = column_vector->buffer_->var_buffer_mgr_->Get(varchar.vector_.file_offset_, varchar.length_);
             std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
             std::memcpy(dst.data() + current_offset + sizeof(i32), data, varchar.length_);
         }

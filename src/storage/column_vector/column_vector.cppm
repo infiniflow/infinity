@@ -1195,11 +1195,11 @@ public:
         auto right_length = static_cast<u32>(right_value.length_);
         const char *left_data = left_value.short_.data_;
         if (!left_value.IsInlined()) {
-            left_data = left.var_buffer_mgr_->Get(left_value.vector1_.file_offset_, left_value.length_);
+            left_data = left.var_buffer_mgr_->Get(left_value.vector_.file_offset_, left_value.length_);
         }
         const char *right_data = right_value.short_.data_;
         if (!right_value.IsInlined()) {
-            right_data = right.var_buffer_mgr_->Get(right_value.vector1_.file_offset_, right_value.length_);
+            right_data = right.var_buffer_mgr_->Get(right_value.vector_.file_offset_, right_value.length_);
         }
         return CompareCharArray(left_data, left_length, right_data, right_length);
     }
@@ -1213,11 +1213,11 @@ public:
         }
         const auto *left_data = left_value.short_.data_;
         if (!left_value.IsInlined()) {
-            left_data = left.var_buffer_mgr_->Get(left_value.vector1_.file_offset_, left_length);
+            left_data = left.var_buffer_mgr_->Get(left_value.vector_.file_offset_, left_length);
         }
         const auto *right_data = right_value.short_.data_;
         if (!right_value.IsInlined()) {
-            right_data = right.var_buffer_mgr_->Get(right_value.vector1_.file_offset_, right_length);
+            right_data = right.var_buffer_mgr_->Get(right_value.vector_.file_offset_, right_length);
         }
         return std::strncmp(left_data, right_data, left_length) == 0;
     }
