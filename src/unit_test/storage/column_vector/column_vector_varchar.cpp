@@ -83,7 +83,7 @@ TEST_P(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -139,7 +139,7 @@ TEST_P(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -189,7 +189,7 @@ TEST_P(ColumnVectorVarcharTest, constant_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -234,7 +234,7 @@ TEST_P(ColumnVectorVarcharTest, constant_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -345,7 +345,7 @@ TEST_P(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -401,7 +401,7 @@ TEST_P(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -447,7 +447,7 @@ TEST_P(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -492,7 +492,7 @@ TEST_P(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -527,7 +527,7 @@ TEST_P(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -583,7 +583,7 @@ TEST_P(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);

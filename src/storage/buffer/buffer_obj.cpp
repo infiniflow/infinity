@@ -97,7 +97,7 @@ BufferHandle BufferObj::Load() {
 bool BufferObj::Free() {
     std::unique_lock<std::mutex> locker(w_locker_, std::defer_lock);
     if (!locker.try_lock()) {
-        return false;
+        return false; // when other thread is loading or cleaning, return false
     }
     if (status_ != BufferStatus::kUnloaded) {
         String error_message = fmt::format("attempt to free {} buffer object", BufferStatusToString(status_));
