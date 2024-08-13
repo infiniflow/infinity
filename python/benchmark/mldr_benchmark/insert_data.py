@@ -97,20 +97,22 @@ class InfinityClientForInsert:
         print("Finish creating fulltext index.")
         print("Start creating Hnsw index...")
         res = self.infinity_table.create_index("hnsw_index", index.IndexInfo("dense_col", index.IndexType.Hnsw,
-                                                                             [index.InitParameter("M", "16"),
-                                                                              index.InitParameter("ef_construction",
-                                                                                                  "200"),
-                                                                              index.InitParameter("ef", "200"),
-                                                                              index.InitParameter("metric", "ip"),
-                                                                              index.InitParameter("encode", "lvq")]),
+                                                                             {
+                                                                                 "m": "16",
+                                                                                 "ef_construction": "200",
+                                                                                 "ef": "200",
+                                                                                 "metric": "ip",
+                                                                                 "encode": "lvq"
+                                                                             }),
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         print("Finish creating Hnsw index.")
         print("Start creating BMP index...")
         res = self.infinity_table.create_index("bmp_index", index.IndexInfo("sparse_col", index.IndexType.BMP,
-                                                                            [index.InitParameter("block_size", "8"),
-                                                                             index.InitParameter("compress_type",
-                                                                                                 "compress")]),
+                                                                            {
+                                                                                "block_size": "8",
+                                                                                "compress_type": "compress"
+                                                                            }),
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         self.infinity_table.optimize("bmp_index", {"topk": "1000", "bp_reorder": ""})

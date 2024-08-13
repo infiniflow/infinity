@@ -37,7 +37,9 @@ public:
                   EmbeddingT query_embedding,
                   Vector<SharedPtr<BaseExpression>> arguments,
                   i64 topn,
-                  Vector<InitParameter *> *opt_params);
+                  Vector<InitParameter *> *opt_params,
+                  String using_index,
+                  bool ignore_index);
 
     inline DataType Type() const override { return DataType(LogicalType::kFloat); }
 
@@ -64,6 +66,8 @@ public:
     const EmbeddingT query_embedding_;
     const i64 topn_;
     Vector<InitParameter> opt_params_;
+    const String using_index_;
+    bool ignore_index_;
 };
 
 } // namespace infinity

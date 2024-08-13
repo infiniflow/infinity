@@ -341,27 +341,66 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     Map<u32, SharedPtr<SegmentIndexEntry>> index_entry_map;
 
-    {
+    if(knn_expression_->ignore_index_) {
+        LOG_TRACE("Not use index"); // No index need to check
+    } else {
         auto map_guard = table_entry->IndexMetaMap();
-        for (auto &[index_name, table_index_meta] : *map_guard) {
+        if(knn_expression_->using_index_.empty()) {
+            LOG_TRACE("Try to find a index to use");
+            for (auto &[index_name, table_index_meta] : *map_guard) {
+                auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
+                if (!status.ok()) {
+                    // already dropped
+                    LOG_WARN(status.message());
+                    continue;
+                }
+
+                const String column_name = table_index_entry->index_base()->column_name();
+                SizeT column_id = table_entry->GetColumnIdByName(column_name);
+                if (column_id != knn_column_id) {
+                    // knn_column_id isn't in this table index
+                    continue;
+                }
+                // check index type
+                if (auto index_type = table_index_entry->index_base()->index_type_;
+                    index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
+                    LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
+                    continue;
+                }
+
+                // Fill the segment with index
+                index_entry_map = table_index_entry->index_by_segment();
+            }
+        } else {
+            LOG_TRACE(fmt::format("Use index: {}", knn_expression_->using_index_));
+            auto iter = (*map_guard).find(knn_expression_->using_index_);
+            if(iter == (*map_guard).end()) {
+                Status status = Status::IndexNotExist(knn_expression_->using_index_);
+                RecoverableError(std::move(status));
+            }
+
+            auto& table_index_meta = iter->second;
+
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
                 // already dropped
-                LOG_WARN(status.message());
-                continue;
+                RecoverableError(std::move(status));
             }
 
             const String column_name = table_index_entry->index_base()->column_name();
             SizeT column_id = table_entry->GetColumnIdByName(column_name);
             if (column_id != knn_column_id) {
                 // knn_column_id isn't in this table index
-                continue;
+                LOG_ERROR(fmt::format("Column {} not found", column_name));
+                Status error_status = Status::ColumnNotExist(column_name);
+                RecoverableError(std::move(error_status));
             }
             // check index type
             if (auto index_type = table_index_entry->index_base()->index_type_;
                 index_type != IndexType::kIVFFlat and index_type != IndexType::kHnsw) {
-                LOG_TRACE(fmt::format("KnnScan: PlanWithIndex(): Skipping non-knn index."));
-                continue;
+                LOG_ERROR("Invalid index type");
+                Status error_status = Status::InvalidIndexType();
+                RecoverableError(std::move(error_status));
             }
 
             // Fill the segment with index

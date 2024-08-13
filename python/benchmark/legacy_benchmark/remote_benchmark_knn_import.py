@@ -106,13 +106,13 @@ def create_index(table_obj, m: int, ef_construction: int, remote: bool):
         index.IndexInfo(
             "col1",
             index.IndexType.Hnsw,
-            [
-                index.InitParameter("M", str(m)),
-                index.InitParameter("ef_construction", str(ef_construction)),
-                index.InitParameter("ef", str(ef_construction)),
-                index.InitParameter("metric", "l2"),
-                index.InitParameter("encode", "lvq"),
-            ],
+            {
+                "m": str(m),
+                "ef_construction": str(ef_construction),
+                "ef": str(ef_construction),
+                "metric": "l2",
+                "encode": "lvq"
+            },
         )
     )
 

@@ -172,7 +172,9 @@ class InfinityThriftQueryBuilder(ABC):
         knn_opt_params = []
         if knn_params is not None:
             for k, v in knn_params.items():
-                knn_opt_params.append(InitParameter(k, v))
+                key = k.lower()
+                value = v.lower()
+                knn_opt_params.append(InitParameter(key, value))
 
         knn_expr = KnnExpr(
             column_expr=column_expr,

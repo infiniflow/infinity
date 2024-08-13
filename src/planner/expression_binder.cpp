@@ -658,13 +658,20 @@ SharedPtr<BaseExpression> ExpressionBinder::BuildKnnExpr(const KnnExpr &parsed_k
     // Create query embedding
     EmbeddingT query_embedding((ptr_t)parsed_knn_expr.embedding_data_ptr_, false);
 
+    if(parsed_knn_expr.ignore_index_ && !parsed_knn_expr.index_name_.empty()) {
+        Status status = Status::SyntaxError(fmt::format("Force to use index {} conflicts with Ignore index flag.", parsed_knn_expr.index_name_));
+        RecoverableError(std::move(status));
+    }
+
     SharedPtr<KnnExpression> bound_knn_expr = MakeShared<KnnExpression>(parsed_knn_expr.embedding_data_type_,
                                                                         parsed_knn_expr.dimension_,
                                                                         parsed_knn_expr.distance_type_,
                                                                         std::move(query_embedding),
                                                                         arguments,
                                                                         parsed_knn_expr.topn_,
-                                                                        parsed_knn_expr.opt_params_);
+                                                                        parsed_knn_expr.opt_params_,
+                                                                        parsed_knn_expr.index_name_,
+                                                                        parsed_knn_expr.ignore_index_);
 
     return bound_knn_expr;
 }
