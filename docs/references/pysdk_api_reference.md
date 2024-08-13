@@ -1771,7 +1771,7 @@ table_object.create_index(
             IndexType.EMVB,
             [
                 InitParameter("pq_subspace_num", "16"),
-                InitParameter("pq_subspace_bits", "8"),
+                InitParameter("pq_subspace_bits", "8")
             ]
         ),
     None
@@ -1808,7 +1808,7 @@ The supported reranking methods, including:
     - 'rank_constant=30': The default value is `60`.
 
 - `weighted_sum-specific options`:
-    - 'weights=1,2,0.5': The weights of children scorers. The default weight of each weight is `1.0`.
+    - 'weights=1,2,0.5': The weights of children scorers. The default weight of each way is `1.0`.
 
 ### Returns
 
