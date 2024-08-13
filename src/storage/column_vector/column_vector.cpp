@@ -2120,6 +2120,8 @@ void ColumnVector::Reset() {
     //    buffer_.reset();
     if (buffer_.get() != nullptr) {
         buffer_->fix_heap_mgr_ = nullptr;
+        buffer_->fix_heap_mgr_1_ = nullptr;
+        buffer_->var_buffer_mgr_ = nullptr;
     }
     //    data_ptr_ = nullptr;
 
