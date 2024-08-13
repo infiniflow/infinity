@@ -66,21 +66,21 @@ IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<St
     SizeT block_size = HNSW_BLOCK_SIZE;
     MetricType metric_type = MetricType::kInvalid;
     HnswEncodeType encode_type = HnswEncodeType::kPlain;
-    for (const auto *para : index_param_list) {
-        if (para->param_name_ == "m" or para->param_name_ == "M") {
-            M = std::stoi(para->param_value_);
-        } else if (para->param_name_ == "ef_construction") {
-            ef_construction = std::stoi(para->param_value_);
-        } else if (para->param_name_ == "ef") {
-            ef = std::stoi(para->param_value_);
-        } else if (para->param_name_ == "metric") {
-            metric_type = StringToMetricType(para->param_value_);
-        } else if (para->param_name_ == "encode") {
-            encode_type = StringToHnswEncodeType(para->param_value_);
-        } else if (para->param_name_ == "block_size") {
-            block_size = std::stoi(para->param_value_);
+    for (const auto *param : index_param_list) {
+        if (param->param_name_ == "m") {
+            M = std::stoi(param->param_value_);
+        } else if (param->param_name_ == "ef_construction") {
+            ef_construction = std::stoi(param->param_value_);
+        } else if (param->param_name_ == "ef") {
+            ef = std::stoi(param->param_value_);
+        } else if (param->param_name_ == "metric") {
+            metric_type = StringToMetricType(param->param_value_);
+        } else if (param->param_name_ == "encode") {
+            encode_type = StringToHnswEncodeType(param->param_value_);
+        } else if (param->param_name_ == "block_size") {
+            block_size = std::stoi(param->param_value_);
         } else {
-            Status status = Status::InvalidIndexParam(para->param_name_);
+            Status status = Status::InvalidIndexParam(param->param_name_);
             RecoverableError(status);
         }
     }
@@ -172,8 +172,8 @@ void IndexHnsw::ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table
     }
     SharedPtr<EmbeddingInfo> embedding_info = std::dynamic_pointer_cast<EmbeddingInfo>(data_type_ptr->type_info());
     EmbeddingDataType embedding_data_type = embedding_info->Type();
-    for (const auto *para : index_param_list) {
-        if (para->param_name_ == "encode" && StringToHnswEncodeType(para->param_value_) == HnswEncodeType::kLVQ) {
+    for (const auto *param : index_param_list) {
+        if (param->param_name_ == "encode" && StringToHnswEncodeType(param->param_value_) == HnswEncodeType::kLVQ) {
             // TODO: now only support float?
             if (embedding_data_type != EmbeddingDataType::kElemFloat) {
                 Status status =

@@ -2631,7 +2631,7 @@ public:
                 } else if (option == "error") {
                     options.conflict_type_ = ConflictType::kError;
                 } else {
-                    json_response["error_code"] = 3074;
+                    json_response["error_code"] = 3075;
                     json_response["error_message"] = fmt::format("Invalid drop option: {}", option);
                     http_status = HTTPStatus::CODE_500;
                 }

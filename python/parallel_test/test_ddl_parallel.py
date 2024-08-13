@@ -129,7 +129,7 @@ def create_index(infinity_obj: RemoteThriftInfinityConnection):
         table_name = exist_tables[random.randint(0, len(exist_tables) - 1)]
         try:
             table_obj = db_obj.get_table(table_name)
-            if (table_name[0:3] == "vec"):
+            if table_name[0:3] == "vec":
                 index_on = vec_indexes_on[random.randint(0, len(vec_indexes_on) - 1)]
                 index_type_choice = random.randint(0, len(vector_index_type) - 1)
                 index_type = vector_index_type[index_type_choice]
@@ -137,7 +137,7 @@ def create_index(infinity_obj: RemoteThriftInfinityConnection):
             else:
                 index_on = fulltext_indexes_on[random.randint(0, len(fulltext_indexes_on) - 1)]
                 index_type = index.IndexType.FullText
-                index_option = []
+                index_option = None
             table_obj.create_index(index_on, index.IndexInfo(index_on, index_type, index_option),
                                    conflict_type=ConflictType.Ignore)
             res = table_obj.list_indexes()

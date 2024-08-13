@@ -330,20 +330,23 @@ class http_adapter:
                 copt = baseCreateOptions[conflict_type]
 
         fields = []
-        index = {}
+        create_index_info = {}
         fields.append(index_info.column_name)
-        index["type"] = index_type_transfrom[index_info.index_type]
-        for param in index_info.params:
-            index[param.param_name] = param.param_value
+        create_index_info["type"] = index_type_transfrom[index_info.index_type]
+        if index_info.params is not None:
+            for key, value in index_info.params.items():
+                if not isinstance(value, str):
+                    raise InfinityException(ErrorCode.INVALID_INDEX_PARAM, f"parameter value: {value} isn't string")
+                create_index_info[key] = value
         #print(fields)
-        #print(index)
+        #print(create_index_info)
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
         h = self.set_up_header(
             ["accept", "content-type"],
         )
         d = self.set_up_data(
-            ["create_option"], {"fields": fields, "index": index, "create_option": copt}
+            ["create_option"], {"fields": fields, "index": create_index_info, "create_option": copt}
         )
         r = self.request(url, "post", h, d)
         self.raise_exception(r)

@@ -74,10 +74,7 @@ class LocalTable(Table, ABC):
         else:
             raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
 
-        index_info_to_use = WrapIndexInfo()
-        index_info_to_use.index_type = index_info.index_type.to_local_type()
-        index_info_to_use.column_name = index_info.column_name.strip()
-        index_info_to_use.index_param_list = [init_param.to_local_type() for init_param in index_info.params]
+        index_info_to_use = index_info.to_local_type()
 
         res = self._conn.create_index(db_name=self._db_name,
                                       table_name=self._table_name,

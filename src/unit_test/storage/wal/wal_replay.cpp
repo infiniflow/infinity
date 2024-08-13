@@ -938,7 +938,7 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             Vector<InitParameter *> parameters1;
             parameters1.emplace_back(new InitParameter("metric", "l2"));
             parameters1.emplace_back(new InitParameter("encode", "plain"));
-            parameters1.emplace_back(new InitParameter("M", "16"));
+            parameters1.emplace_back(new InitParameter("m", "16"));
             parameters1.emplace_back(new InitParameter("ef_construction", "200"));
             parameters1.emplace_back(new InitParameter("ef", "200"));
 

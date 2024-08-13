@@ -80,8 +80,7 @@ class TestIndexParallel(TestSdk):
         table_obj.import_data(file_path, {"delimiter": "\t"})
         res = table_obj.create_index("body_index",
                                      index.IndexInfo("body",
-                                                     index.IndexType.FullText,
-                                                     []))
+                                                     index.IndexType.FullText))
         assert res.error_code == ErrorCode.OK
 
         threads = []
@@ -135,16 +134,12 @@ class TestIndexParallel(TestSdk):
         res = table_obj.create_index("my_index",
                                      index.IndexInfo(index_column_name,
                                                      index_type,
-                                                     [
-                                                         index.InitParameter(
-                                                             "M", "16"),
-                                                         index.InitParameter(
-                                                             "ef_construction", "50"),
-                                                         index.InitParameter(
-                                                             "ef", "50"),
-                                                         index.InitParameter(
-                                                             "metric", index_distance_type)
-                                                     ]), ConflictType.Error)
+                                                     {
+                                                         "M": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": index_distance_type
+                                                     }), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         end_time = time.time() + running_time
@@ -236,16 +231,12 @@ class TestIndexParallel(TestSdk):
         res = table_obj.create_index("my_index",
                                      index.IndexInfo(index_column_name,
                                                      index_type,
-                                                     [
-                                                         index.InitParameter(
-                                                             "M", "16"),
-                                                         index.InitParameter(
-                                                             "ef_construction", "50"),
-                                                         index.InitParameter(
-                                                             "ef", "50"),
-                                                         index.InitParameter(
-                                                             "metric", index_distance_type)
-                                                     ]), ConflictType.Error)
+                                                     {
+                                                         "M": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": index_distance_type
+                                                     }), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         kInsertThreadNum = 4
         kRuningTime = 10
