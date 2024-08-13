@@ -2357,13 +2357,9 @@ void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &
             std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
             std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
         } else {
-            auto varchar_ptr = MakeUnique<char[]>(varchar.length_ + 1);
-            column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(),
-                                                                varchar.vector_.chunk_id_,
-                                                                varchar.vector_.chunk_offset_,
-                                                                varchar.length_);
+            const auto *data = column_vector->buffer_->var_buffer_mgr_->Get(varchar.vector_.file_offset_, length);
             std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-            std::memcpy(dst.data() + current_offset + sizeof(i32), varchar_ptr.get(), varchar.length_);
+            std::memcpy(dst.data() + current_offset + sizeof(i32), data, varchar.length_);
         }
         current_offset += sizeof(i32) + varchar.length_;
     }

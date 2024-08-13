@@ -543,13 +543,12 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, Column
         std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
         std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
-        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            String error_message = "Varchar column vector should use MemoryVectorBuffer.";
+        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
+            String error_message = "Varchar column vector should use VarBuffer.";
             UnrecoverableError(error_message);
         }
-        auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
-        target.vector_.chunk_id_ = chunk_id;
-        target.vector_.chunk_offset_ = chunk_offset;
+        SizeT offset = vector_ptr->buffer_->var_buffer_mgr_->Append(tmp_str.c_str(), target.length_);
+        target.vector_.file_offset_ = offset;
     }
 
     return true;

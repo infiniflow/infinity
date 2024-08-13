@@ -65,6 +65,10 @@ protected:
 
         data_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/data");
         temp_dir_ = MakeShared<String>(std::string(tmp_data_path()) + "/buffer/temp");
+        ResetDir();
+    }
+
+    void ResetDir() {
         fs.DeleteDirectory(*data_dir_);
         fs.DeleteDirectory(*temp_dir_);
         fs.CreateDirectory(*data_dir_);
@@ -276,34 +280,24 @@ public:
 
 class BufferManagerParallelTest : public BufferManagerTest {
 protected:
-    void SetUp() override {
-        BufferManagerTest::SetUp();
-        buffer_mgr_ = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_);
-        finished_n_ = 0;
-    }
+    void SetUp() override { BufferManagerTest::SetUp(); }
 
-    void TearDown() override {
-        EXPECT_EQ(buffer_mgr_->memory_usage(), 0ul);
-        buffer_mgr_.reset();
-        BufferManagerTest::TearDown();
-    }
+    void TearDown() override { BufferManagerTest::TearDown(); }
 
     const SizeT thread_n = 2;
     const SizeT file_n = 100;
     const SizeT avg_file_size = 100;
     const SizeT max_file_size = avg_file_size + avg_file_size / 2;
-    const SizeT buffer_size = max_file_size * thread_n;
+    // *2 because BufferManager::RequestSpace may scan buffer obj that is loading/cleaning
+    const SizeT buffer_size = max_file_size * thread_n * 2;
     const SizeT loop_n = 10;
     const SizeT test_n_ = 2;
     const SizeT var_file_step = max_file_size / loop_n / test_n_;
 
-    UniquePtr<BufferManager> buffer_mgr_;
-    Atomic<SizeT> finished_n_ = 0;
-
-    void TestRoutine(Vector<FileInfo> &file_infos, SizeT test_i, SizeT thread_i, TestObj *test_obj) {
+    void TestRoutine(Vector<FileInfo> &file_infos, SizeT test_i, SizeT thread_i, TestObj *test_obj, Atomic<SizeT> &finished_n) {
         bool alloc_new = test_i == 0;
         bool clean = test_i == test_n_ - 1;
-        while (finished_n_.load() < file_n) {
+        while (finished_n.load() < file_n) {
             int op = rand() % 5;
             if (op > 2) {
                 op = 2; // read
@@ -334,7 +328,7 @@ protected:
                         buffer_obj->PickForCleanup();
                         buffer_obj = nullptr;
                     }
-                    finished_n_.fetch_add(1);
+                    finished_n.fetch_add(1);
                 }
             } else {
                 std::shared_lock lck(file_info.mtx_);
@@ -345,6 +339,9 @@ protected:
                     continue;
                 }
                 test_obj->Check(file_info);
+
+                SizeT file_size = file_info.buffer_obj_->GetBufferSize();
+                EXPECT_EQ(file_size, file_info.file_size_);
             }
         }
         LOG_INFO(fmt::format("Test {} thread {} finished", test_i, thread_i));
@@ -395,29 +392,36 @@ public:
 };
 
 TEST_F(BufferManagerParallelTest, parallel_test1) {
-    auto test1_obj = MakeUnique<Test1Obj>(avg_file_size, buffer_mgr_.get(), data_dir_);
-    LocalFileSystem fs;
+    for (int i = 0; i < 10; ++i) {
+        auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_);
+        auto test1_obj = MakeUnique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_);
+        LocalFileSystem fs;
 
-    Vector<FileInfo> file_infos;
-    for (SizeT i = 0; i < file_n; ++i) {
-        file_infos.emplace_back(i);
-    }
-    LOG_INFO("Start parallel test1");
-    for (SizeT test_i = 0; test_i < test_n_; test_i++) {
-        finished_n_.store(0);
-        for (auto &file_info : file_infos) {
-            file_info.buffer_obj_ = nullptr;
+        Vector<FileInfo> file_infos;
+        for (SizeT i = 0; i < file_n; ++i) {
+            file_infos.emplace_back(i);
         }
+        LOG_INFO(fmt::format("Start parallel test1 {}", i));
+        for (SizeT test_i = 0; test_i < test_n_; test_i++) {
+            Atomic<SizeT> finished_n = 0;
+            for (auto &file_info : file_infos) {
+                file_info.buffer_obj_ = nullptr;
+            }
 
-        Vector<Thread> threads;
-        for (SizeT thread_i = 0; thread_i < thread_n; ++thread_i) {
-            threads.emplace_back([&, thread_i]() { TestRoutine(file_infos, test_i, thread_i, test1_obj.get()); });
+            Vector<Thread> threads;
+            for (SizeT thread_i = 0; thread_i < thread_n; ++thread_i) {
+                threads.emplace_back([&, thread_i]() { TestRoutine(file_infos, test_i, thread_i, test1_obj.get(), finished_n); });
+            }
+            for (auto &thread : threads) {
+                thread.join();
+            }
         }
-        for (auto &thread : threads) {
-            thread.join();
-        }
+        EXPECT_EQ(buffer_mgr->memory_usage(), 0);
+        buffer_mgr->RemoveClean();
+
+        LOG_INFO(fmt::format("Finished parallel test1 {}", i));
+        ResetDir();
     }
-    LOG_INFO("Finished parallel test1");
 }
 
 class Test2Obj : public TestObj {
@@ -466,26 +470,34 @@ public:
 };
 
 TEST_F(BufferManagerParallelTest, parallel_test2) {
-    auto test2_obj = MakeUnique<Test2Obj>(var_file_step, buffer_mgr_.get(), data_dir_);
-    LocalFileSystem fs;
+    for (int i = 0; i < 10; ++i) {
+        auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_);
+        auto test2_obj = MakeUnique<Test2Obj>(var_file_step, buffer_mgr.get(), data_dir_);
+        LocalFileSystem fs;
 
-    Vector<FileInfo> file_infos;
-    for (SizeT i = 0; i < file_n; ++i) {
-        file_infos.emplace_back(i);
-    }
-    LOG_INFO("Start parallel test2");
-    for (SizeT test_i = 0; test_i < test_n_; test_i++) {
-        finished_n_.store(0);
-        for (auto &file_info : file_infos) {
-            file_info.buffer_obj_ = nullptr;
+        Vector<FileInfo> file_infos;
+        for (SizeT i = 0; i < file_n; ++i) {
+            file_infos.emplace_back(i);
         }
+        LOG_INFO(fmt::format("Start parallel test2 {}", i));
+        for (SizeT test_i = 0; test_i < test_n_; test_i++) {
+            Atomic<SizeT> finished_n = 0;
+            for (auto &file_info : file_infos) {
+                file_info.buffer_obj_ = nullptr;
+            }
 
-        Vector<Thread> threads;
-        for (SizeT thread_i = 0; thread_i < thread_n; ++thread_i) {
-            threads.emplace_back([&, thread_i]() { TestRoutine(file_infos, test_i, thread_i, test2_obj.get()); });
+            Vector<Thread> threads;
+            for (SizeT thread_i = 0; thread_i < thread_n; ++thread_i) {
+                threads.emplace_back([&, thread_i]() { TestRoutine(file_infos, test_i, thread_i, test2_obj.get(), finished_n); });
+            }
+            for (auto &thread : threads) {
+                thread.join();
+            }
         }
-        for (auto &thread : threads) {
-            thread.join();
-        }
+        EXPECT_EQ(buffer_mgr->memory_usage(), 0);
+        buffer_mgr->RemoveClean();
+
+        LOG_INFO(fmt::format("Finished parallel test2 {}", i));
+        ResetDir();
     }
 }
