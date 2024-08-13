@@ -140,6 +140,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
                 String error_message = "Vector heap should be null.";
                 UnrecoverableError(error_message);
             }
+            buffer_->ResetToInit();
         } else if (t == VectorBufferType::kHeap or t == VectorBufferType::kTensorHeap or t == VectorBufferType::kSparseHeap) {
             if (buffer_->fix_heap_mgr_.get() != nullptr or buffer_->fix_heap_mgr_1_.get() != nullptr) {
                 String error_message = "Vector heap should be null.";
