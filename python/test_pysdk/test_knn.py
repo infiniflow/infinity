@@ -1140,7 +1140,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_zero_dimension_vector(self):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table("test_zero_dimension_vector",
@@ -1161,7 +1160,7 @@ class TestInfinity:
         assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
 
         # try to insert and search a zero dim vector
-        with pytest.raises(IndexError) as e:
+        with pytest.raises(Exception):
             table_obj.insert([{"zero_vector": []}])
         try:
             res = table_obj.output(["_row_id"]).knn(

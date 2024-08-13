@@ -363,7 +363,6 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("types", ["varchar"])
     @pytest.mark.parametrize("types_example", [[1, 2, 3]])
     def test_update_invalid_value_1(self, types, types_example):
@@ -380,7 +379,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_update_invalid_value", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("types", ["int", "float"])
     @pytest.mark.parametrize("types_example", [
         1,
@@ -402,7 +400,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_update_new_value", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("types", ["int", "float"])
     @pytest.mark.parametrize("types_example", [
         pytest.param([1, 2, 3])

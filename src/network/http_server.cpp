@@ -890,7 +890,6 @@ public:
                 SizeT column_count = first_row_json.size();
 
                 // Used for the column type validation
-                HashMap<String, LiteralType> column_type_map;
                 HashMap<String, u64> column_name_id_map;
 
                 // inserted columns
@@ -912,7 +911,6 @@ public:
                 });
 
                 Vector<String> *columns = new Vector<String>();
-                column_type_map.reserve(column_count);
                 column_name_id_map.reserve(column_count);
                 columns->reserve(column_count);
                 DeferFn defer_free_columns([&]() {
@@ -938,8 +936,8 @@ public:
 
                     for (const auto &item : first_row_json.items()) {
                         const auto &key = item.key();
-                        auto iter = column_type_map.find(key);
-                        if (iter != column_type_map.end()) {
+                        auto iter = column_name_id_map.find(key);
+                        if (iter != column_name_id_map.end()) {
                             json_response["error_code"] = ErrorCode::kDuplicateColumnName;
                             json_response["error_message"] = fmt::format("Duplicated column name: {}", key);
                             return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -951,7 +949,6 @@ public:
                         switch (value.type()) {
                             case nlohmann::json::value_t::boolean: {
                                 auto bool_value = value.template get<bool>();
-                                column_type_map.emplace(key, LiteralType::kBoolean);
 
                                 // Generate constant expression
                                 infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kBoolean);
@@ -962,7 +959,6 @@ public:
                             }
                             case nlohmann::json::value_t::number_integer: {
                                 auto integer_value = value.template get<i64>();
-                                column_type_map.emplace(key, LiteralType::kInteger);
 
                                 // Generate constant expression
                                 infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kInteger);
@@ -973,7 +969,6 @@ public:
                             }
                             case nlohmann::json::value_t::number_unsigned: {
                                 auto integer_value = value.template get<u64>();
-                                column_type_map.emplace(key, LiteralType::kInteger);
 
                                 // Generate constant expression
                                 infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kInteger);
@@ -984,7 +979,6 @@ public:
                             }
                             case nlohmann::json::value_t::number_float: {
                                 auto float_value = value.template get<f64>();
-                                column_type_map.emplace(key, LiteralType::kDouble);
 
                                 // Generate constant expression
                                 infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kDouble);
@@ -1015,7 +1009,6 @@ public:
                                         }
                                     });
 
-                                    column_type_map.emplace(key, LiteralType::kIntegerArray);
 
                                     for (SizeT idx = 0; idx < dimension; ++idx) {
                                         const auto &value_ref = value[idx];
@@ -1052,7 +1045,6 @@ public:
                                         }
                                     });
 
-                                    column_type_map.emplace(key, LiteralType::kDoubleArray);
 
                                     for (SizeT idx = 0; idx < dimension; ++idx) {
                                         const auto &value_ref = value[idx];
@@ -1081,7 +1073,6 @@ public:
                                                 const_expr = nullptr;
                                             }
                                         });
-                                        column_type_map.emplace(key, LiteralType::kSubArrayArray);
                                         const_expr->sub_array_array_.reserve(dimension);
                                         for (SizeT idx = 0; idx < dimension; ++idx) {
                                             const auto &array = value[idx];
@@ -1131,7 +1122,6 @@ public:
                                                 const_expr = nullptr;
                                             }
                                         });
-                                        column_type_map.emplace(key, LiteralType::kSubArrayArray);
                                         const_expr->sub_array_array_.reserve(dimension);
                                         for (SizeT idx = 0; idx < dimension; ++idx) {
                                             const auto &array = value[idx];
@@ -1182,7 +1172,6 @@ public:
                                                     const_expr = nullptr;
                                                 }
                                             });
-                                            column_type_map.emplace(key, LiteralType::kSubArrayArray);
                                             const_expr->sub_array_array_.reserve(dimension);
                                             for (SizeT idx = 0; idx < dimension; ++idx) {
                                                 const auto &array = value[idx];
@@ -1251,7 +1240,6 @@ public:
                                                     const_expr = nullptr;
                                                 }
                                             });
-                                            column_type_map.emplace(key, LiteralType::kSubArrayArray);
                                             const_expr->sub_array_array_.reserve(dimension);
                                             for (SizeT idx = 0; idx < dimension; ++idx) {
                                                 const auto &array = value[idx];
@@ -1328,7 +1316,6 @@ public:
                             }
                             case nlohmann::json::value_t::string: {
                                 auto string_value = value.template get<String>();
-                                column_type_map.emplace(key, LiteralType::kString);
 
                                 ConstantExpr *const_expr = new ConstantExpr(LiteralType::kString);
                                 const_expr->str_value_ = strdup(string_value.c_str());
@@ -1354,7 +1341,6 @@ public:
                                 auto first_value_elem_type = first_value_elem.type();
                                 if(first_value_elem_type == nlohmann::json::value_t::number_float) {
                                     //std::cout<<"DoubleSparseArray"<<std::endl;
-                                    column_type_map.emplace(key, LiteralType::kDoubleSparseArray);
                                     ConstantExpr *const_expr = new ConstantExpr(LiteralType::kDoubleSparseArray);
                                     DeferFn defer_free_sparse([&]() {
                                             if (const_expr != nullptr) {
@@ -1424,7 +1410,6 @@ public:
                                     break;
                                 } else if(first_value_elem_type == nlohmann::json::value_t::number_integer or first_value_elem_type == nlohmann::json::value_t::number_unsigned) {
                                     //std::cout<<"LongSparseArray"<<std::endl;
-                                    column_type_map.emplace(key, LiteralType::kLongSparseArray);
                                     ConstantExpr *const_expr = new ConstantExpr(LiteralType::kLongSparseArray);
                                     DeferFn defer_free_sparse([&]() {
                                             if (const_expr != nullptr) {
@@ -1527,9 +1512,8 @@ public:
 
                     for (const auto &item : row_json.items()) {
                         const auto &key = item.key();
-                        auto type_iter = column_type_map.find(key);
                         auto id_iter = column_name_id_map.find(key);
-                        if (type_iter == column_type_map.end() || id_iter == column_name_id_map.end()) {
+                        if (id_iter == column_name_id_map.end()) {
                             json_response["error_code"] = ErrorCode::kColumnNotExist;
                             json_response["error_message"] = fmt::format("Not existed column name: {}", key);
                             return ResponseFactory::createResponse(http_status, json_response.dump());
@@ -1539,12 +1523,6 @@ public:
                         const auto &value = item.value();
                         switch (value.type()) {
                             case nlohmann::json::value_t::boolean: {
-                                if (type_iter->second != LiteralType::kBoolean) {
-                                    json_response["error_code"] = ErrorCode::kDataTypeMismatch;
-                                    json_response["error_message"] = fmt::format("Column: {} expect type BOOL", key);
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                }
-
                                 // Generate constant expression
                                 infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kBoolean);
                                 const_expr->bool_value_ = value.template get<bool>();
@@ -1553,12 +1531,6 @@ public:
                                 break;
                             }
                             case nlohmann::json::value_t::number_integer: {
-                                if (type_iter->second != LiteralType::kInteger) {
-                                    json_response["error_code"] = ErrorCode::kDataTypeMismatch;
-                                    json_response["error_message"] = fmt::format("Column: {} expect type INTEGER", key);
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                }
-
                                 // Generate constant expression
                                 infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kInteger);
                                 const_expr->integer_value_ = value.template get<i64>();
@@ -1567,12 +1539,6 @@ public:
                                 break;
                             }
                             case nlohmann::json::value_t::number_unsigned: {
-                                if (type_iter->second != LiteralType::kInteger) {
-                                    json_response["error_code"] = ErrorCode::kDataTypeMismatch;
-                                    json_response["error_message"] = fmt::format("Column: {} expect type INTEGER", key);
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                }
-
                                 // Generate constant expression
                                 infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kInteger);
                                 const_expr->integer_value_ = value.template get<u64>();
@@ -1581,12 +1547,6 @@ public:
                                 break;
                             }
                             case nlohmann::json::value_t::number_float: {
-                                if (type_iter->second != LiteralType::kDouble) {
-                                    json_response["error_code"] = ErrorCode::kDataTypeMismatch;
-                                    json_response["error_message"] = fmt::format("Column: {} expect type FLOAT", key);
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                }
-
                                 // Generate constant expression
                                 infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kDouble);
                                 const_expr->double_value_ = value.template get<f64>();
@@ -1919,11 +1879,6 @@ public:
                                 break;
                             }
                             case nlohmann::json::value_t::string: {
-                                if (type_iter->second != LiteralType::kString) {
-                                    json_response["error_code"] = ErrorCode::kDataTypeMismatch;
-                                    json_response["error_message"] = fmt::format("Column: {} expect type STRING", key);
-                                    return ResponseFactory::createResponse(http_status, json_response.dump());
-                                }
 
                                 auto string_value = value.template get<String>();
 
@@ -2304,14 +2259,14 @@ public:
                             for (SizeT idx = 0; idx < dimension; ++idx) {
                                 const auto &value_ref = value[idx];
                                 const auto &value_type = value_ref.type();
-
+                                
                                 switch (value_type) {
                                     case nlohmann::json::value_t::number_integer: {
-                                        const_expr->long_array_.emplace_back(value.template get<i64>());
+                                        const_expr->long_array_.emplace_back(value_ref.template get<i64>());
                                         break;
                                     }
                                     case nlohmann::json::value_t::number_unsigned: {
-                                        const_expr->long_array_.emplace_back(value.template get<u64>());
+                                        const_expr->long_array_.emplace_back(value_ref.template get<u64>());
                                         break;
                                     }
                                     default: {
@@ -2344,7 +2299,7 @@ public:
                                     return ResponseFactory::createResponse(http_status, json_response.dump());
                                 }
 
-                                const_expr->double_array_.emplace_back(value.template get<double>());
+                                const_expr->double_array_.emplace_back(value_ref.template get<double>());
                             }
 
                             update_expr->value = const_expr;
