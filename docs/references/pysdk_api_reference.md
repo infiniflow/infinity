@@ -1668,9 +1668,9 @@ A non-empty string specifying the following search options:
   - If not specified, the search follows Infinity's full-text search syntax, meaning that logical and arithmetic operators and escape characters will function as full-text search operators, such as:
     - `&&`, `+`, `||`, `!`, `NOT`, `AND`, `OR` `-`, `(`, `)`, `~`, `^`, `:`, `"`.
     - Escape characters like `\`, `\t`, and more.
-  - If specified, the above logical and arithmetic operators will be treated as part of the search text, and the corresponding operator will be interpolated into `matching_text`.
+  - If specified, Infinity's full-text search syntax will not take effect, and the specified operator will be interpolated into `matching_text`.
     - `"operator=OR"`/`"operator=or"`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.
-    - `"operator=AND"`/`"operator=and"`: Interpolates the `AND` operator between words in `matching_text` to create a new search text. Useful for searching text including code numbers like `"A01-233:BC"`, resulting in `"(A01) AND (-233) AND (:BC)"`.
+    - `"operator=AND"`/`"operator=and"`: Interpolates the `AND` operator between words in `matching_text` to create a new search text. Useful for searching text including code numbers like `"A01-233:BC"`, resulting in `"A01" AND "-233" AND "BC"`.
   
 :::tip NOTE
 If both `"topn"` and `"operator"` options are specified, separate them with a semicolon, e.g., `"topn=100;operator=OR"`
