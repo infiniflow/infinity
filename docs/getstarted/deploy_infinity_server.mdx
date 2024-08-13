@@ -142,14 +142,32 @@ Fedora/RHEL/CentOS/OpenSUSE
 ```bash
 sudo rpm -i infinity-0.3.0.dev4-x86_64.rpm
 ```
+
+```bash
+sudo chown -R $USER /var/infinity
+```
+
+```bash 
+ulimit -n 500000   
+```
+
 ```bash
 sudo systemctl start infinity
 ```
+
   </TabItem>
   <TabItem value="ubuntu">
 
 ```bash
 sudo dpkg -i infinity-0.3.0.dev4-x86_64.deb
+```
+
+```bash
+sudo chown -R $USER /var/infinity
+```
+
+```bash 
+ulimit -n 500000
 ```
 
 ```bash
