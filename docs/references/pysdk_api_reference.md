@@ -580,7 +580,7 @@ A non-empty string indicating the name of the index, which must adhere to the fo
   - Digits (0-9)
   - "_" (underscore)
 
-#### index_infos: `list[IndexInfo()]`, *Required*
+#### index_infos: `IndexInfo()`, *Required*
 
 An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and `index_param_list`.
 
@@ -690,7 +690,7 @@ table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector
 # - "ef": "50", 
 # - "encode": "plain"
 # Only the "metric" parameter (required) is explicitly set to L2 distance. 
-table_object.create_index("my_index",[IndexInfo("c1", IndexType.Hnsw, [InitParameter("metric", "l2")])], None)
+table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, [InitParameter("metric", "l2")]), None)
 ```
 
 ```python {1}
@@ -702,7 +702,6 @@ table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector
 # "encoding" is set to "lvq" 
 table_object.create_index(
     "my_index",
-    [
         IndexInfo(
             "c1",
             IndexType.Hnsw,
@@ -713,8 +712,7 @@ table_object.create_index(
                 InitParameter("metric", "l2")
                 InitParameter("encode", "lvq") # "lvq" applies to float vector element only
             ]
-        )
-    ],
+        ),
     None
 )
 ```
@@ -729,13 +727,11 @@ table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "
 # - "ANALYZER": "standard"
 table_object.create_index(
     "my_index",
-    [
         IndexInfo(
             "body", 
             IndexType.FullText, 
             []
         ),
-    ],
     None
 )
 ```
@@ -748,7 +744,6 @@ table_object = db_object.create_table("test_index_fulltext", {"body": {"type": "
 # Setting "ANALYZER" to "standard" (same as the above)
 table_object.create_index(
     "my_index",
-    [
         IndexInfo(
             "body", 
             IndexType.FullText, 
@@ -756,7 +751,6 @@ table_object.create_index(
                 InitParameter("ANALYZER", "standard")
             ]
         ),
-    ],
     None
 )
 ```
@@ -791,15 +785,13 @@ table_ojbect = db_object.create_table("test_index_ivfflat", {"c1": {"type": "vec
 # Only the metric parameter (required) is explicitly set to L2 distance. 
 table_object.create_index(
     "my_index",
-        [
         IndexInfo(
             "c1",
             IndexType.IVFFlat,
             [
                 InitParameter("metric", "l2")
             ]
-        )
-        ],
+        ),
     None
 )
 ```
@@ -812,7 +804,6 @@ table_ojbect = db_object.create_table("test_index_ivfflat", {"c1": {"type": "vec
 # Explicitly settings "centroids_count" to "128" and "metric" to "l2" (same as above)
 table_object.create_index(
     "my_index",
-    [
         IndexInfo(
             "c1",
             IndexType.IVFFlat,
@@ -820,8 +811,7 @@ table_object.create_index(
                 InitParameter("centroids_count", "128"),
                 InitParameter("metric", "l2")
             ]
-        )
-    ],
+        ),
     None
 )
 ```
@@ -835,13 +825,11 @@ table_object = db_object.create_table("test_index_secondary", {"c1": {"type": "v
 # Create a secondary index named "my_index" on column "c1"
 table_object.create_index(
     "my_index",
-    [
         IndexInfo(
             "c1", 
             IndexType.Secondary, 
             []
         ),
-    ],
     None
 )
 ```
@@ -857,13 +845,11 @@ table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,
 # - "compress_type": "compress"
 table_object.create_index(
     "my_index",
-    [
         IndexInfo(
             "c1",
             IndexType.BMP,
             []
-        )
-    ],
+        ),
     None
 )
 ```
@@ -876,7 +862,6 @@ table_object = db_object.create_table("test_index_bmp", {"c1": {"type": "sparse,
 # Settings for "block_size" and "compress_type" are the same as above
 table_object.create_index(
     "my_index",
-    [
         IndexInfo(
             "c1",
             IndexType.BMP,
@@ -884,8 +869,7 @@ table_object.create_index(
                 InitParameter("block_size", "16"),
                 InitParameter("compress_type", "compress")
             ]
-        )
-    ],
+        ),
     None
 )
 ```
@@ -1529,7 +1513,7 @@ table_object.knn("vec", [0.1,0.2,0.3], "float", "l2", 100)
 
 ```python
 from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", [IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")])])
+table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")]))
 # Find the 2 nearest neighbors using cosine distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
@@ -1539,7 +1523,7 @@ table_object.knn("vec", [1, 2, 3], "uint8", "cosine", 2)
 
 ```python
 from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", [IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")])])
+table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")]))
 # Find the 2 nearest neighbors using inner product distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
@@ -1632,7 +1616,7 @@ table_object.match_sparse('sparse', {"indices": [0, 10, 20], "values": [0.1, 0.2
 
 ```python
 from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", [IndexInfo("sparse", IndexType.BMP, [])])
+table_object.create_index("my_index", IndexInfo("sparse", IndexType.BMP, []))
 # Find the 100 nearest neighbors using inner product
 # If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
 # regardless of whether `opt_params` is set.
@@ -1684,10 +1668,13 @@ A non-empty string specifying the following search options:
 
 - `"topn"`: `str`, *Required*  
   Specifies the number of the most relevant rows to retrieve, e.g., `"topn=10"` to obtain the ten most relevant rows.
-- `"operator"`: `str`, *Optional*  
-  Specifies the operator for search text interpolation, overriding the operators in `matching_text`.  
-  - `"operator=OR"`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.
-  - `"operator=AND"`: Interpolates the `AND` operator between words in `matching_text` to create a new search text. Useful for searching text including code numbers like `"A01-233:BC\"`, resulting in `"A01 AND -233 AND :BC"`.
+- `"operator"`: `str`, *Optional*   
+  - If not specified, the search follows the default full-text search syntax, meaning that logical and arithmetic operators and escape characters will function as full-text search operators, such as:
+    - `&&`, `+`, `||`, `!`, `NOT`, `AND`, `OR` `-`, `,`, `~`, `^`, `:`, `""`.
+    - Escape characters like `\`, `\t`, and more.
+  - If specified, the above logical and arithmetic operators will be treated as part of the search text, and the corresponding operator will be interpolated into `matching_text`.
+    - `"operator=OR"`/`"operator=or"`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.
+    - `"operator=AND"`/`"operator=and"`: Interpolates the `AND` operator between words in `matching_text` to create a new search text. Useful for searching text including code numbers like `"A01-233:BC\显卡"`, resulting in `"(A01) AND (-233) AND (:BC) AND (显卡)"`.
   
 :::tip NOTE
 If both `"topn"` and `"operator"` options are specified, separate them with a semicolon, e.g., `"topn=100;operator=OR"`
