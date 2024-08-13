@@ -325,6 +325,10 @@ public:
                 EmbeddingDataType e_data_type;
                 if (etype == "integer") {
                     e_data_type = EmbeddingDataType::kElemInt32;
+                } else if (etype == "uint8") {
+                    e_data_type = EmbeddingDataType::kElemUInt8;
+                } else if (etype == "int8") {
+                    e_data_type = EmbeddingDataType::kElemInt8;
                 } else if (etype == "float") {
                     e_data_type = EmbeddingDataType::kElemFloat;
                 } else if (etype == "double") {
@@ -392,6 +396,10 @@ public:
                     e_data_type = EmbeddingDataType::kElemFloat;
                 } else if (etype == "double") {
                     e_data_type = EmbeddingDataType::kElemDouble;
+                } else if (etype == "float16") {
+                    e_data_type = EmbeddingDataType::kElemFloat16;
+                } else if (etype == "bfloat16") {
+                    e_data_type = EmbeddingDataType::kElemBFloat16;
                 } else {
                     infinity::Status status = infinity::Status::InvalidEmbeddingDataType(etype);
                     json_response["error_code"] = status.code();
@@ -1708,7 +1716,7 @@ public:
                                             const_expr->sub_array_array_.emplace_back(std::move(const_expr_2));
                                             const_expr_2 = nullptr;
                                         }
-                                        values_row->emplace_back(const_expr);
+                                        (*values_row)[column_id] = const_expr;
                                         const_expr = nullptr;
                                     } else if(first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
                                         infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kSubArrayArray);
@@ -1753,7 +1761,7 @@ public:
                                             const_expr->sub_array_array_.emplace_back(std::move(const_expr_2));
                                             const_expr_2 = nullptr;
                                         }
-                                        values_row->emplace_back(const_expr);
+                                        (*values_row)[column_id] = const_expr;
                                         const_expr = nullptr;
                                     }  else if(first_elem_first_elem_type == nlohmann::json::value_t::array) {
                                         //std::cout<<"tensorarray"<<std::endl;
@@ -1826,7 +1834,7 @@ public:
                                                 const_expr->sub_array_array_.emplace_back(std::move(const_expr_2));
                                                 const_expr_2 = nullptr;
                                             }
-                                            values_row->emplace_back(const_expr);
+                                            (*values_row)[column_id] = const_expr;
                                             const_expr = nullptr;
                                         } else if(first_elem_first_elem_first_elem_type == nlohmann::json::value_t::number_float) {
                                             infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kSubArrayArray);
@@ -1890,7 +1898,7 @@ public:
                                                 const_expr->sub_array_array_.emplace_back(std::move(const_expr_2));
                                                 const_expr_2 = nullptr;
                                             }
-                                            values_row->emplace_back(const_expr);
+                                            (*values_row)[column_id] = const_expr;
                                             const_expr = nullptr;
                                         } else {
                                             json_response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;

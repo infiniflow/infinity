@@ -456,8 +456,16 @@ KnnExpr *HTTPSearch::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus 
                 knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
             } else if(IsEqual(element_type, "float16")) {
                 knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat16;
-            } else if(IsEqual(element_type, "float16")) {
+            } else if(IsEqual(element_type, "bfloat16")) {
                 knn_expr->embedding_data_type_ = EmbeddingDataType::kElemBFloat16;
+            } else if(IsEqual(element_type, "double")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemDouble;
+            } else if(IsEqual(element_type, "integer")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemInt32;
+            } else if(IsEqual(element_type, "int8")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemInt8;
+            } else if(IsEqual(element_type, "uint8")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemUInt8;
             } else {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = fmt::format("Not supported vector element type: {}", element_type);
@@ -662,6 +670,93 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
     }
 
     switch (elem_type) {
+        case EmbeddingDataType::kElemInt32: {
+            i32 *embedding_data_ptr = new i32[dimension];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT idx = 0; idx < dimension; ++idx) {
+                const auto &value_ref = json_object[idx];
+                const auto &value_type = value_ref.type();
+                switch (value_type) {
+                    case nlohmann::json::value_t::number_integer:
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
+                        break;
+                    }
+                    default: {
+                        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                        response["error_message"] = fmt::format("Embedding element type should be integer");
+                        return {0, nullptr};
+                    }
+                }
+            }
+
+            i32 *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
+        case EmbeddingDataType::kElemInt8: {
+            i8 *embedding_data_ptr = new i8[dimension];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT idx = 0; idx < dimension; ++idx) {
+                const auto &value_ref = json_object[idx];
+                const auto &value_type = value_ref.type();
+                switch (value_type) {
+                    case nlohmann::json::value_t::number_integer:
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
+                        break;
+                    }
+                    default: {
+                        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                        response["error_message"] = fmt::format("Embedding element type should be integer");
+                        return {0, nullptr};
+                    }
+                }
+            }
+
+            i8 *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
+        case EmbeddingDataType::kElemUInt8: {
+            u8 *embedding_data_ptr = new u8[dimension];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT idx = 0; idx < dimension; ++idx) {
+                const auto &value_ref = json_object[idx];
+                const auto &value_type = value_ref.type();
+                switch (value_type) {
+                    case nlohmann::json::value_t::number_integer:
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
+                        break;
+                    }
+                    default: {
+                        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                        response["error_message"] = fmt::format("Embedding element type should be integer");
+                        return {0, nullptr};
+                    }
+                }
+            }
+
+            u8 *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
         case EmbeddingDataType::kElemFloat: {
             f32 *embedding_data_ptr = new f32[dimension];
             DeferFn defer_free_embedding([&]() {
@@ -678,12 +773,9 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
                         embedding_data_ptr[idx] = value_ref.template get<double>();
                         break;
                     }
-                    case nlohmann::json::value_t::number_integer: {
-                        embedding_data_ptr[idx] = value_ref.template get<int>();
-                        break;
-                    }
+                    case nlohmann::json::value_t::number_integer:
                     case nlohmann::json::value_t::number_unsigned: {
-                        embedding_data_ptr[idx] = value_ref.template get<unsigned>();
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
                         break;
                     }
                     default: {
@@ -698,8 +790,72 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
             embedding_data_ptr = nullptr;
             return {dimension, res};
         }
-        case EmbeddingDataType::kElemFloat16:
-        case EmbeddingDataType::kElemBFloat16:
+        case EmbeddingDataType::kElemFloat16: {
+            float16_t *embedding_data_ptr = new float16_t[dimension];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT idx = 0; idx < dimension; ++idx) {
+                const auto &value_ref = json_object[idx];
+                const auto &value_type = value_ref.type();
+                switch (value_type) {
+                    case nlohmann::json::value_t::number_float: {
+                        embedding_data_ptr[idx] = value_ref.template get<double>();
+                        break;
+                    }
+                    case nlohmann::json::value_t::number_integer:
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
+                        break;
+                    }
+                    default: {
+                        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                        response["error_message"] = fmt::format("Embedding element type should be float");
+                        return {0, nullptr};
+                    }
+                }
+            }
+
+            float16_t *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            bfloat16_t *embedding_data_ptr = new bfloat16_t[dimension];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT idx = 0; idx < dimension; ++idx) {
+                const auto &value_ref = json_object[idx];
+                const auto &value_type = value_ref.type();
+                switch (value_type) {
+                    case nlohmann::json::value_t::number_float: {
+                        embedding_data_ptr[idx] = value_ref.template get<double>();
+                        break;
+                    }
+                    case nlohmann::json::value_t::number_integer:
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
+                        break;
+                    }
+                    default: {
+                        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                        response["error_message"] = fmt::format("Embedding element type should be float");
+                        return {0, nullptr};
+                    }
+                }
+            }
+
+            bfloat16_t *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
         default: {
             response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
             response["error_message"] = fmt::format("Only support float as the embedding data type");

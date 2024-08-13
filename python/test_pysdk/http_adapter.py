@@ -482,7 +482,7 @@ class http_adapter:
             tmp.update({"match_sparse":self._match_sparse})
         if len(self._output):
             tmp.update({"output":self._output})
-        print(tmp)
+        #print(tmp)
         d = self.set_up_data([], tmp)
         r = self.request(url, "get", h, d)
         self.raise_exception(r)
