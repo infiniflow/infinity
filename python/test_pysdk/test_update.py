@@ -378,7 +378,7 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_update_invalid_value", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-
+    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("types", ["int", "float"])
     @pytest.mark.parametrize("types_example", [
         1,
