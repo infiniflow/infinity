@@ -96,7 +96,7 @@ Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVe
             break;
         }
         case LogicalType::kVarchar: {
-            vector_buffer_type = VectorBufferType::kHeap;
+            vector_buffer_type = VectorBufferType::kVarBuffer;
             break;
         }
         case LogicalType::kTensor: {
@@ -135,8 +135,13 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
         data_ptr_ = buffer_->GetDataMut();
     } else {
         // Initialize after reset will come to this branch
-        if (const auto t = vector_buffer_types.first;
-            t == VectorBufferType::kHeap or t == VectorBufferType::kTensorHeap or t == VectorBufferType::kSparseHeap) {
+        if (const auto t = vector_buffer_types.first; t == VectorBufferType::kVarBuffer) {
+            if (buffer_->var_buffer_mgr_.get() != nullptr) {
+                String error_message = "Vector heap should be null.";
+                UnrecoverableError(error_message);
+            }
+            buffer_->ResetToInit();
+        } else if (t == VectorBufferType::kHeap or t == VectorBufferType::kTensorHeap or t == VectorBufferType::kSparseHeap) {
             if (buffer_->fix_heap_mgr_.get() != nullptr or buffer_->fix_heap_mgr_1_.get() != nullptr) {
                 String error_message = "Vector heap should be null.";
                 UnrecoverableError(error_message);
@@ -746,12 +751,8 @@ String ColumnVector::ToString(SizeT row_index) const {
                 return {varchar_ref.short_.data_, varchar_ref.length_};
             } else {
                 // Must be vector type
-                String result_str;
-                result_str.resize(varchar_ref.length_);
-                buffer_->fix_heap_mgr_->ReadFromHeap(result_str.data(),
-                                                     varchar_ref.vector_.chunk_id_,
-                                                     varchar_ref.vector_.chunk_offset_,
-                                                     varchar_ref.length_);
+                const char *data = buffer_->var_buffer_mgr_->Get(varchar_ref.vector_.file_offset_, varchar_ref.length_);
+                String result_str(data, varchar_ref.length_);
                 return result_str;
             }
         }
@@ -952,11 +953,8 @@ Value ColumnVector::GetValue(SizeT index) const {
             if (varchar.IsInlined()) {
                 return Value::MakeVarchar(((VarcharT *)data_ptr_)[index]);
             } else {
-                char *varchar_ptr = new char[varchar.length_ + 1]{0};
-                this->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr, varchar.vector_.chunk_id_, varchar.vector_.chunk_offset_, varchar.length_);
-                Value value = Value::MakeVarchar(varchar_ptr, varchar.length_);
-                delete[] varchar_ptr;
-                return value;
+                const char *data_ptr = buffer_->var_buffer_mgr_->Get(varchar.vector_.file_offset_, varchar.length_);
+                return Value::MakeVarchar(data_ptr, varchar.length_);
             }
         }
         case kDate: {
@@ -1195,9 +1193,8 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
                 std::memcpy(target_ref.short_.data_, src_str.c_str(), varchar_len);
             } else {
                 std::memcpy(target_ref.vector_.prefix_, src_str.c_str(), VARCHAR_PREFIX_LEN);
-                auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_str.c_str(), varchar_len);
-                target_ref.vector_.chunk_id_ = chunk_id;
-                target_ref.vector_.chunk_offset_ = chunk_offset;
+                SizeT file_offset = buffer_->var_buffer_mgr_->Append(src_str.c_str(), varchar_len);
+                target_ref.vector_.file_offset_ = file_offset;
             }
             break;
         }
@@ -1778,9 +1775,8 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                 std::memcpy(varchar.short_.data_, sv.data(), sv.size());
             } else {
                 std::memcpy(varchar.vector_.prefix_, sv.data(), VARCHAR_PREFIX_LEN);
-                auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(sv.data(), sv.size());
-                varchar.vector_.chunk_id_ = chunk_id;
-                varchar.vector_.chunk_offset_ = chunk_offset;
+                SizeT file_offset = buffer_->var_buffer_mgr_->Append(sv.data(), sv.size());
+                varchar.vector_.file_offset_ = file_offset;
             }
             break;
         }
@@ -1932,7 +1928,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             for (SizeT idx = 0; idx < count; ++idx) {
                 VarcharT &src_ref = base_src_ptr[from + idx];
                 VarcharT &dst_ref = base_dst_ptr[idx];
-                CopyVarchar(dst_ref, buffer_->fix_heap_mgr_.get(), src_ref, other.buffer_->fix_heap_mgr_.get());
+                CopyVarchar(dst_ref, buffer_->var_buffer_mgr_.get(), src_ref, other.buffer_->var_buffer_mgr_.get());
             }
             break;
         }
@@ -2125,6 +2121,8 @@ void ColumnVector::Reset() {
     //    buffer_.reset();
     if (buffer_.get() != nullptr) {
         buffer_->fix_heap_mgr_ = nullptr;
+        buffer_->fix_heap_mgr_1_ = nullptr;
+        buffer_->var_buffer_mgr_ = nullptr;
     }
     //    data_ptr_ = nullptr;
 
@@ -2160,11 +2158,9 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
                 if (0 != memcmp(lhs->short_.data_, rhs->short_.data_, lhs->length_))
                     return false;
             } else {
-                Vector<char> lhs_str(lhs->length_);
-                Vector<char> rhs_str(rhs->length_);
-                this->buffer_->fix_heap_mgr_->ReadFromHeap(lhs_str.data(), lhs->vector_.chunk_id_, lhs->vector_.chunk_offset_, lhs->length_);
-                other.buffer_->fix_heap_mgr_->ReadFromHeap(rhs_str.data(), rhs->vector_.chunk_id_, rhs->vector_.chunk_offset_, rhs->length_);
-                if (0 != memcmp(lhs_str.data(), rhs_str.data(), lhs->length_))
+                const char *data1 = buffer_->var_buffer_mgr_->Get(lhs->vector_.file_offset_, lhs->length_);
+                const char *data2 = other.buffer_->var_buffer_mgr_->Get(rhs->vector_.file_offset_, rhs->length_);
+                if (0 != memcmp(data1, data2, lhs->length_))
                     return false;
             }
         }
@@ -2193,7 +2189,9 @@ i32 ColumnVector::GetSizeInBytes() const {
     } else {
         size += this->tail_index_ * this->data_type_size_;
     }
-    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
+    if (const auto data_t = data_type_->type(); data_t == kVarchar) {
+        size += sizeof(i32) + buffer_->var_buffer_mgr_->TotalSize();
+    } else if (data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
         size += sizeof(i32) + buffer_->fix_heap_mgr_->total_size();
     }
     if (const auto data_t = data_type_->type(); data_t == kTensorArray) {
@@ -2230,7 +2228,16 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         ptr += this->tail_index_ * this->data_type_size_;
     }
     // write variable part
-    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
+    if (const auto data_t = data_type_->type(); data_t == kVarchar) {
+        SizeT heap_len = buffer_->var_buffer_mgr_->TotalSize();
+        WriteBufAdv<i32>(ptr, heap_len);
+        SizeT write_n = buffer_->var_buffer_mgr_->Write(ptr);
+        if (write_n != heap_len) {
+            String error_message = "Failed to write var buffer";
+            UnrecoverableError(error_message);
+        }
+        ptr += heap_len;
+    } else if (data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
         i32 heap_len = buffer_->fix_heap_mgr_->total_size();
         WriteBufAdv<i32>(ptr, heap_len);
         buffer_->fix_heap_mgr_->ReadFromHeap(ptr, 0, 0, heap_len);
@@ -2265,7 +2272,11 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         ptr += tail_index * data_type_size;
     }
     // read variable part
-    if (const auto data_t = data_type->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
+    if (const auto data_t = data_type->type(); data_t == kVarchar) {
+        SizeT heap_len = ReadBufAdv<i32>(ptr);
+        [[maybe_unused]] SizeT offset = column_vector->buffer_->var_buffer_mgr_->Append(ptr, heap_len);
+        ptr += heap_len;
+    } else if (data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
         i32 heap_len = ReadBufAdv<i32>(ptr);
         const i32 one_chunk_size = column_vector->buffer_->fix_heap_mgr_->current_chunk_size();
         while (heap_len > 0) {
@@ -2300,7 +2311,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
     return column_vector;
 }
 
-void CopyVarchar(VarcharT &dst_ref, FixHeapManager *dst_fix_heap_mgr, const VarcharT &src_ref, FixHeapManager *src_fix_heap_mgr) {
+void CopyVarchar(VarcharT &dst_ref, VarBufferManager *dst_var_buffer, const VarcharT &src_ref, VarBufferManager *src_var_buffer) {
     const u32 varchar_len = src_ref.length_;
     dst_ref.is_value_ = 0;
     dst_ref.length_ = varchar_len;
@@ -2309,10 +2320,9 @@ void CopyVarchar(VarcharT &dst_ref, FixHeapManager *dst_fix_heap_mgr, const Varc
         std::memcpy(dst_ref.short_.data_, src_ref.short_.data_, varchar_len);
     } else {
         std::memcpy(dst_ref.vector_.prefix_, src_ref.vector_.prefix_, VARCHAR_PREFIX_LEN);
-        const auto [chunk_id, chunk_offset] =
-            dst_fix_heap_mgr->AppendToHeap(src_fix_heap_mgr, src_ref.vector_.chunk_id_, src_ref.vector_.chunk_offset_, varchar_len);
-        dst_ref.vector_.chunk_id_ = chunk_id;
-        dst_ref.vector_.chunk_offset_ = chunk_offset;
+        const char *src_data = src_var_buffer->Get(src_ref.vector_.file_offset_, varchar_len);
+        SizeT dst_offset = dst_var_buffer->Append(src_data, varchar_len);
+        dst_ref.vector_.file_offset_ = dst_offset;
     }
 }
 

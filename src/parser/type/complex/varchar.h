@@ -34,8 +34,7 @@ struct InlineVarchar {
 
 struct VectorVarchar {
     char prefix_[VARCHAR_PREFIX_LENGTH]{};
-    uint32_t chunk_id_{0};
-    uint32_t chunk_offset_{0};
+    uint64_t file_offset_{0};
 };
 
 struct Varchar {
