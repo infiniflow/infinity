@@ -547,7 +547,7 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, Column
             String error_message = "Varchar column vector should use VarBuffer.";
             UnrecoverableError(error_message);
         }
-        SizeT offset = vector_ptr->buffer_->var_buffer_mgr_->Append(tmp_str.c_str(), target.length_);
+        SizeT offset = vector_ptr->buffer_->AppendVarchar(tmp_str.c_str(), target.length_);
         target.vector_.file_offset_ = offset;
     }
 

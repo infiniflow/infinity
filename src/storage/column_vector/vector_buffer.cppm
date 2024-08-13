@@ -22,6 +22,7 @@ import heap_chunk;
 import fix_heap;
 import buffer_handle;
 import var_buffer;
+import data_type;
 
 namespace infinity {
 
@@ -70,7 +71,7 @@ public:
 
     void Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT type_size, SizeT capacity);
 
-    void ResetToInit();
+    void ResetToInit(VectorBufferType type);
 
     void Copy(ptr_t input, SizeT size);
 
@@ -117,6 +118,21 @@ public:
     UniquePtr<FixHeapManager> fix_heap_mgr_{nullptr};
     UniquePtr<FixHeapManager> fix_heap_mgr_1_{nullptr};
 
+public:
+    void Reset() {
+        fix_heap_mgr_ = nullptr;
+        fix_heap_mgr_1_ = nullptr;
+        var_buffer_mgr_ = nullptr;
+    }
+
+    SizeT TotalSize(const DataType *data_type) const;
+
+    void WriteAdv(char *&ptr, const DataType *data_type) const;
+
+    const char *GetVarchar(SizeT offset, SizeT len) const;
+    SizeT AppendVarchar(const char *data, SizeT len);
+
+private:
     UniquePtr<VarBufferManager> var_buffer_mgr_{nullptr};
 };
 

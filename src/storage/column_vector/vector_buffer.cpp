@@ -26,6 +26,7 @@ import block_column_entry;
 import default_values;
 import logger;
 import third_party;
+import serialize;
 
 namespace infinity {
 
@@ -168,7 +169,19 @@ void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
     capacity_ = capacity;
 }
 
-void VectorBuffer::ResetToInit() {
+void VectorBuffer::ResetToInit(VectorBufferType type) {
+    if (type == VectorBufferType::kVarBuffer) {
+        if (var_buffer_mgr_.get() != nullptr) {
+            String error_message = "Vector heap should be null.";
+            UnrecoverableError(error_message);
+        }
+    } else if (type == VectorBufferType::kHeap || type == VectorBufferType::kTensorHeap || type == VectorBufferType::kSparseHeap) {
+        if (fix_heap_mgr_.get() != nullptr or fix_heap_mgr_1_.get() != nullptr) {
+            String error_message = "Vector heap should be null.";
+            UnrecoverableError(error_message);
+        }
+    }
+
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_ = MakeUnique<VarBufferManager>();
     } else if (buffer_type_ == VectorBufferType::kHeap) {
@@ -317,5 +330,46 @@ void VectorBuffer::CopyCompactBits(u8 *dst_ptr_u8, const u8 *src_ptr_u8, SizeT d
         }
     }
 }
+
+SizeT VectorBuffer::TotalSize(const DataType *data_type) const {
+    SizeT size = 0;
+    if (const auto data_t = data_type->type(); data_t == kVarchar) {
+        size += sizeof(i32) + var_buffer_mgr_->TotalSize();
+    } else if (data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
+        size += sizeof(i32) + fix_heap_mgr_->total_size();
+    }
+    if (const auto data_t = data_type->type(); data_t == kTensorArray) {
+        size += sizeof(i32) + fix_heap_mgr_1_->total_size();
+    }
+    return size;
+}
+
+void VectorBuffer::WriteAdv(char *&ptr, const DataType *data_type) const {
+    if (const auto data_t = data_type->type(); data_t == kVarchar) {
+        SizeT heap_len = var_buffer_mgr_->TotalSize();
+        WriteBufAdv<i32>(ptr, heap_len);
+        SizeT write_n = var_buffer_mgr_->Write(ptr);
+        if (write_n != heap_len) {
+            String error_message = "Failed to write var buffer";
+            UnrecoverableError(error_message);
+        }
+        ptr += heap_len;
+    } else if (data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
+        i32 heap_len = fix_heap_mgr_->total_size();
+        WriteBufAdv<i32>(ptr, heap_len);
+        fix_heap_mgr_->ReadFromHeap(ptr, 0, 0, heap_len);
+        ptr += heap_len;
+    }
+    if (const auto data_t = data_type->type(); data_t == kTensorArray) {
+        i32 heap_len_1 = fix_heap_mgr_1_->total_size();
+        WriteBufAdv<i32>(ptr, heap_len_1);
+        fix_heap_mgr_1_->ReadFromHeap(ptr, 0, 0, heap_len_1);
+        ptr += heap_len_1;
+    }
+}
+
+const char *VectorBuffer::GetVarchar(SizeT offset, SizeT len) const { return var_buffer_mgr_->Get(offset, len); }
+
+SizeT VectorBuffer::AppendVarchar(const char *data, SizeT len) { return var_buffer_mgr_->Append(data, len); }
 
 } // namespace infinity

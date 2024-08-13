@@ -135,19 +135,7 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
         data_ptr_ = buffer_->GetDataMut();
     } else {
         // Initialize after reset will come to this branch
-        if (const auto t = vector_buffer_types.first; t == VectorBufferType::kVarBuffer) {
-            if (buffer_->var_buffer_mgr_.get() != nullptr) {
-                String error_message = "Vector heap should be null.";
-                UnrecoverableError(error_message);
-            }
-            buffer_->ResetToInit();
-        } else if (t == VectorBufferType::kHeap or t == VectorBufferType::kTensorHeap or t == VectorBufferType::kSparseHeap) {
-            if (buffer_->fix_heap_mgr_.get() != nullptr or buffer_->fix_heap_mgr_1_.get() != nullptr) {
-                String error_message = "Vector heap should be null.";
-                UnrecoverableError(error_message);
-            }
-            buffer_->ResetToInit();
-        }
+        buffer_->ResetToInit(vector_buffer_types.first);
     }
 }
 
@@ -751,7 +739,7 @@ String ColumnVector::ToString(SizeT row_index) const {
                 return {varchar_ref.short_.data_, varchar_ref.length_};
             } else {
                 // Must be vector type
-                const char *data = buffer_->var_buffer_mgr_->Get(varchar_ref.vector_.file_offset_, varchar_ref.length_);
+                const char *data = buffer_->GetVarchar(varchar_ref.vector_.file_offset_, varchar_ref.length_);
                 String result_str(data, varchar_ref.length_);
                 return result_str;
             }
@@ -953,7 +941,7 @@ Value ColumnVector::GetValue(SizeT index) const {
             if (varchar.IsInlined()) {
                 return Value::MakeVarchar(((VarcharT *)data_ptr_)[index]);
             } else {
-                const char *data_ptr = buffer_->var_buffer_mgr_->Get(varchar.vector_.file_offset_, varchar.length_);
+                const char *data_ptr = buffer_->GetVarchar(varchar.vector_.file_offset_, varchar.length_);
                 return Value::MakeVarchar(data_ptr, varchar.length_);
             }
         }
@@ -1193,7 +1181,7 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
                 std::memcpy(target_ref.short_.data_, src_str.c_str(), varchar_len);
             } else {
                 std::memcpy(target_ref.vector_.prefix_, src_str.c_str(), VARCHAR_PREFIX_LEN);
-                SizeT file_offset = buffer_->var_buffer_mgr_->Append(src_str.c_str(), varchar_len);
+                SizeT file_offset = buffer_->AppendVarchar(src_str.c_str(), varchar_len);
                 target_ref.vector_.file_offset_ = file_offset;
             }
             break;
@@ -1775,7 +1763,7 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
                 std::memcpy(varchar.short_.data_, sv.data(), sv.size());
             } else {
                 std::memcpy(varchar.vector_.prefix_, sv.data(), VARCHAR_PREFIX_LEN);
-                SizeT file_offset = buffer_->var_buffer_mgr_->Append(sv.data(), sv.size());
+                SizeT file_offset = buffer_->AppendVarchar(sv.data(), sv.size());
                 varchar.vector_.file_offset_ = file_offset;
             }
             break;
@@ -1928,7 +1916,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             for (SizeT idx = 0; idx < count; ++idx) {
                 VarcharT &src_ref = base_src_ptr[from + idx];
                 VarcharT &dst_ref = base_dst_ptr[idx];
-                CopyVarchar(dst_ref, buffer_->var_buffer_mgr_.get(), src_ref, other.buffer_->var_buffer_mgr_.get());
+                CopyVarchar(dst_ref, buffer_.get(), src_ref, other.buffer_.get());
             }
             break;
         }
@@ -2120,9 +2108,7 @@ void ColumnVector::Reset() {
 
     //    buffer_.reset();
     if (buffer_.get() != nullptr) {
-        buffer_->fix_heap_mgr_ = nullptr;
-        buffer_->fix_heap_mgr_1_ = nullptr;
-        buffer_->var_buffer_mgr_ = nullptr;
+        buffer_->Reset();
     }
     //    data_ptr_ = nullptr;
 
@@ -2158,8 +2144,8 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
                 if (0 != memcmp(lhs->short_.data_, rhs->short_.data_, lhs->length_))
                     return false;
             } else {
-                const char *data1 = buffer_->var_buffer_mgr_->Get(lhs->vector_.file_offset_, lhs->length_);
-                const char *data2 = other.buffer_->var_buffer_mgr_->Get(rhs->vector_.file_offset_, rhs->length_);
+                const char *data1 = buffer_->GetVarchar(lhs->vector_.file_offset_, lhs->length_);
+                const char *data2 = other.buffer_->GetVarchar(rhs->vector_.file_offset_, rhs->length_);
                 if (0 != memcmp(data1, data2, lhs->length_))
                     return false;
             }
@@ -2189,14 +2175,7 @@ i32 ColumnVector::GetSizeInBytes() const {
     } else {
         size += this->tail_index_ * this->data_type_size_;
     }
-    if (const auto data_t = data_type_->type(); data_t == kVarchar) {
-        size += sizeof(i32) + buffer_->var_buffer_mgr_->TotalSize();
-    } else if (data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
-        size += sizeof(i32) + buffer_->fix_heap_mgr_->total_size();
-    }
-    if (const auto data_t = data_type_->type(); data_t == kTensorArray) {
-        size += sizeof(i32) + buffer_->fix_heap_mgr_1_->total_size();
-    }
+    size += buffer_->TotalSize(data_type_.get());
     size += this->nulls_ptr_->GetSizeInBytes();
     return size;
 }
@@ -2228,27 +2207,7 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         ptr += this->tail_index_ * this->data_type_size_;
     }
     // write variable part
-    if (const auto data_t = data_type_->type(); data_t == kVarchar) {
-        SizeT heap_len = buffer_->var_buffer_mgr_->TotalSize();
-        WriteBufAdv<i32>(ptr, heap_len);
-        SizeT write_n = buffer_->var_buffer_mgr_->Write(ptr);
-        if (write_n != heap_len) {
-            String error_message = "Failed to write var buffer";
-            UnrecoverableError(error_message);
-        }
-        ptr += heap_len;
-    } else if (data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
-        i32 heap_len = buffer_->fix_heap_mgr_->total_size();
-        WriteBufAdv<i32>(ptr, heap_len);
-        buffer_->fix_heap_mgr_->ReadFromHeap(ptr, 0, 0, heap_len);
-        ptr += heap_len;
-    }
-    if (const auto data_t = data_type_->type(); data_t == kTensorArray) {
-        i32 heap_len_1 = buffer_->fix_heap_mgr_1_->total_size();
-        WriteBufAdv<i32>(ptr, heap_len_1);
-        buffer_->fix_heap_mgr_1_->ReadFromHeap(ptr, 0, 0, heap_len_1);
-        ptr += heap_len_1;
-    }
+    buffer_->WriteAdv(ptr, data_type_.get());
     this->nulls_ptr_->WriteAdv(ptr);
     return;
 }
@@ -2274,7 +2233,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
     // read variable part
     if (const auto data_t = data_type->type(); data_t == kVarchar) {
         SizeT heap_len = ReadBufAdv<i32>(ptr);
-        [[maybe_unused]] SizeT offset = column_vector->buffer_->var_buffer_mgr_->Append(ptr, heap_len);
+        [[maybe_unused]] SizeT offset = column_vector->buffer_->AppendVarchar(ptr, heap_len);
         ptr += heap_len;
     } else if (data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
         i32 heap_len = ReadBufAdv<i32>(ptr);
@@ -2311,7 +2270,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
     return column_vector;
 }
 
-void CopyVarchar(VarcharT &dst_ref, VarBufferManager *dst_var_buffer, const VarcharT &src_ref, VarBufferManager *src_var_buffer) {
+void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT &src_ref, const VectorBuffer *src_vec_buffer) {
     const u32 varchar_len = src_ref.length_;
     dst_ref.is_value_ = 0;
     dst_ref.length_ = varchar_len;
@@ -2320,9 +2279,7 @@ void CopyVarchar(VarcharT &dst_ref, VarBufferManager *dst_var_buffer, const Varc
         std::memcpy(dst_ref.short_.data_, src_ref.short_.data_, varchar_len);
     } else {
         std::memcpy(dst_ref.vector_.prefix_, src_ref.vector_.prefix_, VARCHAR_PREFIX_LEN);
-        const char *src_data = src_var_buffer->Get(src_ref.vector_.file_offset_, varchar_len);
-        SizeT dst_offset = dst_var_buffer->Append(src_data, varchar_len);
-        dst_ref.vector_.file_offset_ = dst_offset;
+        dst_ref.vector_.file_offset_ = dst_vec_buffer->Append(src_vec_buffer->GetVarchar(src_ref.vector_.file_offset_, varchar_len), varchar_len);
     }
 }
 

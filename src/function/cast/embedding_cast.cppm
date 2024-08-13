@@ -259,7 +259,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         // Set varchar prefix
         std::memcpy(target.vector_.prefix_, res.c_str(), VARCHAR_PREFIX_LEN);
 
-        SizeT offset = vector_ptr->buffer_->var_buffer_mgr_->Append(res.c_str(), target.length_);
+        SizeT offset = vector_ptr->buffer_->AppendVarchar(res.c_str(), target.length_);
         target.vector_.file_offset_ = offset;
     }
 

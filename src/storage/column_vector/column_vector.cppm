@@ -46,7 +46,7 @@ namespace infinity {
 class BufferManager;
 class BlockColumnEntry;
 
-export enum class ColumnVectorTipe: i8 {
+export enum class ColumnVectorTipe : i8 {
     kReadWrite,
     kReadOnly,
 };
@@ -506,7 +506,7 @@ void WriteToTensor<bool>(TensorT &target_tensor,
         target_fix_heap_manager->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), bit_bytes);
 }
 
-void CopyVarchar(VarcharT &dst_ref, VarBufferManager *dst_var_buffer, const VarcharT &src_ref, VarBufferManager *src_var_buffer);
+void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT &src_ref, const VectorBuffer *src_vec_buffer);
 
 void CopyTensor(TensorT &dst_ref,
                 FixHeapManager *dst_fix_heap_mgr,
@@ -576,7 +576,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
         SizeT row_id = input_select[idx];
         VarcharT *dst_ptr = &(((VarcharT *)dst)[idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[row_id]);
-        CopyVarchar(*dst_ptr, dst_buf->var_buffer_mgr_.get(), *src_ptr, src_buf->var_buffer_mgr_.get());
+        CopyVarchar(*dst_ptr, dst_buf, *src_ptr, src_buf);
     }
 }
 
@@ -779,7 +779,7 @@ inline void ColumnVector::CopyFrom<VarcharT>(const VectorBuffer *__restrict src_
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
         VarcharT *dst_ptr = &(((VarcharT *)dst)[dest_start_idx]);
         const VarcharT *src_ptr = &(((const VarcharT *)src)[idx]);
-        CopyVarchar(*dst_ptr, dst_buf->var_buffer_mgr_.get(), *src_ptr, src_buf->var_buffer_mgr_.get());
+        CopyVarchar(*dst_ptr, dst_buf, *src_ptr, src_buf);
         ++dest_start_idx;
     }
 }
@@ -982,7 +982,7 @@ ColumnVector::CopyRowFrom<VarcharT>(const VectorBuffer *__restrict src_buf, Size
     ptr_t dst = dst_buf->GetDataMut();
     VarcharT *dst_ptr = &(((VarcharT *)dst)[dst_idx]);
     const VarcharT *src_ptr = &(((const VarcharT *)src)[src_idx]);
-    CopyVarchar(*dst_ptr, dst_buf->var_buffer_mgr_.get(), *src_ptr, src_buf->var_buffer_mgr_.get());
+    CopyVarchar(*dst_ptr, dst_buf, *src_ptr, src_buf);
 }
 
 template <>
@@ -1181,7 +1181,7 @@ class ColumnVectorPtrAndIdx<VarcharT> {
 
 public:
     explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col)
-        : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), var_buffer_mgr_(col->buffer_->var_buffer_mgr_.get()) {}
+        : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), vec_buffer_(col->buffer_.get()) {}
     auto &SetIndex(u32 index) {
         idx_ = index;
         return *this;
@@ -1195,11 +1195,11 @@ public:
         auto right_length = static_cast<u32>(right_value.length_);
         const char *left_data = left_value.short_.data_;
         if (!left_value.IsInlined()) {
-            left_data = left.var_buffer_mgr_->Get(left_value.vector_.file_offset_, left_value.length_);
+            left_data = left.vec_buffer_->GetVarchar(left_value.vector_.file_offset_, left_value.length_);
         }
         const char *right_data = right_value.short_.data_;
         if (!right_value.IsInlined()) {
-            right_data = right.var_buffer_mgr_->Get(right_value.vector_.file_offset_, right_value.length_);
+            right_data = right.vec_buffer_->GetVarchar(right_value.vector_.file_offset_, right_value.length_);
         }
         return CompareCharArray(left_data, left_length, right_data, right_length);
     }
@@ -1213,18 +1213,18 @@ public:
         }
         const auto *left_data = left_value.short_.data_;
         if (!left_value.IsInlined()) {
-            left_data = left.var_buffer_mgr_->Get(left_value.vector_.file_offset_, left_length);
+            left_data = left.vec_buffer_->GetVarchar(left_value.vector_.file_offset_, left_length);
         }
         const auto *right_data = right_value.short_.data_;
         if (!right_value.IsInlined()) {
-            right_data = right.var_buffer_mgr_->Get(right_value.vector_.file_offset_, right_length);
+            right_data = right.vec_buffer_->GetVarchar(right_value.vector_.file_offset_, right_length);
         }
         return std::strncmp(left_data, right_data, left_length) == 0;
     }
 
 private:
     const VarcharT *data_ptr_ = nullptr;
-    VarBufferManager *var_buffer_mgr_ = nullptr;
+    VectorBuffer *vec_buffer_ = nullptr;
     u32 idx_ = {};
 
     static std::strong_ordering CompareCharArray(const char *left_data, u32 left_len, const char *right_data, u32 right_len) {
