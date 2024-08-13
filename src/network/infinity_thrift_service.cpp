@@ -1794,6 +1794,13 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
 
     knn_expr->opt_params_ = new Vector<InitParameter *>();
     for (auto &param : expr.opt_params) {
+        if(param.param_name == "index_name") {
+            knn_expr->index_name_ = param.param_value;
+        }
+        if(param.param_name == "ignore_index" && param.param_value == "true") {
+            knn_expr->ignore_index_ = true;
+        }
+
         auto init_parameter = new InitParameter();
         init_parameter->param_name_ = param.param_name;
         init_parameter->param_value_ = param.param_value;

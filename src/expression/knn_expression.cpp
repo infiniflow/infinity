@@ -55,10 +55,14 @@ KnnExpression::KnnExpression(EmbeddingDataType embedding_data_type,
                              EmbeddingT query_embedding,
                              Vector<SharedPtr<BaseExpression>> arguments,
                              i64 topn,
-                             Vector<InitParameter *> *opt_params)
+                             Vector<InitParameter *> *opt_params,
+                             String using_index,
+                             bool ignore_index)
     : BaseExpression(ExpressionType::kKnn, std::move(arguments)), dimension_(dimension), embedding_data_type_(embedding_data_type),
       distance_type_(knn_distance_type), query_embedding_(std::move(query_embedding)),
-      topn_(topn) // Should call move constructor, otherwise there will be memory leak.
+      topn_(topn), // Should call move constructor, otherwise there will be memory leak.
+      using_index_(std::move(using_index)),
+      ignore_index_(ignore_index)
 {
     if (opt_params) {
         for (auto &param : *opt_params) {

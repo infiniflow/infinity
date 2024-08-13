@@ -54,6 +54,9 @@ public:
     KnnDistanceType distance_type_{KnnDistanceType::kInvalid};
     int64_t topn_{DEFAULT_MATCH_VECTOR_TOP_N};
     std::vector<InitParameter *> *opt_params_{};
+
+    bool ignore_index_{false};
+    std::string index_name_;
 };
 
 } // namespace infinity
