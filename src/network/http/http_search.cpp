@@ -56,6 +56,8 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             response["error_message"] = "HTTP Body isn't json object";
         }
 
+        SizeT match_expr_count = 0;
+        SizeT fusion_expr_count = 0;
         Vector<ParsedExpr *> *output_columns{nullptr};
         Vector<ParsedExpr *> *search_exprs{nullptr};
         ParsedExpr *filter{nullptr};
@@ -127,79 +129,78 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     return;
                 }
             } else if (IsEqual(key, "fusion")) {
-                if (search_expr != nullptr) {
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
+                }
+                auto &fusion_json_list = elem.value();
+                if (fusion_json_list.type() != nlohmann::json::value_t::array) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] =
-                        "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
+                    response["error_message"] = "Fusion field should be list";
                     return;
                 }
-                search_expr = new SearchExpr();
-                auto &fusion_json = elem.value();
-                if (!ParseFusion(*search_exprs, fusion_json, http_status, response)) {
-                    // error
-                    return;
+                for (auto &fusion_json : fusion_json_list) {
+                    const auto fusion_expr = ParseFusion(fusion_json, http_status, response);
+                    if (fusion_expr == nullptr) {
+                        return;
+                    }
+                    search_exprs->push_back(fusion_expr);
+                    ++fusion_expr_count;
                 }
             } else if (IsEqual(key, "knn")) {
-                if (search_expr != nullptr) {
-                    response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] =
-                        "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
-                    return;
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
                 }
-                search_expr = new SearchExpr();
                 auto &knn_json = elem.value();
                 const auto knn_expr = ParseKnn(knn_json, http_status, response);
                 if (knn_expr == nullptr) {
                     return;
                 }
                 search_exprs->push_back(knn_expr);
+                ++match_expr_count;
             } else if (IsEqual(key, "match")) {
-                if (search_expr != nullptr) {
-                    response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] =
-                        "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
-                    return;
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
                 }
-                search_expr = new SearchExpr();
                 auto &match_json = elem.value();
                 const auto match_expr = ParseMatch(match_json, http_status, response);
                 if (match_expr == nullptr) {
                     return;
                 }
                 search_exprs->push_back(match_expr);
+                ++match_expr_count;
             } else if (IsEqual(key, "match_tensor")) {
-                if (search_expr != nullptr) {
-                    response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] =
-                        "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
-                    return;
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
                 }
-                search_expr = new SearchExpr();
                 auto &match_json = elem.value();
                 const auto match_expr = ParseMatchTensor(match_json, http_status, response);
                 if (match_expr == nullptr) {
                     return;
                 }
                 search_exprs->push_back(match_expr);
+                ++match_expr_count;
             } else if (IsEqual(key, "match_sparse")) {
-                if (search_expr != nullptr) {
-                    response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] =
-                        "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
-                    return;
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
                 }
-                search_expr = new SearchExpr();
                 auto &match_json = elem.value();
                 const auto match_expr = ParseMatchSparse(match_json, http_status, response);
                 if (match_expr == nullptr) {
                     return;
                 }
                 search_exprs->push_back(match_expr);
+                ++match_expr_count;
             } else {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = "Unknown expression: " + key;
                 return;
             }
+        }
+
+        if (match_expr_count > 1 && fusion_expr_count == 0) {
+            response["error_code"] = ErrorCode::kInvalidExpression;
+            response["error_message"] = "More than one knn or match experssion with no fusion experssion!";
+            return;
         }
 
         if (search_exprs != nullptr && !search_exprs->empty()) {
@@ -314,71 +315,26 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
     output_columns = nullptr;
     return res;
 }
-bool HTTPSearch::ParseFusion(Vector<ParsedExpr *> &search_exprs,
-                             const nlohmann::json &fusion_json_object,
+FusionExpr* HTTPSearch::ParseFusion(const nlohmann::json &fusion_json_object,
                              HTTPStatus &http_status,
                              nlohmann::json &response) {
     if (!fusion_json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = fmt::format("Fusion expression must be a json object: {}", fusion_json_object);
-        return false;
+        return nullptr;
     }
-    // case 1. child fusion
-    // case 2. knn, match, match tensor
+
     u32 method_cnt = 0;
-    u32 child_fusion_cnt = 0;
-    u32 child_match_cnt = 0;
+
     UniquePtr<FusionExpr> fusion_expr = nullptr;
     for (const auto &expression : fusion_json_object.items()) {
         String key = expression.key();
         ToLower(key);
-        if (IsEqual(key, "fusion")) {
-            if (child_fusion_cnt++) {
-                response["error_code"] = ErrorCode::kInvalidExpression;
-                response["error_message"] = "Fusion child is already given";
-                return false;
-            }
-            auto &child_fusion_json = expression.value();
-            if (!ParseFusion(search_exprs, child_fusion_json, http_status, response)) {
-                return false;
-            }
-        } else if (IsEqual(key, "knn")) {
-            ++child_match_cnt;
-            auto &knn_json = expression.value();
-            const auto knn_expr = ParseKnn(knn_json, http_status, response);
-            if (knn_expr == nullptr) {
-                return false;
-            }
-            search_exprs.push_back(knn_expr);
-        } else if (IsEqual(key, "match")) {
-            ++child_match_cnt;
-            auto &match_json = expression.value();
-            const auto match_expr = ParseMatch(match_json, http_status, response);
-            if (match_expr == nullptr) {
-                return false;
-            }
-            search_exprs.push_back(match_expr);
-        } else if (IsEqual(key, "match_tensor")) {
-            ++child_match_cnt;
-            auto &match_tensor_json = expression.value();
-            const auto match_tensor_expr = ParseMatchTensor(match_tensor_json, http_status, response);
-            if (match_tensor_expr == nullptr) {
-                return false;
-            }
-            search_exprs.push_back(match_tensor_expr);
-        } else if (IsEqual(key, "match_sparse")) {
-            ++child_match_cnt;
-            auto &match_sparse_json = expression.value();
-            const auto match_tensor_expr = ParseMatchSparse(match_sparse_json, http_status, response);
-            if (match_tensor_expr == nullptr) {
-                return false;
-            }
-            search_exprs.push_back(match_tensor_expr);
-        } else if (IsEqual(key, "method")) {
+        if (IsEqual(key, "method")) {
             if (method_cnt++) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = "Method is already given";
-                return false;
+                return nullptr;
             }
             if (!fusion_expr) {
                 fusion_expr = MakeUnique<FusionExpr>();
@@ -396,30 +352,24 @@ bool HTTPSearch::ParseFusion(Vector<ParsedExpr *> &search_exprs,
             auto &match_tensor_json = expression.value();
             const auto match_tensor_expr = ParseMatchTensor(match_tensor_json, http_status, response);
             if (match_tensor_expr == nullptr) {
-                return false;
+                return nullptr;
             }
             fusion_expr->match_tensor_expr_.reset(match_tensor_expr);
         } else {
             response["error_code"] = ErrorCode::kInvalidExpression;
             response["error_message"] = "Error fusion clause";
-            return false;
+            return nullptr;
         }
     }
-    if ((child_fusion_cnt == 0 and child_match_cnt == 0) or (child_fusion_cnt > 0 and child_match_cnt > 0)) {
-        response["error_code"] = ErrorCode::kInvalidExpression;
-        response["error_message"] = "Error fusion clause";
-        return false;
-    }
+
     if (fusion_expr) {
         if (fusion_expr->method_.empty()) {
             response["error_code"] = ErrorCode::kInvalidExpression;
             response["error_message"] = "Error fusion clause : empty method";
-            return false;
+            return nullptr;
         }
-        //fusion_expr->JobAfterParser();
-        search_exprs.push_back(fusion_expr.release());
     }
-    return true;
+    return fusion_expr.release();
 }
 KnnExpr *HTTPSearch::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!knn_json_object.is_object()) {
