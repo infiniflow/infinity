@@ -34,6 +34,7 @@ import logger;
 import infinity_exception;
 import third_party;
 import status;
+import wal_entry;
 
 namespace infinity {
 
@@ -209,6 +210,16 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
         compact_operator_state->SetComplete();
     }
     compact_operator_state->SetComplete();
+
+    String db_name = *table_entry->GetDBName();
+    String table_name = *table_entry->GetTableName();
+    Vector<SegmentID> old_segment_ids;
+    for (SegmentEntry *segment : compactible_segments) {
+        old_segment_ids.push_back(segment->segment_id());
+    }
+    Vector<WalSegmentInfo> new_segment_infos;
+    new_segment_infos.emplace_back(new_segment.get());
+    txn->AddWalCmd(MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(new_segment_infos), std::move(old_segment_ids)));
 
     return true;
 }
