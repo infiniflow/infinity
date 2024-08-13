@@ -292,7 +292,7 @@ A non-empty string indicating the name of the database to retrieve.
 ### Examples
 
 ```python
-db_object=infinity_object.get_database("my_database")
+db_object = infinity_object.get_database("my_database")
 ```
 
 ---
@@ -561,7 +561,7 @@ res.table_names # ['my_table, 'tensor_table', 'sparse_table']
 ## create_index
 
 ```python
-table_object.create_index(index_name, index_infos, conflict_type = ConflictType.Error)
+table_object.create_index(index_name, index_info, conflict_type = ConflictType.Error)
 ```
 
 Creates index on a specified column.
@@ -580,7 +580,7 @@ A non-empty string indicating the name of the index, which must adhere to the fo
   - Digits (0-9)
   - "_" (underscore)
 
-#### index_infos: `IndexInfo()`, *Required*
+#### index_info: `IndexInfo()`, *Required*
 
 An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and `index_param_list`.
 
@@ -1357,34 +1357,34 @@ table_object.output(["num", "body"]).to_df()
 
 ```python
 # Select a system-generated column "_row_id"
-table_object.output(["_row_id"]).to_result()
+table_object.output(["_row_id"]).to_pl()
 ```
 
 #### Perform aggregation or arithmetic operations on selected columns
 
 ```python
 # Specify that the output should display the average value of all cells in column "c2"
-table_object.output(["avg(c2)"]).to_result()
+table_object.output(["avg(c2)"]).to_pl()
 ```
 
 ```python
 # Select column "c1" and request all cells in this column to be displayed with their original values increased by 5
-table_object.output(["c1+5"]).to_result()
+table_object.output(["c1+5"]).to_pl()
 ```
 
 ```python
 # Specify that the output should display the result of an arithmetic operation combining two aggregation functions
-table_object.output(["min(c1) + max(c2)"]).to_result()
+table_object.output(["min(c1) + max(c2)"]).to_pl()
 ```
 
 ```python
 # Specify that the output should display the row number of the current table
-table_object.output(["count(*)"]).to_result()
+table_object.output(["count(*)"]).to_pl()
 ```
 
 ```python
 # Select column "num" and request all cells in this column to be displayed with their original values divided by 10
-table_object.output(["num/10"]).to_pl()
+table_object.output(["num / 10"]).to_pl()
 ```
 
 ```python
@@ -1396,7 +1396,7 @@ table_object.output(["abs(num)"]).to_pl()
 # Specify that the output should display the result of three multiplied by five
 # Note that no columns are involved in this example!
 # Either of the following works: 
-table_object.output(["3 * 5"]).to_result()
+table_object.output(["3 * 5"]).to_pl()
 ```
 
 ---
@@ -1438,7 +1438,7 @@ table_object.output(["c1", "c2"]).filter("(-7 < c1 or 9 >= c1) and (c2 = 3)").to
 ```
 
 ```python
-table_object.output(["*"]).filter("c2 = 3").to_result()
+table_object.output(["*"]).filter("c2 = 3").to_pl()
 ```
 
 ---
@@ -1634,10 +1634,6 @@ table_object.match(fields, matching_text, distance_type, options_text)
 
 Performs a full-text search on the specified field(s)/column(s) and returns the most relevant rows to the provided matching text.
 
-:::danger NOTE  
-For now, it is only possible to create a full-text index on multiple columns.
-:::
-
 ### Parameters
 
 #### fields: `str`, *Required*
@@ -1668,13 +1664,13 @@ A non-empty string specifying the following search options:
 
 - `"topn"`: `str`, *Required*  
   Specifies the number of the most relevant rows to retrieve, e.g., `"topn=10"` to obtain the ten most relevant rows.
-- `"operator"`: `str`, *Optional*   
-  - If not specified, the search follows the default full-text search syntax, meaning that logical and arithmetic operators and escape characters will function as full-text search operators, such as:
-    - `&&`, `+`, `||`, `!`, `NOT`, `AND`, `OR` `-`, `,`, `~`, `^`, `:`, `""`.
+- `"operator"`: `str`, *Optional*
+  - If not specified, the search follows Infinity's full-text search syntax, meaning that logical and arithmetic operators and escape characters will function as full-text search operators, such as:
+    - `&&`, `+`, `||`, `!`, `NOT`, `AND`, `OR` `-`, `(`, `)`, `~`, `^`, `:`, `"`.
     - Escape characters like `\`, `\t`, and more.
   - If specified, the above logical and arithmetic operators will be treated as part of the search text, and the corresponding operator will be interpolated into `matching_text`.
     - `"operator=OR"`/`"operator=or"`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.
-    - `"operator=AND"`/`"operator=and"`: Interpolates the `AND` operator between words in `matching_text` to create a new search text. Useful for searching text including code numbers like `"A01-233:BC\显卡"`, resulting in `"(A01) AND (-233) AND (:BC) AND (显卡)"`.
+    - `"operator=AND"`/`"operator=and"`: Interpolates the `AND` operator between words in `matching_text` to create a new search text. Useful for searching text including code numbers like `"A01-233:BC"`, resulting in `"(A01) AND (-233) AND (:BC)"`.
   
 :::tip NOTE
 If both `"topn"` and `"operator"` options are specified, separate them with a semicolon, e.g., `"topn=100;operator=OR"`
