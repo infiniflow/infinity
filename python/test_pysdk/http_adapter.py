@@ -500,7 +500,7 @@ class http_adapter:
         self.output_res = []
         self._output = output
         self._filter = ""
-        self._fusion = {}
+        self._fusion = []
         self._knn = {}
         self._match = {}
         self._match_tensor = {}
@@ -554,40 +554,25 @@ class http_adapter:
         return self
 
     def fusion(self, method="", option="", optional_match_tensor: CommonMatchTensorExpr = None):
-        if len(self._fusion):
-            tmp = self._fusion
-            self._fusion = {}
-            self._fusion["fusion"] = tmp
-
-        self._fusion["method"] = method
+        _fusion = {}
+        _fusion["method"] = method
         if len(option) :
-            self._fusion["option"] = option
+            _fusion["option"] = option
         if method == "match_tensor":
-            self._fusion["optional_match_tensor"] = {}
+            _fusion["optional_match_tensor"] = {}
             vector_column_name = optional_match_tensor.vector_column_name
             if isinstance(vector_column_name, list):
                 pass
             else:
                 vector_column_name = [vector_column_name]
-            self._fusion["optional_match_tensor"]["fields"] = vector_column_name
-            self._fusion["optional_match_tensor"]["query_tensor"] = optional_match_tensor.embedding_data
+            _fusion["optional_match_tensor"]["fields"] = vector_column_name
+            _fusion["optional_match_tensor"]["query_tensor"] = optional_match_tensor.embedding_data
             if optional_match_tensor.extra_option:
-                self._fusion["optional_match_tensor"]["options"] = optional_match_tensor.extra_option
-            self._fusion["optional_match_tensor"]["element_type"] = type_transfrom[optional_match_tensor.embedding_data_type]
-            self._fusion["optional_match_tensor"]["search_method"] = optional_match_tensor.method_type
+                _fusion["optional_match_tensor"]["options"] = optional_match_tensor.extra_option
+            _fusion["optional_match_tensor"]["element_type"] = type_transfrom[optional_match_tensor.embedding_data_type]
+            _fusion["optional_match_tensor"]["search_method"] = optional_match_tensor.method_type
 
-        if len(self._knn):
-            self._fusion["knn"] = self._knn
-            self._knn = {}
-        if len(self._match):
-            self._fusion["match"] = self._match
-            self._match = {}
-        if len(self._match_tensor):
-            self._fusion["match_tensor"] = self._match_tensor
-            self._match_tensor = {}
-        if len(self._match_sparse):
-            self._fusion["match_sparse"] = self._match_sparse
-            self._match_sparse = {}
+        self._fusion.append(_fusion)
         return self
 
     def to_result(self):
@@ -680,7 +665,7 @@ class http_adapter:
 
 class database_result(http_adapter):
     def __init__(self, list = [], error_code = ErrorCode.OK, database_name = "" ,columns=[], table_name = "",
-                 index_list = [], output = ["*"], filter="", fusion={}, knn={}, match = {}, match_tensor = {}, match_sparse = {}, output_res = []):
+                 index_list = [], output = ["*"], filter="", fusion=[], knn={}, match = {}, match_tensor = {}, match_sparse = {}, output_res = []):
         self.db_names = list
         self.error_code = error_code
         self.database_name = database_name # get database

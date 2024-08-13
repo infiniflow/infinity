@@ -1041,7 +1041,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_with_multiple_fusion(self, check_data):
