@@ -35,6 +35,9 @@ SizeT VarBuffer::Append(UniquePtr<char[]> buffer, SizeT size, bool *free_success
     buffer_size_prefix_sum_.push_back(offset + size);
 
     bool free_success = true;
+    if (buffer_obj_ != nullptr) {
+        free_success = buffer_obj_->AddBufferSize(size);
+    }
     if (free_success_p != nullptr) {
         *free_success_p = free_success;
     }

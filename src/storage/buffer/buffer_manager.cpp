@@ -216,7 +216,7 @@ bool BufferManager::RequestSpace(SizeT need_size) {
         round_robin_ = (round_robin_ + 1) % lru_caches_.size();
     } while (freed_space + free_space < need_size && round_robin_ != round_robin);
     bool free_success = freed_space + free_space >= need_size;
-    [[maybe_unused]] auto cur_mem_size = current_memory_size_.fetch_add(need_size - freed_space);
+    [[maybe_unused]] auto cur_mem_size = current_memory_size_.fetch_add(need_size - freed_space); // It's ok to add minus value
     return free_success;
 }
 
