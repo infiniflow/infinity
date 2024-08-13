@@ -159,7 +159,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_select", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     def test_select_aggregate(self):
         """
         target: test table select apis
