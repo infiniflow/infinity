@@ -155,8 +155,10 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
         BlockEntry::NewBlockEntry(new_segment.get(), new_segment->GetNextBlockID(), 0 /*checkpoint_ts*/, column_count, txn);
     const SizeT block_capacity = new_block->row_capacity();
 
+    Vector<SegmentID> old_segment_ids;
     for (SegmentEntry *segment : compactible_segments) {
         SegmentID segment_id = segment->segment_id();
+        old_segment_ids.push_back(segment_id);
         const auto &segment_info = block_index->segment_block_index_.at(segment_id);
         for (const auto *block_entry : segment_info.block_map_) {
             BlockID block_id = block_entry->block_id();
@@ -213,10 +215,6 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
 
     String db_name = *table_entry->GetDBName();
     String table_name = *table_entry->GetTableName();
-    Vector<SegmentID> old_segment_ids;
-    for (SegmentEntry *segment : compactible_segments) {
-        old_segment_ids.push_back(segment->segment_id());
-    }
     Vector<WalSegmentInfo> new_segment_infos;
     new_segment_infos.emplace_back(new_segment.get());
     txn->AddWalCmd(MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(new_segment_infos), std::move(old_segment_ids)));

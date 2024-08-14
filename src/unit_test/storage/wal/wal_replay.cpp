@@ -76,7 +76,7 @@ protected:
         system(("mkdir -p " + String(GetFullDataDir())).c_str());
         system(("mkdir -p " + String(GetFullTmpDir())).c_str());
         tree_cmd = "tree ";
-        tree_cmd += GetHomeDir();
+        tree_cmd += GetFullDataDir();
     }
 
     void TearDown() override {
