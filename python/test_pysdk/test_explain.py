@@ -1,3 +1,9 @@
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 from common import common_values
 import infinity
 from infinity.errors import ErrorCode
@@ -5,7 +11,7 @@ from infinity.table import ExplainType
 from infinity.common import ConflictType
 import polars as pl
 import pytest
-from http_adapter import http_adapter
+from infinity_http import infinity_http
 
 @pytest.mark.usefixtures("local_infinity")
 @pytest.mark.usefixtures("http")
@@ -18,7 +24,7 @@ class TestInfinity:
             self.uri = common_values.TEST_LOCAL_HOST
         self.infinity_obj = infinity.connect(self.uri)
         if http:
-           self.infinity_obj = http_adapter()
+           self.infinity_obj = infinity_http()
         assert self.infinity_obj
 
     def teardown(self):
