@@ -2352,17 +2352,11 @@ void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &
 
     i32 current_offset = 0;
     for (SizeT index = 0; index < row_count; ++index) {
-        VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
-        i32 length = varchar.length_;
-        if (varchar.IsInlined()) {
-            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-            std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
-        } else {
-            const auto *data = column_vector->buffer_->GetVarchar(varchar.vector_.file_offset_, length);
-            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-            std::memcpy(dst.data() + current_offset + sizeof(i32), data, varchar.length_);
-        }
-        current_offset += sizeof(i32) + varchar.length_;
+        Span<const char> data = column_vector->GetVarchar(index);
+        i32 length = data.size();
+        std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+        std::memcpy(dst.data() + current_offset + sizeof(i32), data.data(), data.size());
+        current_offset += sizeof(i32) + length;
     }
 
     output_column_field.column_vectors.emplace_back(std::move(dst));

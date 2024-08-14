@@ -731,15 +731,8 @@ String ColumnVector::ToString(SizeT row_index) const {
             RecoverableError(status);
         }
         case kVarchar: {
-            VarcharT &varchar_ref = ((VarcharT *)data_ptr_)[row_index];
-            if (varchar_ref.IsInlined()) {
-                return {varchar_ref.short_.data_, varchar_ref.length_};
-            } else {
-                // Must be vector type
-                const char *data = buffer_->GetVarchar(varchar_ref.vector_.file_offset_, varchar_ref.length_);
-                String result_str(data, varchar_ref.length_);
-                return result_str;
-            }
+            Span<const char> data = this->GetVarchar(row_index);
+            return {data.data(), data.size()};
         }
         case kDate: {
             return ((DateT *)data_ptr_)[row_index].ToString();
@@ -932,13 +925,8 @@ Value ColumnVector::GetValue(SizeT index) const {
             return Value::MakeDecimal(((DecimalT *)data_ptr_)[index], data_type_->type_info());
         }
         case kVarchar: {
-            VarcharT &varchar = ((VarcharT *)data_ptr_)[index];
-            if (varchar.IsInlined()) {
-                return Value::MakeVarchar(((VarcharT *)data_ptr_)[index]);
-            } else {
-                const char *data_ptr = buffer_->GetVarchar(varchar.vector_.file_offset_, varchar.length_);
-                return Value::MakeVarchar(data_ptr, varchar.length_);
-            }
+            Span<const char> data = this->GetVarchar(index);
+            return Value::MakeVarchar(data.data(), data.size());
         }
         case kDate: {
             return Value::MakeDate(((DateT *)data_ptr_)[index]);
@@ -1166,20 +1154,8 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
         case kVarchar: {
-            // Copy string
-            const String &src_str = value.GetVarchar();
-            u64 varchar_len = src_str.size();
-            VarcharT &target_ref = ((VarcharT *)data_ptr_)[index];
-            target_ref.is_value_ = false;
-            target_ref.length_ = varchar_len;
-            if (varchar_len <= VARCHAR_INLINE_LEN) {
-                // Only prefix is enough to contain all string data.
-                std::memcpy(target_ref.short_.data_, src_str.c_str(), varchar_len);
-            } else {
-                std::memcpy(target_ref.vector_.prefix_, src_str.c_str(), VARCHAR_PREFIX_LEN);
-                SizeT file_offset = buffer_->AppendVarchar(src_str.c_str(), varchar_len);
-                target_ref.vector_.file_offset_ = file_offset;
-            }
+            const String &data = value.GetVarchar();
+            this->AppendVarcharInner({data.data(), data.size()}, index);
             break;
         }
         case kTensor: {
@@ -1751,16 +1727,7 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             break;
         }
         case kVarchar: {
-            auto &varchar = (reinterpret_cast<VarcharT *>(data_ptr_))[index];
-            varchar.is_value_ = false;
-            varchar.length_ = sv.size();
-            if (sv.size() <= VARCHAR_INLINE_LEN) {
-                std::memcpy(varchar.short_.data_, sv.data(), sv.size());
-            } else {
-                std::memcpy(varchar.vector_.prefix_, sv.data(), VARCHAR_PREFIX_LEN);
-                SizeT file_offset = buffer_->AppendVarchar(sv.data(), sv.size());
-                varchar.vector_.file_offset_ = file_offset;
-            }
+            this->AppendVarcharInner(sv, index);
             break;
         }
         case kSparse: {
@@ -2129,19 +2096,10 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
         return false;
     if (data_type_->type() == kVarchar) {
         for (SizeT i = 0; i < this->tail_index_; i++) {
-            const VarcharT *lhs = reinterpret_cast<const VarcharT *>(this->data_ptr_ + i * this->data_type_size_);
-            const VarcharT *rhs = reinterpret_cast<const VarcharT *>(other.data_ptr_ + i * this->data_type_size_);
-            if (lhs->length_ != rhs->length_) {
+            Span<const char> data1 = this->GetVarchar(i);
+            Span<const char> data2 = other.GetVarchar(i);
+            if (data1.size() != data2.size() || std::strncmp(data1.data(), data2.data(), data1.size())) {
                 return false;
-            }
-            if (lhs->IsInlined()) {
-                if (0 != memcmp(lhs->short_.data_, rhs->short_.data_, lhs->length_))
-                    return false;
-            } else {
-                const char *data1 = buffer_->GetVarchar(lhs->vector_.file_offset_, lhs->length_);
-                const char *data2 = other.buffer_->GetVarchar(rhs->vector_.file_offset_, rhs->length_);
-                if (0 != memcmp(data1, data2, lhs->length_))
-                    return false;
             }
         }
     } else if (data_type_->type() == LogicalType::kBoolean) {
@@ -2239,6 +2197,41 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         UnrecoverableError(error_message);
     }
     return column_vector;
+}
+
+void ColumnVector::AppendVarcharInner(Span<const char> data, VarcharT &varchar) {
+    varchar.length_ = data.size();
+    if (varchar.IsInlined()) {
+        std::memcpy(varchar.short_.data_, data.data(), data.size());
+    } else {
+        varchar.vector_.file_offset_ = buffer_->AppendVarchar(data.data(), data.size());
+    }
+}
+
+void ColumnVector::AppendVarcharInner(Span<const char> data, SizeT dst_off) {
+    auto &varchar = reinterpret_cast<VarcharT *>(data_ptr_)[dst_off];
+    AppendVarcharInner(data, varchar);
+}
+
+void ColumnVector::AppendVarchar(Span<const char> data) {
+    SizeT dst_off = tail_index_++;
+    AppendVarcharInner(data, dst_off);
+}
+
+Span<const char> ColumnVector::GetVarcharInner(const VarcharT &varchar) const {
+    i32 length = varchar.length_;
+    const char *data = nullptr;
+    if (varchar.IsInlined()) {
+        data = varchar.short_.data_;
+    } else {
+        data = buffer_->GetVarchar(varchar.vector_.file_offset_, length);
+    }
+    return {data, static_cast<SizeT>(length)};
+}
+
+Span<const char> ColumnVector::GetVarchar(SizeT index) const {
+    const auto &varchar = reinterpret_cast<const VarcharT *>(data_ptr_)[index];
+    return GetVarcharInner(varchar);
 }
 
 void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT &src_ref, const VectorBuffer *src_vec_buffer) {

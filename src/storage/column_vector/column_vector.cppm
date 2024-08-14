@@ -316,6 +316,21 @@ private:
             buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tensors.data()), tensors.size() * sizeof(TensorT));
     }
 
+    template <typename T>
+    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off);
+
+    template <typename DataT, typename IdxT>
+    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off);
+
+    template <typename DataT, typename IdxT>
+    void AppendSparseInner(SizeT nnz, DataT *data, IdxT *index, SizeT dst_off);
+
+public:
+    void AppendVarcharInner(Span<const char> data, VarcharT &varchar);
+
+private:
+    void AppendVarcharInner(Span<const char> data, SizeT dst_off);
+
 public:
     template <typename DataT, typename IdxT>
     void AppendSparse(SizeT nnz, DataT *data, IdxT *index) {
@@ -323,116 +338,13 @@ public:
         AppendSparseInner(nnz, data, index, dst_off);
     }
 
+    void AppendVarchar(Span<const char> data);
+
+    Span<const char> GetVarcharInner(const VarcharT &varchar) const;
+
+    Span<const char> GetVarchar(SizeT index) const;
+
 private:
-    template <typename T>
-    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
-        const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
-        switch (sparse_info->IndexType()) {
-            case kElemInt8: {
-                AppendSparse<T, TinyIntT>(ele_str_views, dst_off);
-                break;
-            }
-            case kElemInt16: {
-                AppendSparse<T, SmallIntT>(ele_str_views, dst_off);
-                break;
-            }
-            case kElemInt32: {
-                AppendSparse<T, IntegerT>(ele_str_views, dst_off);
-                break;
-            }
-            case kElemInt64: {
-                AppendSparse<T, BigIntT>(ele_str_views, dst_off);
-                break;
-            }
-            default: {
-                String error_message = "Unsupported sparse index type.";
-                UnrecoverableError(error_message);
-            }
-        }
-    }
-
-    template <typename DataT, typename IdxT>
-    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
-        SizeT total_element_count = ele_str_views.size();
-        Vector<IdxT> index_vec;
-        index_vec.reserve(total_element_count);
-        if constexpr (std::is_same_v<DataT, BooleanT>) {
-            for (u32 i = 0; i < total_element_count; ++i) {
-                auto index = DataType::StringToValue<IdxT>(ele_str_views[i]);
-                if (index < 0) {
-                    RecoverableError(Status::InvalidDataType());
-                }
-                index_vec.push_back(index);
-            }
-            AppendSparseInner(total_element_count, static_cast<DataT *>(nullptr), index_vec.data(), dst_off);
-        } else {
-            Vector<DataT> data_vec;
-            data_vec.reserve(total_element_count);
-            for (u32 i = 0; i < total_element_count; ++i) {
-                auto [index, value] = DataType::StringToSparseValue<DataT, IdxT>(ele_str_views[i]);
-                if (index < 0) {
-                    RecoverableError(Status::InvalidDataType());
-                }
-                index_vec.push_back(index);
-                data_vec.push_back(value);
-            }
-            AppendSparseInner(total_element_count, data_vec.data(), index_vec.data(), dst_off);
-        }
-    }
-
-    template <typename DataT, typename IdxT>
-    void AppendSparseInner(SizeT nnz, DataT *data, IdxT *index, SizeT dst_off) {
-        auto &target_sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
-        target_sparse.nnz_ = nnz;
-        if (nnz == 0) {
-            target_sparse.file_offset_ = -1;
-            return;
-        }
-        bool to_sort = true;
-        auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
-        if (sparse_info->StoreType() == SparseStoreType::kSorted) {
-            to_sort = false;
-        }
-
-        if constexpr (std::is_same_v<DataT, BooleanT>) {
-            if (data != nullptr) {
-                RecoverableError(Status::InvalidDataType());
-                return;
-            }
-            if (to_sort) {
-                auto *index_end = index + nnz;
-                std::sort(index, index_end);
-                auto *index_end1 = std::unique(index, index_end);
-                if (index_end1 != index_end) {
-                    RecoverableError(Status::InvalidDataType());
-                    return;
-                }
-            }
-            SparseVecRef<DataT, IdxT> sparse_vec_ref(nnz, index, nullptr);
-            target_sparse.file_offset_ = buffer_->AppendSparse(sparse_vec_ref);
-        } else {
-            if (to_sort) {
-                auto *index_end = index + nnz;
-                Vector<Pair<IdxT, DataT>> index_value_pairs(nnz);
-                for (u32 i = 0; i < nnz; ++i) {
-                    index_value_pairs[i] = {index[i], data[i]};
-                }
-                std::sort(index_value_pairs.begin(), index_value_pairs.end(), [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
-                for (u32 i = 0; i < nnz; ++i) {
-                    index[i] = index_value_pairs[i].first;
-                    data[i] = index_value_pairs[i].second;
-                }
-                auto *index_end1 = std::unique(index, index_end);
-                if (index_end1 != index_end) {
-                    RecoverableError(Status::InvalidDataType());
-                    return;
-                }
-            }
-            SparseVecRef<DataT, IdxT> sparse_vec_ref(nnz, index, data);
-            target_sparse.file_offset_ = buffer_->AppendSparse(sparse_vec_ref);
-        }
-    }
-
     // Used by Append by Ptr
     void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
 
@@ -459,6 +371,115 @@ public:
 
     [[nodiscard]] inline SizeT Size() const { return tail_index_; }
 };
+
+template <typename T>
+void ColumnVector::AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+    const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+    switch (sparse_info->IndexType()) {
+        case kElemInt8: {
+            AppendSparse<T, TinyIntT>(ele_str_views, dst_off);
+            break;
+        }
+        case kElemInt16: {
+            AppendSparse<T, SmallIntT>(ele_str_views, dst_off);
+            break;
+        }
+        case kElemInt32: {
+            AppendSparse<T, IntegerT>(ele_str_views, dst_off);
+            break;
+        }
+        case kElemInt64: {
+            AppendSparse<T, BigIntT>(ele_str_views, dst_off);
+            break;
+        }
+        default: {
+            String error_message = "Unsupported sparse index type.";
+            UnrecoverableError(error_message);
+        }
+    }
+}
+
+template <typename DataT, typename IdxT>
+void ColumnVector::AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+    SizeT total_element_count = ele_str_views.size();
+    Vector<IdxT> index_vec;
+    index_vec.reserve(total_element_count);
+    if constexpr (std::is_same_v<DataT, BooleanT>) {
+        for (u32 i = 0; i < total_element_count; ++i) {
+            auto index = DataType::StringToValue<IdxT>(ele_str_views[i]);
+            if (index < 0) {
+                RecoverableError(Status::InvalidDataType());
+            }
+            index_vec.push_back(index);
+        }
+        AppendSparseInner(total_element_count, static_cast<DataT *>(nullptr), index_vec.data(), dst_off);
+    } else {
+        Vector<DataT> data_vec;
+        data_vec.reserve(total_element_count);
+        for (u32 i = 0; i < total_element_count; ++i) {
+            auto [index, value] = DataType::StringToSparseValue<DataT, IdxT>(ele_str_views[i]);
+            if (index < 0) {
+                RecoverableError(Status::InvalidDataType());
+            }
+            index_vec.push_back(index);
+            data_vec.push_back(value);
+        }
+        AppendSparseInner(total_element_count, data_vec.data(), index_vec.data(), dst_off);
+    }
+}
+
+template <typename DataT, typename IdxT>
+void ColumnVector::AppendSparseInner(SizeT nnz, DataT *data, IdxT *index, SizeT dst_off) {
+    auto &target_sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
+    target_sparse.nnz_ = nnz;
+    if (nnz == 0) {
+        target_sparse.file_offset_ = -1;
+        return;
+    }
+    bool to_sort = true;
+    auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
+    if (sparse_info->StoreType() == SparseStoreType::kSorted) {
+        to_sort = false;
+    }
+
+    if constexpr (std::is_same_v<DataT, BooleanT>) {
+        if (data != nullptr) {
+            RecoverableError(Status::InvalidDataType());
+            return;
+        }
+        if (to_sort) {
+            auto *index_end = index + nnz;
+            std::sort(index, index_end);
+            auto *index_end1 = std::unique(index, index_end);
+            if (index_end1 != index_end) {
+                RecoverableError(Status::InvalidDataType());
+                return;
+            }
+        }
+        SparseVecRef<DataT, IdxT> sparse_vec_ref(nnz, index, nullptr);
+        target_sparse.file_offset_ = buffer_->AppendSparse(sparse_vec_ref);
+    } else {
+        if (to_sort) {
+            auto *index_end = index + nnz;
+            Vector<Pair<IdxT, DataT>> index_value_pairs(nnz);
+            for (u32 i = 0; i < nnz; ++i) {
+                index_value_pairs[i] = {index[i], data[i]};
+            }
+            std::sort(index_value_pairs.begin(), index_value_pairs.end(), [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
+            for (u32 i = 0; i < nnz; ++i) {
+                index[i] = index_value_pairs[i].first;
+                data[i] = index_value_pairs[i].second;
+            }
+            auto *index_end1 = std::unique(index, index_end);
+            if (index_end1 != index_end) {
+                RecoverableError(Status::InvalidDataType());
+                return;
+            }
+        }
+        SparseVecRef<DataT, IdxT> sparse_vec_ref(nnz, index, data);
+        target_sparse.file_offset_ = buffer_->AppendSparse(sparse_vec_ref);
+    }
+}
 
 template <typename T>
 void WriteToTensor(TensorT &target_tensor,
@@ -1174,7 +1195,7 @@ class ColumnVectorPtrAndIdx<VarcharT> {
 
 public:
     explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col)
-        : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), vec_buffer_(col->buffer_.get()) {}
+        : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), col_(col) {}
     auto &SetIndex(u32 index) {
         idx_ = index;
         return *this;
@@ -1182,42 +1203,20 @@ public:
     auto &operator[](u32 index) { return SetIndex(index); }
     // Does not check type.
     friend std::strong_ordering ThreeWayCompareReaderValue(const IteratorType &left, const IteratorType &right) {
-        const VarcharT &left_value = left.data_ptr_[left.idx_];
-        const VarcharT &right_value = right.data_ptr_[right.idx_];
-        auto left_length = static_cast<u32>(left_value.length_);
-        auto right_length = static_cast<u32>(right_value.length_);
-        const char *left_data = left_value.short_.data_;
-        if (!left_value.IsInlined()) {
-            left_data = left.vec_buffer_->GetVarchar(left_value.vector_.file_offset_, left_value.length_);
-        }
-        const char *right_data = right_value.short_.data_;
-        if (!right_value.IsInlined()) {
-            right_data = right.vec_buffer_->GetVarchar(right_value.vector_.file_offset_, right_value.length_);
-        }
-        return CompareCharArray(left_data, left_length, right_data, right_length);
+        Span<const char> left_v = left.col_->GetVarchar(left.idx_);
+        Span<const char> right_v = right.col_->GetVarchar(right.idx_);
+        return CompareCharArray(left_v.data(), left_v.size(), right_v.data(), right_v.size());
     }
     friend bool CheckReaderValueEquality(const IteratorType &left, const IteratorType &right) {
-        const VarcharT &left_value = left.data_ptr_[left.idx_];
-        const VarcharT &right_value = right.data_ptr_[right.idx_];
-        auto left_length = static_cast<u32>(left_value.length_);
-        auto right_length = static_cast<u32>(right_value.length_);
-        if (left_length != right_length) {
-            return false;
-        }
-        const auto *left_data = left_value.short_.data_;
-        if (!left_value.IsInlined()) {
-            left_data = left.vec_buffer_->GetVarchar(left_value.vector_.file_offset_, left_length);
-        }
-        const auto *right_data = right_value.short_.data_;
-        if (!right_value.IsInlined()) {
-            right_data = right.vec_buffer_->GetVarchar(right_value.vector_.file_offset_, right_length);
-        }
-        return std::strncmp(left_data, right_data, left_length) == 0;
+        Span<const char> left_v = left.col_->GetVarchar(left.idx_);
+        Span<const char> right_v = right.col_->GetVarchar(right.idx_);
+        return left_v.size() == right_v.size() && std::strncmp(left_v.data(), right_v.data(), left_v.size()) == 0;
     }
 
 private:
     const VarcharT *data_ptr_ = nullptr;
-    VectorBuffer *vec_buffer_ = nullptr;
+    // VectorBuffer *vec_buffer_ = nullptr;
+    SharedPtr<ColumnVector> col_;
     u32 idx_ = {};
 
     static std::strong_ordering CompareCharArray(const char *left_data, u32 left_len, const char *right_data, u32 right_len) {

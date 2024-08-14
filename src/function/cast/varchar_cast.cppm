@@ -299,22 +299,10 @@ struct TryCastVarcharVector {
 // Cast VarcharT to BigIntT type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, i64 &target) {
-    if (source.IsInlined()) {
-        auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        if (ec != std::errc()) {
-            return false;
-        }
-    } else {
-        {
-            // varchar is vector
-            SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
-
-            auto [ptr, ec] = std::from_chars(data, data + varchar_len, target);
-            if (ec != std::errc()) {
-                return false;
-            }
-        }
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    auto [ptr, ec] = std::from_chars(data.data(), data.data() + data.size(), target);
+    if (ec != std::errc()) {
+        return false;
     }
     return true;
 }
@@ -322,82 +310,38 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
 // Cast VarcharT to FloatT type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, FloatT &target) {
-    if (source.IsInlined()) {
-        // Used in libc++
-        String substr(source.short_.data_, source.length_);
-        try {
-            target = std::stof(substr);
-        } catch(const std::exception &e) {
-            return false;
-        }
-
-        // Used in libstdc++
-        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        // if (ec != std::errc()) {
-        //     return false;
-        // }
-    } else {
-        {
-            // varchar is vector
-            SizeT varchar_len = source.length_;
-
-            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
-            String varchar_ptr(data, varchar_len);
-
-            // Used in libc++
-            try {
-                target = std::stof(varchar_ptr);
-            } catch(const std::exception &e) {
-                return false;
-            }
-            // Used in libstdc++
-            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
-            // if (ec != std::errc()) {
-            //    return false;
-            // }
-        }
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    // Used in libc++
+    String substr(data.data(), data.size());
+    try {
+        target = std::stof(substr);
+    } catch(const std::exception &e) {
+        return false;
     }
+    // Used in libstdc++
+    // auto [ptr, ec] = std::from_chars(data.data(), data.data() + data.size(), target);
+    // if (ec != std::errc()) {
+    //     return false;
+    // }
     return true;
 }
 
 // Cast VarcharT to DoubleT type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, DoubleT &target) {
-    if (source.IsInlined()) {
-        // Used in libc++
-        String substr(source.short_.data_, source.length_);
-        try {
-            target = std::stod(substr);
-        } catch(const std::exception &e) {
-            return false;
-        }
-
-        // Used in libstdc++
-        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        // if (ec != std::errc()) {
-        //     return false;
-        // }
-    } else {
-        {
-            // varchar is vector
-            SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
-
-            String varchar_ptr(data, varchar_len);
-
-            // Used in libc++
-            try {
-                target = std::stod(varchar_ptr);
-            } catch(const std::exception &e) {
-                return false;
-            }
-            // Used in libstdc++
-            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
-            // if (ec != std::errc()) {
-            //    return false;
-            // }
-        }
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    // Used in libc++
+    String substr(data.data(), data.size());
+    try {
+        target = std::stod(substr);
+    } catch(const std::exception &e) {
+        return false;
     }
+    // Used in libstdc++
+    // auto [ptr, ec] = std::from_chars(data.data(), data.data() + data.size(), target);
+    // if (ec != std::errc()) {
+    //     return false;
+    // }
     return true;
 }
 
@@ -405,82 +349,38 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
 // Cast VarcharT to Float16T type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, Float16T &target) {
-    if (source.IsInlined()) {
-        // Used in libc++
-        String substr(source.short_.data_, source.length_);
-        try {
-            target = std::stof(substr);
-        } catch(const std::exception &e) {
-            return false;
-        }
-
-        // Used in libstdc++
-        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        // if (ec != std::errc()) {
-        //     return false;
-        // }
-    } else {
-        {
-            // varchar is vector
-            SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
-
-            String varchar_ptr(data, varchar_len);
-
-            // Used in libc++
-            try {
-                target = std::stof(varchar_ptr);
-            } catch(const std::exception &e) {
-                return false;
-            }
-            // Used in libstdc++
-            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
-            // if (ec != std::errc()) {
-            //    return false;
-            // }
-        }
+    // Used in libc++
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    String substr(data.data(), data.size());
+    try {
+        target = std::stof(substr);
+    } catch(const std::exception &e) {
+        return false;
     }
+    // Used in libstdc++
+    // auto [ptr, ec] = std::from_chars(data.data(), data.data() + data.size(), target);
+    // if (ec != std::errc()) {
+    //     return false;
+    // }
     return true;
 }
 
 // Cast VarcharT to BFloat16T type
 template <>
 inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, BFloat16T &target) {
-    if (source.IsInlined()) {
-        // Used in libc++
-        String substr(source.short_.data_, source.length_);
-        try {
-            target = std::stof(substr);
-        } catch(const std::exception &e) {
-            return false;
-        }
-
-        // Used in libstdc++
-        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
-        // if (ec != std::errc()) {
-        //     return false;
-        // }
-    } else {
-        {
-            // varchar is vector
-            SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
-
-            String varchar_ptr(data, varchar_len);
-
-            // Used in libc++
-            try {
-                target = std::stof(varchar_ptr);
-            } catch(const std::exception &e) {
-                return false;
-            }
-            // Used in libstdc++
-            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
-            // if (ec != std::errc()) {
-            //    return false;
-            // }
-        }
+    Span<const char> data = source_vector->GetVarcharInner(source);
+    // Used in libc++
+    String substr(data.data(), data.size());
+    try {
+        target = std::stof(substr);
+    } catch(const std::exception &e) {
+        return false;
     }
+    // Used in libstdc++
+    // auto [ptr, ec] = std::from_chars(data.data(), data.size() + data.size(), target);
+    // if (ec != std::errc()) {
+    //     return false;
+    // }
     return true;
 }
 

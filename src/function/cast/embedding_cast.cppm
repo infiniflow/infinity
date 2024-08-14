@@ -246,23 +246,7 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
     LOG_TRACE(fmt::format("EmbeddingInfo Dimension: {}", embedding_info->Dimension()));
 
     String res = EmbeddingT::Embedding2String(source, embedding_info->Type(), embedding_info->Dimension());
-    target.length_ = static_cast<u64>(res.size());
-    target.is_value_ = false;
-    if (target.IsInlined()) {
-        // inline varchar
-        std::memcpy(target.short_.data_, res.c_str(), target.length_);
-    } else {
-        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
-            String error_message = fmt::format("Varchar column vector should use VarBuffer.");
-            UnrecoverableError(error_message);
-        }
-
-        // Set varchar prefix
-        std::memcpy(target.vector_.prefix_, res.c_str(), VARCHAR_PREFIX_LEN);
-
-        SizeT offset = vector_ptr->buffer_->AppendVarchar(res.c_str(), target.length_);
-        target.vector_.file_offset_ = offset;
-    }
+    vector_ptr->AppendVarcharInner({res.data(), res.size()}, target);
 
     return true;
 }
