@@ -34,7 +34,7 @@ public:
 
 export template <typename DataType, template <typename, typename> typename C>
 class MergeKnn final : public MergeKnnBase {
-    using ResultHandler = ReservoirResultHandler<C<DataType, RowID>>;
+    using ResultHandler = HeapResultHandler<C<DataType, RowID>>;
     using DistFunc = DataType (*)(const DataType *, const DataType *, SizeT);
 
 public:
