@@ -73,10 +73,10 @@ inline void HeapifyDown(typename Compare::DistanceType *distance, typename Compa
     auto tmp_d = distance[index];
     auto tmp_i = id[index];
     for (u32 sub; (sub = (index << 1)) <= size; index = sub) {
-        if (sub + 1 <= size && Compare::Compare(distance[sub + 1], distance[sub])) {
+        if (sub + 1 <= size && Compare::Compare(distance[sub + 1], distance[sub], id[sub + 1], id[sub])) {
             ++sub;
         }
-        if (!Compare::Compare(distance[sub], tmp_d)) {
+        if (!Compare::Compare(distance[sub], tmp_d, id[sub], tmp_i)) {
             break;
         }
         distance[index] = distance[sub];
@@ -119,7 +119,7 @@ public:
         auto distance = distance_ptr + q_id * top_k - 1;
         auto id = id_ptr + q_id * top_k - 1;
         if (size == top_k) {
-            if (Compare::Compare(distance[1], d)) {
+            if (Compare::Compare(distance[1], d, id[1], i)) {
                 distance[1] = d;
                 id[1] = i;
                 HeapifyDown<Compare>(distance, id, size, 1);
@@ -145,9 +145,10 @@ public:
             for (SizeT j = j0; j < j1; ++j) {
                 auto dis = dis_tab_i[j];
                 if (size == top_k) {
-                    if (Compare::Compare(distance[1], dis)) {
+                    const auto add_row_id = RowID(segment_id, segment_offset_start + j);
+                    if (Compare::Compare(distance[1], dis, id[1], add_row_id)) {
                         distance[1] = dis;
-                        id[1] = RowID(segment_id, segment_offset_start + j);
+                        id[1] = add_row_id;
                         HeapifyDown<Compare>(distance, id, size, 1);
                     }
                 } else {
@@ -177,9 +178,10 @@ public:
                 if (bitmask.IsTrue(segment_offset)) {
                     auto dis = dis_tab_i[j];
                     if (size == top_k) {
-                        if (Compare::Compare(distance[1], dis)) {
+                        const auto add_row_id = RowID(segment_id, segment_offset);
+                        if (Compare::Compare(distance[1], dis, id[1], add_row_id)) {
                             distance[1] = dis;
-                            id[1] = RowID(segment_id, segment_offset);
+                            id[1] = add_row_id;
                             HeapifyDown<Compare>(distance, id, size, 1);
                         }
                     } else {
@@ -508,7 +510,7 @@ public:
             std::fill_n(dis_result + size + 1, top_k - size, Compare::InitialValue());
         } else {
             for (SizeT j = top_k; j < size; ++j) {
-                if (Compare::Compare(dis_result[1], q_id_distance[j])) {
+                if (Compare::Compare(dis_result[1], q_id_distance[j], id_result[1], q_id_id[j])) {
                     dis_result[1] = q_id_distance[j];
                     id_result[1] = q_id_id[j];
                     HeapifyDown<Compare>(dis_result, id_result, top_k, 1);

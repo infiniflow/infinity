@@ -5,4 +5,4 @@ FROM debian:stable-slim
 # The directory itself isn't copied, only its contents.
 COPY cmake-build-release/src/infinity /usr/bin
 
-ENTRYPOINT ["bash", "-c", "cp -rf /resource /var/infinity/; exec /usr/bin/infinity"]
+ENTRYPOINT ["/usr/bin/infinity"]
