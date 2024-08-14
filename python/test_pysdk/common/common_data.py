@@ -1,3 +1,14 @@
+import os
+import sys
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+grandparent_dir = os.path.dirname(parent_dir)
+python_dir = grandparent_dir
+print(python_dir)
+if python_dir in sys.path:
+    sys.path.remove(python_dir)
+print(sys.path)
+
 from infinity.common import ConflictType, InfinityException
 import infinity.index as index
 from numpy import dtype

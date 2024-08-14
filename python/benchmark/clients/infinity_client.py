@@ -3,10 +3,9 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 grandparent_dir = os.path.dirname(parent_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
 if grandparent_dir not in sys.path:
     sys.path.insert(0, grandparent_dir)
+print(sys.path)
 
 from infinity_http import infinity_http
 import json
@@ -42,16 +41,16 @@ class InfinityClient(BaseClient):
         indexs = []
         for key, value in index_schema.items():
             if value["type"] == "text":
-                indexs.append(index.IndexInfo(key, index.IndexType.FullText, []))
+                indexs.append(index.IndexInfo(key, index.IndexType.FullText))
             elif value["type"] == "HNSW":
-                params = []
+                params = {}
                 for param, v in value["params"].items():
-                    params.append(index.InitParameter(param, str(v)))
+                    params[param] = str(v)
                 indexs.append(index.IndexInfo(key, index.IndexType.Hnsw, params))
             elif value["type"] == "BMP":
-                params = []
+                params = {}
                 for param, v in value["params"].items():
-                    params.append(index.InitParameter(param, str(v)))
+                    params[param] = str(v)
                 indexs.append(index.IndexInfo(key, index.IndexType.BMP, params))
         return indexs
 
