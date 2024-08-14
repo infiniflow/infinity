@@ -1797,7 +1797,7 @@ table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"]
             .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
             .match("body", "blooms", "topn=10")
             .filter("year < 2024")
-            .fusion("match_tensor", "topn=2", make_match_tensor_expr("tensor", [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], "float", "maxsim"))
+            .fusion("match_tensor", "topn=2", commonMatchTensorExpr("tensor", [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], "float", "maxsim"))
             .to_pl()
 ```
 
