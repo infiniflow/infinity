@@ -73,7 +73,7 @@ This section provides instructions on deploying the Infinity using Docker on Lin
 ```bash
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
 docker pull infiniflow/infinity:nightly
-docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
+docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly -f /var/infinity/infinity_conf.toml
 ```
   </TabItem>
   <TabItem value="windows">
