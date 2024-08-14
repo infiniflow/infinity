@@ -455,6 +455,13 @@ KnnExpr *HTTPSearch::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus 
             if (knn_expr->opt_params_ == nullptr) {
                 knn_expr->opt_params_ = new Vector<InitParameter *>();
             }
+            if(key  == "index_name") {
+                knn_expr->index_name_ = field_json_obj.value();
+            }
+            if(key == "ignore_index" && field_json_obj.value() == "true") {
+                knn_expr->ignore_index_ = true;
+            }
+
             auto parameter = MakeUnique<InitParameter>();
             parameter->param_name_ = key;
             parameter->param_value_ = field_json_obj.value();

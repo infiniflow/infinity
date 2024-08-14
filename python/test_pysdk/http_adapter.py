@@ -544,13 +544,16 @@ class http_adapter:
         self._filter = filter
         return self
 
-    def knn(self, fields, query_vector, element_type, metric_type, top_k):
+    def knn(self, fields, query_vector, element_type, metric_type, top_k, opt_params : {} = None):
         self._knn = {}
         self._knn["fields"] = [fields]
         self._knn["query_vector"] = query_vector
         self._knn["element_type"] = type_transfrom[element_type]
         self._knn["metric_type"] = metric_type
         self._knn["top_k"] = top_k
+        if opt_params is not None:
+            for key in opt_params:
+                self._knn[key] = opt_params[key]
         return self
 
     def fusion(self, method="", option="", optional_match_tensor: CommonMatchTensorExpr = None):
