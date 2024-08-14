@@ -48,7 +48,7 @@ using namespace infinity;
 class SealingTaskTest : public BaseTestParamStr {
     void SetUp() override {
         tree_cmd = "tree ";
-        tree_cmd += GetHomeDir();
+        tree_cmd += GetFullDataDir();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
