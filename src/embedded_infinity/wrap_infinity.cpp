@@ -996,10 +996,10 @@ void HandleSparseType(ColumnField &output_column_field, SizeT row_count, const S
         SizeT data_size = sparse_info->DataSize(sparse.nnz_);
         SizeT idx_size = sparse_info->IndiceSize(sparse.nnz_);
         auto [raw_data_ptr, raw_idx_ptr] = column_vector->buffer_->GetSparseRaw(sparse.file_offset_, sparse.nnz_, sparse_info);
-        std::memcpy(dst.data() + current_offset, raw_data_ptr, data_size);
-        current_offset += data_size;
         std::memcpy(dst.data() + current_offset, raw_idx_ptr, idx_size);
         current_offset += idx_size;
+        std::memcpy(dst.data() + current_offset, raw_data_ptr, data_size);
+        current_offset += data_size;
     }
 
     output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
