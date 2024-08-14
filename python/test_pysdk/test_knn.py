@@ -1616,3 +1616,204 @@ class TestInfinity:
 
         res = db_obj.drop_table("test_sparse_knn_with_index", ConflictType.Error)
         assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
+    def test_knn_with_given_index_name(self, check_data, knn_distance_type):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_index", {
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
+        }, ConflictType.Error)
+        if not check_data:
+            copy_data("pysdk_test_knn.csv")
+        test_csv_dir = "/var/infinity/test_data/pysdk_test_knn.csv"
+        table_obj.import_data(test_csv_dir, None)
+        res = table_obj.create_index("my_index_l2",
+                                     index.IndexInfo("gender_vector",
+                                                     index.IndexType.Hnsw,
+                                                     {
+                                                         "M": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "l2"
+                                                     }), ConflictType.Error)
+
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.create_index("my_index_ip",
+                                     index.IndexInfo("gender_vector",
+                                                     index.IndexType.Hnsw,
+                                                     {
+                                                         "M": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "ip"
+                                                     }), ConflictType.Error)
+
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["variant_id"]).knn(
+            "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"index_name":"my_index_l2"}).to_pl()
+        print(res)
+
+        res = table_obj.output(["variant_id"]).knn(
+            "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"index_name": "my_index_ip"}).to_pl()
+        print(res)
+
+        res = table_obj.drop_index("my_index_l2", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.drop_index("my_index_ip", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
+    def test_knn_with_ignore_index(self, check_data, knn_distance_type):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_index", {
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
+        }, ConflictType.Error)
+        if not check_data:
+            copy_data("pysdk_test_knn.csv")
+        test_csv_dir = "/var/infinity/test_data/pysdk_test_knn.csv"
+        table_obj.import_data(test_csv_dir, None)
+        res = table_obj.create_index("my_index_l2",
+                                     index.IndexInfo("gender_vector",
+                                                     index.IndexType.Hnsw,
+                                                     {
+                                                         "M": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "l2"
+                                                     }), ConflictType.Error)
+
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["variant_id"]).knn(
+            "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"ignore_index":"true"}).to_pl()
+        print(res)
+
+        res = table_obj.drop_index("my_index_l2", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
+    def test_knn_with_given_invalid_index_name(self, check_data, knn_distance_type):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_index", {
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
+        }, ConflictType.Error)
+        if not check_data:
+            copy_data("pysdk_test_knn.csv")
+        test_csv_dir = "/var/infinity/test_data/pysdk_test_knn.csv"
+        table_obj.import_data(test_csv_dir, None)
+        res = table_obj.create_index("my_index_l2",
+                                     index.IndexInfo("gender_vector",
+                                                     index.IndexType.Hnsw,
+                                                     {
+                                                         "M": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "l2"
+                                                     }), ConflictType.Error)
+
+        assert res.error_code == ErrorCode.OK
+
+        with  pytest.raises(InfinityException) as e:
+            res = table_obj.output(["variant_id"]).knn(
+                "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"index_name": "my_index_ip"}).to_pl()
+        assert e.value.args[0] == ErrorCode.INDEX_NOT_EXIST
+
+        res = table_obj.drop_index("my_index_l2", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+    @pytest.mark.parametrize("check_data", [{"file_name": "pysdk_test_knn.csv",
+                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
+    @pytest.mark.parametrize("knn_distance_type", ["l2", "ip"])
+    def test_knn_with_given_index_name_and_ignore_index(self, check_data, knn_distance_type):
+        db_obj = self.infinity_obj.get_database("default_db")
+        db_obj.drop_table("test_with_index", ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_index", {
+            "variant_id": {"type": "varchar"},
+            "gender_vector": {"type": "vector,4,float"},
+            "color_vector": {"type": "vector,4,float"},
+            "category_vector": {"type": "vector,4,float"},
+            "tag_vector": {"type": "vector,4,float"},
+            "other_vector": {"type": "vector,4,float"},
+            "query_is_recommend": {"type": "varchar"},
+            "query_gender": {"type": "varchar"},
+            "query_color": {"type": "varchar"},
+            "query_price": {"type": "float"}
+        }, ConflictType.Error)
+        if not check_data:
+            copy_data("pysdk_test_knn.csv")
+        test_csv_dir = "/var/infinity/test_data/pysdk_test_knn.csv"
+        table_obj.import_data(test_csv_dir, None)
+        res = table_obj.create_index("my_index_l2",
+                                     index.IndexInfo("gender_vector",
+                                                     index.IndexType.Hnsw,
+                                                     {
+                                                         "M": "16",
+                                                         "ef_construction": "50",
+                                                         "ef": "50",
+                                                         "metric": "l2"
+                                                     }), ConflictType.Error)
+
+        assert res.error_code == ErrorCode.OK
+
+        res = table_obj.output(["variant_id"]).knn(
+                "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"index_name": "my_index_l2", "ignore_index":"false"}).to_pl()
+        print(res)
+
+        with  pytest.raises(InfinityException) as e:
+            res = table_obj.output(["variant_id"]).knn(
+                    "gender_vector", [1.0] * 4, "float", knn_distance_type, 5, {"index_name": "my_index_l2", "ignore_index":"true"}).to_pl()
+        assert e.value.args[0] == ErrorCode.SYNTAX_ERROR
+
+        res = table_obj.drop_index("my_index_l2", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK
+
+        res = db_obj.drop_table("test_with_index", ConflictType.Error)
+        assert res.error_code == ErrorCode.OK

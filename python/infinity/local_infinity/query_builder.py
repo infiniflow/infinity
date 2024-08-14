@@ -157,7 +157,10 @@ class InfinityLocalQueryBuilder(ABC):
             for k, v in knn_params.items():
                 key = k.lower()
                 value = v.lower()
-                knn_opt_params.append(InitParameter(key, value))
+                tmp_param = InitParameter()
+                tmp_param.param_name = key
+                tmp_param.param_value = value
+                knn_opt_params.append(tmp_param)
 
         knn_expr = WrapKnnExpr()
         knn_expr.column_expr = column_expr

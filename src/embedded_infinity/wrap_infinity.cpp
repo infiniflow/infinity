@@ -311,6 +311,13 @@ ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
 
     knn_expr->opt_params_ = new Vector<InitParameter *>();
     for (auto &param : opt_params) {
+        if(param.param_name_ == "index_name") {
+            knn_expr->index_name_ = param.param_value_;
+        }
+        if(param.param_name_ == "ignore_index" && param.param_value_ == "true") {
+            knn_expr->ignore_index_ = true;
+        }
+
         auto init_parameter = new InitParameter();
         init_parameter->param_name_ = param.param_name_;
         init_parameter->param_value_ = param.param_value_;
