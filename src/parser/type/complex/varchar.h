@@ -24,7 +24,7 @@ class FixHeapManager;
 // varchar related constants
 constexpr uint64_t VARCHAR_PREFIX_LENGTH = 5;
 constexpr uint64_t VARCHAR_INLINE_LENGTH = 13;
-constexpr uint64_t VARCHAR_LENGTH_LIMIT = 8 * 1024 * 1024; // 23 bit or 8MB
+constexpr uint64_t VARCHAR_LENGTH_LIMIT = 16UL * 1024UL * 1024UL - 1UL; // 24 bit or 16MB
 
 #pragma pack(1)
 
@@ -52,8 +52,7 @@ struct Varchar {
 
     [[nodiscard]] inline bool IsInlined() const { return length_ <= VARCHAR_INLINE_LENGTH; }
 
-    uint64_t is_value_ : 1 = 0; // deprecated, keep it for compatibility
-    uint64_t length_ : 23 = 0;
+    uint64_t length_ : 24 = 0;
     union {
         InlineVarchar short_;
         VectorVarchar vector_;

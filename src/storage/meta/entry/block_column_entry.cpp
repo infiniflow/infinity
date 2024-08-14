@@ -29,7 +29,6 @@ import third_party;
 import vector_buffer;
 import local_file_system;
 import infinity_exception;
-import varchar_layout;
 import logger;
 import data_file_worker;
 import var_file_worker;

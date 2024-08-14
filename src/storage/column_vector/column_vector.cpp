@@ -2255,7 +2255,6 @@ Span<const char> ColumnVector::GetVarchar(SizeT index) const {
 
 void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT &src_ref, const VectorBuffer *src_vec_buffer) {
     const u32 varchar_len = src_ref.length_;
-    dst_ref.is_value_ = 0;
     dst_ref.length_ = varchar_len;
     if (src_ref.IsInlined()) {
         // Only prefix is enough to contain all string data.
