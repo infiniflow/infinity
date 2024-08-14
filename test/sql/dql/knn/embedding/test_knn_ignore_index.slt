@@ -1,0 +1,38 @@
+statement ok
+DROP TABLE IF EXISTS test_knn_ignore_index;
+
+statement ok
+CREATE TABLE test_knn_ignore_index(c1 INT,  c2 EMBEDDING(FLOAT, 4));
+
+statement ok
+COPY test_knn_ignore_index FROM '/var/infinity/test_data/embedding_float_dim4.csv' WITH (DELIMITER ',', FORMAT CSV);
+
+statement ok
+CREATE INDEX idx1 ON test_knn_ignore_index (c2) USING Hnsw WITH (M = 16, ef_construction = 200, metric = cos);
+
+query I
+SELECT c1 FROM test_knn_ignore_index SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3);
+----
+8
+6
+4
+
+query I
+SELECT c1 FROM test_knn_ignore_index SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3) USING INDEX (idx1);
+----
+8
+6
+4
+
+query I
+SELECT c1 FROM test_knn_ignore_index SEARCH MATCH VECTOR (c2, [0.3, 0.3, 0.2, 0.2], 'float', 'cosine', 3) IGNORE INDEX;
+----
+8
+6
+4
+
+statement ok
+DROP INDEX idx1 ON test_knn_ignore_index;
+
+statement ok
+DROP TABLE test_knn_ignore_index;
