@@ -990,6 +990,7 @@ void HandleSparseType(ColumnField &output_column_field, SizeT row_count, const S
     i32 current_offset = 0;
     for (SizeT index = 0; index < row_count; ++index) {
         SparseT &sparse = reinterpret_cast<SparseT *>(column_vector->data())[index];
+        i32 nnz = sparse.nnz_;
         std::memcpy(dst.data() + current_offset, &nnz, sizeof(i32));
         current_offset += sizeof(i32);
         SizeT data_size = sparse_info->DataSize(sparse.nnz_);
