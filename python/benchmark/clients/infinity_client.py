@@ -1,3 +1,13 @@
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+grandparent_dir = os.path.dirname(parent_dir)
+if grandparent_dir not in sys.path:
+    sys.path.insert(0, grandparent_dir)
+print(sys.path)
+
+from infinity_http import infinity_http
 import json
 import os
 import h5py
@@ -10,33 +20,6 @@ import infinity.index as index
 from infinity import NetworkAddress
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from .base_client import BaseClient
-
-
-class InfinityHttpClient:
-    def __init__(self, db_name, table_name):
-        self.url = (
-            "http://localhost:23820/" + f"databases/{db_name}/tables/{table_name}/docs"
-        )
-        self.headers = {
-            "accept": "application/json",
-            "content-type": "application/json",
-        }
-
-    def request(self, method, data={}):
-        match method:
-            case "get":
-                response = requests.get(self.url, headers=self.headers, json=data)
-            case "post":
-                response = requests.post(self.url, headers=self.headers, json=data)
-            case "put":
-                response = requests.put(self.url, headers=self.headers, json=data)
-            case "delete":
-                response = requests.delete(self.url, headers=self.headers, json=data)
-        return response
-
-    def insert(self, values=[]):
-        r = self.request("post", values)
-        return r
 
 
 class InfinityClient(BaseClient):
@@ -58,16 +41,16 @@ class InfinityClient(BaseClient):
         indexs = []
         for key, value in index_schema.items():
             if value["type"] == "text":
-                indexs.append(index.IndexInfo(key, index.IndexType.FullText, []))
+                indexs.append(index.IndexInfo(key, index.IndexType.FullText))
             elif value["type"] == "HNSW":
-                params = []
+                params = {}
                 for param, v in value["params"].items():
-                    params.append(index.InitParameter(param, str(v)))
+                    params[param] = str(v)
                 indexs.append(index.IndexInfo(key, index.IndexType.Hnsw, params))
             elif value["type"] == "BMP":
-                params = []
+                params = {}
                 for param, v in value["params"].items():
-                    params.append(index.InitParameter(param, str(v)))
+                    params[param] = str(v)
                 indexs.append(index.IndexInfo(key, index.IndexType.BMP, params))
         return indexs
 
@@ -84,7 +67,8 @@ class InfinityClient(BaseClient):
         for i, idx in enumerate(indexs):
             table_obj.create_index(f"index{i}", idx)
 
-        inf_http_client = InfinityHttpClient("default_db", self.table_name)
+        #inf_http_client = InfinityHttpClient("default_db", self.table_name)
+        inf_http_client = infinity_http()
 
         dataset_path = os.path.join(self.path_prefix, self.data["data_path"])
         if not os.path.exists(dataset_path):
@@ -147,12 +131,18 @@ class InfinityClient(BaseClient):
                         current_batch.append(row_dict)
                         if len(current_batch) >= batch_size:
                             # table_obj.insert(current_batch)
-                            inf_http_client.insert(current_batch)
+                            # inf_http_client.insert(current_batch)
+                            db = inf_http_client.get_database("default_db")
+                            tb = db.get_table(self.table_name)
+                            tb.insert(current_batch)
                             current_batch = []
 
                     if current_batch:
                         # table_obj.insert(current_batch)
-                        inf_http_client.insert(current_batch)
+                        # inf_http_client.insert(current_batch)
+                        db = inf_http_client.get_database("default_db")
+                        tb = db.get_table(self.table_name)
+                        tb.insert(current_batch)
         elif ext == ".csr":
             if self.data["use_import"]:
                 table_obj.import_data(dataset_path, {"file_type": "csr"})

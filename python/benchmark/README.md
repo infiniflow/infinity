@@ -169,15 +169,15 @@ Download and run the database engine, make sure it is accessible when you run th
 Import the data set into database engine using the option [--import].  
 For example, if you want to import splade data set into qdrant, then you shall use:
 ```commandline
-python3 run.py --qdrant --splade --import
+python3 run.py --engine qdrant --dataset splade --import
 ```
 #### Step 5: Run the query set
 Finally, you could run the query set using the option [--query] or [--query-express].
 For example, if you want to run a qdrant benchmark on splade data set with single process for result validation and latency analysis, then you shall use:
 ```commandline
-python3 run.py --qdrant --splade --query 1 
+python3 run.py --engine qdrant --dataset splade --query 1 
 ```
 Or, if you want to run an infinity benchmark on sift data set with 16 processes for QPS measurement, then you shall use:
 ```commandline
-python3 run.py --infinity --sift --query-express 16
+python3 run.py --engine  infinity --dataset sift --query-express 16
 ```

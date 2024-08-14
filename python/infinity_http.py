@@ -3,9 +3,9 @@ import re
 import requests
 import logging
 import os
-from common.common_data import *
+from test_pysdk.common.common_data import *
 from infinity.common import ConflictType, InfinityException, CommonMatchTensorExpr
-from common import common_values
+from test_pysdk.common import common_values
 import infinity
 from infinity.errors import ErrorCode
 import numpy as np
@@ -15,7 +15,7 @@ import pyarrow as pa
 
 
 
-class http_adapter:
+class infinity_http:
     url = default_url
     header_dict = baseHeader
     response_dict = baseResponse
@@ -666,7 +666,7 @@ class http_adapter:
         return self
 
 
-class database_result(http_adapter):
+class database_result(infinity_http):
     def __init__(self, list = [], error_code = ErrorCode.OK, database_name = "" ,columns=[], table_name = "",
                  index_list = [], output = ["*"], filter="", fusion=[], knn={}, match = {}, match_tensor = {}, match_sparse = {}, output_res = []):
         self.db_names = list

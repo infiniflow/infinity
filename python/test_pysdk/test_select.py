@@ -1,3 +1,9 @@
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 import os
 import pandas as pd
 import pytest
@@ -6,7 +12,7 @@ import infinity
 from numpy import dtype
 from infinity.errors import ErrorCode
 from infinity.common import ConflictType
-from http_adapter import http_adapter
+from infinity_http import infinity_http
 from common.utils import copy_data
 
 @pytest.fixture(scope="class")
@@ -26,7 +32,7 @@ def setup_class(request, local_infinity, http):
     request.cls.uri = uri
     request.cls.infinity_obj = infinity.connect(uri)
     if http:
-        request.cls.infinity_obj = http_adapter()
+        request.cls.infinity_obj = infinity_http()
     yield
     request.cls.infinity_obj.disconnect()
 
