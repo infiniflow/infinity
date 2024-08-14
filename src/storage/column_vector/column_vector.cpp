@@ -846,16 +846,8 @@ String ColumnVector::ToString(SizeT row_index) const {
                 UnrecoverableError(error_message);
             }
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
-            const auto &[nnz, file_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[row_index];
-            if (nnz == 0) {
-                return SparseT::Sparse2String(nullptr, nullptr, sparse_info->DataType(), sparse_info->IndexType(), 0);
-            }
-            auto [raw_data_ptr, raw_index_ptr] = buffer_->GetSparseRaw(file_offset, nnz, sparse_info);
-            auto res = SparseT::Sparse2String(raw_data_ptr, raw_index_ptr, sparse_info->DataType(), sparse_info->IndexType(), nnz);
-            if (res.empty()) {
-                String error_message = "Cannot convert sparse to string";
-                UnrecoverableError(error_message);
-            }
+            const auto [data_span, index_span, nnz] = this->GetSparseRaw(row_index);
+            auto res = SparseT::Sparse2String(data_span.data(), index_span.data(), sparse_info->DataType(), sparse_info->IndexType(), nnz);
             return res;
         }
         case kRowID: {
@@ -1002,10 +994,8 @@ Value ColumnVector::GetValue(SizeT index) const {
             return value;
         }
         case kSparse: {
-            const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
-            const auto &[nnz, file_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[index];
-            auto [raw_data_ptr, raw_idx_ptr] = buffer_->GetSparseRaw(file_offset, nnz, sparse_info);
-            return Value::MakeSparse(raw_data_ptr, raw_idx_ptr, nnz, data_type_->type_info());
+            auto [data_span, index_span, nnz] = this->GetSparseRaw(index);
+            return Value::MakeSparse(data_span.data(), index_span.data(), nnz, data_type_->type_info());
         }
         case kRowID: {
             return Value::MakeRow(((RowID *)data_ptr_)[index]);
@@ -1199,18 +1189,8 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
         case kSparse: {
-            const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
-            auto &[target_nnz, target_file_offset] = reinterpret_cast<SparseT *>(data_ptr_)[index];
             auto [source_nnz, source_indice, source_data] = value.GetSparse();
-            target_nnz = source_nnz;
-
-            if (source_nnz == 0) {
-                target_file_offset = -1;
-            } else {
-                const auto *source_data_ptr = source_data.empty() ? nullptr : source_data.data();
-                const auto *source_indice_ptr = source_indice.data();
-                target_file_offset = buffer_->AppendSparseRaw(source_data_ptr, source_indice_ptr, target_nnz, sparse_info);
-            }
+            AppendSparseRaw(source_data.data(), source_indice.data(), source_nnz, index);
             break;
         }
         case kEmbedding: {
@@ -2197,6 +2177,30 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         UnrecoverableError(error_message);
     }
     return column_vector;
+}
+
+void ColumnVector::AppendSparseRaw(const char *raw_data_ptr, const char *raw_index_ptr, SizeT nnz, SizeT dst_off) {
+    auto &sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
+    sparse.nnz_ = nnz;
+    if (nnz == 0) {
+        sparse.file_offset_ = -1;
+        return;
+    }
+    const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+    sparse.file_offset_ = buffer_->AppendSparseRaw(raw_data_ptr, raw_index_ptr, nnz, sparse_info);
+}
+
+Tuple<Span<const char>, Span<const char>, SizeT> ColumnVector::GetSparseRaw(SizeT index) const {
+    const auto &sparse = reinterpret_cast<const SparseT *>(data_ptr_)[index];
+    SizeT nnz = sparse.nnz_;
+    if (nnz == 0) {
+        return {Span<const char>(), Span<const char>(), 0};
+    }
+    const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+    SizeT data_size = sparse_info->DataSize(nnz);
+    SizeT idx_size = sparse_info->IndiceSize(nnz);
+    auto [raw_data_ptr, raw_idx_ptr] = buffer_->GetSparseRaw(sparse.file_offset_, nnz, sparse_info);
+    return {Span<const char>(raw_data_ptr, data_size), Span<const char>(raw_idx_ptr, idx_size), nnz};
 }
 
 void ColumnVector::AppendVarcharInner(Span<const char> data, VarcharT &varchar) {

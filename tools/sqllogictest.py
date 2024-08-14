@@ -62,16 +62,16 @@ def process_test(sqllogictest_bin: str, slt_dir: str, data_dir: str, copy_dir: s
         for filename in filenames:
             file = os.path.join(dirpath, filename)
 
-            # filename = os.path.basename(file)
-            # if (
-            #     "fulltext" in filename
-            #     or "fusion" in filename
-            #     or "test_compact_big" in filename
-            #     or "emvb" in filename
-            #     or "bmp_big" in filename
-            #     or "big_many_import" in filename
-            # ):
-            #     continue
+            filename = os.path.basename(file)
+            if (
+                "fulltext" in filename
+                or "fusion" in filename
+                or "test_compact_big" in filename
+                or "emvb" in filename
+                or "bmp_big" in filename
+                or "big_many_import" in filename
+            ):
+                continue
 
             print("Start running test file: " + file)
             process = subprocess.run(

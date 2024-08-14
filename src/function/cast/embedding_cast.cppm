@@ -214,7 +214,8 @@ struct EmbeddingTryCastToFixlen {
             }
             return true;
         } else {
-            String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>());
+            String error_message =
+                fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>());
             UnrecoverableError(error_message);
             return false;
         }
@@ -460,8 +461,7 @@ void EmbeddingTryCastToSparseImpl(const EmbeddingT &source,
 
     target.nnz_ = source_dim;
     if constexpr (std::is_same_v<IdxT, SourceType>) {
-        SparseVecRef<bool, IdxT> sparse_vec_ref(source_dim, reinterpret_cast<const IdxT *>(source.ptr), nullptr);
-        target.file_offset_ = target_vector_ptr->buffer_->AppendSparse(sparse_vec_ref);
+        target_vector_ptr->AppendSparseInner(source_dim, static_cast<const bool *>(nullptr), reinterpret_cast<const IdxT *>(source.ptr), target);
     } else {
         auto target_tmp_ptr = MakeUniqueForOverwrite<IdxT[]>(source_dim);
         if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceType *>(source.ptr), target_tmp_ptr.get(), source_dim)) {
@@ -470,8 +470,7 @@ void EmbeddingTryCastToSparseImpl(const EmbeddingT &source,
                                                DataType::TypeToString<IdxT>());
             UnrecoverableError(error_message);
         }
-        SparseVecRef<bool, IdxT> sparse_vec_ref(source_dim, target_tmp_ptr.get(), nullptr);
-        target.file_offset_ = target_vector_ptr->buffer_->AppendSparse(sparse_vec_ref);
+        target_vector_ptr->AppendSparseInner(source_dim, static_cast<const bool *>(nullptr), target_tmp_ptr.get(), target);
     }
 }
 

@@ -2459,17 +2459,14 @@ void InfinityThriftService::HandleSparseType(infinity_thrift_rpc::ColumnField &o
 
     i32 current_offset = 0;
     for (SizeT index = 0; index < row_count; ++index) {
-        SparseT &sparse = reinterpret_cast<SparseT *>(column_vector->data())[index];
-        i32 nnz = sparse.nnz_;
+        auto [data_span, index_span, nnz_size_t] = column_vector->GetSparseRaw(index);
+        i32 nnz = nnz_size_t;
         std::memcpy(dst.data() + current_offset, &nnz, sizeof(i32));
         current_offset += sizeof(i32);
-        SizeT data_size = sparse_info->DataSize(sparse.nnz_);
-        SizeT idx_size = sparse_info->IndiceSize(sparse.nnz_);
-        auto [raw_data_ptr, raw_idx_ptr] = column_vector->buffer_->GetSparseRaw(sparse.file_offset_, nnz, sparse_info);
-        std::memcpy(dst.data() + current_offset, raw_idx_ptr, idx_size);
-        current_offset += idx_size;
-        std::memcpy(dst.data() + current_offset, raw_data_ptr, data_size);
-        current_offset += data_size;
+        std::memcpy(dst.data() + current_offset, index_span.data(), index_span.size());
+        current_offset += index_span.size();
+        std::memcpy(dst.data() + current_offset, data_span.data(), data_span.size());
+        current_offset += data_span.size();
     }
 
     output_column_field.column_vectors.emplace_back(std::move(dst));

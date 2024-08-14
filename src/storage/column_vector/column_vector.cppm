@@ -322,21 +322,30 @@ private:
     template <typename DataT, typename IdxT>
     void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off);
 
+public:
     template <typename DataT, typename IdxT>
-    void AppendSparseInner(SizeT nnz, DataT *data, IdxT *index, SizeT dst_off);
+    void AppendSparseInner(SizeT nnz, const DataT *data, const IdxT *index, SparseT &sparse);
+
+    template <typename DataT, typename IdxT>
+    void AppendSparseInner(SizeT nnz, const DataT *data, const IdxT *index, SizeT dst_off) {
+        auto &sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
+        AppendSparseInner(nnz, data, index, sparse);
+    }
+
+    template <typename DataT, typename IdxT>
+    void AppendSparse(SizeT nnz, const DataT *data, const IdxT *index) {
+        SizeT dst_off = tail_index_++;
+        AppendSparseInner(nnz, data, index, dst_off);
+    }
+
+    void AppendSparseRaw(const char *raw_data_ptr, const char *raw_index_ptr, SizeT nnz, SizeT dst_off);
+
+    Tuple<Span<const char>, Span<const char>, SizeT> GetSparseRaw(SizeT index) const;
 
 public:
     void AppendVarcharInner(Span<const char> data, VarcharT &varchar);
 
-private:
     void AppendVarcharInner(Span<const char> data, SizeT dst_off);
-
-public:
-    template <typename DataT, typename IdxT>
-    void AppendSparse(SizeT nnz, DataT *data, IdxT *index) {
-        SizeT dst_off = tail_index_++;
-        AppendSparseInner(nnz, data, index, dst_off);
-    }
 
     void AppendVarchar(Span<const char> data);
 
@@ -429,8 +438,7 @@ void ColumnVector::AppendSparse(const Vector<std::string_view> &ele_str_views, S
 }
 
 template <typename DataT, typename IdxT>
-void ColumnVector::AppendSparseInner(SizeT nnz, DataT *data, IdxT *index, SizeT dst_off) {
-    auto &target_sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
+void ColumnVector::AppendSparseInner(SizeT nnz, const DataT *data, const IdxT *index, SparseT &target_sparse) {
     target_sparse.nnz_ = nnz;
     if (nnz == 0) {
         target_sparse.file_offset_ = -1;
@@ -447,34 +455,42 @@ void ColumnVector::AppendSparseInner(SizeT nnz, DataT *data, IdxT *index, SizeT 
             RecoverableError(Status::InvalidDataType());
             return;
         }
+        UniquePtr<IdxT[]> tmp_index;
         if (to_sort) {
-            auto *index_end = index + nnz;
-            std::sort(index, index_end);
-            auto *index_end1 = std::unique(index, index_end);
-            if (index_end1 != index_end) {
+            tmp_index = MakeUniqueForOverwrite<IdxT[]>(nnz);
+            std::copy(index, index + nnz, tmp_index.get());
+            std::sort(tmp_index.get(), tmp_index.get() + nnz);
+            auto *index_end = std::unique(tmp_index.get(), tmp_index.get() + nnz);
+            if (index_end != tmp_index.get() + nnz) {
                 RecoverableError(Status::InvalidDataType());
                 return;
             }
+            index = tmp_index.get();
         }
         SparseVecRef<DataT, IdxT> sparse_vec_ref(nnz, index, nullptr);
         target_sparse.file_offset_ = buffer_->AppendSparse(sparse_vec_ref);
     } else {
+        UniquePtr<IdxT[]> tmp_index;
+        UniquePtr<DataT[]> tmp_data;
         if (to_sort) {
-            auto *index_end = index + nnz;
+            tmp_index = MakeUniqueForOverwrite<IdxT[]>(nnz);
+            tmp_data = MakeUniqueForOverwrite<DataT[]>(nnz);
             Vector<Pair<IdxT, DataT>> index_value_pairs(nnz);
             for (u32 i = 0; i < nnz; ++i) {
                 index_value_pairs[i] = {index[i], data[i]};
             }
             std::sort(index_value_pairs.begin(), index_value_pairs.end(), [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
             for (u32 i = 0; i < nnz; ++i) {
-                index[i] = index_value_pairs[i].first;
-                data[i] = index_value_pairs[i].second;
+                tmp_index[i] = index_value_pairs[i].first;
+                tmp_data[i] = index_value_pairs[i].second;
             }
-            auto *index_end1 = std::unique(index, index_end);
-            if (index_end1 != index_end) {
+            auto *index_end = std::unique(tmp_index.get(), tmp_index.get() + nnz);
+            if (index_end != tmp_index.get() + nnz) {
                 RecoverableError(Status::InvalidDataType());
                 return;
             }
+            index = tmp_index.get();
+            data = tmp_data.get();
         }
         SparseVecRef<DataT, IdxT> sparse_vec_ref(nnz, index, data);
         target_sparse.file_offset_ = buffer_->AppendSparse(sparse_vec_ref);
@@ -1194,8 +1210,7 @@ class ColumnVectorPtrAndIdx<VarcharT> {
     using IteratorType = ColumnVectorPtrAndIdx<VarcharT>;
 
 public:
-    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col)
-        : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), col_(col) {}
+    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col) : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), col_(col) {}
     auto &SetIndex(u32 index) {
         idx_ = index;
         return *this;
