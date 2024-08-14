@@ -35,6 +35,7 @@ import sparse_info;
 import knn_expr;
 import data_type;
 import default_values;
+import sparse_util;
 
 namespace infinity {
 
@@ -475,12 +476,9 @@ void EmbeddingTryCastToSparseImpl(const EmbeddingT &source,
 
     target.nnz_ = source_dim;
     if constexpr (std::is_same_v<IdxT, SourceType>) {
-        SizeT source_size = source_dim * sizeof(SourceType);
-        const auto [chunk_id, chunk_offset] = target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(source.ptr, source_size);
-        target.chunk_id_ = chunk_id;
-        target.chunk_offset_ = chunk_offset;
+        SparseVecRef<bool, IdxT> sparse_vec_ref(source_dim, reinterpret_cast<const IdxT *>(source.ptr), nullptr);
+        target.file_offset_ = target_vector_ptr->buffer_->AppendSparse(sparse_vec_ref);
     } else {
-        SizeT target_size = source_dim * sizeof(IdxT);
         auto target_tmp_ptr = MakeUniqueForOverwrite<IdxT[]>(source_dim);
         if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceType *>(source.ptr), target_tmp_ptr.get(), source_dim)) {
             String error_message = fmt::format("Failed to cast from embedding with type {} to sparse with type {}",
@@ -488,10 +486,8 @@ void EmbeddingTryCastToSparseImpl(const EmbeddingT &source,
                                                DataType::TypeToString<IdxT>());
             UnrecoverableError(error_message);
         }
-        auto [chunk_id, chunk_offset] =
-            target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
-        target.chunk_id_ = chunk_id;
-        target.chunk_offset_ = chunk_offset;
+        SparseVecRef<bool, IdxT> sparse_vec_ref(source_dim, target_tmp_ptr.get(), nullptr);
+        target.file_offset_ = target_vector_ptr->buffer_->AppendSparse(sparse_vec_ref);
     }
 }
 

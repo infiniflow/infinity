@@ -300,7 +300,7 @@ public:
         return value;
     }
 
-    static Value MakeSparse(const char *raw_ptr, SizeT nnz, const SharedPtr<TypeInfo> type_info);
+    static Value MakeSparse(const char *raw_data_ptr, const char *raw_idx_ptr, SizeT nnz, const SharedPtr<TypeInfo> type_info);
 
     static Value MakeSparse(SizeT nnz, UniquePtr<char[]> indice_ptr, UniquePtr<char[]> data_ptr, const SharedPtr<TypeInfo> type_info);
 
