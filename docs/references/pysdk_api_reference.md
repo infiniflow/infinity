@@ -1540,7 +1540,7 @@ If the HNSW index is not created successfully, the search will fall back to a br
 ## match_sparse
 
 ```python
-table_object.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params = None)
+table_object.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
 ```
 
 Performs a sparse vector search to to identify the top n closest rows to the given sparse vector. Suitable for working with sparse vectors (sparse embeddings).
@@ -1740,7 +1740,7 @@ A non-empty string specifying the following search options:
   Specifies the number of the most relevant rows to retrieve, e.g., `"topn=10"` to obtain the ten most relevant rows.
 - **EMVB index options**: `str`, *Optional*  
   Used when an EMVB index is successfully created on the column being queried. Supported options:
-  - `"emvb_centroid_nprobe"`
+  - `"emvb_centroid_nprobe"`: Refer to the correspnding settings for the IVF index.
   - `"emvb_threshold_first"`
   - `"emvb_n_doc_to_score"`
   - `"emvb_n_doc_out_second_stage"`
@@ -1784,7 +1784,7 @@ match_tensor("tensor", [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], "float", "m
 ## fusion
 
 ```python
-table_object.fusion(method, options_text = '')
+table_object.fusion(method, options_text, commonMatchTensorExpr = None)
 ```
 
 Builds a fusion expression.
@@ -1793,22 +1793,32 @@ Builds a fusion expression.
 
 #### method: `str`
 
-The supported reranking methods, including:
+Supported reranking methods for multi-way retrieval include:
 
-- `"rrf"`
-- `"weighted_sum"`
-- `"match_tensor"`
+- `"rrf"`: [Reciprocal rank fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)  
+  RRF scores all retrieved documents from each retrieval path using the reciprocals of their rankings. It then calculates the final score of each retrieved document by summing its scores from all retrieval paths. This technique is particularly useful when you are uncertain of the importance of each retrieval path.
+- `"weighted_sum"`  
+  The weighted sum approach assigns different weights to different retrieval paths, allowing you to emphasize specific paths. This is particularly useful when you are certain of each path's relative importance.  
+- `"match_tensor"`  
+  Infinity's tensor-based reranking approach. This is used for reranker dense vector, sparse vector, or full-text retrieval paths.  
 
-#### options_text: `str`
+#### options_text: `str`, *Required
 
-- `Common options`:
-    - 'topn=10': Retrieve the 10 most relevant rows. The default value is `100`.
+A non-empty, semicolon-separated string specifying the following reranking options:
 
-- `rrf-specific options`:
-    - 'rank_constant=30': The default value is `60`.
+- **Common options**: `str`, *Required*  
+  Mandatory settings for the fused reranking.  
+  - `"topn"`: Specifies the number of the most relevant rows to retrieve, e.g., `"topn=10"` to obtain the ten most relevant rows.
 
-- `weighted_sum-specific options`:
-    - 'weights=1,2,0.5': The weights of children scorers. The default weight of each way is `1.0`.
+- **RRF-specific options**: `str`, *Optional*  
+  Settings when employing RRF for reranking.  
+  - `"rank_constant"`: The smoothing constant for RRF reranking. Typically set to `60`, e.g., `"topn=10;rank_constant=60"`.
+
+- **weighted_sum-specific options**: `str`, *Optional*
+  Settings when employing Weighted Sum for reranking.  
+  - `"weights"`: Specifies the weight for each retrieval path. For example, `"weights=1,2,0.5"` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval paths, respectively. The default weight of each retrieval path is `1.0`. If `"weight"` is not specified, all retrieval paths will be assiged the default weight of `1.0`.
+
+#### commonMatchTensorExpr: `commonMatchTensorExpr()`, *Optional*
 
 ### Returns
 
@@ -1819,26 +1829,55 @@ The supported reranking methods, including:
 
 ### Examples
 
-:::caution IMPORTANT
-Ensure that you import the following when using `make_match_tensor_expr`:
+The following code snippets illustrate the use of fused reranking in a four-way retrieval.
 
-```python
-from infinity.remote_thrift.types import make_match_tensor_expr
+#### Use RRF for reranking
+
+```python {6}
+table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
+            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
+            .match("body", "blooms", "topn=10")
+            .filter("year < 2024")
+            .fusion("rrf", "topn=2")
+            .to_pl()
 ```
-:::
 
-```python
-table_object.fusion("rrf")
-table_object.fusion("rrf", "topn=10")
-table_object.fusion("weighted_sum", "weights=1,2,0.5")
-table_object.fusion("match_tensor", "topn=2", make_match_tensor_expr("t", [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], "float", "maxsim"))
+```python {6}
+table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
+            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
+            .match("body", "blooms", "topn=10")
+            .filter("year < 2024")
+            .fusion("rrf", "topn=2;rank_constant=30")
+            .to_pl()
 ```
 
-### Details
+#### Use Weighted Sum for reranking
 
-`rrf`:  Reciprocal rank fusion method.
+```python {6}
+table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
+            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
+            .match("body", "blooms", "topn=10")
+            .filter("year < 2024")
+            .fusion("weighted_sum", "topn=2;weights=1,2,0.5")
+            .to_pl()
+```
 
-[Reciprocal rank fusion (RRF)](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf) is a method that combines multiple result sets with different relevance indicators into one result set. RRF does not requires tuning, and the different relevance indicators do not have to be related to each other to achieve high-quality results.
+#### Use tensor reranking
+
+```python {8}
+# You must import `CommonMatchTensorExpr`to set tensor reranking parameters
+from infinity.common import CommonMatchTensorExpr
+table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
+            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
+            .match("body", "blooms", "topn=10")
+            .filter("year < 2024")
+            .fusion("match_tensor", "topn=2", make_match_tensor_expr("tensor", [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], "float", "maxsim"))
+            .to_pl()
+```
 
 ---
 
