@@ -143,14 +143,7 @@ public:
             SparseVecRef<DataType, IdxType> sparse_vec_ref(0, nullptr, nullptr);
             return std::make_pair(sparse_vec_ref, block_offset_ + cur_++);
         }
-
-        const char *raw_data_ptr = column_vector_->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(v_ptr->chunk_id_, v_ptr->chunk_offset_);
-        const char *indice_ptr = raw_data_ptr;
-        const char *data_ptr = indice_ptr + v_ptr->nnz_ * sizeof(IdxType);
-
-        SparseVecRef<DataType, IdxType> sparse_vec_ref(v_ptr->nnz_,
-                                                       reinterpret_cast<const IdxType *>(indice_ptr),
-                                                       reinterpret_cast<const DataType *>(data_ptr));
+        SparseVecRef<DataType, IdxType> sparse_vec_ref = column_vector_->buffer_->GetSparse<DataType, IdxType>(v_ptr->file_offset_, v_ptr->nnz_);
         return std::make_pair(sparse_vec_ref, block_offset_ + cur_++);
     }
 

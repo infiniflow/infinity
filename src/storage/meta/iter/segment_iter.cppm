@@ -158,13 +158,8 @@ public:
         }
 
         const auto &column_vector = segment_iter_.column_vector(0);
-        const char *raw_data_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(v_ptr->chunk_id_, v_ptr->chunk_offset_);
-        const char *indice_ptr = raw_data_ptr;
-        const char *data_ptr = indice_ptr + v_ptr->nnz_ * sizeof(IdxType);
-
-        SparseVecRef<DataType, IdxType> sparse_vec_ref(v_ptr->nnz_,
-                                                       reinterpret_cast<const IdxType *>(indice_ptr),
-                                                       reinterpret_cast<const DataType *>(data_ptr));
+        SparseVecRef<DataType, IdxType> sparse_vec_ref =
+            column_vector->buffer_->template GetSparse<DataType, IdxType>(v_ptr->file_offset_, v_ptr->nnz_);
 
         return std::make_pair(sparse_vec_ref, offset);
     }

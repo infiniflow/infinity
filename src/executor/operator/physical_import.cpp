@@ -904,7 +904,10 @@ SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_obj
 SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &json_object, const SparseInfo *sparse_info) {
     SharedPtr<ConstantExpr> res = nullptr;
     switch (sparse_info->DataType()) {
-        case EmbeddingDataType::kElemBit:
+        case EmbeddingDataType::kElemBit: {
+            res = MakeShared<ConstantExpr>(LiteralType::kIntegerArray);
+            break;
+        }
         case EmbeddingDataType::kElemUInt8:
         case EmbeddingDataType::kElemInt8:
         case EmbeddingDataType::kElemInt16:
@@ -935,9 +938,9 @@ SharedPtr<ConstantExpr> BuildConstantSparseExprFromJson(const nlohmann::json &js
             switch (json_object[0].type()) {
                 case nlohmann::json::value_t::number_unsigned:
                 case nlohmann::json::value_t::number_integer: {
-                    res->long_sparse_array_.first.resize(array_size);
+                    res->long_array_.resize(array_size);
                     for (u32 i = 0; i < array_size; ++i) {
-                        res->long_sparse_array_.first[i] = json_object[i].get<i64>();
+                        res->long_array_[i] = json_object[i].get<i64>();
                     }
                     return res;
                 }

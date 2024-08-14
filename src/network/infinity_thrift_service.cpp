@@ -2357,7 +2357,7 @@ void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &
             std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
             std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
         } else {
-            const auto *data = column_vector->buffer_->var_buffer_mgr_->Get(varchar.vector_.file_offset_, length);
+            const auto *data = column_vector->buffer_->GetVarchar(varchar.vector_.file_offset_, length);
             std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
             std::memcpy(dst.data() + current_offset + sizeof(i32), data, varchar.length_);
         }
@@ -2466,12 +2466,15 @@ void InfinityThriftService::HandleSparseType(infinity_thrift_rpc::ColumnField &o
     for (SizeT index = 0; index < row_count; ++index) {
         SparseT &sparse = reinterpret_cast<SparseT *>(column_vector->data())[index];
         i32 nnz = sparse.nnz_;
-        i32 length = sparse_info->SparseSize(nnz);
         std::memcpy(dst.data() + current_offset, &nnz, sizeof(i32));
         current_offset += sizeof(i32);
-        const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(sparse.chunk_id_, sparse.chunk_offset_);
-        std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
-        current_offset += length;
+        SizeT data_size = sparse_info->DataSize(sparse.nnz_);
+        SizeT idx_size = sparse_info->IndiceSize(sparse.nnz_);
+        auto [raw_data_ptr, raw_idx_ptr] = column_vector->buffer_->GetSparseRaw(sparse.file_offset_, nnz, sparse_info);
+        std::memcpy(dst.data() + current_offset, raw_idx_ptr, idx_size);
+        current_offset += idx_size;
+        std::memcpy(dst.data() + current_offset, raw_data_ptr, data_size);
+        current_offset += data_size;
     }
 
     output_column_field.column_vectors.emplace_back(std::move(dst));
