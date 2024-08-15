@@ -39,12 +39,13 @@ def setup_class(request, local_infinity, http):
     request.cls.infinity_obj.disconnect()
 
 @pytest.mark.usefixtures("setup_class")
+@pytest.mark.usefixtures("suffix")
 class TestInfinity:
     @pytest.fixture
     def skip_setup_marker(self, request):
         request.node.skip_setup = True
 
-    def test_delete(self):
+    def test_delete(self, suffix):
         """
         target: test table delete apis
         method:
@@ -73,13 +74,13 @@ class TestInfinity:
         db_obj = self.infinity_obj.get_database("default_db")
 
         # infinity
-        db_obj.drop_table(table_name="test_delete", conflict_type=ConflictType.Ignore)
+        db_obj.drop_table(table_name="test_delete"+suffix, conflict_type=ConflictType.Ignore)
         res = db_obj.create_table(
-            "test_delete",
+            "test_delete"+suffix,
             {"c1": {"type": "int", "constraints": ["primary key", "not null"]},
              "c2": {"type": "int"}, "c3": {"type": "int"}}, ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_delete")
+        table_obj = db_obj.get_table("test_delete"+suffix)
 
         res = table_obj.insert(
             [{"c1": 1, "c2": 10, "c3": 100}, {"c1": 2, "c2": 20, "c3": 200}, {"c1": 3, "c2": 30, "c3": 300},
@@ -100,37 +101,37 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c3': ()})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
-        res = db_obj.drop_table("test_delete")
+        res = db_obj.drop_table("test_delete"+suffix)
         assert res.error_code == ErrorCode.OK
 
-    def test_delete_empty_table(self):
+    def test_delete_empty_table(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
 
-        tb = db_obj.drop_table("test_delete_empty_table", ConflictType.Ignore)
+        tb = db_obj.drop_table("test_delete_empty_table"+suffix, ConflictType.Ignore)
         assert tb
 
-        tb = db_obj.create_table("test_delete_empty_table", {"c1": {"type": "int"}}, ConflictType.Error)
+        tb = db_obj.create_table("test_delete_empty_table"+suffix, {"c1": {"type": "int"}}, ConflictType.Error)
         assert tb
 
-        table_obj = db_obj.get_table("test_delete_empty_table")
+        table_obj = db_obj.get_table("test_delete_empty_table"+suffix)
 
         try:
             res = table_obj.delete("c1 = 1")
         except Exception as e:
             print(e)
 
-        db_obj.drop_table("test_delete_empty_table", ConflictType.Error)
+        db_obj.drop_table("test_delete_empty_table"+suffix, ConflictType.Error)
 
-    def test_delete_non_existent_table(self):
+    def test_delete_non_existent_table(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
 
-        table_obj = db_obj.drop_table("test_delete_non_existent_table", ConflictType.Ignore)
+        table_obj = db_obj.drop_table("test_delete_non_existent_table"+suffix, ConflictType.Ignore)
         assert table_obj
 
         with pytest.raises(InfinityException) as e:
-            db_obj.get_table("test_delete_non_existent_table").delete()
+            db_obj.get_table("test_delete_non_existent_table"+suffix).delete()
 
         assert e.type == infinity.common.InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
@@ -138,12 +139,12 @@ class TestInfinity:
     @trace_expected_exceptions
     @pytest.mark.parametrize('column_types', common_values.types_array)
     @pytest.mark.parametrize('column_types_example', common_values.types_example_array)
-    def test_delete_table_all_row_met_the_condition(self, column_types, column_types_example):
+    def test_delete_table_all_row_met_the_condition(self, column_types, column_types_example, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_delete_table_all_row_met_the_condition", ConflictType.Ignore)
-        db_obj.create_table("test_delete_table_all_row_met_the_condition", {"c1": {"type": column_types}},
+        db_obj.drop_table("test_delete_table_all_row_met_the_condition"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_delete_table_all_row_met_the_condition"+suffix, {"c1": {"type": column_types}},
                             ConflictType.Error)
-        table_obj = db_obj.get_table("test_delete_table_all_row_met_the_condition")
+        table_obj = db_obj.get_table("test_delete_table_all_row_met_the_condition"+suffix)
         try:
             table_obj.insert([{"c1": column_types_example}])
             print("insert c1 = " + str(column_types_example))
@@ -155,20 +156,20 @@ class TestInfinity:
         except Exception as e:
             print(e)
 
-        db_obj.drop_table("test_delete_table_all_row_met_the_condition", ConflictType.Error)
+        db_obj.drop_table("test_delete_table_all_row_met_the_condition"+suffix, ConflictType.Error)
 
-    def test_delete_table_no_rows_met_condition(self):
+    def test_delete_table_no_rows_met_condition(self,suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         for i in range(len(common_values.types_array)):
-            db_obj.drop_table("test_delete_table_no_rows_met_condition" + str(i), ConflictType.Ignore)
+            db_obj.drop_table("test_delete_table_no_rows_met_condition" + str(i)+suffix, ConflictType.Ignore)
 
         for i in range(len(common_values.types_array)):
-            tb = db_obj.create_table("test_delete_table_no_rows_met_condition" + str(i),
+            tb = db_obj.create_table("test_delete_table_no_rows_met_condition" + str(i)+suffix,
                                      {"c1": {"type": common_values.types_array[i]}}, ConflictType.Error)
             assert tb
 
-            table_obj = db_obj.get_table("test_delete_table_no_rows_met_condition" + str(i))
+            table_obj = db_obj.get_table("test_delete_table_no_rows_met_condition" + str(i)+suffix)
             try:
                 table_obj.insert([{"c1": common_values.types_example_array[i]}])
                 print("insert c1 = " + str(common_values.types_example_array[i]))
@@ -185,12 +186,12 @@ class TestInfinity:
             assert tb
 
         for i in range(len(common_values.types_array)):
-            db_obj.drop_table("test_delete_table_no_rows_met_condition" + str(i), ConflictType.Error)
+            db_obj.drop_table("test_delete_table_no_rows_met_condition" + str(i)+suffix, ConflictType.Error)
 
-    def test_delete_table_with_one_block(self):
+    def test_delete_table_with_one_block(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_delete_table_with_one_block", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_delete_table_with_one_block", {"c1": {"type": "int"}}, ConflictType.Error)
+        db_obj.drop_table("test_delete_table_with_one_block"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_delete_table_with_one_block"+suffix, {"c1": {"type": "int"}}, ConflictType.Error)
 
         # insert
         values = [{"c1": 1} for _ in range(8192)]
@@ -202,13 +203,13 @@ class TestInfinity:
         table_obj.delete("c1 = 1")
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
-        db_obj.drop_table("test_delete_table_with_one_block", ConflictType.Error)
+        db_obj.drop_table("test_delete_table_with_one_block"+suffix, ConflictType.Error)
 
-    def test_delete_table_with_one_segment(self):
+    def test_delete_table_with_one_segment(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_delete_table_with_one_segment", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_delete_table_with_one_segment", {"c1": {"type": "int"}},
+        db_obj.drop_table("test_delete_table_with_one_segment"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_delete_table_with_one_segment"+suffix, {"c1": {"type": "int"}},
                                         ConflictType.Error)
 
         # insert
@@ -222,14 +223,14 @@ class TestInfinity:
         for i in range(1024):
             table_obj.delete("c1 = " + str(i))
         delete_res = table_obj.output(["*"]).to_df()
-        db_obj.drop_table("test_delete_table_with_one_segment", ConflictType.Error)
+        db_obj.drop_table("test_delete_table_with_one_segment"+suffix, ConflictType.Error)
 
         print(delete_res)
 
-    def test_select_before_after_delete(self):
+    def test_select_before_after_delete(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_select_before_after_delete", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_select_before_after_delete", {"c1": {"type": "int"}}, ConflictType.Error)
+        db_obj.drop_table("test_select_before_after_delete"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_select_before_after_delete"+suffix, {"c1": {"type": "int"}}, ConflictType.Error)
 
         # insert
         for i in range(10):
@@ -242,13 +243,13 @@ class TestInfinity:
         table_obj.delete("c1 = 1")
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
-        db_obj.drop_table("test_select_before_after_delete", ConflictType.Error)
+        db_obj.drop_table("test_select_before_after_delete"+suffix, ConflictType.Error)
 
-    def test_delete_insert_data(self):
+    def test_delete_insert_data(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_delete_insert_data", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_delete_insert_data", {"c1": {"type": "int"}}, ConflictType.Error)
+        db_obj.drop_table("test_delete_insert_data"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_delete_insert_data"+suffix, {"c1": {"type": "int"}}, ConflictType.Error)
 
         # insert
         values = [{"c1": 1} for _ in range(10)]
@@ -258,14 +259,14 @@ class TestInfinity:
         table_obj.delete("c1 = 1")
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
-        db_obj.drop_table("test_delete_insert_data", ConflictType.Error)
+        db_obj.drop_table("test_delete_insert_data"+suffix, ConflictType.Error)
 
     @pytest.mark.slow
-    def test_delete_inserted_long_before_data(self):
+    def test_delete_inserted_long_before_data(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_delete_inserted_long_before_data", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_delete_inserted_long_before_data", {"c1": {"type": "int"}},
+        db_obj.drop_table("test_delete_inserted_long_before_data"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_delete_inserted_long_before_data"+suffix, {"c1": {"type": "int"}},
                                         ConflictType.Error)
 
         # insert
@@ -279,18 +280,18 @@ class TestInfinity:
         table_obj.delete("c1 = 1")
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
-        db_obj.drop_table("test_delete_inserted_long_before_data", ConflictType.Error)
+        db_obj.drop_table("test_delete_inserted_long_before_data"+suffix, ConflictType.Error)
 
-    def test_delete_dropped_table(self):
+    def test_delete_dropped_table(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
 
         with pytest.raises(InfinityException) as e:
-            db_obj.drop_table("test_delete_dropped_table")
-            table_obj = db_obj.get_table("test_delete_dropped_table")
+            db_obj.drop_table("test_delete_dropped_table"+suffix)
+            table_obj = db_obj.get_table("test_delete_dropped_table"+suffix)
             table_obj.delete("c1 = 0")
             assert table_obj
-            db_obj.drop_table("test_delete_dropped_table")
+            db_obj.drop_table("test_delete_dropped_table"+suffix)
 
         assert e.type == infinity.common.InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
@@ -307,16 +308,16 @@ class TestInfinity:
                                                       "^789$ test insert varchar",
                                                       True,
                                                       np.array([1.1, 2.2, 3.3]), [1, 2, 3]])
-    def test_various_expression_in_where_clause(self, column_types, column_types_example, http):
+    def test_various_expression_in_where_clause(self, column_types, column_types_example, http, suffix):
         if column_types == "vector, 3, float" and column_types_example == [1, 2, 3] and http:
             pytest.skip(reason = "bus error, core dumped")
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_various_expression_in_where_clause", ConflictType.Ignore)
-        db_obj.create_table("test_various_expression_in_where_clause", {"c1": {"type": column_types}},
+        db_obj.drop_table("test_various_expression_in_where_clause"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_various_expression_in_where_clause"+suffix, {"c1": {"type": column_types}},
                             ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_various_expression_in_where_clause")
+        table_obj = db_obj.get_table("test_various_expression_in_where_clause"+suffix)
 
         values = [{"c1": column_types_example} for _ in range(5)]
         try:
@@ -331,14 +332,14 @@ class TestInfinity:
         except Exception as e:
             print(e)
 
-        res = db_obj.drop_table("test_various_expression_in_where_clause", ConflictType.Error)
+        res = db_obj.drop_table("test_various_expression_in_where_clause"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_delete_one_block_without_expression(self):
+    def test_delete_one_block_without_expression(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_delete_one_block_without_expression", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_delete_one_block_without_expression", {"c1": {"type": "int"}},
+        db_obj.drop_table("test_delete_one_block_without_expression"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_delete_one_block_without_expression"+suffix, {"c1": {"type": "int"}},
                                         ConflictType.Error)
 
         # insert
@@ -351,14 +352,14 @@ class TestInfinity:
         table_obj.delete()
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
-        res = db_obj.drop_table("test_delete_one_block_without_expression", ConflictType.Error)
+        res = db_obj.drop_table("test_delete_one_block_without_expression"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_delete_one_segment_without_expression(self):
+    def test_delete_one_segment_without_expression(self,suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_delete_one_segment_without_expression", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_delete_one_segment_without_expression", {"c1": {"type": "int"}},
+        db_obj.drop_table("test_delete_one_segment_without_expression"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_delete_one_segment_without_expression"+suffix, {"c1": {"type": "int"}},
                                         ConflictType.Error)
 
         # insert
@@ -372,7 +373,7 @@ class TestInfinity:
         table_obj.delete()
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
-        db_obj.drop_table("test_delete_one_segment_without_expression", ConflictType.Error)
+        db_obj.drop_table("test_delete_one_segment_without_expression"+suffix, ConflictType.Error)
 
     @pytest.mark.parametrize("filter_list", [
         "c1 > 10",
@@ -383,11 +384,11 @@ class TestInfinity:
         "c1 < 0.1 and c1 > 1.0",
         "c1 = 0",
     ])
-    def test_filter_with_valid_expression(self, filter_list):
+    def test_filter_with_valid_expression(self, filter_list, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_filter_expression", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_filter_expression", {"c1": {"type": "int"}, "c2": {"type": "float"}},
+        db_obj.drop_table("test_filter_expression"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_filter_expression"+suffix, {"c1": {"type": "int"}, "c2": {"type": "float"}},
                                         ConflictType.Error)
 
         # insert
@@ -401,7 +402,7 @@ class TestInfinity:
         table_obj.delete(filter_list)
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
-        db_obj.drop_table("test_filter_expression", ConflictType.Error)
+        db_obj.drop_table("test_filter_expression"+suffix, ConflictType.Error)
 
     @pytest.mark.parametrize("filter_list", [
         pytest.param("c1"),
@@ -412,11 +413,11 @@ class TestInfinity:
         pytest.param("c1 * 0.1 and c2 / 1.0"),
         pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
     ])
-    def test_filter_with_invalid_expression(self, filter_list):
+    def test_filter_with_invalid_expression(self, filter_list, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_filter_expression", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_filter_expression", {"c1": {"type": "int"}, "c2": {"type": "float"}},
+        db_obj.drop_table("test_filter_expression"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_filter_expression"+suffix, {"c1": {"type": "int"}, "c2": {"type": "float"}},
                                         ConflictType.Error)
 
         # insert
@@ -432,4 +433,4 @@ class TestInfinity:
             table_obj.delete(filter_list)
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
-        db_obj.drop_table("test_filter_expression", ConflictType.Error)
+        db_obj.drop_table("test_filter_expression"+suffix, ConflictType.Error)

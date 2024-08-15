@@ -39,10 +39,11 @@ def setup_class(request, local_infinity, http):
     request.cls.infinity_obj.disconnect()
 
 @pytest.mark.usefixtures("setup_class")
+@pytest.mark.usefixtures("suffix")
 class TestInfinity:
     # def test_version(self):
     #     self.test_infinity_obj._test_version()
-    def test_update(self):
+    def test_update(self, suffix):
         """
         target: test table update apis
         method:
@@ -75,11 +76,11 @@ class TestInfinity:
         """
         db_obj = self.infinity_obj.get_database("default_db")
 
-        db_obj.drop_table(table_name="test_update", conflict_type=ConflictType.Ignore)
+        db_obj.drop_table(table_name="test_update"+suffix, conflict_type=ConflictType.Ignore)
 
         # infinity
         table_obj = db_obj.create_table(
-            "test_update", {"c1": {"type": "int", "constraints": ["primary key", "not null"]},
+            "test_update"+suffix, {"c1": {"type": "int", "constraints": ["primary key", "not null"]},
                             "c2": {"type": "int"}, "c3": {"type": "int"}}, ConflictType.Error)
         assert table_obj is not None
 
@@ -104,22 +105,22 @@ class TestInfinity:
             {'c1': (2, 3, 4, 1), 'c2': (20, 30, 40, 90), 'c3': (200, 300, 400, 900)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32'), 'c3': dtype('int32')}))
 
-        res = db_obj.drop_table("test_update", ConflictType.Error)
+        res = db_obj.drop_table("test_update"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @trace_expected_exceptions
-    def test_update_empty_table(self):
+    def test_update_empty_table(self, suffix):
 
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_empty_table", ConflictType.Ignore)
+        db_obj.drop_table("test_update_empty_table"+suffix, ConflictType.Ignore)
 
         try:
-            db_obj.create_table("test_update_empty_table", {}, ConflictType.Error)
+            db_obj.create_table("test_update_empty_table"+suffix, {}, ConflictType.Error)
         except Exception as e:
             print(e)
 
-        tb_obj = db_obj.get_table("test_update_empty_table")
+        tb_obj = db_obj.get_table("test_update_empty_table"+suffix)
 
         try:
             tb_obj.update("c1 = 1", [{"c2": 90, "c3": 900}])
@@ -129,21 +130,21 @@ class TestInfinity:
         # res = tb_obj.output["*"].to_df()
         # print(res)
 
-        res = db_obj.drop_table("test_update_empty_table", ConflictType.Error)
+        res = db_obj.drop_table("test_update_empty_table"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_update_non_existent_table(self):
+    def test_update_non_existent_table(self, suffix):
 
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_non_existent_table", ConflictType.Ignore)
+        db_obj.drop_table("test_update_non_existent_table"+suffix, ConflictType.Ignore)
 
-        db_obj.create_table("test_update_non_existent_table",
+        db_obj.create_table("test_update_non_existent_table"+suffix,
                             {"c1": {"type": "int"}, "c2": {"type": "int"}, "c3": {"type": "int"}},
                             ConflictType.Error)
 
         try:
-            tb_obj = db_obj.get_table("test_update_empty_table")
+            tb_obj = db_obj.get_table("test_update_empty_table"+suffix)
         except Exception as e:
             print(e)
 
@@ -153,24 +154,24 @@ class TestInfinity:
         except Exception as e:
             print(e)
 
-        res = db_obj.drop_table("test_update_non_existent_table", ConflictType.Error)
+        res = db_obj.drop_table("test_update_non_existent_table"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @trace_expected_exceptions
-    def test_update_no_row_is_met_the_condition(self):
+    def test_update_no_row_is_met_the_condition(self, suffix):
 
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         for i in range(len(common_values.types_array)):
-            db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i), ConflictType.Ignore)
+            db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i)+suffix, ConflictType.Ignore)
 
         for i in range(len(common_values.types_array)):
-            tb = db_obj.create_table("test_update_no_row_is_met_the_condition" + str(i),
+            tb = db_obj.create_table("test_update_no_row_is_met_the_condition" + str(i)+suffix,
                                      {"c1": {"type": common_values.types_array[i]},
                                       "c2": {"type": common_values.types_array[i]}}, ConflictType.Error)
             assert tb
 
-            tb_obj = db_obj.get_table("test_update_no_row_is_met_the_condition" + str(i))
+            tb_obj = db_obj.get_table("test_update_no_row_is_met_the_condition" + str(i)+suffix)
 
             try:
                 tb_obj.insert([{"c1": common_values.types_example_array[i],
@@ -192,23 +193,23 @@ class TestInfinity:
                 print(e)
 
         for i in range(len(common_values.types_array)):
-            db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i), ConflictType.Error)
+            db_obj.drop_table("test_update_no_row_is_met_the_condition" + str(i)+suffix, ConflictType.Error)
 
     @trace_expected_exceptions
-    def test_update_all_row_is_met_the_condition(self):
+    def test_update_all_row_is_met_the_condition(self, suffix):
 
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         for i in range(len(common_values.types_array)):
-            db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i), ConflictType.Ignore)
+            db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i)+suffix, ConflictType.Ignore)
 
         for i in range(len(common_values.types_array)):
-            tb = db_obj.create_table("test_update_all_row_is_met_the_condition" + str(i),
+            tb = db_obj.create_table("test_update_all_row_is_met_the_condition" + str(i)+suffix,
                                      {"c1": {"type": common_values.types_array[i]},
                                       "c2": {"type": common_values.types_array[i]}}, ConflictType.Error)
             assert tb
 
-            tb_obj = db_obj.get_table("test_update_all_row_is_met_the_condition" + str(i))
+            tb_obj = db_obj.get_table("test_update_all_row_is_met_the_condition" + str(i)+suffix)
 
             try:
                 tb_obj.insert([{"c1": common_values.types_example_array[i],
@@ -230,13 +231,13 @@ class TestInfinity:
                 print(e)
 
         for i in range(len(common_values.types_array)):
-            db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i), ConflictType.Error)
+            db_obj.drop_table("test_update_all_row_is_met_the_condition" + str(i)+suffix, ConflictType.Error)
 
-    def test_update_table_with_one_block(self):
+    def test_update_table_with_one_block(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_table_with_one_block", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_update_table_with_one_block",
+        db_obj.drop_table("test_update_table_with_one_block"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_table_with_one_block"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": "int"}},
                                         ConflictType.Error)
 
@@ -252,14 +253,14 @@ class TestInfinity:
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
 
-        res = db_obj.drop_table("test_update_table_with_one_block", ConflictType.Error)
+        res = db_obj.drop_table("test_update_table_with_one_block"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_update_table_with_one_segment(self):
+    def test_update_table_with_one_segment(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_table_with_one_segment", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_update_table_with_one_segment",
+        db_obj.drop_table("test_update_table_with_one_segment"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_table_with_one_segment"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": "int"}},
                                         ConflictType.Error)
 
@@ -275,14 +276,14 @@ class TestInfinity:
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
 
-        res = db_obj.drop_table("test_update_table_with_one_segment", ConflictType.Error)
+        res = db_obj.drop_table("test_update_table_with_one_segment"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_update_before_delete(self):
+    def test_update_before_delete(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_before_delete", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_update_before_delete", {"c1": {"type": "int"}, "c2": {"type": "int"}},
+        db_obj.drop_table("test_update_before_delete"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_before_delete"+suffix, {"c1": {"type": "int"}, "c2": {"type": "int"}},
                                         ConflictType.Error)
 
         # insert
@@ -301,14 +302,14 @@ class TestInfinity:
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 
-        res = db_obj.drop_table("test_update_before_delete", ConflictType.Error)
+        res = db_obj.drop_table("test_update_before_delete"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_update_inserted_data(self):
+    def test_update_inserted_data(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_inserted_data", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_update_inserted_data", {"c1": {"type": "int"}, "c2": {"type": "int"}},
+        db_obj.drop_table("test_update_inserted_data"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_inserted_data"+suffix, {"c1": {"type": "int"}, "c2": {"type": "int"}},
                                         ConflictType.Error)
 
         # insert
@@ -322,16 +323,16 @@ class TestInfinity:
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 
-        res = db_obj.drop_table("test_update_inserted_data", ConflictType.Error)
+        res = db_obj.drop_table("test_update_inserted_data"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.slow
     @pytest.mark.skipif(condition=os.getenv("RUNSLOWTEST")!="1", reason="Taking too much time.")
-    def test_update_inserted_long_before(self):
+    def test_update_inserted_long_before(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_inserted_long_before", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_update_inserted_long_before",
+        db_obj.drop_table("test_update_inserted_long_before"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_inserted_long_before"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": "int"}},
                                         ConflictType.Error)
 
@@ -348,16 +349,16 @@ class TestInfinity:
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 
-        res = db_obj.drop_table("test_update_inserted_long_before", ConflictType.Error)
+        res = db_obj.drop_table("test_update_inserted_long_before"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_update_dropped_table(self):
+    def test_update_dropped_table(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_dropped_table", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_update_dropped_table", {"c1": {"type": "int"}, "c2": {"type": "int"}},
+        db_obj.drop_table("test_update_dropped_table"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_dropped_table"+suffix, {"c1": {"type": "int"}, "c2": {"type": "int"}},
                                         ConflictType.Error)
-        res = db_obj.drop_table("test_update_dropped_table", ConflictType.Error)
+        res = db_obj.drop_table("test_update_dropped_table"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # update
@@ -371,18 +372,18 @@ class TestInfinity:
 
     @pytest.mark.parametrize("types", ["varchar"])
     @pytest.mark.parametrize("types_example", [[1, 2, 3]])
-    def test_update_invalid_value_1(self, types, types_example):
+    def test_update_invalid_value_1(self, types, types_example, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_update_invalid_value", {"c1": {"type": "int"}, "c2": {"type": types}},
+        db_obj.drop_table("test_update_invalid_value"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_invalid_value"+suffix, {"c1": {"type": "int"}, "c2": {"type": types}},
                                         ConflictType.Error)
         # update
         table_obj.update("c1 = 1", [{"c2": types_example}])
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 
-        res = db_obj.drop_table("test_update_invalid_value", ConflictType.Error)
+        res = db_obj.drop_table("test_update_invalid_value"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
     @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("types", ["int", "float"])
@@ -391,11 +392,11 @@ class TestInfinity:
         1.333,
         "1",
     ])
-    def test_update_new_value(self, types, types_example):
+    def test_update_new_value(self, types, types_example, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_new_value", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_update_new_value", {"c1": {"type": "int"}, "c2": {"type": types}},
+        db_obj.drop_table("test_update_new_value"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_new_value"+suffix, {"c1": {"type": "int"}, "c2": {"type": types}},
                                         ConflictType.Error)
 
         # update
@@ -403,18 +404,18 @@ class TestInfinity:
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 
-        res = db_obj.drop_table("test_update_new_value", ConflictType.Error)
+        res = db_obj.drop_table("test_update_new_value"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("types", ["int", "float"])
     @pytest.mark.parametrize("types_example", [
         pytest.param([1, 2, 3])
     ])
-    def test_update_invalid_value_2(self, types, types_example):
+    def test_update_invalid_value_2(self, types, types_example, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_update_invalid_value", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_update_invalid_value", {"c1": {"type": "int"}, "c2": {"type": types}},
+        db_obj.drop_table("test_update_invalid_value"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_update_invalid_value"+suffix, {"c1": {"type": "int"}, "c2": {"type": types}},
                                         ConflictType.Error)
 
         # update
@@ -427,7 +428,7 @@ class TestInfinity:
         update_res = table_obj.output(["*"]).to_df()
         print(update_res)
 
-        res = db_obj.drop_table("test_update_invalid_value", ConflictType.Error)
+        res = db_obj.drop_table("test_update_invalid_value"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("filter_list", [
@@ -440,11 +441,11 @@ class TestInfinity:
         "c1 = 0",
     ])
     @pytest.mark.parametrize("types_example", [1, 1.333])
-    def test_valid_filter_expression(self, filter_list, types_example):
+    def test_valid_filter_expression(self, filter_list, types_example, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_filter_expression", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_filter_expression", {"c1": {"type": "int"}, "c2": {"type": "float"}},
+        db_obj.drop_table("test_filter_expression"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_filter_expression"+suffix, {"c1": {"type": "int"}, "c2": {"type": "float"}},
                                         ConflictType.Error)
 
         # insert
@@ -459,7 +460,7 @@ class TestInfinity:
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
 
-        res = db_obj.drop_table("test_filter_expression", ConflictType.Error)
+        res = db_obj.drop_table("test_filter_expression"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("filter_list", [
@@ -472,11 +473,11 @@ class TestInfinity:
         pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
     ])
     @pytest.mark.parametrize("types_example", [1, 1.333])
-    def test_invalid_filter_expression(self, filter_list, types_example):
+    def test_invalid_filter_expression(self, filter_list, types_example, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_invalid_filter_expression", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_invalid_filter_expression",
+        db_obj.drop_table("test_invalid_filter_expression"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_invalid_filter_expression"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": "float"}},
                                         ConflictType.Error)
 
@@ -494,5 +495,5 @@ class TestInfinity:
         delete_res = table_obj.output(["*"]).to_df()
         print(delete_res)
 
-        res = db_obj.drop_table("test_invalid_filter_expression", ConflictType.Error)
+        res = db_obj.drop_table("test_invalid_filter_expression"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
