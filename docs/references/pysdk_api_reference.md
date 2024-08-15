@@ -18,10 +18,10 @@ Connects to the Infinity server and gets an Infinity object.
 
 The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
 
-- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is deployed as a Python module.
+- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is installed as a Python module.
 - `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A `NetworkAddress` object comprises two fields:
   - `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
-  - `<PORT>`: `int` - The port number on which the Infinity server is listening. Defaults to `23817`.
+  - `<PORT>`: `int` - The SDK port number on which the Infinity server listens. Defaults to `23817`.
 
 :::caution IMPORTANT
 When connecting to Infinity in client-server mode, ensure that the client version *exactly* matches the server version. For example:
@@ -85,7 +85,7 @@ infinity_object = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>"
 infinity_object.disconnect()
 ```
 
-Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is deployed as a Python module.
+Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is installed as a Python module.
 
 ### Returns
 
@@ -1410,7 +1410,7 @@ table_object.filter(cond)
 Creates a filtering condition expression for the current table.
 
 :::tip NOTE
-Call `filter(cond)` in a chain with the `output(columns)` method call on the same table object.
+This method creates a filtering condition for your query. To display the results, you must chain it with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
 :::
 
 ### Parameters
@@ -1449,7 +1449,11 @@ table_object.output(["*"]).filter("c2 = 3").to_pl()
 table_object.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
 ```
 
-Performs a k-nearest neighbor (KNN) or approximate nearest neighbor (ANN) vector search to identify the top k closest rows to the given vector. Suitable for working with dense vectors (dense embeddings).
+Creates a dense vector search expression to identify the top n closest rows to the given dense vector. Suitable for working with dense vectors (dense embeddings).
+
+:::tip NOTE
+To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
+:::
 
 ### Parameters
 
@@ -1543,7 +1547,11 @@ If the HNSW index is not created successfully, the search will fall back to a br
 table_object.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
 ```
 
-Performs a sparse vector search to to identify the top n closest rows to the given sparse vector. Suitable for working with sparse vectors (sparse embeddings).
+Creates a sparse vector search expression to identify the top n closest rows to the given sparse vector. Suitable for working with sparse vectors (sparse embeddings).
+
+:::tip NOTE
+To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
+:::
 
 ### Parameters
 
@@ -1632,7 +1640,11 @@ table_object.match_sparse('sparse', {"indices": [0, 10, 20], "values": [8, 10, 6
 table_object.match(fields, matching_text, distance_type, options_text)
 ```
 
-Performs a full-text search on the specified field(s)/column(s) and returns the most relevant rows to the provided matching text.
+Creates a full-text search expression on the specified field(s)/column(s) to identify the most relevant rows.
+
+:::tip NOTE
+To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
+:::
 
 ### Parameters
 
@@ -1640,9 +1652,12 @@ Performs a full-text search on the specified field(s)/column(s) and returns the 
 
 A non-empty, comma-separated string of column names on which the full-text search will be performed.
 
+:::danger NOTE
+Ensure that a full-text index has been successfully built on each column involved before executing a full-text search; otherwise, an error will occur.
+:::
 
 :::tip NOTE
-Ensure that you have created a full-text index on these columns before executing a full-text search; otherwise, an error will occur.
+To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
 :::
 
 #### matching_text: `str`, *Required*
@@ -1656,7 +1671,6 @@ A non-empty text string to search for. You can use various search options within
 - Escaping reserved characters: "space\-efficient"
 - Sloppy phrase search: "harmful chemical"~10
 - Field-specific search: title:(quick OR brown) AND body:foobar
-
 
 #### options_text: `str`, *Required*
 
@@ -1709,42 +1723,62 @@ for question in questions:
 table_object.fusion(method, topn, fusion_params = None)
 ```
 
-Builds a fusion expression.
+Creates a reranking expression for multiple retrieval ways to identify the top n closest rows.
+
+:::tip NOTE
+To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
+:::
 
 ### Parameters
 
 #### method: `str`, *Required*
 
-Supported reranking methods for multi-way retrieval include:
+A non-empty string indicating the reranking methods to use:
 
 - `"rrf"`: [Reciprocal rank fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)  
-  RRF scores all retrieved documents from each retrieval path using the reciprocals of their rankings. It then calculates the final score of each retrieved document by summing its scores from all retrieval paths. This technique is particularly useful when you are uncertain of the importance of each retrieval path.
+  RRF is a method for combining multiple result sets with varying relevance indicators into a single result set. It requires no tuning, and the relevance indicators need not be related to achieve high-quality results. RRF is particularly useful when you are uncertain of the relative importance of each retrieval way.  
+  RRF uses the following formula to calculate the score for ranking each document:  
+
+  ```python
+  score = 0.0
+  for q in queries:
+      if d in result(q):
+          score += 1.0 / ( k + rank( result(q), d ) )
+  return score
+
+  # Where
+  # k is the ranking constant,
+  # q is a query in a set of queries,
+  # d is a document in the result set of q,
+  # result(q) is the result set of q, and
+  # rank( result(q), d ) is the rank of d within the result(q), starting from 1.
+  ```
+
 - `"weighted_sum"`  
-  The weighted sum approach assigns different weights to different retrieval paths, allowing you to emphasize specific paths. This is particularly useful when you are certain of each path's relative importance.  
+  The weighted sum approach assigns different weights to different retrieval ways, allowing you to emphasize specific ways. This is particularly useful when you are certain of each path's relative importance.  
 - `"match_tensor"`  
-  Infinity's tensor-based reranking approach. This is used for reranker dense vector, sparse vector, or full-text retrieval paths.  
+  Infinity's tensor-based late interaction reranking approach.  
 
 #### topn: `int`, *Required*
 
-Mandatory setting for the fused reranking.
-Specifies the number of the most relevant rows to retrieve, e.g., `topn=10` to obtain the ten most relevant rows.
+An integer indicating the number of the most relevant rows to retrieve.
 
-#### fusion_params: `Optional[dict]`, *Differs across methods*
+#### fusion_params: `dict[str, Any]`, *Optional*
 
-A non-empty dict specifying the following reranking options:
+A dictionary representing additional options for the selected reranking method:
 
 - **RRF-specific options**: *Optional*  
   Settings when employing RRF for reranking.  
-  - `"rank_constant"`: The smoothing constant for RRF reranking. Typically set to `60`, e.g., `{"rank_constant": 60}`.
+  - `"rank_constant"`: The smoothing constant for RRF reranking, e.g., `{"rank_constant": 60}`. Defaults to `60`.
 
 - **weighted_sum-specific options**: *Optional*  
   Settings when employing Weighted Sum for reranking.  
-  - `"weights"`: Specifies the weight for each retrieval path. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval paths, respectively. The default weight of each retrieval path is `1.0`. If `"weight"` is not specified, all retrieval paths will be assiged the default weight of `1.0`.
+  - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assiged the default weight of `1.0`.
 
-- **match_tensor-specific options**: *Required when using match_tensor fusion method*  
+- **match_tensor-specific options**: *Optional*  
   Settings when employing match_tensor for reranking.
-  - `"field"`: The name of the tensor column to be used for reranking.
-  - `"data"`: The tensor data to query against. This should be provided as a list of lists or a two-dimensional NumPy
+  - `"field"`: The name of the tensor column for reranking.
+  - `"data"`: The tensor data to compare against. This should be provided as a list of lists or a two-dimensional NumPy
     array of numerical values.
   - `"data_type"`: The element data type of the query tensor. Usually `"float"`.
 
@@ -1757,7 +1791,7 @@ A non-empty dict specifying the following reranking options:
 
 ### Examples
 
-The following code snippets illustrate the use of fused reranking in a four-way retrieval.
+The following code snippets illustrate the use of fused reranking in a three-way retrieval.
 
 #### Use RRF for reranking
 
@@ -1801,8 +1835,7 @@ table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"]
             .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
             .match("body", "blooms", "topn=10")
             .filter("year < 2024")
-            .fusion("match_tensor", 2, {"field": "tensor", "data_type": "float",
-                                        "data": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})
+            .fusion("match_tensor", 2, {"field": "tensor", "data_type": "float", "data": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})
             .to_pl()
 ```
 
