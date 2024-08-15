@@ -117,7 +117,7 @@ class TestInfinity:
 
         db_names = []
         for db in res.db_names:
-            if db == "default_db" or "test_pysdk" in db:
+            if db == "default_db" or db == db_name:
                 db_names.append(db)
 
         for db in db_names:
