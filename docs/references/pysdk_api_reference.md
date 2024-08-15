@@ -1449,7 +1449,7 @@ table_object.output(["*"]).filter("c2 = 3").to_pl()
 table_object.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
 ```
 
-Creates a k-nearest neighbor (KNN) or approximate nearest neighbor (ANN) vector search expression to identify the top k closest rows to the given vector. Suitable for working with dense vectors (dense embeddings).
+Creates a dense vector search expression to identify the top n closest rows to the given dense vector. Suitable for working with dense vectors (dense embeddings).
 
 :::tip NOTE
 To display your query results, you must chain this method with `output(columns)`, which specifies the columns to output, and a method such as `to_pl()`, `to_df()`, or `to_arrow()` to format the query results.
@@ -1736,7 +1736,7 @@ To display your query results, you must chain this method with `output(columns)`
 A non-empty string indicating the reranking methods to use:
 
 - `"rrf"`: [Reciprocal rank fusion](https://plg.uwaterloo.ca/~gvcormac/cormacksigir09-rrf.pdf)  
-  RRF is a method for combining multiple result sets with varying relevance indicators into a single result set. It requires no tuning, and the relevance indicators need not be related to achieve high-quality results. RRF is particularly useful when you are uncertain of the relative importance of each retrieval path.  
+  RRF is a method for combining multiple result sets with varying relevance indicators into a single result set. It requires no tuning, and the relevance indicators need not be related to achieve high-quality results. RRF is particularly useful when you are uncertain of the relative importance of each retrieval way.  
   RRF uses the following formula to calculate the score for ranking each document:  
 
   ```python
@@ -1755,9 +1755,9 @@ A non-empty string indicating the reranking methods to use:
   ```
 
 - `"weighted_sum"`  
-  The weighted sum approach assigns different weights to different retrieval paths, allowing you to emphasize specific paths. This is particularly useful when you are certain of each path's relative importance.  
+  The weighted sum approach assigns different weights to different retrieval ways, allowing you to emphasize specific ways. This is particularly useful when you are certain of each path's relative importance.  
 - `"match_tensor"`  
-  Infinity's ColBERT-based tensor reranking approach.  
+  Infinity's tensor-based late interaction reranking approach.  
 
 #### topn: `int`, *Required*
 
@@ -1773,7 +1773,7 @@ A dictionary representing additional options for the selected reranking method:
 
 - **weighted_sum-specific options**: *Optional*  
   Settings when employing Weighted Sum for reranking.  
-  - `"weights"`: Specifies the weight for each retrieval path. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval paths, respectively. The default weight of each retrieval path is `1.0`. If `"weight"` is not specified, all retrieval paths will be assiged the default weight of `1.0`.
+  - `"weights"`: Specifies the weight for each retrieval way. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval ways, respectively. The default weight of each retrieval way is `1.0`. If `"weight"` is not specified, all retrieval ways will be assiged the default weight of `1.0`.
 
 - **match_tensor-specific options**: *Optional*  
   Settings when employing match_tensor for reranking.
