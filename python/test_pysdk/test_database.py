@@ -212,7 +212,7 @@ class TestInfinity:
             dbs = self.infinity_obj.list_databases()
             res_dbs = []
             for db_name in dbs.db_names:
-                if db_name.startswith("test_pysdk") or db_name == "default_db":
+                if (db_name.startswith("test_pysdk") and db_name.endswith(suffix)) or db_name == "default_db":
                     assert db_name in ['test_pysdk_test_repeatedly_create_drop_show_databases'+suffix, "default_db"]
                     res_dbs.append(db_name)
             assert len(res_dbs) == 2
