@@ -1253,6 +1253,20 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case ShowType::kShowMemIndex: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ') + "-> SHOW MEM INDEX ";
+            } else {
+                show_str = "SHOW MEM INDEX ";
+            }
+            show_str += "(" + std::to_string(show_node->node_id()) + ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ') + " - output columns: [index_name, table_name, db_name, size, row_count]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowType::kShowViews: {
             String show_str;
             if (intent_size != 0) {
@@ -1674,6 +1688,60 @@ void ExplainPhysicalPlan::Explain(const PhysicalShow *show_node, SharedPtr<Vecto
             result->emplace_back(MakeShared<String>(output_columns_str));
             break;
         }
+        case ShowType::kShowPersistenceFiles: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW PERSISTENCE OBJECTS ";
+            } else {
+                show_str = "SHOW PERSISTENCE OBJECTS ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [file_name, object_name, offset, size]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowPersistenceObjects: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW PERSISTENCE OBJECTS ";
+            } else {
+                show_str = "SHOW PERSISTENCE OBJECTS ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [file_name, reference_count, size, deleted_size]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
+        case ShowType::kShowPersistenceObject: {
+            String show_str;
+            if (intent_size != 0) {
+                show_str = String(intent_size - 2, ' ');
+                show_str += "-> SHOW PERSISTENCE OBJECT ";
+            } else {
+                show_str = "SHOW PERSISTENCE OBJECT ";
+            }
+            show_str += "(";
+            show_str += std::to_string(show_node->node_id());
+            show_str += ")";
+            result->emplace_back(MakeShared<String>(show_str));
+
+            String output_columns_str = String(intent_size, ' ');
+            output_columns_str += " - output columns: [start_position, end_position]";
+            result->emplace_back(MakeShared<String>(output_columns_str));
+            break;
+        }
         case ShowType::kInvalid: {
             String error_message = "Invalid show type";
             UnrecoverableError(error_message);
@@ -1797,6 +1865,10 @@ void ExplainPhysicalPlan::Explain(const PhysicalImport *import_node, SharedPtr<V
             result->emplace_back(file_type);
             break;
         }
+        case CopyFileType::kPARQUET: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: PARQUET");
+            break;
+        }
         case CopyFileType::kInvalid: {
             String error_message = "Invalid show type";
             UnrecoverableError(error_message);
@@ -1871,6 +1943,11 @@ void ExplainPhysicalPlan::Explain(const PhysicalExport *export_node, SharedPtr<V
         }
         case CopyFileType::kBVECS: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: BVECS");
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kPARQUET: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + " - type: PARQUET");
             result->emplace_back(file_type);
             break;
         }

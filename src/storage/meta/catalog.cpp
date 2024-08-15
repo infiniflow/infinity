@@ -14,6 +14,7 @@
 
 module;
 
+#include <cassert>
 #include <fstream>
 #include <thread>
 #include <vector>
@@ -29,6 +30,7 @@ import third_party;
 import status;
 import infinity_exception;
 import function_set;
+import scalar_function_set;
 import table_function;
 import special_function;
 import buffer_manager;
@@ -45,6 +47,10 @@ import data_access_state;
 import catalog_delta_entry;
 import file_writer;
 import extra_ddl_info;
+import index_defines;
+import infinity_context;
+import create_index_info;
+import persistence_manager;
 
 import table_meta;
 import table_index_meta;
@@ -427,10 +433,32 @@ void Catalog::AddFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &fun
     String name = function_set->name();
     StringToLower(name);
     if (catalog->function_sets_.contains(name)) {
-        String error_message = fmt::format("Trying to add duplicated function table_name into catalog: {}", name);
+        String error_message = fmt::format("Trying to add duplicated function {} into catalog", name);
         UnrecoverableError(error_message);
     }
     catalog->function_sets_.emplace(name, function_set);
+}
+
+void Catalog::AppendToScalarFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &function_set) {
+    String name = function_set->name();
+    StringToLower(name);
+    if (!catalog->function_sets_.contains(name)) {
+        String error_message = fmt::format("Trying to append to non-existent function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    auto target_scalar_function_set = std::dynamic_pointer_cast<ScalarFunctionSet>(catalog->function_sets_[name]);
+    if (!target_scalar_function_set) {
+        String error_message = fmt::format("Trying to append to non-scalar function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    auto source_function_set = std::dynamic_pointer_cast<ScalarFunctionSet>(function_set);
+    if (!source_function_set) {
+        String error_message = fmt::format("Trying to append non-scalar function to scalar function {} in catalog", name);
+        UnrecoverableError(error_message);
+    }
+    for (const auto &function : source_function_set->GetAllScalarFunctions()) {
+        target_scalar_function_set->AddFunction(function);
+    }
 }
 
 void Catalog::AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFunction> &special_function) {
@@ -479,6 +507,11 @@ nlohmann::json Catalog::Serialize(TxnTimeStamp max_commit_ts) {
         for (DBMeta *db_meta_ptr : db_meta_ptrs) {
             json_res["databases"].emplace_back(db_meta_ptr->Serialize(max_commit_ts));
         }
+    }
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    if (pm != nullptr) {
+        json_res["obj_addr_map"] = pm->Serialize();
     }
     return json_res;
 }
@@ -544,7 +577,7 @@ UniquePtr<CatalogDeltaEntry> Catalog::LoadFromFileDelta(const DeltaCatalogFileIn
         UnrecoverableError(error_message);
     }
     i32 n_bytes = catalog_delta_entry->GetSizeInBytes();
-    if (file_size != n_bytes) {
+    if (file_size != n_bytes && file_size != ptr - buf.data()) {
         Status status = Status::CatalogCorrupted(catalog_path);
         RecoverableError(status);
     }
@@ -852,10 +885,19 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                                                                                              txn_id,
                                                                                              begin_ts,
                                                                                              commit_ts);
-                    bool insert_ok = table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)}).second;
-                    if (!insert_ok) {
-                        String error_message = fmt::format("Segment index {} is already in the catalog", segment_id);
-                        UnrecoverableError(error_message);
+                    if (merge_flag == MergeFlag::kNew) {
+                        bool insert_ok = table_index_entry->index_by_segment().insert({segment_id, std::move(segment_index_entry)}).second;
+                        if (!insert_ok) {
+                            String error_message = fmt::format("Segment index {} is already in the catalog", segment_id);
+                            UnrecoverableError(error_message);
+                        }
+                    } else if (merge_flag == MergeFlag::kUpdate) {
+                        auto iter = table_index_entry->index_by_segment().find(segment_id);
+                        if (iter == table_index_entry->index_by_segment().end()) {
+                            String error_message = fmt::format("Segment index {} is not found", segment_id);
+                            UnrecoverableError(error_message);
+                        }
+                        iter->second->UpdateSegmentIndexReplay(segment_index_entry);
                     }
                 }
                 break;
@@ -895,6 +937,7 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                     segment_index_entry
                         ->AddChunkIndexEntryReplay(chunk_id, table_entry, base_name, base_rowid, row_count, commit_ts, deprecate_ts, buffer_mgr);
                 }
+
                 break;
             }
             default:
@@ -935,6 +978,12 @@ UniquePtr<Catalog> Catalog::Deserialize(const String &data_dir, const nlohmann::
         for (const auto &db_json : catalog_json["databases"]) {
             UniquePtr<DBMeta> db_meta = DBMeta::Deserialize(*catalog->data_dir_, db_json, buffer_mgr);
             catalog->db_meta_map_.AddNewMetaNoLock(*db_meta->db_name(), std::move(db_meta));
+        }
+    }
+    if (catalog_json.contains("obj_addr_map")) {
+        PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+        if (pm != nullptr) {
+            pm->Deserialize(catalog_json["obj_addr_map"]);
         }
     }
     return catalog;
@@ -979,18 +1028,17 @@ void Catalog::SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_catalog_p
 }
 
 // called by bg_task
-bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog_path, String &delta_catalog_name) {
+bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts, String &delta_catalog_path, String &delta_catalog_name) {
+    // Pick the delta entry to flush and set the max commit ts.
+    UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
+    if (last_ckp_ts >= max_commit_ts) {
+        return false;
+    }
+
     delta_catalog_path = *catalog_dir_;
     delta_catalog_name = CatalogFile::DeltaCheckpointFilename(max_commit_ts);
     String full_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
 
-    // Check the SegmentEntry's for flush the data to disk.
-    UniquePtr<CatalogDeltaEntry> flush_delta_entry = global_catalog_delta_entry_->PickFlushEntry(max_commit_ts);
-
-    if (flush_delta_entry->operations().empty()) {
-        LOG_TRACE("Save delta catalog ops is empty. Skip flush.");
-        return true;
-    }
     LOG_DEBUG(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
 
     for (auto &op : flush_delta_entry->operations()) {
@@ -1041,12 +1089,10 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_catalog
     // }
     LOG_DEBUG(fmt::format("Save delta catalog to: {}, size: {}.", full_path, act_size));
 
-    return false;
+    return true;
 }
 
-void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) {
-    global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry));
-}
+void Catalog::AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->AddDeltaEntry(std::move(delta_entry)); }
 
 void Catalog::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry) { global_catalog_delta_entry_->ReplayDeltaEntry(std::move(delta_entry)); }
 
@@ -1075,12 +1121,12 @@ void Catalog::MemIndexCommitLoop() {
     }
 }
 
-void Catalog::MemIndexRecover(BufferManager *buffer_manager) {
+void Catalog::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts) {
     auto db_meta_map_guard = db_meta_map_.GetMetaMap();
     for (auto &[_, db_meta] : *db_meta_map_guard) {
         auto [db_entry, status] = db_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
         if (status.ok()) {
-            db_entry->MemIndexRecover(buffer_manager);
+            db_entry->MemIndexRecover(buffer_manager, ts);
         }
     }
 }
@@ -1091,8 +1137,6 @@ void Catalog::StartMemoryIndexCommit() {
 
 SizeT Catalog::GetDeltaLogCount() const { return global_catalog_delta_entry_->OpSize(); }
 
-Vector<CatalogDeltaOpBrief> Catalog::GetDeltaLogBriefs() const {
-    return global_catalog_delta_entry_->GetOperationBriefs();
-}
+Vector<CatalogDeltaOpBrief> Catalog::GetDeltaLogBriefs() const { return global_catalog_delta_entry_->GetOperationBriefs(); }
 
 } // namespace infinity

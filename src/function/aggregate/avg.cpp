@@ -200,6 +200,76 @@ public:
 };
 
 template <>
+struct AvgState<Float16T, DoubleT> {
+public:
+    double value_{};
+    i64 count_{};
+    double result_{};
+
+    inline void Initialize() {
+        this->value_ = 0;
+        this->count_ = 0;
+    }
+
+    inline void Update(const Float16T *__restrict input, SizeT idx) {
+        if (count_ == std::numeric_limits<i64>::max()) {
+            String error_message = fmt::format("Data count exceeds: {}", count_);
+            UnrecoverableError(error_message);
+        }
+        this->count_++;
+        value_ += static_cast<float>(input[idx]);
+    }
+
+    inline void ConstantUpdate(const Float16T *__restrict input, SizeT idx, SizeT count) {
+        // TODO: Need to check overflow.
+        this->count_ += count;
+        value_ += static_cast<float>(input[idx]) * count;
+    }
+
+    inline ptr_t Finalize() {
+        result_ = value_ / count_;
+        return (ptr_t)&result_;
+    }
+
+    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+};
+
+template <>
+struct AvgState<BFloat16T, DoubleT> {
+public:
+    double value_{};
+    i64 count_{};
+    double result_{};
+
+    inline void Initialize() {
+        this->value_ = 0;
+        this->count_ = 0;
+    }
+
+    inline void Update(const BFloat16T *__restrict input, SizeT idx) {
+        if (count_ == std::numeric_limits<i64>::max()) {
+            String error_message = fmt::format("Data count exceeds: {}", count_);
+            UnrecoverableError(error_message);
+        }
+        this->count_++;
+        value_ += static_cast<float>(input[idx]);
+    }
+
+    inline void ConstantUpdate(const BFloat16T *__restrict input, SizeT idx, SizeT count) {
+        // TODO: Need to check overflow.
+        this->count_ += count;
+        value_ += static_cast<float>(input[idx]) * count;
+    }
+
+    inline ptr_t Finalize() {
+        result_ = value_ / count_;
+        return (ptr_t)&result_;
+    }
+
+    inline static SizeT Size(const DataType &) { return sizeof(value_) + sizeof(count_) + sizeof(result_); }
+};
+
+template <>
 struct AvgState<FloatT, DoubleT> {
 public:
     double value_{};
@@ -321,6 +391,20 @@ void RegisterAvgFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                                                                      DataType(LogicalType::kDouble));
         function_set_ptr->AddFunction(avg_function);
 #endif
+    }
+
+    {
+        AggregateFunction avg_function = UnaryAggregate<AvgState<Float16T, DoubleT>, Float16T, DoubleT>(func_name,
+                                                                                                        DataType(LogicalType::kFloat16),
+                                                                                                        DataType(LogicalType::kDouble));
+        function_set_ptr->AddFunction(avg_function);
+    }
+
+    {
+        AggregateFunction avg_function = UnaryAggregate<AvgState<BFloat16T, DoubleT>, BFloat16T, DoubleT>(func_name,
+                                                                                                          DataType(LogicalType::kBFloat16),
+                                                                                                          DataType(LogicalType::kDouble));
+        function_set_ptr->AddFunction(avg_function);
     }
 
     {

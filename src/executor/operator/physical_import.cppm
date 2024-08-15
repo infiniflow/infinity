@@ -105,6 +105,8 @@ public:
 
     void ImportJSONL(QueryContext *query_context, ImportOperatorState *import_op_state);
 
+    void ImportPARQUET(QueryContext *query_context, ImportOperatorState *import_op_state);
+
     inline const TableEntry *table_entry() const { return table_entry_; }
 
     inline CopyFileType FileType() const { return file_type_; }
@@ -124,17 +126,20 @@ private:
 
     void JSONLRowHandler(const nlohmann::json &line_json, Vector<ColumnVector> &column_vectors);
 
+    void ParquetValueHandler(const SharedPtr<arrow::Array> &array, ColumnVector &column_vector, u64 value_idx);
+
 private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 
     TableEntry *table_entry_{};
-    CopyFileType file_type_{CopyFileType::kCSV};
+    CopyFileType file_type_{CopyFileType::kInvalid};
     String file_path_{};
     bool header_{false};
     char delimiter_{','};
 };
 
 export SharedPtr<ConstantExpr> BuildConstantExprFromJson(const nlohmann::json &json_object);
+export  ConstantExpr * BuildConstantSparseExprFromJson(const nlohmann::json &json_object);
 
 } // namespace infinity

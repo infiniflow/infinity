@@ -33,6 +33,8 @@ import default_values;
 import logger;
 import infinity_exception;
 import third_party;
+import status;
+import wal_entry;
 
 namespace infinity {
 
@@ -121,17 +123,24 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     const Vector<SegmentEntry *> &candidate_segments = compact_operator_state->segment_groups_[group_idx];
     Vector<SegmentEntry *> compactible_segments;
     {
-        
+        String log_str = fmt::format("PhysicalCompact::Execute: group_idx: {}, candidate_segments: ", group_idx);
         for (auto *candidate_segment : candidate_segments) {
             if (candidate_segment->TrySetCompacting(compact_state_data)) {
                 compactible_segments.push_back(candidate_segment);
             }
+            log_str += fmt::format("{}, ", candidate_segment->segment_id());
         }
+        LOG_INFO(log_str);
     }
 
     auto *txn = query_context->GetTxn();
+    if (compactible_segments.empty()) {
+        RecoverableError(Status::TxnRollback(txn->TxnID(), "No segment to compact."));
+    }
+    auto *txn_mgr = txn->txn_mgr();
     auto *buffer_mgr = query_context->storage()->buffer_manager();
-    TxnTimeStamp begin_ts = txn->BeginTS();
+    TxnTimeStamp scan_ts = txn_mgr->GetNewTimeStamp();
+    compact_state_data->scan_ts_ = scan_ts;
 
     TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     BlockIndex *block_index = base_table_ref_->block_index_.get();
@@ -140,23 +149,27 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
 
     auto new_segment = SegmentEntry::NewSegmentEntry(table_entry, Catalog::GetNextSegmentID(table_entry), txn);
     SegmentID new_segment_id = new_segment->segment_id();
+    LOG_INFO(fmt::format("PhysicalCompact::Execute: txn_id: {}, scan_ts: {}, new segment id: {}", txn->TxnID(), scan_ts, new_segment_id));
 
-    UniquePtr<BlockEntry> new_block = BlockEntry::NewBlockEntry(new_segment.get(), new_segment->GetNextBlockID(), 0 /*checkpoint_ts*/, column_count, txn);
+    UniquePtr<BlockEntry> new_block =
+        BlockEntry::NewBlockEntry(new_segment.get(), new_segment->GetNextBlockID(), 0 /*checkpoint_ts*/, column_count, txn);
     const SizeT block_capacity = new_block->row_capacity();
 
+    Vector<SegmentID> old_segment_ids;
     for (SegmentEntry *segment : compactible_segments) {
         SegmentID segment_id = segment->segment_id();
+        old_segment_ids.push_back(segment_id);
         const auto &segment_info = block_index->segment_block_index_.at(segment_id);
         for (const auto *block_entry : segment_info.block_map_) {
             BlockID block_id = block_entry->block_id();
             Vector<ColumnVector> input_column_vectors;
             for (ColumnID column_id = 0; column_id < column_count; ++column_id) {
                 auto *column_block_entry = block_entry->GetColumnBlockEntry(column_id);
-                input_column_vectors.emplace_back(column_block_entry->GetColumnVector(buffer_mgr));
+                input_column_vectors.emplace_back(column_block_entry->GetConstColumnVector(buffer_mgr));
             }
             SizeT read_offset = 0;
             while (true) {
-                auto [row_begin, row_end] = block_entry->GetVisibleRange(begin_ts, read_offset);
+                auto [row_begin, row_end] = block_entry->GetVisibleRange(scan_ts, read_offset);
                 SizeT read_size = row_end - row_begin;
                 if (read_size == 0) {
                     break;
@@ -166,8 +179,8 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
                     if (read_size1 == 0) {
                         return;
                     }
-                    new_block->AppendBlock(input_column_vectors, row_begin, read_size1, buffer_mgr);
                     RowID new_row_id(new_segment_id, new_block->block_id() * block_capacity + new_block->row_count());
+                    new_block->AppendBlock(input_column_vectors, row_begin, read_size1, buffer_mgr);
                     remapper.AddMap(segment_id, block_id, row_begin, new_row_id);
                     read_offset = row_begin + read_size1;
                 };
@@ -187,6 +200,11 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
     }
     if (new_block->row_count() > 0) {
         new_segment->AppendBlockEntry(std::move(new_block));
+    } else {
+        std::move(*new_block).Cleanup();
+    }
+    if (new_segment->actual_row_count() > new_segment->row_capacity()) {
+        UnrecoverableError(fmt::format("Compact segment {} error because of row count overflow.", new_segment_id));
     }
     compact_state_data->AddNewSegment(new_segment, std::move(compactible_segments), txn);
     compact_operator_state->compact_idx_ = ++group_idx;
@@ -194,6 +212,12 @@ bool PhysicalCompact::Execute(QueryContext *query_context, OperatorState *operat
         compact_operator_state->SetComplete();
     }
     compact_operator_state->SetComplete();
+
+    String db_name = *table_entry->GetDBName();
+    String table_name = *table_entry->GetTableName();
+    Vector<WalSegmentInfo> new_segment_infos;
+    new_segment_infos.emplace_back(new_segment.get());
+    txn->AddWalCmd(MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(new_segment_infos), std::move(old_segment_ids)));
 
     return true;
 }

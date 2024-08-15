@@ -15,6 +15,8 @@
 #pragma once
 
 
+#include "type/number/float16.h"
+#include "type/number/bfloat16.h"
 #include "type/number/huge_int.h"
 #include "type/number/decimal_type.h"
 #include "type/datetime/date_type.h"
@@ -100,5 +102,10 @@ using SparseT = SparseType;
 using TensorArrayT = TensorArrayType;
 
 using EmptyArrayT = std::nullptr_t;
+
+// FP16
+using Float16T = float16_t;
+// BF16
+using BFloat16T = bfloat16_t;
 
 }

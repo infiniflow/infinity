@@ -106,6 +106,8 @@ void RegisterLessEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateLessEqualsFunction<IntegerT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kInteger));
     GenerateLessEqualsFunction<BigIntT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
     GenerateLessEqualsFunction<HugeIntT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateLessEqualsFunction<FloatT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kFloat16));
+    GenerateLessEqualsFunction<FloatT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kBFloat16));
     GenerateLessEqualsFunction<FloatT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kFloat));
     GenerateLessEqualsFunction<DoubleT, PODTypeLessEqualsFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 

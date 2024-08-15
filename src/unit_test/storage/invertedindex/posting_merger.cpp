@@ -28,14 +28,34 @@ import logical_type;
 import infinity_exception;
 import vector_with_lock;
 import logger;
+import infinity_context;
+import persistence_manager;
 
 using namespace infinity;
 
-class PostingMergerTest : public BaseTest {
+class PostingMergerTest : public BaseTestParamStr {
 public:
     PostingMergerTest() {}
     ~PostingMergerTest() {}
-
+    void SetUp() override {
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        CleanupDbDirs();
+        config_path_ = GetParam();
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            std::shared_ptr<std::string> config_path = std::make_shared<std::string>(config_path_);
+            infinity::InfinityContext::instance().Init(config_path);
+        }
+    }
+    void TearDown() override {
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            if (InfinityContext::instance().persistence_manager() != nullptr) {
+                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
+            }
+            infinity::InfinityContext::instance().UnInit();
+        }
+    }
 public:
     struct ExpectedPosting {
         String term;
@@ -49,7 +69,18 @@ protected:
 protected:
     optionflag_t flag_{OPTION_FLAG_ALL};
     static constexpr SizeT BUFFER_SIZE_ = 1024;
+    String config_path_{};
 };
+
+INSTANTIATE_TEST_SUITE_P(
+    TestWithDifferentParams,
+    PostingMergerTest,
+    ::testing::Values(
+        BaseTestParamStr::NULL_CONFIG_PATH,
+        BaseTestParamStr::VFS_CONFIG_PATH
+    )
+);
+
 
 void PostingMergerTest::CreateIndex() {
 
@@ -66,22 +97,22 @@ void PostingMergerTest::CreateIndex() {
         column->AppendValue(v);
     }
 
-    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullTmpDir());
-    MemoryIndexer indexer1(GetFullTmpDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
+    auto fake_segment_index_entry_1 = SegmentIndexEntry::CreateFakeEntry(GetFullDataDir());
+    MemoryIndexer indexer1(GetFullDataDir(), "chunk1", RowID(0U, 0U), flag_, "standard");
     indexer1.Insert(column, 0, 1);
     indexer1.Dump();
     fake_segment_index_entry_1->AddFtChunkIndexEntry("chunk1", RowID(0U, 0U).ToUint64(), 1U);
 
-    auto indexer2 = MakeUnique<MemoryIndexer>(GetFullTmpDir(), "chunk2", RowID(0U, 1U), flag_, "standard");
+    auto indexer2 = MakeUnique<MemoryIndexer>(GetFullDataDir(), "chunk2", RowID(0U, 1U), flag_, "standard");
     indexer2->Insert(column, 1, 1);
     indexer2->Dump();
 }
 
-TEST_F(PostingMergerTest, Basic) {
-    using namespace infinity;
+TEST_P(PostingMergerTest, Basic) {
+    // using namespace infinity;
     CreateIndex();
 
-    const String index_dir = GetFullTmpDir();
+    const String index_dir = GetFullDataDir();
 
     String dst_base_name = "merged_index";
     Path path = Path(index_dir) / dst_base_name;
@@ -126,7 +157,7 @@ TEST_F(PostingMergerTest, Basic) {
     }
 
     auto merge_base_rowid = row_ids[0];
-    for (auto& row_id : row_ids) {
+    for (auto &row_id : row_ids) {
         merge_base_rowid = std::min(merge_base_rowid, row_id);
     }
 
@@ -140,10 +171,15 @@ TEST_F(PostingMergerTest, Basic) {
         unsafe_column_length_array.clear();
         for (u32 i = 0; i < base_names.size(); ++i) {
             String column_len_file = (Path(index_dir) / base_names[i]).string() + LENGTH_SUFFIX;
+            String real_column_len_file = column_len_file;
+            PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+            if (pm != nullptr) {
+                real_column_len_file = pm->GetObjCache(real_column_len_file);
+            }
             RowID base_row_id = row_ids[i];
             u32 id_offset = base_row_id - merge_base_rowid;
-            auto [file_handler, status] = fs.OpenFile(column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
-            if(!status.ok()) {
+            auto [file_handler, status] = fs.OpenFile(real_column_len_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
+            if (!status.ok()) {
                 String error_message = status.message();
                 UnrecoverableError(error_message);
             }
@@ -155,6 +191,9 @@ TEST_F(PostingMergerTest, Basic) {
             if (read_count != file_size) {
                 String error_message = "ColumnIndexMerger: when loading column length file, read_count != file_size";
                 UnrecoverableError(error_message);
+            }
+            if (pm != nullptr) {
+                pm->PutObjCache(column_len_file);
             }
         }
     }

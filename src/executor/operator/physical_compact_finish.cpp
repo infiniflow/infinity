@@ -49,8 +49,6 @@ void PhysicalCompactFinish::SaveSegmentData(QueryContext *query_context, const C
     auto *txn = query_context->GetTxn();
     auto *table_entry = base_table_ref_->table_entry_ptr_;
 
-    Vector<WalSegmentInfo> segment_infos;
-    Vector<SegmentID> old_segment_ids;
     Vector<Pair<SharedPtr<SegmentEntry>, Vector<SegmentEntry *>>> segment_data;
 
     std::stringstream ss;
@@ -58,11 +56,9 @@ void PhysicalCompactFinish::SaveSegmentData(QueryContext *query_context, const C
         auto *new_segment = compact_segment_data.new_segment_.get();
         ss << "Compact ";
         new_segment->FlushNewData();
-        segment_infos.emplace_back(new_segment);
 
         for (const auto *old_segment : compact_segment_data.old_segments_) {
             ss << "old segment " << old_segment->segment_id() << ", ";
-            old_segment_ids.push_back(old_segment->segment_id());
         }
         ss << "to new segment " << new_segment->segment_id();
         segment_data.emplace_back(compact_segment_data.new_segment_, compact_segment_data.old_segments_);
@@ -70,9 +66,6 @@ void PhysicalCompactFinish::SaveSegmentData(QueryContext *query_context, const C
     LOG_DEBUG(ss.str());
 
     txn->Compact(table_entry, std::move(segment_data), compact_type_);
-    String db_name = *table_entry->GetDBName();
-    String table_name = *table_entry->GetTableName();
-    txn->AddWalCmd(MakeShared<WalCmdCompact>(std::move(db_name), std::move(table_name), std::move(segment_infos), std::move(old_segment_ids)));
 }
 
 bool PhysicalCompactFinish::ApplyDeletes(QueryContext *query_context, const CompactStateData *compact_state_data) {
@@ -86,7 +79,7 @@ bool PhysicalCompactFinish::ApplyDeletes(QueryContext *query_context, const Comp
             }
         }
     }
-    const HashMap<SegmentID, Vector<SegmentOffset>> &to_delete = compact_state_data->GetToDelete();
+    const Vector<Pair<SegmentID, Vector<SegmentOffset>>> &to_delete = compact_state_data->GetToDelete();
     Vector<RowID> row_ids;
     for (const auto &[segment_id, delete_offsets] : to_delete) {
         for (SegmentOffset offset : delete_offsets) {

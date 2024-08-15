@@ -1,0 +1,28 @@
+{
+    "name": "infinity_splade",
+    "app": "infinity",
+    "host": "127.0.0.1:23817",
+    "data_path": "datasets/SPLADE/base_1M.csr",
+    "use_import": "sparse_vector_csr",
+    "topK": 10,
+    "mode": "sparse_vector",
+    "schema": {
+        "col1": {"type": "sparse,30109,float,int16"}
+    },
+    "vector_name": "embeddings",
+    "metric_type": "ip",
+    "index": {
+        "col1": {
+            "type": "BMP",
+            "params": {
+                "block_size":8,
+                "compress_type":"compress"
+            }
+        }
+    },
+    "alpha": 0.92,
+    "beta": 0.8,
+    "query_path": "datasets/SPLADE/queries.dev.csr",
+    "batch_size": 8192,
+    "ground_truth_path": "datasets/SPLADE/base_1M.dev.gt"
+}

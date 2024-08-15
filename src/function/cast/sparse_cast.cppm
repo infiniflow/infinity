@@ -32,6 +32,7 @@ import fix_heap;
 import sparse_info;
 import embedding_cast;
 import logger;
+import sparse_util;
 
 namespace infinity {
 
@@ -59,93 +60,85 @@ struct SparseTryCastToSparse {
 };
 
 template <typename SourceValueType, typename SourceIndiceType>
-void SortSourceSparse(char *source_ptr, SizeT source_nnz) {
-    auto *source_indice_ptr = reinterpret_cast<SourceIndiceType *>(source_ptr);
-    auto *source_data_ptr = reinterpret_cast<SourceValueType *>(source_ptr + source_nnz * sizeof(SourceIndiceType));
-    Vector<Pair<SourceIndiceType, SourceValueType>> indice_value_pairs;
-    for (SizeT i = 0; i < source_nnz; ++i) {
-        indice_value_pairs.emplace_back(source_indice_ptr[i], source_data_ptr[i]);
+SparseVec<SourceValueType, SourceIndiceType> SortSourceSparse(SparseVecRef<SourceValueType, SourceIndiceType> old_sparse_ref) {
+    Vector<SizeT> idx(old_sparse_ref.nnz_);
+    std::iota(idx.begin(), idx.end(), 0);
+    std::sort(idx.begin(), idx.end(), [&old_sparse_ref](SizeT i, SizeT j) { return old_sparse_ref.indices_[i] < old_sparse_ref.indices_[j]; });
+    auto new_data = MakeUniqueForOverwrite<SourceValueType[]>(old_sparse_ref.nnz_);
+    auto new_indices = MakeUniqueForOverwrite<SourceIndiceType[]>(old_sparse_ref.nnz_);
+    for (i32 i = 0; i < old_sparse_ref.nnz_; ++i) {
+        new_data[i] = old_sparse_ref.data_[idx[i]];
+        new_indices[i] = old_sparse_ref.indices_[idx[i]];
     }
-    std::sort(indice_value_pairs.begin(), indice_value_pairs.end());
-    for (SizeT i = 0; i < source_nnz; ++i) {
-        source_indice_ptr[i] = indice_value_pairs[i].first;
-        source_data_ptr[i] = indice_value_pairs[i].second;
-    }
+    return {old_sparse_ref.nnz_, std::move(new_indices), std::move(new_data)};
 }
 
 template <typename TargetValueType, typename TargetIndiceType, typename SourceValueType, typename SourceIndiceType>
 void SparseTryCastToSparseFunInner(const SparseInfo *source_info,
                                    const SparseT &source,
-                                   FixHeapManager *source_fix_heap_mgr,
+                                   const VectorBuffer *src_vec_buffer,
                                    const SparseInfo *target_info,
                                    SparseT &target,
-                                   FixHeapManager *target_fix_heap_mgr) {
-    const auto &[source_nnz, source_chunk_id, source_chunk_offset] = source;
+                                   VectorBuffer *tgt_vec_buffer) {
+    const auto &[source_nnz, source_file_offset] = source;
     target.nnz_ = source_nnz;
     if (source_nnz == 0) {
-        target.chunk_id_ = -1;
-        target.chunk_offset_ = 0;
+        target.file_offset_ = -1;
         return;
     }
-    const char *source_ptr = source_fix_heap_mgr->GetRawPtrFromChunk(source_chunk_id, source_chunk_offset);
+    SparseVecRef<SourceValueType, SourceIndiceType> source_sparse_ref =
+        src_vec_buffer->template GetSparse<SourceValueType, SourceIndiceType>(source_file_offset, source_nnz);
+    SparseVec<SourceValueType, SourceIndiceType> source_tmp;
     if (target_info->StoreType() == SparseStoreType::kSort && source_info->StoreType() != SparseStoreType::kSort) {
-        auto *source_ptr_mut = const_cast<char *>(source_ptr);
-        SortSourceSparse<SourceValueType, SourceIndiceType>(source_ptr_mut, source_nnz);
+        source_tmp = SortSourceSparse<SourceValueType, SourceIndiceType>(source_sparse_ref);
+        source_sparse_ref = source_tmp.ToRef();
     }
 
-    SizeT sparse_bytes = source_info->SparseSize(source_nnz);
     if constexpr (std::is_same_v<TargetValueType, SourceValueType>) {
         if constexpr (std::is_same_v<TargetIndiceType, SourceIndiceType>) {
-            std::tie(target.chunk_id_, target.chunk_offset_) = target_fix_heap_mgr->AppendToHeap(source_ptr, sparse_bytes);
+            target.file_offset_ = tgt_vec_buffer->AppendSparse(source_sparse_ref);
         } else {
             auto target_indice_tmp_ptr = MakeUniqueForOverwrite<TargetIndiceType[]>(source_nnz);
-            const SizeT target_indice_size = target_info->IndiceSize(source_nnz);
-            if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceIndiceType *>(source_ptr),
-                                               reinterpret_cast<TargetIndiceType *>(target_indice_tmp_ptr.get()),
-                                               source_nnz)) {
-                String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}", DataType::TypeToString<SourceIndiceType>(), DataType::TypeToString<TargetIndiceType>());
+            if (!EmbeddingTryCastToFixlen::Run(source_sparse_ref.indices_, target_indice_tmp_ptr.get(), source_nnz)) {
+                String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
+                                                   DataType::TypeToString<SourceIndiceType>(),
+                                                   DataType::TypeToString<TargetIndiceType>());
                 UnrecoverableError(error_message);
             }
-            Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
-            data_ptrs.emplace_back(reinterpret_cast<const char *>(target_indice_tmp_ptr.get()), target_indice_size);
-
-            const SizeT source_indice_size = source_info->IndiceSize(source_nnz);
-            const_ptr_t source_data_ptr = source_ptr + source_indice_size;
-            data_ptrs.emplace_back(source_data_ptr, source_info->DataSize(source_nnz));
-
-            std::tie(target.chunk_id_, target.chunk_offset_) = target_fix_heap_mgr->AppendToHeap(data_ptrs);
+            SparseVecRef<TargetValueType, TargetIndiceType> target_sparse_ref{static_cast<i32>(source_nnz),
+                                                                              target_indice_tmp_ptr.get(),
+                                                                              source_sparse_ref.data_};
+            target.file_offset_ = tgt_vec_buffer->AppendSparse(target_sparse_ref);
         }
     } else {
-        const SizeT source_indice_size = source_info->IndiceSize(source_nnz);
-        Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
-        UniquePtr<TargetIndiceType[]> target_indice_tmp_ptr;
-        UniquePtr<TargetValueType[]> target_value_tmp_ptr;
-        if constexpr (std::is_same_v<TargetIndiceType, SourceIndiceType>) {
-            data_ptrs.emplace_back(reinterpret_cast<const char *>(source_ptr), source_indice_size);
-        } else {
-            target_indice_tmp_ptr = MakeUniqueForOverwrite<TargetIndiceType[]>(source_nnz);
-            const SizeT target_indice_size = target_info->IndiceSize(source_nnz);
-            if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceIndiceType *>(source_ptr),
-                                               reinterpret_cast<TargetIndiceType *>(target_indice_tmp_ptr.get()),
-                                               source_nnz)) {
-                String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}", DataType::TypeToString<SourceIndiceType>(), DataType::TypeToString<TargetIndiceType>());
-                UnrecoverableError(error_message);
-            }
-            data_ptrs.emplace_back(reinterpret_cast<const char *>(target_indice_tmp_ptr.get()), target_indice_size);
-        }
-
+        UniquePtr<TargetValueType[]> target_value_tmp_ptr = nullptr;
         if constexpr (!std::is_same_v<TargetValueType, BooleanT>) {
             target_value_tmp_ptr = MakeUniqueForOverwrite<TargetValueType[]>(source_nnz);
-            const SizeT target_data_size = target_info->DataSize(source_nnz);
-            if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceValueType *>(source_ptr + source_indice_size),
-                                            reinterpret_cast<TargetValueType *>(target_value_tmp_ptr.get()),
-                                            source_nnz)) {
-                String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}", DataType::TypeToString<SourceIndiceType>(), DataType::TypeToString<TargetIndiceType>());
+            if (!EmbeddingTryCastToFixlen::Run(source_sparse_ref.data_, target_value_tmp_ptr.get(), source_nnz)) {
+                String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
+                                                   DataType::TypeToString<SourceIndiceType>(),
+                                                   DataType::TypeToString<TargetIndiceType>());
                 UnrecoverableError(error_message);
             }
-            data_ptrs.emplace_back(reinterpret_cast<const char *>(target_value_tmp_ptr.get()), target_data_size);
         }
-        std::tie(target.chunk_id_, target.chunk_offset_) = target_fix_heap_mgr->AppendToHeap(data_ptrs);
+        if constexpr (std::is_same_v<TargetIndiceType, SourceIndiceType>) {
+            SparseVecRef<TargetValueType, TargetIndiceType> target_sparse_ref{static_cast<i32>(source_nnz),
+                                                                              source_sparse_ref.indices_,
+                                                                              target_value_tmp_ptr.get()};
+            target.file_offset_ = tgt_vec_buffer->AppendSparse(target_sparse_ref);
+        } else {
+            auto target_indice_tmp_ptr = MakeUniqueForOverwrite<TargetIndiceType[]>(source_nnz);
+            if (!EmbeddingTryCastToFixlen::Run(source_sparse_ref.indices_, target_indice_tmp_ptr.get(), source_nnz)) {
+                String error_message = fmt::format("Fail to case from sparse with idx {} to sparse with idx {}",
+                                                   DataType::TypeToString<SourceIndiceType>(),
+                                                   DataType::TypeToString<TargetIndiceType>());
+                UnrecoverableError(error_message);
+            }
+            SparseVecRef<TargetValueType, TargetIndiceType> target_sparse_ref{static_cast<i32>(source_nnz),
+                                                                              target_indice_tmp_ptr.get(),
+                                                                              target_value_tmp_ptr.get()};
+            target.file_offset_ = tgt_vec_buffer->AppendSparse(target_sparse_ref);
+        }
     }
 }
 
@@ -156,13 +149,12 @@ void SparseTryCastToSparseFunT4(const SparseInfo *source_info,
                                 const SparseInfo *target_info,
                                 SparseT &target,
                                 ColumnVector *target_vector_ptr) {
-    SparseTryCastToSparseFunInner<TargetValueType, TargetIndiceType, SourceValueType, SourceIndiceType>(
-        source_info,
-        source,
-        source_vector_ptr->buffer_->fix_heap_mgr_.get(),
-        target_info,
-        target,
-        target_vector_ptr->buffer_->fix_heap_mgr_.get());
+    SparseTryCastToSparseFunInner<TargetValueType, TargetIndiceType, SourceValueType, SourceIndiceType>(source_info,
+                                                                                                        source,
+                                                                                                        source_vector_ptr->buffer_.get(),
+                                                                                                        target_info,
+                                                                                                        target,
+                                                                                                        target_vector_ptr->buffer_.get());
 }
 
 template <typename TargetValueType, typename TargetIndiceType, typename SourceValueType>
@@ -228,17 +220,17 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
             String error_message = "Unimplemented";
             UnrecoverableError(error_message);
         }
+        case kElemUInt8: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, u8>(source_info,
+                                                                              source,
+                                                                              source_vector_ptr,
+                                                                              target_info,
+                                                                              target,
+                                                                              target_vector_ptr);
+            break;
+        }
         case kElemInt8: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, TinyIntT>(source_info,
-                                                                                   source,
-                                                                                   source_vector_ptr,
-                                                                                   target_info,
-                                                                                   target,
-                                                                                   target_vector_ptr);
-            break;  
-        }
-        case kElemInt16: {
-            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, SmallIntT>(source_info,
                                                                                     source,
                                                                                     source_vector_ptr,
                                                                                     target_info,
@@ -246,22 +238,31 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                                                                     target_vector_ptr);
             break;
         }
+        case kElemInt16: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, SmallIntT>(source_info,
+                                                                                     source,
+                                                                                     source_vector_ptr,
+                                                                                     target_info,
+                                                                                     target,
+                                                                                     target_vector_ptr);
+            break;
+        }
         case kElemInt32: {
             SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, IntegerT>(source_info,
+                                                                                    source,
+                                                                                    source_vector_ptr,
+                                                                                    target_info,
+                                                                                    target,
+                                                                                    target_vector_ptr);
+            break;
+        }
+        case kElemInt64: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, BigIntT>(source_info,
                                                                                    source,
                                                                                    source_vector_ptr,
                                                                                    target_info,
                                                                                    target,
                                                                                    target_vector_ptr);
-            break;
-        }
-        case kElemInt64: {
-            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, BigIntT>(source_info,
-                                                                                  source,
-                                                                                  source_vector_ptr,
-                                                                                  target_info,
-                                                                                  target,
-                                                                                  target_vector_ptr);
             break;
         }
         case kElemFloat: {
@@ -280,6 +281,24 @@ void SparseTryCastToSparseFunT2(const SparseInfo *source_info,
                                                                                    target_info,
                                                                                    target,
                                                                                    target_vector_ptr);
+            break;
+        }
+        case kElemFloat16: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, Float16T>(source_info,
+                                                                                    source,
+                                                                                    source_vector_ptr,
+                                                                                    target_info,
+                                                                                    target,
+                                                                                    target_vector_ptr);
+            break;
+        }
+        case kElemBFloat16: {
+            SparseTryCastToSparseFunT3<TargetValueType, TargetIndiceType, BFloat16T>(source_info,
+                                                                                     source,
+                                                                                     source_vector_ptr,
+                                                                                     target_info,
+                                                                                     target,
+                                                                                     target_vector_ptr);
             break;
         }
         default: {
@@ -331,6 +350,10 @@ void SparseTryCastToSparseFun(const SparseInfo *source_info,
             SparseTryCastToSparseFunT1<BooleanT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
+        case kElemUInt8: {
+            SparseTryCastToSparseFunT1<u8>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
+            break;
+        }
         case kElemInt8: {
             SparseTryCastToSparseFunT1<TinyIntT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
@@ -355,6 +378,14 @@ void SparseTryCastToSparseFun(const SparseInfo *source_info,
             SparseTryCastToSparseFunT1<DoubleT>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
             break;
         }
+        case kElemFloat16: {
+            SparseTryCastToSparseFunT1<Float16T>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
+            break;
+        }
+        case kElemBFloat16: {
+            SparseTryCastToSparseFunT1<BFloat16T>(source_info, source, source_vector_ptr, target_info, target, target_vector_ptr);
+            break;
+        }
         default: {
             String error_message = "Unreachable code";
             UnrecoverableError(error_message);
@@ -376,7 +407,7 @@ bool SparseTryCastToSparse::Run(const SparseT &source,
     if (source_dim > target_dim) {
         RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
     }
-    if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kSparseHeap) {
+    if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
         String error_message = fmt::format("Sparse column vector should use kHeap VectorBuffer.");
         UnrecoverableError(error_message);
     }

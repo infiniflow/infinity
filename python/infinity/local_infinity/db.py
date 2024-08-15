@@ -7,7 +7,7 @@ from infinity.errors import ErrorCode
 from infinity.local_infinity.table import LocalTable
 from infinity.remote_thrift.utils import check_valid_name, name_validity_check
 from infinity.common import ConflictType, InfinityException
-from infinity.local_infinity.utils import select_res_to_polars
+from infinity.local_infinity.utils import select_res_to_polars, get_local_constant_expr_from_python_value
 from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.embedded_infinity_ext import WrapColumnDef, WrapDataType, LogicalType, ConstraintType, LiteralType, WrapConstantExpr, \
     EmbeddingDataType, WrapEmbeddingType, WrapSparseType, WrapIndexInfo
@@ -18,33 +18,12 @@ def get_constant_expr(column_info):
     if "default" in column_info:
         default = column_info["default"]
 
-    constant_expression = WrapConstantExpr()
     if default is None:
+        constant_expression = WrapConstantExpr()
         constant_expression.literal_type = LiteralType.kNull
         return constant_expression
     else:
-        if isinstance(default, str):
-            constant_expression.literal_type = LiteralType.kString
-            constant_expression.str_value = default
-
-        elif isinstance(default, int):
-            constant_expression.literal_type = LiteralType.kInteger
-            constant_expression.i64_value = default
-
-        elif isinstance(default, float) or isinstance(default, np.float32):
-            constant_expression.literal_type = LiteralType.kDouble
-            constant_expression.f64_value = default
-
-        elif isinstance(default, list):
-            if isinstance(default[0], int):
-                constant_expression.literal_type = LiteralType.kIntegerArray
-                constant_expression.i64_array_value = default
-            elif isinstance(default[0], float):
-                constant_expression.literal_type = LiteralType.kDoubleArray
-                constant_expression.f64_array_value = default
-        else:
-            raise InfinityException(3069, "Invalid constant expression")
-        return constant_expression
+        return get_local_constant_expr_from_python_value(default)
 
 def get_ordinary_info(column_info, column_defs, column_name, index):
     # "c1": {"type": "int", "constraints":["primary key", ...], "default": 1/"asdf"/[1,2]/...}
@@ -53,46 +32,89 @@ def get_ordinary_info(column_info, column_defs, column_name, index):
     proto_column_def = WrapColumnDef()
     proto_column_def.id = index
     proto_column_def.column_name = column_name
+    proto_column_def.column_type.logical_type = LogicalType.kInvalid
 
-    proto_column_type = WrapDataType()
-    datatype = column_info["type"]
-    if datatype == "int8":
-        proto_column_type.logical_type = LogicalType.kTinyInt
-    elif datatype == "int16":
-        proto_column_type.logical_type = LogicalType.kSmallInt
-    elif datatype == "int32" or datatype == "int" or datatype == "integer":
-        proto_column_type.logical_type = LogicalType.kInteger
-    elif datatype == "int64":
-        proto_column_type.logical_type = LogicalType.kBigInt
-    elif datatype == "int128":
-        proto_column_type.logical_type = LogicalType.kHugeInt
-    elif datatype == "float" or datatype == "float32":
-        proto_column_type.logical_type = LogicalType.kFloat
-    elif datatype == "double" or datatype == "float64":
-        proto_column_type.logical_type = LogicalType.kDouble
-    elif datatype == "varchar":
-        proto_column_type.logical_type = LogicalType.kVarchar
-        # proto_column_type.physical_type = ttypes.VarcharType()
-    elif datatype == "bool":
-        proto_column_type.logical_type = LogicalType.kBoolean
-    else:
-        raise InfinityException(3051, f"Unknown datatype: {datatype}")
+    for key, value in column_info.items():
+        lower_key = key.lower()
+        match lower_key:
+            case "type":
+                datatype = value.lower()
+                column_big_info = [item.strip() for item in datatype.split(",")]
+                column_big_info_first_str = column_big_info[0].lower()
+                if column_big_info_first_str == "vector" or column_big_info_first_str == "tensor" or column_big_info_first_str == "tensorarray":
+                    return get_embedding_info(column_info, column_defs, column_name, index)
+                elif column_big_info_first_str == "sparse":
+                    return get_sparse_info(column_info, column_defs, column_name, index)
+                else:
+                    pass
 
-    # process constraints
-    proto_column_def.column_type = proto_column_type
-    if "constraints" in column_info:
-        constraints = column_info["constraints"]
-        for constraint in constraints:
-            if constraint == "null":
-                proto_column_def.constraints.add(ConstraintType.kNull)
-            elif constraint == "not null":
-                proto_column_def.constraints.add(ConstraintType.kNotNull)
-            elif constraint == "primary key":
-                proto_column_def.constraints.add(ConstraintType.kPrimaryKey)
-            elif constraint == "unique":
-                proto_column_def.constraints.add(ConstraintType.kUnique)
-            else:
-                raise InfinityException(3055, f"Unknown constraint: {constraint}")
+                proto_column_type = WrapDataType()
+                match datatype:
+                    case "int8":
+                        proto_column_type.logical_type = LogicalType.kTinyInt
+                    case "int16":
+                        proto_column_type.logical_type = LogicalType.kSmallInt
+                    case "int32":
+                        proto_column_type.logical_type = LogicalType.kInteger
+                    case "int":
+                        proto_column_type.logical_type = LogicalType.kInteger
+                    case "integer":
+                        proto_column_type.logical_type = LogicalType.kInteger
+                    case "int64":
+                        proto_column_type.logical_type = LogicalType.kBigInt
+                    case "int128":
+                        proto_column_type.logical_type = LogicalType.kHugeInt
+                    case "float":
+                        proto_column_type.logical_type = LogicalType.kFloat
+                    case "float32":
+                        proto_column_type.logical_type = LogicalType.kFloat
+                    case "double":
+                        proto_column_type.logical_type = LogicalType.kDouble
+                    case "float64":
+                        proto_column_type.logical_type = LogicalType.kDouble
+                    case "float16":
+                        proto_column_type.logical_type = LogicalType.kFloat16
+                    case "bfloat16":
+                        proto_column_type.logical_type = LogicalType.kBFloat16
+                    case "varchar":
+                        proto_column_type.logical_type = LogicalType.kVarchar
+                    case "bool":
+                        proto_column_type.logical_type = LogicalType.kBoolean
+                    case _:
+                        raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown datatype: {datatype}")
+                proto_column_def.column_type = proto_column_type
+
+            case "constraints":
+                # process constraints
+                constraints = value
+                for constraint in constraints:
+                    constraint = constraint.lower()
+                    match constraint:
+                        case "null":
+                            if ConstraintType.kNull not in proto_column_def.constraints:
+                                proto_column_def.constraints.add(ConstraintType.kNull)
+                            else:
+                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                        case "not null":
+                            if ConstraintType.kNotNull not in proto_column_def.constraints:
+                                proto_column_def.constraints.add(ConstraintType.kNotNull)
+                            else:
+                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                        case "primary key":
+                            if ConstraintType.kPrimaryKey not in proto_column_def.constraints:
+                                proto_column_def.constraints.add(ConstraintType.kPrimaryKey)
+                            else:
+                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                        case "unique":
+                            if ConstraintType.kUnique not in proto_column_def.constraints:
+                                proto_column_def.constraints.add(ConstraintType.kUnique)
+                            else:
+                                raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Duplicated constraint: {constraint}")
+                        case _:
+                            raise InfinityException(ErrorCode.INVALID_CONSTRAINT_TYPE, f"Unknown constraint: {constraint}")
+
+    if proto_column_def.column_type.logical_type is None:
+        raise InfinityException(ErrorCode.NO_COLUMN_DEFINED, f"Column definition without data type")
 
     proto_column_def.constant_expr = get_constant_expr(column_info)
 
@@ -110,32 +132,42 @@ def get_embedding_info(column_info, column_defs, column_name, index):
     proto_column_def.column_name = column_name
     column_type = WrapDataType()
 
-    if column_big_info[0] == "vector":
-        column_type.logical_type = LogicalType.kEmbedding
-    elif column_big_info[0] == "tensor":
-        column_type.logical_type = LogicalType.kTensor
-    elif column_big_info[0] == "tensorarray":
-        column_type.logical_type = LogicalType.kTensorArray
-    else:
-        raise InfinityException(3053, f"Unknown column type: {column_big_info[0]}")
+    match column_big_info[0]:
+        case "vector":
+            column_type.logical_type = LogicalType.kEmbedding
+        case "tensor":
+            column_type.logical_type = LogicalType.kTensor
+        case "tensorarray":
+            column_type.logical_type = LogicalType.kTensorArray
+        case _:
+            raise InfinityException(ErrorCode.INVALID_DATA_TYPE, f"Unknown data type: {column_big_info[0]}")
 
     embedding_type = WrapEmbeddingType()
-    if element_type == "bit":
-        embedding_type.element_type = EmbeddingDataType.kElemBit
-    elif element_type == "float32" or element_type == "float":
-        embedding_type.element_type = EmbeddingDataType.kElemFloat
-    elif element_type == "float64" or element_type == "double":
-        embedding_type.element_type = EmbeddingDataType.kElemDouble
-    elif element_type == "int8":
-        embedding_type.element_type = EmbeddingDataType.kElemInt8
-    elif element_type == "int16":
-        embedding_type.element_type = EmbeddingDataType.kElemInt16
-    elif element_type == "int32" or element_type == "int":
-        embedding_type.element_type = EmbeddingDataType.kElemInt32
-    elif element_type == "int64":
-        embedding_type.element_type = EmbeddingDataType.kElemInt64
-    else:
-        raise InfinityException(3057, f"Unknown element type: {element_type}")
+
+    match element_type:
+        case "bit":
+            embedding_type.element_type = EmbeddingDataType.kElemBit
+        case "float32" | "float":
+            embedding_type.element_type = EmbeddingDataType.kElemFloat
+        case "float64" | "double":
+            embedding_type.element_type = EmbeddingDataType.kElemDouble
+        case "float16":
+            embedding_type.element_type = EmbeddingDataType.kElemFloat16
+        case "bfloat16":
+            embedding_type.element_type = EmbeddingDataType.kElemBFloat16
+        case "uint8":
+            embedding_type.element_type = EmbeddingDataType.kElemUInt8
+        case "int8":
+            embedding_type.element_type = EmbeddingDataType.kElemInt8
+        case "int16":
+            embedding_type.element_type = EmbeddingDataType.kElemInt16
+        case "int32" | "int":
+            embedding_type.element_type = EmbeddingDataType.kElemInt32
+        case "int64":
+            embedding_type.element_type = EmbeddingDataType.kElemInt64
+        case _:
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
+
     embedding_type.dimension = int(length)
     assert isinstance(embedding_type, WrapEmbeddingType)
     assert embedding_type.element_type is not None
@@ -164,7 +196,7 @@ def get_sparse_info(column_info, column_defs, column_name, index):
     if column_big_info[0] == "sparse":
         column_type.logical_type = LogicalType.kSparse
     else:
-        raise InfinityException(3053, f"Unknown column type: {column_big_info[0]}")
+        raise InfinityException(ErrorCode.FTS_INDEX_NOT_EXIST, f"Unknown column type: {column_big_info[0]}")
 
     sparse_type = WrapSparseType()
     # embedding_type = WrapEmbeddingType()
@@ -174,6 +206,12 @@ def get_sparse_info(column_info, column_defs, column_name, index):
         sparse_type.element_type = EmbeddingDataType.kElemFloat
     elif element_type == "float64" or element_type == "double":
         sparse_type.element_type = EmbeddingDataType.kElemDouble
+    elif element_type == "float16":
+        sparse_type.element_type = EmbeddingDataType.kElemFloat16
+    elif element_type == "bfloat16":
+        sparse_type.element_type = EmbeddingDataType.kElemBFloat16
+    elif element_type == "uint8":
+        sparse_type.element_type = EmbeddingDataType.kElemUInt8
     elif element_type == "int8":
         sparse_type.element_type = EmbeddingDataType.kElemInt8
     elif element_type == "int16":
@@ -183,7 +221,7 @@ def get_sparse_info(column_info, column_defs, column_name, index):
     elif element_type == "int64":
         sparse_type.element_type = EmbeddingDataType.kElemInt64
     else:
-        raise InfinityException(3057, f"Unknown element type: {element_type}")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown element type: {element_type}")
     
     if index_type == "int8":
         sparse_type.index_type = EmbeddingDataType.kElemInt8
@@ -194,7 +232,7 @@ def get_sparse_info(column_info, column_defs, column_name, index):
     elif index_type == "int64":
         sparse_type.index_type = EmbeddingDataType.kElemInt64
     else:
-        raise InfinityException(3057, f"Unknown index type: {index_type}")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Unknown index type: {index_type}")
     sparse_type.dimension = int(length)
 
     column_type.sparse_type = sparse_type
@@ -229,13 +267,7 @@ class LocalDatabase(Database, ABC):
         column_defs = []
         for index, (column_name, column_info) in enumerate(columns_definition.items()):
             check_valid_name(column_name, "Column")
-            column_big_info = [item.strip() for item in column_info["type"].split(",")]
-            if column_big_info[0] == "vector" or column_big_info[0] == "tensor" or column_big_info[0] == "tensorarray":
-                get_embedding_info(column_info, column_defs, column_name, index)
-            elif column_big_info[0] == "sparse":
-                get_sparse_info(column_info, column_defs, column_name, index)
-            else:  # numeric or varchar
-                get_ordinary_info(column_info, column_defs, column_name, index)
+            get_ordinary_info(column_info, column_defs, column_name, index)
 
         create_table_conflict: LocalConflictType
         if conflict_type == ConflictType.Error:
@@ -245,7 +277,7 @@ class LocalDatabase(Database, ABC):
         elif conflict_type == ConflictType.Replace:
             create_table_conflict = LocalConflictType.kReplace
         else:
-            raise InfinityException(3066, f"Invalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
         res = self._conn.create_table(db_name=self._db_name, table_name=table_name,
                                       column_defs=column_defs,
                                       conflict_type=create_table_conflict)
@@ -263,7 +295,7 @@ class LocalDatabase(Database, ABC):
         elif conflict_type == ConflictType.Ignore:
             drop_table_conflict = LocalConflictType.kIgnore
         else:
-            raise InfinityException(3066, "nvalid conflict type")
+            raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, "nvalid conflict type")
         res = self._conn.drop_table(db_name=self._db_name, table_name=table_name, conflict_type=drop_table_conflict)
         if res.error_code == ErrorCode.OK or res.error_code == ErrorCode.TABLE_NOT_EXIST:
             return res

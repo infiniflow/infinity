@@ -1,5 +1,5 @@
 [general]
-version                 = "0.2.1"
+version                 = "0.3.0"
 time_zone                = "utc-9"
 cpu_limit               = 2
 
@@ -17,7 +17,7 @@ log_to_stdout           = true
 log_file_max_size            = "2GB"
 log_file_rotate_count   = 3
 
-# trace/info/warning/error/critical 5 log levels, default: info
+# trace/debug/info/warning/error/critical 6 log levels, default: info
 log_level               = "trace"
 
 [storage]
@@ -25,7 +25,9 @@ data_dir                = "/var/infinity/data"
 
 [buffer]
 buffer_manager_size        = "3GB"
+lru_num                  = 8
 temp_dir                = "/tmp"
+memindex_memory_quota   = "2GB"
 
 [wal]
 wal_dir                 = "/var/infinity/wal"

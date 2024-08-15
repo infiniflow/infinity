@@ -32,6 +32,7 @@ import infinity_exception;
 import varchar_layout;
 import logger;
 import data_file_worker;
+import var_file_worker;
 import catalog_delta_entry;
 import internal_types;
 import data_type;
@@ -105,19 +106,26 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
 
     column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker));
 
-    column_entry->outline_buffers_group_0_.reserve(next_outline_idx_0);
-    for (u32 outline_idx = 0; outline_idx < next_outline_idx_0; ++outline_idx) {
-        // FIXME: not use default value
-        SizeT buffer_size = 0;
-        if (column_type->type() == LogicalType::kTensor) {
-            buffer_size = DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE;
-        } else {
-            buffer_size = DEFAULT_FIXLEN_CHUNK_SIZE;
-        }
-        auto outline_buffer_file_worker =
-            MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(0, outline_idx), buffer_size);
+    if (column_type->type() == LogicalType::kVarchar) {
+        SizeT buffer_size = last_chunk_offset_0;
+        auto outline_buffer_file_worker = MakeUnique<VarFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(0, 0), buffer_size);
         auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker));
         column_entry->outline_buffers_group_0_.push_back(buffer_obj);
+    } else {
+        column_entry->outline_buffers_group_0_.reserve(next_outline_idx_0);
+        for (u32 outline_idx = 0; outline_idx < next_outline_idx_0; ++outline_idx) {
+            // FIXME: not use default value
+            SizeT buffer_size = 0;
+            if (column_type->type() == LogicalType::kTensor) {
+                buffer_size = DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE;
+            } else {
+                buffer_size = DEFAULT_FIXLEN_CHUNK_SIZE;
+            }
+            auto outline_buffer_file_worker =
+                MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(0, outline_idx), buffer_size);
+            auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker));
+            column_entry->outline_buffers_group_0_.push_back(buffer_obj);
+        }
     }
     column_entry->outline_buffers_group_1_.reserve(next_outline_idx_1);
     for (u32 outline_idx = 0; outline_idx < next_outline_idx_1; ++outline_idx) {
@@ -140,7 +148,13 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
     return column_entry;
 }
 
-ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
+ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) { return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadWrite); }
+
+ColumnVector BlockColumnEntry::GetConstColumnVector(BufferManager *buffer_mgr) {
+    return GetColumnVectorInner(buffer_mgr, ColumnVectorTipe::kReadOnly);
+}
+
+ColumnVector BlockColumnEntry::GetColumnVectorInner(BufferManager *buffer_mgr, const ColumnVectorTipe tipe) {
     if (this->buffer_ == nullptr) {
         // Get buffer handle from buffer manager
         auto file_worker = MakeUnique<DataFileWorker>(this->base_dir_, this->file_name_, 0);
@@ -148,7 +162,7 @@ ColumnVector BlockColumnEntry::GetColumnVector(BufferManager *buffer_mgr) {
     }
 
     ColumnVector column_vector(column_type_);
-    column_vector.Initialize(buffer_mgr, this, block_entry_->row_count());
+    column_vector.Initialize(buffer_mgr, this, block_entry_->row_count(), tipe);
     return column_vector;
 }
 
@@ -179,9 +193,9 @@ void BlockColumnEntry::AppendOutlineBuffer(const u32 buffer_group_id, BufferObj 
 BufferObj *BlockColumnEntry::GetOutlineBuffer(const u32 buffer_group_id, const SizeT idx) const {
     std::shared_lock lock(mutex_);
     if (buffer_group_id == 0) {
-        return outline_buffers_group_0_[idx];
+        return outline_buffers_group_0_.empty() ? nullptr : outline_buffers_group_0_[idx];
     } else if (buffer_group_id == 1) {
-        return outline_buffers_group_1_[idx];
+        return outline_buffers_group_1_.empty() ? nullptr : outline_buffers_group_1_[idx];
     } else {
         String error_message = "Invalid buffer group id";
         UnrecoverableError(error_message);
@@ -247,6 +261,8 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
         case kDecimal:
         case kFloat:
         case kDouble:
+        case kFloat16:
+        case kBFloat16:
         case kDate:
         case kTime:
         case kDateTime:

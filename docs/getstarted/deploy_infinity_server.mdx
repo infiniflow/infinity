@@ -30,7 +30,7 @@ This approach allows you to embed Infinity as a module in a Python application. 
 ### Install Infinity as a module
 
 ```
-pip install infinity-sdk==0.2.1
+pip install infinity-sdk==0.3.0.dev5
 ```
 
 ### Create an Infinity object
@@ -73,7 +73,7 @@ This section provides instructions on deploying the Infinity using Docker on Lin
 ```bash
 sudo mkdir -p /var/infinity && sudo chown -R $USER /var/infinity
 docker pull infiniflow/infinity:nightly
-docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly
+docker run -d --name infinity -v /var/infinity/:/var/infinity --ulimit nofile=500000:500000 --network=host infiniflow/infinity:nightly -f /var/infinity/infinity_conf.toml
 ```
   </TabItem>
   <TabItem value="windows">
@@ -98,7 +98,7 @@ If you are on Windows 10+, you must enable WSL or WSL2 to deploy Infinity using 
 ### Install Infinity client
 
 ```
-pip install infinity-sdk==0.2.1
+pip install infinity-sdk==0.3.0.dev5
 ```
 
 ### Connect to Infinity Server 
@@ -140,14 +140,29 @@ This section provides instructions on deploying Infinity using binary package on
 
 Fedora/RHEL/CentOS/OpenSUSE
 ```bash
-sudo rpm -i infinity-0.2.1-x86_64.rpm
+sudo rpm -i infinity-0.3.0.dev5-x86_64.rpm
+```
+
+```bash
 sudo systemctl start infinity
 ```
+
   </TabItem>
   <TabItem value="ubuntu">
 
 ```bash
-sudo dpkg -i infinity-0.2.1-x86_64.deb
+sudo dpkg -i infinity-0.3.0.dev5-x86_64.deb
+```
+
+```bash
+sudo chown -R $USER /var/infinity
+```
+
+```bash 
+ulimit -n 500000
+```
+
+```bash
 sudo systemctl start infinity
 ```
 
@@ -157,7 +172,7 @@ sudo systemctl start infinity
 ### Install Infinity client
 
 ```
-pip install infinity-sdk==0.2.1
+pip install infinity-sdk==0.3.0.dev5
 ```
 
 ### Connect to Infinity Server 

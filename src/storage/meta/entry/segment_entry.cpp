@@ -237,6 +237,39 @@ bool SegmentEntry::CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp ch
     return block_entry->CheckRowVisible(block_offset, check_ts, check_append);
 }
 
+void SegmentEntry::CheckRowsVisible(Vector<u32> &segment_offsets, TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
+    if (first_delete_ts_ >= check_ts)
+        return;
+
+    Vector<u32> segment_offsets2;
+    segment_offsets2.reserve(segment_offsets.size());
+    Map<BlockID, Vector<u32>> block_offsets_map;
+    for (const auto segment_offset : segment_offsets) {
+        BlockID block_id = segment_offset >> BLOCK_OFFSET_SHIFT;
+        block_offsets_map[block_id].push_back(segment_offset);
+    }
+
+    for (auto &[block_id, block_offsets] : block_offsets_map) {
+        auto *block_entry = GetBlockEntryByID(block_id).get();
+        if (block_entry == nullptr || block_entry->commit_ts_ > check_ts) {
+            continue;
+        }
+        block_entry->CheckRowsVisible(block_offsets, check_ts);
+        std::copy(block_offsets.begin(), block_offsets.end(), std::back_inserter(segment_offsets2));
+    }
+    segment_offsets = std::move(segment_offsets2);
+}
+
+void SegmentEntry::CheckRowsVisible(Bitmask &segment_offsets, TxnTimeStamp check_ts) const {
+    std::shared_lock lock(rw_locker_);
+    if (first_delete_ts_ >= check_ts)
+        return;
+    for (auto &block_entry : block_entries_) {
+        block_entry->CheckRowsVisible(segment_offsets, check_ts);
+    }
+}
+
 bool SegmentEntry::CheckVisible(Txn *txn) const {
     TxnTimeStamp begin_ts = txn->BeginTS();
     std::shared_lock lock(rw_locker_);
@@ -394,15 +427,14 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
                                  const DeleteState *delete_state) {
     std::unique_lock w_lock(rw_locker_);
     if (status_ == SegmentStatus::kDeprecated) {
-        String error_message = "Assert: Should not commit delete to deprecated segment.";
-        UnrecoverableError(error_message);
+        return;
     }
 
     if (delete_state != nullptr) {
         auto iter = delete_state->rows_.find(segment_id_);
         if (iter != delete_state->rows_.end()) {
             const auto &block_row_hashmap = iter->second;
-            if (this->first_delete_ts_ == UNCOMMIT_TS) {
+            if (!block_row_hashmap.empty() && this->first_delete_ts_ == UNCOMMIT_TS) {
                 this->first_delete_ts_ = commit_ts;
             }
             delete_txns_.erase(txn_id);
@@ -418,8 +450,8 @@ void SegmentEntry::CommitSegment(TransactionID txn_id,
                         segment_offsets.push_back(block_id * DEFAULT_BLOCK_CAPACITY + block_offset);
                     }
                 }
-                compact_state_data_->AddToDelete(segment_id_, segment_offsets);
                 LOG_INFO(fmt::format("Append {} rows to to_delete_list in compact list", segment_offsets.size()));
+                compact_state_data_->AddToDelete(commit_ts, segment_id_, std::move(segment_offsets));
             }
         }
     }
@@ -603,5 +635,9 @@ String SegmentEntry::SegmentStatusToString(const SegmentStatus &type) {
 }
 
 SharedPtr<String> SegmentEntry::base_dir() const { return table_entry_->base_dir(); }
+
+String SegmentEntry::ToString() const {
+    return fmt::format("Segment path: {}, id: {}, row_count: {}, block_count: {}, status: {}", *segment_dir_, segment_id_, row_count_, block_entries_.size(), SegmentStatusToString(status_));
+}
 
 } // namespace infinity

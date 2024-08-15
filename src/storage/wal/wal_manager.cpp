@@ -178,7 +178,7 @@ void WalManager::Flush() {
                 this->SwapWalFile(max_commit_ts_);
             }
 
-            for(const SharedPtr<WalCmd>& cmd: entry->cmds_) {
+            for (const SharedPtr<WalCmd> &cmd : entry->cmds_) {
                 LOG_TRACE(fmt::format("WAL CMD: {}", cmd->ToString()));
             }
 
@@ -270,17 +270,26 @@ void WalManager::Checkpoint(bool is_full_checkpoint) {
     TxnManager *txn_mgr = storage_->txn_manager();
     Txn *txn = txn_mgr->BeginTxn(MakeUnique<String>("Full or delta checkpoint"), true /*is_checkpoint*/);
 
-    this->CheckpointInner(is_full_checkpoint, txn);
+    if(is_full_checkpoint) {
+        FullCheckpointInner(txn);
+    } else {
+        DeltaCheckpointInner(txn);
+    }
+
     txn_mgr->CommitTxn(txn);
 }
 
 void WalManager::Checkpoint(ForceCheckpointTask *ckp_task) {
     bool is_full_checkpoint = ckp_task->is_full_checkpoint_;
 
-    this->CheckpointInner(is_full_checkpoint, ckp_task->txn_);
+    if(is_full_checkpoint) {
+        FullCheckpointInner(ckp_task->txn_);
+    } else {
+        DeltaCheckpointInner(ckp_task->txn_);
+    }
 }
 
-void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn) {
+void WalManager::FullCheckpointInner(Txn *txn) {
     DeferFn defer([&] { checkpoint_in_progress_.store(false); });
 
     TxnTimeStamp last_ckp_ts = last_ckp_ts_;
@@ -289,42 +298,28 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn) {
     max_commit_ts = std::min(max_commit_ts, txn->BeginTS()); // txn commit after txn->BeginTS() should be ignored
     // wal_size may be larger than the actual size. but it's ok. it only makes the swap of wal file a little bit later.
 
-    if (is_full_checkpoint) {
-        if (max_commit_ts == last_full_ckp_ts) {
-            LOG_TRACE(fmt::format("Skip full checkpoint because the max_commit_ts {} is the same as the last full checkpoint", max_commit_ts));
-            return;
-        }
-        if ((last_full_ckp_ts != UNCOMMIT_TS && last_full_ckp_ts >= max_commit_ts) || (last_ckp_ts != UNCOMMIT_TS && last_ckp_ts > max_commit_ts)) {
-            String error_msg = fmt::format("last_full_ckp_ts {} >= max_commit_ts {} or last_ckp_ts {} > max_commit_ts {}",
-                                           last_full_ckp_ts,
-                                           max_commit_ts,
-                                           last_ckp_ts,
-                                           max_commit_ts);
-            UnrecoverableError(error_msg);
-        }
-    } else {
-        if (max_commit_ts == last_ckp_ts) {
-            LOG_TRACE(fmt::format("Skip delta checkpoint because the max_commit_ts {} is the same as the last checkpoint", max_commit_ts));
-            return;
-        }
-        if (last_ckp_ts != UNCOMMIT_TS && last_ckp_ts >= max_commit_ts) {
-            String error_message = fmt::format("last_ckp_ts {} >= max_commit_ts {}", last_ckp_ts, max_commit_ts);
-            UnrecoverableError(error_message);
-        }
+    if (max_commit_ts == last_full_ckp_ts) {
+        LOG_TRACE(fmt::format("Skip full checkpoint because the max_commit_ts {} is the same as the last full checkpoint", max_commit_ts));
+        return;
     }
+    if ((last_full_ckp_ts != UNCOMMIT_TS && last_full_ckp_ts >= max_commit_ts) || (last_ckp_ts != UNCOMMIT_TS && last_ckp_ts > max_commit_ts)) {
+        String error_msg = fmt::format("last_full_ckp_ts {} >= max_commit_ts {} or last_ckp_ts {} > max_commit_ts {}",
+                                       last_full_ckp_ts,
+                                       max_commit_ts,
+                                       last_ckp_ts,
+                                       max_commit_ts);
+        UnrecoverableError(error_msg);
+    }
+
     try {
-        LOG_DEBUG(fmt::format("{} Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
-                              is_full_checkpoint ? "FULL" : "DELTA",
+        LOG_DEBUG(fmt::format("Full Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
                               txn->TxnID(),
                               txn->BeginTS(),
                               max_commit_ts));
-
-        if (!txn->Checkpoint(max_commit_ts, is_full_checkpoint)) {
-            return;
-        }
+        txn->FullCheckpoint(max_commit_ts);
         SetLastCkpWalSize(wal_size);
 
-        LOG_DEBUG(fmt::format("{} Checkpoint is done for commit_ts <= {}", is_full_checkpoint ? "FULL" : "DELTA", max_commit_ts));
+        LOG_DEBUG(fmt::format("Full Checkpoint is done for commit_ts <= {}", max_commit_ts));
     } catch (RecoverableException &e) {
         LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
     } catch (UnrecoverableException &e) {
@@ -333,11 +328,52 @@ void WalManager::CheckpointInner(bool is_full_checkpoint, Txn *txn) {
     }
     last_ckp_ts_ = max_commit_ts;
     WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
-    if (is_full_checkpoint) {
-        last_full_ckp_ts_ = max_commit_ts;
-        const auto &catalog_dir = *storage_->catalog()->CatalogDir();
-        CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
+    last_full_ckp_ts_ = max_commit_ts;
+    const auto &catalog_dir = *storage_->catalog()->CatalogDir();
+    CatalogFile::RecycleCatalogFile(max_commit_ts, catalog_dir);
+}
+
+void WalManager::DeltaCheckpointInner(Txn *txn) {
+    DeferFn defer([&] { checkpoint_in_progress_.store(false); });
+
+    TxnTimeStamp last_ckp_ts = last_ckp_ts_;
+    auto [max_commit_ts, wal_size] = GetCommitState();
+    max_commit_ts = std::min(max_commit_ts, txn->BeginTS()); // txn commit after txn->BeginTS() should be ignored
+    // wal_size may be larger than the actual size. but it's ok. it only makes the swap of wal file a little bit later.
+
+    if (max_commit_ts == last_ckp_ts) {
+        LOG_TRACE(fmt::format("Skip delta checkpoint because the max_commit_ts {} is the same as the last checkpoint", max_commit_ts));
+        return;
     }
+    if (last_ckp_ts != UNCOMMIT_TS && last_ckp_ts >= max_commit_ts) {
+        String error_message = fmt::format("last_ckp_ts {} >= max_commit_ts {}", last_ckp_ts, max_commit_ts);
+        UnrecoverableError(error_message);
+    }
+
+    try {
+        LOG_DEBUG(fmt::format("Delta Checkpoint Txn txn_id: {}, begin_ts: {}, max_commit_ts {}",
+                              txn->TxnID(),
+                              txn->BeginTS(),
+                              max_commit_ts));
+        TxnTimeStamp new_max_commit_ts = 0;
+        if (!txn->DeltaCheckpoint(last_ckp_ts, new_max_commit_ts)) {
+            return;
+        }
+        if (new_max_commit_ts == 0) {
+            UnrecoverableError(fmt::format("new_max_commit_ts = 0"));
+        }
+        max_commit_ts = new_max_commit_ts;
+        SetLastCkpWalSize(wal_size);
+
+        LOG_DEBUG(fmt::format("Delta Checkpoint is done for commit_ts <= {}", max_commit_ts));
+    } catch (RecoverableException &e) {
+        LOG_ERROR(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+    } catch (UnrecoverableException &e) {
+        LOG_CRITICAL(fmt::format("WalManager::Checkpoint failed: {}", e.what()));
+        throw e;
+    }
+    last_ckp_ts_ = max_commit_ts;
+    WalFile::RecycleWalFile(max_commit_ts, wal_dir_);
 }
 
 void WalManager::UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size) {
@@ -447,7 +483,7 @@ i64 WalManager::ReplayWalFile() {
     Vector<String> wal_list{};
     {
         auto [temp_wal_info, wal_infos] = WalFile::ParseWalFilenames(wal_dir_);
-        if (!wal_infos.empty()) {
+        if (wal_infos.size() > 1) {
             std::sort(wal_infos.begin(), wal_infos.end(), [](const WalFileInfo &a, const WalFileInfo &b) {
                 return a.max_commit_ts_ > b.max_commit_ts_;
             });
@@ -532,8 +568,8 @@ i64 WalManager::ReplayWalFile() {
         String error_message = fmt::format("Wal Replay: Parse catalog file failed, catalog_dir: {}", catalog_dir);
         UnrecoverableError(error_message);
     }
-    auto &[full_catalog_fileinfo, delta_catalog_fileinfos] = catalog_fileinfo.value();
-    storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfos, data_path_);
+    auto &[full_catalog_fileinfo, delta_catalog_fileinfo_array] = catalog_fileinfo.value();
+    storage_->AttachCatalog(full_catalog_fileinfo, delta_catalog_fileinfo_array, data_path_);
 
     // phase 3: replay the entries
     LOG_INFO(fmt::format("Replay phase 3: replay {} entries", replay_entries.size()));
@@ -1029,19 +1065,27 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
         UnrecoverableError(error_message);
     }
     SegmentIndexEntry *segment_index_entry = nullptr;
-    auto fake_txn = Txn::NewReplayTxn(storage_->buffer_manager(), storage_->txn_manager(), storage_->catalog(), txn_id, commit_ts);
     {
         auto &index_by_segment = table_index_entry->index_by_segment();
-        auto iter = index_by_segment.find(cmd.segment_id_);
-        if (iter == index_by_segment.end()) {
+
+        if (auto iter = index_by_segment.find(cmd.segment_id_); iter != index_by_segment.end()) {
+            segment_index_entry = iter->second.get();
+        } else {
             auto create_index_param =
                 SegmentIndexEntry::GetCreateIndexParam(table_index_entry->table_index_def(), 0 /*segment_offset*/, table_index_entry->column_def());
-            iter = index_by_segment
-                       .emplace(cmd.segment_id_,
-                                SegmentIndexEntry::NewIndexEntry(table_index_entry, cmd.segment_id_, fake_txn.get(), create_index_param.get()))
-                       .first;
+            auto segment_index_entry_ptr = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
+                                                                                         table_entry,
+                                                                                         cmd.segment_id_,
+                                                                                         buffer_mgr,
+                                                                                         commit_ts /*min_ts*/,
+                                                                                         commit_ts /*max_ts*/,
+                                                                                         0 /*next_chunk_id*/,
+                                                                                         txn_id /*txn_id*/,
+                                                                                         commit_ts /*begin_ts*/,
+                                                                                         commit_ts);
+            index_by_segment.emplace(cmd.segment_id_, segment_index_entry_ptr);
+            segment_index_entry = segment_index_entry_ptr.get();
         }
-        segment_index_entry = iter->second.get();
     }
 
     for (const auto &chunk_info : cmd.chunk_infos_) {
@@ -1053,6 +1097,12 @@ void WalManager::WalCmdDumpIndexReplay(WalCmdDumpIndex &cmd, TransactionID txn_i
                                                          commit_ts,
                                                          chunk_info.deprecate_ts_,
                                                          buffer_mgr);
+    }
+    for (ChunkID old_chunk_id : cmd.deprecate_ids_) {
+        auto *old_chunk = segment_index_entry->GetChunkIndexEntry(old_chunk_id);
+        if (old_chunk != nullptr) {
+            old_chunk->DeprecateChunk(commit_ts);
+        }
     }
 }
 

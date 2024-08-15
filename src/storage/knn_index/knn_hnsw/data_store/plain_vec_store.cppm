@@ -36,6 +36,7 @@ public:
     using This = PlainVecStoreMeta<DataType>;
     using StoreType = const DataType *;
     using QueryType = const DataType *;
+    using DistanceType = f32;
 
 private:
     PlainVecStoreMeta(SizeT dim) : dim_(dim) {}
@@ -52,6 +53,8 @@ public:
 
     static This Make(SizeT dim) { return This(dim); }
     static This Make(SizeT dim, bool) { return This(dim); }
+
+    SizeT GetSizeInBytes() const { return sizeof(SizeT); }
 
     void Save(FileHandler &file_handler) const { file_handler.Write(&dim_, sizeof(dim_)); }
 
@@ -84,20 +87,26 @@ private:
 public:
     PlainVecStoreInner() = default;
 
-    static This Make(SizeT max_vec_num, const Meta &meta) { return This(max_vec_num, meta); }
+    static This Make(SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+        mem_usage += sizeof(DataType) * max_vec_num * meta.dim();
+        return This(max_vec_num, meta);
+    }
+
+    SizeT GetSizeInBytes(SizeT cur_vec_num, const Meta &meta) const { return sizeof(DataType) * cur_vec_num * meta.dim(); }
 
     void Save(FileHandler &file_handler, SizeT cur_vec_num, const Meta &meta) const {
         file_handler.Write(ptr_.get(), sizeof(DataType) * cur_vec_num * meta.dim());
     }
 
-    static This Load(FileHandler &file_handler, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta) {
+    static This Load(FileHandler &file_handler, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
         assert(cur_vec_num <= max_vec_num);
         This ret(max_vec_num, meta);
         file_handler.Read(ret.ptr_.get(), sizeof(DataType) * cur_vec_num * meta.dim());
+        mem_usage += sizeof(DataType) * max_vec_num * meta.dim();
         return ret;
     }
 
-    void SetVec(SizeT idx, const DataType *vec, const Meta &meta) { Copy(vec, vec + meta.dim(), GetVecMut(idx, meta)); }
+    void SetVec(SizeT idx, const DataType *vec, const Meta &meta, SizeT &mem_usage) { Copy(vec, vec + meta.dim(), GetVecMut(idx, meta)); }
 
     const DataType *GetVec(SizeT idx, const Meta &meta) const { return ptr_.get() + idx * meta.dim(); }
 

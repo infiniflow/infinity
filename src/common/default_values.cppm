@@ -40,12 +40,14 @@ export {
     constexpr i64 MAX_VARCHAR_SIZE = 65536;
     constexpr i64 MAX_BLOB_SIZE = 65536L * 65536L;
     constexpr i64 MAX_BITMAP_SIZE = 65536;
-    constexpr i64 EMBEDDING_LIMIT = 65536;
+    constexpr i64 EMBEDDING_LIMIT = 16384;
     constexpr auto PG_MSG_BUFFER_SIZE = 4096u;
 
     // column vector related constants
     constexpr i64 MAX_BLOCK_CAPACITY = 65536L;
     constexpr i64 DEFAULT_BLOCK_CAPACITY = 8192;
+    constexpr u64 BLOCK_OFFSET_SHIFT = 13;    // it should be adjusted together with DEFAULT_BLOCK_CAPACITY
+    constexpr u64 BLOCK_OFFSET_MASK = 0x1FFF; // it should be adjusted together with DEFAULT_BLOCK_CAPACITY
     constexpr i64 MIN_BLOCK_CAPACITY = 8192;
     constexpr i16 INVALID_BLOCK_ID = std::numeric_limits<i16>::max();
     constexpr i64 MAX_BLOCK_COUNT_IN_SEGMENT = 65536L;
@@ -57,8 +59,9 @@ export {
     constexpr u64 MIN_VECTOR_CHUNK_SIZE = 4096UL;
     constexpr u64 MAX_VECTOR_CHUNK_SIZE = 1024 * 1024UL;
     constexpr u64 MAX_VECTOR_CHUNK_COUNT = std::numeric_limits<u64>::max();
+
     // Each row has one chunk.
-    constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 1024 * 1024; // 1MB
+    constexpr u64 DEFAULT_FIXLEN_CHUNK_SIZE = 65536L; // 1MB
     constexpr u64 DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE = 8192UL * 128UL * 8UL;
 
     // segment related constants
@@ -146,10 +149,17 @@ export {
     constexpr u32 EMVB_N_DOC_OUT_SECOND_STAGE_FACTOR = 20;
     constexpr f32 EMVB_THRESHOLD_FINAL = 0.0f;
 
+    // default diskann parameter
+    constexpr SizeT DISKANN_R = 16;
+    constexpr SizeT DISKANN_L = 200;
+    constexpr SizeT DISKANN_NUM_PQ_CHUNKS = 4;
+    constexpr SizeT DISKANN_NUM_PARTS = 1;
+
     // default hnsw parameter
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
     constexpr SizeT HNSW_EF = 200;
+    constexpr SizeT HNSW_BLOCK_SIZE = 8192;
 
     constexpr SizeT BMP_BLOCK_SIZE = 16;
 
@@ -166,12 +176,17 @@ export {
     constexpr u32 DEFAULT_MATCH_TENSOR_OPTION_TOP_N = 10;
     constexpr u32 DEFAULT_FUSION_OPTION_TOP_N = 100;
 
-    constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 4 * 1024lu * 1024lu * 1024lu; // 4Gib
+    constexpr SizeT DEFAULT_BUFFER_MANAGER_SIZE = 8 * 1024lu * 1024lu * 1024lu; // 8Gib
     constexpr SizeT DEFAULT_BUFFER_MANAGER_LRU_COUNT = 7;
-    constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "4GB"; // 4Gib
+    constexpr std::string_view DEFAULT_BUFFER_MANAGER_SIZE_STR = "8GB"; // 8Gib
+
+    constexpr SizeT DEFAULT_MEMINDEX_MEMORY_QUOTA = 4 * 1024lu * 1024lu * 1024lu; // 4GB
+    constexpr std::string_view DEFAULT_MEMINDEX_MEMORY_QUOTA_STR = "4GB"; // 4GB
 
     constexpr SizeT DEFAULT_LOG_FILE_SIZE = 64 * 1024lu * 1024lu; // 64MB
     constexpr std::string_view DEFAULT_LOG_FILE_SIZE_STR = "64MB"; // 64MB
+
+    constexpr SizeT INSERT_BATCH_ROW_LIMIT = 8192;
 
     // default persistence parameter
     constexpr std::string_view DEFAULT_PERSISTENCE_DIR = "";                        // Empty means disabled
@@ -209,6 +224,8 @@ export {
     constexpr std::string_view BUFFER_MANAGER_SIZE_OPTION_NAME = "buffer_manager_size";
     constexpr std::string_view LRU_NUM_OPTION_NAME = "lru_num";
     constexpr std::string_view TEMP_DIR_OPTION_NAME = "temp_dir";
+    constexpr std::string_view MEMINDEX_MEMORY_QUOTA_OPTION_NAME = "memindex_memory_quota";
+
     constexpr std::string_view WAL_DIR_OPTION_NAME = "wal_dir";
     constexpr std::string_view WAL_COMPACT_THRESHOLD_OPTION_NAME = "wal_compact_threshold";
     constexpr std::string_view FULL_CHECKPOINT_INTERVAL_OPTION_NAME = "full_checkpoint_interval";

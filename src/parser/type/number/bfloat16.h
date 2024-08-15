@@ -52,7 +52,7 @@ struct bfloat16_t {
         return val;
     }
 
-    float f() { return (float)(*this); }
+    float f() const { return (float)(*this); }
 };
 
 } // namespace infinity

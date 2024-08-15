@@ -22,7 +22,7 @@ def python_sdk_test(python_test_dir: str, pytest_mark: str):
             "-x",
             "-m",
             pytest_mark,
-            f"{python_test_dir}/test/cases",
+            f"{python_test_dir}/test_pysdk",
         ],
         stdout=sys.stdout,
         stderr=sys.stderr,

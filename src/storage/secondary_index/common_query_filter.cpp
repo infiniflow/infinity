@@ -61,7 +61,7 @@ void ReadDataBlock(DataBlock *output,
             u32 segment_offset = block_id * DEFAULT_BLOCK_CAPACITY;
             output->column_vectors[i]->AppendWith(RowID(segment_id, segment_offset), row_count);
         } else {
-            ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
+            ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr);
             output->column_vectors[i]->AppendWith(column_vector, 0, row_count);
         }
     }
@@ -131,6 +131,9 @@ CommonQueryFilter::CommonQueryFilter(SharedPtr<BaseExpression> original_filter, 
         }
         total_task_num_ = tasks_.size();
     }
+    always_true_ = original_filter_ == nullptr && !base_table_ref_->table_entry_ptr_->CheckAnyDelete(begin_ts_);
+    if (always_true_)
+        finish_build_.test_and_set(std::memory_order_release);
 }
 
 void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
@@ -202,6 +205,12 @@ void CommonQueryFilter::BuildFilter(u32 task_id, Txn *txn) {
                             [&bitmask](Bitmask &m) { m.Merge(bitmask); }},
                    result_elem);
     }
+
+    // Remove deleted rows from the result
+    std::visit(Overload{[segment_entry, begin_ts](Vector<u32> &v) { segment_entry->CheckRowsVisible(v, begin_ts); },
+                        [segment_entry, begin_ts](Bitmask &b) { segment_entry->CheckRowsVisible(b, begin_ts); }},
+               result_elem);
+
     if (const SizeT result_count = std::visit(Overload{[](const Vector<u32> &v) -> SizeT { return v.size(); },
                                                        [segment_row_count](const Bitmask &m) -> SizeT {
                                                            if (m.GetData() == nullptr) {
@@ -245,6 +254,74 @@ void CommonQueryFilter::TryApplySecondaryIndexFilterOptimizer(QueryContext *quer
     secondary_index_filter_qualified_ = std::move(v_qualified);
     secondary_index_column_index_map_ = std::move(column_index_map);
     filter_execute_command_ = std::move(filter_execute_command);
+}
+
+template <typename VariantType, typename T, std::size_t index = 0>
+consteval auto variant_index() {
+    static_assert(std::variant_size_v<VariantType> > index, "Type not found in variant");
+    if constexpr (std::is_same_v<std::variant_alternative_t<index, VariantType>, T>) {
+        return index;
+    } else {
+        return variant_index<VariantType, T, index + 1>();
+    }
+}
+
+using FilterResultType = std::variant<Vector<u32>, Bitmask>;
+static_assert(variant_index<FilterResultType, Vector<u32>>() == 0);
+static_assert(variant_index<FilterResultType, Bitmask>() == 1);
+
+bool CommonQueryFilter::PassFilter(RowID doc_id) {
+    if (always_true_) [[unlikely]]
+        return true;
+    bool finish_build = finish_build_.test();
+    assert(finish_build);
+    if (!finish_build)
+        return false;
+    if (doc_id.segment_id_ != current_segment_id_) [[unlikely]] {
+        const auto it = filter_result_.find(doc_id.segment_id_);
+        if (it == filter_result_.end()) [[unlikely]] {
+            current_segment_id_ = INVALID_SEGMENT_ID;
+            return false;
+        }
+        current_segment_id_ = doc_id.segment_id_;
+        const FilterResultType &doc_id_list_or_bitmask = it->second;
+        decode_status_ = doc_id_list_or_bitmask.index();
+        doc_id_list_ = nullptr;
+        doc_id_bitmask_ = nullptr;
+        switch (decode_status_) {
+            case variant_index<FilterResultType, Vector<u32>>(): {
+                doc_id_list_ = &std::get<Vector<u32>>(doc_id_list_or_bitmask);
+                doc_id_bitmask_ = nullptr;
+                doc_id_list_size_ = doc_id_list_->size();
+                pos_ = 0;
+                break;
+            }
+            case variant_index<FilterResultType, Bitmask>(): {
+                doc_id_list_ = nullptr;
+                doc_id_bitmask_ = &std::get<Bitmask>(doc_id_list_or_bitmask);
+                break;
+            }
+            default: {
+                String error_message = "Error variant status!";
+                UnrecoverableError(error_message);
+                break;
+            }
+        }
+    }
+    switch (decode_status_) {
+        case variant_index<FilterResultType, Vector<u32>>(): {
+            while (pos_ < doc_id_list_size_ && (*doc_id_list_)[pos_] < doc_id.segment_offset_)
+                pos_++;
+            bool found = pos_ < doc_id_list_size_ && (*doc_id_list_)[pos_] == doc_id.segment_offset_;
+            return found;
+        }
+        case variant_index<FilterResultType, Bitmask>(): {
+            bool found = doc_id_bitmask_->IsTrue(doc_id.segment_offset_);
+            return found;
+        }
+        default:
+            return false;
+    }
 }
 
 } // namespace infinity

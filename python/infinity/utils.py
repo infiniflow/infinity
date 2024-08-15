@@ -41,5 +41,7 @@ def binary_exp_to_paser_exp(binary_expr_key) -> str:
         return "*"
     elif binary_expr_key == "div":
         return "/"
+    elif binary_expr_key == "mod":
+        return "%"
     else:
         raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown binary expression: {binary_expr_key}")

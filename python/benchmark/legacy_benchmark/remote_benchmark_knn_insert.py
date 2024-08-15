@@ -123,15 +123,15 @@ def create_index(table_name):
     conn = ThriftInfinityClient(LOCAL_HOST)
     table = RemoteTable(conn, "default_db", table_name)
     res = table.create_index("hnsw_index",
-                             [index.IndexInfo("col1",
-                                              index.IndexType.Hnsw,
-                                              [
-                                                  index.InitParameter("M", "16"),
-                                                  index.InitParameter("ef_construction", "200"),
-                                                  index.InitParameter("ef", "200"),
-                                                  index.InitParameter("metric", "l2"),
-                                                  index.InitParameter("encode", "lvq")
-                                              ])])
+                             index.IndexInfo("col1",
+                                             index.IndexType.Hnsw,
+                                             {
+                                                 "m": "16",
+                                                 "ef_construction": "200",
+                                                 "ef": "200",
+                                                 "metric": "l2",
+                                                 "encode": "lvq"
+                                             }))
 
     assert res.error_code == ErrorCode.OK
 

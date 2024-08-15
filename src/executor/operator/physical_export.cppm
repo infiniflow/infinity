@@ -30,6 +30,9 @@ import data_type;
 import table_entry;
 import block_index;
 import logger;
+import third_party;
+import column_def;
+import column_vector;
 
 namespace infinity {
 
@@ -74,6 +77,8 @@ public:
 
     SizeT ExportToFVECS(QueryContext *query_context, ExportOperatorState *export_op_state);
 
+    SizeT ExportToPARQUET(QueryContext *query_context, ExportOperatorState *export_op_state);
+
     inline CopyFileType FileType() const { return file_type_; }
 
     inline const String &file_path() const { return file_path_; }
@@ -87,11 +92,16 @@ public:
     inline char delimiter() const { return delimiter_; }
 
 private:
+    SharedPtr<arrow::DataType> GetArrowType(ColumnDef *column_def);
+
+    SharedPtr<arrow::Array> BuildArrowArray(ColumnDef *column_def, const ColumnVector &column_vectors);
+
+private:
     SharedPtr<Vector<String>> output_names_{};
     SharedPtr<Vector<SharedPtr<DataType>>> output_types_{};
 
     TableEntry *table_entry_{};
-    CopyFileType file_type_{CopyFileType::kCSV};
+    CopyFileType file_type_{CopyFileType::kInvalid};
     String file_path_{};
     String table_name_{};
     String schema_name_{"default_db"};

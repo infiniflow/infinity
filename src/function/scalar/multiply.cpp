@@ -75,6 +75,26 @@ inline bool MulFunction::Run(BigIntT left, BigIntT right, BigIntT &result) {
     return true;
 }
 
+// Float16T * Float16T = Float16T, and check overflow
+template <>
+inline bool MulFunction::Run(Float16T left, Float16T right, Float16T &result) {
+    result = left * right;
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return true;
+}
+
+// BFloat16T * BFloat16T = BFloat16T, and check overflow
+template <>
+inline bool MulFunction::Run(BFloat16T left, BFloat16T right, BFloat16T &result) {
+    result = left * right;
+    if (const auto f = static_cast<float>(result); std::isnan(f) || std::isinf(f)) {
+        return false;
+    }
+    return true;
+}
+
 // FloatT * FloatT = FloatT, and check overflow
 template <>
 inline bool MulFunction::Run(FloatT left, FloatT right, FloatT &result) {
@@ -185,6 +205,18 @@ void RegisterMulFunction(const UniquePtr<Catalog> &catalog_ptr) {
                                        {DataType(LogicalType::kDouble)},
                                        &ScalarFunction::BinaryFunctionWithFailure<DoubleT, DoubleT, DoubleT, MulFunction>);
     function_set_ptr->AddFunction(mul_function_double);
+
+    ScalarFunction mul_function_float16(func_name,
+                                        {DataType(LogicalType::kFloat16), DataType(LogicalType::kFloat16)},
+                                        {DataType(LogicalType::kFloat16)},
+                                        &ScalarFunction::BinaryFunctionWithFailure<Float16T, Float16T, Float16T, MulFunction>);
+    function_set_ptr->AddFunction(mul_function_float16);
+
+    ScalarFunction mul_function_bfloat16(func_name,
+                                         {DataType(LogicalType::kBFloat16), DataType(LogicalType::kBFloat16)},
+                                         {DataType(LogicalType::kBFloat16)},
+                                         &ScalarFunction::BinaryFunctionWithFailure<BFloat16T, BFloat16T, BFloat16T, MulFunction>);
+    function_set_ptr->AddFunction(mul_function_bfloat16);
 
     ScalarFunction mul_function_Decimal(func_name,
                                         {DataType(LogicalType::kDecimal), DataType(LogicalType::kDecimal)},

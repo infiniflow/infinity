@@ -14,44 +14,92 @@
 
 module;
 
-#include <vector>
+#include <cassert>
 module and_iterator;
 
 import stl;
 import doc_iterator;
+import multi_doc_iterator;
 import internal_types;
 
 namespace infinity {
 
-AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiQueryDocIterator(std::move(iterators)) {
-    sorted_iterators_.reserve(children_.size());
-    for (u32 i = 0; i < children_.size(); ++i) {
-        sorted_iterators_.push_back(children_[i].get());
-    }
-    std::sort(sorted_iterators_.begin(), sorted_iterators_.end(), [](const auto lhs, const auto rhs) { return lhs->GetDF() < rhs->GetDF(); });
-    // initialize doc_id_ to first doc
-    DoSeek(0);
+AndIterator::AndIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
+    std::sort(children_.begin(), children_.end(), [](const auto &lhs, const auto &rhs) { return lhs->GetDF() < rhs->GetDF(); });
     // init df
-    and_iterator_df_ = std::numeric_limits<u32>::max();
-    for (const auto &c : children_) {
-        and_iterator_df_ = std::min(and_iterator_df_, c->GetDF());
+    doc_freq_ = std::numeric_limits<u32>::max();
+    bm25_score_upper_bound_ = 0.0f;
+    for (SizeT i = 0; i < children_.size(); i++) {
+        const auto &it = children_[i];
+        doc_freq_ = std::min(doc_freq_, it->GetDF());
+        bm25_score_upper_bound_ += children_[i]->BM25ScoreUpperBound();
     }
 }
 
-void AndIterator::DoSeek(RowID doc_id) {
-    auto ib = sorted_iterators_.begin();
-    const auto ie = sorted_iterators_.end();
-    while (ib != ie) {
-        (*ib)->Seek(doc_id);
-        if (RowID doc = (*ib)->Doc(); doc != doc_id) {
-            // not match, restart from the first iterator, since first iterator has fewer docs
-            doc_id = doc;
-            ib = sorted_iterators_.begin();
-        } else {
-            ++ib;
+bool AndIterator::Next(RowID doc_id) {
+    assert(doc_id != INVALID_ROWID);
+    if (doc_id_ != INVALID_ROWID && doc_id_ >= doc_id)
+        return true;
+    RowID target_doc_id = doc_id;
+    do {
+        for (SizeT i = 0; i < children_.size(); i++) {
+            const auto &it = children_[i];
+            bool ok = it->Next(target_doc_id);
+            if (!ok) {
+                doc_id_ = INVALID_ROWID;
+                return false;
+            }
+            target_doc_id = it->DocID();
         }
+        if (target_doc_id == INVALID_ROWID) {
+            doc_id_ = INVALID_ROWID;
+            return false;
+        }
+        if (target_doc_id == children_[0]->DocID()) {
+            if (threshold_ <= 0.0f) {
+                doc_id_ = target_doc_id;
+                return true;
+            }
+            float sum_score = 0.0f;
+            for (SizeT i = 0; i < children_.size(); i++) {
+                const auto &it = children_[i];
+                sum_score += it->BM25Score();
+            }
+            if (sum_score > threshold_) {
+                doc_id_ = target_doc_id;
+                bm25_score_cache_ = sum_score;
+                bm25_score_cache_docid_ = doc_id_;
+                return true;
+            }
+            target_doc_id++;
+        }
+    } while (1);
+}
+
+float AndIterator::BM25Score() {
+    if (bm25_score_cache_docid_ == doc_id_) {
+        return bm25_score_cache_;
     }
-    doc_id_ = doc_id;
+    float sum_score = 0.0f;
+    for (SizeT i = 0; i < children_.size(); i++) {
+        const auto &it = children_[i];
+        sum_score += it->BM25Score();
+    }
+    bm25_score_cache_docid_ = doc_id_;
+    bm25_score_cache_ = sum_score;
+    return sum_score;
+}
+
+void AndIterator::UpdateScoreThreshold(float threshold) {
+    if (threshold <= threshold_)
+        return;
+    threshold_ = threshold;
+    const float base_threshold = threshold - BM25ScoreUpperBound();
+    for (SizeT i = 0; i < children_.size(); i++) {
+        const auto &it = children_[i];
+        float new_threshold = std::max(0.0f, base_threshold + it->BM25ScoreUpperBound());
+        it->UpdateScoreThreshold(new_threshold);
+    }
 }
 
 } // namespace infinity

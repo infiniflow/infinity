@@ -12,7 +12,7 @@ CREATE TABLE test_knn_sparse(c1 INT, c2 SPARSE(FLOAT, 100));
 # 4. 4.0*1.0 + 4.0*3.0 = 16.0
 # 5. 0
 statement ok
-COPY test_knn_sparse FROM '/var/infinity/test_data/sparse_knn.csv' WITH (DELIMITER ',');
+COPY test_knn_sparse FROM '/var/infinity/test_data/sparse_knn.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 # mertic ip will order descendingly. The query will return row 4, 2, 1
 query I
@@ -71,9 +71,9 @@ SELECT SIMILARITY() FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [], 'ip', 3);
 query I
 SELECT c2 FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 3);
 ----
-0: 4.000000, 40: 4.000000, 80: 4.000000
-0: 2.000000, 20: 2.000000, 40: 2.000000, 60: 2.000000, 80: 2.000000
-0: 1.000000, 10: 1.000000, 20: 1.000000, 30: 1.000000, 40: 1.000000, 50: 1.000000, 60: 1.000000, 70: 1.000000, 80: 1.000000, 90: 1.000000
+[0:4.000000,40:4.000000,80:4.000000]
+[0:2.000000,20:2.000000,40:2.000000,60:2.000000,80:2.000000]
+[0:1.000000,10:1.000000,20:1.000000,30:1.000000,40:1.000000,50:1.000000,60:1.000000,70:1.000000,80:1.000000,90:1.000000]
 
 query II
 SELECT c1, ROW_ID(), SIMILARITY() FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], 'ip', 5);
@@ -90,7 +90,7 @@ SELECT c1, ROW_ID(), DISTANCE() FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0
 # copy to create another new block
 # there will has 2 knn_scan operator to scan the blocks, and one merge_knn to merge
 statement ok
-COPY test_knn_sparse FROM '/var/infinity/test_data/sparse_knn.csv' WITH (DELIMITER ',');
+COPY test_knn_sparse FROM '/var/infinity/test_data/sparse_knn.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 # the query will return block 1 row 4, block 2 row 4 and a row 3
 query I
@@ -102,7 +102,7 @@ SELECT c1 FROM test_knn_sparse SEARCH MATCH SPARSE (c2, [0:1.0,20:2.0,80:3.0], '
 
 # copy to create another new block
 statement ok
-COPY test_knn_sparse FROM '/var/infinity/test_data/sparse_knn.csv' WITH (DELIMITER ',');
+COPY test_knn_sparse FROM '/var/infinity/test_data/sparse_knn.csv' WITH (DELIMITER ',', FORMAT CSV);
 
 # the query will return row 4 from block 1, 2 and 3
 query I

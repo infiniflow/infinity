@@ -18,15 +18,16 @@ from typing import Optional, Union, List, Any
 
 import numpy as np
 from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
-from infinity.embedded_infinity_ext import WrapIndexInfo, WrapConstantExpr, LiteralType, ImportOptions, CopyFileType, WrapParsedExpr, \
+from infinity.embedded_infinity_ext import WrapIndexInfo, ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
-from infinity.common import INSERT_DATA, VEC, SPARSE, InfinityException
+from infinity.common import INSERT_DATA, VEC, SPARSE, InfinityException, CommonMatchTensorExpr
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
 from infinity.local_infinity.types import build_result
 from infinity.local_infinity.utils import traverse_conditions, select_res_to_polars
+from infinity.local_infinity.utils import get_local_constant_expr_from_python_value
 from infinity.remote_thrift.utils import name_validity_check
 from infinity.table import Table, ExplainType
 import infinity.index as index
@@ -59,7 +60,7 @@ class LocalTable(Table, ABC):
         return wrapper
 
     @name_validity_check("index_name", "Index")
-    def create_index(self, index_name: str, index_infos: list[IndexInfo],
+    def create_index(self, index_name: str, index_info: IndexInfo,
                      conflict_type: ConflictType = ConflictType.Error):
         index_name = index_name.strip()
 
@@ -73,20 +74,12 @@ class LocalTable(Table, ABC):
         else:
             raise InfinityException(ErrorCode.INVALID_CONFLICT_TYPE, f"Invalid conflict type")
 
-        index_info_list_to_use: list[WrapIndexInfo] = []
-
-        for index_info in index_infos:
-            index_info_to_use = WrapIndexInfo()
-            index_info_to_use.index_type = index_info.index_type.to_local_type()
-            index_info_to_use.column_name = index_info.column_name.strip()
-            index_info_to_use.index_param_list = [init_param.to_local_type() for init_param in index_info.params]
-
-            index_info_list_to_use.append(index_info_to_use)
+        index_info_to_use = index_info.to_local_type()
 
         res = self._conn.create_index(db_name=self._db_name,
                                       table_name=self._table_name,
                                       index_name=index_name,
-                                      index_info_list=index_info_list_to_use,
+                                      index_info=index_info_to_use,
                                       conflict_type=create_index_conflict)
 
         if res.error_code == ErrorCode.OK:
@@ -164,43 +157,7 @@ class LocalTable(Table, ABC):
             column_names = list(row.keys())
             parse_exprs = []
             for column_name, value in row.items():
-                constant_expression = WrapConstantExpr()
-                if isinstance(value, str):
-                    constant_expression.literal_type = LiteralType.kString
-                    constant_expression.str_value = value
-                elif isinstance(value, int):
-                    constant_expression.literal_type = LiteralType.kInteger
-                    constant_expression.i64_value = value
-                elif isinstance(value, float) or isinstance(value, np.float32):
-                    constant_expression.literal_type = LiteralType.kDouble
-                    constant_expression.f64_value = value
-                elif isinstance(value, list):
-                    if isinstance(value[0], int):
-                        constant_expression.literal_type = LiteralType.kIntegerArray
-                        constant_expression.i64_array_value = value
-                    elif isinstance(value[0], float):
-                        constant_expression.literal_type = LiteralType.kDoubleArray
-                        constant_expression.f64_array_value = value
-                elif isinstance(value, dict):
-                    if isinstance(value["values"][0], int):
-                        constant_expression.literal_type = LiteralType.kLongSparseArray
-                        if isinstance(value["indices"][0], int):
-                            constant_expression.i64_array_idx = value["indices"]
-                            constant_expression.i64_array_value = value["values"]
-                        else:
-                            raise InfinityException(3069, "Invalid constant expression")
-                    elif isinstance(value["values"][0], float):
-                        constant_expression.literal_type = LiteralType.kDoubleSparseArray
-                        if isinstance(value["indices"][0], int):
-                            constant_expression.i64_array_idx = value["indices"]
-                            constant_expression.f64_array_value = value["values"]
-                        else:
-                            raise InfinityException(3069, "Invalid constant expression")
-                    else:
-                        raise InfinityException(3069, "Invalid constant expression")
-                    
-                else:
-                    raise InfinityException(3069, "Invalid constant expression")
+                constant_expression = get_local_constant_expr_from_python_value(value)
                 parse_exprs.append(constant_expression)
 
             fields.append(parse_exprs)
@@ -230,20 +187,24 @@ class LocalTable(Table, ABC):
                         options.copy_file_type = CopyFileType.kJSONL
                     elif file_type == 'fvecs':
                         options.copy_file_type = CopyFileType.kFVECS
+                    elif file_type == 'csr':
+                        options.copy_file_type = CopyFileType.kCSR
+                    elif file_type == 'bvecs':
+                        options.copy_file_type = CopyFileType.kBVECS
                     else:
-                        raise InfinityException(3037, f"Unrecognized export file type: {file_type}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file type: {file_type}")
                 elif key == 'delimiter':
                     delimiter = v.lower()
                     if len(delimiter) != 1:
-                        raise InfinityException(3037, f"Unrecognized export file delimiter: {delimiter}")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unrecognized export file delimiter: {delimiter}")
                     options.delimiter = delimiter[0]
                 elif key == 'header':
                     if isinstance(v, bool):
                         options.header = v
                     else:
-                        raise InfinityException(3037, "Boolean value is expected in header field")
+                        raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, "Boolean value is expected in header field")
                 else:
-                    raise InfinityException(3037, f"Unknown export parameter: {k}")
+                    raise InfinityException(ErrorCode.IMPORT_FILE_FORMAT_ERROR, f"Unknown export parameter: {k}")
 
         res = self._conn.import_data(db_name=self._db_name,
                                      table_name=self._table_name,
@@ -339,26 +300,7 @@ class LocalTable(Table, ABC):
                 update_expr_array: list[WrapParsedExpr] = []
                 for row in data:
                     for column_name, value in row.items():
-                        constant_expression = WrapConstantExpr()
-                        if isinstance(value, str):
-                            constant_expression.literal_type = LiteralType.kString
-                            constant_expression.str_value = value
-                        elif isinstance(value, int):
-                            constant_expression.literal_type = LiteralType.kInteger
-                            constant_expression.i64_value = value
-                        elif isinstance(value, float) or isinstance(value, np.float32):
-                            constant_expression.literal_type = LiteralType.kDouble
-                            constant_expression.f64_value = value
-                        elif isinstance(value, list):
-                            if isinstance(value[0], int):
-                                constant_expression.literal_type = LiteralType.kIntegerArray
-                                constant_expression.i64_array_value = value
-                            elif isinstance(value[0], float):
-                                constant_expression.literal_type = LiteralType.kDoubleArray
-                                constant_expression.f64_array_value = value
-                        else:
-                            raise InfinityException(3069, "Invalid constant expression")
-
+                        constant_expression = get_local_constant_expr_from_python_value(value)
                         parsed_expr = WrapParsedExpr(ParsedExprType.kConstant)
                         parsed_expr.constant_expr = constant_expression
 
@@ -398,7 +340,7 @@ class LocalTable(Table, ABC):
         return self
 
     @params_type_check
-    def fusion(self, method: str, options_text: str = '', match_tensor_expr=None):
+    def fusion(self, method: str, options_text: str = '', match_tensor_expr: CommonMatchTensorExpr=None):
         self.query_builder.fusion(method, options_text, match_tensor_expr)
         return self
 

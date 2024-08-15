@@ -61,7 +61,7 @@ TEST_F(IndexBaseTest, hnsw_readwrite) {
     Vector<String> columns{"col1", "col2"};
     Vector<InitParameter *> parameters;
     parameters.emplace_back(new InitParameter("metric", "l2"));
-    parameters.emplace_back(new InitParameter("M", "16"));
+    parameters.emplace_back(new InitParameter("m", "16"));
     parameters.emplace_back(new InitParameter("ef_construction", "200"));
     parameters.emplace_back(new InitParameter("ef", "200"));
     parameters.emplace_back(new InitParameter("encode", "plain"));

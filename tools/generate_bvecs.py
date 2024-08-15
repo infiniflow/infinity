@@ -31,7 +31,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE TABLE {} ( c1 embedding(float, {}));\n".format(table_name, dim)
+            "CREATE TABLE {} ( c1 embedding(unsigned tinyint, {}));\n".format(table_name, dim)
         )
         slt_file.write("\n")
         slt_file.write("query I\n")
@@ -48,12 +48,12 @@ def generate(generate_if_exists: bool, copy_dir: str):
         for _ in range(row_n):
             bvecs_file.write((dim).to_bytes(4, byteorder="little"))
             random_array = 20 * np.random.random(dim) # 0~20
-            ivec = random_array.astype(np.int8) # 0~20
+            ivec = random_array.astype(np.uint8) # 0~20
             ivec.tofile(bvecs_file)
-            fvec = ivec.astype(np.float32)
-            fvec_str = ",".join([format_float1(x) for x in fvec])
+            bvec = ivec.astype(np.uint8)
+            bvec_str = ",".join([format_float1(x) for x in bvec])
             slt_file.write("[")
-            slt_file.write(fvec_str)
+            slt_file.write(bvec_str)
             slt_file.write("]")
             slt_file.write("\n")
         slt_file.write("\n")

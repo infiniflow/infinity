@@ -13,8 +13,12 @@
 # limitations under the License.
 
 from typing import Union
-import torch
-from infinity.remote_thrift.types import make_match_tensor_expr
+# NOTICE: please check which infinity you are using, local or remote
+# this statement is for local infinity
+from infinity.local_infinity.types import make_match_tensor_expr
+# enable the following import statement to use remote infinity
+# from infinity.remote_thrift.types import make_match_tensor_expr
+# from infinity.common import LOCAL_HOST
 
 
 class InfinityHelperForColBERT:
@@ -40,9 +44,9 @@ class InfinityHelperForColBERT:
         # append two hidden columns: "INNER_HIDDEN_ColBERT_TENSOR_ARRAY_FLOAT", "INNER_HIDDEN_ColBERT_TENSOR_ARRAY_BIT"
         self.test_db_name = "colbert_test_db"
         self.test_table_name = "colbert_test_table"
-        self.inner_col_txt = "INNER_HIDDEN_ColBERT_TEXT_FOR_BM25"
-        self.inner_col_float = "INNER_HIDDEN_ColBERT_TENSOR_ARRAY_FLOAT"
-        self.inner_col_bit = "INNER_HIDDEN_ColBERT_TENSOR_ARRAY_BIT"
+        self.inner_col_txt = "inner_hidden_colbert_text_for_bm25"
+        self.inner_col_float = "inner_hidden_colbert_tensor_array_float"
+        self.inner_col_bit = "inner_hidden_colbert_tensor_array_bit"
         if self.inner_col_txt in schema:
             raise ValueError(f"Column name {self.inner_col_txt} is reserved for internal use.")
         if self.inner_col_float in schema:
@@ -56,13 +60,22 @@ class InfinityHelperForColBERT:
         from infinity import NetworkAddress
         import infinity.index as index
         from infinity.common import ConflictType
-        self.infinity_obj = infinity.connect(NetworkAddress("127.0.0.1", 23817))
+        # NOTICE: the following statement is for local infinity
+        self.infinity_obj = infinity.connect("/var/infinity")
+        # enable the following statement to use remote infinity
+        # self.infinity_obj = infinity.connect(LOCAL_HOST)
         self.infinity_obj.drop_database(self.test_db_name, ConflictType.Ignore)
         self.colbert_test_db = self.infinity_obj.create_database(self.test_db_name)
         self.colbert_test_table = self.colbert_test_db.create_table(self.test_table_name, schema, ConflictType.Error)
+        # NOTICE: the following statement is for english text
         self.colbert_test_table.create_index("test_ft_index",
-                                             [index.IndexInfo(self.inner_col_txt, index.IndexType.FullText, [])],
+                                             index.IndexInfo(self.inner_col_txt, index.IndexType.FullText),
                                              ConflictType.Error)
+        # please enable the following statement to use chinese text
+        # self.colbert_test_table.create_index("test_ft_index",
+        #                                      index.IndexInfo(self.inner_col_txt, index.IndexType.FullText,
+        #                                                      infinity.index.InitParameter("ANALYZER", "chinese")),
+        #                                      ConflictType.Error)
 
     # clear the test environment for ColBERT
     def clear_test_env(self):

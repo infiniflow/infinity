@@ -76,6 +76,10 @@ ClientVersions::ClientVersions() {
     client_version_map_[8] = String("0.2.0");
     client_version_map_[9] = String("0.2.1.dev5");
     client_version_map_[10] = String("0.2.1");
+    client_version_map_[11] = String("0.3.0.dev1");
+    client_version_map_[12] = String("0.3.0.dev3");
+    client_version_map_[13] = String("0.3.0.dev4");
+    client_version_map_[14] = String("0.3.0.dev5");
 }
 
 Pair<const char*, Status> ClientVersions::GetVersionByIndex(i64 version_index) {
@@ -348,6 +352,8 @@ Tuple<CopyFileType, Status> InfinityThriftService::GetCopyFileType(infinity_thri
             return {CopyFileType::kFVECS, Status::OK()};
         case infinity_thrift_rpc::CopyFileType::CSR:
             return {CopyFileType::kCSR, Status::OK()};
+        case infinity_thrift_rpc::CopyFileType::BVECS:
+            return {CopyFileType::kBVECS, Status::OK()};
         default: {
             return {CopyFileType::kInvalid, Status::ImportFileFormatError("Not implemented yet")};
         }
@@ -1046,43 +1052,30 @@ void InfinityThriftService::CreateIndex(infinity_thrift_rpc::CommonResponse &res
         return;
     }
 
-    auto *index_info_list_to_use = new Vector<IndexInfo *>();
-    for (auto &index_info : request.index_info_list) {
-        auto index_info_to_use = new IndexInfo();
-        index_info_to_use->index_type_ = GetIndexTypeFromProto(index_info.index_type);
-        if (index_info_to_use->index_type_ == IndexType::kInvalid) {
+    auto *index_info_to_use = new IndexInfo();
 
-            if (index_info_list_to_use != nullptr) {
-                for (auto &index_info : *index_info_list_to_use) {
-                    delete index_info;
-                    index_info = nullptr;
-                }
-                delete index_info_list_to_use;
-                index_info_list_to_use = nullptr;
-            }
+    index_info_to_use->index_type_ = GetIndexTypeFromProto(request.index_info.index_type);
+    if (index_info_to_use->index_type_ == IndexType::kInvalid) {
 
-            delete index_info_to_use;
-            index_info_to_use = nullptr;
+        delete index_info_to_use;
+        index_info_to_use = nullptr;
 
-            ProcessStatus(response, Status::InvalidIndexType());
-            return;
-        }
-
-        index_info_to_use->column_name_ = index_info.column_name;
-
-        auto *index_param_list = new Vector<InitParameter *>();
-        for (auto &index_param : index_info.index_param_list) {
-            auto init_parameter = new InitParameter();
-            init_parameter->param_name_ = index_param.param_name;
-            init_parameter->param_value_ = index_param.param_value;
-            index_param_list->emplace_back(init_parameter);
-        }
-        index_info_to_use->index_param_list_ = index_param_list;
-
-        index_info_list_to_use->emplace_back(index_info_to_use);
+        ProcessStatus(response, Status::InvalidIndexType());
+        return;
     }
 
-    QueryResult result = infinity->CreateIndex(request.db_name, request.table_name, request.index_name, index_info_list_to_use, create_index_opts);
+    index_info_to_use->column_name_ = request.index_info.column_name;
+
+    auto *index_param_list = new Vector<InitParameter *>();
+    for (auto &index_param : request.index_info.index_param_list) {
+        auto init_parameter = new InitParameter();
+        init_parameter->param_name_ = index_param.param_name;
+        init_parameter->param_value_ = index_param.param_value;
+        index_param_list->emplace_back(init_parameter);
+    }
+    index_info_to_use->index_param_list_ = index_param_list;
+
+    QueryResult result = infinity->CreateIndex(request.db_name, request.table_name, request.index_name, index_info_to_use, create_index_opts);
     ProcessQueryResult(response, result);
 }
 
@@ -1463,8 +1456,7 @@ Tuple<ColumnDef *, Status> InfinityThriftService::GetColumnDefFromProto(const in
         return {nullptr, status};
     }
 
-    const auto &column_def_name = column_def.name;
-    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def_name, constraints, const_expr);
+    auto col_def = new ColumnDef(column_def.id, column_def_data_type_ptr, column_def.name, constraints, const_expr);
     return {col_def, Status::OK()};
 }
 
@@ -1488,6 +1480,10 @@ SharedPtr<DataType> InfinityThriftService::GetColumnTypeFromProto(const infinity
             return MakeShared<infinity::DataType>(infinity::LogicalType::kFloat);
         case infinity_thrift_rpc::LogicType::Double:
             return MakeShared<infinity::DataType>(infinity::LogicalType::kDouble);
+        case infinity_thrift_rpc::LogicType::Float16:
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kFloat16);
+        case infinity_thrift_rpc::LogicType::BFloat16:
+            return MakeShared<infinity::DataType>(infinity::LogicalType::kBFloat16);
         case infinity_thrift_rpc::LogicType::Tensor:
         case infinity_thrift_rpc::LogicType::TensorArray:
         case infinity_thrift_rpc::LogicType::Embedding: {
@@ -1555,6 +1551,8 @@ EmbeddingDataType InfinityThriftService::GetEmbeddingDataTypeFromProto(const inf
     switch (type) {
         case infinity_thrift_rpc::ElementType::ElementBit:
             return EmbeddingDataType::kElemBit;
+        case infinity_thrift_rpc::ElementType::ElementUInt8:
+            return EmbeddingDataType::kElemUInt8;
         case infinity_thrift_rpc::ElementType::ElementInt8:
             return EmbeddingDataType::kElemInt8;
         case infinity_thrift_rpc::ElementType::ElementInt16:
@@ -1567,9 +1565,12 @@ EmbeddingDataType InfinityThriftService::GetEmbeddingDataTypeFromProto(const inf
             return EmbeddingDataType::kElemFloat;
         case infinity_thrift_rpc::ElementType::ElementFloat64:
             return EmbeddingDataType::kElemDouble;
-        default:
-            return EmbeddingDataType::kElemInvalid;
+        case infinity_thrift_rpc::ElementType::ElementFloat16:
+            return EmbeddingDataType::kElemFloat16;
+        case infinity_thrift_rpc::ElementType::ElementBFloat16:
+            return EmbeddingDataType::kElemBFloat16;
     }
+    return EmbeddingDataType::kElemInvalid;
 }
 
 IndexType InfinityThriftService::GetIndexTypeFromProto(const infinity_thrift_rpc::IndexType::type &type) {
@@ -1586,6 +1587,8 @@ IndexType InfinityThriftService::GetIndexTypeFromProto(const infinity_thrift_rpc
             return IndexType::kEMVB;
         case infinity_thrift_rpc::IndexType::BMP:
             return IndexType::kBMP;
+        case infinity_thrift_rpc::IndexType::DiskAnn:
+            return IndexType::kDiskAnn;
         default:
             return IndexType::kInvalid;
     }
@@ -1620,17 +1623,31 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
         }
         case infinity_thrift_rpc::LiteralType::IntegerArray: {
             auto parsed_expr = new ConstantExpr(LiteralType::kIntegerArray);
-            parsed_expr->long_array_.reserve(expr.i64_array_value.size());
-            for (auto &value : expr.i64_array_value) {
-                parsed_expr->long_array_.emplace_back(value);
-            }
+            parsed_expr->long_array_ = expr.i64_array_value;
             return parsed_expr;
         }
         case infinity_thrift_rpc::LiteralType::DoubleArray: {
             auto parsed_expr = new ConstantExpr(LiteralType::kDoubleArray);
-            parsed_expr->double_array_.reserve(expr.f64_array_value.size());
-            for (auto &value : expr.f64_array_value) {
-                parsed_expr->double_array_.emplace_back(value);
+            parsed_expr->double_array_ = expr.f64_array_value;
+            return parsed_expr;
+        }
+        case infinity_thrift_rpc::LiteralType::IntegerTensor: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
+            parsed_expr->sub_array_array_.reserve(expr.i64_tensor_value.size());
+            for (auto &value_2 : expr.i64_tensor_value) {
+                auto parsed_expr_2 = MakeShared<ConstantExpr>(LiteralType::kIntegerArray);
+                parsed_expr_2->long_array_ = value_2;
+                parsed_expr->sub_array_array_.emplace_back(std::move(parsed_expr_2));
+            }
+            return parsed_expr;
+        }
+        case infinity_thrift_rpc::LiteralType::DoubleTensor: {
+            auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
+            parsed_expr->sub_array_array_.reserve(expr.f64_tensor_value.size());
+            for (auto &value_2 : expr.f64_tensor_value) {
+                auto parsed_expr_2 = MakeShared<ConstantExpr>(LiteralType::kDoubleArray);
+                parsed_expr_2->double_array_ = value_2;
+                parsed_expr->sub_array_array_.emplace_back(std::move(parsed_expr_2));
             }
             return parsed_expr;
         }
@@ -1638,17 +1655,14 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
             auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
             parsed_expr->sub_array_array_.reserve(expr.i64_tensor_array_value.size());
             for (auto &value_1 : expr.i64_tensor_array_value) {
-                auto parsed_expr_1 = new ConstantExpr(LiteralType::kSubArrayArray);
+                auto parsed_expr_1 = MakeShared<ConstantExpr>(LiteralType::kSubArrayArray);
                 parsed_expr_1->sub_array_array_.reserve(value_1.size());
                 for (auto &value_2 : value_1) {
-                    auto parsed_expr_2 = new ConstantExpr(LiteralType::kIntegerArray);
-                    parsed_expr_2->long_array_.reserve(value_2.size());
-                    for (auto &value_3 : value_2) {
-                        parsed_expr_2->long_array_.emplace_back(value_3);
-                    }
-                    parsed_expr_1->sub_array_array_.emplace_back(parsed_expr_2);
+                    auto parsed_expr_2 = MakeShared<ConstantExpr>(LiteralType::kIntegerArray);
+                    parsed_expr_2->long_array_ = value_2;
+                    parsed_expr_1->sub_array_array_.emplace_back(std::move(parsed_expr_2));
                 }
-                parsed_expr->sub_array_array_.emplace_back(parsed_expr_1);
+                parsed_expr->sub_array_array_.emplace_back(std::move(parsed_expr_1));
             }
             return parsed_expr;
         }
@@ -1656,17 +1670,14 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
             auto parsed_expr = new ConstantExpr(LiteralType::kSubArrayArray);
             parsed_expr->sub_array_array_.reserve(expr.f64_tensor_array_value.size());
             for (auto &value_1 : expr.f64_tensor_array_value) {
-                auto parsed_expr_1 = new ConstantExpr(LiteralType::kSubArrayArray);
+                auto parsed_expr_1 = MakeShared<ConstantExpr>(LiteralType::kSubArrayArray);
                 parsed_expr_1->sub_array_array_.reserve(value_1.size());
                 for (auto &value_2 : value_1) {
-                    auto parsed_expr_2 = new ConstantExpr(LiteralType::kDoubleArray);
-                    parsed_expr_2->double_array_.reserve(value_2.size());
-                    for (auto &value_3 : value_2) {
-                        parsed_expr_2->double_array_.emplace_back(value_3);
-                    }
-                    parsed_expr_1->sub_array_array_.emplace_back(parsed_expr_2);
+                    auto parsed_expr_2 = MakeShared<ConstantExpr>(LiteralType::kDoubleArray);
+                    parsed_expr_2->double_array_ = value_2;
+                    parsed_expr_1->sub_array_array_.emplace_back(std::move(parsed_expr_2));
                 }
-                parsed_expr->sub_array_array_.emplace_back(parsed_expr_1);
+                parsed_expr->sub_array_array_.emplace_back(std::move(parsed_expr_1));
             }
             return parsed_expr;
         }
@@ -1704,7 +1715,7 @@ ConstantExpr *InfinityThriftService::GetConstantFromProto(Status &status, const 
 ColumnExpr *InfinityThriftService::GetColumnExprFromProto(const infinity_thrift_rpc::ColumnExpr &column_expr) {
     auto parsed_expr = new ColumnExpr();
 
-    for (auto &column_name : column_expr.column_name) {
+    for (auto column_name : column_expr.column_name) {
         parsed_expr->names_.emplace_back(column_name);
     }
 
@@ -1784,6 +1795,13 @@ KnnExpr *InfinityThriftService::GetKnnExprFromProto(Status &status, const infini
 
     knn_expr->opt_params_ = new Vector<InitParameter *>();
     for (auto &param : expr.opt_params) {
+        if(param.param_name == "index_name") {
+            knn_expr->index_name_ = param.param_value;
+        }
+        if(param.param_name == "ignore_index" && param.param_value == "true") {
+            knn_expr->ignore_index_ = true;
+        }
+
         auto init_parameter = new InitParameter();
         init_parameter->param_name_ = param.param_name;
         init_parameter->param_value_ = param.param_value;
@@ -1946,7 +1964,19 @@ ExplainType InfinityThriftService::GetExplainTypeFromProto(const infinity_thrift
 }
 
 Tuple<void *, i64, Status> InfinityThriftService::GetEmbeddingDataTypeDataPtrFromProto(const infinity_thrift_rpc::EmbeddingData &embedding_data) {
-    if (embedding_data.__isset.i8_array_value) {
+    if (embedding_data.__isset.u8_array_value) {
+        auto ptr_i16 = (int16_t *)(embedding_data.u8_array_value.data());
+        auto ptr_u8 = (uint8_t *)(embedding_data.u8_array_value.data());
+        for (size_t i = 0; i < embedding_data.u8_array_value.size(); ++i) {
+            ptr_u8[i] = static_cast<uint8_t>(ptr_i16[i]);
+        }
+        return {(void *)embedding_data.u8_array_value.data(), embedding_data.u8_array_value.size(), Status::OK()};
+    } else if (embedding_data.__isset.i8_array_value) {
+        auto ptr_i16 = (int16_t *)(embedding_data.i8_array_value.data());
+        auto ptr_i8 = (int8_t *)(embedding_data.i8_array_value.data());
+        for (size_t i = 0; i < embedding_data.i8_array_value.size(); ++i) {
+            ptr_i8[i] = static_cast<int8_t>(ptr_i16[i]);
+        }
         return {(void *)embedding_data.i8_array_value.data(), embedding_data.i8_array_value.size(), Status::OK()};
     } else if (embedding_data.__isset.i16_array_value) {
         return {(void *)embedding_data.i16_array_value.data(), embedding_data.i16_array_value.size(), Status::OK()};
@@ -1963,6 +1993,20 @@ Tuple<void *, i64, Status> InfinityThriftService::GetEmbeddingDataTypeDataPtrFro
         return {(void *)embedding_data.f32_array_value.data(), embedding_data.f32_array_value.size(), Status::OK()};
     } else if (embedding_data.__isset.f64_array_value) {
         return {(void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size(), Status::OK()};
+    } else if (embedding_data.__isset.f16_array_value) {
+        auto ptr_double = (double *)(embedding_data.f16_array_value.data());
+        auto ptr_float16 = (Float16T *)(embedding_data.f16_array_value.data());
+        for (size_t i = 0; i < embedding_data.f16_array_value.size(); ++i) {
+            ptr_float16[i] = float(ptr_double[i]);
+        }
+        return {(void *)embedding_data.f16_array_value.data(), embedding_data.f16_array_value.size(), Status::OK()};
+    } else if (embedding_data.__isset.bf16_array_value) {
+        auto ptr_double = (double *)(embedding_data.bf16_array_value.data());
+        auto ptr_bfloat16 = (BFloat16T *)(embedding_data.bf16_array_value.data());
+        for (size_t i = 0; i < embedding_data.bf16_array_value.size(); ++i) {
+            ptr_bfloat16[i] = float(ptr_double[i]);
+        }
+        return {(void *)embedding_data.bf16_array_value.data(), embedding_data.bf16_array_value.size(), Status::OK()};
     } else {
         return {nullptr, 0, Status::InvalidEmbeddingDataType("unknown type")};
     }
@@ -2005,6 +2049,10 @@ infinity_thrift_rpc::ColumnType::type InfinityThriftService::DataTypeToProtoColu
             return infinity_thrift_rpc::ColumnType::ColumnFloat32;
         case LogicalType::kDouble:
             return infinity_thrift_rpc::ColumnType::ColumnFloat64;
+        case LogicalType::kFloat16:
+            return infinity_thrift_rpc::ColumnType::ColumnFloat16;
+        case LogicalType::kBFloat16:
+            return infinity_thrift_rpc::ColumnType::ColumnBFloat16;
         case LogicalType::kVarchar:
             return infinity_thrift_rpc::ColumnType::ColumnVarchar;
         case LogicalType::kEmbedding:
@@ -2060,6 +2108,16 @@ UniquePtr<infinity_thrift_rpc::DataType> InfinityThriftService::DataTypeToProtoD
         case LogicalType::kDouble: {
             auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
             data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Double);
+            return data_type_proto;
+        }
+        case LogicalType::kFloat16: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::Float16);
+            return data_type_proto;
+        }
+        case LogicalType::kBFloat16: {
+            auto data_type_proto = MakeUnique<infinity_thrift_rpc::DataType>();
+            data_type_proto->__set_logic_type(infinity_thrift_rpc::LogicType::BFloat16);
             return data_type_proto;
         }
         case LogicalType::kVarchar: {
@@ -2128,6 +2186,8 @@ infinity_thrift_rpc::ElementType::type InfinityThriftService::EmbeddingDataTypeT
     switch (embedding_data_type) {
         case EmbeddingDataType::kElemBit:
             return infinity_thrift_rpc::ElementType::ElementBit;
+        case EmbeddingDataType::kElemUInt8:
+            return infinity_thrift_rpc::ElementType::ElementUInt8;
         case EmbeddingDataType::kElemInt8:
             return infinity_thrift_rpc::ElementType::ElementInt8;
         case EmbeddingDataType::kElemInt16:
@@ -2140,6 +2200,10 @@ infinity_thrift_rpc::ElementType::type InfinityThriftService::EmbeddingDataTypeT
             return infinity_thrift_rpc::ElementType::ElementFloat32;
         case EmbeddingDataType::kElemDouble:
             return infinity_thrift_rpc::ElementType::ElementFloat64;
+        case EmbeddingDataType::kElemFloat16:
+            return infinity_thrift_rpc::ElementType::ElementFloat16;
+        case EmbeddingDataType::kElemBFloat16:
+            return infinity_thrift_rpc::ElementType::ElementBFloat16;
         case EmbeddingDataType::kElemInvalid: {
             String error_message = fmt::format("Invalid embedding element data type: {}", static_cast<i8>(embedding_data_type));
             UnrecoverableError(error_message);
@@ -2213,6 +2277,8 @@ Status InfinityThriftService::ProcessColumnFieldType(infinity_thrift_rpc::Column
         case LogicalType::kInteger:
         case LogicalType::kBigInt:
         case LogicalType::kHugeInt:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
         case LogicalType::kFloat:
         case LogicalType::kDouble: {
             HandlePodType(output_column_field, row_count, column_vector);
@@ -2292,13 +2358,9 @@ void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &
             std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
             std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
         } else {
-            auto varchar_ptr = MakeUnique<char[]>(varchar.length_ + 1);
-            column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(),
-                                                                varchar.vector_.chunk_id_,
-                                                                varchar.vector_.chunk_offset_,
-                                                                varchar.length_);
+            const auto *data = column_vector->buffer_->GetVarchar(varchar.vector_.file_offset_, length);
             std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-            std::memcpy(dst.data() + current_offset + sizeof(i32), varchar_ptr.get(), varchar.length_);
+            std::memcpy(dst.data() + current_offset + sizeof(i32), data, varchar.length_);
         }
         current_offset += sizeof(i32) + varchar.length_;
     }
@@ -2405,12 +2467,15 @@ void InfinityThriftService::HandleSparseType(infinity_thrift_rpc::ColumnField &o
     for (SizeT index = 0; index < row_count; ++index) {
         SparseT &sparse = reinterpret_cast<SparseT *>(column_vector->data())[index];
         i32 nnz = sparse.nnz_;
-        i32 length = sparse_info->SparseSize(nnz);
         std::memcpy(dst.data() + current_offset, &nnz, sizeof(i32));
         current_offset += sizeof(i32);
-        const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(sparse.chunk_id_, sparse.chunk_offset_);
-        std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
-        current_offset += length;
+        SizeT data_size = sparse_info->DataSize(sparse.nnz_);
+        SizeT idx_size = sparse_info->IndiceSize(sparse.nnz_);
+        auto [raw_data_ptr, raw_idx_ptr] = column_vector->buffer_->GetSparseRaw(sparse.file_offset_, nnz, sparse_info);
+        std::memcpy(dst.data() + current_offset, raw_idx_ptr, idx_size);
+        current_offset += idx_size;
+        std::memcpy(dst.data() + current_offset, raw_data_ptr, data_size);
+        current_offset += data_size;
     }
 
     output_column_field.column_vectors.emplace_back(std::move(dst));

@@ -113,6 +113,23 @@ void MatchTensorExpr::SetQueryTensorStr(std::string embedding_data_type, const C
                     fake_assume_tensor_column_basic_embedding_dim = child_arr->double_array_.size();
                     break;
                 }
+                case LiteralType::kSubArrayArray: {
+                    switch (const auto &child_child_arr = child_arr->sub_array_array_[0]; child_child_arr->literal_type_) {
+                        case LiteralType::kIntegerArray: {
+                            fake_assume_tensor_column_basic_embedding_dim = child_child_arr->long_array_.size();
+                            break;
+                        }
+                        case LiteralType::kDoubleArray: {
+                            fake_assume_tensor_column_basic_embedding_dim = child_child_arr->double_array_.size();
+                            break;
+                        }
+                        default: {
+                            ParserError("Wrong query tensor format!");
+                            break;
+                        }
+                    }
+                    break;
+                }
                 default: {
                     ParserError("Wrong query tensor format!");
                     break;
@@ -127,35 +144,47 @@ void MatchTensorExpr::SetQueryTensorStr(std::string embedding_data_type, const C
     }
     embedding_data_type_ = EmbeddingT::String2EmbeddingDataType(embedding_data_type);
     switch (embedding_data_type_) {
-        case kElemBit: {
+        case EmbeddingDataType::kElemBit: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<bool>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemInt8: {
+        case EmbeddingDataType::kElemUInt8: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<uint8_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case EmbeddingDataType::kElemInt8: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<int8_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemInt16: {
+        case EmbeddingDataType::kElemInt16: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<int16_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemInt32: {
+        case EmbeddingDataType::kElemInt32: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<int32_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemInt64: {
+        case EmbeddingDataType::kElemInt64: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<int64_t>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemFloat: {
+        case EmbeddingDataType::kElemFloat16: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<Float16T>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            query_tensor_data_ptr_ = GetConcatenatedTensorData<BFloat16T>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
+            break;
+        }
+        case EmbeddingDataType::kElemFloat: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<float>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        case kElemDouble: {
+        case EmbeddingDataType::kElemDouble: {
             query_tensor_data_ptr_ = GetConcatenatedTensorData<double>(tensor_expr, fake_assume_tensor_column_basic_embedding_dim, dimension_);
             break;
         }
-        default: {
+        case EmbeddingDataType::kElemInvalid: {
             ParserError(fmt::format("Invalid embedding data type: {}", embedding_data_type));
         }
     }
@@ -168,7 +197,11 @@ void FillConcatenatedTensorData(T *output_ptr, const std::vector<U> &data_array,
         ParserError(error_info);
     }
     for (uint32_t i = 0; i < expect_dim; ++i) {
-        output_ptr[i] = data_array[i];
+        if constexpr (std::is_same_v<T, Float16T> || std::is_same_v<T, BFloat16T>) {
+            output_ptr[i] = static_cast<float>(data_array[i]);
+        } else {
+            output_ptr[i] = data_array[i];
+        }
     }
 }
 
@@ -177,9 +210,29 @@ std::unique_ptr<char[]> GetConcatenatedTensorDataFromSubArray(const std::vector<
                                                               const uint32_t tensor_column_basic_embedding_dim,
                                                               uint32_t &query_total_dimension) {
     static_assert(!std::is_same_v<T, bool>);
-    query_total_dimension = sub_array_array.size() * tensor_column_basic_embedding_dim;
-    auto result = std::make_unique_for_overwrite<char[]>(query_total_dimension * sizeof(T));
-    auto output_data = reinterpret_cast<T *>(result.get());
+    std::unique_ptr<char[]> result;
+    T * output_data = nullptr;
+    switch (sub_array_array[0]->literal_type_) {
+        case LiteralType::kIntegerArray:
+        case LiteralType::kDoubleArray: {
+            query_total_dimension = sub_array_array.size() * tensor_column_basic_embedding_dim;
+            result = std::make_unique_for_overwrite<char[]>(query_total_dimension * sizeof(T));
+            output_data = reinterpret_cast<T *>(result.get());
+            break;
+        }
+        case LiteralType::kSubArrayArray: {
+            query_total_dimension = sub_array_array.size() * sub_array_array[0]->sub_array_array_.size() * tensor_column_basic_embedding_dim;
+            result = std::make_unique_for_overwrite<char[]>(query_total_dimension * sizeof(T));
+            output_data = reinterpret_cast<T *>(result.get());
+            break;
+        }
+        default: {
+            const auto error_info = "Tensor subarray type should be IntegerArray or DoubleArray or SubArrayArray.";
+            ParserError(error_info);
+            break;
+        }
+    }
+
     for (uint32_t i = 0; i < sub_array_array.size(); ++i) {
         switch (sub_array_array[i]->literal_type_) {
             case LiteralType::kIntegerArray: {
@@ -194,8 +247,32 @@ std::unique_ptr<char[]> GetConcatenatedTensorDataFromSubArray(const std::vector<
                                            tensor_column_basic_embedding_dim);
                 break;
             }
+            case LiteralType::kSubArrayArray: {
+                for(uint32_t j = 0; j < sub_array_array[i]->sub_array_array_.size(); ++j) {
+                    switch (sub_array_array[i]->sub_array_array_[j]->literal_type_) {
+                        case LiteralType::kIntegerArray: {
+                            FillConcatenatedTensorData(output_data + (i*sub_array_array[i]->sub_array_array_.size()+j) * tensor_column_basic_embedding_dim,
+                                                       sub_array_array[i]->sub_array_array_[j]->long_array_,
+                                                       tensor_column_basic_embedding_dim);
+                            break;
+                        }
+                        case LiteralType::kDoubleArray: {
+                            FillConcatenatedTensorData(output_data + (i*sub_array_array[i]->sub_array_array_.size()+j) * tensor_column_basic_embedding_dim,
+                                                       sub_array_array[i]->sub_array_array_[j]->double_array_,
+                                                       tensor_column_basic_embedding_dim);
+                            break;
+                        }
+                        default: {
+                            const auto error_info = "Tensorarray subarray type should be IntegerArray or DoubleArray.";
+                            ParserError(error_info);
+                            break;
+                        }
+                    }
+                }
+                break;
+            }
             default: {
-                const auto error_info = "Tensor subarray type should be IntegerArray or DoubleArray.";
+                const auto error_info = "Tensor subarray type should be IntegerArray or DoubleArray or SubArrayArray.";
                 ParserError(error_info);
                 break;
             }
@@ -269,7 +346,11 @@ GetConcatenatedTensorData(const std::vector<U> &data_array, const uint32_t tenso
         auto result = std::make_unique_for_overwrite<char[]>(query_total_dimension * sizeof(T));
         auto embedding_data_ptr = reinterpret_cast<T *>(result.get());
         for (uint32_t i = 0; i < query_total_dimension; ++i) {
-            embedding_data_ptr[i] = data_array[i];
+            if constexpr (std::is_same_v<T, Float16T> || std::is_same_v<T, BFloat16T>) {
+                embedding_data_ptr[i] = static_cast<float>(data_array[i]);
+            } else {
+                embedding_data_ptr[i] = data_array[i];
+            }
         }
         return result;
     }

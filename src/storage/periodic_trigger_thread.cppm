@@ -23,18 +23,12 @@ namespace infinity {
 
 export class PeriodicTriggerThread {
 public:
-    PeriodicTriggerThread() : running_(true) {}
+    PeriodicTriggerThread() : running_(false) {}
 
     ~PeriodicTriggerThread() {
         if (running_.load()) {
             Stop();
         }
-    }
-
-    int AddTrigger(UniquePtr<PeriodicTrigger> trigger) {
-        int id = triggers_.size();
-        triggers_.push_back(std::move(trigger));
-        return id;
     }
 
     void Start();
@@ -43,13 +37,17 @@ public:
 
     void Run();
 
-    void Reset(int id) { triggers_[id]->Reset(); }
+public:
+    SharedPtr<CleanupPeriodicTrigger> cleanup_trigger_;
+    SharedPtr<CheckpointPeriodicTrigger> full_checkpoint_trigger_;
+    SharedPtr<CheckpointPeriodicTrigger> delta_checkpoint_trigger_;
+    SharedPtr<CompactSegmentPeriodicTrigger> compact_segment_trigger_;
+    SharedPtr<OptimizeIndexPeriodicTrigger> optimize_index_trigger_;
 
 private:
-    Vector<UniquePtr<PeriodicTrigger>> triggers_;
 
     Thread thread_{};
-    atomic_bool running_{};
+    atomic_bool running_{false};
 };
 
 } // namespace infinity

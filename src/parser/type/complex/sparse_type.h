@@ -30,21 +30,23 @@ struct SparseType {
             return {};
         }
         std::stringstream ss;
+        ss << "[";
         if constexpr (std::is_same_v<DataType, bool>) {
             for (size_t i = 0; i < nnz; ++i) {
                 ss << std::to_string(indice_ptr[i]);
                 if (i < nnz - 1) {
-                    ss << ", ";
+                    ss << ",";
                 }
             }
         } else {
             for (size_t i = 0; i < nnz; ++i) {
-                ss << std::to_string(indice_ptr[i]) << ": " << std::to_string(data_ptr[i]);
+                ss << std::to_string(indice_ptr[i]) << ":" << std::to_string(data_ptr[i]);
                 if (i < nnz - 1) {
-                    ss << ", ";
+                    ss << ",";
                 }
             }
         }
+        ss << "]";
         return std::move(ss).str();
     }
 
@@ -70,8 +72,7 @@ struct SparseType {
     }
 
     int64_t nnz_ = 0;
-    uint32_t chunk_id_ = 0;
-    uint32_t chunk_offset_ = 0;
+    int64_t file_offset_ = 0;
 
     static std::string
     Sparse2String(const char *data_ptr, const char *indice_ptr, EmbeddingDataType data_type, EmbeddingDataType indice_type, size_t nnz) {

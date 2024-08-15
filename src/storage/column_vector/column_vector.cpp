@@ -91,12 +91,9 @@ Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVe
             vector_buffer_type = VectorBufferType::kCompactBit;
             break;
         }
-        case LogicalType::kSparse: {
-            vector_buffer_type = VectorBufferType::kSparseHeap;
-            break;
-        }
+        case LogicalType::kSparse:
         case LogicalType::kVarchar: {
-            vector_buffer_type = VectorBufferType::kHeap;
+            vector_buffer_type = VectorBufferType::kVarBuffer;
             break;
         }
         case LogicalType::kTensor: {
@@ -135,20 +132,14 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
         data_ptr_ = buffer_->GetDataMut();
     } else {
         // Initialize after reset will come to this branch
-        if (const auto t = vector_buffer_types.first;
-            t == VectorBufferType::kHeap or t == VectorBufferType::kTensorHeap or t == VectorBufferType::kSparseHeap) {
-            if (buffer_->fix_heap_mgr_.get() != nullptr or buffer_->fix_heap_mgr_1_.get() != nullptr) {
-                String error_message = "Vector heap should be null.";
-                UnrecoverableError(error_message);
-            }
-            buffer_->ResetToInit();
-        }
+        buffer_->ResetToInit(vector_buffer_types.first);
     }
 }
 
 void ColumnVector::Initialize(BufferManager *buffer_mgr,
                               BlockColumnEntry *block_column_entry,
                               SizeT current_row_count,
+                              ColumnVectorTipe vector_tipe,
                               ColumnVectorType vector_type,
                               SizeT capacity) {
     Pair<VectorBufferType, VectorBufferType> vector_buffer_types = InitializeHelper(vector_type, capacity);
@@ -165,7 +156,16 @@ void ColumnVector::Initialize(BufferManager *buffer_mgr,
         buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_types);
         nulls_ptr_ = Bitmask::Make(capacity_);
     }
-    data_ptr_ = buffer_->GetDataMut();
+    switch (vector_tipe) {
+        case ColumnVectorTipe::kReadWrite: {
+            data_ptr_ = buffer_->GetDataMut();
+            break;
+        }
+        case ColumnVectorTipe::kReadOnly: {
+            data_ptr_ = const_cast<ptr_t>(buffer_->GetData());
+            break;
+        }
+    }
     tail_index_ = current_row_count;
 }
 
@@ -213,6 +213,14 @@ void ColumnVector::Initialize(const ColumnVector &other, const Selection &input_
             }
             case kDouble: {
                 CopyFrom<DoubleT>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                break;
+            }
+            case kFloat16: {
+                CopyFrom<Float16T>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
+                break;
+            }
+            case kBFloat16: {
+                CopyFrom<BFloat16T>(other.buffer_.get(), this->buffer_.get(), tail_index_, input_select);
                 break;
             }
             case kDecimal: {
@@ -367,6 +375,14 @@ void ColumnVector::Initialize(ColumnVectorType vector_type, const ColumnVector &
             }
             case kDouble: {
                 CopyFrom<DoubleT>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kFloat16: {
+                CopyFrom<Float16T>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
+                break;
+            }
+            case kBFloat16: {
+                CopyFrom<BFloat16T>(other.buffer_.get(), this->buffer_.get(), start_idx, 0, end_idx - start_idx);
                 break;
             }
             case kDecimal: {
@@ -551,6 +567,14 @@ void ColumnVector::CopyRow(const ColumnVector &other, SizeT dst_idx, SizeT src_i
             CopyRowFrom<DoubleT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
         }
+        case kFloat16: {
+            CopyRowFrom<Float16T>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
+        case kBFloat16: {
+            CopyRowFrom<BFloat16T>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
+            break;
+        }
         case kDecimal: {
             CopyRowFrom<DecimalT>(other.buffer_.get(), src_idx, this->buffer_.get(), dst_idx);
             break;
@@ -696,6 +720,12 @@ String ColumnVector::ToString(SizeT row_index) const {
         case kDouble: {
             return std::to_string(((DoubleT *)data_ptr_)[row_index]);
         }
+        case kFloat16: {
+            return std::to_string(static_cast<float>(((Float16T *)data_ptr_)[row_index]));
+        }
+        case kBFloat16: {
+            return std::to_string(static_cast<float>(((BFloat16T *)data_ptr_)[row_index]));
+        }
         case kDecimal: {
             Status status = Status::NotSupport("Not implemented");
             RecoverableError(status);
@@ -706,12 +736,8 @@ String ColumnVector::ToString(SizeT row_index) const {
                 return {varchar_ref.short_.data_, varchar_ref.length_};
             } else {
                 // Must be vector type
-                String result_str;
-                result_str.resize(varchar_ref.length_);
-                buffer_->fix_heap_mgr_->ReadFromHeap(result_str.data(),
-                                                     varchar_ref.vector_.chunk_id_,
-                                                     varchar_ref.vector_.chunk_offset_,
-                                                     varchar_ref.length_);
+                const char *data = buffer_->GetVarchar(varchar_ref.vector_.file_offset_, varchar_ref.length_);
+                String result_str(data, varchar_ref.length_);
                 return result_str;
             }
         }
@@ -809,15 +835,16 @@ String ColumnVector::ToString(SizeT row_index) const {
                                                  tensor_array_chunk_offset,
                                                  tensor_num * sizeof(TensorT));
             OStringStream oss;
+            oss << '[';
             for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
                 const auto &[embedding_num, chunk_id, chunk_offset] = tensor_array[tensor_id];
                 const char *raw_data_ptr = buffer_->fix_heap_mgr_1_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-                oss << "[" << TensorT::Tensor2String(const_cast<char *>(raw_data_ptr), embedding_data_type, unit_embedding_dimension, embedding_num)
-                    << "]";
+                oss << TensorT::Tensor2String(const_cast<char *>(raw_data_ptr), embedding_data_type, unit_embedding_dimension, embedding_num);
                 if (tensor_id != tensor_num - 1) {
-                    oss << ",";
+                    oss << ',';
                 }
             }
+            oss << ']';
             return std::move(oss).str();
         }
         case kSparse: {
@@ -826,14 +853,12 @@ String ColumnVector::ToString(SizeT row_index) const {
                 UnrecoverableError(error_message);
             }
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
-            const auto &[nnz, chunk_id, chunk_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[row_index];
+            const auto &[nnz, file_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[row_index];
             if (nnz == 0) {
                 return SparseT::Sparse2String(nullptr, nullptr, sparse_info->DataType(), sparse_info->IndexType(), 0);
             }
-            const char *raw_data_ptr = buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-            const char *indice_ptr = raw_data_ptr;
-            const char *data_ptr = indice_ptr + nnz * EmbeddingType::EmbeddingDataWidth(sparse_info->IndexType());
-            auto res = SparseT::Sparse2String(data_ptr, indice_ptr, sparse_info->DataType(), sparse_info->IndexType(), nnz);
+            auto [raw_data_ptr, raw_index_ptr] = buffer_->GetSparseRaw(file_offset, nnz, sparse_info);
+            auto res = SparseT::Sparse2String(raw_data_ptr, raw_index_ptr, sparse_info->DataType(), sparse_info->IndexType(), nnz);
             if (res.empty()) {
                 String error_message = "Cannot convert sparse to string";
                 UnrecoverableError(error_message);
@@ -897,6 +922,12 @@ Value ColumnVector::GetValue(SizeT index) const {
         case kDouble: {
             return Value::MakeDouble(((DoubleT *)data_ptr_)[index]);
         }
+        case kFloat16: {
+            return Value::MakeFloat16(((Float16T *)data_ptr_)[index]);
+        }
+        case kBFloat16: {
+            return Value::MakeBFloat16(((BFloat16T *)data_ptr_)[index]);
+        }
         case kDecimal: {
             return Value::MakeDecimal(((DecimalT *)data_ptr_)[index], data_type_->type_info());
         }
@@ -905,11 +936,8 @@ Value ColumnVector::GetValue(SizeT index) const {
             if (varchar.IsInlined()) {
                 return Value::MakeVarchar(((VarcharT *)data_ptr_)[index]);
             } else {
-                char *varchar_ptr = new char[varchar.length_ + 1]{0};
-                this->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr, varchar.vector_.chunk_id_, varchar.vector_.chunk_offset_, varchar.length_);
-                Value value = Value::MakeVarchar(varchar_ptr, varchar.length_);
-                delete[] varchar_ptr;
-                return value;
+                const char *data_ptr = buffer_->GetVarchar(varchar.vector_.file_offset_, varchar.length_);
+                return Value::MakeVarchar(data_ptr, varchar.length_);
             }
         }
         case kDate: {
@@ -986,9 +1014,10 @@ Value ColumnVector::GetValue(SizeT index) const {
             return value;
         }
         case kSparse: {
-            const auto &[nnz, chunk_id, chunk_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[index];
-            const char *raw_data_ptr = buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-            return Value::MakeSparse(raw_data_ptr, nnz, data_type_->type_info());
+            const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+            const auto &[nnz, file_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[index];
+            auto [raw_data_ptr, raw_idx_ptr] = buffer_->GetSparseRaw(file_offset, nnz, sparse_info);
+            return Value::MakeSparse(raw_data_ptr, raw_idx_ptr, nnz, data_type_->type_info());
         }
         case kRowID: {
             return Value::MakeRow(((RowID *)data_ptr_)[index]);
@@ -1008,10 +1037,11 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         UnrecoverableError(error_message);
     }
     if (index > tail_index_) {
-        String error_message = fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
-                                           std::to_string(index),
-                                           std::to_string(tail_index_),
-                                           std::to_string(capacity_));
+        String error_message =
+            fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+                        std::to_string(index),
+                        std::to_string(tail_index_),
+                        std::to_string(capacity_));
         UnrecoverableError(error_message);
     }
 
@@ -1057,6 +1087,14 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
         }
         case kDouble: {
             ((DoubleT *)data_ptr_)[index] = value.GetValue<DoubleT>();
+            break;
+        }
+        case kFloat16: {
+            ((Float16T *)data_ptr_)[index] = value.GetValue<Float16T>();
+            break;
+        }
+        case kBFloat16: {
+            ((BFloat16T *)data_ptr_)[index] = value.GetValue<BFloat16T>();
             break;
         }
         case kDecimal: {
@@ -1139,9 +1177,8 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
                 std::memcpy(target_ref.short_.data_, src_str.c_str(), varchar_len);
             } else {
                 std::memcpy(target_ref.vector_.prefix_, src_str.c_str(), VARCHAR_PREFIX_LEN);
-                auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(src_str.c_str(), varchar_len);
-                target_ref.vector_.chunk_id_ = chunk_id;
-                target_ref.vector_.chunk_offset_ = chunk_offset;
+                SizeT file_offset = buffer_->AppendVarchar(src_str.c_str(), varchar_len);
+                target_ref.vector_.file_offset_ = file_offset;
             }
             break;
         }
@@ -1186,18 +1223,17 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
         case kSparse: {
-            auto &[target_nnz, target_chunk_id, target_chunk_offset] = reinterpret_cast<SparseT *>(data_ptr_)[index];
+            const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+            auto &[target_nnz, target_file_offset] = reinterpret_cast<SparseT *>(data_ptr_)[index];
             auto [source_nnz, source_indice, source_data] = value.GetSparse();
             target_nnz = source_nnz;
 
-            Vector<Pair<const_ptr_t, SizeT>> data_ptrs;
-            data_ptrs.emplace_back(source_indice.data(), source_indice.size());
-            data_ptrs.emplace_back(source_data.data(), source_data.size());
             if (source_nnz == 0) {
-                target_chunk_id = -1;
-                target_chunk_offset = 0;
+                target_file_offset = -1;
             } else {
-                std::tie(target_chunk_id, target_chunk_offset) = buffer_->fix_heap_mgr_->AppendToHeap(data_ptrs);
+                const auto *source_data_ptr = source_data.empty() ? nullptr : source_data.data();
+                const auto *source_indice_ptr = source_indice.data();
+                target_file_offset = buffer_->AppendSparseRaw(source_data_ptr, source_indice_ptr, target_nnz, sparse_info);
             }
             break;
         }
@@ -1207,8 +1243,8 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             SizeT src_size = data_span.size();
             if (src_size != data_type_->Size()) {
                 String error_message = fmt::format("Attempt to store a value with different size than column vector type, want {}, got {}",
-                                                  data_type_->Size(),
-                                                  src_size);
+                                                   data_type_->Size(),
+                                                   src_size);
                 UnrecoverableError(error_message);
             }
             ptr_t dst_ptr = data_ptr_ + index * data_type_->Size();
@@ -1242,13 +1278,13 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
     if (index > capacity_) {
         String error_message = fmt::format("Attempt to set column vector tail index to {}, capacity: {}", index, capacity_);
         UnrecoverableError(error_message);
-
     }
     if (index > tail_index_) {
-        String error_message = fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
-                                           std::to_string(index),
-                                           std::to_string(tail_index_),
-                                           std::to_string(capacity_));
+        String error_message =
+            fmt::format("Attempt to store value into unavailable row of column vector: {}, current column tail index: {}, capacity: {}",
+                        std::to_string(index),
+                        std::to_string(tail_index_),
+                        std::to_string(capacity_));
         UnrecoverableError(error_message);
     }
     // We assume the value_ptr point to the same type data.
@@ -1281,6 +1317,14 @@ void ColumnVector::SetByRawPtr(SizeT index, const_ptr_t raw_ptr) {
         }
         case kFloat: {
             ((FloatT *)data_ptr_)[index] = *(FloatT *)(raw_ptr);
+            break;
+        }
+        case kFloat16: {
+            ((Float16T *)data_ptr_)[index] = *(Float16T *)(raw_ptr);
+            break;
+        }
+        case kBFloat16: {
+            ((BFloat16T *)data_ptr_)[index] = *(BFloat16T *)(raw_ptr);
             break;
         }
         case kDouble: {
@@ -1475,7 +1519,7 @@ Vector<Vector<std::string_view>> SplitTensorArrayElement(std::string_view data, 
 
 } // namespace
 
-void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *column_def) {
+void ColumnVector::AppendByStringView(std::string_view sv) {
     SizeT index = tail_index_++;
     switch (data_type_->type()) {
         case kBoolean: {
@@ -1504,6 +1548,14 @@ void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *colu
         }
         case kDouble: {
             ((DoubleT *)data_ptr_)[index] = DataType::StringToValue<DoubleT>(sv);
+            break;
+        }
+        case kFloat16: {
+            ((Float16T *)data_ptr_)[index] = DataType::StringToValue<Float16T>(sv);
+            break;
+        }
+        case kBFloat16: {
+            ((BFloat16T *)data_ptr_)[index] = DataType::StringToValue<BFloat16T>(sv);
             break;
         }
         case kDate: {
@@ -1535,6 +1587,10 @@ void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *colu
                     AppendEmbedding<BooleanT>(ele_str_views, dst_off);
                     break;
                 }
+                case kElemUInt8: {
+                    AppendEmbedding<u8>(ele_str_views, dst_off);
+                    break;
+                }
                 case kElemInt8: {
                     AppendEmbedding<TinyIntT>(ele_str_views, dst_off);
                     break;
@@ -1559,7 +1615,15 @@ void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *colu
                     AppendEmbedding<DoubleT>(ele_str_views, dst_off);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendEmbedding<Float16T>(ele_str_views, dst_off);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendEmbedding<BFloat16T>(ele_str_views, dst_off);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
@@ -1578,6 +1642,10 @@ void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *colu
             switch (embedding_info->Type()) {
                 case kElemBit: {
                     AppendTensor<BooleanT>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemUInt8: {
+                    AppendTensor<u8>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
                 }
                 case kElemInt8: {
@@ -1604,7 +1672,15 @@ void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *colu
                     AppendTensor<DoubleT>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendTensor<Float16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendTensor<BFloat16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
@@ -1631,6 +1707,10 @@ void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *colu
                     AppendTensorArray<BooleanT>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
                 }
+                case kElemUInt8: {
+                    AppendTensorArray<u8>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
                 case kElemInt8: {
                     AppendTensorArray<TinyIntT>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
@@ -1655,7 +1735,15 @@ void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *colu
                     AppendTensorArray<DoubleT>(ele_str_views, dst_off, unit_embedding_dim);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendTensorArray<Float16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendTensorArray<BFloat16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid embedding type";
                     UnrecoverableError(error_message);
                 }
@@ -1670,45 +1758,56 @@ void ColumnVector::AppendByStringView(std::string_view sv, const ColumnDef *colu
                 std::memcpy(varchar.short_.data_, sv.data(), sv.size());
             } else {
                 std::memcpy(varchar.vector_.prefix_, sv.data(), VARCHAR_PREFIX_LEN);
-                auto [chunk_id, chunk_offset] = this->buffer_->fix_heap_mgr_->AppendToHeap(sv.data(), sv.size());
-                varchar.vector_.chunk_id_ = chunk_id;
-                varchar.vector_.chunk_offset_ = chunk_offset;
+                SizeT file_offset = buffer_->AppendVarchar(sv.data(), sv.size());
+                varchar.vector_.file_offset_ = file_offset;
             }
             break;
         }
         case kSparse: {
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
             Vector<std::string_view> ele_str_views = SplitArrayElement(sv, ',');
-            switch(sparse_info->DataType()) {
+            switch (sparse_info->DataType()) {
                 case kElemBit: {
-                    AppendSparse<BooleanT>(ele_str_views, index, column_def);
+                    AppendSparse<BooleanT>(ele_str_views, index);
+                    break;
+                }
+                case kElemUInt8: {
+                    AppendSparse<u8>(ele_str_views, index);
                     break;
                 }
                 case kElemInt8: {
-                    AppendSparse<TinyIntT>(ele_str_views, index, column_def);
+                    AppendSparse<TinyIntT>(ele_str_views, index);
                     break;
                 }
                 case kElemInt16: {
-                    AppendSparse<SmallIntT>(ele_str_views, index, column_def);
+                    AppendSparse<SmallIntT>(ele_str_views, index);
                     break;
                 }
                 case kElemInt32: {
-                    AppendSparse<IntegerT>(ele_str_views, index, column_def);
+                    AppendSparse<IntegerT>(ele_str_views, index);
                     break;
                 }
                 case kElemInt64: {
-                    AppendSparse<BigIntT>(ele_str_views, index, column_def);
+                    AppendSparse<BigIntT>(ele_str_views, index);
                     break;
                 }
                 case kElemFloat: {
-                    AppendSparse<FloatT>(ele_str_views, index, column_def);
+                    AppendSparse<FloatT>(ele_str_views, index);
                     break;
                 }
                 case kElemDouble: {
-                    AppendSparse<DoubleT>(ele_str_views, index, column_def);
+                    AppendSparse<DoubleT>(ele_str_views, index);
                     break;
                 }
-                default: {
+                case kElemFloat16: {
+                    AppendSparse<Float16T>(ele_str_views, index);
+                    break;
+                }
+                case kElemBFloat16: {
+                    AppendSparse<BFloat16T>(ele_str_views, index);
+                    break;
+                }
+                case kElemInvalid: {
                     String error_message = "Invalid sparse type";
                     UnrecoverableError(error_message);
                 }
@@ -1749,12 +1848,14 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
     }
 
     if (*this->data_type_ != *other.data_type_) {
-        String error_message = fmt::format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString());
+        String error_message =
+            fmt::format("Attempt to append column vector{} to column vector{}", other.data_type_->ToString(), data_type_->ToString());
         UnrecoverableError(error_message);
     }
 
     if (this->tail_index_ + count > this->capacity_) {
-        String error_message = fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_);
+        String error_message =
+            fmt::format("Attempt to append {} rows data to {} rows data, which exceeds {} limit.", count, this->tail_index_, this->capacity_);
         UnrecoverableError(error_message);
     }
 
@@ -1791,6 +1892,14 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             CopyValue<DoubleT>(*this, other, from, count);
             break;
         }
+        case kFloat16: {
+            CopyValue<Float16T>(*this, other, from, count);
+            break;
+        }
+        case kBFloat16: {
+            CopyValue<BFloat16T>(*this, other, from, count);
+            break;
+        }
         case kDecimal: {
             CopyValue<DecimalT>(*this, other, from, count);
             break;
@@ -1802,7 +1911,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             for (SizeT idx = 0; idx < count; ++idx) {
                 VarcharT &src_ref = base_src_ptr[from + idx];
                 VarcharT &dst_ref = base_dst_ptr[idx];
-                CopyVarchar(dst_ref, buffer_->fix_heap_mgr_.get(), src_ref, other.buffer_->fix_heap_mgr_.get());
+                CopyVarchar(dst_ref, buffer_.get(), src_ref, other.buffer_.get());
             }
             break;
         }
@@ -1834,8 +1943,7 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
             for (SizeT idx = 0; idx < count; ++idx) {
                 const SparseT &src_sparse = base_src_ptr[from + idx];
                 SparseT &dst_sparse = base_dst_ptr[idx];
-                SizeT sparse_bytes = sparse_info->SparseSize(src_sparse.nnz_);
-                CopySparse(dst_sparse, buffer_->fix_heap_mgr_.get(), src_sparse, other.buffer_->fix_heap_mgr_.get(), sparse_bytes);
+                CopySparse(dst_sparse, buffer_.get(), src_sparse, other.buffer_.get(), sparse_info);
             }
             break;
         }
@@ -1953,7 +2061,8 @@ SizeT ColumnVector::AppendWith(RowID from, SizeT row_count) {
 
 void ColumnVector::ShallowCopy(const ColumnVector &other) {
     if (*this->data_type_ != *other.data_type_) {
-        String error_message = fmt::format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString());
+        String error_message =
+            fmt::format("Attempt to shallow copy: {} column vector to: {}", other.data_type_->ToString(), this->data_type_->ToString());
         UnrecoverableError(error_message);
     }
     if (this->buffer_.get() != other.buffer_.get()) {
@@ -1993,7 +2102,7 @@ void ColumnVector::Reset() {
 
     //    buffer_.reset();
     if (buffer_.get() != nullptr) {
-        buffer_->fix_heap_mgr_ = nullptr;
+        buffer_->Reset();
     }
     //    data_ptr_ = nullptr;
 
@@ -2029,11 +2138,9 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
                 if (0 != memcmp(lhs->short_.data_, rhs->short_.data_, lhs->length_))
                     return false;
             } else {
-                Vector<char> lhs_str(lhs->length_);
-                Vector<char> rhs_str(rhs->length_);
-                this->buffer_->fix_heap_mgr_->ReadFromHeap(lhs_str.data(), lhs->vector_.chunk_id_, lhs->vector_.chunk_offset_, lhs->length_);
-                other.buffer_->fix_heap_mgr_->ReadFromHeap(rhs_str.data(), rhs->vector_.chunk_id_, rhs->vector_.chunk_offset_, rhs->length_);
-                if (0 != memcmp(lhs_str.data(), rhs_str.data(), lhs->length_))
+                const char *data1 = buffer_->GetVarchar(lhs->vector_.file_offset_, lhs->length_);
+                const char *data2 = other.buffer_->GetVarchar(rhs->vector_.file_offset_, rhs->length_);
+                if (0 != memcmp(data1, data2, lhs->length_))
                     return false;
             }
         }
@@ -2052,7 +2159,7 @@ i32 ColumnVector::GetSizeInBytes() const {
         UnrecoverableError(error_message);
     }
     if (vector_type_ != ColumnVectorType::kFlat && vector_type_ != ColumnVectorType::kConstant && vector_type_ != ColumnVectorType::kCompactBit) {
-        String error_message =  fmt::format("Not supported vector_type {}", int(vector_type_));
+        String error_message = fmt::format("Not supported vector_type {}", int(vector_type_));
         UnrecoverableError(error_message);
     }
     i32 size = this->data_type_->GetSizeInBytes() + sizeof(ColumnVectorType);
@@ -2062,12 +2169,7 @@ i32 ColumnVector::GetSizeInBytes() const {
     } else {
         size += this->tail_index_ * this->data_type_size_;
     }
-    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
-        size += sizeof(i32) + buffer_->fix_heap_mgr_->total_size();
-    }
-    if (const auto data_t = data_type_->type(); data_t == kTensorArray) {
-        size += sizeof(i32) + buffer_->fix_heap_mgr_1_->total_size();
-    }
+    size += buffer_->TotalSize(data_type_.get());
     size += this->nulls_ptr_->GetSizeInBytes();
     return size;
 }
@@ -2099,18 +2201,7 @@ void ColumnVector::WriteAdv(char *&ptr) const {
         ptr += this->tail_index_ * this->data_type_size_;
     }
     // write variable part
-    if (const auto data_t = data_type_->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
-        i32 heap_len = buffer_->fix_heap_mgr_->total_size();
-        WriteBufAdv<i32>(ptr, heap_len);
-        buffer_->fix_heap_mgr_->ReadFromHeap(ptr, 0, 0, heap_len);
-        ptr += heap_len;
-    }
-    if (const auto data_t = data_type_->type(); data_t == kTensorArray) {
-        i32 heap_len_1 = buffer_->fix_heap_mgr_1_->total_size();
-        WriteBufAdv<i32>(ptr, heap_len_1);
-        buffer_->fix_heap_mgr_1_->ReadFromHeap(ptr, 0, 0, heap_len_1);
-        ptr += heap_len_1;
-    }
+    buffer_->WriteAdv(ptr, data_type_.get());
     this->nulls_ptr_->WriteAdv(ptr);
     return;
 }
@@ -2134,26 +2225,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
         ptr += tail_index * data_type_size;
     }
     // read variable part
-    if (const auto data_t = data_type->type(); data_t == kVarchar or data_t == kTensor or data_t == kTensorArray or data_t == kSparse) {
-        i32 heap_len = ReadBufAdv<i32>(ptr);
-        const i32 one_chunk_size = column_vector->buffer_->fix_heap_mgr_->current_chunk_size();
-        while (heap_len > 0) {
-            const i32 real_append_size = std::min(heap_len, one_chunk_size);
-            column_vector->buffer_->fix_heap_mgr_->AppendToHeap(ptr, real_append_size);
-            ptr += real_append_size;
-            heap_len -= real_append_size;
-        }
-    }
-    if (const auto data_t = data_type->type(); data_t == kTensorArray) {
-        i32 heap_len_1 = ReadBufAdv<i32>(ptr);
-        const i32 one_chunk_size = column_vector->buffer_->fix_heap_mgr_1_->current_chunk_size();
-        while (heap_len_1 > 0) {
-            const i32 real_append_size = std::min(heap_len_1, one_chunk_size);
-            column_vector->buffer_->fix_heap_mgr_1_->AppendToHeap(ptr, real_append_size);
-            ptr += real_append_size;
-            heap_len_1 -= real_append_size;
-        }
-    }
+    column_vector->buffer_->ReadAdv(ptr, data_type.get());
 
     maxbytes = ptr_end - ptr;
     if (maxbytes < 0) {
@@ -2169,7 +2241,7 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
     return column_vector;
 }
 
-void CopyVarchar(VarcharT &dst_ref, FixHeapManager *dst_fix_heap_mgr, const VarcharT &src_ref, FixHeapManager *src_fix_heap_mgr) {
+void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT &src_ref, const VectorBuffer *src_vec_buffer) {
     const u32 varchar_len = src_ref.length_;
     dst_ref.is_value_ = 0;
     dst_ref.length_ = varchar_len;
@@ -2178,10 +2250,8 @@ void CopyVarchar(VarcharT &dst_ref, FixHeapManager *dst_fix_heap_mgr, const Varc
         std::memcpy(dst_ref.short_.data_, src_ref.short_.data_, varchar_len);
     } else {
         std::memcpy(dst_ref.vector_.prefix_, src_ref.vector_.prefix_, VARCHAR_PREFIX_LEN);
-        const auto [chunk_id, chunk_offset] =
-            dst_fix_heap_mgr->AppendToHeap(src_fix_heap_mgr, src_ref.vector_.chunk_id_, src_ref.vector_.chunk_offset_, varchar_len);
-        dst_ref.vector_.chunk_id_ = chunk_id;
-        dst_ref.vector_.chunk_offset_ = chunk_offset;
+        dst_ref.vector_.file_offset_ =
+            dst_vec_buffer->AppendVarchar(src_vec_buffer->GetVarchar(src_ref.vector_.file_offset_, varchar_len), varchar_len);
     }
 }
 
@@ -2220,18 +2290,17 @@ void CopyTensorArray(TensorArrayT &dst_ref,
 }
 
 void CopySparse(SparseT &dst_sparse,
-                FixHeapManager *dst_fix_heap_mgr,
+                VectorBuffer *dst_vec_buffer,
                 const SparseT &src_sparse,
-                FixHeapManager *src_fix_heap_mgr,
-                SizeT sparse_bytes) {
+                const VectorBuffer *src_vec_buffer,
+                const SparseInfo *sparse_info) {
     dst_sparse.nnz_ = src_sparse.nnz_;
     if (src_sparse.nnz_ == 0) {
-        dst_sparse.chunk_id_ = -1;
-        dst_sparse.chunk_offset_ = 0;
+        dst_sparse.file_offset_ = -1;
         return;
     }
-    std::tie(dst_sparse.chunk_id_, dst_sparse.chunk_offset_) =
-        dst_fix_heap_mgr->AppendToHeap(src_fix_heap_mgr, src_sparse.chunk_id_, src_sparse.chunk_offset_, sparse_bytes);
+    const auto [raw_data_ptr, raw_idx_ptr] = src_vec_buffer->GetSparseRaw(src_sparse.file_offset_, src_sparse.nnz_, sparse_info);
+    dst_sparse.file_offset_ = dst_vec_buffer->AppendSparseRaw(raw_data_ptr, raw_idx_ptr, src_sparse.nnz_, sparse_info);
 }
 
 Vector<std::string_view> SplitTensorElement(std::string_view data, char delimiter, const u32 unit_embedding_dim) {

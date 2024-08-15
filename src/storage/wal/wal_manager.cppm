@@ -30,7 +30,7 @@ class Storage;
 class BGTaskProcessor;
 class TableEntry;
 class Txn;
-class SegmentEntry;
+struct SegmentEntry;
 
 export class WalManager {
 public:
@@ -76,7 +76,8 @@ public:
 
 private:
     // Checkpoint Helper
-    void CheckpointInner(bool is_full_checkpoint, Txn *txn);
+    void FullCheckpointInner(Txn *txn);
+    void DeltaCheckpointInner(Txn *txn);
     void UpdateCommitState(TxnTimeStamp commit_ts, i64 wal_size);
     Tuple<TxnTimeStamp, i64> GetCommitState();
     i64 GetLastCkpWalSize();
@@ -106,6 +107,7 @@ public:
     u64 cfg_delta_checkpoint_interval_wal_bytes_{};
 
     const String &wal_dir() const { return wal_dir_; }
+    const String &data_path() const { return data_path_; }
 
 private:
     // Concurrent writing WAL is disallowed. So put all WAL writing into a queue

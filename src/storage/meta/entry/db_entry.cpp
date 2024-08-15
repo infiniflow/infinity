@@ -68,10 +68,14 @@ SharedPtr<DBEntry> DBEntry::NewDBEntry(DBMeta *db_meta,
                                        TransactionID txn_id,
                                        TxnTimeStamp begin_ts) {
     String delete_str = fmt::format("{}/", *base_dir);
-    SharedPtr<String> temp_dir = DetermineDBDir(*base_dir, *db_name);
-    auto pos = temp_dir->find(delete_str);
-    temp_dir->erase(pos, delete_str.size());
-    SharedPtr<String> db_entry_dir = is_delete ? MakeShared<String>("deleted") : temp_dir;
+    SharedPtr<String> db_entry_dir;
+    if (is_delete) {
+        db_entry_dir = MakeShared<String>("deleted");
+    } else {
+        db_entry_dir = DetermineDBDir(*base_dir, *db_name);
+        auto pos = db_entry_dir->find(delete_str);
+        db_entry_dir->erase(pos, delete_str.size());
+    }
     return MakeShared<DBEntry>(db_meta, is_delete, base_dir, db_entry_dir, db_name, txn_id, begin_ts);
 }
 
@@ -235,6 +239,10 @@ Status DBEntry::GetTablesDetail(Txn *txn, Vector<TableDetail> &output_table_arra
     return Status::OK();
 }
 
+Tuple<Vector<String>, Vector<TableMeta*>, std::shared_lock<std::shared_mutex>> DBEntry::GetAllTableMetas() const {
+    return table_meta_map_.GetAllMetaGuard();
+}
+
 SharedPtr<String> DBEntry::ToString() {
     SharedPtr<String> res =
         MakeShared<String>(fmt::format("DBEntry, db_entry_dir: {}, txn id: {}, table count: ", *AbsoluteDir(), txn_id_, table_meta_map_.Size()));
@@ -323,12 +331,12 @@ void DBEntry::MemIndexCommit() {
     }
 }
 
-void DBEntry::MemIndexRecover(BufferManager *buffer_manager) {
+void DBEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts) {
     auto table_meta_map_guard = table_meta_map_.GetMetaMap();
     for (auto &[_, table_meta] : *table_meta_map_guard) {
         auto [table_entry, status] = table_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
         if (status.ok()) {
-            table_entry->MemIndexRecover(buffer_manager);
+            table_entry->MemIndexRecover(buffer_manager, ts);
         }
     }
 }

@@ -17,6 +17,8 @@ module;
 import stl;
 import buffer_handle;
 import buffer_obj;
+import logger;
+import file_worker_type;
 
 module buffer_handle;
 

@@ -42,15 +42,23 @@ import column_index_reader;
 
 using namespace infinity;
 
-class QueryMatchTest : public BaseTest {
+class QueryMatchTest : public BaseTestParamStr {
 protected:
     void SetUp() override {
-        BaseTest::SetUp();
-        BaseTest::RemoveDbDirs();
+        BaseTestParamStr::SetUp();
+        BaseTestParamStr::RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        infinity::InfinityContext::instance().Init(MakeShared<String>(config_path_));
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        config_path_ = GetParam();
+        SharedPtr<String> config_path = nullptr;
+        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = MakeShared<String>(config_path_);
+        }
+        infinity::InfinityContext::instance().Init(config_path);
         InitData();
     }
     void TearDown() override {
@@ -60,7 +68,7 @@ protected:
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 
     void CreateDBAndTable(const String& db_name, const String& table_name);
@@ -86,10 +94,19 @@ public:
     const String db_name_ = "default_db";
     const String table_name_ = "test_table";
     const String index_name_ = "test_fulltext_index";
-    const String config_path_ = data_path_ + "/config/test_catalog_delta.toml";
+    String config_path_{};
     TxnTimeStamp last_commit_ts_ = 0;
     Vector<Vector<String>> datas_;
 };
+
+INSTANTIATE_TEST_SUITE_P(
+    TestWithDifferentParams,
+    QueryMatchTest,
+    ::testing::Values(
+        BaseTestParamStr::NULL_CONFIG_PATH,
+        BaseTestParamStr::VFS_CONFIG_PATH
+    )
+);
 
 void QueryMatchTest::InitData() {
     datas_ = {
@@ -108,7 +125,7 @@ void QueryMatchTest::InitData() {
     };
 }
 
-TEST_F(QueryMatchTest, basic_term) {
+TEST_P(QueryMatchTest, basic_term) {
     CreateDBAndTable(db_name_, table_name_);
     CreateIndex(db_name_, table_name_, index_name_, "standard");
     InsertData(db_name_, table_name_);
@@ -122,11 +139,11 @@ TEST_F(QueryMatchTest, basic_term) {
         auto term = terms[i];
         auto doc_freq = expected_doc_freq[i];
         auto term_freq = expected_term_freq[i];
-        QueryMatch(db_name_, table_name_, index_name_, fields, term, doc_freq, term_freq, DocIteratorType::kTermIterator);
+        QueryMatch(db_name_, table_name_, index_name_, fields, term, doc_freq, term_freq, DocIteratorType::kTermDocIterator);
     }
 }
 
-TEST_F(QueryMatchTest, phrase) {
+TEST_P(QueryMatchTest, phrase) {
     CreateDBAndTable(db_name_, table_name_);
     Vector<String> analyzers = {String("standard")};
     for (auto &analyzer : analyzers) {
@@ -145,7 +162,7 @@ TEST_F(QueryMatchTest, phrase) {
         Vector<float> expected_phrase_freq = {
             1.0F,
             2.0F,
-            0.0F,
+            0.0f,
             3.0F,
             2.0F,
             2.0F / 3.0F,
@@ -350,16 +367,17 @@ void QueryMatchTest::QueryMatch(const String &db_name,
     }
     FullTextQueryContext full_text_query_context;
     full_text_query_context.query_tree_ = std::move(query_tree);
-    UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context);
+    UniquePtr<DocIterator> doc_iterator = query_builder.CreateSearch(full_text_query_context, EarlyTermAlgo::kNaive);
 
-    RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : (doc_iterator->PrepareFirstDoc(), doc_iterator->Doc());
+    RowID iter_row_id = doc_iterator.get() == nullptr ? INVALID_ROWID : (doc_iterator->Next(), doc_iterator->DocID());
     if (iter_row_id == INVALID_ROWID) {
         fmt::print("iter_row_id is INVALID_ROWID\n");
     } else {
         do {
-            auto score = query_builder.Score(iter_row_id);
+            auto score = doc_iterator->BM25Score();
             fmt::print("iter_row_id = {}, score = {}\n", iter_row_id.ToUint64(), score);
-            iter_row_id = doc_iterator->Next();
+            doc_iterator->Next();
+            iter_row_id = doc_iterator->DocID();
         } while (iter_row_id != INVALID_ROWID);
         if (query_type == DocIteratorType::kPhraseIterator) {
             EXPECT_EQ(doc_iterator->GetType(), DocIteratorType::kPhraseIterator);
@@ -369,14 +387,13 @@ void QueryMatchTest::QueryMatch(const String &db_name,
             EXPECT_EQ(res_df, expected_doc_freq);
             EXPECT_FLOAT_EQ(res_phrase_freq, expected_matched_freq);
         } else {
-            EXPECT_EQ(doc_iterator->GetType(), DocIteratorType::kTermIterator);
+            EXPECT_EQ(doc_iterator->GetType(), DocIteratorType::kTermDocIterator);
             auto term_iterator = dynamic_cast<TermDocIterator *>(doc_iterator.get());
             auto res_df = term_iterator->GetDF();
             auto res_term_freq = term_iterator->GetTermFreq();
             EXPECT_EQ(res_df, expected_doc_freq);
             EXPECT_FLOAT_EQ(res_term_freq, expected_matched_freq);
         }
-
     }
     last_commit_ts_ = txn_mgr->CommitTxn(txn);
 }

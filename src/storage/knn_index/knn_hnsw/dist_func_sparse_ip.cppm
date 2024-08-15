@@ -28,6 +28,7 @@ class SparseIPDist {
 public:
     using SparseVecRef = SparseVecRef<DataType, IdxType>;
     using VecStoreMeta = SparseVecStoreMeta<DataType, IdxType>;
+    using DistanceType = typename VecStoreMeta::DistanceType;
 
 public:
     SparseIPDist(SizeT dim) {}

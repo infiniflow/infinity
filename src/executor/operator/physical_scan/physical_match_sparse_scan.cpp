@@ -60,6 +60,7 @@ import sparse_util;
 import bmp_util;
 import knn_filter;
 import segment_entry;
+import abstract_bmp;
 
 namespace infinity {
 
@@ -224,6 +225,10 @@ bool PhysicalMatchSparseScan::Execute(QueryContext *query_context, OperatorState
             ExecuteInner<i64>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
             break;
         }
+        case EmbeddingDataType::kElemUInt8: {
+            ExecuteInner<u8>(query_context, match_sparse_scan_state, sparse_info, match_sparse_expr_->metric_type_);
+            break;
+        }
         default: {
             UnrecoverableError("Not implemented yet");
         }
@@ -313,7 +318,7 @@ template <typename DataT, typename IdxType, typename ResultType, template <typen
 void PhysicalMatchSparseScan::ExecuteInner(QueryContext *query_context, MatchSparseScanOperatorState *match_sparse_scan_state) {
     MatchSparseScanFunctionData &function_data = match_sparse_scan_state->match_sparse_scan_function_data_;
 
-    using MergeHeap = MergeKnn<ResultType, C>;
+    using MergeHeap = MergeKnn<ResultType, C, ResultType>;
     auto *merge_heap = static_cast<MergeHeap *>(function_data.merge_knn_base_.get());
     if constexpr (std::is_same_v<DataT, bool>) {
         using DistFuncT = SparseBitDistance<IdxType, ResultType>;
@@ -365,14 +370,8 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
 
     auto get_ele = [](const ColumnVector &column_vector, SizeT idx) -> SparseVecRef<typename DistFunc::DataT, typename DistFunc::IndexT> {
         const auto *ele = reinterpret_cast<const SparseT *>(column_vector.data()) + idx;
-        const auto &[nnz, chunk_id, chunk_offset] = *ele;
-        if (nnz == 0) {
-            return SparseVecRef<typename DistFunc::DataT, typename DistFunc::IndexT>(0, nullptr, nullptr);
-        }
-        const char *sparse_ptr = column_vector.buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-        const auto *indices = reinterpret_cast<const typename DistFunc::IndexT *>(sparse_ptr);
-        const auto *data = reinterpret_cast<const typename DistFunc::DataT *>(sparse_ptr + nnz * sizeof(typename DistFunc::IndexT));
-        return SparseVecRef<typename DistFunc::DataT, typename DistFunc::IndexT>(nnz, indices, data);
+        const auto &[nnz, file_offset] = *ele;
+        return column_vector.buffer_->template GetSparse<typename DistFunc::DataT, typename DistFunc::IndexT>(file_offset, nnz);
     };
 
     auto task_id = block_ids_idx;
@@ -393,7 +392,7 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
         block_entry->SetDeleteBitmask(begin_ts, bitmask);
 
         auto *block_column_entry = block_entry->GetColumnBlockEntry(search_column_id_);
-        ColumnVector column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+        ColumnVector column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
 
         for (SizeT query_id = 0; query_id < query_n; ++query_id) {
             auto query_sparse = get_ele(query_vector, query_id);
@@ -431,33 +430,40 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             UnrecoverableError(fmt::format("IndexType: {} is not supported.", (i8)index_base->index_type_));
         }
 
-        auto it = common_query_filter_->filter_result_.find(segment_id);
-        if (it == common_query_filter_->filter_result_.end()) {
-            break;
-        }
-        SizeT segment_row_count = 0;
-        SegmentEntry *segment_entry = nullptr;
-        {
-            auto segment_it = block_index->segment_block_index_.find(segment_id);
-            if (segment_it == block_index->segment_block_index_.end()) {
-                UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
-            }
-            segment_entry = segment_it->second.segment_entry_;
-            segment_row_count = segment_it->second.segment_offset_;
-        }
+        bool has_some_result = false;
         Bitmask bitmask;
-        const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
-        if (std::holds_alternative<Vector<u32>>(filter_result)) {
-            const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-            bitmask.Initialize(std::ceil(segment_row_count));
-            bitmask.SetAllFalse();
-            for (u32 row_id : filter_result_vector) {
-                bitmask.SetTrue(row_id);
-            }
+        bool use_bitmask = false;
+        if (common_query_filter_->AlwaysTrue()) {
+            has_some_result = true;
+            bitmask.SetAllTrue();
         } else {
-            bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+            auto it = common_query_filter_->filter_result_.find(segment_id);
+            if (it != common_query_filter_->filter_result_.end()) {
+                SizeT segment_row_count = 0;
+                {
+                    auto segment_it = block_index->segment_block_index_.find(segment_id);
+                    if (segment_it == block_index->segment_block_index_.end()) {
+                        UnrecoverableError(fmt::format("Cannot find segment with id: {}", segment_id));
+                    }
+                    segment_row_count = segment_it->second.segment_offset_;
+                }
+                const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
+                if (std::holds_alternative<Vector<u32>>(filter_result)) {
+                    const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
+                    bitmask.Initialize(std::ceil(segment_row_count));
+                    bitmask.SetAllFalse();
+                    for (u32 row_id : filter_result_vector) {
+                        bitmask.SetTrue(row_id);
+                    }
+                } else {
+                    bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+                }
+                has_some_result = true;
+                use_bitmask = !bitmask.IsAllTrue();
+            }
         }
-        bool use_bitmask = !bitmask.IsAllTrue();
+        if (!has_some_result)
+            break;
 
         auto bmp_search = [&](AbstractBMP index, SizeT query_id, bool with_lock, const auto &filter) {
             auto query = get_ele(query_vector, query_id);
@@ -492,33 +498,20 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
             for (SizeT query_id = 0; query_id < query_n; ++query_id) {
                 for (auto chunk_index_entry : chunk_index_entries) {
                     BufferHandle buffer_handle = chunk_index_entry->GetIndex();
-                    auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
-                    bmp_search(abstract_bmp, query_id, false, filter);
+                    const auto *bmp_index = reinterpret_cast<const AbstractBMP *>(buffer_handle.GetData());
+                    bmp_search(*bmp_index, query_id, false, filter);
                 }
                 if (memory_index_entry.get() != nullptr) {
-                    BufferHandle buffer_handle = memory_index_entry->GetIndex();
-                    auto abstract_bmp = static_cast<BMPIndexFileWorker *>(buffer_handle.GetFileWorkerMut())->GetAbstractIndex();
-                    bmp_search(abstract_bmp, query_id, true, filter);
+                    bmp_search(memory_index_entry->get(), query_id, true, filter);
                 }
             }
         };
 
         if (use_bitmask) {
-            if (segment_entry->CheckAnyDelete(begin_ts)) {
-                DeleteWithBitmaskFilter filter(bitmask, segment_entry, begin_ts);
-                bmp_scan(filter);
-            } else {
-                BitmaskFilter<SegmentOffset> filter(bitmask);
-                bmp_scan(filter);
-            }
+            BitmaskFilter<SegmentOffset> filter(bitmask);
+            bmp_scan(filter);
         } else {
-            SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
-            if (segment_entry->CheckAnyDelete(begin_ts)) {
-                DeleteFilter filter(segment_entry, begin_ts, max_segment_offset);
-                bmp_scan(filter);
-            } else {
-                bmp_scan(nullptr);
-            }
+            bmp_scan(nullptr);
         }
 
         break;

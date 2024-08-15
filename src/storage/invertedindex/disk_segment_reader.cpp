@@ -34,6 +34,8 @@ import byte_slice_reader;
 import infinity_exception;
 import status;
 import logger;
+import persistence_manager;
+import infinity_context;
 
 namespace infinity {
 
@@ -41,25 +43,45 @@ DiskIndexSegmentReader::DiskIndexSegmentReader(const String &index_dir, const St
     : base_row_id_(base_row_id) {
     Path path = Path(index_dir) / base_name;
     String path_str = path.string();
-    String dict_file = path_str;
-    dict_file.append(DICT_SUFFIX);
+    dict_file_ = path_str;
+    dict_file_.append(DICT_SUFFIX);
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    String dict_file = dict_file_;
+    if (nullptr != pm) {
+
+        dict_file = pm->GetObjCache(dict_file);
+    }
     dict_reader_ = MakeShared<DictionaryReader>(dict_file, PostingFormatOption(flag));
     posting_file_ = path_str;
     posting_file_.append(POSTING_SUFFIX);
-    int rc = fs_.MmapFile(posting_file_, data_ptr_, data_len_);
+    String posting_file = posting_file_;
+    if (nullptr != pm) {
+        posting_file = pm->GetObjCache(posting_file);
+        posting_file_obj_ = posting_file;
+    }
+    int rc = fs_.MmapFile(posting_file, data_ptr_, data_len_);
     assert(rc == 0);
     if (rc != 0) {
-        Status status = Status::MmapFileError(posting_file_);
+        Status status = Status::MmapFileError(posting_file);
         RecoverableError(status);
     }
 }
 
 DiskIndexSegmentReader::~DiskIndexSegmentReader() {
-    int rc = fs_.MunmapFile(posting_file_);
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    String posting_file = posting_file_;
+    if (nullptr != pm) {
+        posting_file = posting_file_obj_;
+    }
+    int rc = fs_.MunmapFile(posting_file);
     assert(rc == 0);
     if (rc != 0) {
-        Status status = Status::MunmapFileError(posting_file_);
+        Status status = Status::MunmapFileError(posting_file);
         RecoverableError(status);
+    }
+    if (nullptr != pm) {
+        pm->PutObjCache(dict_file_);
+        pm->PutObjCache(posting_file_);
     }
 }
 

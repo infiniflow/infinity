@@ -46,6 +46,7 @@ import log_file;
 
 import query_context;
 import infinity_context;
+import memindex_tracer;
 
 namespace infinity {
 
@@ -57,6 +58,8 @@ void Storage::Init() {
                                             MakeShared<String>(config_ptr_->DataDir()),
                                             MakeShared<String>(config_ptr_->TempDir()),
                                             config_ptr_->LRUNum());
+    buffer_mgr_->Start();
+    memory_index_tracer_ = MakeUnique<BGMemIndexTracer>(config_ptr_->MemIndexMemoryQuota());
 
     // Construct wal manager
     wal_mgr_ = MakeUnique<WalManager>(this,
@@ -76,31 +79,21 @@ void Storage::Init() {
 
     bg_processor_ = MakeUnique<BGTaskProcessor>(wal_mgr_.get(), new_catalog_.get());
     // Construct txn manager
-    std::chrono::seconds compact_interval = static_cast<std::chrono::seconds>(config_ptr_->CompactInterval());
-    bool enable_compaction = compact_interval.count() > 0;
     txn_mgr_ = MakeUnique<TxnManager>(new_catalog_.get(),
                                       buffer_mgr_.get(),
                                       bg_processor_.get(),
                                       wal_mgr_.get(),
                                       new_catalog_->next_txn_id(),
-                                      system_start_ts,
-                                      enable_compaction);
+                                      system_start_ts);
 
-    std::chrono::seconds optimize_interval = static_cast<std::chrono::seconds>(config_ptr_->OptimizeIndexInterval());
-    bool enable_optimize = optimize_interval.count() > 0;
-
-    if (enable_compaction || enable_optimize) {
-        compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
-    } else {
-        LOG_WARN("Compact interval is not set, auto compact is disable");
-    }
+    compact_processor_ = MakeUnique<CompactionProcessor>(new_catalog_.get(), txn_mgr_.get());
 
     txn_mgr_->Start();
     // start WalManager after TxnManager since it depends on TxnManager.
     wal_mgr_->Start();
 
     new_catalog_->StartMemoryIndexCommit();
-    new_catalog_->MemIndexRecover(buffer_mgr_.get());
+    new_catalog_->MemIndexRecover(buffer_mgr_.get(), system_start_ts);
 
     bg_processor_->Start();
     if (compact_processor_.get() != nullptr) {
@@ -116,54 +109,33 @@ void Storage::Init() {
     {
         periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
 
-        if (enable_compaction) {
-            periodic_trigger_thread_->AddTrigger(MakeUnique<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get()));
-        } else {
-            LOG_WARN("Compact interval is not set, auto compact task will not be triggered");
-        }
-        if (enable_optimize) {
-            periodic_trigger_thread_->AddTrigger(MakeUnique<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get()));
-        } else {
-            LOG_WARN("Optimize interval is not set, auto optimize task will not be triggered");
-        }
+        i64 compact_interval = config_ptr_->CompactInterval() > 0 ? config_ptr_->CompactInterval() : 0;
+        i64 optimize_interval = config_ptr_->OptimizeIndexInterval() > 0 ? config_ptr_->OptimizeIndexInterval() : 0;
+        i64 cleanup_interval = config_ptr_->CleanupInterval() > 0 ? config_ptr_->CleanupInterval() : 0;
+        i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval() > 0 ? config_ptr_->FullCheckpointInterval() : 0;
+        i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval() > 0 ? config_ptr_->DeltaCheckpointInterval() : 0;
 
-        std::chrono::seconds cleanup_interval = static_cast<std::chrono::seconds>(config_ptr_->CleanupInterval());
-        if (cleanup_interval.count() > 0) {
-            periodic_trigger_thread_->AddTrigger(
-                MakeUnique<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get()));
-        } else {
-            LOG_WARN("Cleanup interval is not set, auto cleanup task will not be triggered");
-        }
+        periodic_trigger_thread_ = MakeUnique<PeriodicTriggerThread>();
+        periodic_trigger_thread_->cleanup_trigger_ = MakeShared<CleanupPeriodicTrigger>(cleanup_interval, bg_processor_.get(), new_catalog_.get(), txn_mgr_.get());
+        periodic_trigger_thread_->full_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(full_checkpoint_interval_sec, wal_mgr_.get(), true);
+        periodic_trigger_thread_->delta_checkpoint_trigger_ = MakeShared<CheckpointPeriodicTrigger>(delta_checkpoint_interval_sec, wal_mgr_.get(), false);
+        periodic_trigger_thread_->compact_segment_trigger_ = MakeShared<CompactSegmentPeriodicTrigger>(compact_interval, compact_processor_.get());
+        periodic_trigger_thread_->optimize_index_trigger_ = MakeShared<OptimizeIndexPeriodicTrigger>(optimize_interval, compact_processor_.get());
 
-        i64 full_checkpoint_interval_sec = config_ptr_->FullCheckpointInterval();
-        if (full_checkpoint_interval_sec > 0) {
-            periodic_trigger_thread_->AddTrigger(
-                MakeUnique<CheckpointPeriodicTrigger>(std::chrono::seconds(full_checkpoint_interval_sec), wal_mgr_.get(), true));
-        } else {
-            LOG_WARN("Full checkpoint interval is not set, auto full checkpoint task will NOT be triggered");
-        }
-
-        i64 delta_checkpoint_interval_sec = config_ptr_->DeltaCheckpointInterval();
-        if (delta_checkpoint_interval_sec > 0) {
-            periodic_trigger_thread_->AddTrigger(
-                MakeUnique<CheckpointPeriodicTrigger>(std::chrono::seconds(delta_checkpoint_interval_sec), wal_mgr_.get(), false));
-        } else {
-            LOG_WARN("Delta checkpoint interval is not set, auto delta checkpoint task will NOT be triggered");
-        }
+        bg_processor_->SetCleanupTrigger(periodic_trigger_thread_->cleanup_trigger_);
 
         periodic_trigger_thread_->Start();
     }
 }
 
 void Storage::UnInit() {
-    LOG_INFO("Close storage ...\n");
+    LOG_INFO("Close storage ...");
     periodic_trigger_thread_->Stop();
     if (compact_processor_.get() != nullptr) {
         compact_processor_->Stop();
     }
     bg_processor_->Stop();
     wal_mgr_->Stop();
-    txn_mgr_->Stop();
 
     txn_mgr_.reset();
     if (compact_processor_.get() != nullptr) {
@@ -172,6 +144,8 @@ void Storage::UnInit() {
     bg_processor_.reset();
     wal_mgr_.reset();
     new_catalog_.reset();
+
+    buffer_mgr_->Stop();
     buffer_mgr_.reset();
     config_ptr_ = nullptr;
     LOG_INFO("Close storage successfully\n");

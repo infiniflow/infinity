@@ -35,6 +35,9 @@ import compact_statement;
 import compilation_config;
 import defer_op;
 import bg_query_state;
+import txn_store;
+import memindex_tracer;
+import segment_entry;
 
 namespace infinity {
 
@@ -56,7 +59,7 @@ void CompactionProcessor::Stop() {
 
 void CompactionProcessor::Submit(SharedPtr<BGTask> bg_task) {
     task_queue_.Enqueue(std::move(bg_task));
-    ++ task_count_;
+    ++task_count_;
 }
 
 void CompactionProcessor::DoCompact() {
@@ -90,6 +93,7 @@ TxnTimeStamp
 CompactionProcessor::ManualDoCompact(const String &schema_name, const String &table_name, bool rollback, Optional<std::function<void()>> mid_func) {
     auto statement = MakeUnique<ManualCompactStatement>(schema_name, table_name);
     Txn *txn = txn_mgr_->BeginTxn(MakeUnique<String>("ManualCompact"));
+    LOG_INFO(fmt::format("Compact txn id {}.", txn->TxnID()));
     BGQueryContextWrapper wrapper(txn);
     BGQueryState state;
     bool res = wrapper.query_context_->ExecuteBGStatement(statement.get(), state);
@@ -121,6 +125,11 @@ Vector<Pair<UniquePtr<BaseStatement>, Txn *>> CompactionProcessor::ScanForCompac
                     break;
                 }
 
+                LOG_TRACE("Construct compact task: ");
+                for(SegmentEntry* segment_ptr: compact_segments) {
+                    LOG_TRACE(fmt::format("To compact segment: {}", segment_ptr->ToString()));
+                }
+
                 compaction_tasks.emplace_back(MakeUnique<AutoCompactStatement>(table_entry, std::move(compact_segments)), txn);
             }
         }
@@ -148,6 +157,35 @@ void CompactionProcessor::ScanAndOptimize() {
     }
 }
 
+void CompactionProcessor::DoDump(DumpIndexTask *dump_task) {
+    Txn *dump_txn = txn_mgr_->BeginTxn(MakeUnique<String>(dump_task->ToString()));
+    TransactionID txn_id = dump_txn->TxnID();
+    TxnTimeStamp begin_ts = dump_txn->BeginTS();
+
+    auto *memindex_tracer = InfinityContext::instance().storage()->memindex_tracer();
+    try {
+        auto [table_entry, status1] = catalog_->GetTableByName(*dump_task->db_name_, *dump_task->table_name_, txn_id, begin_ts);
+        if (!status1.ok()) {
+            RecoverableError(status1);
+        }
+        auto [table_index_entry, status2] = table_entry->GetIndex(*dump_task->index_name_, txn_id, begin_ts);
+        if (!status2.ok()) {
+            RecoverableError(status2);
+        }
+
+        TxnTableStore *txn_table_store = dump_txn->GetTxnTableStore(table_entry);
+        SizeT dump_size = 0;
+        table_index_entry->MemIndexDump(dump_txn, txn_table_store, false /*spill*/, &dump_size);
+
+        txn_mgr_->CommitTxn(dump_txn);
+        memindex_tracer->DumpDone(dump_size, dump_task->task_id_);
+    } catch (const RecoverableException &e) {
+        txn_mgr_->RollBackTxn(dump_txn);
+        memindex_tracer->DumpFail(dump_task->task_id_);
+        LOG_WARN(fmt::format("Dump index task failed: {}, task: {}", e.what(), dump_task->ToString()));
+    }
+}
+
 void CompactionProcessor::Process() {
     bool running = true;
     while (running) {
@@ -169,6 +207,13 @@ void CompactionProcessor::Process() {
                     LOG_DEBUG("Optimize start.");
                     ScanAndOptimize();
                     LOG_DEBUG("Optimize done.");
+                    break;
+                }
+                case BGTaskType::kDumpIndex: {
+                    auto dump_task = static_cast<DumpIndexTask *>(bg_task.get());
+                    LOG_DEBUG(dump_task->ToString());
+                    DoDump(dump_task);
+                    LOG_DEBUG("Dump index done.");
                     break;
                 }
                 default: {

@@ -72,3 +72,6 @@ DROP TABLE sqllogic_db1.t1;
 
 statement error
 SELECT * FROM sqllogic_db1.t1;
+
+statement ok
+DROP DATABASE sqllogic_db1;

@@ -49,8 +49,6 @@ public:
 
     void *GetData() { return data_; }
 
-    void SetData(void *data) { data_ = data; } // use for optimize hnsw index
-
     void SetBaseTempDir(SharedPtr<String> base_dir, SharedPtr<String> temp_dir) {
         base_dir_ = std::move(base_dir);
         temp_dir_ = std::move(temp_dir);
@@ -66,7 +64,7 @@ public:
 protected:
     virtual void WriteToFileImpl(bool to_spill, bool &prepare_success) = 0;
 
-    virtual void ReadFromFileImpl() = 0;
+    virtual void ReadFromFileImpl(SizeT file_size) = 0;
 
 private:
     String ChooseFileDir(bool spill) const { return spill ? fmt::format("{}{}", *temp_dir_, *file_dir_) : *file_dir_; }

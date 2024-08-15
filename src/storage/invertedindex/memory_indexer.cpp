@@ -28,7 +28,6 @@ module;
 #include <filesystem>
 #include <iostream>
 #include <string.h>
-#include "concurrentqueue.h"
 
 module memory_indexer;
 
@@ -62,6 +61,10 @@ import buf_writer;
 import profiler;
 import third_party;
 import infinity_context;
+import defer_op;
+import blocking_queue;
+import segment_index_entry;
+import persistence_manager;
 
 namespace infinity {
 constexpr int MAX_TUPLE_LENGTH = 1024; // we assume that analyzed term, together with docid/offset info, will never exceed such length
@@ -257,13 +260,20 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     while (GetInflightTasks() > 0) {
         CommitSync(100);
     }
-    // LOG_INFO("MemoryIndexer::Dump begin");
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
     LocalFileSystem fs;
     String posting_file = index_prefix + POSTING_SUFFIX + (spill ? SPILL_SUFFIX : "");
-    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
     String dict_file = index_prefix + DICT_SUFFIX + (spill ? SPILL_SUFFIX : "");
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr && !spill;
+    if (use_object_cache) {
+        pm->ObjCreateRefCount(posting_file);
+        pm->ObjCreateRefCount(dict_file);
+    }
+
+    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
 
@@ -294,8 +304,22 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
     }
 
     String column_length_file = index_prefix + LENGTH_SUFFIX + (spill ? SPILL_SUFFIX : "");
+    if (use_object_cache) {
+        pm->ObjCreateRefCount(column_length_file);
+    }
+    DeferFn defer_fn([&]() {
+        if (!use_object_cache) {
+            return;
+        }
+        pm->PutObjCache(posting_file);
+        pm->PutObjCache(dict_file);
+        pm->PutObjCache(column_length_file);
+        std::filesystem::remove(posting_file);
+        std::filesystem::remove(dict_file);
+        std::filesystem::remove(column_length_file);
+    });
     auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
@@ -305,7 +329,6 @@ void MemoryIndexer::Dump(bool offline, bool spill) {
 
     is_spilled_ = spill;
     Reset();
-    // LOG_INFO("MemoryIndexer::Dump end");
 }
 
 // Similar to DiskIndexSegmentReader::GetSegmentPosting
@@ -333,7 +356,7 @@ void MemoryIndexer::Load() {
 
     String column_length_file = index_prefix + LENGTH_SUFFIX + SPILL_SUFFIX;
     auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::READ_FLAG, FileLockType::kNoLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
@@ -365,15 +388,21 @@ void MemoryIndexer::Reset() {
     column_lengths_.Clear();
 }
 
-void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple, u32>>& merger) {
-    auto& count = merger->Count();
-    auto& term_tuple_list_queue = merger->TermTupleListQueue();
+void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple, u32>> &merger) {
+    auto &count = merger->Count();
+    auto &term_tuple_list_queue = merger->TermTupleListQueue();
     Path path = Path(index_dir_) / base_name_;
     String index_prefix = path.string();
     LocalFileSystem fs;
+
+    bool use_object_cache = InfinityContext::instance().persistence_manager() != nullptr;
     String posting_file = index_prefix + POSTING_SUFFIX;
-    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
     String dict_file = index_prefix + DICT_SUFFIX;
+    if (use_object_cache) {
+        InfinityContext::instance().persistence_manager()->ObjCreateRefCount(posting_file);
+        InfinityContext::instance().persistence_manager()->ObjCreateRefCount(dict_file);
+    }
+    SharedPtr<FileWriter> posting_file_writer = MakeShared<FileWriter>(fs, posting_file, 128000);
     SharedPtr<FileWriter> dict_file_writer = MakeShared<FileWriter>(fs, dict_file, 128000);
     TermMetaDumper term_meta_dumpler((PostingFormatOption(flag_)));
     String fst_file = index_prefix + DICT_SUFFIX + ".fst";
@@ -390,53 +419,52 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     UniquePtr<PostingWriter> posting;
 
     while (count > 0) {
-        UniquePtr<TermTupleList> temp_term_tuple;
-        {
-            term_tuple_list_queue.wait_dequeue(temp_term_tuple);
-            if (count == 0) {
-                break;
+        Deque<SharedPtr<TermTupleList>> temp_term_tuple_queue;
+        term_tuple_list_queue.DequeueBulk(temp_term_tuple_queue);
+
+        while (!temp_term_tuple_queue.empty()) {
+            SharedPtr<TermTupleList> temp_term_tuple = temp_term_tuple_queue.front();
+            temp_term_tuple_queue.pop_front();
+            doc_pos_list_size = temp_term_tuple->Size();
+            term_length = temp_term_tuple->term_.size();
+
+            if (term_length >= MAX_TUPLE_LENGTH) {
+                continue;
+            }
+            assert(count >= temp_term_tuple->Size());
+            count -= temp_term_tuple->Size();
+            std::string_view term = std::string_view(temp_term_tuple->term_);
+
+            if (term != last_term) {
+                assert(last_term < term);
+                if (last_doc_id != INVALID_DOCID) {
+                    posting->EndDocument(last_doc_id, 0);
+                }
+                if (posting.get()) {
+                    TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
+                    posting->Dump(posting_file_writer, term_meta);
+                    SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
+                    term_meta_dumpler.Dump(dict_file_writer, term_meta);
+                    fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
+                }
+                posting = MakeUnique<PostingWriter>(posting_format_, column_lengths_);
+                last_term_str = String(term);
+                last_term = std::string_view(last_term_str);
+                last_doc_id = INVALID_DOCID;
+            }
+            for (SizeT i = 0; i < doc_pos_list_size; ++i) {
+                u32 &doc_id = temp_term_tuple->doc_pos_list_[i].first;
+                u32 &term_pos = temp_term_tuple->doc_pos_list_[i].second;
+
+                if (last_doc_id != INVALID_DOCID && last_doc_id != doc_id) {
+                    assert(last_doc_id < doc_id);
+                    assert(posting.get() != nullptr);
+                    posting->EndDocument(last_doc_id, 0);
+                }
+                last_doc_id = doc_id;
+                posting->AddPosition(term_pos);
             }
         }
-        doc_pos_list_size = temp_term_tuple->Size();
-        term_length = temp_term_tuple->term_.size();
-
-        if (term_length >= MAX_TUPLE_LENGTH) {
-            continue;
-        }
-
-        count -= temp_term_tuple->Size();
-        std::string_view term = std::string_view(temp_term_tuple->term_);
-
-        if (term != last_term) {
-            assert(last_term < term);
-            if (last_doc_id != INVALID_DOCID) {
-                posting->EndDocument(last_doc_id, 0);
-            }
-            if (posting.get()) {
-                TermMeta term_meta(posting->GetDF(), posting->GetTotalTF());
-                posting->Dump(posting_file_writer, term_meta);
-                SizeT term_meta_offset = dict_file_writer->TotalWrittenBytes();
-                term_meta_dumpler.Dump(dict_file_writer, term_meta);
-                fst_builder.Insert((u8 *)last_term.data(), last_term.length(), term_meta_offset);
-            }
-            posting = MakeUnique<PostingWriter>(posting_format_, column_lengths_);
-            last_term_str = String(term);
-            last_term = std::string_view(last_term_str);
-            last_doc_id = INVALID_DOCID;
-        }
-        for (SizeT i = 0; i < doc_pos_list_size; ++i) {
-            u32& doc_id = temp_term_tuple->doc_pos_list_[i].first;
-            u32& term_pos = temp_term_tuple->doc_pos_list_[i].second;
-
-            if (last_doc_id != INVALID_DOCID && last_doc_id != doc_id) {
-                assert(last_doc_id < doc_id);
-                assert(posting.get() != nullptr);
-                posting->EndDocument(last_doc_id, 0);
-            }
-            last_doc_id = doc_id;
-            posting->AddPosition(term_pos);
-        }
-
     }
     if (last_doc_id != INVALID_DOCID) {
         posting->EndDocument(last_doc_id, 0);
@@ -453,8 +481,24 @@ void MemoryIndexer::TupleListToIndexFile(UniquePtr<SortMergerTermTuple<TermTuple
     fs.DeleteFile(fst_file);
 
     String column_length_file = index_prefix + LENGTH_SUFFIX;
+
+    if (use_object_cache) {
+        InfinityContext::instance().persistence_manager()->ObjCreateRefCount(column_length_file);
+    }
+    DeferFn defer_fn([&]() {
+        if (!use_object_cache) {
+            return;
+        }
+        InfinityContext::instance().persistence_manager()->PutObjCache(posting_file);
+        InfinityContext::instance().persistence_manager()->PutObjCache(dict_file);
+        InfinityContext::instance().persistence_manager()->PutObjCache(column_length_file);
+        std::filesystem::remove(posting_file);
+        std::filesystem::remove(dict_file);
+        std::filesystem::remove(column_length_file);
+    });
+
     auto [file_handler, status] = fs.OpenFile(column_length_file, FileFlags::WRITE_FLAG | FileFlags::TRUNCATE_CREATE, FileLockType::kNoLock);
-    if(!status.ok()) {
+    if (!status.ok()) {
         UnrecoverableError(status.message());
     }
 
@@ -474,7 +518,8 @@ void MemoryIndexer::OfflineDump() {
     }
     FinalSpillFile();
     constexpr u32 buffer_size_of_each_run = 2 * 1024 * 1024;
-    UniquePtr<SortMergerTermTuple<TermTuple, u32>> merger = MakeUnique<SortMergerTermTuple<TermTuple, u32>>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
+    UniquePtr<SortMergerTermTuple<TermTuple, u32>> merger =
+        MakeUnique<SortMergerTermTuple<TermTuple, u32>>(spill_full_path_.c_str(), num_runs_, buffer_size_of_each_run * num_runs_, 2);
     Vector<UniquePtr<Thread>> threads;
     merger->Run(threads);
     UniquePtr<Thread> output_thread = MakeUnique<Thread>(std::bind(&MemoryIndexer::TupleListToIndexFile, this, std::ref(merger)));

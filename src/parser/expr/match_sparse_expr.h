@@ -58,6 +58,9 @@ public:
     size_t topn_{DEFAULT_MATCH_SPARSE_TOP_N};
 
     std::vector<std::unique_ptr<InitParameter>> opt_params_{};
+
+    bool ignore_index_{false};
+    std::string index_name_;
 };
 
 } // namespace infinity

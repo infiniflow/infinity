@@ -10,12 +10,12 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
+from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN, CommonMatchTensorExpr
 from infinity.embedded_infinity_ext import *
 from infinity.local_infinity.types import logic_type_to_dtype, make_match_tensor_expr
 from infinity.local_infinity.utils import traverse_conditions, parse_expr
 from infinity.table import ExplainType as BaseExplainType
-
+from infinity.errors import ErrorCode
 
 class Query(ABC):
     def __init__(
@@ -69,7 +69,7 @@ class InfinityLocalQueryBuilder(ABC):
         embedding_data: VEC,
         embedding_data_type: str,
         distance_type: str,
-        topn: int = DEFAULT_MATCH_VECTOR_TOPN,
+        topn: int,
         knn_params: {} = None,
     ) -> InfinityLocalQueryBuilder:
         if self._search is None:
@@ -82,7 +82,7 @@ class InfinityLocalQueryBuilder(ABC):
 
         if not isinstance(topn, int):
             raise InfinityException(
-                3073, f"Invalid topn, type should be embedded, but get {type(topn)}"
+                ErrorCode.INVALID_TOPK_TYPE, f"Invalid topn, type should be embedded, but get {type(topn)}"
             )
 
         # type casting
@@ -94,60 +94,73 @@ class InfinityLocalQueryBuilder(ABC):
             embedding_data = embedding_data.tolist()
         else:
             raise InfinityException(
-                3051,
+                ErrorCode.INVALID_DATA_TYPE,
                 f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}",
             )
 
-        if (
-            embedding_data_type == "tinyint"
-            or embedding_data_type == "smallint"
-            or embedding_data_type == "int"
-            or embedding_data_type == "bigint"
-        ):
+        if embedding_data_type in ["int", "uint8", "int8", "int16", "int32", "int64", "tinyint", "unsigned tinyint",
+                                   "smallint", "bigint"]:
             embedding_data = [int(x) for x in embedding_data]
+
+        if embedding_data_type in ["float", "float32", "double", "float64", "float16", "bfloat16"]:
+            embedding_data = [float(x) for x in embedding_data]
 
         data = EmbeddingData()
         elem_type = EmbeddingDataType.kElemFloat
         if embedding_data_type == "bit":
             elem_type = EmbeddingDataType.kElemBit
             raise Exception(f"Invalid embedding {embedding_data[0]} type")
-        elif embedding_data_type == "tinyint":
+        elif embedding_data_type in ["unsigned tinyint", "uint8"]:
+            elem_type = EmbeddingDataType.kElemUInt8
+            data.u8_array_value = embedding_data
+        elif embedding_data_type in ["tinyint", "int8"]:
             elem_type = EmbeddingDataType.kElemInt8
             data.i8_array_value = embedding_data
-        elif embedding_data_type == "smallint":
+        elif embedding_data_type in ["smallint", "int16"]:
             elem_type = EmbeddingDataType.kElemInt16
             data.i16_array_value = embedding_data
-        elif embedding_data_type == "int":
+        elif embedding_data_type in ["int", "int32"]:
             elem_type = EmbeddingDataType.kElemInt32
             data.i32_array_value = embedding_data
-        elif embedding_data_type == "bigint":
+        elif embedding_data_type in ["bigint", "int64"]:
             elem_type = EmbeddingDataType.kElemInt64
             data.i64_array_value = embedding_data
-        elif embedding_data_type == "float":
+        elif embedding_data_type in ["float", "float32"]:
             elem_type = EmbeddingDataType.kElemFloat
             data.f32_array_value = embedding_data
-        elif embedding_data_type == "double":
+        elif embedding_data_type in ["double", "float64"]:
             elem_type = EmbeddingDataType.kElemDouble
             data.f64_array_value = embedding_data
+        elif embedding_data_type in ["float16"]:
+            elem_type = EmbeddingDataType.kElemFloat16
+            data.f16_array_value = embedding_data
+        elif embedding_data_type in ["bfloat16"]:
+            elem_type = EmbeddingDataType.kElemBFloat16
+            data.bf16_array_value = embedding_data
         else:
-            raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
         dist_type = KnnDistanceType.kInvalid
         if distance_type == "l2":
             dist_type = KnnDistanceType.kL2
-        elif distance_type == "cosine":
+        elif distance_type == "cosine" or distance_type == "cos":
             dist_type = KnnDistanceType.kCosine
         elif distance_type == "ip":
             dist_type = KnnDistanceType.kInnerProduct
         elif distance_type == "hamming":
             dist_type = KnnDistanceType.kHamming
         else:
-            raise InfinityException(3056, f"Invalid distance type {distance_type}")
+            raise InfinityException(ErrorCode.INVALID_KNN_DISTANCE_TYPE, f"Invalid distance type {distance_type}")
 
         knn_opt_params = []
         if knn_params != None:
             for k, v in knn_params.items():
-                knn_opt_params.append(InitParameter(k, v))
+                key = k.lower()
+                value = v.lower()
+                tmp_param = InitParameter()
+                tmp_param.param_name = key
+                tmp_param.param_value = value
+                knn_opt_params.append(tmp_param)
 
         knn_expr = WrapKnnExpr()
         knn_expr.column_expr = column_expr
@@ -181,7 +194,7 @@ class InfinityLocalQueryBuilder(ABC):
 
         if not isinstance(topn, int):
             raise InfinityException(
-                3073, f"Invalid topn, type should be embedded, but get {type(topn)}"
+                ErrorCode.INVALID_TOPK_TYPE, f"Invalid topn, type should be embedded, but get {type(topn)}"
             )
 
         sparse_opt_params = []
@@ -205,7 +218,7 @@ class InfinityLocalQueryBuilder(ABC):
             sparse_expr.f64_array_value = sparse_data["values"]
         else:
             raise InfinityException(
-                3058, f"Invalid sparse data {sparse_data['values'][0]} type"
+                ErrorCode.INVALID_CONSTANT_TYPE, f"Invalid sparse data {sparse_data['values'][0]} type"
             )
         match_sparse_expr.sparse_expr = sparse_expr
 
@@ -259,7 +272,7 @@ class InfinityLocalQueryBuilder(ABC):
         self._search.match_exprs += [match_tensor_expr]
         return self
 
-    def fusion(self, method: str, options_text: str = None, match_tensor_expr=None) -> InfinityLocalQueryBuilder:
+    def fusion(self, method: str, options_text: str = None, match_tensor_expr: CommonMatchTensorExpr = None) -> InfinityLocalQueryBuilder:
         if self._search is None:
             self._search = WrapSearchExpr()
         fusion_expr = WrapFusionExpr()
@@ -268,7 +281,13 @@ class InfinityLocalQueryBuilder(ABC):
             fusion_expr.options_text = options_text
         if match_tensor_expr is not None:
             fusion_expr.has_match_tensor_expr = True
-            fusion_expr.match_tensor_expr = match_tensor_expr
+            fusion_expr.match_tensor_expr = make_match_tensor_expr(
+                match_tensor_expr.vector_column_name,
+                match_tensor_expr.embedding_data,
+                match_tensor_expr.embedding_data_type,
+                match_tensor_expr.method_type,
+                match_tensor_expr.extra_option
+            )
         else:
             fusion_expr.has_match_tensor_expr = False
 
@@ -285,18 +304,18 @@ class InfinityLocalQueryBuilder(ABC):
         return self
 
     def limit(self, limit: Optional[int]) -> InfinityLocalQueryBuilder:
-        constant_exp = WrapConstantExpr(
-            literal_type=LiteralType.kInteger, i64_value=limit
-        )
+        constant_exp = WrapConstantExpr()
+        constant_exp.literal_type = LiteralType.kInteger
+        constant_exp.i64_value = limit
         limit_expr = WrapParsedExpr(ParsedExprType.kConstant)
         limit_expr.constant_expr = constant_exp
         self._limit = limit_expr
         return self
 
     def offset(self, offset: Optional[int]) -> InfinityLocalQueryBuilder:
-        constant_exp = WrapConstantExpr(
-            literal_type=LiteralType.kInteger, i64_value=offset
-        )
+        constant_exp = WrapConstantExpr()
+        constant_exp.literal_type = LiteralType.kInteger
+        constant_exp.i64_value = offset
         offset_expr = WrapParsedExpr(ParsedExprType.kConstant)
         offset_expr.constant_expr = constant_exp
         self._offset = offset_expr

@@ -54,9 +54,13 @@ export enum class ShowType {
     kShowGlobalVariables,
     kShowConfig,
     kShowBuffer,
+    kShowMemIndex,
     kShowLogs,
     kShowDeltaLogs,
     kShowCatalogs,
+    kShowPersistenceFiles,
+    kShowPersistenceObjects,
+    kShowPersistenceObject,
 };
 
 export String ToString(ShowType type);

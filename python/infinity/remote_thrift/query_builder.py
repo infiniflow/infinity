@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
+from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN, CommonMatchTensorExpr
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -89,7 +89,7 @@ class InfinityThriftQueryBuilder(ABC):
         embedding_data: VEC,
         embedding_data_type: str,
         distance_type: str,
-        topn: int = DEFAULT_MATCH_VECTOR_TOPN,
+        topn: int,
         knn_params: {} = None,
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:
@@ -100,7 +100,7 @@ class InfinityThriftQueryBuilder(ABC):
 
         if not isinstance(topn, int):
             raise InfinityException(
-                3073, f"Invalid topn, type should be embedded, but get {type(topn)}"
+                ErrorCode.INVALID_TOPK_TYPE, f"Invalid topn, type should be embedded, but get {type(topn)}"
             )
 
         # type casting
@@ -116,56 +116,65 @@ class InfinityThriftQueryBuilder(ABC):
                 f"Invalid embedding data, type should be embedded, but get {type(embedding_data)}",
             )
 
-        if (
-            embedding_data_type == "tinyint"
-            or embedding_data_type == "smallint"
-            or embedding_data_type == "int"
-            or embedding_data_type == "bigint"
-        ):
+        if embedding_data_type in ["uint8", "int8", "int16", "int32", "int", "int64"]:
             embedding_data = [int(x) for x in embedding_data]
+
+        if embedding_data_type in ["float", "float32", "double", "float64", "float16", "bfloat16"]:
+            embedding_data = [float(x) for x in embedding_data]
 
         data = EmbeddingData()
         elem_type = ElementType.ElementFloat32
         if embedding_data_type == "bit":
             elem_type = ElementType.ElementBit
-            raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
-        elif embedding_data_type == "tinyint":
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
+        elif embedding_data_type == "uint8":
+            elem_type = ElementType.ElementUInt8
+            data.u8_array_value = embedding_data
+        elif embedding_data_type == "int8":
             elem_type = ElementType.ElementInt8
             data.i8_array_value = embedding_data
-        elif embedding_data_type == "smallint":
+        elif embedding_data_type == "int16":
             elem_type = ElementType.ElementInt16
             data.i16_array_value = embedding_data
-        elif embedding_data_type == "int":
+        elif embedding_data_type in ["int", "int32"]:
             elem_type = ElementType.ElementInt32
             data.i32_array_value = embedding_data
-        elif embedding_data_type == "bigint":
+        elif embedding_data_type == "int64":
             elem_type = ElementType.ElementInt64
             data.i64_array_value = embedding_data
-        elif embedding_data_type == "float":
+        elif embedding_data_type in ["float", "float32"]:
             elem_type = ElementType.ElementFloat32
             data.f32_array_value = embedding_data
-        elif embedding_data_type == "double":
+        elif embedding_data_type in ["double", "float64"]:
             elem_type = ElementType.ElementFloat64
             data.f64_array_value = embedding_data
+        elif embedding_data_type == "float16":
+            elem_type = ElementType.ElementFloat16
+            data.f16_array_value = embedding_data
+        elif embedding_data_type == "bfloat16":
+            elem_type = ElementType.ElementBFloat16
+            data.bf16_array_value = embedding_data
         else:
-            raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+            raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
         dist_type = KnnDistanceType.L2
         if distance_type == "l2":
             dist_type = KnnDistanceType.L2
-        elif distance_type == "cosine":
+        elif distance_type == "cosine" or distance_type == "cos":
             dist_type = KnnDistanceType.Cosine
         elif distance_type == "ip":
             dist_type = KnnDistanceType.InnerProduct
         elif distance_type == "hamming":
             dist_type = KnnDistanceType.Hamming
         else:
-            raise InfinityException(3056, f"Invalid distance type {distance_type}")
+            raise InfinityException(ErrorCode.INVALID_KNN_DISTANCE_TYPE, f"Invalid distance type {distance_type}")
 
         knn_opt_params = []
-        if knn_params != None:
+        if knn_params is not None:
             for k, v in knn_params.items():
-                knn_opt_params.append(InitParameter(k, v))
+                key = k.lower()
+                value = v.lower()
+                knn_opt_params.append(InitParameter(key, value))
 
         knn_expr = KnnExpr(
             column_expr=column_expr,
@@ -238,7 +247,7 @@ class InfinityThriftQueryBuilder(ABC):
         self,
         method: str,
         options_text: str = "",
-        match_tensor_expr: MatchTensorExpr = None,
+        match_tensor_expr: CommonMatchTensorExpr = None,
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
@@ -248,7 +257,15 @@ class InfinityThriftQueryBuilder(ABC):
         fusion_expr.method = method
         fusion_expr.options_text = options_text
         if match_tensor_expr is not None:
-            fusion_expr.optional_match_tensor_expr = match_tensor_expr
+            fusion_expr.optional_match_tensor_expr = make_match_tensor_expr(
+                match_tensor_expr.vector_column_name,
+                match_tensor_expr.embedding_data,
+                match_tensor_expr.embedding_data_type,
+                match_tensor_expr.method_type,
+                match_tensor_expr.extra_option
+            )
+        elif fusion_expr.method == "match_tensor":
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Match tensor expression is required")
         self._search.fusion_exprs.append(fusion_expr)
         return self
 

@@ -90,6 +90,9 @@ public:
 
     TableIndexEntry *GetEntryReplay(TransactionID txn_id, TxnTimeStamp begin_ts);
 
+    List<SharedPtr<TableIndexEntry>> GetAllEntries() const {
+        return index_entry_list_.GetAllEntries();
+    }
 private:
     SharedPtr<String> ToString();
 
@@ -118,5 +121,7 @@ public:
     void PickCleanupBySegments(const Vector<SegmentID> &segment_ids, CleanupScanner *scanner);
 
     bool Empty() override { return index_entry_list_.Empty(); }
+
+    SizeT EntryCount() const { return index_entry_list_.size(); }
 };
 } // namespace infinity

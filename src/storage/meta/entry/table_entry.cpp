@@ -55,6 +55,7 @@ import column_index_merger;
 import parsed_expr;
 import constant_expr;
 import infinity_context;
+import persistence_manager;
 
 namespace infinity {
 
@@ -87,10 +88,7 @@ TableEntry::TableEntry(bool is_delete,
                        TxnTimeStamp begin_ts,
                        SegmentID unsealed_id,
                        SegmentID next_segment_id)
-    : BaseEntry(EntryType::kTable,
-                is_delete,
-                table_meta ? base_dir : MakeShared<String>(),
-                TableEntry::EncodeIndex(*table_name, table_meta)),
+    : BaseEntry(EntryType::kTable, is_delete, table_meta ? base_dir : MakeShared<String>(), TableEntry::EncodeIndex(*table_name, table_meta)),
       table_meta_(table_meta), table_entry_dir_(std::move(table_entry_dir)), table_name_(std::move(table_name)), columns_(columns),
       table_entry_type_(table_entry_type), unsealed_id_(unsealed_id), next_segment_id_(next_segment_id) {
     begin_ts_ = begin_ts;
@@ -117,8 +115,12 @@ SharedPtr<TableEntry> TableEntry::NewTableEntry(bool is_delete,
                                                 TableMeta *table_meta,
                                                 TransactionID txn_id,
                                                 TxnTimeStamp begin_ts) {
-    SharedPtr<String> temp_dir = TableEntry::DetermineTableDir(*base_dir, *db_entry_dir, *table_name);
-    SharedPtr<String> table_entry_dir = is_delete ? MakeShared<String>("deleted") : temp_dir;
+    SharedPtr<String> table_entry_dir;
+    if (is_delete) {
+        table_entry_dir = MakeShared<String>("deleted");
+    } else {
+        table_entry_dir = TableEntry::DetermineTableDir(*base_dir, *db_entry_dir, *table_name);
+    }
     return MakeShared<TableEntry>(is_delete,
                                   std::move(base_dir),
                                   std::move(table_entry_dir),
@@ -217,7 +219,7 @@ void TableEntry::RemoveIndexEntry(const String &index_name, TransactionID txn_id
     return index_meta->DeleteEntry(txn_id);
 }
 
-void TableEntry::AddIndexMetaNoLock(const String& table_meta_name, UniquePtr<TableIndexMeta> table_index_meta) {
+void TableEntry::AddIndexMetaNoLock(const String &table_meta_name, UniquePtr<TableIndexMeta> table_index_meta) {
     index_meta_map_.AddNewMetaNoLock(table_meta_name, std::move(table_index_meta));
 }
 
@@ -366,8 +368,6 @@ void TableEntry::Import(SharedPtr<SegmentEntry> segment_entry, Txn *txn) {
         PopulateEntireConfig populate_entire_config{.prepare_ = false, .check_ts_ = false};
         SharedPtr<SegmentIndexEntry> segment_index_entry = table_index_entry->PopulateEntirely(segment_entry.get(), txn, populate_entire_config);
         if (segment_index_entry.get() != nullptr) {
-            Vector<SegmentIndexEntry *> segment_index_entries{segment_index_entry.get()};
-            txn_table_store->AddSegmentIndexesStore(table_index_entry, segment_index_entries);
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
             segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
             for (auto &chunk_index_entry : chunk_index_entries) {
@@ -752,15 +752,30 @@ void TableEntry::MemIndexCommit() {
     }
 }
 
-void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
+void TableEntry::MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts) {
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
     for (auto &[index_name, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(0UL, MAX_TIMESTAMP);
         if (!status.ok())
             continue;
-        for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
-            SharedPtr<SegmentEntry> segment_entry = GetSegmentByID(segment_id, segment_index_entry->max_ts());
-            assert(segment_entry.get() != nullptr);
+        for (const auto &[segment_id, segment_entry] : segment_map_) {
+            auto iter = table_index_entry->index_by_segment().find(segment_id);
+            SharedPtr<SegmentIndexEntry> segment_index_entry = nullptr;
+            if (iter == table_index_entry->index_by_segment().end()) {
+                segment_index_entry = SegmentIndexEntry::NewReplaySegmentIndexEntry(table_index_entry,
+                                                                               this,
+                                                                               segment_id,
+                                                                               buffer_manager,
+                                                                               ts /*min_ts*/,
+                                                                               ts /*max_ts*/,
+                                                                               0 /*next_chunk_id*/,
+                                                                               0 /*txn_id*/,
+                                                                               ts /*begin_ts*/,
+                                                                               ts /*commit_ts*/);
+                table_index_entry->index_by_segment().emplace(segment_id, segment_index_entry);
+            } else {
+                segment_index_entry = iter->second;
+            }
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
             segment_index_entry->GetChunkIndexEntries(chunk_index_entries);
 
@@ -830,7 +845,7 @@ void TableEntry::MemIndexRecover(BufferManager *buffer_manager) {
 void TableEntry::OptimizeIndex(Txn *txn) {
     TxnTableStore *txn_table_store = txn->GetTxnTableStore(this);
     auto index_meta_map_guard = index_meta_map_.GetMetaMap();
-    for (auto &[_, table_index_meta] : *index_meta_map_guard) {
+    for (auto &[index_name, table_index_meta] : *index_meta_map_guard) {
         auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn->TxnID(), txn->BeginTS());
         if (!status.ok()) {
             continue;
@@ -842,18 +857,21 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                 for (auto &[segment_id, segment_index_entry] : table_index_entry->index_by_segment()) {
                     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
                     Vector<ChunkIndexEntry *> old_chunks;
-                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, txn->BeginTS());
+                    segment_index_entry->GetChunkIndexEntries(chunk_index_entries, txn);
                     if (chunk_index_entries.size() <= 1) {
                         continue;
                     }
 
-                    String msg("merging");
+                    String msg = fmt::format("merging {}", index_name);
                     Vector<String> base_names;
                     Vector<RowID> base_rowids;
                     RowID base_rowid = chunk_index_entries[0]->base_rowid_;
                     u32 total_row_count = 0;
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
+                        if (!chunk_index_entry->TrySetOptimizing()) {
+                            chunk_index_entries.erase(chunk_index_entries.begin() + i);
+                        }
                         assert(chunk_index_entry->base_rowid_ == chunk_index_entries[0]->base_rowid_ + total_row_count);
                         msg += " " + chunk_index_entry->base_name_;
                         base_names.push_back(chunk_index_entry->base_name_);
@@ -869,7 +887,6 @@ void TableEntry::OptimizeIndex(Txn *txn) {
 
                     for (SizeT i = 0; i < chunk_index_entries.size(); i++) {
                         auto &chunk_index_entry = chunk_index_entries[i];
-                        txn_table_store->AddChunkIndexStore(table_index_entry, chunk_index_entry.get());
                         old_chunks.push_back(chunk_index_entry.get());
                     }
                     SharedPtr<ChunkIndexEntry> merged_chunk_index_entry = ChunkIndexEntry::NewFtChunkIndexEntry(segment_index_entry.get(),
@@ -877,7 +894,6 @@ void TableEntry::OptimizeIndex(Txn *txn) {
                                                                                                                 base_rowid,
                                                                                                                 total_row_count,
                                                                                                                 txn->buffer_mgr());
-                    txn_table_store->AddChunkIndexStore(table_index_entry, merged_chunk_index_entry.get());
                     segment_index_entry->ReplaceChunkIndexEntries(txn_table_store, merged_chunk_index_entry, std::move(old_chunks));
                     // OPTIMIZE invoke this func at which the txn hasn't been commited yet.
                     TxnTimeStamp ts = std::max(txn->BeginTS(), txn->CommitTS());
@@ -1093,8 +1109,17 @@ UniquePtr<TableEntry> TableEntry::Deserialize(const nlohmann::json &table_entry_
     SegmentID unsealed_id = table_entry_json["unsealed_id"];
     SegmentID next_segment_id = table_entry_json["next_segment_id"];
 
-    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(deleted, table_meta->base_dir(), table_entry_dir, table_name, columns, table_entry_type,
-                                                               table_meta, txn_id, begin_ts, unsealed_id, next_segment_id);
+    UniquePtr<TableEntry> table_entry = MakeUnique<TableEntry>(deleted,
+                                                               table_meta->base_dir(),
+                                                               table_entry_dir,
+                                                               table_name,
+                                                               columns,
+                                                               table_entry_type,
+                                                               table_meta,
+                                                               txn_id,
+                                                               begin_ts,
+                                                               unsealed_id,
+                                                               next_segment_id);
     table_entry->row_count_ = row_count;
 
     if (table_entry_json.contains("segments")) {
@@ -1222,18 +1247,26 @@ void TableEntry::Cleanup() {
 
     String full_table_dir = fmt::format("{}/{}", *base_dir_, *table_entry_dir_);
     LOG_DEBUG(fmt::format("Cleaning up dir: {}", full_table_dir));
-    CleanupScanner::CleanupDir(*table_entry_dir_);
+    CleanupScanner::CleanupDir(full_table_dir);
     LOG_DEBUG(fmt::format("Cleaned dir: {}", full_table_dir));
 }
 
 IndexReader TableEntry::GetFullTextIndexReader(Txn *txn) { return fulltext_column_index_cache_.GetIndexReader(txn, this); }
 
-Tuple<Vector<String>, Vector<TableIndexMeta*>, std::shared_lock<std::shared_mutex>> TableEntry::GetAllIndexMapGuard() const {
+Tuple<Vector<String>, Vector<TableIndexMeta *>, std::shared_lock<std::shared_mutex>> TableEntry::GetAllIndexMapGuard() const {
     return index_meta_map_.GetAllMetaGuard();
 }
 
-TableIndexMeta* TableEntry::GetIndexMetaPtrByName(const String& name) const {
-    return index_meta_map_.GetMetaPtrByName(name);
+TableIndexMeta *TableEntry::GetIndexMetaPtrByName(const String &name) const { return index_meta_map_.GetMetaPtrByName(name); }
+
+bool TableEntry::CheckAnyDelete(TxnTimeStamp check_ts) const {
+    std::shared_lock lock(this->rw_locker_);
+    for (const auto &[_, segment] : segment_map_) {
+        if (segment->CheckAnyDelete(check_ts)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace infinity

@@ -21,6 +21,7 @@ from typing import Any, Tuple, Dict, List
 
 import polars as pl
 from numpy import dtype
+from infinity.errors import ErrorCode
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 
@@ -41,6 +42,10 @@ def column_type_to_dtype(ttype: ttypes.ColumnType):
             return dtype('float32')
         case ttypes.ColumnType.ColumnFloat64:
             return dtype('float64')
+        case ttypes.ColumnType.ColumnFloat16:
+            return dtype('float32')
+        case ttypes.ColumnType.ColumnBFloat16:
+            return dtype('float32')
         case ttypes.ColumnType.ColumnVarchar:
             return dtype('str')
         case _:
@@ -63,11 +68,17 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
             return dtype('float32')
         case ttypes.LogicType.Double:
             return dtype('float64')
+        case ttypes.LogicType.Float16:
+            return dtype('float32')
+        case ttypes.LogicType.BFloat16:
+            return dtype('float32')
         case ttypes.LogicType.Varchar:
             return dtype('str')
         case ttypes.LogicType.Embedding:
             if ttype.physical_type.embedding_type is not None:
                 match ttype.physical_type.embedding_type.element_type:
+                    case ttypes.ElementType.ElementUInt8:
+                        return object
                     case ttypes.ElementType.ElementInt8:
                         return object
                     case ttypes.ElementType.ElementInt16:
@@ -77,6 +88,10 @@ def logic_type_to_dtype(ttype: ttypes.DataType):
                     case ttypes.ElementType.ElementFloat32:
                         return object
                     case ttypes.ElementType.ElementFloat64:
+                        return object
+                    case ttypes.ElementType.ElementFloat16:
+                        return object
+                    case ttypes.ElementType.ElementBFloat16:
                         return object
                     case ttypes.ElementType.ElementBit:
                         return object
@@ -108,11 +123,17 @@ def logic_type_to_pl_type(ttype: ttypes.DataType):
             return pl.Float32
         case ttypes.LogicType.Double:
             return pl.Float64
+        case ttypes.LogicType.Float16:
+            return pl.Float32
+        case ttypes.LogicType.BFloat16:
+            return pl.Float32
         case ttypes.LogicType.Varchar:
             return pl.Utf8
         case ttypes.LogicType.Embedding:
             if ttype.physical_type.embedding_type is not None:
                 match ttype.physical_type.embedding_type.element_type:
+                    case ttypes.ElementType.ElementUInt8:
+                        return pl.List
                     case ttypes.ElementType.ElementInt8:
                         return pl.List
                     case ttypes.ElementType.ElementInt16:
@@ -120,6 +141,10 @@ def logic_type_to_pl_type(ttype: ttypes.DataType):
                     case ttypes.ElementType.ElementInt32:
                         return pl.List
                     case ttypes.ElementType.ElementFloat32:
+                        return pl.List
+                    case ttypes.ElementType.ElementFloat16:
+                        return pl.List
+                    case ttypes.ElementType.ElementBFloat16:
                         return pl.List
                     case ttypes.ElementType.ElementFloat64:
                         return pl.List
@@ -141,6 +166,14 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
             return list(struct.unpack('<{}f'.format(len(column_vector) // 4), column_vector))
         case ttypes.ColumnType.ColumnFloat64:
             return list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
+        case ttypes.ColumnType.ColumnFloat16:
+            return list(struct.unpack('<{}e'.format(len(column_vector) // 2), column_vector))
+        case ttypes.ColumnType.ColumnBFloat16:
+            tmp_u16 = np.frombuffer(column_vector, dtype='<i2')
+            result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+            result_arr[1::2] = tmp_u16
+            view_float32 = result_arr.view('<f4')
+            return list(view_float32)
         case ttypes.ColumnType.ColumnVarchar:
             return list(parse_bytes(column_vector))
         case ttypes.ColumnType.ColumnBool:
@@ -153,7 +186,10 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
             return list(struct.unpack('<{}q'.format(len(column_vector) // 8), column_vector))
         case ttypes.ColumnType.ColumnEmbedding:
             dimension = column_data_type.physical_type.embedding_type.dimension
-            if column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt8:
+            if column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementUInt8:
+                all_list = list(struct.unpack('<{}B'.format(len(column_vector)), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+            elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt8:
                 all_list = list(struct.unpack('<{}b'.format(len(column_vector)), column_vector))
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt16:
@@ -170,6 +206,16 @@ def column_vector_to_list(column_type: ttypes.ColumnType, column_data_type: ttyp
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat64:
                 all_list = list(struct.unpack('<{}d'.format(len(column_vector) // 8), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+            elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat16:
+                all_list = list(struct.unpack('<{}e'.format(len(column_vector) // 2), column_vector))
+                return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+            elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBFloat16:
+                tmp_u16 = np.frombuffer(column_vector, dtype='<i2')
+                result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+                result_arr[1::2] = tmp_u16
+                view_float32 = result_arr.view('<f4')
+                all_list = list(view_float32)
                 return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
             elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBit:
                 all_list = list(struct.unpack('<{}B'.format(len(column_vector)), column_vector))
@@ -253,6 +299,9 @@ def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[
                 mid_res_int = mid_res_int * 256 + j
             result.append([f"\u007b0:0{dimension}b\u007d".format(mid_res_int)[::-1]])
         return result
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementUInt8:
+        all_list = list(struct.unpack('<{}B'.format(len(binary_data)), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementInt8:
         all_list = list(struct.unpack('<{}b'.format(len(binary_data)), binary_data))
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
@@ -270,6 +319,16 @@ def tensor_to_list(column_data_type: ttypes.DataType, binary_data) -> list[list[
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat64:
         all_list = list(struct.unpack('<{}d'.format(len(binary_data) // 8), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementFloat16:
+        all_list = list(struct.unpack('<{}e'.format(len(binary_data) // 2), binary_data))
+        return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
+    elif column_data_type.physical_type.embedding_type.element_type == ttypes.ElementType.ElementBFloat16:
+        tmp_u16 = np.frombuffer(binary_data, dtype='<i2')
+        result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+        result_arr[1::2] = tmp_u16
+        view_float32 = result_arr.view('<f4')
+        all_list = list(view_float32)
         return [all_list[i:i + dimension] for i in range(0, len(all_list), dimension)]
     else:
         raise NotImplementedError(
@@ -304,6 +363,9 @@ def parse_sparse_bytes(column_data_type: ttypes.DataType, column_vector):
             case _:
                 raise NotImplementedError(f"Unsupported type {index_type}")
         match element_type:
+            case ttypes.ElementType.ElementUInt8:
+                values = struct.unpack('<{}B'.format(nnz), column_vector[offset:offset + nnz])
+                offset += nnz
             case ttypes.ElementType.ElementInt8:
                 values = struct.unpack('<{}b'.format(nnz), column_vector[offset:offset + nnz])
                 offset += nnz
@@ -322,6 +384,16 @@ def parse_sparse_bytes(column_data_type: ttypes.DataType, column_vector):
             case ttypes.ElementType.ElementFloat64:
                 values = struct.unpack('<{}d'.format(nnz), column_vector[offset:offset + nnz * 8])
                 offset += nnz * 8
+            case ttypes.ElementType.ElementFloat16:
+                values = struct.unpack('<{}e'.format(nnz), column_vector[offset:offset + nnz * 2])
+                offset += nnz * 2
+            case ttypes.ElementType.ElementBFloat16:
+                tmp_u16 = np.frombuffer(column_vector[offset:offset + nnz * 2], dtype='<i2')
+                result_arr = np.zeros(2 * len(tmp_u16), dtype='<i2')
+                result_arr[1::2] = tmp_u16
+                view_float32 = result_arr.view('<f4')
+                values = list(view_float32)
+                offset += nnz * 2
             case ttypes.ElementType.ElementBit:
                 raise NotImplementedError(f"Unsupported type {element_type}")
             case _:
@@ -369,27 +441,36 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
     match_tensor_expr.extra_options = extra_option
     data = EmbeddingData()
     if embedding_data_type == 'bit':
-        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
-    elif embedding_data_type == 'tinyint' or embedding_data_type == 'int8' or embedding_data_type == 'i8':
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
+    elif embedding_data_type in ['unsigned tinyint', 'uint8', 'u8']:
+        elem_type = ElementType.ElementUInt8
+        data.u8_array_value = np.asarray(embedding_data, dtype=np.uint8).flatten()
+    elif embedding_data_type in ['tinyint', 'int8', 'i8']:
         elem_type = ElementType.ElementInt8
         data.i8_array_value = np.asarray(embedding_data, dtype=np.int8).flatten()
-    elif embedding_data_type == 'smallint' or embedding_data_type == 'int16' or embedding_data_type == 'i16':
+    elif embedding_data_type in ['smallint', 'int16', 'i16']:
         elem_type = ElementType.ElementInt16
         data.i16_array_value = np.asarray(embedding_data, dtype=np.int16).flatten()
-    elif embedding_data_type == 'int' or embedding_data_type == 'int32' or embedding_data_type == 'i32':
+    elif embedding_data_type in ['int', 'int32', 'i32']:
         elem_type = ElementType.ElementInt32
         data.i32_array_value = np.asarray(embedding_data, dtype=np.int32).flatten()
-    elif embedding_data_type == 'bigint' or embedding_data_type == 'int64' or embedding_data_type == 'i64':
+    elif embedding_data_type in ['bigint', 'int64', 'i64']:
         elem_type = ElementType.ElementInt64
         data.i64_array_value = np.asarray(embedding_data, dtype=np.int64).flatten()
-    elif embedding_data_type == 'float' or embedding_data_type == 'float32' or embedding_data_type == 'f32':
+    elif embedding_data_type in ['float', 'float32', 'f32']:
         elem_type = ElementType.ElementFloat32
         data.f32_array_value = np.asarray(embedding_data, dtype=np.float32).flatten()
-    elif embedding_data_type == 'double' or embedding_data_type == 'float64' or embedding_data_type == 'f64':
+    elif embedding_data_type in ['double', 'float64', 'f64']:
         elem_type = ElementType.ElementFloat64
         data.f64_array_value = np.asarray(embedding_data, dtype=np.float64).flatten()
+    elif embedding_data_type in ['float16', 'fp16', 'f16']:
+        elem_type = ElementType.ElementFloat16
+        data.f16_array_value = np.asarray(embedding_data, dtype=np.float16).flatten()
+    elif embedding_data_type in ['bfloat16', 'bf16']:
+        elem_type = ElementType.ElementBFloat16
+        data.bf16_array_value = np.asarray(embedding_data, dtype=np.float32).flatten()
     else:
-        raise InfinityException(3057, f"Invalid embedding {embedding_data[0]} type")
+        raise InfinityException(ErrorCode.INVALID_EMBEDDING_DATA_TYPE, f"Invalid embedding {embedding_data[0]} type")
 
     match_tensor_expr.embedding_data_type = elem_type
     match_tensor_expr.embedding_data = data
@@ -408,7 +489,7 @@ def make_match_sparse_expr(vector_column_name: str, sparse_data: SPARSE, metric_
         query_sparse_expr.i64_array_idx = sparse_data["indices"]
         query_sparse_expr.f64_array_value = sparse_data["values"]
     else:
-        raise InfinityException(3058, f"Invalid sparse data {sparse_data['values'][0]} type")
+        raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE, f"Invalid sparse data {sparse_data['values'][0]} type")
 
     match_sparse_options = []
     if opt_params is not None:

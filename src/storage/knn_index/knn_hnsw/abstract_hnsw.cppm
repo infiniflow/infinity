@@ -14,7 +14,11 @@
 
 module;
 
-#include <ostream>
+#include <future>
+
+namespace infinity {
+struct SegmentEntry;
+}
 
 export module abstract_hnsw;
 
@@ -31,178 +35,166 @@ import index_hnsw;
 import infinity_exception;
 import index_base;
 import logger;
+import internal_types;
+import embedding_info;
+import infinity_context;
+import logger;
+import base_memindex;
+import memindex_tracer;
 
 namespace infinity {
 
-export template <typename DataType, typename LabelType>
-class AbstractHnsw {
-    using Hnsw1 = KnnHnsw<PlainCosVecStoreType<DataType>, LabelType>;
-    using Hnsw2 = KnnHnsw<PlainIPVecStoreType<DataType>, LabelType>;
-    using Hnsw3 = KnnHnsw<PlainL2VecStoreType<DataType>, LabelType>;
-    using Hnsw4 = KnnHnsw<LVQCosVecStoreType<DataType, i8>, LabelType>;
-    using Hnsw5 = KnnHnsw<LVQIPVecStoreType<DataType, i8>, LabelType>;
-    using Hnsw6 = KnnHnsw<LVQL2VecStoreType<DataType, i8>, LabelType>;
+class BufferManager;
+class ChunkIndexEntry;
+class SegmentIndexEntry;
+class BlockColumnEntry;
 
+export using AbstractHnsw = std::variant<KnnHnsw<PlainCosVecStoreType<float>, SegmentOffset> *,
+                                         KnnHnsw<PlainIPVecStoreType<float>, SegmentOffset> *,
+                                         KnnHnsw<PlainL2VecStoreType<float>, SegmentOffset> *,
+                                         KnnHnsw<PlainCosVecStoreType<u8>, SegmentOffset> *,
+                                         KnnHnsw<PlainIPVecStoreType<u8>, SegmentOffset> *,
+                                         KnnHnsw<PlainL2VecStoreType<u8>, SegmentOffset> *,
+                                         KnnHnsw<PlainCosVecStoreType<i8>, SegmentOffset> *,
+                                         KnnHnsw<PlainIPVecStoreType<i8>, SegmentOffset> *,
+                                         KnnHnsw<PlainL2VecStoreType<i8>, SegmentOffset> *,
+                                         KnnHnsw<LVQCosVecStoreType<float, i8>, SegmentOffset> *,
+                                         KnnHnsw<LVQIPVecStoreType<float, i8>, SegmentOffset> *,
+                                         KnnHnsw<LVQL2VecStoreType<float, i8>, SegmentOffset> *,
+                                         std::nullptr_t>;
+
+export struct HnswIndexInMem : public BaseMemIndex {
 public:
-    AbstractHnsw(void *ptr, const IndexHnsw *index_hnsw) {
+    HnswIndexInMem() : hnsw_(nullptr) {}
+
+    static UniquePtr<HnswIndexInMem>
+    Make(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace = false);
+
+    HnswIndexInMem(RowID begin_row_id, const IndexBase *index_base, const ColumnDef *column_def, SegmentIndexEntry *segment_index_entry, bool trace);
+
+private:
+    template <typename DataType>
+    static AbstractHnsw InitAbstractIndex(const IndexHnsw *index_hnsw) {
         switch (index_hnsw->encode_type_) {
             case HnswEncodeType::kPlain: {
                 switch (index_hnsw->metric_type_) {
-                    case MetricType::kMetricCosine: {
-                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw1 *>(ptr);
-                        break;
+                    case MetricType::kMetricL2: {
+                        using HnswIndex = KnnHnsw<PlainL2VecStoreType<DataType>, SegmentOffset>;
+                        return static_cast<HnswIndex *>(nullptr);
                     }
                     case MetricType::kMetricInnerProduct: {
-                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw2 *>(ptr);
-                        break;
+                        using HnswIndex = KnnHnsw<PlainIPVecStoreType<DataType>, SegmentOffset>;
+                        return static_cast<HnswIndex *>(nullptr);
                     }
-                    case MetricType::kMetricL2: {
-                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw3 *>(ptr);
-                        break;
+                    case MetricType::kMetricCosine: {
+                        using HnswIndex = KnnHnsw<PlainCosVecStoreType<DataType>, SegmentOffset>;
+                        return static_cast<HnswIndex *>(nullptr);
                     }
                     default: {
-                        String error_message = "HNSW supports inner product and L2 distance.";
-                        UnrecoverableError(error_message);
+                        return nullptr;
                     }
                 }
-                break;
             }
             case HnswEncodeType::kLVQ: {
-                switch (index_hnsw->metric_type_) {
-                    case MetricType::kMetricCosine: {
-                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw4 *>(ptr);
-                        break;
-                    }
-                    case MetricType::kMetricInnerProduct: {
-                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw5 *>(ptr);
-                        break;
-                    }
-                    case MetricType::kMetricL2: {
-                        knn_hnsw_ptr_ = reinterpret_cast<Hnsw6 *>(ptr);
-                        break;
-                    }
-                    default: {
-                        String error_message = "HNSW supports inner product and L2 distance.";
-                        UnrecoverableError(error_message);
+                if constexpr (std::is_same_v<DataType, u8> || std::is_same_v<DataType, i8>) {
+                    return nullptr;
+                } else {
+                    switch (index_hnsw->metric_type_) {
+                        case MetricType::kMetricL2: {
+                            using HnswIndex = KnnHnsw<LVQL2VecStoreType<DataType, i8>, SegmentOffset>;
+                            return static_cast<HnswIndex *>(nullptr);
+                        }
+                        case MetricType::kMetricInnerProduct: {
+                            using HnswIndex = KnnHnsw<LVQIPVecStoreType<DataType, i8>, SegmentOffset>;
+                            return static_cast<HnswIndex *>(nullptr);
+                        }
+                        case MetricType::kMetricCosine: {
+                            using HnswIndex = KnnHnsw<LVQCosVecStoreType<DataType, i8>, SegmentOffset>;
+                            return static_cast<HnswIndex *>(nullptr);
+                        }
+                        default: {
+                            return nullptr;
+                        }
                     }
                 }
-                break;
             }
             default: {
-                String error_message = "Invalid metric type";
-                UnrecoverableError(error_message);
+                return nullptr;
             }
         }
     }
 
+    template <typename Iter, typename Index>
+    static void InsertVecs(Index &index, Iter iter, const HnswInsertConfig &config, SizeT &mem_usage) {
+        auto &thread_pool = InfinityContext::instance().GetHnswBuildThreadPool();
+        using T = std::decay_t<decltype(index)>;
+        if constexpr (!std::is_same_v<T, std::nullptr_t>) {
+            SizeT mem1 = index->mem_usage();
+            auto [start, end] = index->StoreData(std::move(iter), config);
+            SizeT bucket_size = std::max(kBuildBucketSize, SizeT(end - start - 1) / thread_pool.size() + 1);
+            SizeT bucket_n = (end - start - 1) / bucket_size + 1;
+
+            Vector<std::future<void>> futs;
+            futs.reserve(bucket_n);
+            for (SizeT i = 0; i < bucket_n; ++i) {
+                SizeT i1 = start + i * bucket_size;
+                SizeT i2 = std::min(i1 + bucket_size, SizeT(end));
+                futs.emplace_back(thread_pool.push([&, i1, i2](int id) {
+                    for (SizeT j = i1; j < i2; ++j) {
+                        index->Build(j);
+                    }
+                }));
+            }
+            for (auto &fut : futs) {
+                fut.wait();
+            }
+            SizeT mem2 = index->mem_usage();
+            mem_usage = mem2 - mem1;
+        }
+    }
+
 public:
-    void Make(SizeT chunk_sizes, SizeT max_chunk_n, SizeT dimension, SizeT M, SizeT ef_c) {
-        std::visit(
-            [chunk_sizes, max_chunk_n, dimension, M, ef_c, this](auto &&arg) {
-                using T = std::decay_t<decltype(*arg)>;
-                knn_hnsw_ptr_ = new T(T::Make(chunk_sizes, max_chunk_n, dimension, M, ef_c));
-            },
-            knn_hnsw_ptr_);
-    }
+    static AbstractHnsw InitAbstractIndex(const IndexBase *index_base, const ColumnDef *column_def);
 
-    void Load(FileHandler &file_handler) {
-        std::visit(
-            [&file_handler, this](auto &&arg) {
-                using T = std::decay_t<decltype(*arg)>;
-                knn_hnsw_ptr_ = new T(T::Load(file_handler));
-            },
-            knn_hnsw_ptr_);
-    }
+    HnswIndexInMem(const HnswIndexInMem &) = delete;
+    HnswIndexInMem &operator=(const HnswIndexInMem &) = delete;
 
-    void Save(FileHandler &file_handler) {
-        std::visit([&file_handler](auto &&arg) { arg->Save(file_handler); }, knn_hnsw_ptr_);
-    }
+    virtual ~HnswIndexInMem();
 
-    void Free() {
-        std::visit([](auto &&arg) { delete arg; }, knn_hnsw_ptr_);
-    }
+    SizeT GetRowCount() const;
 
-    SizeT GetVertexNum() const {
-        return std::visit([](auto &&arg) { return arg->GetVertexNum(); }, knn_hnsw_ptr_);
-    }
+    void InsertVecs(SizeT block_offset,
+                    BlockColumnEntry *block_column_entry,
+                    BufferManager *buffer_manager,
+                    SizeT row_offset,
+                    SizeT row_count,
+                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
-    void Build(SizeT idx) {
-        std::visit([idx](auto &&arg) { arg->Build(idx); }, knn_hnsw_ptr_);
-    }
+    void InsertVecs(const SegmentEntry *segment_entry,
+                    BufferManager *buffer_mgr,
+                    SizeT column_id,
+                    TxnTimeStamp begin_ts,
+                    bool check_ts,
+                    const HnswInsertConfig &config = kDefaultHnswInsertConfig);
 
-    void *RawPtr() const {
-        return std::visit([](auto &&arg) { return reinterpret_cast<void *>(arg); }, knn_hnsw_ptr_);
-    }
+    SharedPtr<ChunkIndexEntry> Dump(SegmentIndexEntry *segment_index_entry, BufferManager *buffer_mgr, SizeT *dump_size = nullptr);
 
-    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    Pair<SizeT, SizeT> InsertVecs(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
-        return std::visit([&iter, &config](auto &&arg) { return arg->InsertVecs(std::move(iter), config); }, knn_hnsw_ptr_);
-    }
+    const AbstractHnsw &get() const { return hnsw_; }
 
-    template <DataIteratorConcept<const DataType *, LabelType> Iterator>
-    Pair<SizeT, SizeT> StoreData(Iterator &&iter, const HnswInsertConfig &config = kDefaultHnswInsertConfig) {
-        return std::visit([&iter, &config](auto &&arg) { return arg->StoreData(std::move(iter), config); }, knn_hnsw_ptr_);
-    }
+    AbstractHnsw *get_ptr() { return &hnsw_; }
 
-    void Dump(std::ostream &os) const {
-        std::visit([&os](auto &&arg) { arg->Dump(os); }, knn_hnsw_ptr_);
-    }
-
-    void SetEf(SizeT ef) {
-        std::visit([ef](auto &&arg) { arg->SetEf(ef); }, knn_hnsw_ptr_);
-    }
-
-    template <FilterConcept<LabelType> Filter>
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>>
-    KnnSearch(const DataType *q, SizeT k, const Filter &filter, bool with_lock = true) const {
-        return std::visit(
-            [q, k, &filter, with_lock](auto &&arg) {
-                if (with_lock) {
-                    return arg->template KnnSearch<Filter, true>(q, k, filter);
-                } else {
-                    return arg->template KnnSearch<Filter, false>(q, k, filter);
-                }
-            },
-            knn_hnsw_ptr_);
-    }
-
-    Tuple<SizeT, UniquePtr<DataType[]>, UniquePtr<LabelType[]>> KnnSearch(const DataType *q, SizeT k, bool with_lock = true) const {
-        return std::visit(
-            [q, k, with_lock](auto &&arg) {
-                if (with_lock) {
-                    return arg->template KnnSearch<true>(q, k);
-                } else {
-                    return arg->template KnnSearch<false>(q, k);
-                }
-            },
-            knn_hnsw_ptr_);
-    }
-
-    bool RerankDist() const {
-        return std::visit(
-            [](auto &&arg) {
-                using T = std::decay_t<decltype(*arg)>;
-                if constexpr (std::is_same_v<T, Hnsw4> || std::is_same_v<T, Hnsw5> || std::is_same_v<T, Hnsw6>) {
-                    return true;
-                } else {
-                    return false;
-                }
-            },
-            knn_hnsw_ptr_);
-    }
-
-    void CompressToLVQ() {
-        std::visit([&](auto &arg) {
-            auto new_hnsw = std::move(*arg).CompressToLVQ();
-            using NewT = std::decay_t<decltype(new_hnsw)>;
-            delete arg;
-            arg = nullptr;
-            knn_hnsw_ptr_ = new NewT(std::move(new_hnsw));
-        }, knn_hnsw_ptr_);
-    }
+protected:
+    MemIndexTracerInfo GetInfo() const override;
 
 private:
-    std::variant<Hnsw1 *, Hnsw2 *, Hnsw3 *, Hnsw4 *, Hnsw5 *, Hnsw6 *> knn_hnsw_ptr_;
+    static constexpr SizeT kBuildBucketSize = 1024;
+
+    RowID begin_row_id_ = {};
+    AbstractHnsw hnsw_ = nullptr;
+
+    SegmentIndexEntry *segment_index_entry_{};
+    bool trace_{};
+    bool own_memory_{};
 };
 
 } // namespace infinity

@@ -12,7 +12,7 @@ CREATE TABLE test_embedding_type ( c1 int, c2 embedding(int,3));
 
 # copy data from tbl file
 query I
-COPY test_embedding_type FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH ( DELIMITER ',' );
+COPY test_embedding_type FROM '/var/infinity/test_data/embedding_int_dim3.csv' WITH ( DELIMITER ',', FORMAT CSV );
 ----
 
 query II

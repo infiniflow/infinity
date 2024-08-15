@@ -1,3 +1,4 @@
+import sys
 from abc import abstractmethod
 from typing import Any
 import subprocess
@@ -11,6 +12,7 @@ import numpy as np
 import threading
 import multiprocessing
 
+from .utils import csr_read_all, gt_read_all, calculate_recall
 
 class BaseClient:
     """
@@ -61,6 +63,21 @@ class BaseClient:
         """
         Download dataset and extract it into path.
         """
+        #Ask for downloading data in taeget path
+        print(f"Dataset doesn't exist: {target_path},\n"
+              f"downloading dataset in {target_path}?\n"
+              f"[Y/n]")
+        while(True):
+            user_input = input()
+            if user_input == 'Y' or user_input == 'y' :
+                print("Downloading...")
+                break
+            elif user_input == 'N' or user_input == 'n':
+                print("Exit")
+                sys.exit(0)
+            else :
+                print("Invalid input!")
+
         _, ext = os.path.splitext(url)
         if ext == ".bz2":
             bz2_path = target_path + ".bz2"
@@ -81,8 +98,7 @@ class BaseClient:
             for line in open(query_path, "r"):
                 line = line.strip()
                 self.queries.append(line)
-        else:
-            self.data["mode"] == "vector"
+        elif self.data["mode"] == "vector":
             if ext == ".hdf5":
                 with h5py.File(query_path, "r") as f:
                     self.queries = list(f["test"])
@@ -91,6 +107,14 @@ class BaseClient:
                 for line in open(query_path, "r"):
                     query = json.loads(line)["vector"]
                     self.queries.append(query)
+        elif self.data["mode"] == "sparse_vector":
+            assert ext == ".csr"
+            query_mat = csr_read_all(query_path)
+            for query_id in range(query_mat.nrow):
+                indices, values = query_mat.at(query_id)
+                self.queries.append((indices, values))
+        else:
+            raise TypeError("Unsupported type")
 
         self.mt_active_workers = num_workers
         threads = []
@@ -208,16 +232,18 @@ class BaseClient:
             for line in open(query_path, "r"):
                 line = line.strip()
                 self.queries.append(line)
-        else:
-            self.data["mode"] == "vector"
+        elif self.data["mode"] == "vector":
             if ext == ".hdf5":
                 with h5py.File(query_path, "r") as f:
                     self.queries = list(f["test"])
-            else:
-                assert ext == "jsonl"
-                for line in open(query_path, "r"):
-                    query = json.loads(line)["vector"]
-                    self.queries.append(query)
+        elif self.data["mode"] == "sparse_vector":
+            assert ext == ".csr"
+            query_mat = csr_read_all(query_path)
+            for query_id in range(query_mat.nrow):
+                indices, values = query_mat.at(query_id)
+                self.queries.append((indices, values))
+        else:
+            raise TypeError("Unsupported type")
 
         self.mp_active_workers.value = num_workers
         workers = []
@@ -363,12 +389,35 @@ class BaseClient:
                 with h5py.File(ground_truth_path, "r") as f:
                     expected_result = f["neighbors"]
                     for i, result in enumerate(results):
-                        ids = [((x >> 32) << 23) + (x & 0xFFFFFFFF) for x in result[1:]]
+                        ids = []
+                        if self.data["app"] == "qdrant" :
+                            for ScoredPoint in result[1:]:
+                                ids.append(((ScoredPoint.id >> 32) << 23) + (ScoredPoint.id & 0xFFFFFFFF))
+                        else :#elasticsearch & infinity
+                            ids = [((x >> 32) << 23) + (x & 0xFFFFFFFF) for x in result[1:]]
                         precision = (
                             len(set(ids).intersection(expected_result[i][1:]))
                             / self.data["topK"]
                         )
                         precisions.append(precision)
+            elif self.data["mode"] == "sparse_vector":
+                assert ext == ".gt"
+                topk, gt = gt_read_all(ground_truth_path)
+                assert topk == self.data["topK"]
+                query_results = [[] for _ in range(len(self.queries))]
+                if self.data["app"] == "qdrant":
+                    for query_id, result in enumerate(results):
+                        for res in result[1:]:
+                            query_results[query_id].append(res.id)
+                elif self.data["app"] == "infinity":
+                    for query_id, result in enumerate(results):
+                        for res in result[1:]:
+                            query_results[query_id].append(res)
+                else:
+                    raise TypeError("Unsupport engine!")
+
+                recall = calculate_recall(gt, query_results)
+                precisions.append(recall)
             else:
                 assert ext == ".json" or ext == ".jsonl"
                 with open(ground_truth_path, "r") as f:

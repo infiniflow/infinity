@@ -62,16 +62,21 @@ import compaction_process;
 
 using namespace infinity;
 
-class WalReplayTest : public BaseTest {
+class WalReplayTest : public BaseTestParamStr {
 protected:
     static std::shared_ptr<std::string> config_path() {
-        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
+        return GetParam() == BaseTestParamStr::NULL_CONFIG_PATH
+                   ? std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml")
+                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp_vfs.toml");
     }
 
     void SetUp() override {
         RemoveDbDirs();
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
         tree_cmd = "tree ";
-        tree_cmd += GetHomeDir();
+        tree_cmd += GetFullDataDir();
     }
 
     void TearDown() override {
@@ -82,7 +87,11 @@ protected:
     String tree_cmd;
 };
 
-TEST_F(WalReplayTest, wal_replay_database) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         WalReplayTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+
+TEST_P(WalReplayTest, wal_replay_database) {
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -172,7 +181,7 @@ TEST_F(WalReplayTest, wal_replay_database) {
     }
 }
 
-TEST_F(WalReplayTest, wal_replay_tables) {
+TEST_P(WalReplayTest, wal_replay_tables) {
 
     Vector<SharedPtr<ColumnDef>> columns;
     {
@@ -285,7 +294,7 @@ TEST_F(WalReplayTest, wal_replay_tables) {
     }
 }
 
-TEST_F(WalReplayTest, wal_replay_append) {
+TEST_P(WalReplayTest, wal_replay_append) {
     SizeT row_count = 2;
     {
 #ifdef INFINITY_DEBUG
@@ -440,9 +449,9 @@ TEST_F(WalReplayTest, wal_replay_append) {
             BlockColumnEntry *column1 = block_entry->GetColumnBlockEntry(1);
             BlockColumnEntry *column2 = block_entry->GetColumnBlockEntry(2);
 
-            ColumnVector col0 = column0->GetColumnVector(storage->buffer_manager());
-            ColumnVector col1 = column1->GetColumnVector(storage->buffer_manager());
-            ColumnVector col2 = column2->GetColumnVector(storage->buffer_manager());
+            ColumnVector col0 = column0->GetConstColumnVector(storage->buffer_manager());
+            ColumnVector col1 = column1->GetConstColumnVector(storage->buffer_manager());
+            ColumnVector col2 = column2->GetConstColumnVector(storage->buffer_manager());
 
             for (SizeT i = 0; i < row_count; ++i) {
                 Value v0 = col0.GetValue(i);
@@ -466,7 +475,7 @@ TEST_F(WalReplayTest, wal_replay_append) {
     }
 }
 
-TEST_F(WalReplayTest, wal_replay_import) {
+TEST_P(WalReplayTest, wal_replay_import) {
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -640,15 +649,15 @@ TEST_F(WalReplayTest, wal_replay_import) {
             BlockColumnEntry *column1 = block_entry->GetColumnBlockEntry(1);
             BlockColumnEntry *column2 = block_entry->GetColumnBlockEntry(2);
 
-            ColumnVector col0 = column0->GetColumnVector(buffer_manager);
+            ColumnVector col0 = column0->GetConstColumnVector(buffer_manager);
             Value v0 = col0.GetValue(0);
             EXPECT_EQ(v0.GetValue<TinyIntT>(), 1);
 
-            ColumnVector col1 = column1->GetColumnVector(buffer_manager);
+            ColumnVector col1 = column1->GetConstColumnVector(buffer_manager);
             Value v1 = col1.GetValue(0);
             EXPECT_EQ(v1.GetValue<BigIntT>(), (i64)(22));
 
-            ColumnVector col2 = column2->GetColumnVector(buffer_manager);
+            ColumnVector col2 = column2->GetConstColumnVector(buffer_manager);
             Value v2 = col2.GetValue(0);
             DataType *col2_type = column2->column_type().get();
             EXPECT_EQ(col2_type->type(), LogicalType::kDouble);
@@ -667,13 +676,14 @@ TEST_F(WalReplayTest, wal_replay_import) {
 }
 
 // FIXME: The test case diverges from the original intent.
+// TODO: Support compact for vfs
 TEST_F(WalReplayTest, wal_replay_compact) {
+    std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
     u64 test_segment_n = 2;
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -753,7 +763,6 @@ TEST_F(WalReplayTest, wal_replay_compact) {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        std::shared_ptr<std::string> config_path = WalReplayTest::config_path();
         infinity::InfinityContext::instance().Init(config_path);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -788,7 +797,7 @@ TEST_F(WalReplayTest, wal_replay_compact) {
     }
 }
 
-TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
+TEST_P(WalReplayTest, wal_replay_create_index_IvfFlat) {
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -891,7 +900,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_IvfFlat) {
     }
 }
 
-TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
+TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -929,7 +938,7 @@ TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
             Vector<InitParameter *> parameters1;
             parameters1.emplace_back(new InitParameter("metric", "l2"));
             parameters1.emplace_back(new InitParameter("encode", "plain"));
-            parameters1.emplace_back(new InitParameter("M", "16"));
+            parameters1.emplace_back(new InitParameter("m", "16"));
             parameters1.emplace_back(new InitParameter("ef_construction", "200"));
             parameters1.emplace_back(new InitParameter("ef", "200"));
 
@@ -988,9 +997,9 @@ TEST_F(WalReplayTest, wal_replay_create_index_hnsw) {
 
             EXPECT_NE(table_index_meta, nullptr);
             EXPECT_EQ(*table_index_meta->index_name(), "hnsw_index");
-//            EXPECT_EQ(table_index_meta->index_entry_list().size(), 1u);
-//            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
-//            EXPECT_EQ(*table_index_entry_front->index_base()->index_name_, "hnsw_index");
+            //            EXPECT_EQ(table_index_meta->index_entry_list().size(), 1u);
+            //            auto table_index_entry_front = static_cast<TableIndexEntry *>(table_index_meta->index_entry_list().front().get());
+            //            EXPECT_EQ(*table_index_entry_front->index_base()->index_name_, "hnsw_index");
             txn_mgr->CommitTxn(txn);
         }
 

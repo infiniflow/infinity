@@ -14,6 +14,7 @@
 
 module;
 
+#include <expr/match_sparse_expr.h>
 #include <string>
 
 module http_search;
@@ -28,6 +29,7 @@ import search_expr;
 import match_tensor_expr;
 import fusion_expr;
 import column_expr;
+import function_expr;
 import constant_expr;
 import defer_op;
 import expr_parser;
@@ -54,6 +56,8 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             response["error_message"] = "HTTP Body isn't json object";
         }
 
+        SizeT match_expr_count = 0;
+        SizeT fusion_expr_count = 0;
         Vector<ParsedExpr *> *output_columns{nullptr};
         Vector<ParsedExpr *> *search_exprs{nullptr};
         ParsedExpr *filter{nullptr};
@@ -125,60 +129,67 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
                     return;
                 }
             } else if (IsEqual(key, "fusion")) {
-                if (search_expr != nullptr) {
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
+                }
+                auto &fusion_json_list = elem.value();
+                if (fusion_json_list.type() != nlohmann::json::value_t::array) {
                     response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] =
-                        "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
+                    response["error_message"] = "Fusion field should be list";
                     return;
                 }
-                search_expr = new SearchExpr();
-                auto &fusion_json = elem.value();
-                if (!ParseFusion(*search_exprs, fusion_json, http_status, response)) {
-                    // error
-                    return;
+                for (auto &fusion_json : fusion_json_list) {
+                    const auto fusion_expr = ParseFusion(fusion_json, http_status, response);
+                    if (fusion_expr == nullptr) {
+                        return;
+                    }
+                    search_exprs->push_back(fusion_expr);
+                    ++fusion_expr_count;
                 }
             } else if (IsEqual(key, "knn")) {
-                if (search_expr != nullptr) {
-                    response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] =
-                        "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
-                    return;
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
                 }
-                search_expr = new SearchExpr();
                 auto &knn_json = elem.value();
                 const auto knn_expr = ParseKnn(knn_json, http_status, response);
                 if (knn_expr == nullptr) {
                     return;
                 }
                 search_exprs->push_back(knn_expr);
+                ++match_expr_count;
             } else if (IsEqual(key, "match")) {
-                if (search_expr != nullptr) {
-                    response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] =
-                        "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
-                    return;
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
                 }
-                search_expr = new SearchExpr();
                 auto &match_json = elem.value();
                 const auto match_expr = ParseMatch(match_json, http_status, response);
                 if (match_expr == nullptr) {
                     return;
                 }
                 search_exprs->push_back(match_expr);
+                ++match_expr_count;
             } else if (IsEqual(key, "match_tensor")) {
-                if (search_expr != nullptr) {
-                    response["error_code"] = ErrorCode::kInvalidExpression;
-                    response["error_message"] =
-                        "There are more than one fusion expressions, Or fusion expression coexists with knn / match expression ";
-                    return;
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
                 }
-                search_expr = new SearchExpr();
                 auto &match_json = elem.value();
                 const auto match_expr = ParseMatchTensor(match_json, http_status, response);
                 if (match_expr == nullptr) {
                     return;
                 }
                 search_exprs->push_back(match_expr);
+                ++match_expr_count;
+            } else if (IsEqual(key, "match_sparse")) {
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
+                }
+                auto &match_json = elem.value();
+                const auto match_expr = ParseMatchSparse(match_json, http_status, response);
+                if (match_expr == nullptr) {
+                    return;
+                }
+                search_exprs->push_back(match_expr);
+                ++match_expr_count;
             } else {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = "Unknown expression: " + key;
@@ -186,11 +197,16 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             }
         }
 
+        if (match_expr_count > 1 && fusion_expr_count == 0) {
+            response["error_code"] = ErrorCode::kInvalidExpression;
+            response["error_message"] = "More than one knn or match experssion with no fusion experssion!";
+            return;
+        }
+
         if (search_exprs != nullptr && !search_exprs->empty()) {
             search_expr->SetExprs(search_exprs);
             search_exprs = nullptr;
         }
-
         const QueryResult result = infinity_ptr->Search(db_name, table_name, search_expr, filter, output_columns);
 
         output_columns = nullptr;
@@ -266,17 +282,32 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
             return nullptr;
         }
 
-        UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
-        ExprParser expr_parser;
-        expr_parser.Parse(output_expr_str, expr_parsed_result.get());
-        if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() == 0) {
-            response["error_code"] = ErrorCode::kInvalidExpression;
-            response["error_message"] = fmt::format("Invalid expression: {}", output_expr_str);
-            return nullptr;
-        }
+        if(output_expr_str == "_row_id" or output_expr_str == "_similarity" or output_expr_str == "_distance" or output_expr_str == "_score") {
+            auto parsed_expr = new FunctionExpr();
+            if(output_expr_str == "_row_id") {
+                parsed_expr->func_name_ = "row_id";
+            } else if(output_expr_str == "_similarity") {
+                parsed_expr->func_name_ = "similarity";
+            } else if(output_expr_str == "_distance") {
+                parsed_expr->func_name_ = "distance";
+            } else if(output_expr_str == "_score") {
+                parsed_expr->func_name_ = "score";
+            }
+            output_columns->emplace_back(parsed_expr);
+            parsed_expr = nullptr;
+        } else {
+            UniquePtr<ExpressionParserResult> expr_parsed_result = MakeUnique<ExpressionParserResult>();
+            ExprParser expr_parser;
+            expr_parser.Parse(output_expr_str, expr_parsed_result.get());
+            if (expr_parsed_result->IsError() || expr_parsed_result->exprs_ptr_->size() == 0) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = fmt::format("Invalid expression: {}", output_expr_str);
+                return nullptr;
+            }
 
-        output_columns->emplace_back(expr_parsed_result->exprs_ptr_->at(0));
-        expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+            output_columns->emplace_back(expr_parsed_result->exprs_ptr_->at(0));
+            expr_parsed_result->exprs_ptr_->at(0) = nullptr;
+        }
     }
 
     // Avoiding DeferFN auto free the output expressions
@@ -284,63 +315,26 @@ Vector<ParsedExpr *> *HTTPSearch::ParseOutput(const nlohmann::json &output_list,
     output_columns = nullptr;
     return res;
 }
-bool HTTPSearch::ParseFusion(Vector<ParsedExpr *> &search_exprs,
-                             const nlohmann::json &fusion_json_object,
+FusionExpr* HTTPSearch::ParseFusion(const nlohmann::json &fusion_json_object,
                              HTTPStatus &http_status,
                              nlohmann::json &response) {
     if (!fusion_json_object.is_object()) {
         response["error_code"] = ErrorCode::kInvalidExpression;
         response["error_message"] = fmt::format("Fusion expression must be a json object: {}", fusion_json_object);
-        return false;
+        return nullptr;
     }
-    // case 1. child fusion
-    // case 2. knn, match, match tensor
+
     u32 method_cnt = 0;
-    u32 child_fusion_cnt = 0;
-    u32 child_match_cnt = 0;
+
     UniquePtr<FusionExpr> fusion_expr = nullptr;
     for (const auto &expression : fusion_json_object.items()) {
         String key = expression.key();
         ToLower(key);
-        if (IsEqual(key, "fusion")) {
-            if (child_fusion_cnt++) {
-                response["error_code"] = ErrorCode::kInvalidExpression;
-                response["error_message"] = "Fusion child is already given";
-                return false;
-            }
-            auto &child_fusion_json = expression.value();
-            if (!ParseFusion(search_exprs, child_fusion_json, http_status, response)) {
-                return false;
-            }
-        } else if (IsEqual(key, "knn")) {
-            ++child_match_cnt;
-            auto &knn_json = expression.value();
-            const auto knn_expr = ParseKnn(knn_json, http_status, response);
-            if (knn_expr == nullptr) {
-                return false;
-            }
-            search_exprs.push_back(knn_expr);
-        } else if (IsEqual(key, "match")) {
-            ++child_match_cnt;
-            auto &match_json = expression.value();
-            const auto match_expr = ParseMatch(match_json, http_status, response);
-            if (match_expr == nullptr) {
-                return false;
-            }
-            search_exprs.push_back(match_expr);
-        } else if (IsEqual(key, "match_tensor")) {
-            ++child_match_cnt;
-            auto &match_tensor_json = expression.value();
-            const auto match_tensor_expr = ParseMatchTensor(match_tensor_json, http_status, response);
-            if (match_tensor_expr == nullptr) {
-                return false;
-            }
-            search_exprs.push_back(match_tensor_expr);
-        } else if (IsEqual(key, "method")) {
+        if (IsEqual(key, "method")) {
             if (method_cnt++) {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = "Method is already given";
-                return false;
+                return nullptr;
             }
             if (!fusion_expr) {
                 fusion_expr = MakeUnique<FusionExpr>();
@@ -351,27 +345,31 @@ bool HTTPSearch::ParseFusion(Vector<ParsedExpr *> &search_exprs,
                 fusion_expr = MakeUnique<FusionExpr>();
             }
             fusion_expr->SetOptions(expression.value());
+        } else if (IsEqual(key, "optional_match_tensor")) {
+            if (!fusion_expr) {
+                fusion_expr = MakeUnique<FusionExpr>();
+            }
+            auto &match_tensor_json = expression.value();
+            const auto match_tensor_expr = ParseMatchTensor(match_tensor_json, http_status, response);
+            if (match_tensor_expr == nullptr) {
+                return nullptr;
+            }
+            fusion_expr->match_tensor_expr_.reset(match_tensor_expr);
         } else {
             response["error_code"] = ErrorCode::kInvalidExpression;
             response["error_message"] = "Error fusion clause";
-            return false;
+            return nullptr;
         }
     }
-    if ((child_fusion_cnt == 0 and child_match_cnt == 0) or (child_fusion_cnt > 0 and child_match_cnt > 0)) {
-        response["error_code"] = ErrorCode::kInvalidExpression;
-        response["error_message"] = "Error fusion clause";
-        return false;
-    }
+
     if (fusion_expr) {
         if (fusion_expr->method_.empty()) {
             response["error_code"] = ErrorCode::kInvalidExpression;
             response["error_message"] = "Error fusion clause : empty method";
-            return false;
+            return nullptr;
         }
-        fusion_expr->JobAfterParser();
-        search_exprs.push_back(fusion_expr.release());
     }
-    return true;
+    return fusion_expr.release();
 }
 KnnExpr *HTTPSearch::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus &http_status, nlohmann::json &response) {
     if (!knn_json_object.is_object()) {
@@ -406,6 +404,18 @@ KnnExpr *HTTPSearch::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus 
             String element_type = knn_json_object["element_type"];
             if (IsEqual(element_type, "float")) {
                 knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat;
+            } else if(IsEqual(element_type, "float16")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemFloat16;
+            } else if(IsEqual(element_type, "bfloat16")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemBFloat16;
+            } else if(IsEqual(element_type, "double")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemDouble;
+            } else if(IsEqual(element_type, "integer")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemInt32;
+            } else if(IsEqual(element_type, "int8")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemInt8;
+            } else if(IsEqual(element_type, "uint8")) {
+                knn_expr->embedding_data_type_ = EmbeddingDataType::kElemUInt8;
             } else {
                 response["error_code"] = ErrorCode::kInvalidExpression;
                 response["error_message"] = fmt::format("Not supported vector element type: {}", element_type);
@@ -445,6 +455,13 @@ KnnExpr *HTTPSearch::ParseKnn(const nlohmann::json &knn_json_object, HTTPStatus 
             if (knn_expr->opt_params_ == nullptr) {
                 knn_expr->opt_params_ = new Vector<InitParameter *>();
             }
+            if(key  == "index_name") {
+                knn_expr->index_name_ = field_json_obj.value();
+            }
+            if(key == "ignore_index" && field_json_obj.value() == "true") {
+                knn_expr->ignore_index_ = true;
+            }
+
             auto parameter = MakeUnique<InitParameter>();
             parameter->param_name_ = key;
             parameter->param_value_ = field_json_obj.value();
@@ -541,6 +558,60 @@ MatchTensorExpr *HTTPSearch::ParseMatchTensor(const nlohmann::json &json_object,
     return match_tensor_expr.release();
 }
 
+MatchSparseExpr *HTTPSearch::ParseMatchSparse(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response) {
+    if (!json_object.is_object()) {
+        response["error_code"] = ErrorCode::kInvalidExpression;
+        response["error_message"] = "MatchSparse field should be object";
+        return nullptr;
+    }
+    auto match_sparse_expr = MakeUnique<MatchSparseExpr>();
+    i64 topn = DEFAULT_MATCH_SPARSE_TOP_N;
+    auto *opt_params_ptr = new Vector<InitParameter *>();
+    DeferFn release_opt([&]() {
+            if(opt_params_ptr != nullptr) {
+                for (auto &params_ptr : *opt_params_ptr) {
+                    delete params_ptr;
+                }
+                delete opt_params_ptr;
+                opt_params_ptr = nullptr;
+            }
+        });
+    for (auto &field_json_obj : json_object.items()) {
+        String key = field_json_obj.key();
+        ToLower(key);
+        if (IsEqual(key, "metric_type")) {
+            match_sparse_expr->SetMetricType(field_json_obj.value());
+        } else if (IsEqual(key, "fields")) {
+            auto column_expr = MakeUnique<ColumnExpr>();
+            const auto &fields_value = field_json_obj.value();
+            if (!fields_value.is_array()) {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "Fields should be array";
+                return nullptr;
+            }
+            for (SizeT i = 0; i < fields_value.size(); i++) {
+                column_expr->names_.emplace_back(fields_value[i]);
+            }
+            match_sparse_expr->column_expr_ = std::move(column_expr);
+        } else if (IsEqual(key, "query_sparse")) {
+            const auto sparse_expr = BuildConstantSparseExprFromJson(field_json_obj.value());
+            match_sparse_expr->SetQuerySparse(sparse_expr);
+        } else if (IsEqual(key, "topn")) {
+            topn = field_json_obj.value().get<i64>();
+        } else if (IsEqual(key, "opt_params")) {
+            for(auto &param : field_json_obj.value().items()) {
+                auto *init_parameter = new InitParameter();
+                init_parameter->param_name_ = param.key();
+                init_parameter->param_value_ = param.value();
+                opt_params_ptr->emplace_back(init_parameter);
+            }
+        }
+    }
+    match_sparse_expr->SetOptParams(topn, opt_params_ptr);
+    opt_params_ptr = nullptr;
+    return match_sparse_expr.release();
+}
+
 Tuple<i64, void *>
 HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType elem_type, HTTPStatus &http_status, nlohmann::json &response) {
     if (!json_object.is_array()) {
@@ -556,6 +627,93 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
     }
 
     switch (elem_type) {
+        case EmbeddingDataType::kElemInt32: {
+            i32 *embedding_data_ptr = new i32[dimension];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT idx = 0; idx < dimension; ++idx) {
+                const auto &value_ref = json_object[idx];
+                const auto &value_type = value_ref.type();
+                switch (value_type) {
+                    case nlohmann::json::value_t::number_integer:
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
+                        break;
+                    }
+                    default: {
+                        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                        response["error_message"] = fmt::format("Embedding element type should be integer");
+                        return {0, nullptr};
+                    }
+                }
+            }
+
+            i32 *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
+        case EmbeddingDataType::kElemInt8: {
+            i8 *embedding_data_ptr = new i8[dimension];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT idx = 0; idx < dimension; ++idx) {
+                const auto &value_ref = json_object[idx];
+                const auto &value_type = value_ref.type();
+                switch (value_type) {
+                    case nlohmann::json::value_t::number_integer:
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
+                        break;
+                    }
+                    default: {
+                        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                        response["error_message"] = fmt::format("Embedding element type should be integer");
+                        return {0, nullptr};
+                    }
+                }
+            }
+
+            i8 *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
+        case EmbeddingDataType::kElemUInt8: {
+            u8 *embedding_data_ptr = new u8[dimension];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT idx = 0; idx < dimension; ++idx) {
+                const auto &value_ref = json_object[idx];
+                const auto &value_type = value_ref.type();
+                switch (value_type) {
+                    case nlohmann::json::value_t::number_integer:
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
+                        break;
+                    }
+                    default: {
+                        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                        response["error_message"] = fmt::format("Embedding element type should be integer");
+                        return {0, nullptr};
+                    }
+                }
+            }
+
+            u8 *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
         case EmbeddingDataType::kElemFloat: {
             f32 *embedding_data_ptr = new f32[dimension];
             DeferFn defer_free_embedding([&]() {
@@ -567,10 +725,14 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
             for (SizeT idx = 0; idx < dimension; ++idx) {
                 const auto &value_ref = json_object[idx];
                 const auto &value_type = value_ref.type();
-
                 switch (value_type) {
                     case nlohmann::json::value_t::number_float: {
                         embedding_data_ptr[idx] = value_ref.template get<double>();
+                        break;
+                    }
+                    case nlohmann::json::value_t::number_integer:
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
                         break;
                     }
                     default: {
@@ -582,6 +744,72 @@ HTTPSearch::ParseVector(const nlohmann::json &json_object, EmbeddingDataType ele
             }
 
             f32 *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
+        case EmbeddingDataType::kElemFloat16: {
+            float16_t *embedding_data_ptr = new float16_t[dimension];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT idx = 0; idx < dimension; ++idx) {
+                const auto &value_ref = json_object[idx];
+                const auto &value_type = value_ref.type();
+                switch (value_type) {
+                    case nlohmann::json::value_t::number_float: {
+                        embedding_data_ptr[idx] = value_ref.template get<double>();
+                        break;
+                    }
+                    case nlohmann::json::value_t::number_integer:
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
+                        break;
+                    }
+                    default: {
+                        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                        response["error_message"] = fmt::format("Embedding element type should be float");
+                        return {0, nullptr};
+                    }
+                }
+            }
+
+            float16_t *res = embedding_data_ptr;
+            embedding_data_ptr = nullptr;
+            return {dimension, res};
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            bfloat16_t *embedding_data_ptr = new bfloat16_t[dimension];
+            DeferFn defer_free_embedding([&]() {
+                if (embedding_data_ptr != nullptr) {
+                    delete[] embedding_data_ptr;
+                    embedding_data_ptr = nullptr;
+                }
+            });
+            for (SizeT idx = 0; idx < dimension; ++idx) {
+                const auto &value_ref = json_object[idx];
+                const auto &value_type = value_ref.type();
+                switch (value_type) {
+                    case nlohmann::json::value_t::number_float: {
+                        embedding_data_ptr[idx] = value_ref.template get<double>();
+                        break;
+                    }
+                    case nlohmann::json::value_t::number_integer:
+                    case nlohmann::json::value_t::number_unsigned: {
+                        embedding_data_ptr[idx] = value_ref.template get<i64>();
+                        break;
+                    }
+                    default: {
+                        response["error_code"] = ErrorCode::kInvalidEmbeddingDataType;
+                        response["error_message"] = fmt::format("Embedding element type should be float");
+                        return {0, nullptr};
+                    }
+                }
+            }
+
+            bfloat16_t *res = embedding_data_ptr;
             embedding_data_ptr = nullptr;
             return {dimension, res};
         }

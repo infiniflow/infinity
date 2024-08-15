@@ -29,10 +29,10 @@ import index_base;
 import buffer_handle;
 import default_values;
 import column_def;
+import txn;
 
 namespace infinity {
 
-class Txn;
 class SegmentIndexEntry;
 struct BlockEntry;
 class BufferManager;
@@ -44,25 +44,20 @@ export class ChunkIndexEntry : public BaseEntry, public EntryInterface {
 public:
     static Vector<std::string_view> DecodeIndex(std::string_view encode);
 
-    static String EncodeIndex(const ChunkID chunk_id, const SegmentIndexEntry *segment_index_entry);
+    static String EncodeIndex(const ChunkID chunk_id, const String &base_name, const SegmentIndexEntry *segment_index_entry);
 
     ChunkIndexEntry(ChunkID chunk_id, SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count);
-
-    static UniquePtr<IndexFileWorker> CreateFileWorker(const SharedPtr<IndexBase> index_base,
-                                                       const SharedPtr<ColumnDef> column_def,
-                                                       const SharedPtr<String> &index_dir,
-                                                       CreateIndexParam *param,
-                                                       SegmentID segment_id,
-                                                       ChunkID chunk_id);
 
 public:
     static String IndexFileName(SegmentID segment_id, ChunkID chunk_id);
 
-    static SharedPtr<ChunkIndexEntry> NewChunkIndexEntry(ChunkID chunk_id,
-                                                         SegmentIndexEntry *segment_index_entry,
-                                                         CreateIndexParam *param,
-                                                         RowID base_rowid,
-                                                         BufferManager *buffer_mgr);
+    static SharedPtr<ChunkIndexEntry> NewHnswIndexChunkIndexEntry(ChunkID chunk_id,
+                                                                  SegmentIndexEntry *segment_index_entry,
+                                                                  const String &base_name,
+                                                                  RowID base_rowid,
+                                                                  u32 row_count,
+                                                                  BufferManager *buffer_mgr,
+                                                                  SizeT index_size);
 
     static SharedPtr<ChunkIndexEntry>
     NewFtChunkIndexEntry(SegmentIndexEntry *segment_index_entry, const String &base_name, RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
@@ -80,6 +75,14 @@ public:
                                                                   RowID base_rowid,
                                                                   u32 row_count,
                                                                   BufferManager *buffer_mgr);
+
+    static SharedPtr<ChunkIndexEntry> NewBMPIndexChunkIndexEntry(ChunkID chunk_id,
+                                                                 SegmentIndexEntry *segment_index_entry,
+                                                                 const String &base_name,
+                                                                 RowID base_rowid,
+                                                                 u32 row_count,
+                                                                 BufferManager *buffer_mgr,
+                                                                 SizeT index_size);
 
     static SharedPtr<ChunkIndexEntry> NewReplayChunkIndexEntry(ChunkID chunk_id,
                                                                SegmentIndexEntry *segment_index_entry,
@@ -126,14 +129,10 @@ public:
     void DeprecateChunk(TxnTimeStamp commit_ts) {
         assert(commit_ts_.load() < commit_ts);
         deprecate_ts_.store(commit_ts);
+        ResetOptimizing();
     }
 
-    bool CheckVisibleByTS(TxnTimeStamp ts) { // FIXME: should overload BaseEntry::CheckVisible
-        TxnTimeStamp deprecate_ts = deprecate_ts_.load();
-        TxnTimeStamp commit_ts = commit_ts_.load();
-        assert(commit_ts == UNCOMMIT_TS || commit_ts < deprecate_ts);
-        return ts >= commit_ts && ts <= deprecate_ts;
-    }
+    bool CheckVisible(Txn *txn) const override;
 
     bool CheckDeprecate(TxnTimeStamp ts) {
         TxnTimeStamp deprecate_ts = deprecate_ts_.load();
@@ -141,6 +140,10 @@ public:
     }
 
     void Save();
+
+    bool TrySetOptimizing();
+
+    void ResetOptimizing();
 
 public:
     ChunkID chunk_id_;
@@ -154,6 +157,7 @@ public:
 private:
     BufferObj *buffer_obj_{};
     Vector<BufferObj *> part_buffer_objs_;
+    Atomic<bool> optimizing_{false};
 };
 
 } // namespace infinity

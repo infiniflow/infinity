@@ -63,6 +63,12 @@ inline BoundCastFunc BindIntegerCast(const DataType &source, const DataType &tar
         case LogicalType::kDouble: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, DoubleT, IntegerTryCastToFixlen>);
         }
+        case LogicalType::kFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, Float16T, IntegerTryCastToFixlen>);
+        }
+        case LogicalType::kBFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, BFloat16T, IntegerTryCastToFixlen>);
+        }
         case LogicalType::kDecimal: {
             return BoundCastFunc(&ColumnVectorCast::TryCastColumnVector<SourceType, DecimalT, IntegerTryCastToFixlen>);
         }
@@ -94,7 +100,97 @@ struct IntegerTryCastToVarlen {
     }
 };
 
+// Cast u8 to other numeric type
+template <>
+inline bool IntegerTryCastToFixlen::Run(u8 source, TinyIntT &target) {
+    target = source;
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(u8 source, SmallIntT &target) {
+    target = source;
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(u8 source, IntegerT &target) {
+    target = source;
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(u8 source, BigIntT &target) {
+    target = source;
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(u8 source, HugeIntT &target) {
+    target.lower = source;
+    target.upper = (source < 0) * -1;
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(u8 source, FloatT &target) {
+    target = source;
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(u8 source, DoubleT &target) {
+    target = source;
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(u8 source, Float16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(u8 source, BFloat16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
+// TODO
+template <>
+inline bool IntegerTryCastToFixlen::Run(u8, DecimalT &) {
+    String error_message = "Not implemented";
+    UnrecoverableError(error_message);
+    return false;
+}
+
+// Cast u8 to VarcharT type
+template <>
+inline bool IntegerTryCastToVarlen::Run(u8 source, VarcharT &target, ColumnVector*) {
+    target.is_value_ = false;
+    if (source == 0) {
+        target.short_.data_[0] = '0';
+        target.length_ = 1;
+        return true;
+    }
+    // TODO: High performance itoa needed here.
+    String tmp_str = std::to_string(source);
+    target.length_ = static_cast<u32>(tmp_str.size());
+    if (target.length_ > VARCHAR_INLINE_LEN) {
+        String error_message = "Integer digits number should less than 14.";
+        UnrecoverableError(error_message);
+    }
+    std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
+    return true;
+}
+
 // Cast TinyInt to other numeric type
+template <>
+inline bool IntegerTryCastToFixlen::Run(TinyIntT source, u8 &target) {
+    target = source;
+    return true;
+}
+
 template <>
 inline bool IntegerTryCastToFixlen::Run(TinyIntT source, SmallIntT &target) {
     target = source;
@@ -132,6 +228,18 @@ inline bool IntegerTryCastToFixlen::Run(TinyIntT source, DoubleT &target) {
     return true;
 }
 
+template <>
+inline bool IntegerTryCastToFixlen::Run(TinyIntT source, Float16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(TinyIntT source, BFloat16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(TinyIntT, DecimalT &) {
@@ -161,6 +269,15 @@ inline bool IntegerTryCastToVarlen::Run(TinyIntT source, VarcharT &target, Colum
 }
 
 // Cast SmallInt to other numeric type
+template <>
+inline bool IntegerTryCastToFixlen::Run(SmallIntT source, u8 &target) {
+    if (source < 0 || source > std::numeric_limits<u8>::max()) {
+        return false;
+    }
+    target = static_cast<u8>(source);
+    return true;
+}
+
 template <>
 inline bool IntegerTryCastToFixlen::Run(SmallIntT source, TinyIntT &target) {
     if (source < std::numeric_limits<i8>::min() || source > std::numeric_limits<i8>::max()) {
@@ -201,6 +318,18 @@ inline bool IntegerTryCastToFixlen::Run(SmallIntT source, DoubleT &target) {
     return true;
 }
 
+template <>
+inline bool IntegerTryCastToFixlen::Run(SmallIntT source, Float16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(SmallIntT source, BFloat16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(SmallIntT, DecimalT &) {
@@ -230,6 +359,15 @@ inline bool IntegerTryCastToVarlen::Run(SmallIntT source, VarcharT &target, Colu
 }
 
 // Cast Integer to other numeric type
+template <>
+inline bool IntegerTryCastToFixlen::Run(IntegerT source, u8 &target) {
+    if (source < 0 || source > std::numeric_limits<u8>::max()) {
+        return false;
+    }
+    target = static_cast<u8>(source);
+    return true;
+}
+
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT source, TinyIntT &target) {
     if (source < std::numeric_limits<i8>::min() || source > std::numeric_limits<i8>::max()) {
@@ -273,6 +411,18 @@ inline bool IntegerTryCastToFixlen::Run(IntegerT source, DoubleT &target) {
     return true;
 }
 
+template <>
+inline bool IntegerTryCastToFixlen::Run(IntegerT source, Float16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(IntegerT source, BFloat16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(IntegerT, DecimalT &) {
@@ -302,6 +452,15 @@ inline bool IntegerTryCastToVarlen::Run(IntegerT source, VarcharT &target, Colum
 }
 
 // Cast BigInt to other numeric type
+template <>
+inline bool IntegerTryCastToFixlen::Run(BigIntT source, u8 &target) {
+    if (source < 0 || source > std::numeric_limits<u8>::max()) {
+        return false;
+    }
+    target = static_cast<u8>(source);
+    return true;
+}
+
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT source, TinyIntT &target) {
     if (source < std::numeric_limits<i8>::min() || source > std::numeric_limits<i8>::max()) {
@@ -348,6 +507,18 @@ inline bool IntegerTryCastToFixlen::Run(BigIntT source, DoubleT &target) {
     return true;
 }
 
+template <>
+inline bool IntegerTryCastToFixlen::Run(BigIntT source, Float16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(BigIntT source, BFloat16T &target) {
+    target = static_cast<float>(source);
+    return true;
+}
+
 // TODO
 template <>
 inline bool IntegerTryCastToFixlen::Run(BigIntT, DecimalT &) {
@@ -372,19 +543,25 @@ inline bool IntegerTryCastToVarlen::Run(BigIntT source, VarcharT &target, Column
         std::memcpy(target.short_.data_, tmp_str.c_str(), target.length_);
     } else {
         std::memcpy(target.vector_.prefix_, tmp_str.c_str(), VARCHAR_PREFIX_LEN);
-        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
-            String error_message = "Varchar column vector should use MemoryVectorBuffer.";
+        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
+            String error_message = "Varchar column vector should use VarBuffer.";
             UnrecoverableError(error_message);
         }
-        auto [chunk_id, chunk_offset] = vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(tmp_str.c_str(), target.length_);
-        target.vector_.chunk_id_ = chunk_id;
-        target.vector_.chunk_offset_ = chunk_offset;
+        SizeT offset = vector_ptr->buffer_->AppendVarchar(tmp_str.c_str(), target.length_);
+        target.vector_.file_offset_ = offset;
     }
 
     return true;
 }
 
 // TODO: Cast HugeInt to other numeric type
+template <>
+inline bool IntegerTryCastToFixlen::Run(HugeIntT, u8 &) {
+    String error_message = "Not implement: IntegerTryCastToFixlen::Run";
+    UnrecoverableError(error_message);
+    return false;
+}
+
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, TinyIntT &) {
     String error_message = "Not implement: IntegerTryCastToFixlen::Run";
@@ -422,6 +599,20 @@ inline bool IntegerTryCastToFixlen::Run(HugeIntT, FloatT &) {
 
 template <>
 inline bool IntegerTryCastToFixlen::Run(HugeIntT, DoubleT &) {
+    String error_message = "Not implemented";
+    UnrecoverableError(error_message);
+    return false;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(HugeIntT, Float16T &) {
+    String error_message = "Not implemented";
+    UnrecoverableError(error_message);
+    return false;
+}
+
+template <>
+inline bool IntegerTryCastToFixlen::Run(HugeIntT, BFloat16T &) {
     String error_message = "Not implemented";
     UnrecoverableError(error_message);
     return false;

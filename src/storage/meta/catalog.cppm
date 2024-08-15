@@ -214,6 +214,8 @@ public:
 
     static void AddFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &function_set);
 
+    static void AppendToScalarFunctionSet(Catalog *catalog, const SharedPtr<FunctionSet> &function_set);
+
     static void AddSpecialFunction(Catalog *catalog, const SharedPtr<SpecialFunction> &special_function);
 
     static Tuple<SpecialFunction *, Status> GetSpecialFunctionByNameNoExcept(Catalog *catalog, String function_name);
@@ -224,7 +226,7 @@ public:
 
     void SaveFullCatalog(TxnTimeStamp max_commit_ts, String &full_path, String &full_name);
 
-    bool SaveDeltaCatalog(TxnTimeStamp max_commit_ts, String &delta_path, String &delta_name);
+    bool SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commit_ts, String &delta_path, String &delta_name);
 
     void AddDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
@@ -292,7 +294,7 @@ public:
 private: // TODO: remove this
     std::shared_mutex &GetDbMetaLock() { return db_meta_map_.GetMetaLock(); }
 
-//    HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
+    //    HashMap<String, UniquePtr<DBMeta>> &db_meta_map() { return db_meta_map_.meta_map_; };
 
     Atomic<bool> running_{};
     UniquePtr<Thread> mem_index_commit_thread_{};
@@ -302,7 +304,7 @@ private: // TODO: remove this
     void MemIndexCommitLoop();
 
 public:
-    void MemIndexRecover(BufferManager *buffer_manager);
+    void MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts);
 
     void PickCleanup(CleanupScanner *scanner);
 

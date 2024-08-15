@@ -114,7 +114,7 @@ public:
     QueryResult CreateIndex(const String &db_name,
                             const String &table_name,
                             const String &index_name,
-                            Vector<IndexInfo *> *index_info_list,
+                            IndexInfo *index_info_ptr,
                             const CreateIndexOptions &create_index_options);
 
     QueryResult DropIndex(const String &db_name, const String &table_name, const String &index_name, const DropIndexOptions &drop_index_option);

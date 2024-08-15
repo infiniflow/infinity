@@ -32,13 +32,20 @@ import logical_type;
 import data_type;
 import compilation_config;
 
-class ColumnVectorVarcharTest : public BaseTest {
+class ColumnVectorVarcharTest : public BaseTestParamStr {
     void SetUp() override {
         RemoveDbDirs();
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        auto config_path = std::make_shared<std::string>(std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml");
+        system(("mkdir -p " + std::string(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        system(("mkdir -p " + std::string(GetFullDataDir())).c_str());
+        std::string config_path_str = GetParam();
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -49,11 +56,16 @@ class ColumnVectorVarcharTest : public BaseTest {
         EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
         infinity::GlobalResourceUsage::UnInit();
 #endif
-        BaseTest::TearDown();
+        BaseTestParamStr::TearDown();
     }
 };
 
-TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         ColumnVectorVarcharTest,
+                         ::testing::Values((std::string(infinity::test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
+                                           BaseTestParamStr::VFS_CONFIG_PATH));
+
+TEST_P(ColumnVectorVarcharTest, flat_inline_varchar) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -71,7 +83,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -127,7 +139,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -157,7 +169,7 @@ TEST_F(ColumnVectorVarcharTest, flat_inline_varchar) {
     }
 }
 
-TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
+TEST_P(ColumnVectorVarcharTest, constant_inline_varchar) {
 
     using namespace infinity;
 
@@ -177,7 +189,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -222,7 +234,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -239,7 +251,7 @@ TEST_F(ColumnVectorVarcharTest, constant_inline_varchar) {
     }
 }
 
-TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
+TEST_P(ColumnVectorVarcharTest, varchar_column_vector_select) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -277,7 +289,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_vector_select) {
     }
 }
 
-TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
+TEST_P(ColumnVectorVarcharTest, varchar_column_slice_init) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -315,7 +327,7 @@ TEST_F(ColumnVectorVarcharTest, varchar_column_slice_init) {
     }
 }
 
-TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
+TEST_P(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -333,7 +345,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -389,7 +401,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -420,7 +432,7 @@ TEST_F(ColumnVectorVarcharTest, flat_not_inline_varchar) {
     }
 }
 
-TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
+TEST_P(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     using namespace infinity;
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
     ColumnVector column_vector(data_type);
@@ -435,7 +447,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -480,7 +492,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kConstant);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -497,7 +509,7 @@ TEST_F(ColumnVectorVarcharTest, constant_not_inline_varchar) {
     }
 }
 
-TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
+TEST_P(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     using namespace infinity;
 
     SharedPtr<DataType> data_type = MakeShared<DataType>(LogicalType::kVarchar);
@@ -515,7 +527,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);
@@ -571,7 +583,7 @@ TEST_F(ColumnVectorVarcharTest, flat_mixed_inline_varchar) {
     EXPECT_NE(column_vector.data(), nullptr);
     EXPECT_EQ(column_vector.vector_type(), ColumnVectorType::kFlat);
     EXPECT_EQ(column_vector.data_type(), data_type);
-    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kHeap);
+    EXPECT_EQ(column_vector.buffer_->buffer_type_, VectorBufferType::kVarBuffer);
 
     EXPECT_NE(column_vector.buffer_, nullptr);
     EXPECT_NE(column_vector.nulls_ptr_, nullptr);

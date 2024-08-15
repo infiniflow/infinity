@@ -18,6 +18,7 @@ export module session_manager;
 import stl;
 import session;
 import profiler;
+import status;
 
 namespace infinity {
 
@@ -33,21 +34,27 @@ export class SessionManager {
 public:
     SessionManager() = default;
 
-    SharedPtr<RemoteSession> CreateRemoteSession() {
+    SharedPtr<RemoteSession> CreateRemoteSession(bool maintenance_mode) {
         u64 session_id = ++ session_id_generator_;
-        SharedPtr<RemoteSession> remote_session = MakeShared<RemoteSession>(session_id);
+        SharedPtr<RemoteSession> remote_session = MakeShared<RemoteSession>(session_id, maintenance_mode);
         {
             std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+            if(maintenance_mode && sessions_.size() > 0) {
+                return nullptr;
+            }
             sessions_.emplace(session_id, remote_session.get());
         }
         return remote_session;
     }
 
-    SharedPtr<LocalSession> CreateLocalSession() {
+    SharedPtr<LocalSession> CreateLocalSession(bool maintenance_mode) {
         u64 session_id = ++ session_id_generator_;
-        SharedPtr<LocalSession> local_session = MakeShared<LocalSession>(session_id);
+        SharedPtr<LocalSession> local_session = MakeShared<LocalSession>(session_id, maintenance_mode);
         {
             std::unique_lock<std::shared_mutex> w_locker(rw_locker_);
+            if(maintenance_mode && sessions_.size() > 0) {
+                return nullptr;
+            }
             sessions_.emplace(session_id, local_session.get());
         }
         return local_session;

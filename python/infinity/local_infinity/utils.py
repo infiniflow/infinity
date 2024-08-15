@@ -18,7 +18,9 @@ import inspect
 import pandas as pd
 import polars as pl
 import sqlglot.expressions as exp
-
+import numpy as np
+from infinity.errors import ErrorCode
+from infinity.common import InfinityException
 from infinity.local_infinity.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
 from infinity.embedded_infinity_ext import WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapSearchExpr, WrapConstantExpr, ParsedExprType, LiteralType
@@ -58,6 +60,15 @@ def traverse_conditions(cons, fn=None):
         parsed_expr.type = ParsedExprType.kColumn
         parsed_expr.column_expr = column_expr
 
+        return parsed_expr
+
+    elif isinstance(cons, exp.Boolean):
+        parsed_expr = WrapParsedExpr()
+        constant_expr = WrapConstantExpr()
+        constant_expr.literal_type = LiteralType.kBoolean
+        constant_expr.bool_value = cons.this
+        parsed_expr.type = ParsedExprType.kConstant
+        parsed_expr.constant_expr = constant_expr
         return parsed_expr
 
     elif isinstance(cons, exp.Literal):
@@ -101,6 +112,20 @@ def traverse_conditions(cons, fn=None):
             parsed_expr.constant_expr = constant_expr
 
             return parsed_expr
+    elif isinstance(cons, exp.Func):
+        arguments = []
+        for arg in cons.args.values():
+            if arg:
+                parsed_expr = parse_expr(arg)
+                arguments.append(parsed_expr)
+        func_expr = WrapFunctionExpr()
+        func_expr.func_name = cons.key
+        func_expr.arguments = arguments
+
+        parsed_expr = WrapParsedExpr()
+        parsed_expr.type = ParsedExprType.kFunction
+        parsed_expr.function_expr = func_expr
+        return parsed_expr
     else:
         raise Exception(f"unknown condition type: {cons}")
 
@@ -109,21 +134,7 @@ def parse_expr(expr):
     try:
         return traverse_conditions(expr, parse_expr)
     except:
-        if isinstance(expr, exp.Func):
-            arguments = []
-            for arg in expr.args.values():
-                if arg:
-                    parsed_expr = parse_expr(arg)
-                    arguments.append(parsed_expr)
-            func_expr = WrapFunctionExpr()
-            func_expr.func_name = expr.key
-            func_expr.arguments = arguments
-
-            parsed_expr = WrapParsedExpr()
-            parsed_expr.type = ParsedExprType.kFunction
-            parsed_expr.function_expr = func_expr
-            return parsed_expr
-        elif isinstance(expr, exp.Star):
+        if isinstance(expr, exp.Star):
             column_expr = WrapColumnExpr()
             column_expr.star = True
             parsed_expr = WrapParsedExpr(ParsedExprType.kColumn)
@@ -131,6 +142,70 @@ def parse_expr(expr):
             return parsed_expr
         else:
             raise Exception(f"unknown expression type: {expr}")
+
+
+def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
+    # convert numpy types
+    if isinstance(value, np.integer):
+        value = int(value)
+    elif isinstance(value, np.floating):
+        value = float(value)
+    elif isinstance(value, list) and isinstance(value[0], np.ndarray):
+        if value[0].ndim <= 2:
+            value = [x.tolist() for x in value]
+        else:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Invalid list member type: {type(value[0])}, ndarray dimension > 2")
+    elif isinstance(value, np.ndarray):
+        if value.ndim <= 2:
+            value = value.tolist()
+        else:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Invalid list type: {type(value)}, ndarray dimension > 2")
+    # match ConstantExpr
+    constant_expression = WrapConstantExpr()
+    match value:
+        case str():
+            constant_expression.literal_type = LiteralType.kString
+            constant_expression.str_value = value
+        case bool():
+            constant_expression.literal_type = LiteralType.kBoolean
+            constant_expression.bool_value = value
+        case int():
+            constant_expression.literal_type = LiteralType.kInteger
+            constant_expression.i64_value = value
+        case float():
+            constant_expression.literal_type = LiteralType.kDouble
+            constant_expression.f64_value = value
+        case [int(), *_]:
+            constant_expression.literal_type = LiteralType.kIntegerArray
+            constant_expression.i64_array_value = value
+        case [float(), *_]:
+            constant_expression.literal_type = LiteralType.kDoubleArray
+            constant_expression.f64_array_value = value
+        case [[int(), *_], *_]:
+            constant_expression.literal_type = LiteralType.kSubArrayArray
+            constant_expression.i64_tensor_value = value
+        case [[float(), *_], *_]:
+            constant_expression.literal_type = LiteralType.kSubArrayArray
+            constant_expression.f64_tensor_value = value
+        case [[[int(), *_], *_], *_]:
+            constant_expression.literal_type = LiteralType.kSubArrayArray
+            constant_expression.i64_tensor_array_value = value
+        case [[[float(), *_], *_], *_]:
+            constant_expression.literal_type = LiteralType.kSubArrayArray
+            constant_expression.f64_tensor_array_value = value
+        case {"indices": [int(), *_], "values": [int(), *_]}:
+            constant_expression.literal_type = LiteralType.kLongSparseArray
+            constant_expression.i64_array_idx = value["indices"]
+            constant_expression.i64_array_value = value["values"]
+        case {"indices": [int(), *_], "values": [float(), *_]}:
+            constant_expression.literal_type = LiteralType.kDoubleSparseArray
+            constant_expression.i64_array_idx = value["indices"]
+            constant_expression.f64_array_value = value["values"]
+        case _:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
+    return constant_expression
 
 
 # invalid_name_array = [

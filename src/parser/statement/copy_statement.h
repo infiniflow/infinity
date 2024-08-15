@@ -32,7 +32,7 @@ enum class CopyOptionType {
 struct CopyOption {
     CopyOptionType option_type_{CopyOptionType::kFormat};
     bool header_{false};
-    CopyFileType file_type_{CopyFileType::kCSV};
+    CopyFileType file_type_{CopyFileType::kInvalid};
     char delimiter_{','};
     size_t offset_{0};
     size_t limit_{0};
@@ -52,7 +52,7 @@ public:
     std::string table_name_{};
     std::string schema_name_{};
     bool header_{false};
-    CopyFileType copy_file_type_{CopyFileType::kCSV};
+    CopyFileType copy_file_type_{CopyFileType::kInvalid};
     char delimiter_{','};
     size_t offset_{0};
     size_t limit_{0};

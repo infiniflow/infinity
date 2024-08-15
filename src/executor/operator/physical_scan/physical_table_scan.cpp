@@ -180,7 +180,7 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                     break;
                 }
                 default: {
-                    ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetColumnVector(buffer_mgr);
+                    ColumnVector column_vector = current_block_entry->GetColumnBlockEntry(column_id)->GetConstColumnVector(buffer_mgr);
                     output_ptr->column_vectors[output_column_id++]->AppendWith(column_vector, read_offset, write_size);
                 }
             }

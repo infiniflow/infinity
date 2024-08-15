@@ -66,6 +66,8 @@ public:
         return meta;
     }
 
+    SizeT GetSizeInBytes() const { return sizeof(Mmax0_) + sizeof(Mmax_) + sizeof(max_layer_) + sizeof(enterpoint_); }
+
     void Save(FileHandler &file_handler) const {
         file_handler.Write(&Mmax0_, sizeof(Mmax0_));
         file_handler.Write(&Mmax_, sizeof(Mmax_));
@@ -145,10 +147,24 @@ public:
         }
     }
 
-    static GraphStoreInner Make(SizeT max_vertex, const GraphStoreMeta &meta) {
+    static GraphStoreInner Make(SizeT max_vertex, const GraphStoreMeta &meta, SizeT &mem_usage) {
         GraphStoreInner graph_store(max_vertex, meta, 0);
         std::fill(graph_store.graph_.get(), graph_store.graph_.get() + max_vertex * meta.level0_size(), 0);
+        mem_usage += max_vertex * meta.level0_size();
         return graph_store;
+    }
+
+    SizeT GetSizeInBytes(SizeT cur_vertex_n, const GraphStoreMeta &meta) const {
+        SizeT size = 0;
+        for (VertexType vertex_i = 0; vertex_i < (VertexType)cur_vertex_n; ++vertex_i) {
+            const VertexL0 *v = GetLevel0(vertex_i, meta);
+            size += sizeof(v->layer_n_) + sizeof(v->neighbor_n_) + sizeof(VertexType) * v->neighbor_n_;
+            for (i32 layer_i = 1; layer_i <= v->layer_n_; ++layer_i) {
+                const VertexLX *vx = GetLevelX(v->layers_p_, layer_i, meta);
+                size += sizeof(vx->neighbor_n_) + sizeof(VertexType) * vx->neighbor_n_;
+            }
+        }
+        return size;
     }
 
     void Save(FileHandler &file_handler, SizeT cur_vertex_n, const GraphStoreMeta &meta) const {
@@ -166,7 +182,7 @@ public:
         }
     }
 
-    static GraphStoreInner Load(FileHandler &file_handler, SizeT cur_vertex_n, SizeT max_vertex, const GraphStoreMeta &meta) {
+    static GraphStoreInner Load(FileHandler &file_handler, SizeT cur_vertex_n, SizeT max_vertex, const GraphStoreMeta &meta, SizeT &mem_usage) {
         assert(cur_vertex_n <= max_vertex);
 
         SizeT layer_sum;
@@ -188,15 +204,19 @@ public:
             }
         }
         graph_store.loaded_layers_ = std::move(loaded_layers);
+
+        mem_usage += max_vertex * meta.level0_size() + layer_sum * meta.levelx_size();
         return graph_store;
     }
 
-    void AddVertex(VertexType vertex_i, i32 layer_n, const GraphStoreMeta &meta) {
+    void AddVertex(VertexType vertex_i, i32 layer_n, const GraphStoreMeta &meta, SizeT &mem_usage) {
         VertexL0 *v = GetLevel0(vertex_i, meta);
         v->neighbor_n_ = 0;
         v->layer_n_ = layer_n;
         if (layer_n) {
             v->layers_p_ = new char[meta.levelx_size() * layer_n];
+            mem_usage += meta.levelx_size() * layer_n;
+
             for (i32 layer_i = 1; layer_i <= layer_n; ++layer_i) {
                 GetLevelX(v->layers_p_, layer_i, meta)->neighbor_n_ = 0;
             }

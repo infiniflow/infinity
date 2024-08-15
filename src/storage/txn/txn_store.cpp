@@ -85,26 +85,36 @@ void TxnIndexStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp 
     for (auto [segment_id, segment_index_entry] : index_entry_map_) {
         local_delta_ops->AddOperation(MakeUnique<AddSegmentIndexEntryOp>(segment_index_entry, commit_ts));
     }
-    for (auto *chunk_index_entry : chunk_index_entries_) {
+    for (auto &[chunk_encode, chunk_index_entry] : chunk_index_entries_) {
         local_delta_ops->AddOperation(MakeUnique<AddChunkIndexEntryOp>(chunk_index_entry, commit_ts));
     }
 }
 
-void TxnIndexStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr) {
+void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) {
     for (auto [segment_index_entry, new_chunk, old_chunks] : optimize_data_) {
         segment_index_entry->CommitOptimize(new_chunk, old_chunks, commit_ts);
+        chunk_index_entries_.emplace(new_chunk->encode(), new_chunk);
+        for (auto *old_chunk : old_chunks) {
+            chunk_index_entries_.emplace(old_chunk->encode(), old_chunk);
+        }
+        index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
     }
-}
-
-void TxnIndexStore::Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const {
     for (const auto &[segment_id, segment_index_entry] : index_entry_map_) {
         segment_index_entry->CommitSegmentIndex(txn_id, commit_ts);
     }
-    for (auto *chunk_index_entry : chunk_index_entries_) {
+    for (auto &[chunk_encode, chunk_index_entry] : chunk_index_entries_) {
         // uncommitted: insert or import, create index
         // committed: create index, insert or import
         if (!chunk_index_entry->Committed()) {
             chunk_index_entry->Commit(commit_ts);
+        }
+    }
+}
+
+void TxnIndexStore::Rollback() {
+    for (auto [segment_index_entry, new_chunk, old_chunks] : optimize_data_) {
+        for (auto *old_chunk : old_chunks) {
+            old_chunk->ResetOptimizing();
         }
     }
 }
@@ -194,7 +204,9 @@ void TxnTableStore::AddSegmentIndexesStore(TableIndexEntry *table_index_entry, c
 
 void TxnTableStore::AddChunkIndexStore(TableIndexEntry *table_index_entry, ChunkIndexEntry *chunk_index_entry) {
     auto *txn_index_store = this->GetIndexStore(table_index_entry);
-    txn_index_store->chunk_index_entries_.push_back(chunk_index_entry);
+    SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
+    txn_index_store->index_entry_map_.emplace(segment_index_entry->segment_id(), segment_index_entry);
+    txn_index_store->chunk_index_entries_.emplace(chunk_index_entry->encode(), chunk_index_entry);
 
     has_update_ = true;
 }
@@ -251,8 +263,10 @@ Tuple<UniquePtr<String>, Status> TxnTableStore::Compact(Vector<Pair<SharedPtr<Se
     compact_state_ = TxnCompactStore(type);
     for (auto &[new_segment, old_segments] : segment_data) {
         auto txn_segment_store = TxnSegmentStore::AddSegmentStore(new_segment.get());
-        compact_state_.compact_data_.emplace_back(std::move(txn_segment_store), std::move(old_segments));
-
+        compact_state_.compact_data_.emplace_back(std::move(txn_segment_store), old_segments);
+        for (auto *old_segment : old_segments) {
+            txn_segments_store_.emplace(old_segment->segment_id(), TxnSegmentStore(old_segment));
+        }
         this->AddSegmentStore(new_segment.get());
         this->AddSealedSegment(new_segment.get());
         this->flushed_segments_.emplace_back(new_segment.get());
@@ -273,12 +287,41 @@ void TxnTableStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
     //     Catalog::RollbackPopulateIndex(txn_index_store.get(), txn_);
     // }
     Catalog::RollbackCompact(table_entry_, txn_id, abort_ts, compact_state_);
+    for (const auto &[new_segment_store, old_segments] : compact_state_.compact_data_) {
+        std::move(*new_segment_store.segment_entry_).Cleanup();
+    }
     blocks_.clear();
 
     for (auto &[table_index_entry, ptr_seq_n] : txn_indexes_) {
         table_index_entry->Cleanup();
         Catalog::RemoveIndexEntry(table_index_entry, txn_id); // fix me
     }
+    for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
+        txn_index_store->Rollback();
+    }
+}
+
+bool TxnTableStore::CheckConflict(Catalog *catalog, Txn *txn) const {
+    const String &db_name = txn->db_name();
+    const String &table_name = *table_entry_->GetTableName();
+    for (const auto &[index_name, index_store] : txn_indexes_store_) {
+        auto [table_index_entry1, status] = catalog->GetIndexByName(db_name, table_name, index_name, txn->TxnID(), txn->CommitTS());
+        if (!status.ok() || table_index_entry1 != index_store->table_index_entry_) {
+            return true;
+        }
+    }
+    for (const auto &[segment_id, block_map] : delete_state_.rows_) {
+        if (auto *segment_entry = table_entry_->GetSegmentEntry(segment_id); segment_entry != nullptr) {
+            for (const auto &[block_id, block_offsets] : block_map) {
+                if (auto block_entry = segment_entry->GetBlockEntryByID(block_id); block_entry.get() != nullptr) {
+                    if (block_entry->CheckDeleteConflict(block_offsets)) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
 }
 
 bool TxnTableStore::CheckConflict(const TxnTableStore *other_table_store) const {
@@ -347,10 +390,6 @@ void TxnTableStore::PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, 
 
     Catalog::Delete(table_entry_, txn_id, this, commit_ts, delete_state_);
 
-    for (const auto &[index_name, txn_index_store] : txn_indexes_store_) {
-        txn_index_store->PrepareCommit(txn_id, commit_ts, buffer_mgr);
-    }
-
     for (auto *sealed_segment : set_sealed_segments_) {
         if (!sealed_segment->SetSealed()) {
             String error_message = fmt::format("Set sealed segment failed, segment id: {}", sealed_segment->segment_id());
@@ -410,10 +449,10 @@ void TxnTableStore::AddSealedSegment(SegmentEntry *segment_entry) {
 }
 
 void TxnTableStore::AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnManager *txn_mgr, TxnTimeStamp commit_ts, bool added) const {
-    if(!has_update_) {
+    if (!has_update_) {
         // No any option
         LOG_TRACE("Not update on txn table store, no need to add delta op");
-        return ;
+        return;
     }
 
     if (!added) {
@@ -502,6 +541,24 @@ void TxnStore::MaintainCompactionAlg() const {
     }
 }
 
+bool TxnStore::CheckConflict(Catalog *catalog) {
+    if (txn_->db_name().empty() && !txn_tables_store_.empty()) {
+        const String &db_name = *txn_tables_store_.begin()->second->GetTableEntry()->GetDBName();
+        txn_->SetDBName(db_name);
+    }
+    const String &db_name = txn_->db_name();
+    for (const auto &[table_name, table_store] : txn_tables_store_) {
+        auto [table_entry1, status] = catalog->GetTableByName(db_name, table_name, txn_->TxnID(), txn_->CommitTS());
+        if (!status.ok() || table_entry1 != table_store->GetTableEntry()) {
+            return true;
+        }
+        if (table_store->CheckConflict(catalog, txn_)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool TxnStore::CheckConflict(const TxnStore &other_txn_store) {
     for (const auto &[table_name, table_store] : txn_tables_store_) {
         for (const auto [table_entry, _] : other_txn_store.txn_tables_) {
@@ -572,22 +629,22 @@ void TxnStore::Rollback(TransactionID txn_id, TxnTimeStamp abort_ts) {
 
 bool TxnStore::ReadOnly() const {
     bool read_only = true;
-    if(!txn_dbs_.empty()) {
+    if (!txn_dbs_.empty()) {
         // CREATE or DROP DB
         read_only = false;
     }
-    if(!txn_tables_.empty()) {
+    if (!txn_tables_.empty()) {
         // CREATE or DROP TABLE
         read_only = false;
     }
-    if(!txn_tables_store_.empty()) {
-        for(const auto& txn_table_store: txn_tables_store_) {
-            if(txn_table_store.second->HasUpdate()) {
+    if (!txn_tables_store_.empty()) {
+        for (const auto &txn_table_store : txn_tables_store_) {
+            if (txn_table_store.second->HasUpdate()) {
                 read_only = false;
                 break;
             }
         }
-//        read_only = false;
+        //        read_only = false;
     }
 
     return read_only;

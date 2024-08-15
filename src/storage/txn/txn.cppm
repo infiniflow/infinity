@@ -93,6 +93,8 @@ public:
 
     TxnTimeStamp Commit();
 
+    bool CheckConflict(Catalog *catalog);
+
     bool CheckConflict(Txn *txn);
 
     void CommitBottom();
@@ -178,15 +180,13 @@ public:
 
     inline TxnTimeStamp CommitTS() { return txn_context_.GetCommitTS(); }
 
-    TxnTimeStamp CommittedTS() { return txn_context_.GetCommittedTS(); }
-
     inline TxnTimeStamp BeginTS() { return txn_context_.GetBeginTS(); }
 
     inline TxnState GetTxnState() { return txn_context_.GetTxnState(); }
 
     inline TxnType GetTxnType() const { return txn_context_.GetTxnType(); }
 
-    void SetTxnCommitted(TxnTimeStamp committed_ts);
+    void SetTxnCommitted();
 
     void SetTxnCommitting(TxnTimeStamp commit_ts);
 
@@ -199,11 +199,9 @@ public:
     // WAL and replay OPS
     void AddWalCmd(const SharedPtr<WalCmd> &cmd);
 
-    bool Checkpoint(const TxnTimeStamp max_commit_ts, bool is_full_checkpoint);
-
     void FullCheckpoint(const TxnTimeStamp max_commit_ts);
 
-    bool DeltaCheckpoint(const TxnTimeStamp max_commit_ts);
+    bool DeltaCheckpoint(TxnTimeStamp last_ckp_ts,TxnTimeStamp &max_commit_ts);
 
     TxnManager *txn_mgr() const { return txn_mgr_; }
 
@@ -216,19 +214,23 @@ public:
 
     const SharedPtr<String> GetTxnText() const { return txn_text_; }
 
+    const String &db_name() const { return db_name_; }
+
+    void SetDBName(const String &db_name) { db_name_ = db_name; }
+
 private:
     void CheckTxnStatus();
 
     void CheckTxn(const String &db_name);
 
 private:
-    TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
-
+    // Reference to external class
     TxnManager *txn_mgr_{};
-    // This BufferManager ptr Only for replaying wal
-    BufferManager *buffer_mgr_{};
+    BufferManager *buffer_mgr_{};  // This BufferManager ptr Only for replaying wal
     BGTaskProcessor *bg_task_processor_{};
     Catalog *catalog_{};
+
+    TxnStore txn_store_; // this has this ptr, so txn cannot be moved.
     TransactionID txn_id_{};
 
     TxnContext txn_context_;
@@ -240,12 +242,12 @@ private:
     // WalEntry
     SharedPtr<WalEntry> wal_entry_{};
     // TODO: remove this
-    UniquePtr<CatalogDeltaEntry> local_catalog_delta_ops_entry_{};
+    UniquePtr<CatalogDeltaEntry> txn_delta_ops_entry_{};
 
-    // WalManager notify the  commit bottom half is done
-    std::mutex lock_{};
-    std::condition_variable cond_var_{};
-    bool done_bottom_{false};
+    // WalManager notify the commit bottom half is done
+    std::mutex commit_lock_{};
+    std::condition_variable commit_cv_{};
+    bool commit_bottom_done_{false};
 
     // String
     SharedPtr<String> txn_text_{nullptr};

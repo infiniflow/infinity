@@ -36,6 +36,10 @@ std::string ShowStatement::ToString() const {
             ss << "Show buffer";
             break;
         }
+        case ShowStmtType::kMemIndex: {
+            ss << "Show mem index";
+            break;
+        }
         case ShowStmtType::kIndexSegment: {
             ss << "Show index segment, database: " << schema_name_ << ", table_name: " << table_name_;
             break;
@@ -142,6 +146,18 @@ std::string ShowStatement::ToString() const {
         }
         case ShowStmtType::kCatalogs: {
             ss << "Show catalogs";
+            break;
+        }
+        case ShowStmtType::kPersistenceFiles: {
+            ss << "Show persistence files";
+            break;
+        }
+        case ShowStmtType::kPersistenceObjects: {
+            ss << "Show persistence objects";
+            break;
+        }
+        case ShowStmtType::kPersistenceObject: {
+            ss << "Show persistence object";
             break;
         }
     }

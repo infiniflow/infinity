@@ -549,6 +549,10 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW BUFFER"));
             break;
         }
+        case ShowStmtType::kMemIndex: {
+            result->emplace_back(MakeShared<String>("SHOW MEMINDEX"));
+            break;
+        }
         case ShowStmtType::kTables: {
             result->emplace_back(MakeShared<String>("SHOW TABLES: "));
             intent_size += 2;
@@ -684,6 +688,18 @@ void ExplainAST::BuildShow(const ShowStatement *show_statement, SharedPtr<Vector
             result->emplace_back(MakeShared<String>("SHOW CATALOGS"));
             break;
         }
+        case ShowStmtType::kPersistenceFiles: {
+            result->emplace_back(MakeShared<String>("SHOW PERSISTENCE FILES"));
+            break;
+        }
+        case ShowStmtType::kPersistenceObjects: {
+            result->emplace_back(MakeShared<String>("SHOW PERSISTENCE OBJECTS"));
+            break;
+        }
+        case ShowStmtType::kPersistenceObject: {
+            result->emplace_back(MakeShared<String>("SHOW PERSISTENCE OBJECT"));
+            break;
+        }
     }
 }
 
@@ -793,6 +809,11 @@ void ExplainAST::BuildCopy(const CopyStatement *copy_statement, SharedPtr<Vector
         }
         case CopyFileType::kBVECS: {
             SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: BVECS");
+            result->emplace_back(file_type);
+            break;
+        }
+        case CopyFileType::kPARQUET: {
+            SharedPtr<String> file_type = MakeShared<String>(String(intent_size, ' ') + "file type: PARQUET");
             result->emplace_back(file_type);
             break;
         }

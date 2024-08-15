@@ -28,6 +28,7 @@ static thread_local std::stringstream string_buffer;
 
 [ \t\n]+        /* ignore \t\n and space */;
 
+ADMIN           { return ADMIN; }
 ALL             { return ALL; }
 ALTER           { return ALTER; }
 ANALYZE         { return ANALYZE; }
@@ -36,6 +37,7 @@ AS              { return AS; }
 AST             { return AST; }
 ASC             { return ASC; }
 BETWEEN         { return BETWEEN; }
+BFLOAT16        { return BFLOAT16; }
 BIGINT          { return BIGINT; }
 BIT             { return BIT; }
 BITMAP          { return BITMAP; }
@@ -48,6 +50,7 @@ BUFFER          { return BUFFER; }
 BY              { return BY; }
 CASE            { return CASE; }
 CAST            { return CAST; }
+CATALOG         { return CATALOG; }
 CATALOGS        { return CATALOGS; }
 CHUNK           { return CHUNK; }
 CIRCLE          { return CIRCLE; }
@@ -86,7 +89,9 @@ EXISTS          { return EXISTS; }
 EXPLAIN         { return EXPLAIN; }
 EXPORT          { return EXPORT; }
 FALSE           { return FALSE; }
+FILES           { return FILES; }
 FLOAT           { return FLOAT; }
+FLOAT16         { return FLOAT16; }
 FLUSH           { return FLUSH; }
 FORMAT          { return FORMAT; }
 FRAGMENT        { return FRAGMENT; }
@@ -101,6 +106,7 @@ HOUR            { return HOUR; }
 HOURS           { return HOURS; }
 HUGEINT         { return HUGEINT; }
 IF              { return IF; }
+IGNORE          { return IGNORE; }
 IN              { return IN; }
 INDEX           { return INDEX; }
 INDEXES         { return INDEXES; }
@@ -124,6 +130,7 @@ LOGICAL         { return LOGICAL; }
 LSEG            { return LSEG; }
 MATCH           { return MATCH; }
 MAXSIM          { return MAXSIM; }
+MEMINDEX        { return MEMINDEX; }
 MINUTE          { return MINUTE; }
 MINUTES         { return MINUTES; }
 MONTH           { return MONTH; }
@@ -131,6 +138,8 @@ MONTHS          { return MONTHS; }
 NATURAL         { return NATURAL; }
 NULL            { return NULLABLE; }
 NOT             { return NOT; }
+OBJECT          { return OBJECT; }
+OBJECTS         { return OBJECTS; }
 OFF             { return OFF; }
 OFFSET          { return OFFSET; }
 ON              { return ON; }
@@ -139,6 +148,7 @@ OR              { return OR; }
 ORDER           { return ORDER; }
 OUTER           { return OUTER; }
 PATH            { return PATH; }
+PERSISTENCE     { return PERSISTENCE; }
 PHYSICAL        { return PHYSICAL; }
 PIPELINE        { return PIPELINE; }
 POINT           { return POINT; }
@@ -180,6 +190,7 @@ TRANSACTIONS    { return TRANSACTIONS; }
 TRUE            { return TRUE; }
 UNION           { return UNION; }
 UNIQUE          { return UNIQUE; }
+UNSIGNED        { return UNSIGNED; }
 USING           { return USING; }
 UPDATE          { return UPDATE; }
 UUID            { return UUID; }

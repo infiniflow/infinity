@@ -67,6 +67,12 @@ export inline BoundCastFunc BindVarcharCast(const DataType &source, const DataTy
         case kDouble: {
             return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, DoubleT, TryCastVarcharVector>);
         }
+        case kFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, Float16T, TryCastVarcharVector>);
+        }
+        case kBFloat16: {
+            return BoundCastFunc(&ColumnVectorCast::TryCastVarlenColumnVector<VarcharT, BFloat16T, TryCastVarcharVector>);
+        }
         case kDecimal: {
             String error_message = fmt::format("Not implement cast from varchar to decimal128 type.", source.ToString(), target.ToString());
             UnrecoverableError(error_message);
@@ -302,13 +308,9 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
         {
             // varchar is vector
             SizeT varchar_len = source.length_;
-            u32 chunk_id = source.vector_.chunk_id_;
-            u32 chunk_offset = source.vector_.chunk_offset_;
-            auto varchar_ptr = MakeUniqueForOverwrite<char[]>(varchar_len + 1);
-            varchar_ptr[varchar_len] = '\0';
-            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(), chunk_id, chunk_offset, varchar_len);
+            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
 
-            auto [ptr, ec] = std::from_chars(varchar_ptr.get(), varchar_ptr.get() + varchar_len, target);
+            auto [ptr, ec] = std::from_chars(data, data + varchar_len, target);
             if (ec != std::errc()) {
                 return false;
             }
@@ -338,11 +340,9 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
         {
             // varchar is vector
             SizeT varchar_len = source.length_;
-            u32 chunk_id = source.vector_.chunk_id_;
-            u32 chunk_offset = source.vector_.chunk_offset_;
 
-            String varchar_ptr(varchar_len, 0);
-            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.data(), chunk_id, chunk_offset, varchar_len);
+            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
+            String varchar_ptr(data, varchar_len);
 
             // Used in libc++
             try {
@@ -381,15 +381,96 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
         {
             // varchar is vector
             SizeT varchar_len = source.length_;
-            u32 chunk_id = source.vector_.chunk_id_;
-            u32 chunk_offset = source.vector_.chunk_offset_;
+            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
 
-            String varchar_ptr(varchar_len, 0);
-            source_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.data(), chunk_id, chunk_offset, varchar_len);
+            String varchar_ptr(data, varchar_len);
 
             // Used in libc++
             try {
                 target = std::stod(varchar_ptr);
+            } catch(const std::exception &e) {
+                return false;
+            }
+            // Used in libstdc++
+            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
+            // if (ec != std::errc()) {
+            //    return false;
+            // }
+        }
+    }
+    return true;
+}
+
+
+// Cast VarcharT to Float16T type
+template <>
+inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, Float16T &target) {
+    if (source.IsInlined()) {
+        // Used in libc++
+        String substr(source.short_.data_, source.length_);
+        try {
+            target = std::stof(substr);
+        } catch(const std::exception &e) {
+            return false;
+        }
+
+        // Used in libstdc++
+        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        // if (ec != std::errc()) {
+        //     return false;
+        // }
+    } else {
+        {
+            // varchar is vector
+            SizeT varchar_len = source.length_;
+            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
+
+            String varchar_ptr(data, varchar_len);
+
+            // Used in libc++
+            try {
+                target = std::stof(varchar_ptr);
+            } catch(const std::exception &e) {
+                return false;
+            }
+            // Used in libstdc++
+            // auto [ptr, ec] = std::from_chars(varchar_ptr.c_str(), varchar_ptr.c_str() + varchar_len, target);
+            // if (ec != std::errc()) {
+            //    return false;
+            // }
+        }
+    }
+    return true;
+}
+
+// Cast VarcharT to BFloat16T type
+template <>
+inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* source_vector, BFloat16T &target) {
+    if (source.IsInlined()) {
+        // Used in libc++
+        String substr(source.short_.data_, source.length_);
+        try {
+            target = std::stof(substr);
+        } catch(const std::exception &e) {
+            return false;
+        }
+
+        // Used in libstdc++
+        // auto [ptr, ec] = std::from_chars(source.short_.data_, source.short_.data_ + source.length_, target);
+        // if (ec != std::errc()) {
+        //     return false;
+        // }
+    } else {
+        {
+            // varchar is vector
+            SizeT varchar_len = source.length_;
+            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
+
+            String varchar_ptr(data, varchar_len);
+
+            // Used in libc++
+            try {
+                target = std::stof(varchar_ptr);
             } catch(const std::exception &e) {
                 return false;
             }

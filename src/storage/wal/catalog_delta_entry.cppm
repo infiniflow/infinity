@@ -103,6 +103,7 @@ public:
     virtual const String ToString() const;
     virtual bool operator==(const CatalogDeltaOperation &rhs) const;
     virtual void Merge(CatalogDeltaOperation &other) = 0;
+    virtual Vector<String> GetFilePaths() const { return Vector<String>(); }
 
     static PruneFlag ToPrune(Optional<MergeFlag> old_merge_flag, MergeFlag new_merge_flag);
 
@@ -208,6 +209,7 @@ public:
     const String ToString() const final;
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(CatalogDeltaOperation &other) override;
+    Vector<String> GetFilePaths() const override { return local_paths_; }
 
     void FlushDataToDisk(TxnTimeStamp max_commit_ts);
 
@@ -223,6 +225,7 @@ public:
     TxnTimeStamp checkpoint_ts_{0};
     u16 checkpoint_row_count_{0};
     String block_filter_binary_data_{};
+    Vector<String> local_paths_{};
 };
 
 /// class AddColumnEntryOp
@@ -240,9 +243,11 @@ public:
     const String ToString() const final;
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(CatalogDeltaOperation &other) override;
+    Vector<String> GetFilePaths() const override { return local_paths_; }
 
 public:
     Vector<Pair<u32, u64>> outline_infos_;
+    Vector<String> local_paths_;
 };
 
 /// class AddTableIndexEntryOp
@@ -307,9 +312,11 @@ public:
     void Flush(TxnTimeStamp max_commit_ts);
     bool operator==(const CatalogDeltaOperation &rhs) const override;
     void Merge(CatalogDeltaOperation &other) override;
+    Vector<String> GetFilePaths() const override { return local_paths_; }
 
 public:
     String base_name_{};
+    Vector<String> local_paths_;
     RowID base_rowid_;
     u32 row_count_{0};
     TxnTimeStamp deprecate_ts_{UNCOMMIT_TS};
@@ -382,7 +389,7 @@ public:
     void ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delta_entry);
 
     // Pick and remove all operations that are committed before `max_commit_ts`, after `full_ckp_ts`
-    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp max_commit_ts);
+    UniquePtr<CatalogDeltaEntry> PickFlushEntry(TxnTimeStamp &max_commit_ts);
 
     Vector<CatalogDeltaOpBrief> GetOperationBriefs() const;
 
@@ -400,6 +407,7 @@ private:
 
     Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops_;
     HashSet<TransactionID> txn_ids_;
+    TxnTimeStamp max_commit_ts_ = 0;
     // update by add delta entry, read by bg_process::checkpoint
     TxnTimeStamp last_full_ckp_ts_{0};
 

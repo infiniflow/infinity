@@ -6,20 +6,33 @@ add_executable(infinity_benchmark
 target_include_directories(infinity_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(
     infinity_benchmark
-    infinity_core
     benchmark_profiler
+    infinity_core
     sql_parser
     onnxruntime_mlas
     zsv_parser
     newpfor
     fastpfor
-    lz4.a
-    atomic.a
-    c++.a
-    c++abi.a
+    #        profiler
     jma
     opencc
+    dl
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
+    lz4.a
+    atomic.a
+    event.a
+    c++.a
+    c++abi.a
+    snappy.a
+    ${JEMALLOC_STATIC_LIB}
 )
+
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(infinity_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 # ########################################
 # knn
@@ -38,13 +51,26 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
-    lz4.a
-    atomic.a
-    c++.a
-    c++abi.a
     jma
     opencc
+    dl
+    lz4.a
+    atomic.a
+    event.a
+    c++.a
+    c++abi.a
+    #        profiler
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
+    snappy.a
+    ${JEMALLOC_STATIC_LIB}
 )
+
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(knn_import_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 # query benchmark
 add_executable(knn_query_benchmark
@@ -61,13 +87,24 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
     c++.a
     c++abi.a
-    jma
-    opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
+    snappy.a
+    ${JEMALLOC_STATIC_LIB}
 )
+
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(knn_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 # ########################################
 # fulltext
@@ -86,13 +123,24 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
     c++.a
     c++abi.a
-    jma
-    opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
+    snappy.a
+    ${JEMALLOC_STATIC_LIB}
 )
+
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(fulltext_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 # ########################################
 add_executable(sparse_benchmark
@@ -109,13 +157,24 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
-    jma
     c++.a
     c++abi.a
-    opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
+    snappy.a
+    ${JEMALLOC_STATIC_LIB}
 )
+
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(sparse_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 add_executable(bmp_benchmark
     ./sparse/bmp_benchmark.cpp
@@ -131,13 +190,24 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
-    jma
     c++.a
     c++abi.a
-    opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
+    snappy.a
+    ${JEMALLOC_STATIC_LIB}
 )
+
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(bmp_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 add_executable(hnsw_benchmark
     ./knn/hnsw_benchmark.cpp
@@ -153,23 +223,24 @@ target_link_libraries(
     zsv_parser
     newpfor
     fastpfor
+    jma
+    opencc
+    dl
     lz4.a
     atomic.a
-    jma
     c++.a
     c++abi.a
-    opencc
+    parquet.a
+    arrow.a
+    thrift.a
+    thriftnb.a
+    snappy.a
+    ${JEMALLOC_STATIC_LIB}
 )
 
-if(ENABLE_JEMALLOC)
-    target_link_libraries(infinity_benchmark jemalloc.a)
-    target_link_libraries(knn_import_benchmark jemalloc.a)
-    target_link_libraries(knn_query_benchmark jemalloc.a)
-    target_link_libraries(fulltext_benchmark jemalloc.a)
-    target_link_libraries(sparse_benchmark jemalloc.a)
-    target_link_libraries(bmp_benchmark jemalloc.a)
-    target_link_libraries(hnsw_benchmark jemalloc.a)
-endif()
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(hnsw_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)

@@ -175,11 +175,17 @@ file(GLOB_RECURSE
         parser/*.cppm
 )
 
-#file(GLOB_RECURSE
-#        std_cppm
-#        CONFIGURE_DEPENDS
-#        third_party_modules/std_modules/*.cppm
-#)
+file(GLOB_RECURSE
+        admin_cpp
+        CONFIGURE_DEPENDS
+        admin/*.cpp
+)
+
+file(GLOB_RECURSE
+        admin_cppm
+        CONFIGURE_DEPENDS
+        admin/*.cppm
+)
 
 add_library(infinity_core
         ${infinity_cpp}
@@ -191,6 +197,7 @@ add_library(infinity_core
         ${executor_cpp}
         ${metrics_cpp}
         ${common_cpp}
+        ${admin_cpp}
         storage/buffer/file_worker/file_worker_type.cppm)
 
 target_sources(infinity_core
@@ -207,9 +214,10 @@ target_sources(infinity_core
         ${expression_cppm}
         ${executor_cppm}
         ${metrics_cppm}
+        ${admin_cppm}
 )
 
-add_dependencies(infinity_core thrift thriftnb)
+add_dependencies(infinity_core thrift thriftnb parquet_static snappy)
 
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/parser")
@@ -235,6 +243,8 @@ target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/oatpp/src")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/eigen-3.4.0")
 target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/opencc")
+target_include_directories(infinity_core PUBLIC "${CMAKE_SOURCE_DIR}/third_party/arrow/src")
+target_include_directories(infinity_core PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 if (NOT SUPPORT_FMA EQUAL 0)
     message(FATAL_ERROR "This project requires the processor support fused multiply-add (FMA) instructions.")
@@ -273,7 +283,6 @@ target_sources(infinity
 
 add_dependencies(infinity oatpp)
 
-message("Python3_LIBRARIES = ${Python3_LIBRARIES}")
 target_link_libraries(infinity
         infinity_core
         sql_parser
@@ -281,6 +290,9 @@ target_link_libraries(infinity
         zsv_parser
         newpfor
         fastpfor
+        jma
+        opencc
+        dl
         thrift.a
         thriftnb.a
         lz4.a
@@ -290,16 +302,16 @@ target_link_libraries(infinity
         c++abi.a
 #        profiler
         oatpp.a
-        jma
-        opencc
+        parquet.a
+        arrow.a
+        snappy.a
+        ${JEMALLOC_STATIC_LIB}
 )
-
-if (ENABLE_JEMALLOC)
-    target_link_libraries(infinity jemalloc.a)
-endif ()
 
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(infinity PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 target_include_directories(infinity PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(infinity PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
@@ -335,12 +347,18 @@ target_link_libraries(embedded_infinity_ext PRIVATE
         fastpfor
         jma
         opencc
+        dl
         lz4.a
         atomic.a
         event.a
         oatpp.a
         c++.a
         c++abi.a
+        parquet.a
+        arrow.a
+        thrift.a
+        thriftnb.a
+        snappy.a
 )
 
 # WARN: python modules shall not link to static libstdc++!!!
@@ -349,6 +367,8 @@ set_target_properties(embedded_infinity_ext PROPERTIES CXX_VISIBILITY_PRESET hid
 
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/lib")
 target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/oatpp/src/")
+target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(embedded_infinity_ext PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 nanobind_disable_stack_protector(embedded_infinity_ext)
 nanobind_opt_size(embedded_infinity_ext)
 nanobind_strip(embedded_infinity_ext)
@@ -446,6 +466,7 @@ add_executable(unit_test
         ${function_cpp}
         ${common_cpp}
         ${executor_cpp}
+        ${admin_cpp}
 )
 
 set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
@@ -453,24 +474,30 @@ set_target_properties(unit_test PROPERTIES OUTPUT_NAME test_main)
 target_link_libraries(unit_test
         gtest
         gtest_main
-        gmock
-        gmock_main
         sql_parser
         infinity_core
         onnxruntime_mlas
         zsv_parser
         newpfor
         fastpfor
-        lz4.a
-        atomic.a
-        thrift.a
-        c++.a
-        c++abi.a
         jma
         opencc
+        dl
+        lz4.a
+        atomic.a
+        c++.a
+        c++abi.a
+        parquet.a
+        arrow.a
+        thrift.a
+        thriftnb.a
+        snappy.a
+        ${JEMALLOC_STATIC_LIB}
 )
 
 target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(unit_test PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 target_sources(unit_test
         PRIVATE

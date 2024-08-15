@@ -8,10 +8,13 @@ import time
 python_executable = sys.executable
 
 
-def http_api_test(http_api_dir: str, pytest_mark: str):
-    print(f"start http api test with {pytest_mark}")
+def python_sdk_test(python_test_dir: str, pytest_mark: str):
+    print("python test path is {}".format(python_test_dir))
+    # run test
+    print(f"start pysdk test with {pytest_mark}")
+
     process = subprocess.Popen(
-        # ["python", "-m", "pytest", "--tb=line", '-s', '-x', '-m', pytest_mark, f'{python_test_dir}/test_http_api'],
+        # ["python", "-m", "pytest", "--tb=line", '-s', '-x', '-m', pytest_mark, f'{python_test_dir}/test'],
         [
             python_executable,
             "-m",
@@ -20,7 +23,8 @@ def http_api_test(http_api_dir: str, pytest_mark: str):
             "-x",
             "-m",
             pytest_mark,
-            f"{python_test_dir}/test_http_api",
+            f"{python_test_dir}/test_pysdk",
+            "--http",
         ],
         stdout=sys.stdout,
         stderr=sys.stderr,
@@ -29,14 +33,15 @@ def http_api_test(http_api_dir: str, pytest_mark: str):
     process.wait()
     if process.returncode != 0:
         raise Exception(f"An error occurred: {process.stderr}")
-    return
+
+    print("http api test finished.")
 
 
 if __name__ == "__main__":
     print("Note: this script must be run under root directory of the project.")
     current_path = os.getcwd()
-    python_test_dir = current_path + "/python/"
-    parser = argparse.ArgumentParser(description="HTTP API Test For Infinity")
+    python_test_dir = current_path + "/python"
+    parser = argparse.ArgumentParser(description="Http Api Test For Infinity")
     parser.add_argument(
         "-m",
         "--pytest_mark",
@@ -46,10 +51,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    print("Start Python HTTP API testing...")
+    print("Start Http Api testing...")
     start = time.time()
     try:
-        http_api_test(python_test_dir, args.pytest_mark)
+        python_sdk_test(python_test_dir, args.pytest_mark)
     except Exception as e:
         print(e)
         sys.exit(-1)

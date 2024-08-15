@@ -43,6 +43,8 @@ DataType::DataType(LogicalType logical_type, std::shared_ptr<TypeInfo> type_info
         case kDecimal:
         case kFloat:
         case kDouble:
+        case kFloat16:
+        case kBFloat16:
         case kDate:
         case kTime:
         case kDateTime:
@@ -418,6 +420,16 @@ std::string DataType::TypeToString<DoubleT>() {
 }
 
 template <>
+std::string DataType::TypeToString<Float16T>() {
+    return "Float16";
+}
+
+template <>
+std::string DataType::TypeToString<BFloat16T>() {
+    return "BFloat16";
+}
+
+template <>
 std::string DataType::TypeToString<DecimalT>() {
     return "Decimal";
 }
@@ -548,6 +560,21 @@ BooleanT DataType::StringToValue<BooleanT>(const std::string_view &str) {
 }
 
 template <>
+uint8_t DataType::StringToValue<uint8_t>(const std::string_view &str) {
+    if (str.empty()) {
+        return {};
+    }
+    uint8_t value{};
+    auto res = std::from_chars(str.begin(), str.end(), value);
+    if(res.ptr != str.data() + str.size()) {
+        std::string error_message = fmt::format("Error: parse u8 integer: {} to {}", str, value);
+        std::cerr << error_message << std::endl;
+        ParserError(error_message);
+    }
+    return value;
+}
+
+template <>
 TinyIntT DataType::StringToValue<TinyIntT>(const std::string_view &str) {
     if (str.empty()) {
         return TinyIntT{};
@@ -619,14 +646,9 @@ FloatT DataType::StringToValue<FloatT>(const std::string_view &str) {
 #else
     // Used in libc++
     try {
-        std::string float_str;
-        size_t len = str.end() - str.begin();
-        float_str.reserve(len);
-        for(size_t i = 0; i < len; ++ i) {
-            float_str.push_back(str[i]);
-        }
+        const std::string float_str(str);
         value = std::stof(float_str);
-    } catch(const std::exception &e) {
+    } catch (const std::exception &e) {
         std::string error_message = fmt::format("Error: parse float: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
@@ -646,14 +668,9 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
     ParserAssert(ret == str.size(), "Error: parse double error");
 #else
     try {
-        std::string double_str;
-        size_t len = str.end() - str.begin();
-        double_str.reserve(len);
-        for(size_t i = 0; i < len; ++ i) {
-            double_str.push_back(str[i]);
-        }
-        value = std::stod(str.data());
-    } catch(const std::exception &e) {
+        const std::string double_str(str);
+        value = std::stod(double_str);
+    } catch (const std::exception &e) {
         std::string error_message = fmt::format("Error: parse double: {} to {}", str, value);
         std::cerr << error_message << std::endl;
         ParserError(error_message);
@@ -661,4 +678,17 @@ DoubleT DataType::StringToValue<DoubleT>(const std::string_view &str) {
 #endif
     return value;
 }
+
+template <>
+Float16T DataType::StringToValue<Float16T>(const std::string_view &str) {
+    FloatT float_value = StringToValue<FloatT>(str);
+    return static_cast<Float16T>(float_value);
+}
+
+template <>
+BFloat16T DataType::StringToValue<BFloat16T>(const std::string_view &str) {
+    FloatT float_value = StringToValue<FloatT>(str);
+    return static_cast<BFloat16T>(float_value);
+}
+
 } // namespace infinity

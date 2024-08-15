@@ -32,9 +32,10 @@ TEST_F(ConfigTest, test1) {
     using namespace infinity;
     SharedPtr<String> path = nullptr;
     Config config;
-    config.Init(path, nullptr);
+    auto status = config.Init(path, nullptr);
+    ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.2.1");
+    EXPECT_EQ(config.Version(), "0.3.0");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), 8);
     EXPECT_EQ(config.CPULimit(), std::thread::hardware_concurrency());
@@ -57,17 +58,21 @@ TEST_F(ConfigTest, test1) {
     EXPECT_EQ(config.DataDir(), "/var/infinity/data");
     EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
 
-    EXPECT_EQ(config.BufferManagerSize(), 4 * 1024l * 1024l * 1024l);
+    // buffer
+    EXPECT_EQ(config.BufferManagerSize(), 8 * 1024l * 1024l * 1024l);
+    EXPECT_EQ(config.LRUNum(), 7);
     EXPECT_EQ(config.TempDir(), "/var/infinity/tmp");
+    EXPECT_EQ(config.MemIndexMemoryQuota(), 4 * 1024l * 1024l * 1024l);
 }
 
 TEST_F(ConfigTest, test2) {
     using namespace infinity;
     SharedPtr<String> path = MakeShared<String>(String(test_data_path()) + "/config/infinity_conf.toml");
     Config config;
-    config.Init(path, nullptr);
+    auto status = config.Init(path, nullptr);
+    ASSERT_TRUE(status.ok());
 
-    EXPECT_EQ(config.Version(), "0.2.1");
+    EXPECT_EQ(config.Version(), "0.3.0");
     EXPECT_EQ(config.TimeZone(), "UTC");
     EXPECT_EQ(config.TimeZoneBias(), -9);
 
@@ -89,6 +94,9 @@ TEST_F(ConfigTest, test2) {
     EXPECT_EQ(config.DataDir(), "/var/infinity/data");
     EXPECT_EQ(config.WALDir(), "/var/infinity/wal");
 
+    // buffer
     EXPECT_EQ(config.BufferManagerSize(), 3 * 1024l * 1024l * 1024l);
+    EXPECT_EQ(config.LRUNum(), 8);
     EXPECT_EQ(config.TempDir(), "/tmp");
+    EXPECT_EQ(config.MemIndexMemoryQuota(), 2 * 1024l * 1024l * 1024l);
 }

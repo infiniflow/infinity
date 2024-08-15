@@ -89,6 +89,10 @@ export struct WrapConstantExpr {
     String str_value;
     Vector<i64> i64_array_value;
     Vector<f64> f64_array_value;
+    Vector<Vector<i64>> i64_tensor_value;
+    Vector<Vector<f64>> f64_tensor_value;
+    Vector<Vector<Vector<i64>>> i64_tensor_array_value;
+    Vector<Vector<Vector<f64>>> f64_tensor_array_value;
     Vector<i64> i64_array_idx;
 
     ParsedExpr *GetParsedExpr(Status &status);
@@ -168,12 +172,15 @@ export struct WrapBetweenExpr {
 
 export struct EmbeddingData {
     Vector<bool> bool_array_value;
-    Vector<String> i8_array_value;
+    Vector<int16_t> u8_array_value;
+    Vector<int16_t> i8_array_value;
     Vector<int16_t> i16_array_value;
     Vector<int32_t> i32_array_value;
     Vector<int64_t> i64_array_value;
     Vector<double> f32_array_value;
     Vector<double> f64_array_value;
+    Vector<double> f16_array_value;
+    Vector<double> bf16_array_value;
 };
 
 export struct WrapKnnExpr {
@@ -313,7 +320,7 @@ export WrapQueryResult WrapCreateIndex(Infinity &instance,
                                        const String &db_name,
                                        const String &table_name,
                                        const String &index_name,
-                                       Vector<WrapIndexInfo> &wrap_index_info_list,
+                                       WrapIndexInfo &wrap_index_info,
                                        const CreateIndexOptions &create_index_options);
 
 export WrapQueryResult WrapDropIndex(Infinity &instance,

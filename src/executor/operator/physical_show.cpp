@@ -14,8 +14,8 @@
 
 module;
 
-#include <string>
 #include <map>
+#include <string>
 
 module physical_show;
 
@@ -73,6 +73,8 @@ import file_worker_type;
 import system_info;
 import wal_entry;
 import catalog_delta_entry;
+import memindex_tracer;
+import persistence_manager;
 
 namespace infinity {
 
@@ -397,6 +399,21 @@ void PhysicalShow::Init() {
             output_types_->emplace_back(varchar_type);
             break;
         }
+        case ShowType::kShowMemIndex: {
+            output_names_->reserve(5);
+            output_types_->reserve(5);
+            output_names_->emplace_back("index_name");
+            output_names_->emplace_back("table_name");
+            output_names_->emplace_back("db_name");
+            output_names_->emplace_back("size");
+            output_names_->emplace_back("row_count");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            break;
+        }
         case ShowType::kShowQueries: {
             output_names_->reserve(5);
             output_types_->reserve(5);
@@ -474,6 +491,41 @@ void PhysicalShow::Init() {
             output_names_->emplace_back("file_path");
             output_types_->emplace_back(bigint_type);
             output_types_->emplace_back(varchar_type);
+            break;
+        }
+        case ShowType::kShowPersistenceFiles: {
+            output_names_->reserve(4);
+            output_types_->reserve(4);
+            output_names_->emplace_back("file_name");
+            output_names_->emplace_back("object_name");
+            output_names_->emplace_back("offset");
+            output_names_->emplace_back("size");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            break;
+        }
+        case ShowType::kShowPersistenceObjects: {
+            output_names_->reserve(4);
+            output_types_->reserve(4);
+            output_names_->emplace_back("name");
+            output_names_->emplace_back("reference_count");
+            output_names_->emplace_back("size");
+            output_names_->emplace_back("deleted_size");
+            output_types_->emplace_back(varchar_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
+            break;
+        }
+        case ShowType::kShowPersistenceObject: {
+            output_names_->reserve(2);
+            output_types_->reserve(2);
+            output_names_->emplace_back("start");
+            output_names_->emplace_back("end");
+            output_types_->emplace_back(bigint_type);
+            output_types_->emplace_back(bigint_type);
             break;
         }
         default: {
@@ -580,6 +632,10 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
             ExecuteShowBuffer(query_context, show_operator_state);
             break;
         }
+        case ShowType::kShowMemIndex: {
+            ExecuteShowMemIndex(query_context, show_operator_state);
+            break;
+        }
         case ShowType::kShowQueries: {
             ExecuteShowQueries(query_context, show_operator_state);
             break;
@@ -606,6 +662,18 @@ bool PhysicalShow::Execute(QueryContext *query_context, OperatorState *operator_
         }
         case ShowType::kShowCatalogs: {
             ExecuteShowCatalogs(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowPersistenceFiles: {
+            ExecuteShowPersistenceFiles(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowPersistenceObjects: {
+            ExecuteShowPersistenceObjects(query_context, show_operator_state);
+            break;
+        }
+        case ShowType::kShowPersistenceObject: {
+            ExecuteShowPersistenceObject(query_context, show_operator_state);
             break;
         }
         default: {
@@ -1020,12 +1088,12 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> segment_map = table_index_entry->GetIndexBySegmentSnapshot(table_entry, txn);
     auto iter = segment_map.find(segment_id_.value());
-    if(iter == segment_map.end()) {
+    if (iter == segment_map.end()) {
         show_operator_state->status_ = Status::SegmentNotExist(segment_id_.value());
         RecoverableError(show_operator_state->status_);
     }
 
-    SegmentIndexEntry* segment_index_entry = iter->second.get();
+    SegmentIndexEntry *segment_index_entry = iter->second.get();
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
     Vector<SharedPtr<DataType>> column_types{varchar_type, varchar_type};
@@ -1047,7 +1115,6 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
             value_expr.AppendToChunk(output_block_ptr->column_vectors[column_id]);
         }
     }
-
 
     String full_segment_index_dir = fmt::format("{}/{}", *segment_index_entry->base_dir(), *segment_index_entry->index_dir());
     {
@@ -1093,11 +1160,11 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
 
         ++column_id;
         {
-            IndexBase* index_base = table_index_entry->table_index_def().get();
+            IndexBase *index_base = table_index_entry->table_index_def().get();
             String index_type_name = IndexInfo::IndexTypeToString(index_base->index_type_);
 
             Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries;
-            switch(index_base->index_type_) {
+            switch (index_base->index_type_) {
                 case IndexType::kIVFFlat: {
                     Status status3 = Status::InvalidIndexName(index_type_name);
                     show_operator_state->status_ = status3;
@@ -1124,6 +1191,7 @@ void PhysicalShow::ExecuteShowIndexSegment(QueryContext *query_context, ShowOper
                     chunk_index_entries = std::get<0>(segment_index_entry->GetBMPIndexSnapshot());
                     break;
                 }
+                case IndexType::kDiskAnn:
                 case IndexType::kInvalid: {
                     Status status3 = Status::InvalidIndexName(index_type_name);
                     RecoverableError(status3);
@@ -1161,17 +1229,17 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
 
     Map<SegmentID, SharedPtr<SegmentIndexEntry>> segment_map = table_index_entry->GetIndexBySegmentSnapshot(table_entry, txn);
     auto iter = segment_map.find(segment_id_.value());
-    if(iter == segment_map.end()) {
+    if (iter == segment_map.end()) {
         show_operator_state->status_ = Status::SegmentNotExist(segment_id_.value());
         RecoverableError(show_operator_state->status_);
     }
 
-    SegmentIndexEntry* segment_index_entry = iter->second.get();
-    IndexBase* index_base = table_index_entry->table_index_def().get();
+    SegmentIndexEntry *segment_index_entry = iter->second.get();
+    IndexBase *index_base = table_index_entry->table_index_def().get();
     String index_type_name = IndexInfo::IndexTypeToString(index_base->index_type_);
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_indexes;
-    switch(index_base->index_type_) {
+    switch (index_base->index_type_) {
         case IndexType::kIVFFlat: {
             Status status3 = Status::InvalidIndexName(index_type_name);
             show_operator_state->status_ = status3;
@@ -1203,6 +1271,7 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
             chunk_indexes = chunk_index_entries;
             break;
         }
+        case IndexType::kDiskAnn:
         case IndexType::kInvalid: {
             Status status3 = Status::InvalidIndexName(index_type_name);
             RecoverableError(status3);
@@ -1211,12 +1280,12 @@ void PhysicalShow::ExecuteShowIndexChunk(QueryContext *query_context, ShowOperat
     }
 
     ChunkID chunk_id = chunk_id_.value();
-    if(chunk_id >= chunk_indexes.size()) {
+    if (chunk_id >= chunk_indexes.size()) {
         show_operator_state->status_ = Status::ChunkNotExist(chunk_id);
         RecoverableError(show_operator_state->status_);
     }
 
-    ChunkIndexEntry* chunk_index_entry = chunk_indexes[chunk_id].get();
+    ChunkIndexEntry *chunk_index_entry = chunk_indexes[chunk_id].get();
 
     // Prepare the output data block
     UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
@@ -2102,7 +2171,7 @@ void PhysicalShow::ExecuteShowBlockColumn(QueryContext *query_context, ShowOpera
     }
 
     SizeT column_count = table_entry->ColumnCount();
-    if(!column_id_.has_value()) {
+    if (!column_id_.has_value()) {
         String error_message = "No column id is given.";
         UnrecoverableError(error_message);
         return;
@@ -2347,7 +2416,6 @@ void PhysicalShow::ExecuteShowConfigs(QueryContext *query_context, ShowOperatorS
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
     }
-
 
     {
         {
@@ -4375,7 +4443,7 @@ void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorSt
 
     BufferManager *buffer_manager = query_context->storage()->buffer_manager();
     Vector<BufferObjectInfo> buffer_object_info_array = buffer_manager->GetBufferObjectsInfo();
-    for(const auto& buffer_object_info: buffer_object_info_array) {
+    for (const auto &buffer_object_info : buffer_object_info_array) {
 
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -4414,19 +4482,94 @@ void PhysicalShow::ExecuteShowBuffer(QueryContext *query_context, ShowOperatorSt
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
 
-        ++ row_count;
+        ++row_count;
         if (row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
             operator_state->output_.emplace_back(std::move(output_block_ptr));
             output_block_ptr = nullptr;
             row_count = 0;
         }
-
     }
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return ;
+    return;
+}
+
+void PhysicalShow::ExecuteShowMemIndex(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "index_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "table_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, varchar_type, "db_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, bigint_type, "size", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, bigint_type, "row_count", std::set<ConstraintType>()),
+    };
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_memindex"), column_defs);
+
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+        varchar_type,
+        bigint_type,
+        bigint_type,
+    };
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    BGMemIndexTracer *mem_index_tracer = query_context->storage()->memindex_tracer();
+    Vector<MemIndexTracerInfo> mem_index_tracer_info_array = mem_index_tracer->GetMemIndexTracerInfo();
+    for (const auto &memindex_tracer_info : mem_index_tracer_info_array) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // index_name
+            Value value = Value::MakeVarchar(*memindex_tracer_info.index_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // table_name
+            Value value = Value::MakeVarchar(*memindex_tracer_info.table_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // db_name
+            Value value = Value::MakeVarchar(*memindex_tracer_info.db_name_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+        {
+            // size
+            Value value = Value::MakeBigInt(memindex_tracer_info.mem_used_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+        {
+            // row_count
+            Value value = Value::MakeBigInt(memindex_tracer_info.row_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
 }
 
 void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorState *operator_state) {
@@ -4458,9 +4601,9 @@ void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorS
 
     SessionManager *session_manager = query_context->session_manager();
     Map<u64, SharedPtr<QueryInfo>> query_map = session_manager->QueryRecords();
-    for(auto& query_pair: query_map) {
+    for (auto &query_pair : query_map) {
         u64 session_id = query_pair.first;
-        QueryInfo& query_info = *query_pair.second;
+        QueryInfo &query_info = *query_pair.second;
 
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
@@ -4498,7 +4641,7 @@ void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorS
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
 
-        ++ row_count;
+        ++row_count;
         if (row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
             operator_state->output_.emplace_back(std::move(output_block_ptr));
@@ -4509,13 +4652,13 @@ void PhysicalShow::ExecuteShowQueries(QueryContext *query_context, ShowOperatorS
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return ;
+    return;
 }
 
 void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorState *operator_state) {
 
-    QueryInfo* query_info_ptr = query_context->session_manager()->GetQueryRecord(*session_id_);
-    if(query_info_ptr == nullptr) {
+    QueryInfo *query_info_ptr = query_context->session_manager()->GetQueryRecord(*session_id_);
+    if (query_info_ptr == nullptr) {
         Status status = Status::SessionNotFound(*session_id_);
         RecoverableError(status);
     }
@@ -4611,17 +4754,15 @@ void PhysicalShow::ExecuteShowQuery(QueryContext *query_context, ShowOperatorSta
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return ;
+    return;
 }
 
 void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOperatorState *operator_state) {
     auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
     auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
 
-    Vector<SharedPtr<ColumnDef>> column_defs = {
-        MakeShared<ColumnDef>(0, bigint_type, "transaction_id", std::set<ConstraintType>()),
-        MakeShared<ColumnDef>(1, varchar_type, "transaction_text", std::set<ConstraintType>())
-    };
+    Vector<SharedPtr<ColumnDef>> column_defs = {MakeShared<ColumnDef>(0, bigint_type, "transaction_id", std::set<ConstraintType>()),
+                                                MakeShared<ColumnDef>(1, varchar_type, "transaction_text", std::set<ConstraintType>())};
 
     SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_transactions"), column_defs);
 
@@ -4637,7 +4778,7 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
 
     TxnManager *txn_manager = query_context->storage()->txn_manager();
     Vector<TxnInfo> txn_info_array = txn_manager->GetTxnInfoArray();
-    for(const auto& txn_info: txn_info_array) {
+    for (const auto &txn_info : txn_info_array) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -4652,7 +4793,7 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
         {
             // txn_text
             String txn_string;
-            if(txn_info.txn_text_.get() != nullptr) {
+            if (txn_info.txn_text_.get() != nullptr) {
                 txn_string = *txn_info.txn_text_;
             }
             Value value = Value::MakeVarchar(txn_string);
@@ -4660,7 +4801,7 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
 
-        ++ row_count;
+        ++row_count;
         if (row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
             operator_state->output_.emplace_back(std::move(output_block_ptr));
@@ -4671,14 +4812,14 @@ void PhysicalShow::ExecuteShowTransactions(QueryContext *query_context, ShowOper
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return ;
+    return;
 }
 
 void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOperatorState *operator_state) {
 
     TxnManager *txn_manager = query_context->storage()->txn_manager();
     UniquePtr<TxnInfo> txn_info = txn_manager->GetTxnInfoByID(*txn_id_);
-    if(txn_info.get() == nullptr) {
+    if (txn_info.get() == nullptr) {
         Status status = Status::TransactionNotFound(*txn_id_);
         RecoverableError(status);
     }
@@ -4735,7 +4876,7 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
         ++column_id;
         {
             String txn_string;
-            if(txn_info->txn_text_.get() != nullptr) {
+            if (txn_info->txn_text_.get() != nullptr) {
                 txn_string = *txn_info->txn_text_;
             }
             Value value = Value::MakeVarchar(txn_string);
@@ -4746,7 +4887,7 @@ void PhysicalShow::ExecuteShowTransaction(QueryContext *query_context, ShowOpera
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return ;
+    return;
 }
 
 void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorState *operator_state) {
@@ -4779,8 +4920,8 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
     Vector<SharedPtr<WalEntry>> wal_entries = wal_manager->CollectWalEntries();
     LOG_TRACE(fmt::format("WAL Entries count: {}", wal_entries.size()));
 
-    for(const auto& wal_entry_ref: wal_entries) {
-        for(const auto& cmd_ref: wal_entry_ref->cmds_) {
+    for (const auto &wal_entry_ref : wal_entries) {
+        for (const auto &cmd_ref : wal_entry_ref->cmds_) {
             if (output_block_ptr.get() == nullptr) {
                 output_block_ptr = DataBlock::MakeUniquePtr();
                 output_block_ptr->Init(column_types);
@@ -4816,7 +4957,7 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
                 value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
             }
 
-            ++ row_count;
+            ++row_count;
             if (row_count == output_block_ptr->capacity()) {
                 output_block_ptr->Finalize();
                 operator_state->output_.emplace_back(std::move(output_block_ptr));
@@ -4828,7 +4969,7 @@ void PhysicalShow::ExecuteShowLogs(QueryContext *query_context, ShowOperatorStat
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return ;
+    return;
 }
 
 void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperatorState *operator_state) {
@@ -4862,7 +5003,7 @@ void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperato
     auto catalog = query_context->GetTxn()->GetCatalog();
     Vector<CatalogDeltaOpBrief> delta_log_brief_array = catalog->GetDeltaLogBriefs();
 
-    for(const auto& delta_op_brief: delta_log_brief_array) {
+    for (const auto &delta_op_brief : delta_log_brief_array) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -4899,7 +5040,7 @@ void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperato
             value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
 
-        ++ row_count;
+        ++row_count;
         if (row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
             operator_state->output_.emplace_back(std::move(output_block_ptr));
@@ -4910,7 +5051,7 @@ void PhysicalShow::ExecuteShowDeltaLogs(QueryContext *query_context, ShowOperato
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return ;
+    return;
 }
 
 void PhysicalShow::ExecuteShowCatalogs(QueryContext *query_context, ShowOperatorState *operator_state) {
@@ -4959,7 +5100,7 @@ void PhysicalShow::ExecuteShowCatalogs(QueryContext *query_context, ShowOperator
         ++row_count;
     }
 
-    for(const auto& delta_catalog_file_info: delta_catalog_file_infos) {
+    for (const auto &delta_catalog_file_info : delta_catalog_file_infos) {
         if (output_block_ptr.get() == nullptr) {
             output_block_ptr = DataBlock::MakeUniquePtr();
             output_block_ptr->Init(column_types);
@@ -4978,7 +5119,7 @@ void PhysicalShow::ExecuteShowCatalogs(QueryContext *query_context, ShowOperator
             value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
         }
 
-        ++ row_count;
+        ++row_count;
         if (row_count == output_block_ptr->capacity()) {
             output_block_ptr->Finalize();
             operator_state->output_.emplace_back(std::move(output_block_ptr));
@@ -4989,8 +5130,229 @@ void PhysicalShow::ExecuteShowCatalogs(QueryContext *query_context, ShowOperator
 
     output_block_ptr->Finalize();
     operator_state->output_.emplace_back(std::move(output_block_ptr));
-    return ;
+    return;
 }
 
+void PhysicalShow::ExecuteShowPersistenceFiles(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "file_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, varchar_type, "object_name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, bigint_type, "offset", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, bigint_type, "size", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_persistence_files"), column_defs);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        varchar_type,
+        bigint_type,
+        bigint_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    PersistenceManager* persistence_manager = query_context->persistence_manager();
+    if(persistence_manager == nullptr) {
+        Status status = Status::FunctionIsDisable("Persistence");
+        RecoverableError(status);
+    }
+    HashMap<String, ObjAddr> file_map = persistence_manager->GetAllFiles();
+
+    for (const auto &file_pair : file_map) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // file_name
+            Value value = Value::MakeVarchar(file_pair.first);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // object_name
+            Value value = Value::MakeVarchar(file_pair.second.obj_key_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // file offset
+            Value value = Value::MakeBigInt(file_pair.second.part_offset_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+        {
+            // file size
+            Value value = Value::MakeBigInt(file_pair.second.part_size_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(1, bigint_type, "reference_count", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, bigint_type, "size", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(3, bigint_type, "deleted_size", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_persistence_objects"), column_defs);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        varchar_type,
+        bigint_type,
+        bigint_type,
+        bigint_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    PersistenceManager* persistence_manager = query_context->persistence_manager();
+    if(persistence_manager == nullptr) {
+        Status status = Status::FunctionIsDisable("Persistence");
+        RecoverableError(status);
+    }
+
+    HashMap<String, ObjStat> object_map = persistence_manager->GetAllObjects();
+    for (const auto &object_pair : object_map) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+
+        {
+            // name
+            Value value = Value::MakeVarchar(object_pair.first);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[0]);
+        }
+        {
+            // reference count
+            Value value = Value::MakeBigInt(object_pair.second.ref_count_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[1]);
+        }
+        {
+            // size
+            Value value = Value::MakeBigInt(object_pair.second.obj_size_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+        {
+            // delete size
+            Value value = Value::MakeBigInt(object_pair.second.deleted_size_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
+
+void PhysicalShow::ExecuteShowPersistenceObject(QueryContext *query_context, ShowOperatorState *operator_state) {
+    auto varchar_type = MakeShared<DataType>(LogicalType::kVarchar);
+    auto bigint_type = MakeShared<DataType>(LogicalType::kBigInt);
+
+    Vector<SharedPtr<ColumnDef>> column_defs = {
+        MakeShared<ColumnDef>(1, bigint_type, "start", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, bigint_type, "end", std::set<ConstraintType>()),
+    };
+
+    SharedPtr<TableDef> table_def = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>("show_persistence_object"), column_defs);
+
+    // create data block for output state
+    Vector<SharedPtr<DataType>> column_types{
+        bigint_type,
+        bigint_type,
+    };
+
+    UniquePtr<DataBlock> output_block_ptr = DataBlock::MakeUniquePtr();
+    output_block_ptr->Init(column_types);
+    SizeT row_count = 0;
+
+    PersistenceManager* persistence_manager = query_context->persistence_manager();
+    if(persistence_manager == nullptr) {
+        Status status = Status::FunctionIsDisable("Persistence");
+        RecoverableError(status);
+    }
+
+    HashMap<String, ObjStat> object_map = persistence_manager->GetAllObjects();
+    auto iter = object_map.find(object_name_);
+    if(iter == object_map.end()) {
+        Status status = Status::FileNotFound(object_name_);
+        RecoverableError(status);
+    }
+
+    Set<Range>& deleted_ranges = iter->second.deleted_ranges_;
+    for(auto& range: deleted_ranges) {
+        if (output_block_ptr.get() == nullptr) {
+            output_block_ptr = DataBlock::MakeUniquePtr();
+            output_block_ptr->Init(column_types);
+        }
+        {
+            // start
+            Value value = Value::MakeBigInt(range.start_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
+        }
+        {
+            // end
+            Value value = Value::MakeBigInt(range.end_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+
+        ++row_count;
+        if (row_count == output_block_ptr->capacity()) {
+            output_block_ptr->Finalize();
+            operator_state->output_.emplace_back(std::move(output_block_ptr));
+            output_block_ptr = nullptr;
+            row_count = 0;
+        }
+
+    }
+
+    output_block_ptr->Finalize();
+    operator_state->output_.emplace_back(std::move(output_block_ptr));
+    return;
+}
 
 } // namespace infinity

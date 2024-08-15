@@ -106,6 +106,12 @@ BoundCastFunc CastFunction::GetBoundFunc(const DataType &source, const DataType 
         case kHugeInt: {
             return BindIntegerCast<HugeIntT>(source, target);
         }
+        case kFloat16: {
+            return BindFloatCast<Float16T>(source, target);
+        }
+        case kBFloat16: {
+            return BindFloatCast<BFloat16T>(source, target);
+        }
         case kFloat: {
             return BindFloatCast<FloatT>(source, target);
         }

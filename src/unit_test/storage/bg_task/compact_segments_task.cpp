@@ -48,7 +48,7 @@ import third_party;
 
 using namespace infinity;
 
-class CompactTaskTest : public BaseTest {
+class CompactTaskTest : public BaseTestParamStr {
 protected:
     void AddSegments(TxnManager *txn_mgr, const String &table_name, const Vector<SizeT> &segment_sizes, BufferManager *buffer_mgr) {
         for (SizeT segment_size : segment_sizes) {
@@ -84,12 +84,18 @@ protected:
     }
 
     void SetUp() override {
-        auto config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_cleanup_task.toml");
-
+        RemoveDbDirs();
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        RemoveDbDirs();
+        std::string config_path_str = GetParam();
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 
@@ -101,18 +107,36 @@ protected:
     }
 };
 
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         CompactTaskTest,
+                         ::testing::Values((std::string(test_data_path()) + "/config/test_cleanup_task.toml").c_str(),
+                                           (std::string(test_data_path()) + "/config/test_cleanup_task_vfs.toml").c_str()));
+
+
 class SilentLogTestCompactTaskTest : public CompactTaskTest {
     void SetUp() override {
-        auto config_path = MakeShared<String>(String(test_data_path()) + "/config/test_cleanup_task_silent.toml");
+        RemoveDbDirs();
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
 #endif
-        RemoveDbDirs();
+        std::string config_path_str = GetParam();
+        std::shared_ptr<std::string> config_path = nullptr;
+        if (config_path_str != BaseTestParamStr::NULL_CONFIG_PATH) {
+            config_path = infinity::MakeShared<std::string>(config_path_str);
+        }
         infinity::InfinityContext::instance().Init(config_path);
     }
 };
 
-TEST_F(CompactTaskTest, compact_to_single_segment) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         SilentLogTestCompactTaskTest,
+                         ::testing::Values((std::string(test_data_path()) + "/config/test_cleanup_task_silent.toml").c_str(),
+                                           BaseTestParamStr::VFS_CONFIG_PATH));
+
+TEST_P(CompactTaskTest, compact_to_single_segment) {
     {
         String table_name = "tbl1";
 
@@ -172,7 +196,7 @@ TEST_F(CompactTaskTest, compact_to_single_segment) {
     }
 }
 
-TEST_F(CompactTaskTest, compact_to_two_segment) {
+TEST_P(CompactTaskTest, compact_to_two_segment) {
     {
         String table_name = "tbl1";
 
@@ -236,7 +260,7 @@ TEST_F(CompactTaskTest, compact_to_two_segment) {
     }
 }
 
-TEST_F(CompactTaskTest, compact_with_delete) {
+TEST_P(CompactTaskTest, compact_with_delete) {
     {
         String table_name = "tbl1";
 
@@ -322,7 +346,7 @@ TEST_F(CompactTaskTest, compact_with_delete) {
     }
 }
 
-TEST_F(SilentLogTestCompactTaskTest, delete_in_compact_process) {
+TEST_P(SilentLogTestCompactTaskTest, delete_in_compact_process) {
     {
         String table_name = "tbl1";
 
@@ -435,10 +459,9 @@ TEST_F(SilentLogTestCompactTaskTest, delete_in_compact_process) {
     }
 }
 
-// Cannot compile the test. So annotate it.
-
-TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
-    for (int task_i = 0; task_i < 2; ++task_i) {
+TEST_P(CompactTaskTest, uncommit_delete_in_compact_process) {
+    for (int task_i = 0; task_i < 10; ++task_i) {
+        LOG_INFO(fmt::format("Test {}", task_i));
         String table_name = fmt::format("tbl{}", task_i);
 
         Storage *storage = infinity::InfinityContext::instance().storage();
@@ -488,7 +511,10 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                 }
                 delete_n += offsets.size();
             }
+            LOG_INFO(fmt::format("A: delete_n: {}", delete_n));
             auto [table_entry, status] = txn3->GetTableByName("default_db", table_name);
+            int total_row_n = table_entry->row_count();
+            EXPECT_EQ(total_row_n, row_count);
             EXPECT_TRUE(status.ok());
             txn3->Delete(table_entry, delete_row_ids);
 
@@ -523,34 +549,23 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
 
                 delete_row_n1 += offsets.size();
                 delete_row_n2 += offsets2.size();
+
+                LOG_INFO(fmt::format("Delete1 {} in segment {}", offsets.size(), i));
             }
 
-            auto delete_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
-            auto [table_entry, status] = delete_txn1->GetTableByName("default_db", table_name);
-            EXPECT_TRUE(status.ok());
-            delete_txn1->Delete(table_entry, delete_row_ids);
-
-            bool slow_delete2 = task_i & 1;
-
             auto commit_ts = compaction_processor->ManualDoCompact("default_db", table_name, false, [&]() {
-                txn_mgr->CommitTxn(delete_txn1);
-                delete_n += delete_row_n1;
-
-                auto delete_txn2 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
-                auto [table_entry, status] = delete_txn2->GetTableByName("default_db", table_name);
+                auto delete_txn1 = txn_mgr->BeginTxn(MakeUnique<String>("delete table"));
+                LOG_INFO(fmt::format("delete1 txn id: {}", delete_txn1->TxnID()));
+                auto [table_entry, status] = delete_txn1->GetTableByName("default_db", table_name);
                 EXPECT_TRUE(status.ok());
 
-                if (slow_delete2) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-                }
                 try {
-                    delete_txn2->Delete(table_entry, delete_row_ids2);
-                    txn_mgr->CommitTxn(delete_txn2);
-                    LOG_INFO("Delete 2 is committed");
-                    delete_n += delete_row_n2;
-                    EXPECT_FALSE(slow_delete2);
+                    delete_txn1->Delete(table_entry, delete_row_ids);
+                    txn_mgr->CommitTxn(delete_txn1);
+                    LOG_INFO(fmt::format("Delete 1 is committed, {}", delete_row_n1));
+                    delete_n += delete_row_n1;
                 } catch (const RecoverableException &e) {
-                    LOG_INFO("Delete 2 is row backed");
+                    LOG_INFO("Delete 1 is row backed");
                 }
             });
             EXPECT_NE(commit_ts, 0u);
@@ -583,7 +598,14 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
                 EXPECT_NE(compact_segment, nullptr);
                 EXPECT_NE(compact_segment->status(), SegmentStatus::kDeprecated);
 
-                EXPECT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
+                if (compact_segment->actual_row_count() != row_count - delete_n) {
+                    LOG_ERROR(fmt::format("compact_segment->actual_row_count():{}, row_count: {}, delete_n: {}",
+                                          compact_segment->actual_row_count(),
+                                          row_count,
+                                          delete_n));
+                    LOG_ERROR(fmt::format("delete_row_n1: {}, delete_row_n2: {}, row_n: {}", delete_row_n1, delete_row_n2, row_count));
+                }
+                ASSERT_EQ(compact_segment->actual_row_count(), row_count - delete_n);
 
                 txn_mgr->CommitTxn(txn5);
             }
@@ -591,7 +613,7 @@ TEST_F(CompactTaskTest, uncommit_delete_in_compact_process) {
     }
 }
 
-TEST_F(CompactTaskTest, compact_not_exist_table) {
+TEST_P(CompactTaskTest, compact_not_exist_table) {
     Storage *storage = infinity::InfinityContext::instance().storage();
     BufferManager *buffer_mgr = storage->buffer_manager();
     TxnManager *txn_mgr = storage->txn_manager();

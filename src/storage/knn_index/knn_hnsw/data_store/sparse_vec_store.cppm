@@ -37,6 +37,7 @@ public:
     using QueryVecType = SparseVecRef<DataType, IdxType>;
     using StoreType = SparseVecRef<DataType, IdxType>;
     using QueryType = SparseVecRef<DataType, IdxType>;
+    using DistanceType = std::conditional_t<std::is_same_v<DataType, bool>, IdxType, std::conditional_t<std::is_same_v<DataType, f64>, f64, f32>>;
 
 private:
     SparseVecStoreMeta(SizeT max_dim) : max_dim_(max_dim) {}
@@ -78,7 +79,11 @@ private:
 public:
     SparseVecStoreInner() = default;
 
-    static This Make(SizeT max_vec_num, const Meta &meta) { return This(max_vec_num, meta); }
+    static This Make(SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
+        auto ret = This(max_vec_num, meta);
+        mem_usage += sizeof(SparseVecEle) * max_vec_num;
+        return ret;
+    }
 
     void Save(FileHandler &file_handler, SizeT cur_vec_num, const Meta &meta) const {
         SizeT nnz = 0;
@@ -101,7 +106,7 @@ public:
         file_handler.Write(data.get(), sizeof(DataType) * nnz);
     }
 
-    static This Load(FileHandler &file_handler, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta) {
+    static This Load(FileHandler &file_handler, SizeT cur_vec_num, SizeT max_vec_num, const Meta &meta, SizeT &mem_usage) {
         SizeT nnz = 0;
         file_handler.Read(&nnz, sizeof(nnz));
         auto indptr = MakeUniqueForOverwrite<i32[]>(cur_vec_num + 1);
@@ -112,22 +117,27 @@ public:
         file_handler.Read(data.get(), sizeof(DataType) * nnz);
 
         This ret(max_vec_num, meta);
-        for (SizeT i = 0; i < cur_vec_num; ++i) {
+        mem_usage += sizeof(SparseVecEle) * max_vec_num;
+        for (SizeT i = 0; i < cur_vec_num; ++i) { // todo: optimize it
             SparseVecEle &vec = ret.vecs_[i];
             vec.nnz_ = indptr[i + 1] - indptr[i];
             vec.indices_ = MakeUniqueForOverwrite<IdxType[]>(vec.nnz_);
             vec.data_ = MakeUniqueForOverwrite<DataType[]>(vec.nnz_);
+            mem_usage += sizeof(IdxType) * vec.nnz_ + sizeof(DataType) * vec.nnz_;
+
             Copy(indice.get() + indptr[i], indice.get() + indptr[i + 1], vec.indices_.get());
             Copy(data.get() + indptr[i], data.get() + indptr[i + 1], vec.data_.get());
         }
         return ret;
     }
 
-    void SetVec(SizeT idx, const SparseVecRef &vec, const Meta &meta) {
+    void SetVec(SizeT idx, const SparseVecRef &vec, const Meta &meta, SizeT &mem_usage) {
         SparseVecEle &dst = vecs_[idx];
         dst.nnz_ = vec.nnz_;
         dst.indices_ = MakeUniqueForOverwrite<IdxType[]>(vec.nnz_);
         dst.data_ = MakeUniqueForOverwrite<DataType[]>(vec.nnz_);
+        mem_usage += sizeof(IdxType) * vec.nnz_ + sizeof(DataType) * vec.nnz_;
+
         Copy(vec.indices_, vec.indices_ + vec.nnz_, dst.indices_.get());
         Copy(vec.data_, vec.data_ + vec.nnz_, dst.data_.get());
     }

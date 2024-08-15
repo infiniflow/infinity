@@ -29,15 +29,29 @@ import data_type;
 import logical_type;
 import constant_expr;
 
-class CatalogDeltaEntryTest : public BaseTest {};
-
 using namespace infinity;
 
-TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
-    std::shared_ptr<std::string> config_path = nullptr;
-    RemoveDbDirs();
-    InfinityContext::instance().Init(config_path);
+class CatalogDeltaEntryTest : public BaseTestParamStr {
+public:
+    void SetUp() override {
+        RemoveDbDirs();
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+        config_path_ = GetParam();
+        SharedPtr<String> config_path =
+            config_path_ == BaseTestParamStr::NULL_CONFIG_PATH ? nullptr : MakeShared<String>(std::string("test/data") + config_path_);
+        InfinityContext::instance().Init(config_path);
+    }
 
+    String config_path_{};
+};
+
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         CatalogDeltaEntryTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+
+TEST_P(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     auto db_name = String("db_test");
     auto db_dir = MakeShared<String>("data");
     auto table_name = String("table_test");
@@ -169,11 +183,7 @@ TEST_F(CatalogDeltaEntryTest, test_DeltaOpEntry) {
     infinity::InfinityContext::instance().UnInit();
 }
 
-TEST_F(CatalogDeltaEntryTest, MergeEntries) {
-    std::shared_ptr<std::string> config_path = nullptr;
-    RemoveDbDirs();
-    InfinityContext::instance().Init(config_path);
-
+TEST_P(CatalogDeltaEntryTest, MergeEntries) {
     auto global_catalog_delta_entry = std::make_unique<GlobalCatalogDeltaEntry>();
     auto local_catalog_delta_entry = std::make_unique<CatalogDeltaEntry>();
     //    local_catalog_delta_entry->set_txn_ids({1});
@@ -385,7 +395,8 @@ TEST_F(CatalogDeltaEntryTest, MergeEntries) {
     infinity::InfinityContext::instance().UnInit();
 }
 
-TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
+TEST_P(CatalogDeltaEntryTest, ComplicateMergeEntries) {
+    infinity::InfinityContext::instance().UnInit();
     auto db_name = MakeShared<String>("db_test");
     auto db_dir = MakeShared<String>("data");
     auto table_name = MakeShared<String>("table_test");
@@ -473,7 +484,9 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
             for (auto &entry : merged_entries) {
                 global_catalog_delta_entry->ReplayDeltaEntry(std::move(entry));
             }
-            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(5);
+            TxnTimeStamp max_ts;
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(max_ts);
+            EXPECT_EQ(max_ts, 4);
             EXPECT_EQ(merged_entry->operations().size(), 1u);
         }
     }
@@ -511,7 +524,9 @@ TEST_F(CatalogDeltaEntryTest, ComplicateMergeEntries) {
             for (auto &entry : merged_entries) {
                 global_catalog_delta_entry->ReplayDeltaEntry(std::move(entry));
             }
-            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(7);
+            TxnTimeStamp max_ts;
+            auto merged_entry = global_catalog_delta_entry->PickFlushEntry(max_ts);
+            EXPECT_EQ(max_ts, 6);
             EXPECT_EQ(merged_entry->operations().size(), 1u);
         }
     }

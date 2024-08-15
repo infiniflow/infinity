@@ -80,8 +80,15 @@ static const char *type2name[] = {
 
     "EmptyArray",
 
+    // FP16
+    "Float16",
+    // BF16
+    "BFloat16",
+
     "Invalid",
 };
+
+static_assert(std::size(type2name) == static_cast<size_t>(LogicalType::kInvalid) + 1);
 
 std::unordered_map<std::string, LogicalType> name2type = {
     // Bool
@@ -140,6 +147,12 @@ std::unordered_map<std::string, LogicalType> name2type = {
     // sparse
     { "sparse" , LogicalType::kSparse},
     { "emptyarray", LogicalType::kEmptyArray},
+
+    // FP16
+    {"float16", LogicalType::kFloat16},
+    // BF16
+    {"bfloat16", LogicalType::kBFloat16},
+
     { "invalid" , LogicalType::kInvalid },
 };
 
@@ -206,8 +219,14 @@ static int64_t type_size[] = {
     sizeof(SparseType),
 
     0, // empty array
+
+    2, // Float16
+    2, // BFloat16
+
     0, // Invalid
 };
+
+static_assert(std::size(type_size) == static_cast<size_t>(LogicalType::kInvalid) + 1);
 
 const char *LogicalType2Str(LogicalType logical_type) { return type2name[logical_type]; }
 
@@ -248,6 +267,7 @@ LogicalType GetCommonLogicalType(const EmbeddingDataType column_type) {
         case EmbeddingDataType::kElemInt8: {
             return GetCommonLogicalType<T, int8_t>();
         }
+        case EmbeddingDataType::kElemUInt8:
         case EmbeddingDataType::kElemInt16: {
             return GetCommonLogicalType<T, int16_t>();
         }
@@ -257,6 +277,8 @@ LogicalType GetCommonLogicalType(const EmbeddingDataType column_type) {
         case EmbeddingDataType::kElemInt64: {
             return GetCommonLogicalType<T, int64_t>();
         }
+        case EmbeddingDataType::kElemFloat16:
+        case EmbeddingDataType::kElemBFloat16:
         case EmbeddingDataType::kElemFloat: {
             return GetCommonLogicalType<T, float>();
         }
@@ -275,6 +297,7 @@ LogicalType GetCommonLogicalType(const EmbeddingDataType type1, const EmbeddingD
         case EmbeddingDataType::kElemInt8: {
             return GetCommonLogicalType<int8_t>(type2);
         }
+        case EmbeddingDataType::kElemUInt8:
         case EmbeddingDataType::kElemInt16: {
             return GetCommonLogicalType<int16_t>(type2);
         }
@@ -284,6 +307,8 @@ LogicalType GetCommonLogicalType(const EmbeddingDataType type1, const EmbeddingD
         case EmbeddingDataType::kElemInt64: {
             return GetCommonLogicalType<int64_t>(type2);
         }
+        case EmbeddingDataType::kElemFloat16:
+        case EmbeddingDataType::kElemBFloat16:
         case EmbeddingDataType::kElemFloat: {
             return GetCommonLogicalType<float>(type2);
         }

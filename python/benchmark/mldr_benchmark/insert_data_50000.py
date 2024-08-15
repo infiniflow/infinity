@@ -98,26 +98,28 @@ class InfinityClientForInsert:
         if lang == "zh":
             ft_params.append(index.InitParameter("analyzer", "chinese"))
         res = self.infinity_table.create_index("ft_index",
-                                               [index.IndexInfo("fulltext_col", index.IndexType.FullText, ft_params)],
+                                               index.IndexInfo("fulltext_col", index.IndexType.FullText, ft_params),
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         print("Finish creating fulltext index.")
         print("Start creating Hnsw index...")
-        res = self.infinity_table.create_index("hnsw_index", [index.IndexInfo("dense_col", index.IndexType.Hnsw,
-                                                                              [index.InitParameter("M", "16"),
-                                                                               index.InitParameter("ef_construction",
-                                                                                                   "1000"),
-                                                                               index.InitParameter("ef", "1000"),
-                                                                               index.InitParameter("metric", "ip"),
-                                                                               index.InitParameter("encode", "lvq")])],
+        res = self.infinity_table.create_index("hnsw_index", index.IndexInfo("dense_col", index.IndexType.Hnsw,
+                                                                             {
+                                                                                 "m": "16",
+                                                                                 "ef_construction": "1000",
+                                                                                 "ef": "1000",
+                                                                                 "metric": "ip",
+                                                                                 "encode": "lvq"
+                                                                             }),
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         print("Finish creating Hnsw index.")
         print("Start creating BMP index...")
-        res = self.infinity_table.create_index("bmp_index", [index.IndexInfo("sparse_col", index.IndexType.BMP,
-                                                                             [index.InitParameter("block_size", "8"),
-                                                                              index.InitParameter("compress_type",
-                                                                                                  "compress")])],
+        res = self.infinity_table.create_index("bmp_index", index.IndexInfo("sparse_col", index.IndexType.BMP,
+                                                                            {
+                                                                                "block_size": "8",
+                                                                                "compress_type": "compress",
+                                                                            }),
                                                ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         self.infinity_table.optimize("bmp_index", {"topk": "1000", "bp_reorder": ""})

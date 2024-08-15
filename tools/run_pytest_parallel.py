@@ -43,3 +43,4 @@ if __name__ == "__main__":
 
     if command_failed:
         sys.exit(-1)
+

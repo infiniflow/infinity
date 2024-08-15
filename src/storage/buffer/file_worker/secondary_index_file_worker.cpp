@@ -74,7 +74,7 @@ void SecondaryIndexFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_succ
     }
 }
 
-void SecondaryIndexFileWorker::ReadFromFileImpl() {
+void SecondaryIndexFileWorker::ReadFromFileImpl(SizeT file_size) {
     if (!data_) [[likely]] {
         auto index = GetSecondaryIndexData(column_def_->type(), row_count_, false);
         index->ReadIndexInner(*file_handler_);
@@ -142,7 +142,7 @@ void SecondaryIndexFileWorkerParts::WriteToFileImpl(bool to_spill, bool &prepare
     }
 }
 
-void SecondaryIndexFileWorkerParts::ReadFromFileImpl() {
+void SecondaryIndexFileWorkerParts::ReadFromFileImpl(SizeT file_size) {
     if (row_count_ < part_id_ * 8192) {
         String error_message = fmt::format("ReadFromFileImpl: row_count_: {} < part_id_ * 8192: {}", row_count_, part_id_ * 8192);
         UnrecoverableError(error_message);

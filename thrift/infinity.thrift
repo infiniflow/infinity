@@ -13,6 +13,8 @@ HugeInt,
 Decimal,
 Float,
 Double,
+Float16,
+BFloat16,
 Varchar,
 Embedding,
 Tensor,
@@ -52,12 +54,15 @@ struct VarcharType {}
 
 enum ElementType {
 ElementBit,
+ElementUInt8,
 ElementInt8,
 ElementInt16,
 ElementInt32,
 ElementInt64,
 ElementFloat32,
 ElementFloat64,
+ElementFloat16,
+ElementBFloat16,
 }
 
 struct EmbeddingType {
@@ -98,6 +103,8 @@ Int64,
 Null,
 IntegerArray,
 DoubleArray,
+IntegerTensor,
+DoubleTensor,
 IntegerTensorArray,
 DoubleTensorArray,
 SparseIntegerArray,
@@ -136,12 +143,15 @@ Hamming,
 
 union EmbeddingData {
 1: list<bool> bool_array_value,
-2: list<binary> i8_array_value,
-3: list<i16> i16_array_value,
-4: list<i32> i32_array_value,
-5: list<i64> i64_array_value,
-6: list<double> f32_array_value,
-7: list<double> f64_array_value,
+2: list<i16> u8_array_value,
+3: list<i16> i8_array_value,
+4: list<i16> i16_array_value,
+5: list<i32> i32_array_value,
+6: list<i64> i64_array_value,
+7: list<double> f32_array_value,
+8: list<double> f64_array_value,
+9: list<double> f16_array_value,
+10: list<double> bf16_array_value,
 }
 
 struct InitParameter {
@@ -157,9 +167,11 @@ struct ConstantExpr {
 5: optional string str_value,
 6: optional list<i64> i64_array_value,
 7: optional list<double> f64_array_value,
-8: optional list<list<list<i64>>> i64_tensor_array_value,
-9: optional list<list<list<double>>> f64_tensor_array_value,
-10: optional list<i64> i64_array_idx,
+8: optional list<list<i64>> i64_tensor_value,
+9: optional list<list<double>> f64_tensor_value,
+10: optional list<list<list<i64>>> i64_tensor_array_value,
+11: optional list<list<list<double>>> f64_tensor_array_value,
+12: optional list<i64> i64_array_idx,
 }
 
 struct KnnExpr {
@@ -263,6 +275,8 @@ ColumnInt32,
 ColumnInt64,
 ColumnFloat32,
 ColumnFloat64,
+ColumnFloat16,
+ColumnBFloat16,
 ColumnVarchar,
 ColumnEmbedding,
 ColumnTensor,
@@ -389,12 +403,12 @@ struct GetTableRequest {
 
 enum IndexType {
 IVFFlat,
-HnswLVQ,
 Hnsw,
 FullText,
 BMP,
 Secondary,
 EMVB,
+DiskAnn,
 }
 
 struct IndexInfo {
@@ -407,7 +421,7 @@ struct CreateIndexRequest {
 1: string db_name,
 2: string table_name,
 3: string index_name,
-5: list<IndexInfo> index_info_list = [],
+5: IndexInfo index_info,
 6: i64 session_id,
 7: CreateOption create_option,
 }

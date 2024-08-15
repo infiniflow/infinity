@@ -36,7 +36,6 @@ namespace nb = nanobind;
 using namespace infinity;
 
 NB_MODULE(embedded_infinity_ext, m) {
-    nb::bytes a;
     nb::class_<WrapUpdateExpr>(m, "WrapUpdateExpr")
         .def(nb::init<>())
         .def_rw("column_name", &WrapUpdateExpr::column_name)
@@ -79,6 +78,10 @@ NB_MODULE(embedded_infinity_ext, m) {
         .def_rw("str_value", &WrapConstantExpr::str_value)
         .def_rw("i64_array_value", &WrapConstantExpr::i64_array_value)
         .def_rw("f64_array_value", &WrapConstantExpr::f64_array_value)
+        .def_rw("i64_tensor_value", &WrapConstantExpr::i64_tensor_value)
+        .def_rw("f64_tensor_value", &WrapConstantExpr::f64_tensor_value)
+        .def_rw("i64_tensor_array_value", &WrapConstantExpr::i64_tensor_array_value)
+        .def_rw("f64_tensor_array_value", &WrapConstantExpr::f64_tensor_array_value)
         .def_rw("i64_array_idx", &WrapConstantExpr::i64_array_idx);
 
     nb::class_<WrapColumnDef>(m, "WrapColumnDef")
@@ -141,10 +144,13 @@ NB_MODULE(embedded_infinity_ext, m) {
     nb::class_<EmbeddingData>(m, "EmbeddingData")
         .def(nb::init<>())
         .def_rw("bool_array_value", &EmbeddingData::bool_array_value)
+        .def_rw("u8_array_value", &EmbeddingData::u8_array_value)
         .def_rw("i8_array_value", &EmbeddingData::i8_array_value)
         .def_rw("i16_array_value", &EmbeddingData::i16_array_value)
         .def_rw("i32_array_value", &EmbeddingData::i32_array_value)
         .def_rw("i64_array_value", &EmbeddingData::i64_array_value)
+        .def_rw("f16_array_value", &EmbeddingData::f16_array_value)
+        .def_rw("bf16_array_value", &EmbeddingData::bf16_array_value)
         .def_rw("f32_array_value", &EmbeddingData::f32_array_value)
         .def_rw("f64_array_value", &EmbeddingData::f64_array_value);
 
@@ -303,6 +309,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kJSON", CopyFileType::kJSON)
         .value("kJSONL", CopyFileType::kJSONL)
         .value("kFVECS", CopyFileType::kFVECS)
+        .value("kCSR", CopyFileType::kCSR)
+        .value("kBVECS", CopyFileType::kBVECS)
         .value("kInvalid", CopyFileType::kInvalid);
 
     nb::class_<InitParameter>(m, "InitParameter")
@@ -464,6 +472,7 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kSecondary", IndexType::kSecondary)
         .value("kBMP", IndexType::kBMP)
         .value("kEMVB", IndexType::kEMVB)
+        .value("kDiskAnn", IndexType::kDiskAnn)
         .value("kInvalid", IndexType::kInvalid)
         .export_values();
 
@@ -616,6 +625,8 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kDecimal", LogicalType::kDecimal)
         .value("kFloat", LogicalType::kFloat)
         .value("kDouble", LogicalType::kDouble)
+        .value("kFloat16", LogicalType::kFloat16)
+        .value("kBFloat16", LogicalType::kBFloat16)
         .value("kVarchar", LogicalType::kVarchar)
         .value("kDate", LogicalType::kDate)
         .value("kTime", LogicalType::kTime)
@@ -663,12 +674,15 @@ NB_MODULE(embedded_infinity_ext, m) {
     // embedding_info
     nb::enum_<EmbeddingDataType>(m, "EmbeddingDataType")
         .value("kElemBit", EmbeddingDataType::kElemBit)
+        .value("kElemUInt8", EmbeddingDataType::kElemUInt8)
         .value("kElemInt8", EmbeddingDataType::kElemInt8)
         .value("kElemInt16", EmbeddingDataType::kElemInt16)
         .value("kElemInt32", EmbeddingDataType::kElemInt32)
         .value("kElemInt64", EmbeddingDataType::kElemInt64)
         .value("kElemFloat", EmbeddingDataType::kElemFloat)
         .value("kElemDouble", EmbeddingDataType::kElemDouble)
+        .value("kElemFloat16", EmbeddingDataType::kElemFloat16)
+        .value("kElemBFloat16", EmbeddingDataType::kElemBFloat16)
         .value("kElemInvalid", EmbeddingDataType::kElemInvalid)
         .export_values();
 
@@ -683,4 +697,11 @@ NB_MODULE(embedded_infinity_ext, m) {
         .value("kFragment", ExplainType::kFragment)
         .value("kInvalid", ExplainType::kInvalid)
         .export_values();
+
+    m.def("test_helper_float32_to_chars", [](float x) -> std::string {
+        char buffer[30];
+        auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), x);
+        std::string result(buffer, ptr);
+        return result;
+    });
 }

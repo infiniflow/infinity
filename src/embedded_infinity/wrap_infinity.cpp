@@ -48,40 +48,34 @@ namespace infinity {
 ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
     status.code_ = ErrorCode::kOk;
 
-    auto constant_expr = new ConstantExpr(literal_type);
+    auto constant_expr = MakeUnique<ConstantExpr>(literal_type);
     switch (literal_type) {
         case LiteralType::kBoolean: {
             constant_expr->bool_value_ = bool_value;
-            return constant_expr;
+            break;
         }
         case LiteralType::kDouble: {
             constant_expr->double_value_ = f64_value;
-            return constant_expr;
+            break;
         }
         case LiteralType::kString: {
             constant_expr->str_value_ = strdup(str_value.c_str());
-            return constant_expr;
+            break;
         }
         case LiteralType::kInteger: {
             constant_expr->integer_value_ = i64_value;
-            return constant_expr;
+            break;
         }
         case LiteralType::kNull: {
-            return constant_expr;
+            break;
         }
         case LiteralType::kIntegerArray: {
-            constant_expr->long_array_.reserve(i64_array_value.size());
-            for (SizeT i = 0; i < i64_array_value.size(); ++i) {
-                constant_expr->long_array_.emplace_back(i64_array_value[i]);
-            }
-            return constant_expr;
+            constant_expr->long_array_ = i64_array_value;
+            break;
         }
         case LiteralType::kDoubleArray: {
-            constant_expr->double_array_.reserve(f64_array_value.size());
-            for (SizeT i = 0; i < f64_array_value.size(); ++i) {
-                constant_expr->double_array_.emplace_back(f64_array_value[i]);
-            }
-            return constant_expr;
+            constant_expr->double_array_ = f64_array_value;
+            break;
         }
         case LiteralType::kLongSparseArray: {
             constant_expr->long_sparse_array_.first.reserve(i64_array_idx.size());
@@ -90,7 +84,7 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
                 constant_expr->long_sparse_array_.first.emplace_back(i64_array_idx[i]);
                 constant_expr->long_sparse_array_.second.emplace_back(i64_array_value[i]);
             }
-            return constant_expr;
+            break;
         }
         case LiteralType::kDoubleSparseArray: {
             constant_expr->double_sparse_array_.first.reserve(i64_array_idx.size());
@@ -99,19 +93,68 @@ ParsedExpr *WrapConstantExpr::GetParsedExpr(Status &status) {
                 constant_expr->double_sparse_array_.first.emplace_back(i64_array_idx[i]);
                 constant_expr->double_sparse_array_.second.emplace_back(f64_array_value[i]);
             }
-            return constant_expr;
+            break;
         }
         case LiteralType::kEmptyArray: {
-            return constant_expr;
+            break;
+        }
+        case LiteralType::kSubArrayArray: {
+            auto create_vv = []<typename T>(const std::vector<std::vector<T>> &vv, ConstantExpr *output_constant_expr) {
+                static_assert(std::is_same_v<T, int64_t> || std::is_same_v<T, double>);
+                constexpr auto basic_type = [] {
+                    if constexpr (std::is_same_v<T, int64_t>) {
+                        return LiteralType::kIntegerArray;
+                    } else if constexpr (std::is_same_v<T, double>) {
+                        return LiteralType::kDoubleArray;
+                    } else {
+                        static_assert(false, "unexpected type");
+                        return LiteralType::kEmptyArray;
+                    }
+                }();
+                output_constant_expr->sub_array_array_.reserve(vv.size());
+                for (const auto &value_2 : vv) {
+                    auto parsed_expr_2 = MakeShared<ConstantExpr>(basic_type);
+                    if constexpr (std::is_same_v<T, int64_t>) {
+                        parsed_expr_2->long_array_ = value_2;
+                    } else if constexpr (std::is_same_v<T, double>) {
+                        parsed_expr_2->double_array_ = value_2;
+                    } else {
+                        static_assert(false, "unexpected type");
+                    }
+                    output_constant_expr->sub_array_array_.emplace_back(std::move(parsed_expr_2));
+                }
+            };
+            auto create_vvv = [&constant_expr, &create_vv](const auto &vvv) {
+                constant_expr->sub_array_array_.reserve(vvv.size());
+                for (const auto &value_1 : vvv) {
+                    auto parsed_expr_1 = MakeShared<ConstantExpr>(LiteralType::kSubArrayArray);
+                    create_vv(value_1, parsed_expr_1.get());
+                    constant_expr->sub_array_array_.emplace_back(std::move(parsed_expr_1));
+                }
+            };
+            const auto total_have_val = static_cast<int>(!i64_tensor_value.empty()) + static_cast<int>(!f64_tensor_value.empty()) +
+                                        static_cast<int>(!i64_tensor_array_value.empty()) + static_cast<int>(!f64_tensor_array_value.empty());
+            if (total_have_val != 1) {
+                status = Status::InvalidConstantType();
+                return nullptr;
+            }
+            if (!i64_tensor_value.empty()) {
+                create_vv(i64_tensor_value, constant_expr.get());
+            } else if (!f64_tensor_value.empty()) {
+                create_vv(f64_tensor_value, constant_expr.get());
+            } else if (!i64_tensor_array_value.empty()) {
+                create_vvv(i64_tensor_array_value);
+            } else if (!f64_tensor_array_value.empty()) {
+                create_vvv(f64_tensor_array_value);
+            }
+            break;
         }
         default: {
             status = Status::InvalidConstantType();
-            delete constant_expr;
-            constant_expr = nullptr;
             return nullptr;
         }
     }
-    return constant_expr;
+    return constant_expr.release();
 }
 
 ParsedExpr *WrapColumnExpr::GetParsedExpr(Status &status) {
@@ -174,7 +217,19 @@ ParsedExpr *WrapBetweenExpr::GetParsedExpr(Status &status) {
 
 Tuple<void *, i64> GetEmbeddingDataTypeDataPtrFromProto(const EmbeddingData &embedding_data, Status &status) {
     status.code_ = ErrorCode::kOk;
-    if (embedding_data.i8_array_value.size() != 0) {
+    if (embedding_data.u8_array_value.size() != 0) {
+        auto ptr_i16 = (int16_t *)(embedding_data.u8_array_value.data());
+        auto ptr_u8 = (uint8_t *)(embedding_data.u8_array_value.data());
+        for (size_t i = 0; i < embedding_data.u8_array_value.size(); ++i) {
+            ptr_u8[i] = static_cast<uint8_t>(ptr_i16[i]);
+        }
+        return {(void *)embedding_data.u8_array_value.data(), embedding_data.u8_array_value.size()};
+    } else if (embedding_data.i8_array_value.size() != 0) {
+        auto ptr_i16 = (int16_t *)(embedding_data.i8_array_value.data());
+        auto ptr_i8 = (int8_t *)(embedding_data.i8_array_value.data());
+        for (size_t i = 0; i < embedding_data.i8_array_value.size(); ++i) {
+            ptr_i8[i] = static_cast<int8_t>(ptr_i16[i]);
+        }
         return {(void *)embedding_data.i8_array_value.data(), embedding_data.i8_array_value.size()};
     } else if (embedding_data.i16_array_value.size() != 0) {
         return {(void *)embedding_data.i16_array_value.data(), embedding_data.i16_array_value.size()};
@@ -191,6 +246,20 @@ Tuple<void *, i64> GetEmbeddingDataTypeDataPtrFromProto(const EmbeddingData &emb
         return {(void *)embedding_data.f32_array_value.data(), embedding_data.f32_array_value.size()};
     } else if (embedding_data.f64_array_value.size() != 0) {
         return {(void *)embedding_data.f64_array_value.data(), embedding_data.f64_array_value.size()};
+    } else if (embedding_data.f16_array_value.size() != 0) {
+        auto ptr_double = (double *)(embedding_data.f16_array_value.data());
+        auto ptr_float16 = (Float16T *)(embedding_data.f16_array_value.data());
+        for (size_t i = 0; i < embedding_data.f16_array_value.size(); ++i) {
+            ptr_float16[i] = float(ptr_double[i]);
+        }
+        return {(void *)embedding_data.f16_array_value.data(), embedding_data.f16_array_value.size()};
+    } else if (embedding_data.bf16_array_value.size() != 0) {
+        auto ptr_double = (double *)(embedding_data.bf16_array_value.data());
+        auto ptr_bfloat16 = (BFloat16T *)(embedding_data.bf16_array_value.data());
+        for (size_t i = 0; i < embedding_data.bf16_array_value.size(); ++i) {
+            ptr_bfloat16[i] = float(ptr_double[i]);
+        }
+        return {(void *)embedding_data.bf16_array_value.data(), embedding_data.bf16_array_value.size()};
     } else {
         status = Status::InvalidEmbeddingDataType("unknown type");
         return {nullptr, 0};
@@ -242,6 +311,13 @@ ParsedExpr *WrapKnnExpr::GetParsedExpr(Status &status) {
 
     knn_expr->opt_params_ = new Vector<InitParameter *>();
     for (auto &param : opt_params) {
+        if(param.param_name_ == "index_name") {
+            knn_expr->index_name_ = param.param_value_;
+        }
+        if(param.param_name_ == "ignore_index" && param.param_value_ == "true") {
+            knn_expr->ignore_index_ = true;
+        }
+
         auto init_parameter = new InitParameter();
         init_parameter->param_name_ = param.param_name_;
         init_parameter->param_value_ = param.param_value_;
@@ -568,7 +644,16 @@ WrapQueryResult WrapShowTable(Infinity &instance, const String &db_name, const S
 
 WrapQueryResult WrapListTableIndexes(Infinity &instance, const String &db_name, const String &table_name) {
     auto query_result = instance.ListTableIndexes(db_name, table_name);
-    return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
+    WrapQueryResult result(query_result.ErrorCode(), query_result.ErrorMsg());
+
+    SharedPtr<DataBlock> data_block = query_result.result_table_->GetDataBlockById(0);
+    auto &names = result.names;
+    names.resize(data_block->row_count());
+    for (SizeT i = 0; i < names.size(); ++i) {
+        Value value = data_block->GetValue(0, i);
+        names[i] = value.GetVarchar();
+    }
+    return result;
 }
 
 WrapQueryResult WrapGetTable(Infinity &instance, const String &db_name, const String &table_name) {
@@ -580,25 +665,20 @@ WrapQueryResult WrapCreateIndex(Infinity &instance,
                                 const String &db_name,
                                 const String &table_name,
                                 const String &index_name,
-                                Vector<WrapIndexInfo> &wrap_index_info_list,
+                                WrapIndexInfo &wrap_index_info,
                                 const CreateIndexOptions &create_index_options) {
-    auto index_info_list = new Vector<IndexInfo *>();
-    for (SizeT i = 0; i < wrap_index_info_list.size(); ++i) {
-        auto wrap_index_info = wrap_index_info_list[i];
-        auto index_info = new IndexInfo();
-        index_info->index_type_ = wrap_index_info.index_type;
-        index_info->column_name_ = wrap_index_info.column_name;
-        {
-            auto index_param_list = new Vector<InitParameter *>();
-            for (SizeT j = 0; j < wrap_index_info.index_param_list.size(); ++j) {
-                auto &wrap_init_param = wrap_index_info.index_param_list[j];
-                index_param_list->emplace_back(new InitParameter(wrap_init_param.param_name_, wrap_init_param.param_value_));
-            }
-            index_info->index_param_list_ = index_param_list;
+    auto index_info = new IndexInfo();
+    index_info->index_type_ = wrap_index_info.index_type;
+    index_info->column_name_ = wrap_index_info.column_name;
+    {
+        auto index_param_list = new Vector<InitParameter *>();
+        for (SizeT j = 0; j < wrap_index_info.index_param_list.size(); ++j) {
+            auto &wrap_init_param = wrap_index_info.index_param_list[j];
+            index_param_list->emplace_back(new InitParameter(wrap_init_param.param_name_, wrap_init_param.param_value_));
         }
-        index_info_list->emplace_back(index_info);
+        index_info->index_param_list_ = index_param_list;
     }
-    auto query_result = instance.CreateIndex(db_name, table_name, index_name, index_info_list, create_index_options);
+    auto query_result = instance.CreateIndex(db_name, table_name, index_name, index_info, create_index_options);
     return WrapQueryResult(query_result.ErrorCode(), query_result.ErrorMsg());
 }
 
@@ -788,10 +868,7 @@ void HandleBoolType(ColumnField &output_column_field, SizeT row_count, const Sha
 
 void HandlePodType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
-    String dst;
-    dst.resize(size);
-    std::memcpy(dst.data(), column_vector->data(), size);
-    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+    output_column_field.column_vectors.emplace_back(column_vector->data(), size);
 }
 
 void HandleVarcharType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
@@ -813,13 +890,9 @@ void HandleVarcharType(ColumnField &output_column_field, SizeT row_count, const 
             std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
             std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
         } else {
-            auto varchar_ptr = MakeUnique<char[]>(varchar.length_ + 1);
-            column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(varchar_ptr.get(),
-                                                                varchar.vector_.chunk_id_,
-                                                                varchar.vector_.chunk_offset_,
-                                                                varchar.length_);
+            const char *data = column_vector->buffer_->GetVarchar(varchar.vector_.file_offset_, varchar.length_);
             std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-            std::memcpy(dst.data() + current_offset + sizeof(i32), varchar_ptr.get(), varchar.length_);
+            std::memcpy(dst.data() + current_offset + sizeof(i32), data, varchar.length_);
         }
         current_offset += sizeof(i32) + varchar.length_;
     }
@@ -830,10 +903,7 @@ void HandleVarcharType(ColumnField &output_column_field, SizeT row_count, const 
 
 void HandleEmbeddingType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
-    String dst;
-    dst.resize(size);
-    std::memcpy(dst.data(), column_vector->data(), size);
-    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+    output_column_field.column_vectors.emplace_back(column_vector->data(), size);
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
@@ -921,12 +991,15 @@ void HandleSparseType(ColumnField &output_column_field, SizeT row_count, const S
     for (SizeT index = 0; index < row_count; ++index) {
         SparseT &sparse = reinterpret_cast<SparseT *>(column_vector->data())[index];
         i32 nnz = sparse.nnz_;
-        i32 length = sparse_info->SparseSize(nnz);
         std::memcpy(dst.data() + current_offset, &nnz, sizeof(i32));
         current_offset += sizeof(i32);
-        const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(sparse.chunk_id_, sparse.chunk_offset_);
-        std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
-        current_offset += length;
+        SizeT data_size = sparse_info->DataSize(sparse.nnz_);
+        SizeT idx_size = sparse_info->IndiceSize(sparse.nnz_);
+        auto [raw_data_ptr, raw_idx_ptr] = column_vector->buffer_->GetSparseRaw(sparse.file_offset_, sparse.nnz_, sparse_info);
+        std::memcpy(dst.data() + current_offset, raw_idx_ptr, idx_size);
+        current_offset += idx_size;
+        std::memcpy(dst.data() + current_offset, raw_data_ptr, data_size);
+        current_offset += data_size;
     }
 
     output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
@@ -935,10 +1008,7 @@ void HandleSparseType(ColumnField &output_column_field, SizeT row_count, const S
 
 void HandleRowIDType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     auto size = column_vector->data_type()->Size() * row_count;
-    String dst;
-    dst.resize(size);
-    std::memcpy(dst.data(), column_vector->data(), size);
-    output_column_field.column_vectors.emplace_back(dst.c_str(), dst.size());
+    output_column_field.column_vectors.emplace_back(column_vector->data(), size);
     output_column_field.column_type = column_vector->data_type()->type();
 }
 
@@ -953,6 +1023,8 @@ void ProcessColumnFieldType(ColumnField &output_column_field, SizeT row_count, c
         case LogicalType::kInteger:
         case LogicalType::kBigInt:
         case LogicalType::kHugeInt:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
         case LogicalType::kFloat:
         case LogicalType::kDouble: {
             HandlePodType(output_column_field, row_count, column_vector);
@@ -1005,6 +1077,8 @@ void DataTypeToWrapDataType(WrapDataType &proto_data_type, const SharedPtr<DataT
         case LogicalType::kSmallInt:
         case LogicalType::kInteger:
         case LogicalType::kBigInt:
+        case LogicalType::kFloat16:
+        case LogicalType::kBFloat16:
         case LogicalType::kFloat:
         case LogicalType::kDouble: {
             proto_data_type.logical_type = data_type->type();

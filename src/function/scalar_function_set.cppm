@@ -34,6 +34,8 @@ public:
 
     ScalarFunction GetMostMatchFunction(const Vector<SharedPtr<BaseExpression>> &input_arguments);
 
+    const Vector<ScalarFunction> &GetAllScalarFunctions() const { return functions_; }
+
 private:
     static i64 MatchFunctionCost(const ScalarFunction &func, const Vector<SharedPtr<BaseExpression>> &arguments);
 

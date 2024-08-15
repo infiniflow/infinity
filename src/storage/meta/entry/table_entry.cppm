@@ -192,7 +192,7 @@ public:
     void MemIndexCommit();
 
     // Invoked once at init stage to recovery memory index.
-    void MemIndexRecover(BufferManager *buffer_manager);
+    void MemIndexRecover(BufferManager *buffer_manager, TxnTimeStamp ts);
 
     void OptimizeIndex(Txn *txn);
 
@@ -246,6 +246,15 @@ public:
     u64 GetColumnIdByName(const String &column_name) const;
 
     Map<SegmentID, SharedPtr<SegmentEntry>> &segment_map() { return segment_map_; }
+
+    SegmentEntry *GetSegmentEntry(SegmentID seg_id) const {
+        std::shared_lock lock(rw_locker_);
+        auto iter = segment_map_.find(seg_id);
+        if (iter == segment_map_.end()) {
+            return nullptr;
+        }
+        return iter->second.get();
+    }
 
     const Vector<SharedPtr<ColumnDef>> &column_defs() const { return columns_; }
 
@@ -303,6 +312,8 @@ private: // TODO: remove it
 
 public: // TODO: remove it?
 //    HashMap<String, UniquePtr<TableIndexMeta>> &index_meta_map() { return index_meta_map_.meta_map_; }
+
+    bool CheckAnyDelete(TxnTimeStamp check_ts) const;
 
 public:
     void PickCleanup(CleanupScanner *scanner) override;

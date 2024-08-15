@@ -17,6 +17,8 @@ module;
 export module persistence_manager;
 
 import stl;
+import serialize;
+import third_party;
 
 // A view means a logical plan
 namespace infinity {
@@ -25,19 +27,51 @@ export struct ObjAddr {
     String obj_key_{};
     SizeT part_offset_{};
     SizeT part_size_{};
+
     bool Valid() const { return !obj_key_.empty() && part_size_ > 0; }
+
+    nlohmann::json Serialize() const;
+
+    void Deserialize(const nlohmann::json &obj);
+
+    void WriteBufAdv(char *&buf) const;
+
+    void ReadBufAdv(char *&buf);
+};
+
+export struct Range {
+    SizeT start_{};
+    SizeT end_{};
+    bool operator<(const Range &rhs) const { return start_ < rhs.start_; }
+
+    bool HasIntersection(const Range &rhs) const {
+        SizeT max_start = std::max(start_, rhs.start_);
+        SizeT min_end = std::min(end_, rhs.end_);
+        return max_start < min_end;
+    }
 };
 
 export struct ObjStat {
     SizeT obj_size_{};
     int ref_count_{};
+    SizeT deleted_size_{};
+    Set<Range> deleted_ranges_{};
+
+    nlohmann::json Serialize() const;
+
+    void Deserialize(const nlohmann::json &obj);
+
+    void WriteBufAdv(char *&buf) const;
+
+    void ReadBufAdv(char *&buf);
 };
 
 export class PersistenceManager {
 public:
     // TODO: build cache from existing files under workspace
-    PersistenceManager(const String workspace, SizeT object_size_limit) : workspace_(workspace), object_size_limit_(object_size_limit) {}
-    ~PersistenceManager() {}
+    PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit);
+
+    ~PersistenceManager();
 
     // Create new object or append to current object, and returns the location.
     ObjAddr Persist(const String &file_path, bool allow_compose = true);
@@ -49,10 +83,31 @@ public:
     void CurrentObjFinalize();
 
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
-    String GetObjCache(const ObjAddr &object_addr);
+    String GetObjCache(const String &local_path);
+
+    ObjAddr GetObjFromLocalPath(const String &file_path);
 
     // Decrease refcount
-    void PutObjCache(const ObjAddr &object_addr);
+    void PutObjCache(const String &file_path);
+
+    ObjAddr ObjCreateRefCount(const String &file_path);
+
+    void Cleanup(const String &file_path);
+
+    nlohmann::json Serialize();
+
+    void Deserialize(const nlohmann::json &obj);
+
+    SizeT SumRefCounts();
+  
+    void WriteBufAdv(char *&buf, const Vector<String> &local_paths);
+
+    void ReadBufAdv(char *&buf);
+
+    SizeT GetSizeInBytes(const Vector<String> &local_paths);
+
+    HashMap<String, ObjStat> GetAllObjects() const;
+    HashMap<String, ObjAddr> GetAllFiles() const;
 
 private:
     String ObjCreate();
@@ -67,11 +122,24 @@ private:
     // Finalize current object.
     void CurrentObjFinalizeNoLock();
 
+    // Cleanup
+    void CleanupNoLock(const ObjAddr &object_addr);
+
+    String RemovePrefix(const String &path);
+
+    ObjStat GetObjStatByObjAddr(const ObjAddr &obj_addr);
+
+    void SaveLocalPath(const String &local_path, const ObjAddr &object_addr);
+
+    void SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj_stat);
+
     String workspace_;
+    String local_data_dir_;
     SizeT object_size_limit_;
 
-    std::mutex mtx_;
-    HashMap<String, ObjStat> objects_; // obj_key -> ObjStat
+    mutable std::mutex mtx_;
+    HashMap<String, ObjStat> objects_;        // obj_key -> ObjStat
+    HashMap<String, ObjAddr> local_path_obj_; // local_file_path -> ObjAddr
     // Current unsealed object key
     String current_object_key_;
     SizeT current_object_size_;

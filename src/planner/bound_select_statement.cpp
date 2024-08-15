@@ -81,8 +81,8 @@ import logger;
 import search_options;
 import search_driver;
 import query_node;
+import doc_iterator;
 import status;
-import early_terminate_iterator;
 import default_values;
 
 namespace infinity {
@@ -99,7 +99,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
 
         if (!group_by_expressions_.empty() || !aggregate_expressions_.empty()) {
             // Build logical aggregate
-            auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
+            auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
             auto aggregate = MakeShared<LogicalAggregate>(bind_context->GetNewLogicalNodeId(),
                                                           base_table_ref,
                                                           group_by_expressions_,
@@ -129,7 +129,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                 root = sort;
             } else {
                 SharedPtr<LogicalNode> top = MakeShared<LogicalTop>(bind_context->GetNewLogicalNodeId(),
-                                                                    static_pointer_cast<BaseTableRef>(table_ref_ptr_),
+                                                                    std::static_pointer_cast<BaseTableRef>(table_ref_ptr_),
                                                                     limit_expression_,
                                                                     offset_expression_,
                                                                     order_by_expressions_,
@@ -167,7 +167,7 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
             String error_message = "Not base table reference";
             UnrecoverableError(error_message);
         }
-        auto base_table_ref = static_pointer_cast<BaseTableRef>(table_ref_ptr_);
+        auto base_table_ref = std::static_pointer_cast<BaseTableRef>(table_ref_ptr_);
         // FIXME: need check if there is subquery inside the where conditions
         auto filter_expr = ComposeExpressionWithDelimiter(where_conditions_, ConjunctionType::kAnd);
         auto common_query_filter = MakeShared<CommonQueryFilter>(filter_expr, base_table_ref, query_context->GetTxn()->BeginTS());
@@ -225,7 +225,20 @@ SharedPtr<LogicalNode> BoundSelectStatement::BuildPlan(QueryContext *query_conte
                         match_node->top_n_ = DEFAULT_MATCH_TEXT_OPTION_TOP_N;
                     }
 
-                    SearchDriver search_driver(column2analyzer, default_field);
+                    auto query_operator_option = FulltextQueryOperatorOption::kInfinitySyntax;
+                    // option: operator
+                    if (iter = search_ops.options_.find("operator"); iter != search_ops.options_.end()) {
+                        ToLower(iter->second);
+                        if (iter->second == "and") {
+                            query_operator_option = FulltextQueryOperatorOption::kAnd;
+                        } else if (iter->second == "or") {
+                            query_operator_option = FulltextQueryOperatorOption::kOr;
+                        } else {
+                            RecoverableError(Status::SyntaxError(R"(operator option must be "and" or "or".)"));
+                        }
+                    }
+
+                    SearchDriver search_driver(column2analyzer, default_field, query_operator_option);
                     UniquePtr<QueryNode> query_tree =
                         search_driver.ParseSingleWithFields(match_node->match_expr_->fields_, match_node->match_expr_->matching_text_);
                     if (query_tree.get() == nullptr) {

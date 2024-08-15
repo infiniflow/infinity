@@ -53,11 +53,12 @@ def create_index(db_obj: Database):
     try:
         table_obj = db_obj.get_table(table_name)
         table_obj.create_index(index_name,
-                               [index.IndexInfo("c1", index.IndexType.Hnsw,
-                                                [index.InitParameter("M", "16"),
-                                                 index.InitParameter("ef_construction", "50"),
-                                                 index.InitParameter("ef", "50"), index.InitParameter("metric", "l2")
-                                                 ])], ConflictType.Error)
+                               index.IndexInfo("c1", index.IndexType.Hnsw,{
+                                   "M": "16",
+                                   "ef_construction": "50",
+                                   "ef": "50",
+                                   "metric": "l2"
+                               }), ConflictType.Error)
     except Exception as e:
         return
 

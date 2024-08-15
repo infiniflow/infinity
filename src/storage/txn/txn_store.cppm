@@ -64,15 +64,15 @@ public:
 
     void AddDeltaOp(CatalogDeltaEntry *local_delta_ops, TxnTimeStamp commit_ts) const;
 
-    void PrepareCommit(TransactionID txn_id, TxnTimeStamp commit_ts, BufferManager *buffer_mgr);
+    void Commit(TransactionID txn_id, TxnTimeStamp commit_ts);
 
-    void Commit(TransactionID txn_id, TxnTimeStamp commit_ts) const;
+    void Rollback();
 
 public:
     TableIndexEntry *const table_index_entry_{};
 
     HashMap<SegmentID, SegmentIndexEntry *> index_entry_map_{};
-    Vector<ChunkIndexEntry *> chunk_index_entries_{};
+    HashMap<String, ChunkIndexEntry *> chunk_index_entries_{};
 
     Vector<Tuple<SegmentIndexEntry *, ChunkIndexEntry *, Vector<ChunkIndexEntry *>>> optimize_data_;
 };
@@ -120,6 +120,8 @@ public:
     // transaction related
 
     void Rollback(TransactionID txn_id, TxnTimeStamp abort_ts);
+
+    bool CheckConflict(Catalog *catalog, Txn *txn) const;
 
     bool CheckConflict(const TxnTableStore *txn_table_store) const;
 
@@ -212,6 +214,8 @@ public:
     void AddDeltaOp(CatalogDeltaEntry *local_delta_opsm, TxnManager *txn_mgr) const;
 
     void MaintainCompactionAlg() const;
+
+    bool CheckConflict(Catalog *catalog);
 
     bool CheckConflict(const TxnStore &txn_store);
 

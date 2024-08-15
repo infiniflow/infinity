@@ -1,7 +1,27 @@
+import os
+from shutil import copyfile
 import sys
+
+current_path = os.path.abspath(os.path.dirname(__file__))
+parent = os.path.join(os.getcwd(), os.pardir)
+pparent = os.path.join(parent, os.pardir)
+local_infinity_path = os.path.abspath(pparent)
+current_python_path = os.path.abspath(pparent) + '/python'
+
+print(current_path, local_infinity_path)
+
+if local_infinity_path in sys.path:
+    sys.path.remove(local_infinity_path)
+
+if current_python_path in sys.path:
+    sys.path.remove(current_python_path)
+
+print(sys.path)
+
 import pytest
 from httpapibase import HttpTest
 from common.common_values import *
+from infinity.errors import ErrorCode
 import infinity.index as index
 import pandas
 import os
@@ -527,7 +547,7 @@ class TestIndex(HttpTest):
             {"name": "body", "type": "varchar"}
         ])
         test_csv_dir = TEST_TMP_DIR + "enwiki_99.csv"
-        print("test_csv_dir: " + test_csv_dir)
+        # print("test_csv_dir: " + test_csv_dir)
         assert os.path.exists(test_csv_dir)
 
         self.create_index(db_name, table_name, idxname, ["body"], {
@@ -558,7 +578,7 @@ class TestIndex(HttpTest):
         ])
         httputils.copy_data("enwiki_9.csv")
         test_csv_dir = TEST_TMP_DIR + "enwiki_9.csv"
-        print("test_csv_dir: " + test_csv_dir)
+        # print("test_csv_dir: " + test_csv_dir)
         assert os.path.exists(test_csv_dir)
 
         self.import_data(db_name, table_name, {
@@ -701,22 +721,13 @@ class TestIndex(HttpTest):
         idx_option = [1.1, "#@$@!%string", [], {}, ()]
         i = 0
         for opt in idx_option:
-            if i == 0:
-                self.create_index(db_name, table_name, idxname, ["c1"], {
-                    "type": "HNSW",
-                    "M": "16",
-                    "ef_construction": "50",
-                    "ef": "50",
-                    "metric": "l2"
-                }, {"error_code": 0}, str(opt))
-            else:
-                self.create_index(db_name, table_name, idxname, ["c1"], {
-                    "type": "HNSW",
-                    "M": "16",
-                    "ef_construction": "50",
-                    "ef": "50",
-                    "metric": "l2"
-                }, {"status_code": 500}, str(opt))
+            self.create_index(db_name, table_name, idxname, ["c1"], {
+                "type": "HNSW",
+                "M": "16",
+                "ef_construction": "50",
+                "ef": "50",
+                "metric": "l2"
+            }, {"status_code": 500}, str(opt))
             i += 1
         self.drop_index(db_name, table_name, idxname)
         self.drop_table(db_name, table_name)
@@ -984,7 +995,7 @@ class TestIndex(HttpTest):
         for ctype in conflict_type:
             self.drop_index(db_name, table_name, idx_name, {
                 "status_code": 500,
-                "error_code": 3023,
+                "error_code": ErrorCode.INVALID_DROP_OPTION,
             }, str(ctype))
         self.drop_table(db_name, table_name)
         return
@@ -1044,7 +1055,7 @@ class TestIndex(HttpTest):
         ])
         self.drop_index(db_name, table_name, idxname)
 
-        index_distance_type = ["cosine", "hamming"]
+        index_distance_type = ["hamming"]
         for t in index_distance_type:
             self.create_index(db_name, table_name, idxname, ["c1"], {
                 "type": "HNSW",

@@ -20,6 +20,7 @@ import config;
 import session;
 import resource_manager;
 import session_manager;
+import persistence_manager;
 import profiler;
 import storage;
 import txn;
@@ -29,6 +30,7 @@ import optimizer;
 import status;
 import query_result;
 import base_statement;
+import admin_statement;
 
 export module query_context;
 
@@ -51,7 +53,8 @@ public:
               TaskScheduler *scheduler_ptr,
               Storage *storage_ptr,
               ResourceManager *resource_manager_ptr,
-              SessionManager* session_manager);
+              SessionManager* session_manager,
+              PersistenceManager* persistence_manager);
 
     inline void UnInit() {
         initialized_ = false;
@@ -60,6 +63,7 @@ public:
         scheduler_ = nullptr;
         storage_ = nullptr;
         resource_manager_ = nullptr;
+        persistence_manager_ = nullptr;
     }
 
     QueryResult Query(const String &query);
@@ -115,6 +119,8 @@ public:
 
     [[nodiscard]] inline SessionManager *session_manager() { return session_manager_; }
 
+    [[nodiscard]] inline PersistenceManager *persistence_manager() { return persistence_manager_; }
+
     [[nodiscard]] inline SQLParser *parser() const { return parser_.get(); }
     [[nodiscard]] inline LogicalPlanner *logical_planner() const { return logical_planner_.get(); }
     [[nodiscard]] inline Optimizer *optimizer() const { return optimizer_.get(); }
@@ -128,6 +134,9 @@ public:
             query_profiler_->Flush(std::move(profiler));
         }
     }
+
+private:
+    QueryResult HandleAdminStatement(const AdminStatement* admin_statement);
 
 private:
     inline void CreateQueryProfiler() {
@@ -175,6 +184,7 @@ private:
     BaseSession *session_ptr_{};
     ResourceManager *resource_manager_{};
     SessionManager *session_manager_{};
+    PersistenceManager* persistence_manager_{};
 
     u64 catalog_version_{};
 

@@ -33,18 +33,29 @@ import logger;
 
 using namespace infinity;
 
-class RecycleLogTest : public BaseTest {
+class RecycleLogTest : public BaseTestParamStr {
 protected:
     static std::shared_ptr<std::string> test_ckp_recycle_config() {
-        return std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml");
+        return GetParam() == BaseTestParamStr::NULL_CONFIG_PATH
+                   ? std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp.toml")
+                   : std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_close_ckp_vfs.toml");
     }
 
-    void SetUp() override { RemoveDbDirs(); }
+    void SetUp() override {
+        RemoveDbDirs();
+        system(("mkdir -p " + String(GetFullPersistDir())).c_str());
+        system(("mkdir -p " + String(GetFullDataDir())).c_str());
+        system(("mkdir -p " + String(GetFullTmpDir())).c_str());
+    }
 
     void TearDown() override { RemoveDbDirs(); }
 };
 
-TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
+INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
+                         RecycleLogTest,
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::CONFIG_PATH));
+
+TEST_P(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();
@@ -139,7 +150,7 @@ TEST_F(RecycleLogTest, recycle_wal_after_delta_checkpoint) {
     }
 }
 
-TEST_F(RecycleLogTest, recycle_wal_after_full_checkpoint) {
+TEST_P(RecycleLogTest, recycle_wal_after_full_checkpoint) {
     {
 #ifdef INFINITY_DEBUG
         infinity::GlobalResourceUsage::Init();

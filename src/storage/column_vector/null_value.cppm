@@ -38,6 +38,11 @@ inline BooleanT NullValue() {
 }
 
 template <>
+inline u8 NullValue() {
+    return std::numeric_limits<u8>::infinity();
+}
+
+template <>
 inline TinyIntT NullValue() {
     return std::numeric_limits<i8>::infinity();
 }
@@ -63,6 +68,16 @@ inline HugeIntT NullValue() {
     value.lower = std::numeric_limits<i64>::infinity();
     value.upper = std::numeric_limits<i64>::infinity();
     return value;
+}
+
+template <>
+inline Float16T NullValue() {
+    return std::numeric_limits<Float16T>::infinity();
+}
+
+template <>
+inline BFloat16T NullValue() {
+    return std::numeric_limits<BFloat16T>::infinity();
 }
 
 template <>

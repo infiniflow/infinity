@@ -36,9 +36,10 @@ class PlainCosDist {
 public:
     using VecStoreMeta = PlainVecStoreMeta<DataType>;
     using StoreType = typename VecStoreMeta::StoreType;
+    using DistanceType = typename VecStoreMeta::DistanceType;
 
 private:
-    using SIMDFuncType = DataType (*)(const DataType *, const DataType *, SizeT);
+    using SIMDFuncType = f32 (*)(const DataType *, const DataType *, SizeT);
 
     SIMDFuncType SIMDFunc = nullptr;
 
@@ -60,10 +61,14 @@ public:
             } else {
                 SIMDFunc = GetSIMD_FUNCTIONS().HNSW_F32Cos_ptr_;
             }
+        } else if constexpr (std::is_same<DataType, u8>()) {
+            SIMDFunc = GetSIMD_FUNCTIONS().HNSW_U8Cos_ptr_;
+        } else if constexpr (std::is_same<DataType, i8>()) {
+            SIMDFunc = GetSIMD_FUNCTIONS().HNSW_I8Cos_ptr_;
         }
     }
 
-    DataType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
+    DistanceType operator()(const StoreType &v1, const StoreType &v2, const VecStoreMeta &vec_store_meta) const {
         return -SIMDFunc(v1, v2, vec_store_meta.dim());
     }
 
@@ -111,6 +116,7 @@ public:
     using This = LVQCosDist<DataType, CompressType>;
     using VecStoreMeta = LVQVecStoreMeta<DataType, CompressType, LVQCosCache<DataType, CompressType>>;
     using StoreType = typename VecStoreMeta::StoreType;
+    using DistanceType = typename VecStoreMeta::DistanceType;
 
 private:
     using SIMDFuncType = i32 (*)(const CompressType *, const CompressType *, SizeT);

@@ -22,7 +22,6 @@ module;
 #include <cstdio>
 #include <unistd.h>
 #include <fcntl.h>
-#include "concurrentqueue.h"
 
 module external_sort_merger;
 
@@ -32,6 +31,7 @@ import file_writer;
 import local_file_system;
 import profiler;
 import logger;
+import blocking_queue;
 
 namespace infinity {
 
@@ -46,7 +46,7 @@ template <typename KeyType, typename LenType>
 SortMerger<KeyType, LenType>::SortMerger(const char *filenm, u32 group_size, u32 bs, u32 output_num)
     : filenm_(filenm), MAX_GROUP_SIZE_(group_size), BS_SIZE_(bs), PRE_BUF_SIZE_((u32)(1. * bs * 0.8 / (group_size + 1))),
       RUN_BUF_SIZE_(PRE_BUF_SIZE_ * group_size), OUT_BUF_SIZE_(bs - RUN_BUF_SIZE_ - PRE_BUF_SIZE_), OUT_BUF_NUM_(output_num),
-      term_tuple_list_queue_(20480) {
+      term_tuple_list_queue_() {
     run_buf_ = out_buf_ = nullptr;
     count_ = 0;
 
@@ -461,22 +461,22 @@ SortMergerTermTuple<KeyType, LenType>::SortMergerTermTuple(const char *filenm, u
 template <typename KeyType, typename LenType>
 requires std::same_as<KeyType, TermTuple>
 void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
-    UniquePtr<TermTupleList> tuple_list = nullptr;
+    SharedPtr<TermTupleList> tuple_list = nullptr;
     u32 last_idx = -1;
     while (this->merge_loser_tree_->TopSource() != LoserTree<KeyAddr>::invalid_) {
         auto top = this->merge_loser_tree_->TopKey();
         u32 idx = top.IDX();
         auto out_key = top.KEY();
         if (tuple_list == nullptr) {
-            tuple_list = MakeUnique<TermTupleList>(out_key.term_);
+            tuple_list = MakeShared<TermTupleList>(out_key.term_);
             tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
         } else if (idx != last_idx) {
             if (tuple_list->IsFull() || out_key.term_ != tuple_list->term_) {
                 // output
                 {
-                    this->term_tuple_list_queue_.enqueue(std::move(tuple_list));
+                    this->term_tuple_list_queue_.Enqueue(std::move(tuple_list));
                 }
-                tuple_list = MakeUnique<TermTupleList>(out_key.term_);
+                tuple_list = MakeShared<TermTupleList>(out_key.term_);
             }
             tuple_list->Add(out_key.doc_id_, out_key.term_pos_);
         }
@@ -520,7 +520,7 @@ void SortMergerTermTuple<KeyType, LenType>::MergeImpl() {
     }
     {
         if (tuple_list != nullptr) {
-            this->term_tuple_list_queue_.enqueue(std::move(tuple_list));
+            this->term_tuple_list_queue_.Enqueue(std::move(tuple_list));
         }
     }
 }

@@ -149,9 +149,9 @@ public:
 
     static BMPAlg<DataType, IdxType, CompressType> Load(FileHandler &file_handler);
 
-private:
     SizeT GetSizeInBytes() const;
 
+private:
     void WriteAdv(char *&p) const;
 
     static BMPAlg<DataType, IdxType, CompressType> ReadAdv(const char *&p);

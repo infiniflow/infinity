@@ -127,25 +127,21 @@ int main(int argc, char *argv[]) {
         QueryResult query_result = infinity->Import(db_name, table_name, base_path, import_options);
         std::cout << "Import data cost: " << profiler.ElapsedToString() << std::endl;
 
-        auto index_info_list = new std::vector<IndexInfo *>();
-        {
-            auto index_info = new IndexInfo();
-            index_info->index_type_ = IndexType::kHnsw;
-            index_info->column_name_ = col1_name;
+        auto index_info = new IndexInfo();
+        index_info->index_type_ = IndexType::kHnsw;
+        index_info->column_name_ = col1_name;
 
-            {
-                auto index_param_list = new std::vector<InitParameter *>();
-                index_param_list->emplace_back(new InitParameter("M", std::to_string(16)));
-                index_param_list->emplace_back(new InitParameter("ef_construction", std::to_string(200)));
-                index_param_list->emplace_back(new InitParameter("ef", std::to_string(200)));
-                index_param_list->emplace_back(new InitParameter("metric", "l2"));
-                index_param_list->emplace_back(new InitParameter("encode", "lvq"));
-                index_info->index_param_list_ = index_param_list;
-            }
-            index_info_list->emplace_back(index_info);
+        {
+            auto index_param_list = new std::vector<InitParameter *>();
+            index_param_list->emplace_back(new InitParameter("m", std::to_string(16)));
+            index_param_list->emplace_back(new InitParameter("ef_construction", std::to_string(200)));
+            index_param_list->emplace_back(new InitParameter("ef", std::to_string(200)));
+            index_param_list->emplace_back(new InitParameter("metric", "l2"));
+            index_param_list->emplace_back(new InitParameter("encode", "lvq"));
+            index_info->index_param_list_ = index_param_list;
         }
 
-        query_result = infinity->CreateIndex(db_name, table_name, index_name, index_info_list, CreateIndexOptions());
+        query_result = infinity->CreateIndex(db_name, table_name, index_name, index_info, CreateIndexOptions());
 
         if (query_result.IsOk()) {
             std::cout << "Create Index cost: " << profiler.ElapsedToString() << std::endl;

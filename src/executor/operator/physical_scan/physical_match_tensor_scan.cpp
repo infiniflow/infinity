@@ -14,6 +14,9 @@
 
 module;
 
+#include <bit>
+#include <cstdlib>
+#include <memory>
 #include <string>
 #include <vector>
 module physical_match_tensor_scan;
@@ -69,8 +72,15 @@ import mlas_matrix_multiply;
 import physical_fusion;
 import filter_value_type_classification;
 import logical_match_tensor_scan;
+import simd_functions;
+import knn_expression;
 
 namespace infinity {
+
+using AlignedMatchTensorExprHolderT =
+    std::pair<std::unique_ptr<void, decltype([](void *ptr) { std::free(ptr); })>, std::unique_ptr<MatchTensorExpression>>;
+
+AlignedMatchTensorExprHolderT GetMatchTensorExprForCalculation(MatchTensorExpression &src_match_tensor_expr, EmbeddingDataType column_embedding_type);
 
 PhysicalMatchTensorScan::PhysicalMatchTensorScan(u64 id,
                                                  u64 table_index,
@@ -81,7 +91,7 @@ PhysicalMatchTensorScan::PhysicalMatchTensorScan(u64 id,
                                                  const MatchTensorScanIndexOptions &index_options,
                                                  SharedPtr<Vector<LoadMeta>> load_metas)
     : PhysicalFilterScanBase(id, PhysicalOperatorType::kMatchTensorScan, nullptr, nullptr, base_table_ref, common_query_filter, load_metas),
-      table_index_(table_index), match_tensor_expr_(std::move(match_tensor_expression)), topn_(topn), index_options_(index_options) {
+      table_index_(table_index), src_match_tensor_expr_(std::move(match_tensor_expression)), topn_(topn), index_options_(index_options) {
     search_column_id_ = std::numeric_limits<ColumnID>::max();
 }
 
@@ -104,7 +114,7 @@ SharedPtr<Vector<SharedPtr<DataType>>> PhysicalMatchTensorScan::GetOutputTypes()
     for (auto &type : *base_table_ref_->column_types_) {
         result_types->emplace_back(type);
     }
-    result_types->emplace_back(MakeShared<DataType>(match_tensor_expr_->Type()));
+    result_types->emplace_back(MakeShared<DataType>(src_match_tensor_expr_->Type()));
     result_types->emplace_back(MakeShared<DataType>(LogicalType::kRowID));
     return result_types;
 }
@@ -118,7 +128,7 @@ ColumnID PhysicalMatchTensorScan::SearchColumnID() const {
 }
 
 void PhysicalMatchTensorScan::CheckColumn() {
-    search_column_id_ = match_tensor_expr_->column_expr_->binding().column_idx;
+    search_column_id_ = src_match_tensor_expr_->column_expr_->binding().column_idx;
     const ColumnDef *column_def = base_table_ref_->table_entry_ptr_->GetColumnDefByID(search_column_id_);
     const auto &column_type_ptr = column_def->type();
     if (const auto l_type = column_type_ptr->type(); l_type != LogicalType::kTensor and l_type != LogicalType::kTensorArray) {
@@ -131,10 +141,19 @@ void PhysicalMatchTensorScan::CheckColumn() {
         UnrecoverableError(error_message);
     }
     const auto *embedding_info = static_cast<const EmbeddingInfo *>(type_info.get());
-    if (embedding_info->Dimension() != match_tensor_expr_->tensor_basic_embedding_dimension_) {
+    if (embedding_info->Dimension() != src_match_tensor_expr_->tensor_basic_embedding_dimension_) {
         String error_message =
-            fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), match_tensor_expr_->ToString());
+            fmt::format("Column {} embedding dimension not match with query {}", column_def->name(), src_match_tensor_expr_->ToString());
         UnrecoverableError(error_message);
+    }
+    // check column basic embedding data type and query embedding data type
+    // apply necessary cast
+    if (auto [new_search_ptr, new_search_expr] = GetMatchTensorExprForCalculation(*src_match_tensor_expr_, embedding_info->Type()); new_search_ptr) {
+        calc_match_tensor_aligned_holder_ = SharedPtr<void>(new_search_ptr.release(), std::free);
+        calc_match_tensor_expr_holder_ = std::move(new_search_expr);
+        calc_match_tensor_expr_ = calc_match_tensor_expr_holder_.get();
+    } else {
+        calc_match_tensor_expr_ = src_match_tensor_expr_.get();
     }
 }
 
@@ -237,28 +256,42 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         } else {
             segment_entry = iter->second.segment_entry_;
         }
-        if (auto it = common_query_filter_->filter_result_.find(segment_id); it != common_query_filter_->filter_result_.end()) {
-            LOG_TRACE(fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, index_entries_.size()));
-            const auto segment_row_count = segment_entry->row_count();
-            Bitmask segment_bitmask;
-            const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
-            if (std::holds_alternative<Vector<u32>>(filter_result)) {
-                const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
-                segment_bitmask.Initialize(std::ceil(segment_row_count));
-                segment_bitmask.SetAllFalse();
-                for (u32 row_id : filter_result_vector) {
-                    segment_bitmask.SetTrue(row_id);
+
+        bool has_some_result = false;
+        Bitmask segment_bitmask;
+        if (common_query_filter_->AlwaysTrue()) {
+            has_some_result = true;
+            segment_bitmask.SetAllTrue();
+        } else {
+            auto it = common_query_filter_->filter_result_.find(segment_id);
+            if (it != common_query_filter_->filter_result_.end()) {
+                LOG_TRACE(fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, index_entries_.size()));
+
+                auto segment_row_count = segment_entry->row_count();
+                const std::variant<Vector<u32>, Bitmask> &filter_result = it->second;
+                if (std::holds_alternative<Vector<u32>>(filter_result)) {
+                    const Vector<u32> &filter_result_vector = std::get<Vector<u32>>(filter_result);
+                    segment_bitmask.Initialize(std::ceil(segment_row_count));
+                    segment_bitmask.SetAllFalse();
+                    for (u32 row_id : filter_result_vector) {
+                        segment_bitmask.SetTrue(row_id);
+                    }
+                } else {
+                    segment_bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
                 }
-            } else {
-                segment_bitmask.ShallowCopy(std::get<Bitmask>(filter_result));
+                has_some_result = true;
             }
+        }
+
+        if (has_some_result) {
+            LOG_TRACE(fmt::format("MatchTensorScan: index {}/{} not skipped after common_query_filter", task_job_index, index_entries_.size()));
             // TODO: now only have EMVB index
             const Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<EMVBIndexInMem>> emvb_snapshot = index_entry->GetEMVBIndexSnapshot();
             // 1. in mem index
-            if (const EMVBIndexInMem *emvb_index_in_mem = std::get<1>(emvb_snapshot).get(); emvb_index_in_mem) {
+            if (const EMVBIndexInMem *emvb_index_in_mem = std::get<SharedPtr<EMVBIndexInMem>>(emvb_snapshot).get(); emvb_index_in_mem) {
                 // TODO: fix the parameters
-                const auto result = emvb_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(match_tensor_expr_->query_embedding_.ptr),
-                                                                         match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                const auto result = emvb_index_in_mem->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
+                                                                         calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
                                                                          topn_,
                                                                          segment_bitmask,
                                                                          segment_entry,
@@ -288,7 +321,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                 const BlockEntry *block_entry = block_guard.block_entries_[block_id].get();
                                                 block_entry->SetDeleteBitmask(begin_ts, block_bitmask);
                                                 BlockColumnEntry *block_column_entry = block_entry->GetColumnBlockEntry(this->search_column_id_);
-                                                auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                                                auto column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
                                                 // output score will always be float type
                                                 CalculateScoreOnColumnVector(column_vector,
                                                                              segment_id,
@@ -296,7 +329,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                                                                              block_offset,
                                                                              row_to_read,
                                                                              block_bitmask,
-                                                                             *(this->match_tensor_expr_),
+                                                                             *(this->calc_match_tensor_expr_),
                                                                              function_data);
                                             }
                                             // prepare next block
@@ -308,14 +341,14 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
                            result);
             }
             // 2. chunk index
-            for (const auto &chunk_index_entry : std::get<0>(emvb_snapshot)) {
+            for (const auto &chunk_index_entry : std::get<Vector<SharedPtr<ChunkIndexEntry>>>(emvb_snapshot)) {
                 if (chunk_index_entry->CheckVisible(txn)) {
                     const BufferHandle index_handle = chunk_index_entry->GetIndex();
                     const auto *emvb_index = static_cast<const EMVBIndex *>(index_handle.GetData());
                     // TODO: fix the parameters
                     const auto [result_num, score_ptr, row_id_ptr] =
-                        emvb_index->SearchWithBitmask(reinterpret_cast<const f32 *>(match_tensor_expr_->query_embedding_.ptr),
-                                                      match_tensor_expr_->num_of_embedding_in_query_tensor_,
+                        emvb_index->SearchWithBitmask(reinterpret_cast<const f32 *>(calc_match_tensor_expr_->query_embedding_.ptr),
+                                                      calc_match_tensor_expr_->num_of_embedding_in_query_tensor_,
                                                       topn_,
                                                       segment_bitmask,
                                                       segment_entry,
@@ -342,9 +375,9 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
         Bitmask bitmask;
         if (this->CalculateFilterBitmask(segment_id, block_id, row_count, bitmask)) {
             block_entry->SetDeleteBitmask(begin_ts, bitmask);
-            auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+            auto column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
             // output score will always be float type
-            CalculateScoreOnColumnVector(column_vector, segment_id, block_id, 0, row_count, bitmask, *match_tensor_expr_, function_data);
+            CalculateScoreOnColumnVector(column_vector, segment_id, block_id, 0, row_count, bitmask, *calc_match_tensor_expr_, function_data);
         }
     } else {
         // all task Complete
@@ -386,7 +419,7 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
             for (SizeT i = 0; i < column_n; ++i) {
                 const auto column_id = base_table_ref_->column_ids_[i];
                 auto *block_column_entry = block_entry->GetColumnBlockEntry(column_id);
-                auto column_vector = block_column_entry->GetColumnVector(buffer_mgr);
+                auto column_vector = block_column_entry->GetConstColumnVector(buffer_mgr);
                 output_block_ptr->column_vectors[i]->AppendWith(column_vector, block_offset, 1);
             }
             output_block_ptr->AppendValueByPtr(column_n, (ptr_t)&result_scores[top_idx]);
@@ -398,9 +431,214 @@ void PhysicalMatchTensorScan::ExecuteInner(QueryContext *query_context, MatchTen
     }
 }
 
+// TensorElemT: bit, QueryElemT: bit (unaligned).
+// TensorElemT: bit, QueryElemT: f32, i32, i64 (aligned).
+// TensorElemT: u8, QueryElemT: u8 (unaligned).
+// TensorElemT: i8, QueryElemT: i8 (unaligned).
+// TensorElemT: f32, f64, f16, bf16, QueryElemT: f32 (aligned).
 template <typename TensorElemT, typename QueryElemT>
-struct MaxSimOp;
+struct MaxSimOp {
+    static float Score(const char *raw_query_tensor_ptr,
+                       const char *raw_target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        UnrecoverableError("Unreachable code!");
+        return {};
+    }
+};
 
+// TensorElemT: bit, QueryElemT: bit (unaligned)
+// TODO: hamming distance?
+template <>
+struct MaxSimOp<bool, bool> {
+    static float Score(const char *raw_query_tensor_ptr,
+                       const char *raw_target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        const auto unit_embedding_bytes = basic_embedding_dimension / 8;
+        if (unit_embedding_bytes % 4 == 0) {
+            if (reinterpret_cast<uintptr_t>(raw_query_tensor_ptr) % alignof(u32) == 0 &&
+                reinterpret_cast<uintptr_t>(raw_target_tensor_ptr) % alignof(u32) == 0) {
+                const auto u32_cnt = unit_embedding_bytes / 4;
+                const auto query_tensor_u32_ptr = reinterpret_cast<const u32 *>(raw_query_tensor_ptr);
+                const auto target_tensor_u32_ptr = reinterpret_cast<const u32 *>(raw_target_tensor_ptr);
+                u32 maxsim_score = 0;
+                for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+                    const auto query_ptr = query_tensor_u32_ptr + query_i * u32_cnt;
+                    auto min_score_i = std::numeric_limits<u32>::max();
+                    for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
+                        const auto target_ptr = target_tensor_u32_ptr + target_j * u32_cnt;
+                        u32 score_ij = 0;
+                        for (u32 k = 0; k < u32_cnt; ++k) {
+                            score_ij += std::popcount(query_ptr[k] ^ target_ptr[k]);
+                        }
+                        min_score_i = std::min(min_score_i, score_ij);
+                    }
+                    maxsim_score += min_score_i;
+                }
+                // hamming distance, higher score means more different
+                return -static_cast<float>(maxsim_score);
+            }
+            // memory allocated by new char[] should be aligned to any basic type
+            LOG_ERROR("MaxSimOp<bool, bool> Score: input tensor is not aligned to int");
+        }
+        const auto query_tensor_ptr = reinterpret_cast<const u8 *>(raw_query_tensor_ptr);
+        const auto target_tensor_ptr = reinterpret_cast<const u8 *>(raw_target_tensor_ptr);
+        u32 maxsim_score = 0;
+        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            const auto query_ptr = query_tensor_ptr + query_i * unit_embedding_bytes;
+            auto min_score_i = std::numeric_limits<u32>::max();
+            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
+                const auto target_ptr = target_tensor_ptr + target_j * unit_embedding_bytes;
+                u32 score_ij = 0;
+                for (u32 k = 0; k < unit_embedding_bytes; ++k) {
+                    score_ij += std::popcount(static_cast<u32>(query_ptr[k] ^ target_ptr[k]));
+                }
+                min_score_i = std::min(min_score_i, score_ij);
+            }
+            maxsim_score += min_score_i;
+        }
+        // hamming distance, higher score means more different
+        return -static_cast<float>(maxsim_score);
+    }
+};
+
+// TensorElemT: bit, QueryElemT: f32 (aligned)
+template <>
+struct MaxSimOp<bool, f32> {
+    static float Score(const char *raw_query_tensor_ptr,
+                       const char *raw_target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        const auto f32_bit_ip_func_ptr = GetSIMD_FUNCTIONS().MaxSimF32BitIP_func_ptr_;
+        const auto query_tensor_ptr = reinterpret_cast<const f32 *>(raw_query_tensor_ptr);
+        const auto target_tensor_ptr = reinterpret_cast<const u8 *>(raw_target_tensor_ptr);
+        const auto unit_embedding_bytes = basic_embedding_dimension / 8;
+        float maxsim_score = 0.0f;
+        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            const auto query_ptr = query_tensor_ptr + query_i * basic_embedding_dimension;
+            auto max_score_i = std::numeric_limits<float>::lowest();
+            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
+                const auto target_ptr = target_tensor_ptr + target_j * unit_embedding_bytes;
+                const auto score_ij = f32_bit_ip_func_ptr(query_ptr, target_ptr, basic_embedding_dimension);
+                max_score_i = std::max(max_score_i, score_ij);
+            }
+            maxsim_score += max_score_i;
+        }
+        return maxsim_score;
+    }
+};
+
+// TensorElemT: bit, QueryElemT: i32 (aligned)
+template <>
+struct MaxSimOp<bool, i32> {
+    static float Score(const char *raw_query_tensor_ptr,
+                       const char *raw_target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        const auto i32_bit_ip_func_ptr = GetSIMD_FUNCTIONS().MaxSimI32BitIP_func_ptr_;
+        const auto query_tensor_ptr = reinterpret_cast<const i32 *>(raw_query_tensor_ptr);
+        const auto target_tensor_ptr = reinterpret_cast<const u8 *>(raw_target_tensor_ptr);
+        const auto unit_embedding_bytes = basic_embedding_dimension / 8;
+        i32 maxsim_score = 0;
+        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            const auto query_ptr = query_tensor_ptr + query_i * basic_embedding_dimension;
+            auto max_score_i = std::numeric_limits<i32>::lowest();
+            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
+                const auto target_ptr = target_tensor_ptr + target_j * unit_embedding_bytes;
+                const auto score_ij = i32_bit_ip_func_ptr(query_ptr, target_ptr, basic_embedding_dimension);
+                max_score_i = std::max(max_score_i, score_ij);
+            }
+            maxsim_score += max_score_i;
+        }
+        return maxsim_score;
+    }
+};
+
+// TensorElemT: bit, QueryElemT: i64 (aligned)
+template <>
+struct MaxSimOp<bool, i64> {
+    static float Score(const char *raw_query_tensor_ptr,
+                       const char *raw_target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        const auto i64_bit_ip_func_ptr = GetSIMD_FUNCTIONS().MaxSimI64BitIP_func_ptr_;
+        const auto query_tensor_ptr = reinterpret_cast<const i64 *>(raw_query_tensor_ptr);
+        const auto target_tensor_ptr = reinterpret_cast<const u8 *>(raw_target_tensor_ptr);
+        const auto unit_embedding_bytes = basic_embedding_dimension / 8;
+        i64 maxsim_score = 0;
+        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            const auto query_ptr = query_tensor_ptr + query_i * basic_embedding_dimension;
+            auto max_score_i = std::numeric_limits<i64>::lowest();
+            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
+                const auto target_ptr = target_tensor_ptr + target_j * unit_embedding_bytes;
+                const auto score_ij = i64_bit_ip_func_ptr(query_ptr, target_ptr, basic_embedding_dimension);
+                max_score_i = std::max(max_score_i, score_ij);
+            }
+            maxsim_score += max_score_i;
+        }
+        return maxsim_score;
+    }
+};
+
+// TensorElemT: u8, QueryElemT: u8 (unaligned)
+template <>
+struct MaxSimOp<u8, u8> {
+    static float Score(const char *raw_query_tensor_ptr,
+                       const char *raw_target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        const auto u8ip_func_ptr = GetSIMD_FUNCTIONS().HNSW_U8IP_ptr_;
+        const auto query_tensor_ptr = reinterpret_cast<const u8 *>(raw_query_tensor_ptr);
+        const auto target_tensor_ptr = reinterpret_cast<const u8 *>(raw_target_tensor_ptr);
+        i32 maxsim_score = 0;
+        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            const auto query_ptr = query_tensor_ptr + query_i * basic_embedding_dimension;
+            auto max_score_i = std::numeric_limits<i32>::lowest();
+            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
+                const auto target_ptr = target_tensor_ptr + target_j * basic_embedding_dimension;
+                const i32 score_ij = u8ip_func_ptr(query_ptr, target_ptr, basic_embedding_dimension);
+                max_score_i = std::max(max_score_i, score_ij);
+            }
+            maxsim_score += max_score_i;
+        }
+        return maxsim_score;
+    }
+};
+
+// TensorElemT: i8, QueryElemT: i8 (unaligned)
+template <>
+struct MaxSimOp<i8, i8> {
+    static float Score(const char *raw_query_tensor_ptr,
+                       const char *raw_target_tensor_ptr,
+                       const u32 query_embedding_num,
+                       const u32 target_embedding_num,
+                       const u32 basic_embedding_dimension) {
+        const auto i8ip_func_ptr = GetSIMD_FUNCTIONS().HNSW_I8IP_ptr_;
+        const auto query_tensor_ptr = reinterpret_cast<const i8 *>(raw_query_tensor_ptr);
+        const auto target_tensor_ptr = reinterpret_cast<const i8 *>(raw_target_tensor_ptr);
+        i32 maxsim_score = 0;
+        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            const auto query_ptr = query_tensor_ptr + query_i * basic_embedding_dimension;
+            auto max_score_i = std::numeric_limits<i32>::lowest();
+            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
+                const auto target_ptr = target_tensor_ptr + target_j * basic_embedding_dimension;
+                const i32 score_ij = i8ip_func_ptr(query_ptr, target_ptr, basic_embedding_dimension);
+                max_score_i = std::max(max_score_i, score_ij);
+            }
+            maxsim_score += max_score_i;
+        }
+        return maxsim_score;
+    }
+};
+
+// TensorElemT: f32, QueryElemT: f32 (aligned)
 template <>
 struct MaxSimOp<float, float> {
     static float Score(const char *query_tensor_ptr,
@@ -428,124 +666,33 @@ struct MaxSimOp<float, float> {
     }
 };
 
-template <typename TensorElemT, typename QueryElemT>
-    requires(!std::is_same_v<TensorElemT, bool> && !std::is_same_v<QueryElemT, bool>)
-struct MaxSimOp<TensorElemT, QueryElemT> {
-    static float Score(const char *raw_query_tensor_ptr,
-                       const char *raw_target_tensor_ptr,
-                       const u32 query_embedding_num,
-                       const u32 target_embedding_num,
-                       const u32 basic_embedding_dimension) {
-        const auto query_tensor_ptr = reinterpret_cast<const QueryElemT *>(raw_query_tensor_ptr);
-        const auto target_tensor_ptr = reinterpret_cast<const TensorElemT *>(raw_target_tensor_ptr);
-        auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * target_embedding_num);
-        float maxsim_score = 0.0f;
-        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
-            float max_score_i = std::numeric_limits<float>::lowest();
-            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
-                const auto query_ptr = query_tensor_ptr + query_i * basic_embedding_dimension;
-                const auto target_ptr = target_tensor_ptr + target_j * basic_embedding_dimension;
-                float score_ij = 0.0f;
-                for (u32 k = 0; k < basic_embedding_dimension; ++k) {
-                    score_ij += static_cast<float>(query_ptr[k]) * static_cast<float>(target_ptr[k]);
-                }
-                max_score_i = std::max(max_score_i, score_ij);
-            }
-            maxsim_score += max_score_i;
-        }
-        return maxsim_score;
-    }
-};
-
-template <>
-struct MaxSimOp<bool, bool> {
-    static float Score(const char *raw_query_tensor_ptr,
-                       const char *raw_target_tensor_ptr,
-                       const u32 query_embedding_num,
-                       const u32 target_embedding_num,
-                       const u32 basic_embedding_dimension) {
-        const auto query_tensor_ptr = reinterpret_cast<const u8 *>(raw_query_tensor_ptr);
-        const auto target_tensor_ptr = reinterpret_cast<const u8 *>(raw_target_tensor_ptr);
-        const auto unit_embedding_bytes = basic_embedding_dimension / 8;
-        auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * target_embedding_num);
-        float maxsim_score = 0.0f;
-        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
-            u32 max_score_i = 0;
-            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
-                const auto query_ptr = query_tensor_ptr + query_i * unit_embedding_bytes;
-                const auto target_ptr = target_tensor_ptr + target_j * unit_embedding_bytes;
-                u32 score_ij = 0;
-                auto is_true = [](const u8 *ptr, const u32 k) -> bool { return ptr[k / 8] & (1u << (k % 8)); };
-                for (u32 k = 0; k < basic_embedding_dimension; ++k) {
-                    if (is_true(query_ptr, k) && is_true(target_ptr, k)) {
-                        ++score_ij;
-                    }
-                }
-                max_score_i = std::max(max_score_i, score_ij);
-            }
-            maxsim_score += max_score_i;
-        }
-        return maxsim_score;
-    }
-};
-
-template <typename QueryElemT>
-struct MaxSimOp<bool, QueryElemT> {
-    static float Score(const char *raw_query_tensor_ptr,
-                       const char *raw_target_tensor_ptr,
-                       const u32 query_embedding_num,
-                       const u32 target_embedding_num,
-                       const u32 basic_embedding_dimension) {
-        const auto query_tensor_ptr = reinterpret_cast<const QueryElemT *>(raw_query_tensor_ptr);
-        const auto target_tensor_ptr = reinterpret_cast<const u8 *>(raw_target_tensor_ptr);
-        const auto unit_embedding_bytes = basic_embedding_dimension / 8;
-        auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * target_embedding_num);
-        float maxsim_score = 0.0f;
-        for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
-            float max_score_i = std::numeric_limits<float>::lowest();
-            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
-                const auto query_ptr = query_tensor_ptr + query_i * basic_embedding_dimension;
-                const auto target_ptr = target_tensor_ptr + target_j * unit_embedding_bytes;
-                float score_ij = 0.0f;
-                auto is_true = [](const u8 *ptr, const u32 k) -> bool { return ptr[k / 8] & (1u << (k % 8)); };
-                for (u32 k = 0; k < basic_embedding_dimension; ++k) {
-                    if (is_true(target_ptr, k)) {
-                        score_ij += static_cast<float>(query_ptr[k]);
-                    }
-                }
-                max_score_i = std::max(max_score_i, score_ij);
-            }
-            maxsim_score += max_score_i;
-        }
-        return maxsim_score;
-    }
-};
-
+// TensorElemT: f64, f16, bf16, QueryElemT: f32 (aligned)
 template <typename TensorElemT>
-struct MaxSimOp<TensorElemT, bool> {
-    static float Score(const char *raw_query_tensor_ptr,
-                       const char *raw_target_tensor_ptr,
+    requires(IsAnyOf<TensorElemT, f64, Float16T, BFloat16T>)
+struct MaxSimOp<TensorElemT, float> {
+    static float Score(const char *query_tensor_ptr,
+                       const char *src_target_tensor_ptr,
                        const u32 query_embedding_num,
                        const u32 target_embedding_num,
                        const u32 basic_embedding_dimension) {
-        const auto query_tensor_ptr = reinterpret_cast<const u8 *>(raw_query_tensor_ptr);
-        const auto target_tensor_ptr = reinterpret_cast<const TensorElemT *>(raw_target_tensor_ptr);
-        const auto unit_embedding_bytes = basic_embedding_dimension / 8;
+        auto src_target_type_ptr = reinterpret_cast<const TensorElemT *>(src_target_tensor_ptr);
+        auto target_buffer = MakeUniqueForOverwrite<float[]>(basic_embedding_dimension * target_embedding_num);
+        for (u32 i = 0; i < basic_embedding_dimension * target_embedding_num; ++i) {
+            target_buffer[i] = static_cast<float>(src_target_type_ptr[i]);
+        }
         auto output_ptr = MakeUniqueForOverwrite<float[]>(query_embedding_num * target_embedding_num);
+        matrixA_multiply_transpose_matrixB_output_to_C(reinterpret_cast<const float *>(query_tensor_ptr),
+                                                       target_buffer.get(),
+                                                       query_embedding_num,
+                                                       target_embedding_num,
+                                                       basic_embedding_dimension,
+                                                       output_ptr.get());
         float maxsim_score = 0.0f;
         for (u32 query_i = 0; query_i < query_embedding_num; ++query_i) {
+            const float *query_ip_ptr = output_ptr.get() + query_i * target_embedding_num;
             float max_score_i = std::numeric_limits<float>::lowest();
-            for (u32 target_j = 0; target_j < target_embedding_num; ++target_j) {
-                const auto query_ptr = query_tensor_ptr + query_i * unit_embedding_bytes;
-                const auto target_ptr = target_tensor_ptr + target_j * basic_embedding_dimension;
-                float score_ij = 0.0f;
-                auto is_true = [](const u8 *ptr, const u32 k) -> bool { return ptr[k / 8] & (1u << (k % 8)); };
-                for (u32 k = 0; k < basic_embedding_dimension; ++k) {
-                    if (is_true(query_ptr, k)) {
-                        score_ij += static_cast<float>(target_ptr[k]);
-                    }
-                }
-                max_score_i = std::max(max_score_i, score_ij);
+            for (u32 k = 0; k < target_embedding_num; ++k) {
+                max_score_i = std::max(max_score_i, query_ip_ptr[k]);
             }
             maxsim_score += max_score_i;
         }
@@ -699,6 +846,9 @@ void ElemTypeDispatch(Params &parameter_pack, EmbeddingDataType type_enum, Args.
         case EmbeddingDataType::kElemBit: {
             return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<bool>>>(parameter_pack, extra_types...);
         }
+        case EmbeddingDataType::kElemUInt8: {
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<u8>>>(parameter_pack, extra_types...);
+        }
         case EmbeddingDataType::kElemInt8: {
             return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<i8>>>(parameter_pack, extra_types...);
         }
@@ -712,10 +862,16 @@ void ElemTypeDispatch(Params &parameter_pack, EmbeddingDataType type_enum, Args.
             return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<i64>>>(parameter_pack, extra_types...);
         }
         case EmbeddingDataType::kElemFloat: {
-            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<float>>>(parameter_pack, extra_types...);
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<f32>>>(parameter_pack, extra_types...);
         }
         case EmbeddingDataType::kElemDouble: {
-            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<double>>>(parameter_pack, extra_types...);
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<f64>>>(parameter_pack, extra_types...);
+        }
+        case EmbeddingDataType::kElemFloat16: {
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<Float16T>>>(parameter_pack, extra_types...);
+        }
+        case EmbeddingDataType::kElemBFloat16: {
+            return ElemTypeDispatch<ExecuteT, AddTypeList<Typelist, TypeList<BFloat16T>>>(parameter_pack, extra_types...);
         }
         case EmbeddingDataType::kElemInvalid: {
             const auto error_message = "Invalid embedding data type!";
@@ -771,7 +927,7 @@ void GetRerankerScore(Vector<MatchTensorRerankDoc> &rerank_docs,
         const BlockOffset block_offset = segment_offset % DEFAULT_BLOCK_CAPACITY;
         BlockColumnEntry *block_column_entry =
             block_index->segment_block_index_.at(segment_id).block_map_.at(block_id)->GetColumnBlockEntry(column_id);
-        auto column_vec = block_column_entry->GetColumnVector(buffer_mgr);
+        auto column_vec = block_column_entry->GetConstColumnVector(buffer_mgr);
         doc.score_ = CalcutateScoreOfRowOp::Execute(column_vec, block_offset, query_tensor_ptr, query_embedding_num, basic_embedding_dimension);
     }
 }
@@ -822,11 +978,175 @@ void CalculateFusionMatchTensorRerankerScores(Vector<MatchTensorRerankDoc> &rera
                                               const DataType *column_data_type,
                                               const ColumnID column_id,
                                               const BlockIndex *block_index,
-                                              const MatchTensorExpression &match_tensor_expr) {
-    RerankerParameterPack parameter_pack(rerank_docs, buffer_mgr, column_data_type, column_id, block_index, match_tensor_expr);
-    auto column_elem_type = static_cast<const EmbeddingInfo *>(column_data_type->type_info().get())->Type();
-    auto query_elem_type = parameter_pack.match_tensor_expr_.embedding_data_type_;
+                                              MatchTensorExpression &src_match_tensor_expr) {
+    const auto column_elem_type = static_cast<const EmbeddingInfo *>(column_data_type->type_info().get())->Type();
+    const auto [new_search_ptr, new_search_expr] = GetMatchTensorExprForCalculation(src_match_tensor_expr, column_elem_type);
+    const auto *match_tensor_expr_ptr = new_search_expr ? new_search_expr.get() : &src_match_tensor_expr;
+    RerankerParameterPack parameter_pack(rerank_docs, buffer_mgr, column_data_type, column_id, block_index, *match_tensor_expr_ptr);
+    const auto query_elem_type = parameter_pack.match_tensor_expr_.embedding_data_type_;
     ElemTypeDispatch<ExecuteMatchTensorRerankerTypes, TypeList<>>(parameter_pack, column_elem_type, query_elem_type);
+}
+
+// For AVX512
+inline auto GetAVX512AlignedMemory(const SizeT bytes) {
+    const auto alloc_bytes = ((bytes + 63u) & (~static_cast<SizeT>(63))) + 128u; // need to be multiple of 64, with extra 128 bytes
+    auto ptr = std::aligned_alloc(64, alloc_bytes);
+    if (!ptr) {
+        UnrecoverableError("Out of memory!");
+    }
+    return ptr;
+}
+
+struct ExecuteCast512AlignedParamPack {
+    char *src_embedding_ptr = nullptr;
+    u32 dimension = 0;
+    void *result_ptr = nullptr;
+    ExecuteCast512AlignedParamPack() = default;
+    ExecuteCast512AlignedParamPack(const ExecuteCast512AlignedParamPack &) = delete;
+    ExecuteCast512AlignedParamPack(ExecuteCast512AlignedParamPack &&) = delete;
+    ExecuteCast512AlignedParamPack &operator=(const ExecuteCast512AlignedParamPack &) = delete;
+    ExecuteCast512AlignedParamPack &operator=(ExecuteCast512AlignedParamPack &&) = delete;
+};
+
+template <typename SRC_T, typename DST_T>
+struct ExecuteCast512Aligned {
+    static void Execute(ExecuteCast512AlignedParamPack &param) { UnrecoverableError("Unreachable code!"); }
+};
+
+template <typename SRC_T, typename DST_T>
+    requires((std::is_same_v<DST_T, i32> && IsAnyOf<SRC_T, u8, i8, i16, i32>) || (std::is_same_v<DST_T, i64> && IsAnyOf<SRC_T, i64>) ||
+             (std::is_same_v<DST_T, f32> && IsAnyOf<SRC_T, f32, f64, Float16T, BFloat16T>))
+struct ExecuteCast512Aligned<SRC_T, DST_T> {
+    static void Execute(ExecuteCast512AlignedParamPack &param) {
+        auto *src_embedding_ptr = reinterpret_cast<const SRC_T *>(param.src_embedding_ptr);
+        auto *result_aligned = GetAVX512AlignedMemory(param.dimension * sizeof(DST_T));
+        param.result_ptr = result_aligned;
+        auto *dst_embedding_ptr = static_cast<DST_T *>(result_aligned);
+        for (u32 i = 0; i < param.dimension; ++i) {
+            dst_embedding_ptr[i] = static_cast<DST_T>(src_embedding_ptr[i]);
+        }
+    }
+};
+
+// u8, i8, i16, i32 -> i32
+// i64 -> i64
+// f32, f64, float16, bfloat16 -> f32
+void *GetAlignedCast(char *src_embedding_ptr, u32 dimension, EmbeddingDataType src_embedding_data_type, EmbeddingDataType new_embedding_data_type) {
+    ExecuteCast512AlignedParamPack param;
+    param.src_embedding_ptr = src_embedding_ptr;
+    param.dimension = dimension;
+    ElemTypeDispatch<ExecuteCast512Aligned, TypeList<>>(param, src_embedding_data_type, new_embedding_data_type);
+    return param.result_ptr;
+}
+
+AlignedMatchTensorExprHolderT GetMatchTensorExprForCalculation(MatchTensorExpression &src_match_tensor_expr,
+                                                               const EmbeddingDataType column_embedding_type) {
+    // check column basic embedding data type and query embedding data type
+    // apply necessary cast
+    const auto src_query_embedding_type = src_match_tensor_expr.embedding_data_type_;
+    EmbeddingDataType new_query_embedding_type = EmbeddingDataType::kElemInvalid;
+    switch (column_embedding_type) {
+        case EmbeddingDataType::kElemBit: {
+            // accept all query embedding types
+            switch (src_query_embedding_type) {
+                case EmbeddingDataType::kElemBit: {
+                    // use the old query embedding
+                    // no need for alignment
+                    // TODO: hamming distance?
+                    break;
+                }
+                case EmbeddingDataType::kElemUInt8:
+                case EmbeddingDataType::kElemInt8:
+                case EmbeddingDataType::kElemInt16:
+                case EmbeddingDataType::kElemInt32: {
+                    // cast to aligned i32
+                    new_query_embedding_type = EmbeddingDataType::kElemInt32;
+                    break;
+                }
+                case EmbeddingDataType::kElemInt64: {
+                    // cast to aligned i64
+                    new_query_embedding_type = EmbeddingDataType::kElemInt64;
+                    break;
+                }
+                case EmbeddingDataType::kElemFloat:
+                case EmbeddingDataType::kElemDouble:
+                case EmbeddingDataType::kElemFloat16:
+                case EmbeddingDataType::kElemBFloat16: {
+                    // cast to aligned f32
+                    new_query_embedding_type = EmbeddingDataType::kElemFloat;
+                    break;
+                }
+                case EmbeddingDataType::kElemInvalid: {
+                    UnrecoverableError("Invalid embedding data type");
+                    break;
+                }
+            }
+            break;
+        }
+        case EmbeddingDataType::kElemUInt8:
+        case EmbeddingDataType::kElemInt8: {
+            // expect query embedding to be the same type
+            if (src_query_embedding_type != column_embedding_type) {
+                UnrecoverableError(fmt::format("Query embedding with data type: {} which doesn't match with column basic embedding type {}.",
+                                               EmbeddingInfo::EmbeddingDataTypeToString(src_query_embedding_type),
+                                               EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
+            }
+            // use the old query embedding
+            // no need for alignment
+            break;
+        }
+        case EmbeddingDataType::kElemInt16:
+        case EmbeddingDataType::kElemInt32:
+        case EmbeddingDataType::kElemInt64: {
+            // TODO: not supported yet
+            UnrecoverableError(fmt::format("Cannot query on column with basic embedding data type: {}.",
+                                           EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
+            break;
+        }
+        case EmbeddingDataType::kElemFloat:
+        case EmbeddingDataType::kElemDouble:
+        case EmbeddingDataType::kElemFloat16:
+        case EmbeddingDataType::kElemBFloat16: {
+            // expect query embedding to be also float type
+            switch (src_query_embedding_type) {
+                case EmbeddingDataType::kElemFloat:
+                case EmbeddingDataType::kElemDouble:
+                case EmbeddingDataType::kElemFloat16:
+                case EmbeddingDataType::kElemBFloat16: {
+                    // cast to aligned f32
+                    new_query_embedding_type = EmbeddingDataType::kElemFloat;
+                    break;
+                }
+                default: {
+                    UnrecoverableError(fmt::format("Query embedding with data type: {} which doesn't match with column basic embedding type {}.",
+                                                   EmbeddingInfo::EmbeddingDataTypeToString(src_query_embedding_type),
+                                                   EmbeddingInfo::EmbeddingDataTypeToString(column_embedding_type)));
+                    break;
+                }
+            }
+            break;
+        }
+        case EmbeddingDataType::kElemInvalid: {
+            UnrecoverableError("Invalid embedding data type");
+            break;
+        }
+    }
+    AlignedMatchTensorExprHolderT result;
+    if (new_query_embedding_type != EmbeddingDataType::kElemInvalid) {
+        const auto aligned_ptr = GetAlignedCast(src_match_tensor_expr.query_embedding_.ptr,
+                                                src_match_tensor_expr.dimension_,
+                                                src_query_embedding_type,
+                                                new_query_embedding_type);
+        result.first.reset(aligned_ptr);
+        result.second = std::make_unique<MatchTensorExpression>(src_match_tensor_expr.arguments(),
+                                                                src_match_tensor_expr.search_method_,
+                                                                new_query_embedding_type,
+                                                                src_match_tensor_expr.dimension_,
+                                                                EmbeddingT(static_cast<char *>(aligned_ptr), false),
+                                                                src_match_tensor_expr.tensor_basic_embedding_dimension_,
+                                                                src_match_tensor_expr.options_text_);
+    }
+    return result;
 }
 
 } // namespace infinity

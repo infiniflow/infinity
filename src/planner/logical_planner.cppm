@@ -157,6 +157,8 @@ public:
 
     Status BuildShowBuffer(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
+    Status BuildShowMemIndex(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
     Status BuildShowProfiles(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowSessionVariable(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
@@ -174,6 +176,12 @@ public:
     Status BuildShowDeltaLogs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     Status BuildShowCatalogs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowPersistenceFiles(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowPersistenceObjects(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
+
+    Status BuildShowPersistenceObject(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr);
 
     // Flush
     Status BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr);

@@ -69,6 +69,7 @@ import default_values;
 import index_base;
 import index_ivfflat;
 import index_hnsw;
+import index_diskann;
 import index_secondary;
 import index_emvb;
 import index_bmp;
@@ -84,6 +85,8 @@ import create_index_info;
 import create_collection_info;
 import create_view_info;
 import drop_collection_info;
+import embedding_info;
+import type_info;
 import drop_index_info;
 import drop_schema_info;
 import drop_table_info;
@@ -239,6 +242,11 @@ Status LogicalPlanner::BuildInsertValue(const InsertStatement *statement, Shared
     // Create value list
     Vector<Vector<SharedPtr<BaseExpression>>> value_list_array;
     SizeT value_count = statement->values_->size();
+    if(value_count > INSERT_BATCH_ROW_LIMIT) {
+        Status status = Status::NotSupport("Insert batch row limit shouldn't more than 8192.");
+        RecoverableError(status);
+    }
+
     for (SizeT idx = 0; idx < value_count; ++idx) {
         const auto *parsed_expr_list = statement->values_->at(idx);
 
@@ -459,7 +467,8 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             }
         }
 
-        switch (create_table_info->column_defs_[idx]->type()->type()) {
+        const DataType* data_type = create_table_info->column_defs_[idx]->type().get();
+        switch (data_type->type()) {
             case LogicalType::kBoolean:
             case LogicalType::kTinyInt:
             case LogicalType::kSmallInt:
@@ -467,19 +476,30 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             case LogicalType::kBigInt:
             case LogicalType::kFloat:
             case LogicalType::kDouble:
+            case LogicalType::kFloat16:
+            case LogicalType::kBFloat16:
             case LogicalType::kVarchar:
             case LogicalType::kDate:
             case LogicalType::kTime:
             case LogicalType::kTimestamp:
-            case LogicalType::kDateTime:
-            case LogicalType::kEmbedding:
+            case LogicalType::kDateTime: {
+                break;
+            }
+            case LogicalType::kEmbedding: {
+                TypeInfo* type_info_ptr = data_type->type_info().get();
+                EmbeddingInfo* embedding_info = static_cast<EmbeddingInfo*>(type_info_ptr);
+                if(embedding_info->Dimension() > EMBEDDING_LIMIT) {
+                    return Status::NotSupport(fmt::format("Embedding data limit is {}, which larger than limit {}", embedding_info->Dimension(), EMBEDDING_LIMIT));
+                }
+                break;
+            }
             case LogicalType::kTensor:
             case LogicalType::kTensorArray:
             case LogicalType::kSparse: {
                 break;
             }
             default: {
-                return Status::NotSupport(fmt::format("Not supported data type: {}", create_table_info->column_defs_[idx]->type()->ToString()));
+                return Status::NotSupport(fmt::format("Not supported data type: {}", data_type->ToString()));
             }
         }
 
@@ -660,12 +680,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
     UniquePtr<QueryBinder> query_binder_ptr = MakeUnique<QueryBinder>(this->query_context_ptr_, bind_context_ptr);
     auto base_table_ref = query_binder_ptr->GetTableRef(*schema_name, *table_name);
 
-    if (create_index_info->index_info_list_->size() != 1) {
-        Status status = Status::InvalidIndexDefinition(
-            fmt::format("Index {} consists of {} IndexInfo however 1 is expected", *index_name, create_index_info->index_info_list_->size()));
-        RecoverableError(status);
-    }
-    IndexInfo *index_info = create_index_info->index_info_list_->at(0);
+    IndexInfo *index_info = create_index_info->index_info_;
     SharedPtr<IndexBase> base_index_ptr{nullptr};
     String index_filename = fmt::format("{}_{}", create_index_info->table_name_, *index_name);
     switch (index_info->index_type_) {
@@ -678,7 +693,7 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
         case IndexType::kHnsw: {
             assert(index_info->index_param_list_ != nullptr);
             // The following check might affect performance
-            IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            IndexHnsw::ValidateColumnDataType(base_table_ref, index_info->column_name_, *(index_info->index_param_list_)); // may throw exception
             base_index_ptr = IndexHnsw::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
@@ -703,6 +718,12 @@ Status LogicalPlanner::BuildCreateIndex(const CreateStatement *statement, Shared
             assert(index_info->index_param_list_ != nullptr);
             IndexBMP::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
             base_index_ptr = IndexBMP::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
+            break;
+        }
+        case IndexType::kDiskAnn: {
+            assert(index_info->index_param_list_ != nullptr);
+            IndexDiskAnn::ValidateColumnDataType(base_table_ref, index_info->column_name_); // may throw exception
+            base_index_ptr = IndexDiskAnn::Make(index_name, index_filename, {index_info->column_name_}, *(index_info->index_param_list_));
             break;
         }
         case IndexType::kInvalid: {
@@ -880,7 +901,8 @@ Status LogicalPlanner::BuildExport(const CopyStatement *statement, SharedPtr<Bin
     switch (statement->copy_file_type_) {
         case CopyFileType::kJSONL:
         case CopyFileType::kFVECS:
-        case CopyFileType::kCSV: {
+        case CopyFileType::kCSV: 
+        case CopyFileType::kPARQUET: {
             break;
         }
         default: {
@@ -1218,6 +1240,9 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         case ShowStmtType::kBuffer: {
             return BuildShowBuffer(statement, bind_context_ptr);
         }
+        case ShowStmtType::kMemIndex: {
+            return BuildShowMemIndex(statement, bind_context_ptr);
+        }
         case ShowStmtType::kLogs: {
             return BuildShowLogs(statement, bind_context_ptr);
         }
@@ -1226,6 +1251,15 @@ Status LogicalPlanner::BuildShow(ShowStatement *statement, SharedPtr<BindContext
         }
         case ShowStmtType::kCatalogs: {
             return BuildShowCatalogs(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kPersistenceFiles: {
+            return BuildShowPersistenceFiles(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kPersistenceObjects: {
+            return BuildShowPersistenceObjects(statement, bind_context_ptr);
+        }
+        case ShowStmtType::kPersistenceObject: {
+            return BuildShowPersistenceObject(statement, bind_context_ptr);
         }
         default: {
             String error_message = "Unexpected show statement type.";
@@ -1560,6 +1594,16 @@ Status LogicalPlanner::BuildShowBuffer(const ShowStatement *statement, SharedPtr
     return Status::OK();
 }
 
+Status LogicalPlanner::BuildShowMemIndex(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowMemIndex,
+                                                                  query_context_ptr_->schema_name(),
+                                                                  statement->var_name_,
+                                                                  bind_context_ptr->GenerateTableIndex());
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
 Status LogicalPlanner::BuildShowLogs(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
                                                                   ShowType::kShowLogs,
@@ -1592,6 +1636,40 @@ Status LogicalPlanner::BuildShowCatalogs(const ShowStatement *statement, SharedP
     this->logical_plan_ = logical_show;
     return Status::OK();
 }
+
+Status LogicalPlanner::BuildShowPersistenceFiles(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowPersistenceFiles,
+                                                                  "",
+                                                                  "",
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowPersistenceObjects(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowPersistenceObjects,
+                                                                  "",
+                                                                  "",
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
+Status LogicalPlanner::BuildShowPersistenceObject(const ShowStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
+    SharedPtr<LogicalNode> logical_show = MakeShared<LogicalShow>(bind_context_ptr->GetNewLogicalNodeId(),
+                                                                  ShowType::kShowPersistenceObject,
+                                                                  "",
+                                                                  statement->file_name_.value(),
+                                                                  bind_context_ptr->GenerateTableIndex());
+
+    this->logical_plan_ = logical_show;
+    return Status::OK();
+}
+
 
 Status LogicalPlanner::BuildFlush(const FlushStatement *statement, SharedPtr<BindContext> &bind_context_ptr) {
     switch (statement->type()) {

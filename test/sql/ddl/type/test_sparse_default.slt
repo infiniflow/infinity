@@ -12,13 +12,13 @@ col2 Sparse(float,int16,30000) (empty) (empty)
 col3 Sparse(bit,int16,30000) (empty) (empty)
 
 statement ok
-COPY test_sparse_default FROM '/var/infinity/test_data/sparse_default.csv' WITH ( DELIMITER ',' );
+COPY test_sparse_default FROM '/var/infinity/test_data/sparse_default.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 query I
 SELECT * FROM test_sparse_default;
 ----
-1 10000: 1.000000, 20000: 2.000000 10000, 20000
-3 3000: 3.000000 3000
+1 [10000:1.000000,20000:2.000000] [10000,20000]
+3 [3000:3.000000] [3000]
 0 (empty) (empty)
 
 #######################################
@@ -27,24 +27,24 @@ statement ok
 DROP TABLE test_sparse_default;
 
 statement ok
-CREATE TABLE test_sparse_default (col1 INT, col2 SPARSE(FLOAT, 30000) DEFAULT [0: 0.0], col3 SPARSE(BIT, 30000) DEFAULT [0]);
+CREATE TABLE test_sparse_default (col1 INT, col2 SPARSE(FLOAT, 30000) DEFAULT [0:0.0], col3 SPARSE(BIT, 30000) DEFAULT [0]);
 
 query I
 SHOW TABLE test_sparse_default COLUMNS;
 ----
 col1 Integer (empty) Null
-col2 Sparse(float,int16,30000) (empty) 0.000000: 0
-col3 Sparse(bit,int16,30000) (empty) 0
+col2 Sparse(float,int16,30000) (empty) [0.000000:0]
+col3 Sparse(bit,int16,30000) (empty) [0]
 
 statement ok
-COPY test_sparse_default FROM '/var/infinity/test_data/sparse_default.csv' WITH ( DELIMITER ',' );
+COPY test_sparse_default FROM '/var/infinity/test_data/sparse_default.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 query I
 SELECT * FROM test_sparse_default;
 ----
-1 10000: 1.000000, 20000: 2.000000 10000, 20000
-3 3000: 3.000000 3000
-0 0: 0.000000 0
+1 [10000:1.000000,20000:2.000000] [10000,20000]
+3 [3000:3.000000] [3000]
+0 [0:0.000000] [0]
 
 #######################################
 
@@ -52,7 +52,7 @@ statement ok
 DROP TABLE test_sparse_default;
 
 statement ok
-CREATE TABLE test_sparse_default (col1 INT, col2 SPARSE(FLOAT, 30000) DEFAULT [0: 0.0], col3 SPARSE(BIT, 30000) DEFAULT [0]);
+CREATE TABLE test_sparse_default (col1 INT, col2 SPARSE(FLOAT, 30000) DEFAULT [0:0.0], col3 SPARSE(BIT, 30000) DEFAULT [0]);
 
 statement ok
 COPY test_sparse_default FROM '/var/infinity/test_data/sparse_default.jsonl' WITH ( DELIMITER ',', FORMAT JSONL);
@@ -60,9 +60,9 @@ COPY test_sparse_default FROM '/var/infinity/test_data/sparse_default.jsonl' WIT
 query I
 SELECT * FROM test_sparse_default;
 ----
-1 10000: 1.000000, 20000: 2.000000 10000, 20000
-3 3000: 3.000000 3000
-0 0: 0.000000 0
+1 [10000:1.000000,20000:2.000000] [10000,20000]
+3 [3000:3.000000] [3000]
+0 [0:0.000000] [0]
 
 statement ok
 DROP TABLE test_sparse_default;

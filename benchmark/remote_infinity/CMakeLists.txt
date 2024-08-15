@@ -11,6 +11,8 @@ target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/sr
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_SOURCE_DIR}/third_party/thrift/lib/cpp/src")
 target_include_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/thrift/")
 target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/lib")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/arrow/")
+target_link_directories(remote_query_benchmark PUBLIC "${CMAKE_BINARY_DIR}/third_party/snappy/")
 
 target_link_libraries(
         remote_query_benchmark
@@ -21,18 +23,19 @@ target_link_libraries(
         zsv_parser
         newpfor
         fastpfor
+        jma
+        opencc
+        dl
         lz4.a
         atomic.a
         thrift.a
         c++.a
         c++abi.a
-        jma
-        opencc
+        parquet.a
+        arrow.a
+        snappy.a
+        ${JEMALLOC_STATIC_LIB}
 )
-
-if(ENABLE_JEMALLOC)
-    target_link_libraries(remote_query_benchmark jemalloc.a)
-endif()
 
 # add_definitions(-march=native)
 # add_definitions(-msse4.2 -mfma)

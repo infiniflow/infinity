@@ -108,6 +108,8 @@ void RegisterLessFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateLessFunction<IntegerT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kInteger));
     GenerateLessFunction<BigIntT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
     GenerateLessFunction<HugeIntT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateLessFunction<FloatT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kFloat16));
+    GenerateLessFunction<FloatT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kBFloat16));
     GenerateLessFunction<FloatT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kFloat));
     GenerateLessFunction<DoubleT, PODTypeLessFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 

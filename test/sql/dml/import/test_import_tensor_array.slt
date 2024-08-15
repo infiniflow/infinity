@@ -5,15 +5,15 @@ statement ok
 CREATE TABLE test_import_tensor_array (c1 int, c2 TensorArray(float,4));
 
 statement ok
-COPY test_import_tensor_array FROM '/var/infinity/test_data/tensor_array_float_dim4.csv' WITH ( DELIMITER ',' );
+COPY test_import_tensor_array FROM '/var/infinity/test_data/tensor_array_float_dim4.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 query II
 SELECT c1, c2 FROM test_import_tensor_array;
 ----
-2 [[0.1,0.2,0.3,-0.2]],[[0.3,-0.2,0.2,0.3]]
-4 [[0.2,0.1,0.3,0.4]]
-6 [[0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5]],[[0.1,-0.4,9.4,0.3]]
-8 [[0.4,0.3,0.2,0.1]]
+2 [[[0.1,0.2,0.3,-0.2]],[[0.3,-0.2,0.2,0.3]]]
+4 [[[0.2,0.1,0.3,0.4]]]
+6 [[[0.3,0.2,0.1,0.4],[0.4,0.3,0.2,-88.5]],[[0.1,-0.4,9.4,0.3]]]
+8 [[[0.4,0.3,0.2,0.1]]]
 
 query II
 SELECT count(*) FROM test_import_tensor_array;
@@ -21,7 +21,7 @@ SELECT count(*) FROM test_import_tensor_array;
 4
 
 statement error
-COPY test_import_tensor_array FROM '/var/infinity/test_data/tensor_array_float_dim4_invalid.csv' WITH ( DELIMITER ',' );
+COPY test_import_tensor_array FROM '/var/infinity/test_data/tensor_array_float_dim4_invalid.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 # Clean up
 statement ok
@@ -31,15 +31,15 @@ statement ok
 CREATE TABLE test_import_tensor_array (c1 int, c2 tensorarray(bit,8));
 
 statement ok
-COPY test_import_tensor_array FROM '/var/infinity/test_data/tensor_array_float_dim8.csv' WITH ( DELIMITER ',' );
+COPY test_import_tensor_array FROM '/var/infinity/test_data/tensor_array_float_dim8.csv' WITH ( DELIMITER ',', FORMAT CSV );
 
 query II
 SELECT c1, c2 FROM test_import_tensor_array;
 ----
-2 [[11101011]]
-4 [[11110111]],[[01001011]]
-6 [[11111110],[10111111]],[[11101011]]
-8 [[10110111]]
+2 [[[11101011]]]
+4 [[[11110111]],[[01001011]]]
+6 [[[11111110],[10111111]],[[11101011]]]
+8 [[[10110111]]]
 
 query II
 SELECT count(*) FROM test_import_tensor_array;

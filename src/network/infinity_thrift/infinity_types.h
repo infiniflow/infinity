@@ -32,12 +32,14 @@ struct LogicType {
     Decimal = 6,
     Float = 7,
     Double = 8,
-    Varchar = 9,
-    Embedding = 10,
-    Tensor = 11,
-    TensorArray = 12,
-    Sparse = 13,
-    Invalid = 14
+    Float16 = 9,
+    BFloat16 = 10,
+    Varchar = 11,
+    Embedding = 12,
+    Tensor = 13,
+    TensorArray = 14,
+    Sparse = 15,
+    Invalid = 16
   };
 };
 
@@ -77,12 +79,15 @@ std::string to_string(const DropConflict::type& val);
 struct ElementType {
   enum type {
     ElementBit = 0,
-    ElementInt8 = 1,
-    ElementInt16 = 2,
-    ElementInt32 = 3,
-    ElementInt64 = 4,
-    ElementFloat32 = 5,
-    ElementFloat64 = 6
+    ElementUInt8 = 1,
+    ElementInt8 = 2,
+    ElementInt16 = 3,
+    ElementInt32 = 4,
+    ElementInt64 = 5,
+    ElementFloat32 = 6,
+    ElementFloat64 = 7,
+    ElementFloat16 = 8,
+    ElementBFloat16 = 9
   };
 };
 
@@ -116,10 +121,12 @@ struct LiteralType {
     Null = 4,
     IntegerArray = 5,
     DoubleArray = 6,
-    IntegerTensorArray = 7,
-    DoubleTensorArray = 8,
-    SparseIntegerArray = 9,
-    SparseDoubleArray = 10
+    IntegerTensor = 7,
+    DoubleTensor = 8,
+    IntegerTensorArray = 9,
+    DoubleTensorArray = 10,
+    SparseIntegerArray = 11,
+    SparseDoubleArray = 12
   };
 };
 
@@ -170,13 +177,15 @@ struct ColumnType {
     ColumnInt64 = 4,
     ColumnFloat32 = 5,
     ColumnFloat64 = 6,
-    ColumnVarchar = 7,
-    ColumnEmbedding = 8,
-    ColumnTensor = 9,
-    ColumnTensorArray = 10,
-    ColumnSparse = 11,
-    ColumnRowID = 12,
-    ColumnInvalid = 13
+    ColumnFloat16 = 7,
+    ColumnBFloat16 = 8,
+    ColumnVarchar = 9,
+    ColumnEmbedding = 10,
+    ColumnTensor = 11,
+    ColumnTensorArray = 12,
+    ColumnSparse = 13,
+    ColumnRowID = 14,
+    ColumnInvalid = 15
   };
 };
 
@@ -189,12 +198,12 @@ std::string to_string(const ColumnType::type& val);
 struct IndexType {
   enum type {
     IVFFlat = 0,
-    HnswLVQ = 1,
-    Hnsw = 2,
-    FullText = 3,
-    BMP = 4,
-    Secondary = 5,
-    EMVB = 6
+    Hnsw = 1,
+    FullText = 2,
+    BMP = 3,
+    Secondary = 4,
+    EMVB = 5,
+    DiskAnn = 6
   };
 };
 
@@ -1053,14 +1062,17 @@ void swap(ColumnExpr &a, ColumnExpr &b);
 std::ostream& operator<<(std::ostream& out, const ColumnExpr& obj);
 
 typedef struct _EmbeddingData__isset {
-  _EmbeddingData__isset() : bool_array_value(false), i8_array_value(false), i16_array_value(false), i32_array_value(false), i64_array_value(false), f32_array_value(false), f64_array_value(false) {}
+  _EmbeddingData__isset() : bool_array_value(false), u8_array_value(false), i8_array_value(false), i16_array_value(false), i32_array_value(false), i64_array_value(false), f32_array_value(false), f64_array_value(false), f16_array_value(false), bf16_array_value(false) {}
   bool bool_array_value :1;
+  bool u8_array_value :1;
   bool i8_array_value :1;
   bool i16_array_value :1;
   bool i32_array_value :1;
   bool i64_array_value :1;
   bool f32_array_value :1;
   bool f64_array_value :1;
+  bool f16_array_value :1;
+  bool bf16_array_value :1;
 } _EmbeddingData__isset;
 
 class EmbeddingData : public virtual ::apache::thrift::TBase {
@@ -1073,18 +1085,23 @@ class EmbeddingData : public virtual ::apache::thrift::TBase {
 
   virtual ~EmbeddingData() noexcept;
   std::vector<bool>  bool_array_value;
-  std::vector<std::string>  i8_array_value;
+  std::vector<int16_t>  u8_array_value;
+  std::vector<int16_t>  i8_array_value;
   std::vector<int16_t>  i16_array_value;
   std::vector<int32_t>  i32_array_value;
   std::vector<int64_t>  i64_array_value;
   std::vector<double>  f32_array_value;
   std::vector<double>  f64_array_value;
+  std::vector<double>  f16_array_value;
+  std::vector<double>  bf16_array_value;
 
   _EmbeddingData__isset __isset;
 
   void __set_bool_array_value(const std::vector<bool> & val);
 
-  void __set_i8_array_value(const std::vector<std::string> & val);
+  void __set_u8_array_value(const std::vector<int16_t> & val);
+
+  void __set_i8_array_value(const std::vector<int16_t> & val);
 
   void __set_i16_array_value(const std::vector<int16_t> & val);
 
@@ -1096,11 +1113,19 @@ class EmbeddingData : public virtual ::apache::thrift::TBase {
 
   void __set_f64_array_value(const std::vector<double> & val);
 
+  void __set_f16_array_value(const std::vector<double> & val);
+
+  void __set_bf16_array_value(const std::vector<double> & val);
+
   bool operator == (const EmbeddingData & rhs) const
   {
     if (__isset.bool_array_value != rhs.__isset.bool_array_value)
       return false;
     else if (__isset.bool_array_value && !(bool_array_value == rhs.bool_array_value))
+      return false;
+    if (__isset.u8_array_value != rhs.__isset.u8_array_value)
+      return false;
+    else if (__isset.u8_array_value && !(u8_array_value == rhs.u8_array_value))
       return false;
     if (__isset.i8_array_value != rhs.__isset.i8_array_value)
       return false;
@@ -1125,6 +1150,14 @@ class EmbeddingData : public virtual ::apache::thrift::TBase {
     if (__isset.f64_array_value != rhs.__isset.f64_array_value)
       return false;
     else if (__isset.f64_array_value && !(f64_array_value == rhs.f64_array_value))
+      return false;
+    if (__isset.f16_array_value != rhs.__isset.f16_array_value)
+      return false;
+    else if (__isset.f16_array_value && !(f16_array_value == rhs.f16_array_value))
+      return false;
+    if (__isset.bf16_array_value != rhs.__isset.bf16_array_value)
+      return false;
+    else if (__isset.bf16_array_value && !(bf16_array_value == rhs.bf16_array_value))
       return false;
     return true;
   }
@@ -1195,7 +1228,7 @@ void swap(InitParameter &a, InitParameter &b);
 std::ostream& operator<<(std::ostream& out, const InitParameter& obj);
 
 typedef struct _ConstantExpr__isset {
-  _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false), i64_tensor_array_value(false), f64_tensor_array_value(false), i64_array_idx(false) {}
+  _ConstantExpr__isset() : literal_type(false), bool_value(false), i64_value(false), f64_value(false), str_value(false), i64_array_value(false), f64_array_value(false), i64_tensor_value(false), f64_tensor_value(false), i64_tensor_array_value(false), f64_tensor_array_value(false), i64_array_idx(false) {}
   bool literal_type :1;
   bool bool_value :1;
   bool i64_value :1;
@@ -1203,6 +1236,8 @@ typedef struct _ConstantExpr__isset {
   bool str_value :1;
   bool i64_array_value :1;
   bool f64_array_value :1;
+  bool i64_tensor_value :1;
+  bool f64_tensor_value :1;
   bool i64_tensor_array_value :1;
   bool f64_tensor_array_value :1;
   bool i64_array_idx :1;
@@ -1233,6 +1268,8 @@ class ConstantExpr : public virtual ::apache::thrift::TBase {
   std::string str_value;
   std::vector<int64_t>  i64_array_value;
   std::vector<double>  f64_array_value;
+  std::vector<std::vector<int64_t> >  i64_tensor_value;
+  std::vector<std::vector<double> >  f64_tensor_value;
   std::vector<std::vector<std::vector<int64_t> > >  i64_tensor_array_value;
   std::vector<std::vector<std::vector<double> > >  f64_tensor_array_value;
   std::vector<int64_t>  i64_array_idx;
@@ -1252,6 +1289,10 @@ class ConstantExpr : public virtual ::apache::thrift::TBase {
   void __set_i64_array_value(const std::vector<int64_t> & val);
 
   void __set_f64_array_value(const std::vector<double> & val);
+
+  void __set_i64_tensor_value(const std::vector<std::vector<int64_t> > & val);
+
+  void __set_f64_tensor_value(const std::vector<std::vector<double> > & val);
 
   void __set_i64_tensor_array_value(const std::vector<std::vector<std::vector<int64_t> > > & val);
 
@@ -1286,6 +1327,14 @@ class ConstantExpr : public virtual ::apache::thrift::TBase {
     if (__isset.f64_array_value != rhs.__isset.f64_array_value)
       return false;
     else if (__isset.f64_array_value && !(f64_array_value == rhs.f64_array_value))
+      return false;
+    if (__isset.i64_tensor_value != rhs.__isset.i64_tensor_value)
+      return false;
+    else if (__isset.i64_tensor_value && !(i64_tensor_value == rhs.i64_tensor_value))
+      return false;
+    if (__isset.f64_tensor_value != rhs.__isset.f64_tensor_value)
+      return false;
+    else if (__isset.f64_tensor_value && !(f64_tensor_value == rhs.f64_tensor_value))
       return false;
     if (__isset.i64_tensor_array_value != rhs.__isset.i64_tensor_array_value)
       return false;
@@ -3259,11 +3308,11 @@ void swap(IndexInfo &a, IndexInfo &b);
 std::ostream& operator<<(std::ostream& out, const IndexInfo& obj);
 
 typedef struct _CreateIndexRequest__isset {
-  _CreateIndexRequest__isset() : db_name(false), table_name(false), index_name(false), index_info_list(true), session_id(false), create_option(false) {}
+  _CreateIndexRequest__isset() : db_name(false), table_name(false), index_name(false), index_info(false), session_id(false), create_option(false) {}
   bool db_name :1;
   bool table_name :1;
   bool index_name :1;
-  bool index_info_list :1;
+  bool index_info :1;
   bool session_id :1;
   bool create_option :1;
 } _CreateIndexRequest__isset;
@@ -3278,14 +3327,13 @@ class CreateIndexRequest : public virtual ::apache::thrift::TBase {
                        table_name(),
                        index_name(),
                        session_id(0) {
-
   }
 
   virtual ~CreateIndexRequest() noexcept;
   std::string db_name;
   std::string table_name;
   std::string index_name;
-  std::vector<IndexInfo>  index_info_list;
+  IndexInfo index_info;
   int64_t session_id;
   CreateOption create_option;
 
@@ -3297,7 +3345,7 @@ class CreateIndexRequest : public virtual ::apache::thrift::TBase {
 
   void __set_index_name(const std::string& val);
 
-  void __set_index_info_list(const std::vector<IndexInfo> & val);
+  void __set_index_info(const IndexInfo& val);
 
   void __set_session_id(const int64_t val);
 
@@ -3311,7 +3359,7 @@ class CreateIndexRequest : public virtual ::apache::thrift::TBase {
       return false;
     if (!(index_name == rhs.index_name))
       return false;
-    if (!(index_info_list == rhs.index_info_list))
+    if (!(index_info == rhs.index_info))
       return false;
     if (!(session_id == rhs.session_id))
       return false;

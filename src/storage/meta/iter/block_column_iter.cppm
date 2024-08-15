@@ -36,7 +36,7 @@ export template <bool CheckTS = true>
 class BlockColumnIter {
 public:
     BlockColumnIter(BlockColumnEntry *entry, BufferManager *buffer_mgr, TxnTimeStamp iterate_ts)
-        : block_entry_(entry->GetBlockEntry()), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+        : block_entry_(entry->GetBlockEntry()), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr))),
           ele_size_(entry->column_type()->Size()), iterate_ts_(iterate_ts), offset_(0), read_end_(0) {}
     // TODO: Does `ColumnVector` implements the move constructor?
 
@@ -58,6 +58,8 @@ public:
 
     const SharedPtr<ColumnVector> &column_vector() const { return column_vector_; }
 
+    BlockOffset offset() const { return offset_; }
+
 private:
     const BlockEntry *const block_entry_;
     const SharedPtr<ColumnVector> column_vector_;
@@ -72,7 +74,7 @@ export template <>
 class BlockColumnIter<false> {
 public:
     BlockColumnIter(BlockColumnEntry *entry, BufferManager *buffer_mgr, TxnTimeStamp)
-        : block_entry_(entry->GetBlockEntry()), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+        : block_entry_(entry->GetBlockEntry()), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr))),
           ele_size_(entry->column_type()->Size()), size_(block_entry_->row_count()), offset_(0) {}
 
     Optional<Pair<const void *, BlockOffset>> Next() {
@@ -87,6 +89,8 @@ public:
 
     const SharedPtr<ColumnVector> &column_vector() const { return column_vector_; }
 
+    BlockOffset offset() const { return offset_; }
+
 private:
     const BlockEntry *const block_entry_;
     const SharedPtr<ColumnVector> column_vector_;
@@ -100,7 +104,7 @@ export template <typename DataType>
 class MemIndexInserterIter {
 public:
     MemIndexInserterIter(SegmentOffset block_offset, BlockColumnEntry *entry, BufferManager *buffer_mgr, SizeT offset, SizeT size)
-        : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+        : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr))),
           ele_size_(entry->column_type()->Size()), cur_(offset), end_(offset + size) {}
 
     Optional<Pair<const DataType *, SegmentOffset>> Next() {
@@ -126,7 +130,7 @@ export template <typename DataType, typename IdxType>
 class MemIndexInserterIter<SparseVecRef<DataType, IdxType>> {
 public:
     MemIndexInserterIter(SegmentOffset block_offset, BlockColumnEntry *entry, BufferManager *buffer_mgr, SizeT offset, SizeT size)
-        : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetColumnVector(buffer_mgr))),
+        : block_offset_(block_offset), column_vector_(MakeShared<ColumnVector>(entry->GetConstColumnVector(buffer_mgr))),
           ele_size_(entry->column_type()->Size()), cur_(offset), end_(offset + size) {}
 
     Optional<Pair<SparseVecRef<DataType, IdxType>, SegmentOffset>> Next() {
@@ -139,14 +143,7 @@ public:
             SparseVecRef<DataType, IdxType> sparse_vec_ref(0, nullptr, nullptr);
             return std::make_pair(sparse_vec_ref, block_offset_ + cur_++);
         }
-
-        const char *raw_data_ptr = column_vector_->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(v_ptr->chunk_id_, v_ptr->chunk_offset_);
-        const char *indice_ptr = raw_data_ptr;
-        const char *data_ptr = indice_ptr + v_ptr->nnz_ * sizeof(IdxType);
-
-        SparseVecRef<DataType, IdxType> sparse_vec_ref(v_ptr->nnz_,
-                                                       reinterpret_cast<const IdxType *>(indice_ptr),
-                                                       reinterpret_cast<const DataType *>(data_ptr));
+        SparseVecRef<DataType, IdxType> sparse_vec_ref = column_vector_->buffer_->GetSparse<DataType, IdxType>(v_ptr->file_offset_, v_ptr->nnz_);
         return std::make_pair(sparse_vec_ref, block_offset_ + cur_++);
     }
 

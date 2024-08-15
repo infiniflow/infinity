@@ -106,6 +106,8 @@ void RegisterGreaterEqualsFunction(const UniquePtr<Catalog> &catalog_ptr) {
     GenerateGreaterEqualsFunction<IntegerT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kInteger));
     GenerateGreaterEqualsFunction<BigIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kBigInt));
     GenerateGreaterEqualsFunction<HugeIntT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kHugeInt));
+    GenerateGreaterEqualsFunction<FloatT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kFloat16));
+    GenerateGreaterEqualsFunction<FloatT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kBFloat16));
     GenerateGreaterEqualsFunction<FloatT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kFloat));
     GenerateGreaterEqualsFunction<DoubleT, PODTypeGreaterEqualsFunction>(function_set_ptr, DataType(LogicalType::kDouble));
 

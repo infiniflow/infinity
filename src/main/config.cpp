@@ -85,7 +85,7 @@ Status Config::ParseTimeInfo(const String &time_info, i64 &time_seconds) {
     u64 time_number = 0;
     for (SizeT i = 0; i < info_size - 1; ++i) {
         if (std::isdigit(time_info[i])) {
-            time_number += time_number * 10 + (time_info[i] - '0');
+            time_number = time_number * 10 + (time_info[i] - '0');
         } else {
             return Status::InvalidTimeInfo(time_info);
         }
@@ -124,7 +124,8 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
     toml::table config_toml{};
     if (config_path.get() == nullptr || !fs.Exists(*config_path)) {
         if (config_path.get() == nullptr) {
-            fmt::print("No config file is given, use default configs.\n");
+//            fmt::print("No config file is given, use default configs.\n");
+            ;
         } else {
             if (!fs.Exists(*config_path)) {
                 fmt::print("Config file: {} is not existent.\n", *config_path);
@@ -234,6 +235,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
 
         // Log dir
         String log_dir = "/var/infinity/log";
+        if(default_config != nullptr) {
+            log_dir = default_config->default_log_dir_;
+        }
         UniquePtr<StringOption> log_dir_option = MakeUnique<StringOption>(LOG_DIR_OPTION_NAME, log_dir);
         status = global_options_.AddOption(std::move(log_dir_option));
         if(!status.ok()) {
@@ -286,6 +290,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
 
         // Data Dir
         String data_dir = "/var/infinity/data";
+        if(default_config != nullptr) {
+            data_dir = default_config->default_data_dir_;
+        }
         UniquePtr<StringOption> data_dir_option = MakeUnique<StringOption>(DATA_DIR_OPTION_NAME, data_dir);
         status = global_options_.AddOption(std::move(data_dir_option));
         if(!status.ok()) {
@@ -351,8 +358,20 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
             UnrecoverableError(status.message());
         }
 
+        i64 memindex_memory_quota = DEFAULT_MEMINDEX_MEMORY_QUOTA;
+        UniquePtr<IntegerOption> memindex_memory_quota_option = MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME,
+                                                                                          memindex_memory_quota, std::numeric_limits<i64>::max(), 0);
+        status = global_options_.AddOption(std::move(memindex_memory_quota_option));
+        if(!status.ok()) {
+            fmt::print("Fatal: {}", status.message());
+            UnrecoverableError(status.message());
+        }
+
         // Temp Dir
         String temp_dir = "/var/infinity/tmp";
+        if(default_config != nullptr) {
+            temp_dir = default_config->default_temp_dir_;
+        }
         UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
         status = global_options_.AddOption(std::move(temp_dir_option));
         if(!status.ok()) {
@@ -362,6 +381,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
 
         // WAL Dir
         String wal_dir = "/var/infinity/wal";
+        if(default_config != nullptr) {
+            wal_dir = default_config->default_wal_dir_;
+        }
         UniquePtr<StringOption> wal_dir_option = MakeUnique<StringOption>(WAL_DIR_OPTION_NAME, wal_dir);
         status = global_options_.AddOption(std::move(wal_dir_option));
         if(!status.ok()) {
@@ -424,6 +446,9 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
 
         // Resource Dir
         String resource_dir = "/var/infinity/resource";
+        if(default_config != nullptr) {
+            resource_dir = default_config->default_resource_dir_;
+        }
         UniquePtr<StringOption> resource_dir_option = MakeUnique<StringOption>("resource_dir", resource_dir);
         status = global_options_.AddOption(std::move(resource_dir_option));
         if(!status.ok()) {
@@ -1324,6 +1349,22 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                             global_options_.AddOption(std::move(temp_dir_option));
                             break;
                         }
+                        case GlobalOptionIndex::kMemIndexMemoryQuota: {
+                            i64 mem_index_memory_quota = DEFAULT_MEMINDEX_MEMORY_QUOTA;
+                            if (elem.second.is_string()) {
+                                String mem_index_memory_quota_str = elem.second.value_or(DEFAULT_MEMINDEX_MEMORY_QUOTA_STR.data());
+                                auto res = ParseByteSize(mem_index_memory_quota_str, mem_index_memory_quota);
+                                if (!res.ok()) {
+                                    return res;
+                                }
+                            } else {
+                                return Status::InvalidConfig("'mem_index_memory_quota' field isn't string.");
+                            }
+                            UniquePtr<IntegerOption> mem_index_memory_quota_option =
+                                MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME, mem_index_memory_quota, std::numeric_limits<i64>::max(), 0);
+                            global_options_.AddOption(std::move(mem_index_memory_quota_option));
+                            break;
+                        }
                         default: {
                             return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'buffer' field", var_name));
                         }
@@ -1355,6 +1396,16 @@ Status Config::Init(const SharedPtr<String> &config_path, DefaultConfig* default
                     String temp_dir = "/var/infinity/tmp";
                     UniquePtr<StringOption> temp_dir_option = MakeUnique<StringOption>(TEMP_DIR_OPTION_NAME, temp_dir);
                     Status status = global_options_.AddOption(std::move(temp_dir_option));
+                    if(!status.ok()) {
+                        UnrecoverableError(status.message());
+                    }
+                }
+                if (global_options_.GetOptionByIndex(GlobalOptionIndex::kMemIndexMemoryQuota) == nullptr) {
+                    // Mem Index Memory Quota
+                    i64 mem_index_memory_quota = DEFAULT_MEMINDEX_MEMORY_QUOTA;
+                    UniquePtr<IntegerOption> mem_index_memory_quota_option =
+                        MakeUnique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME, mem_index_memory_quota, std::numeric_limits<i64>::max(), 0);
+                    Status status = global_options_.AddOption(std::move(mem_index_memory_quota_option));
                     if(!status.ok()) {
                         UnrecoverableError(status.message());
                     }
@@ -1790,14 +1841,50 @@ i64 Config::CleanupInterval() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kCleanupInterval);
 }
 
+void Config::SetCleanupInterval(i64 interval) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kCleanupInterval);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
+        String error_message = "Attempt to set non-integer value to cleanup interval";
+        UnrecoverableError(error_message);
+    }
+    IntegerOption *cleanup_interval_option = static_cast<IntegerOption *>(base_option);
+    cleanup_interval_option->value_ = interval;
+    return ;
+}
+
 i64 Config::CompactInterval() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kCompactInterval);
 }
 
+void Config::SetCompactInterval(i64 interval) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kCompactInterval);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
+        String error_message = "Attempt to set non-integer value to compact segment interval";
+        UnrecoverableError(error_message);
+    }
+    IntegerOption *compact_interval_option = static_cast<IntegerOption *>(base_option);
+    compact_interval_option->value_ = interval;
+    return ;
+}
+
 i64 Config::OptimizeIndexInterval() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kOptimizeIndexInterval);
+}
+
+void Config::SetOptimizeInterval(i64 interval) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kOptimizeIndexInterval);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
+        String error_message = "Attempt to set non-integer value to optimize interval";
+        UnrecoverableError(error_message);
+    }
+    IntegerOption *optimize_interval_option = static_cast<IntegerOption *>(base_option);
+    optimize_interval_option->value_ = interval;
+    return ;
 }
 
 i64 Config::MemIndexCapacity() {
@@ -1832,6 +1919,11 @@ String Config::TempDir() {
     return global_options_.GetStringValue(GlobalOptionIndex::kTempDir);
 }
 
+i64 Config::MemIndexMemoryQuota() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    return global_options_.GetIntegerValue(GlobalOptionIndex::kMemIndexMemoryQuota);
+}
+
 // WAL
 String Config::WALDir() {
     std::lock_guard<std::mutex> guard(mutex_);
@@ -1848,9 +1940,33 @@ i64 Config::FullCheckpointInterval() {
     return global_options_.GetIntegerValue(GlobalOptionIndex::kFullCheckpointInterval);
 }
 
+void Config::SetFullCheckpointInterval(i64 interval) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kFullCheckpointInterval);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
+        String error_message = "Attempt to set non-integer value to full checkpoint interval";
+        UnrecoverableError(error_message);
+    }
+    IntegerOption *full_checkpoint_interval_option = static_cast<IntegerOption *>(base_option);
+    full_checkpoint_interval_option->value_ = interval;
+    return ;
+}
+
 i64 Config::DeltaCheckpointInterval() {
     std::lock_guard<std::mutex> guard(mutex_);
     return global_options_.GetIntegerValue(GlobalOptionIndex::kDeltaCheckpointInterval);
+}
+
+void Config::SetDeltaCheckpointInterval(i64 interval) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    BaseOption *base_option = global_options_.GetOptionByIndex(GlobalOptionIndex::kDeltaCheckpointInterval);
+    if (base_option->data_type_ != BaseOptionDataType::kInteger) {
+        String error_message = "Attempt to set non-integer value to delta checkpoint interval";
+        UnrecoverableError(error_message);
+    }
+    IntegerOption *delta_checkpoint_interval_option = static_cast<IntegerOption *>(base_option);
+    delta_checkpoint_interval_option->value_ = interval;
+    return ;
 }
 
 i64 Config::DeltaCheckpointThreshold() {
@@ -1922,6 +2038,7 @@ void Config::PrintAll() {
     // Buffer manager
     fmt::print(" - buffer_manager_size: {}\n", Utility::FormatByteSize(BufferManagerSize()));
     fmt::print(" - temp_dir: {}\n", TempDir());
+    fmt::print(" - memindex_memory_quota: {}\n", Utility::FormatByteSize(MemIndexMemoryQuota()));
 
     // WAL
     fmt::print(" - wal_dir: {}\n", WALDir());

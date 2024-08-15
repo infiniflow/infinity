@@ -31,6 +31,7 @@ import value;
 import meta_entry_interface;
 import cleanup_scanner;
 import logger;
+import bitmask;
 
 namespace infinity {
 
@@ -125,6 +126,10 @@ public:
 
     bool CheckRowVisible(SegmentOffset segment_offset, TxnTimeStamp check_ts, bool check_append) const;
 
+    void CheckRowsVisible(Vector<u32> &segment_offsets, TxnTimeStamp check_ts) const;
+
+    void CheckRowsVisible(Bitmask &segment_offsets, TxnTimeStamp check_ts) const;
+
     virtual bool CheckVisible(Txn *txn) const override;
 
     bool CheckDeprecate(TxnTimeStamp check_ts) const;
@@ -145,6 +150,7 @@ public:
     void LoadFilterBinaryData(const String &segment_filter_data);
     static String SegmentStatusToString(const SegmentStatus &type);
 
+    String ToString() const;
 public:
     // Const getter
     const TableEntry *GetTableEntry() const { return table_entry_; }

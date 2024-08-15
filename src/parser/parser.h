@@ -75,6 +75,7 @@ extern int sqldebug;
 #include "statement/update_statement.h"
 #include "statement/command_statement.h"
 #include "statement/compact_statement.h"
+#include "statement/admin_statement.h"
 #include "table_reference/base_table_reference.h"
 #include "table_reference/join_reference.h"
 #include "table_reference/cross_product_reference.h"
@@ -116,7 +117,7 @@ struct SQL_LTYPE {
         }                                         \
     }
 
-#line 120 "parser.h"
+#line 121 "parser.h"
 
 /* Token kinds.  */
 #ifndef SQLTOKENTYPE
@@ -229,81 +230,92 @@ struct SQL_LTYPE {
     DATE = 357,                    /* DATE  */
     TIME = 358,                    /* TIME  */
     DATETIME = 359,                /* DATETIME  */
-    TIMESTAMP = 360,               /* TIMESTAMP  */
-    UUID = 361,                    /* UUID  */
-    POINT = 362,                   /* POINT  */
-    LINE = 363,                    /* LINE  */
-    LSEG = 364,                    /* LSEG  */
-    BOX = 365,                     /* BOX  */
-    PATH = 366,                    /* PATH  */
-    POLYGON = 367,                 /* POLYGON  */
-    CIRCLE = 368,                  /* CIRCLE  */
-    BLOB = 369,                    /* BLOB  */
-    BITMAP = 370,                  /* BITMAP  */
-    EMBEDDING = 371,               /* EMBEDDING  */
-    VECTOR = 372,                  /* VECTOR  */
-    BIT = 373,                     /* BIT  */
-    TEXT = 374,                    /* TEXT  */
-    TENSOR = 375,                  /* TENSOR  */
-    SPARSE = 376,                  /* SPARSE  */
-    TENSORARRAY = 377,             /* TENSORARRAY  */
-    PRIMARY = 378,                 /* PRIMARY  */
-    KEY = 379,                     /* KEY  */
-    UNIQUE = 380,                  /* UNIQUE  */
-    NULLABLE = 381,                /* NULLABLE  */
-    IS = 382,                      /* IS  */
-    DEFAULT = 383,                 /* DEFAULT  */
-    TRUE = 384,                    /* TRUE  */
-    FALSE = 385,                   /* FALSE  */
-    INTERVAL = 386,                /* INTERVAL  */
-    SECOND = 387,                  /* SECOND  */
-    SECONDS = 388,                 /* SECONDS  */
-    MINUTE = 389,                  /* MINUTE  */
-    MINUTES = 390,                 /* MINUTES  */
-    HOUR = 391,                    /* HOUR  */
-    HOURS = 392,                   /* HOURS  */
-    DAY = 393,                     /* DAY  */
-    DAYS = 394,                    /* DAYS  */
-    MONTH = 395,                   /* MONTH  */
-    MONTHS = 396,                  /* MONTHS  */
-    YEAR = 397,                    /* YEAR  */
-    YEARS = 398,                   /* YEARS  */
-    EQUAL = 399,                   /* EQUAL  */
-    NOT_EQ = 400,                  /* NOT_EQ  */
-    LESS_EQ = 401,                 /* LESS_EQ  */
-    GREATER_EQ = 402,              /* GREATER_EQ  */
-    BETWEEN = 403,                 /* BETWEEN  */
-    AND = 404,                     /* AND  */
-    OR = 405,                      /* OR  */
-    EXTRACT = 406,                 /* EXTRACT  */
-    LIKE = 407,                    /* LIKE  */
-    DATA = 408,                    /* DATA  */
-    LOG = 409,                     /* LOG  */
-    BUFFER = 410,                  /* BUFFER  */
-    TRANSACTIONS = 411,            /* TRANSACTIONS  */
-    TRANSACTION = 412,             /* TRANSACTION  */
-    USING = 413,                   /* USING  */
-    SESSION = 414,                 /* SESSION  */
-    GLOBAL = 415,                  /* GLOBAL  */
-    OFF = 416,                     /* OFF  */
-    EXPORT = 417,                  /* EXPORT  */
-    PROFILE = 418,                 /* PROFILE  */
-    CONFIGS = 419,                 /* CONFIGS  */
-    CONFIG = 420,                  /* CONFIG  */
-    PROFILES = 421,                /* PROFILES  */
-    VARIABLES = 422,               /* VARIABLES  */
-    VARIABLE = 423,                /* VARIABLE  */
-    DELTA = 424,                   /* DELTA  */
-    LOGS = 425,                    /* LOGS  */
-    CATALOGS = 426,                /* CATALOGS  */
-    SEARCH = 427,                  /* SEARCH  */
-    MATCH = 428,                   /* MATCH  */
-    MAXSIM = 429,                  /* MAXSIM  */
-    QUERY = 430,                   /* QUERY  */
-    QUERIES = 431,                 /* QUERIES  */
-    FUSION = 432,                  /* FUSION  */
-    ROWLIMIT = 433,                /* ROWLIMIT  */
-    NUMBER = 434                   /* NUMBER  */
+    FLOAT16 = 360,                 /* FLOAT16  */
+    BFLOAT16 = 361,                /* BFLOAT16  */
+    UNSIGNED = 362,                /* UNSIGNED  */
+    TIMESTAMP = 363,               /* TIMESTAMP  */
+    UUID = 364,                    /* UUID  */
+    POINT = 365,                   /* POINT  */
+    LINE = 366,                    /* LINE  */
+    LSEG = 367,                    /* LSEG  */
+    BOX = 368,                     /* BOX  */
+    PATH = 369,                    /* PATH  */
+    POLYGON = 370,                 /* POLYGON  */
+    CIRCLE = 371,                  /* CIRCLE  */
+    BLOB = 372,                    /* BLOB  */
+    BITMAP = 373,                  /* BITMAP  */
+    EMBEDDING = 374,               /* EMBEDDING  */
+    VECTOR = 375,                  /* VECTOR  */
+    BIT = 376,                     /* BIT  */
+    TEXT = 377,                    /* TEXT  */
+    TENSOR = 378,                  /* TENSOR  */
+    SPARSE = 379,                  /* SPARSE  */
+    TENSORARRAY = 380,             /* TENSORARRAY  */
+    IGNORE = 381,                  /* IGNORE  */
+    PRIMARY = 382,                 /* PRIMARY  */
+    KEY = 383,                     /* KEY  */
+    UNIQUE = 384,                  /* UNIQUE  */
+    NULLABLE = 385,                /* NULLABLE  */
+    IS = 386,                      /* IS  */
+    DEFAULT = 387,                 /* DEFAULT  */
+    TRUE = 388,                    /* TRUE  */
+    FALSE = 389,                   /* FALSE  */
+    INTERVAL = 390,                /* INTERVAL  */
+    SECOND = 391,                  /* SECOND  */
+    SECONDS = 392,                 /* SECONDS  */
+    MINUTE = 393,                  /* MINUTE  */
+    MINUTES = 394,                 /* MINUTES  */
+    HOUR = 395,                    /* HOUR  */
+    HOURS = 396,                   /* HOURS  */
+    DAY = 397,                     /* DAY  */
+    DAYS = 398,                    /* DAYS  */
+    MONTH = 399,                   /* MONTH  */
+    MONTHS = 400,                  /* MONTHS  */
+    YEAR = 401,                    /* YEAR  */
+    YEARS = 402,                   /* YEARS  */
+    EQUAL = 403,                   /* EQUAL  */
+    NOT_EQ = 404,                  /* NOT_EQ  */
+    LESS_EQ = 405,                 /* LESS_EQ  */
+    GREATER_EQ = 406,              /* GREATER_EQ  */
+    BETWEEN = 407,                 /* BETWEEN  */
+    AND = 408,                     /* AND  */
+    OR = 409,                      /* OR  */
+    EXTRACT = 410,                 /* EXTRACT  */
+    LIKE = 411,                    /* LIKE  */
+    DATA = 412,                    /* DATA  */
+    LOG = 413,                     /* LOG  */
+    BUFFER = 414,                  /* BUFFER  */
+    TRANSACTIONS = 415,            /* TRANSACTIONS  */
+    TRANSACTION = 416,             /* TRANSACTION  */
+    MEMINDEX = 417,                /* MEMINDEX  */
+    USING = 418,                   /* USING  */
+    SESSION = 419,                 /* SESSION  */
+    GLOBAL = 420,                  /* GLOBAL  */
+    OFF = 421,                     /* OFF  */
+    EXPORT = 422,                  /* EXPORT  */
+    PROFILE = 423,                 /* PROFILE  */
+    CONFIGS = 424,                 /* CONFIGS  */
+    CONFIG = 425,                  /* CONFIG  */
+    PROFILES = 426,                /* PROFILES  */
+    VARIABLES = 427,               /* VARIABLES  */
+    VARIABLE = 428,                /* VARIABLE  */
+    DELTA = 429,                   /* DELTA  */
+    LOGS = 430,                    /* LOGS  */
+    CATALOGS = 431,                /* CATALOGS  */
+    CATALOG = 432,                 /* CATALOG  */
+    SEARCH = 433,                  /* SEARCH  */
+    MATCH = 434,                   /* MATCH  */
+    MAXSIM = 435,                  /* MAXSIM  */
+    QUERY = 436,                   /* QUERY  */
+    QUERIES = 437,                 /* QUERIES  */
+    FUSION = 438,                  /* FUSION  */
+    ROWLIMIT = 439,                /* ROWLIMIT  */
+    ADMIN = 440,                   /* ADMIN  */
+    PERSISTENCE = 441,             /* PERSISTENCE  */
+    OBJECT = 442,                  /* OBJECT  */
+    OBJECTS = 443,                 /* OBJECTS  */
+    FILES = 444,                   /* FILES  */
+    NUMBER = 445                   /* NUMBER  */
   };
   typedef enum sqltokentype sqltoken_kind_t;
 #endif
@@ -312,7 +324,7 @@ struct SQL_LTYPE {
 #if ! defined SQLSTYPE && ! defined SQLSTYPE_IS_DECLARED
 union SQLSTYPE
 {
-#line 103 "parser.y"
+#line 104 "parser.y"
 
     bool    bool_value;
     char*   str_value;
@@ -336,6 +348,7 @@ union SQLSTYPE
     infinity::OptimizeStatement*  optimize_stmt;
     infinity::CommandStatement* command_stmt;
     infinity::CompactStatement* compact_stmt;
+    infinity::AdminStatement* admin_stmt;
 
     std::vector<infinity::BaseStatement*>* stmt_array;
 
@@ -381,7 +394,7 @@ union SQLSTYPE
     std::vector<infinity::InitParameter*>* index_param_list_t;
     std::vector<infinity::InitParameter*>* with_index_param_list_t;
 
-    std::vector<infinity::IndexInfo*>* index_info_list_t;
+    infinity::IndexInfo* index_info_t;
 
     // infinity::IfExistsInfo*        if_exists_info_t;
     infinity::IfNotExistsInfo*     if_not_exists_info_t;
@@ -389,7 +402,7 @@ union SQLSTYPE
     std::pair<int64_t, int64_t>*    int_sparse_ele_t;
     std::pair<int64_t, double>*     float_sparse_ele_t;
 
-#line 393 "parser.h"
+#line 406 "parser.h"
 
 };
 typedef union SQLSTYPE SQLSTYPE;

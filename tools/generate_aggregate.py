@@ -52,7 +52,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(
+            "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(
                 table_name, copy_path
             )
         )
@@ -139,7 +139,7 @@ def generate(generate_if_exists: bool, copy_dir: str):
         slt_file.write("\n")
         slt_file.write("query I\n")
         slt_file.write(
-            "COPY {} FROM '{}' WITH ( DELIMITER ',' );\n".format(
+            "COPY {} FROM '{}' WITH ( DELIMITER ',', FORMAT CSV );\n".format(
                 table_name, copy_path
             )
         )

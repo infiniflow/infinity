@@ -105,7 +105,7 @@ git config --global --add safe.directory infinity
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-18
 export CXX=/usr/bin/clang++-18
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON ..
 cmake --build .
 ```
 
@@ -196,7 +196,7 @@ git config --global --add safe.directory infinity
 cd infinity && mkdir cmake-build-debug && cd cmake-build-debug
 export CC=/usr/bin/clang-18
 export CXX=/usr/bin/clang++-18
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_VERBOSE_MAKEFILE=ON ..
 cmake --build .
 ```
 

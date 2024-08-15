@@ -42,6 +42,7 @@ enum class ShowStmtType {
     kGlobalVariables,
     kConfig,
     kBuffer,
+    kMemIndex,
     kQueries,
     kQuery,
     kTransactions,
@@ -51,6 +52,9 @@ enum class ShowStmtType {
     kLogs,
     kDeltaLogs,
     kCatalogs,
+    kPersistenceFiles,
+    kPersistenceObjects,
+    kPersistenceObject,
 };
 
 class ShowStatement : public BaseStatement {
@@ -63,6 +67,7 @@ public:
     std::string schema_name_{};
     std::string table_name_{};
     std::optional<std::string> index_name_{};
+    std::optional<std::string> file_name_{};
     std::optional<int64_t> segment_id_{};
     std::optional<int64_t> block_id_{};
     std::optional<int64_t> chunk_id_{};

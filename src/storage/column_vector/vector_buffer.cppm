@@ -21,6 +21,10 @@ import global_resource_usage;
 import heap_chunk;
 import fix_heap;
 import buffer_handle;
+import var_buffer;
+import data_type;
+import sparse_util;
+import sparse_info;
 
 namespace infinity {
 
@@ -33,7 +37,8 @@ export enum class VectorBufferType {
     kHeap, // varchar, can be stored across multiple chunks
     kCompactBit,
     kTensorHeap, // tensor, should be stored in one chunk
-    kSparseHeap, // sparse, should be stored in one chunk
+
+    kVarBuffer, // new varchar
 };
 
 export class VectorBuffer {
@@ -67,7 +72,7 @@ public:
 
     void Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT type_size, SizeT capacity);
 
-    void ResetToInit();
+    void ResetToInit(VectorBufferType type);
 
     void Copy(ptr_t input, SizeT size);
 
@@ -113,6 +118,62 @@ public:
 
     UniquePtr<FixHeapManager> fix_heap_mgr_{nullptr};
     UniquePtr<FixHeapManager> fix_heap_mgr_1_{nullptr};
+
+public:
+    void Reset() {
+        fix_heap_mgr_ = nullptr;
+        fix_heap_mgr_1_ = nullptr;
+        var_buffer_mgr_ = nullptr;
+    }
+
+    SizeT TotalSize(const DataType *data_type) const;
+
+    void WriteAdv(char *&ptr, const DataType *data_type) const;
+
+    void ReadAdv(char *&ptr, const DataType *data_type);
+
+    const char *GetVarchar(SizeT offset, SizeT len) const;
+
+    SizeT AppendVarchar(const char *data, SizeT len);
+
+    Pair<const char *, const char *> GetSparseRaw(SizeT offset, SizeT nnz, const SparseInfo *sparse_info) const;
+
+    SizeT AppendSparseRaw(const char *raw_data, const char *raw_idx, SizeT nnz, const SparseInfo *sparse_info);
+
+    template <typename DataType, typename IdxType>
+    SparseVecRef<DataType, IdxType> GetSparse(SizeT offset, SizeT nnz) const;
+
+    template <typename DataType, typename IdxType>
+    SizeT AppendSparse(const SparseVecRef<DataType, IdxType> &sparse_vec);
+
+private:
+    UniquePtr<VarBufferManager> var_buffer_mgr_{nullptr};
 };
+
+template <typename DataType, typename IdxType>
+SparseVecRef<DataType, IdxType> VectorBuffer::GetSparse(SizeT offset, SizeT nnz) const {
+    if (nnz == 0) {
+        return {0, nullptr, nullptr};
+    }
+    SizeT indice_size = SparseInfo::IndiceSize<IdxType>(nnz);
+    SizeT data_size = SparseInfo::DataSize<DataType>(nnz);
+    const char *raw_indice = var_buffer_mgr_->Get(offset, indice_size);
+    const char *raw_data = nullptr;
+    if (data_size > 0) {
+        raw_data = var_buffer_mgr_->Get(offset + indice_size, data_size);
+    }
+    return {static_cast<i32>(nnz), reinterpret_cast<const IdxType *>(raw_indice), reinterpret_cast<const DataType *>(raw_data)};
+}
+
+template <typename DataType, typename IdxType>
+SizeT VectorBuffer::AppendSparse(const SparseVecRef<DataType, IdxType> &sparse_vec) {
+    SizeT indice_size = SparseInfo::IndiceSize<IdxType>(sparse_vec.nnz_);
+    SizeT data_size = SparseInfo::DataSize<DataType>(sparse_vec.nnz_);
+    SizeT file_offset = var_buffer_mgr_->Append(reinterpret_cast<const char *>(sparse_vec.indices_), indice_size);
+    if (data_size > 0) {
+        var_buffer_mgr_->Append(reinterpret_cast<const char *>(sparse_vec.data_), data_size);
+    }
+    return file_offset;
+}
 
 } // namespace infinity

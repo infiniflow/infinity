@@ -29,6 +29,11 @@ import parsed_expr;
 import constant_expr;
 import stl;
 import data_type;
+import block_version;
+import create_index_info;
+import infinity_context;
+import index_defines;
+import persistence_manager;
 
 import third_party;
 import logger;
@@ -36,17 +41,37 @@ import logger;
 namespace infinity {
 
 String ToString(CatalogDeltaOpType op_type) {
-    switch(op_type) {
-        case CatalogDeltaOpType::ADD_DATABASE_ENTRY: { return "AddDatabase"; }
-        case CatalogDeltaOpType::ADD_TABLE_ENTRY: { return "AddTable"; }
-        case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: { return "AddSegment"; }
-        case CatalogDeltaOpType::ADD_BLOCK_ENTRY: { return "AddBlock"; }
-        case CatalogDeltaOpType::ADD_COLUMN_ENTRY: { return "AddColumn"; }
-        case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: { return "AddTableIndex"; }
-        case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: { return "AddSegmentIndex"; }
-        case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: { return "AddChunkIndex"; }
-        case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: { return "SealSegment"; }
-        case CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED: { return "SealBlock"; }
+    switch (op_type) {
+        case CatalogDeltaOpType::ADD_DATABASE_ENTRY: {
+            return "AddDatabase";
+        }
+        case CatalogDeltaOpType::ADD_TABLE_ENTRY: {
+            return "AddTable";
+        }
+        case CatalogDeltaOpType::ADD_SEGMENT_ENTRY: {
+            return "AddSegment";
+        }
+        case CatalogDeltaOpType::ADD_BLOCK_ENTRY: {
+            return "AddBlock";
+        }
+        case CatalogDeltaOpType::ADD_COLUMN_ENTRY: {
+            return "AddColumn";
+        }
+        case CatalogDeltaOpType::ADD_TABLE_INDEX_ENTRY: {
+            return "AddTableIndex";
+        }
+        case CatalogDeltaOpType::ADD_SEGMENT_INDEX_ENTRY: {
+            return "AddSegmentIndex";
+        }
+        case CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY: {
+            return "AddChunkIndex";
+        }
+        case CatalogDeltaOpType::SET_SEGMENT_STATUS_SEALED: {
+            return "SealSegment";
+        }
+        case CatalogDeltaOpType::SET_BLOCK_STATUS_SEALED: {
+            return "SealBlock";
+        }
         case CatalogDeltaOpType::INVALID: {
             String error_message = "Invalid catalog delta operation type.";
             UnrecoverableError(error_message);
@@ -58,6 +83,12 @@ String ToString(CatalogDeltaOpType op_type) {
 SizeT CatalogDeltaOperation::GetBaseSizeInBytes() const {
     SizeT size = sizeof(TxnTimeStamp) + sizeof(merge_flag_) + sizeof(TransactionID) + sizeof(TxnTimeStamp);
     size += sizeof(i32) + encode_->size();
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        size += pm->GetSizeInBytes(GetFilePaths());
+    }
     return size;
 }
 
@@ -67,6 +98,12 @@ void CatalogDeltaOperation::WriteAdvBase(char *&buf) const {
     WriteBufAdv(buf, this->txn_id_);
     WriteBufAdv(buf, this->commit_ts_);
     WriteBufAdv(buf, *(this->encode_));
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        pm->WriteBufAdv(buf, GetFilePaths());
+    }
 }
 
 void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
@@ -75,6 +112,12 @@ void CatalogDeltaOperation::ReadAdvBase(char *&ptr) {
     txn_id_ = ReadBufAdv<TransactionID>(ptr);
     commit_ts_ = ReadBufAdv<TxnTimeStamp>(ptr);
     encode_ = MakeUnique<String>(ReadBufAdv<String>(ptr));
+
+    PersistenceManager *pm = InfinityContext::instance().persistence_manager();
+    bool use_object_cache = pm != nullptr;
+    if (use_object_cache) {
+        pm->ReadBufAdv(ptr);
+    }
 }
 
 const String CatalogDeltaOperation::ToString() const {
@@ -320,13 +363,18 @@ AddBlockEntryOp::AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_BLOCK_ENTRY, block_entry, commit_ts), block_entry_(block_entry),
       row_capacity_(block_entry->row_capacity()), row_count_(block_entry->row_count()), min_row_ts_(block_entry->min_row_ts()),
       max_row_ts_(block_entry->max_row_ts()), checkpoint_ts_(block_entry->checkpoint_ts()),
-      checkpoint_row_count_(block_entry->checkpoint_row_count()), block_filter_binary_data_(std::move(block_filter_binary_data)) {}
+      checkpoint_row_count_(block_entry->checkpoint_row_count()), block_filter_binary_data_(std::move(block_filter_binary_data)) {
+    String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
+    String file_path = fmt::format("{}/{}", file_dir, *BlockVersion::FileName());
+    local_paths_.push_back(file_path);
+}
 
 AddColumnEntryOp::AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts) {
     for (u32 layer = 0; layer < 2; ++layer) {
         outline_infos_.emplace_back(column_entry->OutlineBufferCount(layer), column_entry->LastChunkOff(layer));
     }
+    local_paths_.push_back(column_entry->FilePath());
 }
 
 AddTableIndexEntryOp::AddTableIndexEntryOp(TableIndexEntry *table_index_entry, TxnTimeStamp commit_ts)
@@ -339,7 +387,33 @@ AddSegmentIndexEntryOp::AddSegmentIndexEntryOp(SegmentIndexEntry *segment_index_
 
 AddChunkIndexEntryOp::AddChunkIndexEntryOp(ChunkIndexEntry *chunk_index_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY, chunk_index_entry, commit_ts), base_name_(chunk_index_entry->base_name_),
-      base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {}
+      base_rowid_(chunk_index_entry->base_rowid_), row_count_(chunk_index_entry->row_count_), deprecate_ts_(chunk_index_entry->deprecate_ts_) {
+    SegmentIndexEntry *segment_index_entry = chunk_index_entry->segment_index_entry_;
+    IndexType index_type = segment_index_entry->table_index_entry()->index_base()->index_type_;
+    switch (index_type) {
+        case IndexType::kFullText: {
+            String full_path = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
+            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + POSTING_SUFFIX);
+            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + DICT_SUFFIX);
+            local_paths_.push_back(full_path + chunk_index_entry->base_name_ + LENGTH_SUFFIX);
+            break;
+        }
+        case IndexType::kHnsw:
+        case IndexType::kEMVB:
+        case IndexType::kSecondary:
+        case IndexType::kBMP: {
+            String full_dir = fmt::format("{}/{}", *chunk_index_entry->base_dir_, *(segment_index_entry->index_dir()));
+            String file_name = ChunkIndexEntry::IndexFileName(segment_index_entry->segment_id(), chunk_index_entry->chunk_id_);
+            String full_path = fmt::format("{}/{}", full_dir, file_name);
+            local_paths_.push_back(full_path);
+            break;
+        }
+        default: {
+            String error_message = "Unsupported index type when add delta catalog op.";
+            UnrecoverableError(error_message);
+        }
+    }
+}
 
 UniquePtr<AddDBEntryOp> AddDBEntryOp::ReadAdv(char *&ptr) {
     auto add_db_op = MakeUnique<AddDBEntryOp>();
@@ -862,7 +936,10 @@ void AddSegmentIndexEntryOp::Merge(CatalogDeltaOperation &other) {
         String error_message = fmt::format("Merge failed, other type: {}", other.GetTypeStr());
         UnrecoverableError(error_message);
     }
-    *this = std::move(static_cast<AddSegmentIndexEntryOp &>(other));
+    auto &add_segment_index_op = static_cast<AddSegmentIndexEntryOp &>(other);
+    MergeFlag flag = this->NextDeleteFlag(add_segment_index_op.merge_flag_);
+    *this = std::move(add_segment_index_op);
+    this->merge_flag_ = flag;
 }
 
 void AddChunkIndexEntryOp::Merge(CatalogDeltaOperation &other) {
@@ -1064,22 +1141,29 @@ void GlobalCatalogDeltaEntry::ReplayDeltaEntry(UniquePtr<CatalogDeltaEntry> delt
 }
 
 // background process Checkpoint call this.
-UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp max_commit_ts) {
+UniquePtr<CatalogDeltaEntry> GlobalCatalogDeltaEntry::PickFlushEntry(TxnTimeStamp &max_commit_ts) {
     auto flush_delta_entry = MakeUnique<CatalogDeltaEntry>();
 
-    std::lock_guard<std::mutex> lock(catalog_delta_locker_);
+    Map<String, UniquePtr<CatalogDeltaOperation>> delta_ops;
+    HashSet<TransactionID> txn_ids;
     {
-        auto delta_ops = std::exchange(delta_ops_, {});
-        auto txn_ids = std::exchange(txn_ids_, {});
+        std::lock_guard<std::mutex> lock(catalog_delta_locker_);
+        delta_ops = std::exchange(delta_ops_, {});
+        txn_ids = std::exchange(txn_ids_, {});
+    }
+    {
+        TxnTimeStamp max_ts = 0;
         for (auto &[_, delta_op] : delta_ops) {
             if (delta_op->commit_ts_ <= last_full_ckp_ts_) { // skip the delta op that is before full checkpoint
                 continue;
             }
+            max_ts = std::max(max_ts, delta_op->commit_ts_);
             flush_delta_entry->AddOperation(std::move(delta_op));
         }
-
-        flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids.begin(), txn_ids.end()));
+        max_commit_ts = std::max(max_ts, max_commit_ts_);
     }
+
+    flush_delta_entry->set_txn_ids(Vector<TransactionID>(txn_ids.begin(), txn_ids.end()));
     flush_delta_entry->set_commit_ts(max_commit_ts);
 
     // write delta op from top to bottom.
@@ -1105,12 +1189,18 @@ void GlobalCatalogDeltaEntry::AddDeltaEntryInner(CatalogDeltaEntry *delta_entry)
         String error_message = "max_commit_ts == UNCOMMIT_TS";
         UnrecoverableError(error_message);
     }
+    max_commit_ts_ = std::max(max_commit_ts_, max_commit_ts);
 
     for (auto &new_op : delta_entry->operations()) {
         if (new_op->type_ == CatalogDeltaOpType::ADD_SEGMENT_ENTRY) {
             auto *add_segment_op = static_cast<AddSegmentEntryOp *>(new_op.get());
             if (add_segment_op->status_ == SegmentStatus::kDeprecated) {
                 add_segment_op->merge_flag_ = MergeFlag::kDelete;
+            }
+        } else if (new_op->type_ == CatalogDeltaOpType::ADD_CHUNK_INDEX_ENTRY) {
+            auto *add_chunk_index_op = static_cast<AddChunkIndexEntryOp *>(new_op.get());
+            if (add_chunk_index_op->deprecate_ts_ != UNCOMMIT_TS) {
+                add_chunk_index_op->merge_flag_ = MergeFlag::kDelete;
             }
         }
         const String &encode = *new_op->encode_;
@@ -1183,16 +1273,10 @@ Vector<CatalogDeltaOpBrief> GlobalCatalogDeltaEntry::GetOperationBriefs() const 
     {
         std::lock_guard<std::mutex> lock(catalog_delta_locker_);
         res.reserve(delta_ops_.size());
-        for(const auto& op_pair: delta_ops_) {
-            CatalogDeltaOperation* delta_op = op_pair.second.get();
+        for (const auto &op_pair : delta_ops_) {
+            CatalogDeltaOperation *delta_op = op_pair.second.get();
 
-            res.push_back({
-                delta_op->begin_ts_,
-                delta_op->commit_ts_,
-                delta_op->txn_id_,
-                delta_op->type_,
-                MakeShared<String>(delta_op->ToString())
-            });
+            res.push_back({delta_op->begin_ts_, delta_op->commit_ts_, delta_op->txn_id_, delta_op->type_, MakeShared<String>(delta_op->ToString())});
         }
     }
     return res;

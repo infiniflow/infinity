@@ -28,8 +28,7 @@ class TestInsertParallel:
             "c_double": {"type": "float64"},
             "c_vector": {"type": "vector, 4, float"}
         }, ConflictType.Error)
-        table_obj.create_index("text_index", [index.IndexInfo("text",
-                                                              index.IndexType.FullText, [])])
+        table_obj.create_index("text_index", index.IndexInfo("text", index.IndexType.FullText))
         connection_pool.release_conn(infinity_obj)
 
         threads = []
@@ -73,8 +72,7 @@ class TestInsertParallel:
             "c_double": {"type": "float64"},
             "c_vector": {"type": "vector, 4, float"}
         }, ConflictType.Error)
-        table_obj.create_index("text_index", [index.IndexInfo("text",
-                                                              index.IndexType.FullText, [])])
+        table_obj.create_index("text_index", index.IndexInfo("text", index.IndexType.FullText))
 
         db_obj = infinity_obj.get_database("default_db")
         table_obj = db_obj.get_table("parallel_insert_test")
@@ -122,8 +120,7 @@ class TestInsertParallel:
             "c_double": {"type": "float64"},
             "c_vector": {"type": "vector, 4, float"}
         }, ConflictType.Error)
-        table_obj.create_index("text_index", [index.IndexInfo("text",
-                                                              index.IndexType.FullText, [])])
+        table_obj.create_index("text_index", index.IndexInfo("text", index.IndexType.FullText))
         connection_pool.release_conn(infinity_obj)
 
         threads = []

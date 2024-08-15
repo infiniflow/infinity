@@ -27,6 +27,7 @@ import third_party;
 import internal_types;
 import data_type;
 import logger;
+import status;
 
 namespace infinity {
 
@@ -77,8 +78,8 @@ bool LikeOperator(const ptr_t left_ptr, SizeT left_len, const ptr_t right_ptr, S
 struct LikeFunction {
     template <typename TA, typename TB, typename TC>
     static inline void Run(TA, TB, TC &) {
-        String error_message = "Not implement: LikeFunction";
-        UnrecoverableError(error_message);
+        Status status = Status::NotSupport("Not support: Like function");
+        RecoverableError(status);
     }
 };
 

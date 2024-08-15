@@ -42,16 +42,15 @@ public:
                         BGTaskProcessor *task_processor,
                         WalManager *wal_mgr,
                         TransactionID start_txn_id,
-                        TxnTimeStamp start_ts,
-                        bool enable_compaction);
+                        TxnTimeStamp start_ts);
 
     ~TxnManager() = default;
 
     Txn *BeginTxn(UniquePtr<String> txn_text, bool ckp_txn = false);
 
-    Txn *GetTxn(TransactionID txn_id);
+    Txn *GetTxn(TransactionID txn_id) const;
 
-    TxnState GetTxnState(TransactionID txn_id);
+    TxnState GetTxnState(TransactionID txn_id) const;
 
     bool CheckIfCommitting(TransactionID txn_id, TxnTimeStamp begin_ts);
 
@@ -93,6 +92,8 @@ public:
 
     TxnTimeStamp CurrentTS() const;
 
+    TxnTimeStamp GetNewTimeStamp();
+
     TxnTimeStamp GetCleanupScanTS();
 
     void IncreaseCommittedTxnCount() { ++total_committed_txn_count_; }
@@ -107,8 +108,6 @@ private:
     void FinishTxn(Txn *txn);
 
 public:
-    bool enable_compaction() const { return enable_compaction_; }
-
     u64 NextSequence() { return ++sequence_; }
 
     bool InCheckpointProcess(TxnTimeStamp commit_ts);

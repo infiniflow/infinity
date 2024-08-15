@@ -18,7 +18,7 @@ import inspect
 import pandas as pd
 import polars as pl
 import sqlglot.expressions as exp
-
+import numpy as np
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
@@ -88,6 +88,18 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
                 parsed_expr.type = parser_expr_type
                 return parsed_expr
 
+    elif isinstance(cons, exp.Boolean):
+        parsed_expr = ttypes.ParsedExpr()
+        constant_expr = ttypes.ConstantExpr()
+        constant_expr.literal_type = ttypes.LiteralType.Boolean
+        constant_expr.bool_value = cons.this
+
+        parser_expr_type = ttypes.ParsedExprType()
+        parser_expr_type.constant_expr = constant_expr
+
+        parsed_expr.type = parser_expr_type
+        return parsed_expr
+
     elif isinstance(cons, exp.Literal):
         parsed_expr = ttypes.ParsedExpr()
         constant_expr = ttypes.ConstantExpr()
@@ -131,6 +143,18 @@ def traverse_conditions(cons, fn=None) -> ttypes.ParsedExpr:
             parsed_expr.type = parser_expr_type
 
             return parsed_expr
+    elif isinstance(cons, exp.Func):
+        arguments = []
+        for arg in cons.args.values():
+            if arg:
+                arguments.append(parse_expr(arg))
+        func_expr = ttypes.FunctionExpr(
+            function_name=cons.key,
+            arguments=arguments
+        )
+        expr_type = ttypes.ParsedExprType(function_expr=func_expr)
+        parsed_expr = ttypes.ParsedExpr(type=expr_type)
+        return parsed_expr
     else:
         raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown condition type: {cons}")
 
@@ -139,19 +163,7 @@ def parse_expr(expr) -> ttypes.ParsedExpr:
     try:
         return traverse_conditions(expr, parse_expr)
     except:
-        if isinstance(expr, exp.Func):
-            arguments = []
-            for arg in expr.args.values():
-                if arg:
-                    arguments.append(parse_expr(arg))
-            func_expr = ttypes.FunctionExpr(
-                function_name=expr.key,
-                arguments=arguments
-            )
-            expr_type = ttypes.ParsedExprType(function_expr=func_expr)
-            parsed_expr = ttypes.ParsedExpr(type=expr_type)
-            return parsed_expr
-        elif isinstance(expr, exp.Star):
+        if isinstance(expr, exp.Star):
             column_expr = ttypes.ColumnExpr(
                 star=True,
                 column_name=[]
@@ -161,6 +173,67 @@ def parse_expr(expr) -> ttypes.ParsedExpr:
             return parsed_expr
         else:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown expression type: {expr}")
+
+
+def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
+    # convert numpy types
+    if isinstance(value, np.integer):
+        value = int(value)
+    elif isinstance(value, np.floating):
+        value = float(value)
+    elif isinstance(value, list) and isinstance(value[0], np.ndarray):
+        if value[0].ndim <= 2:
+            value = [x.tolist() for x in value]
+        else:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Invalid list member type: {type(value[0])}, ndarray dimension > 2")
+    elif isinstance(value, np.ndarray):
+        if value.ndim <= 2:
+            value = value.tolist()
+        else:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION,
+                                    f"Invalid list type: {type(value)}, ndarray dimension > 2")
+    # match ConstantExpr
+    match value:
+        case str():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.String, str_value=value)
+        case bool():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Boolean, bool_value=value)
+        case int():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Int64, i64_value=value)
+        case float():
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.Double, f64_value=value)
+        case [int(), *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerArray,
+                                                      i64_array_value=value)
+        case [float(), *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleArray,
+                                                      f64_array_value=value)
+        case [[int(), *_], *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerTensor,
+                                                      i64_tensor_value=value)
+        case [[float(), *_], *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleTensor,
+                                                      f64_tensor_value=value)
+        case [[[int(), *_], *_], *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.IntegerTensorArray,
+                                                      i64_tensor_array_value=value)
+        case [[[float(), *_], *_], *_]:
+            constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleTensorArray,
+                                                      f64_tensor_array_value=value)
+        case {"indices": [int(), *_], "values": [int(), *_]}:
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.SparseIntegerArray,
+                i64_array_value=value["values"],
+                i64_array_idx=value["indices"])
+        case {"indices": [int(), *_], "values": [float(), *_]}:
+            constant_expression = ttypes.ConstantExpr(
+                literal_type=ttypes.LiteralType.SparseDoubleArray,
+                f64_array_value=value["values"],
+                i64_array_idx=value["indices"])
+        case _:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
+    return constant_expression
 
 
 # invalid_name_array = [

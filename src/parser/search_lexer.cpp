@@ -28,11 +28,29 @@
      * We will address this in a future release of flex, or omit the C++ scanner
      * altogether.
      */
-    #define yyFlexLexer yyFlexLexer
+    #define yyFlexLexer SearchScannerInfinitySyntaxFlexLexer
 /* %endif */
 
 /* %if-c-only */
 /* %endif */
+
+#ifdef yyalloc
+#define SearchScannerInfinitySyntaxalloc_ALREADY_DEFINED
+#else
+#define yyalloc SearchScannerInfinitySyntaxalloc
+#endif
+
+#ifdef yyrealloc
+#define SearchScannerInfinitySyntaxrealloc_ALREADY_DEFINED
+#else
+#define yyrealloc SearchScannerInfinitySyntaxrealloc
+#endif
+
+#ifdef yyfree
+#define SearchScannerInfinitySyntaxfree_ALREADY_DEFINED
+#else
+#define yyfree SearchScannerInfinitySyntaxfree
+#endif
 
 /* %if-c-only */
 /* %endif */
@@ -374,7 +392,7 @@ int yyFlexLexer::yylex()
 	return 0;
 	}
 
-#define YY_DECL int infinity::SearchScanner::yylex()
+#define YY_DECL int infinity::SearchScannerInfinitySyntax::yylex()
 
 /* %% [1.5] DFA */
 
@@ -518,9 +536,9 @@ static const flex_int16_t yy_chk[148] =
 
 static const flex_int16_t yy_rule_linenum[27] =
     {   0,
-       59,   61,   62,   63,   65,   66,   68,   69,   70,   72,
-       74,   76,   78,   79,   81,   83,   84,   85,   87,   88,
-       89,   90,   93,   94,   95,   96
+       62,   64,   65,   66,   68,   69,   71,   72,   73,   75,
+       77,   79,   81,   82,   84,   86,   87,   88,   90,   91,
+       92,   93,   96,   97,   98,   99
     } ;
 
 /* The intent behind this definition is that it'll catch
@@ -537,10 +555,12 @@ static const flex_int16_t yy_rule_linenum[27] =
 #include <iostream>
 #include <cstdlib>
 
-/* Implementation of yyFlexScanner */ 
-#include "search_scanner.h"
+/* Implementation of yyFlexScanner */
+#define SearchScannerDerived SearchScannerInfinitySyntax
+#include "search_scanner_derived.h"
+#undef SearchScannerDerived
 #undef  YY_DECL
-#define YY_DECL int infinity::SearchScanner::yylex(infinity::SearchParser::semantic_type * const lval, infinity::SearchParser::location_type *loc)
+#define YY_DECL int infinity::SearchScannerInfinitySyntax::yylex(infinity::SearchParser::semantic_type * const lval, infinity::SearchParser::location_type *loc)
 
 /* typedef to make the returns for the tokens shorter */
 using token = infinity::SearchParser::token;
@@ -557,10 +577,10 @@ using token = infinity::SearchParser::token;
 /* for temporary storage of quoted string */
 static thread_local std::stringstream string_buffer;
 
-#line 561 "search_lexer.cpp"
+#line 581 "search_lexer.cpp"
 #define YY_NO_INPUT 1
 
-#line 564 "search_lexer.cpp"
+#line 584 "search_lexer.cpp"
 
 #define INITIAL 0
 #define SINGLE_QUOTED_STRING 1
@@ -754,16 +774,16 @@ YY_DECL
 
 	{
 /* %% [7.0] user's declarations go here */
-#line 51 "search_lexer.l"
+#line 54 "search_lexer.l"
 
           /** Code executed at the beginning of yylex **/
-#line 54 "search_lexer.l"
+#line 57 "search_lexer.l"
             yylval = lval;
 
             /* Note: special characters in pattern shall be double-quoted or escaped with backslash: " <^.+|/()[]{}" */
 
 
-#line 767 "search_lexer.cpp"
+#line 787 "search_lexer.cpp"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -841,126 +861,126 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 59 "search_lexer.l"
+#line 62 "search_lexer.l"
 /* ignore \t\n and space */;
 	YY_BREAK
 case 2:
-#line 62 "search_lexer.l"
+#line 65 "search_lexer.l"
 case 3:
-#line 63 "search_lexer.l"
+#line 66 "search_lexer.l"
 case 4:
 YY_RULE_SETUP
-#line 63 "search_lexer.l"
+#line 66 "search_lexer.l"
 { return token::AND; }
 	YY_BREAK
 case 5:
-#line 66 "search_lexer.l"
+#line 69 "search_lexer.l"
 case 6:
 YY_RULE_SETUP
-#line 66 "search_lexer.l"
+#line 69 "search_lexer.l"
 { return token::OR; }
 	YY_BREAK
 case 7:
-#line 69 "search_lexer.l"
+#line 72 "search_lexer.l"
 case 8:
-#line 70 "search_lexer.l"
+#line 73 "search_lexer.l"
 case 9:
 YY_RULE_SETUP
-#line 70 "search_lexer.l"
+#line 73 "search_lexer.l"
 { return token::NOT; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 72 "search_lexer.l"
+#line 75 "search_lexer.l"
 { return token::LPAREN; }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 74 "search_lexer.l"
+#line 77 "search_lexer.l"
 { return token::RPAREN; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 76 "search_lexer.l"
+#line 79 "search_lexer.l"
 { return token::OP_COLON; }
 	YY_BREAK
 case 13:
-#line 79 "search_lexer.l"
+#line 82 "search_lexer.l"
 case 14:
 YY_RULE_SETUP
-#line 79 "search_lexer.l"
+#line 82 "search_lexer.l"
 { yylval->build(std::strtof(yytext+1, NULL)); return token::CARAT; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 81 "search_lexer.l"
+#line 84 "search_lexer.l"
 { yylval->build(std::strtoul(yytext+1, NULL, 10)); return token::TILDE; }
 	YY_BREAK
 case 16:
-#line 84 "search_lexer.l"
+#line 87 "search_lexer.l"
 case 17:
-#line 85 "search_lexer.l"
+#line 88 "search_lexer.l"
 case 18:
 YY_RULE_SETUP
-#line 85 "search_lexer.l"
+#line 88 "search_lexer.l"
 { yylval->build<InfString>(InfString(yytext, false)); return token::STRING; }  // https://stackoverflow.com/questions/9611682/flexlexer-support-for-unicode
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 87 "search_lexer.l"
+#line 90 "search_lexer.l"
 { BEGIN SINGLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 88 "search_lexer.l"
+#line 91 "search_lexer.l"
 { string_buffer << '\''; }
 	YY_BREAK
 case 21:
 /* rule 21 can match eol */
 YY_RULE_SETUP
-#line 89 "search_lexer.l"
+#line 92 "search_lexer.l"
 { string_buffer << yytext; }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 90 "search_lexer.l"
+#line 93 "search_lexer.l"
 { BEGIN INITIAL; yylval->build<InfString>(InfString(string_buffer.str(), true)); return token::STRING; }
 	YY_BREAK
 case YY_STATE_EOF(SINGLE_QUOTED_STRING):
-#line 91 "search_lexer.l"
+#line 94 "search_lexer.l"
 { std::cerr << "[Lucene-Lexer-Error] Unterminated string" << std::endl; return 0; }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 93 "search_lexer.l"
+#line 96 "search_lexer.l"
 { BEGIN DOUBLE_QUOTED_STRING; string_buffer.clear(); string_buffer.str(""); }  // Clear strbuf manually, see #170
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 94 "search_lexer.l"
+#line 97 "search_lexer.l"
 { string_buffer << '\"'; }
 	YY_BREAK
 case 25:
 /* rule 25 can match eol */
 YY_RULE_SETUP
-#line 95 "search_lexer.l"
+#line 98 "search_lexer.l"
 { string_buffer << yytext; }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 96 "search_lexer.l"
+#line 99 "search_lexer.l"
 { BEGIN INITIAL; yylval->build<InfString>(InfString(string_buffer.str(), true)); return token::STRING; }
 	YY_BREAK
 case YY_STATE_EOF(DOUBLE_QUOTED_STRING):
-#line 97 "search_lexer.l"
+#line 100 "search_lexer.l"
 { std::cerr << "[Lucene-Lexer-Error] Unterminated string" << std::endl; return 0; }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 99 "search_lexer.l"
+#line 102 "search_lexer.l"
 ECHO;
 	YY_BREAK
-#line 964 "search_lexer.cpp"
+#line 984 "search_lexer.cpp"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -2079,6 +2099,6 @@ void yyfree (void * ptr )
 
 /* %ok-for-header */
 
-#line 99 "search_lexer.l"
+#line 102 "search_lexer.l"
 
 

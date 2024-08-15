@@ -24,6 +24,7 @@ namespace NGT {
 class CpuInfo {
 public:
     enum SimdType {
+        SimdTypeF16C,
         SimdTypeSSE2,
         SimdTypeAVX,
         SimdTypeAVX2,
@@ -46,6 +47,11 @@ public:
 #if defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
         __builtin_cpu_init();
         switch (type) {
+#if defined(__F16C__)
+            case SimdTypeF16C:
+                return __builtin_cpu_supports("f16c") > 0;
+                break;
+#endif
 #if defined(__SSE2__)
             case SimdTypeSSE2:
                 return __builtin_cpu_supports("sse2") > 0;
@@ -145,15 +151,18 @@ public:
                 return false;
         }
 #else
-        static_assert(false, "Unsupported platform.");
+#error "Unsupported platform."
         return false;
 #endif
     }
+    static bool isF16C() { return is(SimdTypeF16C); }
     static bool isSSE2() { return is(SimdTypeSSE2); }
     static bool isAVX2() { return is(SimdTypeAVX2); }
     static bool isAVX512() { return is(SimdTypeAVX512F); }
+    static bool isAVX512BW() { return is(SimdTypeAVX512BW); }
     static std::vector<char const *> getSupportedSimdTypes() {
-        static constexpr char const *simdTypes[] = {"sse2",
+        static constexpr char const *simdTypes[] = {"f16c",
+                                                    "sse2",
                                                     "avx",
                                                     "avx2",
                                                     "avx512f",
@@ -170,10 +179,10 @@ public:
                                                     "avx512vpopcntdq",
                                                     "avx512vbmi2",
                                                     "avx512vnni"};
-        constexpr int size = std::size(simdTypes);
+        static constexpr int size = std::size(simdTypes);
         static_assert(size == SimdType::SimdTypeAVX512VNNI + 1, "The number of SIMD types is not correct.");
         std::vector<char const *> types;
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < size; ++i) {
             if (is(static_cast<SimdType>(i))) {
                 types.push_back(simdTypes[i]);
             }

@@ -34,10 +34,10 @@ import chunk_index_entry;
 import memory_indexer;
 import default_values;
 import statement_common;
+import txn;
 
 namespace infinity {
 
-class Txn;
 class TxnTableStore;
 struct TableIndexEntry;
 struct BlockEntry;
@@ -45,8 +45,10 @@ struct TableEntry;
 class BufferManager;
 struct SegmentEntry;
 struct TableEntry;
+class HnswIndexInMem;
 class SecondaryIndexInMem;
 class EMVBIndexInMem;
+class BMPIndexInMem;
 
 export struct PopulateEntireConfig {
     bool prepare_;
@@ -73,6 +75,8 @@ public:
                                                                    TransactionID txn_id,
                                                                    TxnTimeStamp begin_ts,
                                                                    TxnTimeStamp commit_ts);
+
+    void UpdateSegmentIndexReplay(SharedPtr<SegmentIndexEntry> new_entry);
 
     static Vector<UniquePtr<IndexFileWorker>> CreateFileWorkers(SharedPtr<String> index_dir, CreateIndexParam *param, SegmentID segment_id);
 
@@ -121,9 +125,9 @@ public:
     void MemIndexCommit();
 
     // Dump or spill the memory indexer
-    SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false);
+    SharedPtr<ChunkIndexEntry> MemIndexDump(bool spill = false, SizeT *dump_size = nullptr);
 
-    void AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn);
+    void AddWalIndexDump(ChunkIndexEntry *dumped_index_entry, Txn *txn, Vector<ChunkID> chunk_ids = {});
 
     // Init the mem index from previously spilled one.
     void MemIndexLoad(const String &base_name, RowID base_row_id);
@@ -139,13 +143,13 @@ public:
 
     static UniquePtr<CreateIndexParam> GetCreateIndexParam(SharedPtr<IndexBase> index_base, SizeT seg_row_count, SharedPtr<ColumnDef> column_def);
 
-    void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries, TxnTimeStamp begin_ts = MAX_TIMESTAMP) {
+    void GetChunkIndexEntries(Vector<SharedPtr<ChunkIndexEntry>> &chunk_index_entries, Txn *txn = nullptr) {
         std::shared_lock lock(rw_locker_);
         chunk_index_entries.clear();
         SizeT num = chunk_index_entries_.size();
         for (SizeT i = 0; i < num; i++) {
             auto &chunk_index_entry = chunk_index_entries_[i];
-            if (chunk_index_entry->CheckVisibleByTS(begin_ts)) {
+            if (chunk_index_entry->CheckVisible(txn)) {
                 chunk_index_entries.push_back(chunk_index_entry);
             }
         }
@@ -167,7 +171,7 @@ public:
 
     void ReplaceChunkIndexEntries(TxnTableStore *txn_table_store,
                                   SharedPtr<ChunkIndexEntry> merged_chunk_index_entry,
-                                  Vector<ChunkIndexEntry *> &&old_chunks);
+                                  Vector<ChunkIndexEntry *> old_chunks);
 
     ChunkIndexEntry *RebuildChunkIndexEntries(TxnTableStore *txn_table_store, SegmentEntry *segment_entry);
 
@@ -176,14 +180,14 @@ public:
         return {chunk_index_entries_, memory_indexer_};
     }
 
-    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<ChunkIndexEntry>> GetHnswIndexSnapshot() {
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<HnswIndexInMem>> GetHnswIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
-        return {chunk_index_entries_, memory_chunk_indexer_};
+        return {chunk_index_entries_, memory_hnsw_index_};
     }
 
-    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<ChunkIndexEntry>> GetBMPIndexSnapshot() {
+    Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<BMPIndexInMem>> GetBMPIndexSnapshot() {
         std::shared_lock lock(rw_locker_);
-        return {chunk_index_entries_, memory_chunk_indexer_};
+        return {chunk_index_entries_, memory_bmp_index_};
     }
 
     Tuple<Vector<SharedPtr<ChunkIndexEntry>>, SharedPtr<SecondaryIndexInMem>> GetSecondaryIndexSnapshot() {
@@ -210,11 +214,13 @@ public:
     }
 
 public:
-    SharedPtr<ChunkIndexEntry> CreateChunkIndexEntry(SharedPtr<ColumnDef> column_def, RowID base_rowid, BufferManager *buffer_mgr);
+    SharedPtr<ChunkIndexEntry> CreateHnswIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr, SizeT index_size);
 
     SharedPtr<ChunkIndexEntry> CreateSecondaryIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
 
     SharedPtr<ChunkIndexEntry> CreateEMVBIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr);
+
+    SharedPtr<ChunkIndexEntry> CreateBMPIndexChunkIndexEntry(RowID base_rowid, u32 row_count, BufferManager *buffer_mgr, SizeT index_size);
 
     void AddChunkIndexEntry(SharedPtr<ChunkIndexEntry> chunk_index_entry);
 
@@ -237,6 +243,8 @@ public:
                                                         TxnTimeStamp commit_ts,
                                                         TxnTimeStamp deprecate_ts,
                                                         BufferManager *buffer_mgr);
+
+    ChunkIndexEntry *GetChunkIndexEntry(ChunkID chunk_id);
 
     // only for unittest
     MemoryIndexer *GetMemoryIndexer() { return memory_indexer_.get(); }
@@ -267,10 +275,13 @@ private:
     ChunkID next_chunk_id_{0};
 
     Vector<SharedPtr<ChunkIndexEntry>> chunk_index_entries_{};
-    SharedPtr<ChunkIndexEntry> memory_chunk_indexer_{};
+
+    std::mutex mem_index_locker_{};
+    SharedPtr<HnswIndexInMem> memory_hnsw_index_{};
     SharedPtr<MemoryIndexer> memory_indexer_{};
     SharedPtr<SecondaryIndexInMem> memory_secondary_index_{};
     SharedPtr<EMVBIndexInMem> memory_emvb_index_{};
+    SharedPtr<BMPIndexInMem> memory_bmp_index_{};
 
     u64 ft_column_len_sum_{}; // increase only
     u32 ft_column_len_cnt_{}; // increase only

@@ -75,9 +75,15 @@ void Infinity::LocalInit(const String &path) {
         InfinityContext::instance().Init(config_path);
     } else {
         UniquePtr<DefaultConfig> default_config = MakeUnique<DefaultConfig>();
+        default_config->default_log_dir_ = fmt::format("{}/log", path);
+        default_config->default_data_dir_ = fmt::format("{}/data", path);
+        default_config->default_wal_dir_ = fmt::format("{}/wal", path);
+        default_config->default_temp_dir_ = fmt::format("{}/tmp", path);
+        default_config->default_resource_dir_ = fmt::format("{}/resource", path);
+
         default_config->default_log_level_ = LogLevel::kInfo;
         default_config->default_log_to_stdout_ = false;
-        InfinityContext::instance().Init(nullptr, default_config.get());
+        InfinityContext::instance().Init(nullptr, false, default_config.get());
     }
 }
 
@@ -87,7 +93,7 @@ SharedPtr<Infinity> Infinity::LocalConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
 
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    infinity_ptr->session_ = session_mgr->CreateLocalSession();
+    infinity_ptr->session_ = session_mgr->CreateLocalSession(InfinityContext::instance().MaintenanceMode());
     return infinity_ptr;
 }
 
@@ -98,7 +104,11 @@ void Infinity::LocalDisconnect() {
 SharedPtr<Infinity> Infinity::RemoteConnect() {
     SharedPtr<Infinity> infinity_ptr = MakeShared<Infinity>();
     SessionManager *session_mgr = InfinityContext::instance().session_manager();
-    infinity_ptr->session_ = session_mgr->CreateRemoteSession();
+    SharedPtr<RemoteSession> remote_session = session_mgr->CreateRemoteSession(InfinityContext::instance().MaintenanceMode());
+    if(remote_session == nullptr) {
+        return nullptr;
+    }
+    infinity_ptr->session_ = std::move(remote_session);
     return infinity_ptr;
 }
 
@@ -114,7 +124,8 @@ QueryResult Infinity::CreateDatabase(const String &schema_name, const CreateData
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
     SharedPtr<CreateSchemaInfo> create_schema_info = MakeShared<CreateSchemaInfo>();
 
@@ -132,7 +143,8 @@ QueryResult Infinity::DropDatabase(const String &schema_name, const DropDatabase
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
     SharedPtr<DropSchemaInfo> drop_schema_info = MakeShared<DropSchemaInfo>();
 
@@ -151,7 +163,8 @@ QueryResult Infinity::ListDatabases() {
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kDatabases;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
@@ -164,7 +177,8 @@ QueryResult Infinity::GetDatabase(const String &schema_name) {
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
 
     String db_name = schema_name;
@@ -181,7 +195,8 @@ QueryResult Infinity::ShowDatabase(const String &schema_name) {
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kDatabase;
 
@@ -198,7 +213,8 @@ QueryResult Infinity::Query(const String &query_text) {
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
 
     String query_text_internal = query_text;
     ToLower(query_text_internal);
@@ -213,7 +229,8 @@ QueryResult Infinity::Flush() {
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<FlushStatement> flush_statement = MakeUnique<FlushStatement>();
     flush_statement->type_ = FlushType::kData;
 
@@ -227,7 +244,8 @@ QueryResult Infinity::SetVariableOrConfig(const String &name, bool value, SetSco
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
 
     String var_name = name;
     ToLower(var_name);
@@ -244,7 +262,8 @@ QueryResult Infinity::SetVariableOrConfig(const String &name, i64 value, SetScop
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
 
     String var_name = name;
     ToLower(var_name);
@@ -261,7 +280,8 @@ QueryResult Infinity::SetVariableOrConfig(const String &name, double value, SetS
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
 
     String var_name = name;
     ToLower(var_name);
@@ -278,7 +298,8 @@ QueryResult Infinity::SetVariableOrConfig(const String &name, String value, SetS
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
 
     String var_name = name;
     ToLower(var_name);
@@ -295,7 +316,8 @@ QueryResult Infinity::ShowVariable(const String &variable_name, SetScope scope) 
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
 
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->var_name_ = variable_name;
@@ -325,7 +347,8 @@ QueryResult Infinity::ShowVariables(SetScope scope) {
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
 
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     switch (scope) {
@@ -353,7 +376,8 @@ QueryResult Infinity::ShowConfig(const String &config_name) {
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
 
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->var_name_ = config_name;
@@ -371,7 +395,8 @@ QueryResult Infinity::ShowConfigs() {
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
 
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->show_type_ = ShowStmtType::kConfigs;
@@ -390,7 +415,8 @@ QueryResult Infinity::CreateTable(const String &db_name,
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
     SharedPtr<CreateTableInfo> create_table_info = MakeShared<CreateTableInfo>();
     create_table_info->schema_name_ = db_name;
@@ -400,9 +426,16 @@ QueryResult Infinity::CreateTable(const String &db_name,
     ToLower(create_table_info->table_name_);
 
     create_table_info->column_defs_ = std::move(column_defs);
+    for(ColumnDef* column_def_ptr: create_table_info->column_defs_) {
+        ToLower(column_def_ptr->name_);
+    }
     create_table_info->constraints_ = std::move(constraints);
     create_table_info->conflict_type_ = create_table_options.conflict_type_;
     create_table_info->properties_ = std::move(create_table_options.properties_);
+    for(InitParameter* parameter_ptr: create_table_info->properties_) {
+        ToLower(parameter_ptr->param_name_);
+        ToLower(parameter_ptr->param_value_);
+    }
     create_statement->create_info_ = std::move(create_table_info);
     QueryResult result = query_context_ptr->QueryStatement(create_statement.get());
     return result;
@@ -414,7 +447,8 @@ QueryResult Infinity::DropTable(const String &db_name, const String &table_name,
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
     SharedPtr<DropTableInfo> drop_table_info = MakeShared<DropTableInfo>();
     drop_table_info->schema_name_ = db_name;
@@ -431,13 +465,15 @@ QueryResult Infinity::DropTable(const String &db_name, const String &table_name,
 
 QueryResult Infinity::ListTables(const String &db_name) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
-    query_context_ptr->set_current_schema(db_name);
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
+    show_statement->schema_name_ = db_name;
+    ToLower(show_statement->schema_name_);
     show_statement->show_type_ = ShowStmtType::kTables;
     QueryResult result = query_context_ptr->QueryStatement(show_statement.get());
     return result;
@@ -449,7 +485,8 @@ QueryResult Infinity::ShowTable(const String &db_name, const String &table_name)
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -468,7 +505,8 @@ QueryResult Infinity::ShowColumns(const String &db_name, const String &table_nam
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -487,7 +525,8 @@ QueryResult Infinity::ShowTables(const String &db_name) {
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -504,7 +543,8 @@ QueryResult Infinity::GetTable(const String &db_name, const String &table_name) 
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<CommandStatement> command_statement = MakeUnique<CommandStatement>();
 
     String table_name_internal = table_name;
@@ -521,7 +561,8 @@ QueryResult Infinity::ListTableIndexes(const String &db_name, const String &tabl
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -537,14 +578,15 @@ QueryResult Infinity::ListTableIndexes(const String &db_name, const String &tabl
 QueryResult Infinity::CreateIndex(const String &db_name,
                                   const String &table_name,
                                   const String &index_name,
-                                  Vector<IndexInfo *> *index_info_list,
+                                  IndexInfo *index_info_ptr,
                                   const CreateIndexOptions &create_index_options) {
     UniquePtr<QueryContext> query_context_ptr = MakeUnique<QueryContext>(session_.get());
     query_context_ptr->Init(InfinityContext::instance().config(),
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
 
     UniquePtr<CreateStatement> create_statement = MakeUnique<CreateStatement>();
     SharedPtr<CreateIndexInfo> create_index_info = MakeShared<CreateIndexInfo>();
@@ -558,7 +600,13 @@ QueryResult Infinity::CreateIndex(const String &db_name,
     create_index_info->index_name_ = index_name;
     ToLower(create_index_info->index_name_);
 
-    create_index_info->index_info_list_ = index_info_list;
+    ToLower(index_info_ptr->column_name_);
+    for(InitParameter* init_param_ptr: *index_info_ptr->index_param_list_) {
+        ToLower(init_param_ptr->param_name_);
+        ToLower(init_param_ptr->param_value_);
+    }
+
+    create_index_info->index_info_ = index_info_ptr;
 
     create_statement->create_info_ = create_index_info;
     create_statement->create_info_->conflict_type_ = create_index_options.conflict_type_;
@@ -574,13 +622,13 @@ Infinity::DropIndex(const String &db_name, const String &table_name, const Strin
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<DropStatement> drop_statement = MakeUnique<DropStatement>();
     SharedPtr<DropIndexInfo> drop_index_info = MakeShared<DropIndexInfo>();
 
     drop_index_info->schema_name_ = db_name;
     ToLower(drop_index_info->schema_name_);
-
 
     drop_index_info->table_name_ = table_name;
     ToLower(drop_index_info->table_name_);
@@ -602,7 +650,8 @@ QueryResult Infinity::ShowIndex(const String &db_name, const String &table_name,
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -627,7 +676,8 @@ QueryResult Infinity::ShowIndexSegment(const String &db_name, const String &tabl
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -653,7 +703,8 @@ Infinity::ShowIndexChunk(const String &db_name, const String &table_name, const 
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -679,7 +730,8 @@ QueryResult Infinity::ShowSegment(const String &db_name, const String &table_nam
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -699,7 +751,8 @@ QueryResult Infinity::ShowSegments(const String &db_name, const String &table_na
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -718,7 +771,8 @@ QueryResult Infinity::ShowBlock(const String &db_name, const String &table_name,
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -739,7 +793,8 @@ QueryResult Infinity::ShowBlocks(const String &db_name, const String &table_name
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -764,7 +819,8 @@ QueryResult Infinity::ShowBlockColumn(const String &db_name,
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ShowStatement> show_statement = MakeUnique<ShowStatement>();
     show_statement->schema_name_ = db_name;
     ToLower(show_statement->schema_name_);
@@ -786,7 +842,8 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<InsertStatement> insert_statement = MakeUnique<InsertStatement>();
     insert_statement->schema_name_ = db_name;
     ToLower(insert_statement->schema_name_);
@@ -795,6 +852,9 @@ QueryResult Infinity::Insert(const String &db_name, const String &table_name, Ve
     ToLower(insert_statement->table_name_);
 
     insert_statement->columns_ = columns;
+    for(String& column_name: *insert_statement->columns_) {
+        ToLower(column_name);
+    }
     insert_statement->values_ = values;
     QueryResult result = query_context_ptr->QueryStatement(insert_statement.get());
     return result;
@@ -807,7 +867,8 @@ QueryResult Infinity::Import(const String &db_name, const String &table_name, co
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<CopyStatement> import_statement = MakeUnique<CopyStatement>();
 
     import_statement->copy_from_ = true;
@@ -833,7 +894,8 @@ QueryResult Infinity::Export(const String &db_name, const String &table_name, Ve
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<CopyStatement> export_statement = MakeUnique<CopyStatement>();
 
     export_statement->copy_from_ = false;
@@ -864,7 +926,8 @@ QueryResult Infinity::Delete(const String &db_name, const String &table_name, Pa
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<DeleteStatement> delete_statement = MakeUnique<DeleteStatement>();
 
     delete_statement->schema_name_ = db_name;
@@ -885,18 +948,19 @@ QueryResult Infinity::Update(const String &db_name, const String &table_name, Pa
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<UpdateStatement> update_statement = MakeUnique<UpdateStatement>();
 
     update_statement->schema_name_ = db_name;
-    ToLower(update_statement->schema_name_);
-
     update_statement->table_name_ = table_name;
-    ToLower(update_statement->table_name_);
 
     // TODO: to lower expression identifier string
     update_statement->where_expr_ = filter;
     update_statement->update_expr_array_ = update_list;
+    for(UpdateExpr* update_expr_ptr: *update_statement->update_expr_array_) {
+        ToLower(update_expr_ptr->column_name);
+    }
     QueryResult result = query_context_ptr->QueryStatement(update_statement.get());
     return result;
 }
@@ -913,7 +977,8 @@ QueryResult Infinity::Explain(const String &db_name,
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<ExplainStatement> explain_statment = MakeUnique<ExplainStatement>();
     explain_statment->type_ = explain_type;
 
@@ -947,7 +1012,8 @@ Infinity::Search(const String &db_name, const String &table_name, SearchExpr *se
                             InfinityContext::instance().task_scheduler(),
                             InfinityContext::instance().storage(),
                             InfinityContext::instance().resource_manager(),
-                            InfinityContext::instance().session_manager());
+                            InfinityContext::instance().session_manager(),
+                            InfinityContext::instance().persistence_manager());
     UniquePtr<SelectStatement> select_statement = MakeUnique<SelectStatement>();
 
     auto *table_ref = new TableReference();
@@ -975,7 +1041,8 @@ QueryResult Infinity::Optimize(const String &db_name, const String &table_name, 
                                InfinityContext::instance().task_scheduler(),
                                InfinityContext::instance().storage(),
                                InfinityContext::instance().resource_manager(),
-                               InfinityContext::instance().session_manager());
+                               InfinityContext::instance().session_manager(),
+                               InfinityContext::instance().persistence_manager());
     UniquePtr<OptimizeStatement> optimize_statement = MakeUnique<OptimizeStatement>();
 
     optimize_statement->schema_name_ = db_name;

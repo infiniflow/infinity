@@ -49,9 +49,10 @@ public:
               HnswEncodeType encode_type,
               SizeT M,
               SizeT ef_construction,
-              SizeT ef)
+              SizeT ef,
+              SizeT block_size)
         : IndexBase(IndexType::kHnsw, index_name, file_name, std::move(column_names)), metric_type_(metric_type), encode_type_(encode_type), M_(M),
-          ef_construction_(ef_construction), ef_(ef) {}
+          ef_construction_(ef_construction), ef_(ef), block_size_(block_size) {}
 
     ~IndexHnsw() final = default;
 
@@ -71,7 +72,8 @@ public:
     virtual nlohmann::json Serialize() const override;
 
 public:
-    static void ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name);
+    static void
+    ValidateColumnDataType(const SharedPtr<BaseTableRef> &base_table_ref, const String &column_name, const Vector<InitParameter *> &index_param_list);
 
 public:
     const MetricType metric_type_{MetricType::kInvalid};
@@ -79,6 +81,7 @@ public:
     const SizeT M_{};
     const SizeT ef_construction_{};
     const SizeT ef_{};
+    const SizeT block_size_{};
 };
 
 } // namespace infinity

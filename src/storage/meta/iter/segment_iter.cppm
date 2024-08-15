@@ -88,6 +88,8 @@ public:
 
     const SharedPtr<ColumnVector> &column_vector(SizeT col_id) const { return block_iter_->column_vector(col_id); }
 
+    SizeT offset() const { return block_idx_ * DEFAULT_BLOCK_CAPACITY + block_iter_->offset(); }
+
 private:
     const SegmentEntry *const entry_;
     BufferManager *const buffer_mgr_;
@@ -114,8 +116,27 @@ public:
         return None;
     }
 
+    SizeT offset() const { return segment_iter_.offset(); }
+
 private:
     SegmentIter<CheckTS> segment_iter_;
+};
+
+export template <typename DataType, bool CheckTS>
+class CappedOneColumnIterator : public OneColumnIterator<DataType, CheckTS> {
+public:
+    CappedOneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts, SizeT cap)
+        : OneColumnIterator<DataType, CheckTS>(entry, buffer_mgr, column_id, iterate_ts), cap_(cap) {}
+
+    Optional<Pair<const DataType *, SegmentOffset>> Next() {
+        if (this->offset() >= cap_) {
+            return None;
+        }
+        return OneColumnIterator<DataType, CheckTS>::Next();
+    }
+
+private:
+    SizeT cap_;
 };
 
 export template <typename DataType, typename IdxType, bool CheckTS>
@@ -137,19 +158,31 @@ public:
         }
 
         const auto &column_vector = segment_iter_.column_vector(0);
-        const char *raw_data_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(v_ptr->chunk_id_, v_ptr->chunk_offset_);
-        const char *indice_ptr = raw_data_ptr;
-        const char *data_ptr = indice_ptr + v_ptr->nnz_ * sizeof(IdxType);
-
-        SparseVecRef<DataType, IdxType> sparse_vec_ref(v_ptr->nnz_,
-                                                       reinterpret_cast<const IdxType *>(indice_ptr),
-                                                       reinterpret_cast<const DataType *>(data_ptr));
+        SparseVecRef<DataType, IdxType> sparse_vec_ref =
+            column_vector->buffer_->template GetSparse<DataType, IdxType>(v_ptr->file_offset_, v_ptr->nnz_);
 
         return std::make_pair(sparse_vec_ref, offset);
     }
 
 private:
     SegmentIter<CheckTS> segment_iter_;
+};
+
+export template <typename DataType, typename IdxType, bool CheckTS>
+class CappedOneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS> : public OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS> {
+public:
+    CappedOneColumnIterator(const SegmentEntry *entry, BufferManager *buffer_mgr, ColumnID column_id, TxnTimeStamp iterate_ts, SizeT cap)
+        : OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS>(entry, buffer_mgr, column_id, iterate_ts), cap_(cap) {}
+
+    Optional<Pair<SparseVecRef<DataType, IdxType>, SegmentOffset>> Next() {
+        if (this->offset() >= cap_) {
+            return None;
+        }
+        return OneColumnIterator<SparseVecRef<DataType, IdxType>, CheckTS>::Next();
+    }
+
+private:
+    SizeT cap_;
 };
 
 } // namespace infinity

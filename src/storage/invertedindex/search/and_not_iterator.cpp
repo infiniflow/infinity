@@ -18,30 +18,34 @@ module and_not_iterator;
 
 import stl;
 import index_defines;
-import multi_query_iterator;
+import multi_doc_iterator;
 import doc_iterator;
 import internal_types;
 
 namespace infinity {
 
-AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiQueryDocIterator(std::move(iterators)) {
-    // initialize doc_id_ to first valid doc
-    DoSeek(0);
+AndNotIterator::AndNotIterator(Vector<UniquePtr<DocIterator>> iterators) : MultiDocIterator(std::move(iterators)) {
+    std::sort(children_.begin() + 1, children_.end(), [](const auto &lhs, const auto &rhs) { return lhs->GetDF() < rhs->GetDF(); });
+    // initialize doc_id_ to first doc
+    Next(0);
+    // init df
+    doc_freq_ = children_[0]->GetDF();
+    bm25_score_upper_bound_ = children_[0]->BM25ScoreUpperBound();
 }
 
-void AndNotIterator::DoSeek(RowID doc_id) {
+bool AndNotIterator::Next(RowID doc_id) {
     bool next_loop = false;
     do {
-        children_[0]->Seek(doc_id);
-        doc_id = children_[0]->Doc();
+        children_[0]->Next(doc_id);
+        doc_id = children_[0]->DocID();
         if (doc_id == INVALID_ROWID) [[unlikely]] {
             break;
         }
         // now doc_id < INVALID_ROWID
         next_loop = false;
         for (u32 i = 1; i < children_.size(); ++i) {
-            children_[i]->Seek(doc_id);
-            if (RowID doc = children_[i]->Doc(); doc == doc_id) {
+            children_[i]->Next(doc_id);
+            if (RowID doc = children_[i]->DocID(); doc == doc_id) {
                 ++doc_id;
                 next_loop = true;
                 break;
@@ -49,7 +53,11 @@ void AndNotIterator::DoSeek(RowID doc_id) {
         }
     } while (next_loop);
     doc_id_ = doc_id;
+    return doc_id != INVALID_ROWID;
 }
 
-u32 AndNotIterator::GetDF() const { return children_[0]->GetDF(); }
+float AndNotIterator::BM25Score() { return children_[0]->BM25Score(); }
+
+void AndNotIterator::UpdateScoreThreshold(float threshold) { children_[0]->UpdateScoreThreshold(threshold); }
+
 } // namespace infinity
