@@ -129,7 +129,7 @@ class TestShow(HttpTest):
         self.show_table(db_name, table_name, {
             "status_code": 404,
             "error_code": 1004,
-            "message": f"Table {table_name} does not exist in database {db_name}."
+            "message": f"Table {table_name} do not exist in database {db_name}."
         })
         return
     
