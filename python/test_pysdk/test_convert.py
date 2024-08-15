@@ -14,6 +14,7 @@ from infinity_http import infinity_http
 
 @pytest.mark.usefixtures("local_infinity")
 @pytest.mark.usefixtures("http")
+@pytest.mark.usefixtures("suffix")
 class TestInfinity:
     @pytest.fixture(autouse=True)
     def setup(self, local_infinity, http):
@@ -30,13 +31,13 @@ class TestInfinity:
         res = self.infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_to_pl(self):
+    def test_to_pl(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_to_pl", ConflictType.Ignore)
-        db_obj.create_table("test_to_pl", {
+        db_obj.drop_table("test_to_pl"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_to_pl"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_to_pl")
+        table_obj = db_obj.get_table("test_to_pl"+suffix)
         table_obj.insert([{"c1": 1, "c2": 2}])
         print()
         res = table_obj.output(["c1", "c2"]).to_pl()
@@ -45,14 +46,14 @@ class TestInfinity:
         print(res)
         res = table_obj.output(["c1", "c2", "c1"]).to_pl()
         print(res)
-        db_obj.drop_table("test_to_pl", ConflictType.Error)
-    def test_to_pa(self):
+        db_obj.drop_table("test_to_pl"+suffix, ConflictType.Error)
+    def test_to_pa(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_to_pa", ConflictType.Ignore)
-        db_obj.create_table("test_to_pa", {
+        db_obj.drop_table("test_to_pa"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_to_pa"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_to_pa")
+        table_obj = db_obj.get_table("test_to_pa"+suffix)
         table_obj.insert([{"c1": 1, "c2": 2.0}])
         print()
         res = table_obj.output(["c1", "c2"]).to_arrow()
@@ -61,14 +62,14 @@ class TestInfinity:
         print(res)
         res = table_obj.output(["c1", "c2", "c1"]).to_arrow()
         print(res)
-        db_obj.drop_table("test_to_pa", ConflictType.Error)
-    def test_to_df(self):
+        db_obj.drop_table("test_to_pa"+suffix, ConflictType.Error)
+    def test_to_df(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_to_df", ConflictType.Ignore)
-        db_obj.create_table("test_to_df", {
+        db_obj.drop_table("test_to_df"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_to_df"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_to_df")
+        table_obj = db_obj.get_table("test_to_df"+suffix)
         table_obj.insert([{"c1": 1, "c2": 2.0}])
         print()
         res = table_obj.output(["c1", "c2"]).to_df()
@@ -77,14 +78,14 @@ class TestInfinity:
         print(res)
         res = table_obj.output(["c1", "c2", "c1"]).to_df()
         print(res)
-        db_obj.drop_table("test_to_df", ConflictType.Error)
+        db_obj.drop_table("test_to_df"+suffix, ConflictType.Error)
 
     @pytest.mark.usefixtures("skip_if_http")
-    def test_without_output_select_list(self):
+    def test_without_output_select_list(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_without_output_select_list", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_without_output_select_list", {
+        db_obj.drop_table("test_without_output_select_list"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_without_output_select_list"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
 
         table_obj.insert([{"c1": 1, "c2": 2.0}])
@@ -107,11 +108,11 @@ class TestInfinity:
                                                 "c1 = 0",
                                                 "_row_id",
                                                 "*"])
-    def test_convert_test_with_valid_select_list_output(self, condition_list):
+    def test_convert_test_with_valid_select_list_output(self, condition_list, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_with_valid_select_list_output", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_with_valid_select_list_output", {
+        db_obj.drop_table("test_with_valid_select_list_output"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_valid_select_list_output"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
@@ -122,17 +123,17 @@ class TestInfinity:
         insert_res_df = table_obj.output(["c1", condition_list]).to_pl()
         print(insert_res_df)
 
-        db_obj.drop_table("test_with_valid_select_list_output", ConflictType.Error)
+        db_obj.drop_table("test_with_valid_select_list_output"+suffix, ConflictType.Error)
 
     @pytest.mark.parametrize("condition_list", [pytest.param("c1 + 0.1 and c2 - 1.0", ),
                                                 pytest.param("c1 * 0.1 and c2 / 1.0", ),
                                                 pytest.param("c1 > 0.1 %@#$sf c2 < 1.0", ),
                                                 ])
-    def test_convert_test_with_invalid_select_list_output(self, condition_list):
+    def test_convert_test_with_invalid_select_list_output(self, condition_list, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_with_invalid_select_list_output", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_with_invalid_select_list_output", {
+        db_obj.drop_table("test_with_invalid_select_list_output"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_with_invalid_select_list_output"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
@@ -144,7 +145,7 @@ class TestInfinity:
             insert_res_df = table_obj.output(["c1", condition_list]).to_pl()
             print(insert_res_df)
 
-        db_obj.drop_table("test_with_invalid_select_list_output", ConflictType.Error)
+        db_obj.drop_table("test_with_invalid_select_list_output"+suffix, ConflictType.Error)
 
     # skipped tests using InfinityThriftQueryBuilder which is incompatible with local infinity
     @pytest.mark.usefixtures("skip_if_http")
@@ -158,11 +159,11 @@ class TestInfinity:
         "c1 = 0",
     ])
     @pytest.mark.usefixtures("skip_if_local_infinity")
-    def test_convert_test_output_with_valid_filter_function(self, filter_list):
+    def test_convert_test_output_with_valid_filter_function(self, filter_list, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_output_with_valid_filter_function", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_output_with_valid_filter_function", {
+        db_obj.drop_table("test_output_with_valid_filter_function"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_output_with_valid_filter_function"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
@@ -173,7 +174,7 @@ class TestInfinity:
         insert_res_df = InfinityThriftQueryBuilder(table_obj).output(["*"]).filter(filter_list).to_pl()
         print(str(insert_res_df))
 
-        db_obj.drop_table("test_output_with_valid_filter_function", ConflictType.Error)
+        db_obj.drop_table("test_output_with_valid_filter_function"+suffix, ConflictType.Error)
 
     @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.usefixtures("skip_if_local_infinity")
@@ -186,11 +187,11 @@ class TestInfinity:
         pytest.param("c1 * 0.1 and c2 / 1.0"),
         pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
     ])
-    def test_convert_test_output_with_invalid_filter_function(self, filter_list):
+    def test_convert_test_output_with_invalid_filter_function(self, filter_list, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_output_with_invalid_filter_function", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_output_with_invalid_filter_function", {
+        db_obj.drop_table("test_output_with_invalid_filter_function"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_output_with_invalid_filter_function"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
@@ -204,4 +205,4 @@ class TestInfinity:
 
         print(e.type)
 
-        db_obj.drop_table("test_output_with_invalid_filter_function", ConflictType.Error)
+        db_obj.drop_table("test_output_with_invalid_filter_function"+suffix, ConflictType.Error)

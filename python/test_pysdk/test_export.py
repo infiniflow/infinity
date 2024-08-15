@@ -48,26 +48,27 @@ def delete_file(file_path: str):
         os.remove(file_path)
 
 @pytest.mark.usefixtures("setup_class")
+@pytest.mark.usefixtures("suffix")
 class TestInfinity:
     @pytest.fixture
     def skip_setup_marker(self, request):
         request.node.skip_setup = True
 
-    def test_export_csv(self):
+    def test_export_csv(self, suffix):
         file_name = "enwiki_embedding_9999.csv"
         copy_data(file_name)
 
         test_csv_dir = common_values.TEST_TMP_DIR + file_name
 
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_export_csv", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_export_csv", {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "num": {"type": "integer"}, "vec": {"type": "vector, 4, float"}})
+        db_obj.drop_table("test_export_csv"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_export_csv"+suffix, {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "num": {"type": "integer"}, "vec": {"type": "vector, 4, float"}})
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv", "delimiter" : "\t"})
         assert res.error_code == ErrorCode.OK
         res = table_obj.output(["count(*)"]).to_pl()
         print(res)
 
-        test_export_csv_file_path = common_values.TEST_TMP_DIR + "test_export_csv.csv"
+        test_export_csv_file_path = common_values.TEST_TMP_DIR + suffix +"test_export_csv.csv"
         res = table_obj.export_data(test_export_csv_file_path, {"file_type": "csv", "delimiter" : "\t"})
         assert res.error_code == ErrorCode.OK
         assert count_lines(test_export_csv_file_path) == 9999
@@ -100,24 +101,24 @@ class TestInfinity:
         assert count_lines(test_export_csv_file_path+".part1") == 9999 - 8192
         delete_file(test_export_csv_file_path+".part1")
 
-        res = db_obj.drop_table("test_export_csv", ConflictType.Error)
+        res = db_obj.drop_table("test_export_csv"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_export_jsonl(self):
+    def test_export_jsonl(self, suffix):
         file_name = "enwiki_embedding_9999.csv"
         copy_data(file_name)
 
         test_csv_dir = common_values.TEST_TMP_DIR + file_name
 
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_export_jsonl", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_export_jsonl", {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "num": {"type": "integer"}, "vec": {"type": "vector, 4, float"}})
+        db_obj.drop_table("test_export_jsonl"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_export_jsonl"+suffix, {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "num": {"type": "integer"}, "vec": {"type": "vector, 4, float"}})
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv", "delimiter" : "\t"})
         assert res.error_code == ErrorCode.OK
         res = table_obj.output(["count(*)"]).to_pl()
         print(res)
 
-        test_export_jsonl_file_path = common_values.TEST_TMP_DIR + "test_export_jsonl.jsonl"
+        test_export_jsonl_file_path = common_values.TEST_TMP_DIR + suffix + "test_export_jsonl.jsonl"
         res = table_obj.export_data(test_export_jsonl_file_path, {"file_type": "jsonl", "delimiter" : "\t"})
         assert res.error_code == ErrorCode.OK
         assert count_lines(test_export_jsonl_file_path) == 9999
@@ -150,24 +151,24 @@ class TestInfinity:
         assert count_lines(test_export_jsonl_file_path+".part1") == 9999 - 8192
         delete_file(test_export_jsonl_file_path+".part1")
 
-        res = db_obj.drop_table("test_export_jsonl", ConflictType.Error)
+        res = db_obj.drop_table("test_export_jsonl"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_export_fvecs(self):
+    def test_export_fvecs(self, suffix):
         file_name = "enwiki_embedding_9999.csv"
         copy_data(file_name)
 
         test_csv_dir = common_values.TEST_TMP_DIR + file_name
 
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_export_fvecs", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_export_fvecs", {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "num": {"type": "integer"}, "vec": {"type": "vector, 4, float"}})
+        db_obj.drop_table("test_export_fvecs"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_export_fvecs"+suffix, {"doctitle": {"type": "varchar"}, "docdate": {"type": "varchar"}, "body": {"type": "varchar"}, "num": {"type": "integer"}, "vec": {"type": "vector, 4, float"}})
         res = table_obj.import_data(test_csv_dir, import_options={"file_type": "csv", "delimiter" : "\t"})
         assert res.error_code == ErrorCode.OK
         res = table_obj.output(["count(*)"]).to_pl()
         print(res)
 
-        test_export_fvecs_file_path = common_values.TEST_TMP_DIR + "test_export_fvecs.fvecs"
+        test_export_fvecs_file_path = common_values.TEST_TMP_DIR + suffix + "test_export_fvecs.fvecs"
         res = table_obj.export_data(test_export_fvecs_file_path, {"file_type": "fvecs"}, ["vec"])
         assert res.error_code == ErrorCode.OK
         assert len(read_fvecs_file(test_export_fvecs_file_path)) == 9999
@@ -202,5 +203,5 @@ class TestInfinity:
         assert len(read_fvecs_file(test_export_fvecs_file_path+".part1")) == 9999 - 8192
         delete_file(test_export_fvecs_file_path+".part1")
 
-        res = db_obj.drop_table("test_export_fvecs", ConflictType.Error)
+        res = db_obj.drop_table("test_export_fvecs"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

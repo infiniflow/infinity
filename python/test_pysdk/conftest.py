@@ -128,6 +128,13 @@ def local_infinity(request):
 def http(request):
     return request.config.getoption("--http")
 
+@pytest.fixture
+def suffix(request):
+    if request.config.getoption("--http"):
+        return "_http"
+    else :
+        return "_remote"
+
 def pytest_addoption(parser):
     parser.addoption(
         "--run-integration",

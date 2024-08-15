@@ -37,10 +37,11 @@ def setup_class(request, local_infinity, http):
     request.cls.infinity_obj.disconnect()
 
 @pytest.mark.usefixtures("setup_class")
+@pytest.mark.usefixtures("suffix")
 class TestInfinity:
     # def test_version(self):
     #     self.test_infinity_obj._test_version()
-    def test_select(self):
+    def test_select(self, suffix):
         """
         target: test table select apis
         method:
@@ -94,9 +95,9 @@ class TestInfinity:
         db_obj = self.infinity_obj.get_database("default_db")
 
         # infinity
-        db_obj.drop_table("test_select", ConflictType.Ignore)
+        db_obj.drop_table("test_select"+suffix, ConflictType.Ignore)
         table_obj = db_obj.create_table(
-            "test_select", {
+            "test_select"+suffix, {
                 "c1": {"type": "int", "constraints": ["primary key", "not null"]},
                 "c2": {"type": "int", "constraints": ["not null"]}}, ConflictType.Error)
 
@@ -162,10 +163,10 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c2': (1, -7)})
                                       .astype({'c2': dtype('int32')}))
 
-        res = db_obj.drop_table("test_select", ConflictType.Error)
+        res = db_obj.drop_table("test_select"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_select_aggregate(self):
+    def test_select_aggregate(self, suffix):
         """
         target: test table select apis
         methods:
@@ -204,9 +205,9 @@ class TestInfinity:
         db_obj = self.infinity_obj.get_database("default_db")
 
         # infinity
-        db_obj.drop_table("test_select_aggregate", ConflictType.Ignore)
+        db_obj.drop_table("test_select_aggregate"+suffix, ConflictType.Ignore)
         table_obj = db_obj.create_table(
-            "test_select_aggregate", {
+            "test_select_aggregate"+suffix, {
                 "c1": {"type": "int", "constraints": ["primary key", "not null"]},
                 "c2": {"type": "float", "constraints": ["not null"]}}, ConflictType.Error)
 
@@ -236,10 +237,10 @@ class TestInfinity:
         res = table_obj.output(["avg(c2)"]).to_pl()
         print(res)
 
-        res = db_obj.drop_table("test_select_aggregate", ConflictType.Error)
+        res = db_obj.drop_table("test_select_aggregate"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_select_varchar(self):
+    def test_select_varchar(self, suffix):
         """
         target: test table select apis
         method:
@@ -289,11 +290,11 @@ class TestInfinity:
 
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_select_varchar", ConflictType.Ignore)
-        db_obj.create_table("test_select_varchar",
+        db_obj.drop_table("test_select_varchar"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_varchar"+suffix,
                             {"c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
                              "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
-        table_obj = db_obj.get_table("test_select_varchar")
+        table_obj = db_obj.get_table("test_select_varchar"+suffix)
         table_obj.insert(
             [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'},
              {"c1": 'e', "c2": 'e'}, {"c1": 'f', "c2": 'f'}, {
@@ -316,28 +317,28 @@ class TestInfinity:
         # TODO NotImplement Error: Not implement: varchar > varchar
         # res = table_obj.output(["c1"]).filter("c1 > 'a' and c2 < 'c'").to_df()
         # pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ('b',)}).astype({'c1': dtype('O')}))
-        res = db_obj.drop_table("test_select_varchar")
+        res = db_obj.drop_table("test_select_varchar"+suffix)
         assert res.error_code == ErrorCode.OK
 
-    def test_select_big(self):
+    def test_select_big(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        res = db_obj.drop_table("test_select_big", ConflictType.Ignore)
-        db_obj.create_table("test_select_big", {
+        res = db_obj.drop_table("test_select_big"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_big"+suffix, {
             "c1": {"type": "varchar", "constraints": ["primary key", "not null"]},
             "c2": {"type": "varchar", "constraints": ["not null"]}}, ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_select_big")
+        table_obj = db_obj.get_table("test_select_big"+suffix)
 
         for i in range(1000):
             table_obj.insert(
                 [{"c1": 'a', "c2": 'a'}, {"c1": 'b', "c2": 'b'}, {"c1": 'c', "c2": 'c'}, {"c1": 'd', "c2": 'd'}])
 
-        res = db_obj.drop_table("test_select_big", ConflictType.Error)
+        res = db_obj.drop_table("test_select_big"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_select_embedding_int32(self, check_data):
+    def test_select_embedding_int32(self, check_data, suffix):
         """
         TestSelect.test_select_embedding()
         This method tests the functionality of selecting embeddings from a table in the database.
@@ -355,12 +356,12 @@ class TestInfinity:
         """
         db_obj = self.infinity_obj.get_database("default_db")
 
-        db_obj.drop_table("test_select_embedding", ConflictType.Ignore)
+        db_obj.drop_table("test_select_embedding"+suffix, ConflictType.Ignore)
 
-        res = db_obj.create_table("test_select_embedding", {
+        res = db_obj.create_table("test_select_embedding"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_select_embedding")
+        table_obj = db_obj.get_table("test_select_embedding"+suffix)
 
         if not check_data:
             copy_data("embedding_int_dim3.csv")
@@ -381,12 +382,12 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (1, 5, 9), 'c2': ([2, 3, 4], [6, 7, 8], [10, 11, 12])})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('O')}))
 
-        res = db_obj.drop_table("test_select_embedding", ConflictType.Error)
+        res = db_obj.drop_table("test_select_embedding"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_float_dim4.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_select_embedding_float(self, check_data):
+    def test_select_embedding_float(self, check_data, suffix):
         """
         Method: test_select_embedding_float
         This method performs a series of tests on the `test_select_embedding_float` table in the Infinity database.
@@ -403,12 +404,12 @@ class TestInfinity:
         """
         db_obj = self.infinity_obj.get_database("default_db")
 
-        db_obj.drop_table("test_select_embedding_float", ConflictType.Ignore)
+        db_obj.drop_table("test_select_embedding_float"+suffix, ConflictType.Ignore)
 
-        res = db_obj.create_table("test_select_embedding_float", {
+        res = db_obj.create_table("test_select_embedding_float"+suffix, {
             "c1": {"type": "float"}, "c2": {"type": "vector,4,float"}}, ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_select_embedding_float")
+        table_obj = db_obj.get_table("test_select_embedding_float"+suffix)
 
         test_dir = "/var/infinity/test_data/"
         test_csv_dir = test_dir + "embedding_float_dim4.csv"
@@ -436,12 +437,12 @@ class TestInfinity:
                                       .astype({'c1': dtype('float32'), 'c2': dtype('O')}))
 
         res = db_obj.drop_table(
-            "test_select_embedding_float", ConflictType.Error)
+            "test_select_embedding_float"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("check_data", [{"file_name": "embedding_int_dim3.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_select_big_embedding(self, check_data):
+    def test_select_big_embedding(self, check_data, suffix):
         """
         Method: test_select_big_embedding
 
@@ -461,12 +462,12 @@ class TestInfinity:
         """
         db_obj = self.infinity_obj.get_database("default_db")
 
-        db_obj.drop_table("test_select_big_embedding", ConflictType.Ignore)
+        db_obj.drop_table("test_select_big_embedding"+suffix, ConflictType.Ignore)
 
-        db_obj.create_table("test_select_big_embedding", {
+        db_obj.create_table("test_select_big_embedding"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_select_big_embedding")
+        table_obj = db_obj.get_table("test_select_big_embedding"+suffix)
 
         if not check_data:
             copy_data("embedding_int_dim3.csv")
@@ -479,17 +480,17 @@ class TestInfinity:
             assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(
-            "test_select_big_embedding", ConflictType.Error)
+            "test_select_big_embedding"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.usefixtures("skip_if_http")
-    def test_select_same_output(self):
+    def test_select_same_output(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_select_same_output", ConflictType.Ignore)
-        db_obj.create_table("test_select_same_output", {
+        db_obj.drop_table("test_select_same_output"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_select_same_output"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "int"}}, ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_select_same_output")
+        table_obj = db_obj.get_table("test_select_same_output"+suffix)
         table_obj.insert([{"c1": 1, "c2": 2}])
         print()
         res = table_obj.output(["c1", "c2"]).to_df()
@@ -499,17 +500,17 @@ class TestInfinity:
         res = table_obj.output(["c1", "c2", "c1"]).to_df()
         print(res)
 
-        res = db_obj.drop_table("test_select_same_output", ConflictType.Error)
+        res = db_obj.drop_table("test_select_same_output"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.usefixtures("skip_if_http")
-    def test_empty_table(self):
+    def test_empty_table(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_empty_table", ConflictType.Ignore)
-        db_obj.create_table("test_empty_table", {
+        db_obj.drop_table("test_empty_table"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_empty_table"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "int"}}, ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_empty_table")
+        table_obj = db_obj.get_table("test_empty_table"+suffix)
         print()
         res = table_obj.output(["c1", "c2"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': ()}).astype(
@@ -521,7 +522,7 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (), 'c2': (), 'c1_2': ()}).astype(
             {'c1': dtype('int32'), 'c2': dtype('int32'), 'c1_2': dtype('int32')}))
 
-        res = db_obj.drop_table("test_empty_table", ConflictType.Error)
+        res = db_obj.drop_table("test_empty_table"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("filter_list", [
@@ -533,11 +534,11 @@ class TestInfinity:
         "c1 < 0.1 and c1 > 1.0",
         "c1 = 0",
     ])
-    def test_valid_filter_expression(self, filter_list):
+    def test_valid_filter_expression(self, filter_list, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_valid_filter_expression", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_valid_filter_expression", {
+        db_obj.drop_table("test_valid_filter_expression"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_valid_filter_expression"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
@@ -549,7 +550,7 @@ class TestInfinity:
         print(str(select_res_df))
 
         res = db_obj.drop_table(
-            "test_valid_filter_expression", ConflictType.Error)
+            "test_valid_filter_expression"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("filter_list", [
@@ -561,12 +562,12 @@ class TestInfinity:
         pytest.param("c1 * 0.1 and c2 / 1.0"),
         pytest.param("c1 > 0.1 %@#$sf c2 < 1.0"),
     ])
-    def test_invalid_filter_expression(self, filter_list):
+    def test_invalid_filter_expression(self, filter_list, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_invalid_filter_expression",
+        db_obj.drop_table("test_invalid_filter_expression"+suffix,
                           ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_invalid_filter_expression", {
+        table_obj = db_obj.create_table("test_invalid_filter_expression"+suffix, {
             "c1": {"type": "int"}, "c2": {"type": "float"}}, ConflictType.Error)
         table_obj.insert([{"c1": 1, "c2": 2.0},
                           {"c1": 10, "c2": 2.0},
@@ -579,5 +580,5 @@ class TestInfinity:
             print(str(select_res_df))
 
         res = db_obj.drop_table(
-            "test_invalid_filter_expression", ConflictType.Error)
+            "test_invalid_filter_expression"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

@@ -15,6 +15,7 @@ from infinity_http import infinity_http
 
 @pytest.mark.usefixtures("local_infinity")
 @pytest.mark.usefixtures("http")
+@pytest.mark.usefixtures("suffix")
 class TestInfinity:
     @pytest.fixture(autouse=True)
     def setup(self, local_infinity, http):

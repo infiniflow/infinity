@@ -44,6 +44,7 @@ def setup_class(request, local_infinity, http):
 @pytest.mark.usefixtures("setup_class")
 class TestInfinity:
     @pytest.mark.usefixtures("skip_if_local_infinity")
+    @pytest.mark.usefixtures("skip_if_http")
     def test_query(self):
         conn = ThriftInfinityClient(common_values.TEST_LOCAL_HOST)
         db = RemoteDatabase(conn, "default_db")
