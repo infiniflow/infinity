@@ -56,28 +56,19 @@ export inline BoundCastFunc BindTensorArrayCast(const DataType &source, const Da
 template <typename TargetValueType, typename SourceValueType>
 void TensorArrayTryCastToTensorArrayImpl(const u32 basic_embedding_dim,
                                          const TensorArrayT &source,
-                                         ColumnVector *source_vector_ptr,
+                                         const ColumnVector *source_vector_ptr,
                                          TensorArrayT &target,
                                          ColumnVector *target_vector_ptr) {
-    const auto &[source_tensor_num, source_tensor_array_chunk_id, source_tensor_array_chunk_offset] = source;
-    auto &[target_tensor_num, target_tensor_array_chunk_id, target_tensor_array_chunk_offset] = target;
-    target_tensor_num = source_tensor_num;
-    Vector<TensorT> source_tensor_array_data(source_tensor_num);
-    Vector<TensorT> target_tensor_array_data(source_tensor_num);
-    source_vector_ptr->buffer_->fix_heap_mgr_->ReadFromHeap(reinterpret_cast<char *>(source_tensor_array_data.data()),
-                                                            source_tensor_array_chunk_id,
-                                                            source_tensor_array_chunk_offset,
-                                                            source_tensor_num * sizeof(TensorT));
-    for (u32 i = 0; i < source_tensor_num; ++i) {
-        TensorTryCastToTensorImplInner<TargetValueType, SourceValueType>(basic_embedding_dim,
-                                                                         source_tensor_array_data[i],
-                                                                         source_vector_ptr->buffer_->fix_heap_mgr_1_.get(),
-                                                                         target_tensor_array_data[i],
-                                                                         target_vector_ptr->buffer_->fix_heap_mgr_1_.get());
+    Span<const TensorT> source_tensors = ColumnVector::GetTensorArrayMeta(source, source_vector_ptr->buffer_.get());
+    SizeT tensor_num = source_tensors.size();
+    Vector<TensorT> target_tensors(tensor_num);
+    for (SizeT i = 0; i < tensor_num; ++i) {
+        TensorTryCastToTensorImpl<TargetValueType, SourceValueType>(source_tensors.data()[i],
+                                                                    source_vector_ptr,
+                                                                    target_tensors[i],
+                                                                    target_vector_ptr);
     }
-    std::tie(target_tensor_array_chunk_id, target_tensor_array_chunk_offset) =
-        target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tensor_array_data.data()),
-                                                                source_tensor_num * sizeof(TensorT));
+    ColumnVector::SetTensorArrayMeta(target, target_vector_ptr->buffer_.get(), {target_tensors.data(), tensor_num});
 }
 
 template <typename TargetValueType>
@@ -129,7 +120,11 @@ void TensorArrayTryCastToTensorArrayImpl(const u32 basic_embedding_dim,
             break;
         }
         case EmbeddingDataType::kElemBFloat16: {
-            TensorArrayTryCastToTensorArrayImpl<TargetValueType, BFloat16T>(basic_embedding_dim, source, source_vector_ptr, target, target_vector_ptr);
+            TensorArrayTryCastToTensorArrayImpl<TargetValueType, BFloat16T>(basic_embedding_dim,
+                                                                            source,
+                                                                            source_vector_ptr,
+                                                                            target,
+                                                                            target_vector_ptr);
             break;
         }
         case EmbeddingDataType::kElemInvalid: {

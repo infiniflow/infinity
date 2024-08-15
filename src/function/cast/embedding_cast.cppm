@@ -254,27 +254,24 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
 
 template <typename TargetValueType, typename SourceValueType>
 void EmbeddingTryCastToTensorImpl(const EmbeddingT &source, const SizeT source_embedding_dim, TensorT &target, ColumnVector *target_vector_ptr) {
+    const auto *target_info = static_cast<const EmbeddingInfo *>(target_vector_ptr->data_type()->type_info().get());
     if constexpr (std::is_same_v<TargetValueType, SourceValueType>) {
         const auto source_size =
             std::is_same_v<SourceValueType, BooleanT> ? (source_embedding_dim + 7) / 8 : source_embedding_dim * sizeof(SourceValueType);
-        const auto [chunk_id, chunk_offset] = target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(source.ptr, source_size);
-        target.chunk_id_ = chunk_id;
-        target.chunk_offset_ = chunk_offset;
+        Span<const char> tensor_data = {source.ptr, source_size};
+        ColumnVector::SetTensor(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
     } else if constexpr (std::is_same_v<TargetValueType, BooleanT>) {
         static_assert(sizeof(bool) == 1);
-        const SizeT target_ptr_n = (source_embedding_dim + 7) / 8;
-        const auto target_size = target_ptr_n;
-        auto target_tmp_ptr = MakeUnique<u8[]>(target_size);
+        const auto target_size = (source_embedding_dim + 7) / 8;
+        auto target_tmp_ptr = MakeUnique<char[]>(target_size);
         auto src_ptr = reinterpret_cast<const SourceValueType *>(source.ptr);
         for (SizeT i = 0; i < source_embedding_dim; ++i) {
             if (src_ptr[i]) {
                 target_tmp_ptr[i / 8] |= (1u << (i % 8));
             }
         }
-        const auto [chunk_id, chunk_offset] =
-            target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
-        target.chunk_id_ = chunk_id;
-        target.chunk_offset_ = chunk_offset;
+        Span<const char> tensor_data = {target_tmp_ptr.get(), target_size};
+        ColumnVector::SetTensor(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
     } else {
         const auto target_size = source_embedding_dim * sizeof(TargetValueType);
         auto target_tmp_ptr = MakeUniqueForOverwrite<TargetValueType[]>(source_embedding_dim);
@@ -286,10 +283,8 @@ void EmbeddingTryCastToTensorImpl(const EmbeddingT &source, const SizeT source_e
                                                DataType::TypeToString<TargetValueType>());
             UnrecoverableError(error_message);
         }
-        const auto [chunk_id, chunk_offset] =
-            target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
-        target.chunk_id_ = chunk_id;
-        target.chunk_offset_ = chunk_offset;
+        Span<const char> tensor_data = {reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size};
+        ColumnVector::SetTensor(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
     }
 }
 
@@ -428,8 +423,8 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         RecoverableError(status);
     }
     target.embedding_num_ = target_tensor_num;
-    if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kTensorHeap) {
-        String error_message = fmt::format("Tensor column vector should use kTensorHeap VectorBuffer.");
+    if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
+        String error_message = fmt::format("Tensor column vector should use kVarBuffer VectorBuffer.");
         UnrecoverableError(error_message);
     }
     EmbeddingTryCastToTensor(source, embedding_info->Type(), source_embedding_dim, target, target_embedding_info->Type(), target_vector_ptr);

@@ -27,7 +27,7 @@ struct TensorType {
     uint16_t chunk_id_ = 0;
     uint32_t chunk_offset_ = 0;
 
-    [[nodiscard]] static std::string Tensor2String(char *tensor_ptr, EmbeddingDataType type, size_t embedding_dimension, size_t embedding_num);
+    [[nodiscard]] static std::string Tensor2String(const char *tensor_ptr, EmbeddingDataType type, size_t embedding_dimension, size_t embedding_num);
 };
 
 static_assert(sizeof(TensorType) == sizeof(uint64_t));

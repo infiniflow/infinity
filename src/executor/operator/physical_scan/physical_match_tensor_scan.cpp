@@ -707,11 +707,8 @@ struct CalcutateScoreOfTensorRow {
                          const char *query_tensor_ptr,
                          const u32 query_embedding_num,
                          const u32 basic_embedding_dimension) {
-        auto tensor_ptr = reinterpret_cast<const TensorT *>(column_vector.data());
-        FixHeapManager *tensor_heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
-        const auto [embedding_num, chunk_id, chunk_offset] = tensor_ptr[block_offset];
-        const char *tensor_data_ptr = tensor_heap_mgr->GetRawPtrFromChunk(chunk_id, chunk_offset);
-        return Op::Score(query_tensor_ptr, tensor_data_ptr, query_embedding_num, embedding_num, basic_embedding_dimension);
+        const auto [raw_data, embedding_num] = column_vector.GetTensorRaw(block_offset);
+        return Op::Score(query_tensor_ptr, raw_data.data(), query_embedding_num, embedding_num, basic_embedding_dimension);
     }
 };
 
@@ -722,19 +719,10 @@ struct CalcutateScoreOfTensorArrayRow {
                          const char *query_tensor_ptr,
                          const u32 query_embedding_num,
                          const u32 basic_embedding_dimension) {
-        auto tensor_array_ptr = reinterpret_cast<const TensorArrayT *>(column_vector.data());
-        FixHeapManager *tensor_array_heap_mgr = column_vector.buffer_->fix_heap_mgr_.get();
-        FixHeapManager *tensor_heap_mgr = column_vector.buffer_->fix_heap_mgr_1_.get();
-        const auto [tensor_num, tensor_array_chunk_id, tensor_array_chunk_offset] = tensor_array_ptr[block_offset];
-        Vector<TensorT> tensors(tensor_num);
-        tensor_array_heap_mgr->ReadFromHeap(reinterpret_cast<char *>(tensors.data()),
-                                            tensor_array_chunk_id,
-                                            tensor_array_chunk_offset,
-                                            tensor_num * sizeof(TensorT));
         float maxsim_score = std::numeric_limits<float>::lowest();
-        for (const auto [embedding_num, tensor_chunk_id, tensor_chunk_offset] : tensors) {
-            const char *tensor_data_ptr = tensor_heap_mgr->GetRawPtrFromChunk(tensor_chunk_id, tensor_chunk_offset);
-            const float tensor_score = Op::Score(query_tensor_ptr, tensor_data_ptr, query_embedding_num, embedding_num, basic_embedding_dimension);
+        Vector<Pair<Span<const char>, SizeT>> tensor_array = column_vector.GetTensorArrayRaw(block_offset);
+        for (const auto &[raw_data, embedding_num] : tensor_array) {
+            const float tensor_score = Op::Score(query_tensor_ptr, raw_data.data(), query_embedding_num, embedding_num, basic_embedding_dimension);
             maxsim_score = std::max(maxsim_score, tensor_score);
         }
         return maxsim_score;
