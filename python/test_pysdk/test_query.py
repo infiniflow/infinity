@@ -44,6 +44,7 @@ def setup_class(request, local_infinity, http):
 @pytest.mark.usefixtures("setup_class")
 class TestInfinity:
     @pytest.mark.usefixtures("skip_if_local_infinity")
+    @pytest.mark.usefixtures("skip_if_http")
     def test_query(self):
         conn = ThriftInfinityClient(common_values.TEST_LOCAL_HOST)
         db = RemoteDatabase(conn, "default_db")
@@ -77,7 +78,7 @@ class TestInfinity:
         query_builder.output(["num", "body"])
         query_builder.knn('vec', [3.0] * 5, 'float', 'ip', 2)
         query_builder.match('body', 'harmful', 'topn=2')
-        query_builder.fusion('rrf')
+        query_builder.fusion(method='rrf', topn=10, fusion_params=None)
         res = query_builder.to_df()
         print(res)
         res = table.drop_index("my_index", ConflictType.Error)

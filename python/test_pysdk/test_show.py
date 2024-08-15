@@ -36,49 +36,50 @@ def setup_class(request, local_infinity, http):
     request.cls.infinity_obj.disconnect()
 
 @pytest.mark.usefixtures("setup_class")
+@pytest.mark.usefixtures("suffix")
 class TestInfinity:
-    def _test_show_table(self):
+    def _test_show_table(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_show_table", ConflictType.Ignore)
+        db_obj.drop_table("test_show_table"+suffix, ConflictType.Ignore)
         db_obj.create_table(
-            "test_show_table",
+            "test_show_table"+suffix,
             {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector,5,float"}},
             ConflictType.Error)
         with pl.Config(fmt_str_lengths=1000):
-            res = db_obj.show_table("test_show_table")
+            res = db_obj.show_table("test_show_table"+suffix)
             print(res)
 
-        res = db_obj.drop_table("test_show_table", ConflictType.Error)
+        res = db_obj.drop_table("test_show_table"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-    def _test_show_columns(self):
+    def _test_show_columns(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_show_columns", ConflictType.Ignore)
+        db_obj.drop_table("test_show_columns"+suffix, ConflictType.Ignore)
         db_obj.create_table(
-            "test_show_columns",
+            "test_show_columns"+suffix,
             {"num": {"type": "integer"}, "body": {"type": "varchar"}, "vec": {"type": "vector,5,float"}},
             ConflictType.Error)
         with pl.Config(fmt_str_lengths=1000):
-            res = db_obj.show_columns("test_show_columns")
+            res = db_obj.show_columns("test_show_columns"+suffix)
             print(res)
             # check the polars dataframe
             assert res.columns == ["column_name", "column_type", "constraint", "default"]
 
-        res = db_obj.drop_table("test_show_columns", ConflictType.Error)
+        res = db_obj.drop_table("test_show_columns"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-    def _test_show_big_databases(self):
+    def _test_show_big_databases(self, suffix):
         for i in range(8193):
-            self.infinity_obj.drop_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
+            self.infinity_obj.drop_database(f"test_show_big_databases_{i}"+suffix, ConflictType.Ignore)
 
         for i in range(8193):
-            self.infinity_obj.create_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
+            self.infinity_obj.create_database(f"test_show_big_databases_{i}"+suffix, ConflictType.Ignore)
 
         res = self.infinity_obj.list_databases()
         assert res.error_code == ErrorCode.OK
 
         for i in range(8193):
-            self.infinity_obj.drop_database(f"test_show_big_databases_{i}", ConflictType.Ignore)
+            self.infinity_obj.drop_database(f"test_show_big_databases_{i}"+suffix, ConflictType.Ignore)
 
-    def test_show(self):
-        self._test_show_table()
-        self._test_show_columns()
-        self._test_show_big_databases()
+    def test_show(self, suffix):
+        self._test_show_table(suffix)
+        self._test_show_columns(suffix)
+        self._test_show_big_databases(suffix)

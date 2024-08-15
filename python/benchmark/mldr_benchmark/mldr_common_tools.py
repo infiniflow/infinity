@@ -277,8 +277,8 @@ def apply_sparse(table, query_embedding: dict, max_hits: int):
 
 
 def apply_colbert(table, query_tensor: list[list], max_hits: int):
-    return table.match_tensor("colbert_col", query_tensor, 'float', 'maxsim',
-                              f'topn={max_hits};emvb_threshold_first=0.3;emvb_threshold_final=0.4')
+    return table.match_tensor(column_name="colbert_col", query_data=query_tensor, query_data_type='float',
+                              topn=max_hits, extra_option={"emvb_threshold_first": 0.3, "emvb_threshold_final": 0.4})
 
 
 apply_funcs = {'bm25': apply_bm25, 'dense': apply_dense, 'sparse': apply_sparse, 'colbert': apply_colbert}

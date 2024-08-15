@@ -17,6 +17,7 @@ from infinity_http import infinity_http
 
 @pytest.mark.usefixtures("local_infinity")
 @pytest.mark.usefixtures("http")
+@pytest.mark.usefixtures("suffix")
 class TestInfinity:
     @pytest.fixture(autouse=True)
     def setup(self, local_infinity, http):
@@ -33,7 +34,7 @@ class TestInfinity:
         res = self.infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_connection_pool(self):
+    def test_connection_pool(self, suffix):
         connection_pool = ConnectionPool(uri=self.uri, min_size=4, max_size=8)
         assert len(connection_pool.free_pool_) == 4
 
@@ -41,8 +42,8 @@ class TestInfinity:
         assert infinity_obj
         assert len(connection_pool.free_pool_) == 3
 
-        infinity_obj.drop_database("my_database", conflict_type=ConflictType.Ignore)
-        db = infinity_obj.create_database("my_database")
+        infinity_obj.drop_database("my_database"+suffix, conflict_type=ConflictType.Ignore)
+        db = infinity_obj.create_database("my_database"+suffix)
         assert db
 
         res = infinity_obj.list_databases()
@@ -52,9 +53,9 @@ class TestInfinity:
         res.db_names.sort()
 
         assert "default_db" in res.db_names
-        assert "my_database" in res.db_names
+        assert "my_database"+suffix in res.db_names
 
-        infinity_obj.drop_database("my_database", conflict_type=ConflictType.Error)
+        infinity_obj.drop_database("my_database"+suffix, conflict_type=ConflictType.Error)
 
         connection_pool.release_conn(infinity_obj)
         assert len(connection_pool.free_pool_) == 4

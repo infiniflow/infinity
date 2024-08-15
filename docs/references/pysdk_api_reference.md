@@ -1720,7 +1720,7 @@ for question in questions:
 ## fusion
 
 ```python
-table_object.fusion(method, options_text, commonMatchTensorExpr = None)
+table_object.fusion(method, topn, fusion_params = None)
 ```
 
 Creates a reranking expression for multiple retrieval ways to identify the top n closest rows.
@@ -1731,7 +1731,7 @@ To display your query results, you must chain this method with `output(columns)`
 
 ### Parameters
 
-#### method: `str`
+#### method: `str`, *Required*
 
 A non-empty string indicating the reranking methods to use:
 
@@ -1759,23 +1759,28 @@ A non-empty string indicating the reranking methods to use:
 - `"match_tensor"`  
   Infinity's ColBERT-based tensor reranking approach.  
 
-#### options_text: `str`, *Required
+#### topn: `int`, *Required*
 
-A non-empty, semicolon-separated string specifying the following reranking options:
+An integer indicating the number of the most relevant rows to retrieve.
 
-- **Common options**: `str`, *Required*  
-  Mandatory settings for the fused reranking.  
-  - `"topn"`: Specifies the number of the most relevant rows to retrieve, e.g., `"topn=10"` to obtain the ten most relevant rows.
+#### fusion_params: `dict[str, Any]`, *Optional*
 
-- **RRF-specific options**: `str`, *Optional*  
+A dictionary representing additional options for the selected reranking method:
+
+- **RRF-specific options**: *Optional*  
   Settings when employing RRF for reranking.  
-  - `"rank_constant"`: The smoothing constant for RRF reranking, e.g., `"topn=10;rank_constant=30"`. Defaults to `60`.
+  - `"rank_constant"`: The smoothing constant for RRF reranking, e.g., `{"rank_constant": 60}`. Defaults to `60`.
 
-- **weighted_sum-specific options**: `str`, *Optional*  
+- **weighted_sum-specific options**: *Optional*  
   Settings when employing Weighted Sum for reranking.  
-  - `"weights"`: Specifies the weight for each retrieval path. For example, `"weights=1,2,0.5"` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval paths, respectively. The default weight of each retrieval path is `1.0`. If `"weight"` is not specified, all retrieval paths will be assiged the default weight of `1.0`.
+  - `"weights"`: Specifies the weight for each retrieval path. For example, `{"weights": "1,2,0.5"}` sets weights of `1`, `2`, and `0.5` for the first, second, and third retrieval paths, respectively. The default weight of each retrieval path is `1.0`. If `"weight"` is not specified, all retrieval paths will be assiged the default weight of `1.0`.
 
-#### commonMatchTensorExpr: `commonMatchTensorExpr()`, *Optional*
+- **match_tensor-specific options**: *Optional*  
+  Settings when employing match_tensor for reranking.
+  - `"field"`: The name of the tensor column for reranking.
+  - `"data"`: The tensor data to compare against. This should be provided as a list of lists or a two-dimensional NumPy
+    array of numerical values.
+  - `"data_type"`: The element data type of the query tensor. Usually `"float"`.
 
 ### Returns
 
@@ -1796,7 +1801,7 @@ table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"]
             .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
             .match("body", "blooms", "topn=10")
             .filter("year < 2024")
-            .fusion("rrf", "topn=2")
+            .fusion("rrf", 2)
             .to_pl()
 ```
 
@@ -1806,7 +1811,7 @@ table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"]
             .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
             .match("body", "blooms", "topn=10")
             .filter("year < 2024")
-            .fusion("rrf", "topn=2;rank_constant=30")
+            .fusion("rrf", 2, {"rank_constant": 30})
             .to_pl()
 ```
 
@@ -1818,21 +1823,20 @@ table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"]
             .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
             .match("body", "blooms", "topn=10")
             .filter("year < 2024")
-            .fusion("weighted_sum", "topn=2;weights=1,2,0.5")
+            .fusion("weighted_sum", 2, {"weights": "1,2,0.5"})
             .to_pl()
 ```
 
 #### Use tensor reranking
 
 ```python {8}
-# You must import `CommonMatchTensorExpr`to set tensor reranking parameters
-from infinity.common import CommonMatchTensorExpr
 table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
             .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
             .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
             .match("body", "blooms", "topn=10")
             .filter("year < 2024")
-            .fusion("match_tensor", "topn=2", commonMatchTensorExpr("tensor", [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], "float", "maxsim"))
+            .fusion("match_tensor", 2, {"field": "tensor", "data_type": "float",
+                                        "data": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})
             .to_pl()
 ```
 

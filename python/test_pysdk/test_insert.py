@@ -41,8 +41,9 @@ def setup_class(request, local_infinity, http):
 
 
 @pytest.mark.usefixtures("setup_class")
+@pytest.mark.usefixtures("suffix")
 class TestInfinity:
-    def _test_insert_basic(self):
+    def _test_insert_basic(self, suffix):
         """
         target: test table insert apis
         method:
@@ -64,11 +65,11 @@ class TestInfinity:
         """
         db_obj = self.infinity_obj.get_database("default_db")
 
-        db_obj.drop_table(table_name="table_2",
+        db_obj.drop_table(table_name="table_2"+suffix,
                           conflict_type=ConflictType.Ignore)
         # infinity
         table_obj = db_obj.create_table(
-            "table_2", {
+            "table_2"+suffix, {
                 "c1": {"type": "int", "constraints": ["primary key", "not null"]},
                 "c2": {"type": "int", "constraints": ["not null"]}
             },
@@ -91,18 +92,18 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (0, 1, 2, 3, 4), 'c2': (0, 1, 2, 3, 4)})
                                       .astype({'c1': dtype('int32'), 'c2': dtype('int32')}))
 
-        res = db_obj.drop_table("table_2")
+        res = db_obj.drop_table("table_2"+suffix)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_bool(self):
+    def _test_insert_bool(self, suffix):
         """
         target: test insert bool column
         method: create table with bool column
         expected: ok
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("python_test_bool_insert", ConflictType.Ignore)
-        table_obj = db_obj.create_table("python_test_bool_insert", {"c1": {"type": "float"}, "c2": {"type": "bool"}},
+        db_obj.drop_table("python_test_bool_insert"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("python_test_bool_insert"+suffix, {"c1": {"type": "float"}, "c2": {"type": "bool"}},
                                         ConflictType.Error)
         assert table_obj
         res = table_obj.insert([{"c1": -1, "c2": True}, {"c1": 2, "c2": False}])
@@ -111,10 +112,10 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': (-1, 2), 'c2': (True, False)}).astype(
             {'c1': dtype('float32'), 'c2': dtype('bool')}))
-        res = db_obj.drop_table("python_test_bool_insert", ConflictType.Error)
+        res = db_obj.drop_table("python_test_bool_insert"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
-        db_obj.drop_table("python_test_bool_insert_default", ConflictType.Ignore)
-        table_instance = db_obj.create_table("python_test_bool_insert_default", {
+        db_obj.drop_table("python_test_bool_insert_default"+suffix, ConflictType.Ignore)
+        table_instance = db_obj.create_table("python_test_bool_insert_default"+suffix, {
             "c1": {"type": "int8", "default": 0},
             "c2": {"type": "int16", "default": 0},
             "c3": {"type": "int", "default": 0},
@@ -139,18 +140,18 @@ class TestInfinity:
             {'c1': dtype('int8'), 'c2': dtype('int16'), 'c3': dtype('int32'), 'c4': dtype('int32'),
              'c5': dtype('int32'), 'c6': dtype('int64'), 'c7': dtype('object'), 'c8': dtype('float32'),
              'c9': dtype('float32'), 'c10': dtype('float64'), 'c11': dtype('float64'), 'c12': dtype('bool')}))
-        res = db_obj.drop_table("python_test_bool_insert_default", ConflictType.Error)
+        res = db_obj.drop_table("python_test_bool_insert_default"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_float16_bfloat16(self):
+    def _test_insert_float16_bfloat16(self, suffix):
         """
         target: test insert float16 bfloat16 column
         method: create table with float16 bfloat16 column
         expected: ok
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("python_test_fp16_bf16", ConflictType.Ignore)
-        table_obj = db_obj.create_table("python_test_fp16_bf16", {"c1": {"type": "float"}, "c2": {"type": "float16"},
+        db_obj.drop_table("python_test_fp16_bf16"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("python_test_fp16_bf16"+suffix, {"c1": {"type": "float"}, "c2": {"type": "float16"},
                                                                   "c3": {"type": "bfloat16"}}, ConflictType.Error)
         assert table_obj
         res = table_obj.insert(
@@ -162,18 +163,18 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': (-1, 2, -3, 4, -5), 'c2': (1, -2, 3, -4, 5), 'c3': (-1, 2, -3, 4, -5)}).astype(
             {'c1': dtype('float32'), 'c2': dtype('float32'), 'c3': dtype('float32')}))
-        res = db_obj.drop_table("python_test_fp16_bf16", ConflictType.Error)
+        res = db_obj.drop_table("python_test_fp16_bf16"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_varchar(self):
+    def _test_insert_varchar(self, suffix):
         """
         target: test insert varchar column
         method: create table with varchar column
         expected: ok
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_varchar", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_varchar", {"c1": {"type": "varchar"}}, ConflictType.Error)
+        db_obj.drop_table("test_insert_varchar"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_varchar"+suffix, {"c1": {"type": "varchar"}}, ConflictType.Error)
         assert table_obj
 
         res = table_obj.insert([{"c1": "test_insert_varchar"}])
@@ -186,18 +187,18 @@ class TestInfinity:
         res = table_obj.output(["*"]).to_df()
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ("test_insert_varchar", " test insert varchar ",
                                                                 "^789$ test insert varchar")}))
-        res = db_obj.drop_table("test_insert_varchar", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_varchar"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_big_varchar(self):
+    def _test_insert_big_varchar(self, suffix):
         """
         target: test insert varchar with big length
         method: create table with varchar column
         expected: ok
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_big_varchar", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_big_varchar", {"c1": {"type": "varchar"}}, ConflictType.Error)
+        db_obj.drop_table("test_insert_big_varchar"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_big_varchar"+suffix, {"c1": {"type": "varchar"}}, ConflictType.Error)
         assert table_obj
         for i in range(100):
             res = table_obj.insert([{"c1": "test_insert_big_varchar" * 1000}])
@@ -207,18 +208,18 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ["test_insert_big_varchar" * 1000] * 100}))
 
-        res = db_obj.drop_table("test_insert_big_varchar", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_big_varchar"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_embedding(self):
+    def _test_insert_embedding(self, suffix):
         """
         target: test insert embedding column
         method: create table with embedding column
         expected: ok
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_embedding", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_embedding", {"c1": {"type": "vector,3,int"}}, ConflictType.Error)
+        db_obj.drop_table("test_insert_embedding"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_embedding"+suffix, {"c1": {"type": "vector,3,int"}}, ConflictType.Error)
         assert table_obj
         res = table_obj.insert([{"c1": [1, 2, 3]}])
         assert res.error_code == ErrorCode.OK
@@ -238,13 +239,13 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9],
                                                                 [1, 2, 3], [4, 5, 6], [7, 8, 9], [-7, -8, -9])}))
 
-        res = db_obj.drop_table("test_insert_embedding", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_embedding"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         embedding_insert_float = [[1.1, 2.2, 3.3], [4.4, 5.5, 6.6], [7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]]
-        db_obj.drop_table("test_insert_embedding_2", ConflictType.Ignore)
-        db_obj.create_table("test_insert_embedding_2", {"c1": {"type": "vector,3,float"}}, ConflictType.Error)
-        table_obj = db_obj.get_table("test_insert_embedding_2")
+        db_obj.drop_table("test_insert_embedding_2"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_insert_embedding_2"+suffix, {"c1": {"type": "vector,3,float"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_insert_embedding_2"+suffix)
         assert table_obj
         res = table_obj.insert([{"c1": embedding_insert_float[0]}])
         assert res.error_code == ErrorCode.OK
@@ -259,12 +260,12 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': embedding_insert_float}))
 
-        res = db_obj.drop_table("test_insert_embedding_2", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_embedding_2"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        db_obj.drop_table("test_insert_embedding_3", ConflictType.Ignore)
-        db_obj.create_table("test_insert_embedding_3", {"c1": {"type": "vector,3,float16"}}, ConflictType.Error)
-        table_obj = db_obj.get_table("test_insert_embedding_3")
+        db_obj.drop_table("test_insert_embedding_3"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_insert_embedding_3"+suffix, {"c1": {"type": "vector,3,float16"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_insert_embedding_3"+suffix)
         assert table_obj
         res = table_obj.insert([{"c1": embedding_insert_float[0]}])
         assert res.error_code == ErrorCode.OK
@@ -278,12 +279,12 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': [np.array(x).astype(np.float16).tolist() for x in embedding_insert_float]}))
-        res = db_obj.drop_table("test_insert_embedding_3", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_embedding_3"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        db_obj.drop_table("test_insert_embedding_4", ConflictType.Ignore)
-        db_obj.create_table("test_insert_embedding_4", {"c1": {"type": "vector,3,bfloat16"}}, ConflictType.Error)
-        table_obj = db_obj.get_table("test_insert_embedding_4")
+        db_obj.drop_table("test_insert_embedding_4"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_insert_embedding_4"+suffix, {"c1": {"type": "vector,3,bfloat16"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_insert_embedding_4"+suffix)
         assert table_obj
         res = table_obj.insert([{"c1": embedding_insert_float[0]}])
         assert res.error_code == ErrorCode.OK
@@ -298,18 +299,18 @@ class TestInfinity:
         tmp_bf16 = np.array(embedding_insert_float).astype('<f4')
         tmp_bf16.view('<i2')[:, ::2] = 0
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': tmp_bf16.tolist()}))
-        res = db_obj.drop_table("test_insert_embedding_4", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_embedding_4"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_big_embedding(self):
+    def _test_insert_big_embedding(self, suffix):
         """
         target: test insert embedding with big dimension
         method: create table with embedding column
         expected: ok
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_big_embedding", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_big_embedding", {"c1": {"type": "vector,16384,int"}},
+        db_obj.drop_table("test_insert_big_embedding"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_big_embedding"+suffix, {"c1": {"type": "vector,16384,int"}},
                                         ConflictType.Error)
         assert table_obj
         res = table_obj.insert([{"c1": [1] * 16384}])
@@ -322,19 +323,19 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(
-            "test_insert_big_embedding", ConflictType.Error)
+            "test_insert_big_embedding"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_big_embedding_float(self):
+    def _test_insert_big_embedding_float(self, suffix):
         """
         target: test insert embedding float with big dimension
         method: create table with embedding column
         expected: ok
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_big_embedding_float",
+        db_obj.drop_table("test_insert_big_embedding_float"+suffix,
                           ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_big_embedding_float", {"c1": {"type": "vector,16384,float"}},
+        table_obj = db_obj.create_table("test_insert_big_embedding_float"+suffix, {"c1": {"type": "vector,16384,float"}},
                                         ConflictType.Error)
         assert table_obj
         res = table_obj.insert([{"c1": [1] * 16384}])
@@ -347,13 +348,13 @@ class TestInfinity:
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(
-            "test_insert_big_embedding_float", ConflictType.Error)
+            "test_insert_big_embedding_float"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_exceed_block_size(self):
+    def _test_insert_exceed_block_size(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_exceed_block_size", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_exceed_block_size", {
+        db_obj.drop_table("test_insert_exceed_block_size"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_exceed_block_size"+suffix, {
             "c1": {"type": "float"}}, ConflictType.Error)
         assert table_obj
         values = [{"c1": 1} for _ in range(8193)]
@@ -363,20 +364,20 @@ class TestInfinity:
             assert exception.type == InfinityException
             assert exception.value.args[0] == "Insert batch row limit shouldn\'t more than 8193"
 
-        res = db_obj.drop_table("test_insert_exceed_block_size", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_exceed_block_size"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_data_into_non_existent_table(self):
+    def _test_insert_data_into_non_existent_table(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
-            "test_insert_data_into_non_existent_table", ConflictType.Ignore)
+            "test_insert_data_into_non_existent_table"+suffix, ConflictType.Ignore)
 
         # create and drop table
-        table_obj = db_obj.create_table("test_insert_data_into_non_existent_table",
+        table_obj = db_obj.create_table("test_insert_data_into_non_existent_table"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": "int"}}, ConflictType.Error)
         res = db_obj.drop_table(
-            "test_insert_data_into_non_existent_table", ConflictType.Error)
+            "test_insert_data_into_non_existent_table"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
         # insert
@@ -388,12 +389,12 @@ class TestInfinity:
         assert e.type == InfinityException
         assert e.value.args[0] == ErrorCode.TABLE_NOT_EXIST
 
-    def _test_insert_data_into_index_created_table(self):
+    def _test_insert_data_into_index_created_table(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
-            "test_insert_data_into_index_created_table", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_data_into_index_created_table",
+            "test_insert_data_into_index_created_table"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_data_into_index_created_table"+suffix,
                                         {"c1": {"type": "vector,1024,float"}}, ConflictType.Error)
 
         # create index
@@ -426,15 +427,15 @@ class TestInfinity:
         # assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(
-            "test_insert_data_into_index_created_table", ConflictType.Error)
+            "test_insert_data_into_index_created_table"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_table_with_10000_columns(self):
+    def _test_insert_table_with_10000_columns(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
-            "test_insert_table_with_10000_columns", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_table_with_10000_columns",
+            "test_insert_table_with_10000_columns"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_table_with_10000_columns"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": "int"}},
                                         ConflictType.Error)
 
@@ -446,22 +447,22 @@ class TestInfinity:
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-    def _test_read_after_shutdown(self):
+    def _test_read_after_shutdown(self, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
-        table_obj = db_obj.get_table("test_insert_table_with_10000_columns")
+        table_obj = db_obj.get_table("test_insert_table_with_10000_columns"+suffix)
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
         res = db_obj.drop_table(
-            "test_insert_table_with_10000_columns", ConflictType.Error)
+            "test_insert_table_with_10000_columns"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_batch_insert(self):
+    def _test_batch_insert(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_batch_insert", ConflictType.Ignore)
+        db_obj.drop_table("test_batch_insert"+suffix, ConflictType.Ignore)
         table_obj = db_obj.create_table(
-            "test_batch_insert", {"c1": {"type": "int"}, "c2": {"type": "int"}}, ConflictType.Error)
+            "test_batch_insert"+suffix, {"c1": {"type": "int"}, "c2": {"type": "int"}}, ConflictType.Error)
 
         # insert
         values = [{"c1": 1, "c2": 2} for _ in range(8192)]
@@ -469,14 +470,14 @@ class TestInfinity:
         insert_res = table_obj.output(["*"]).to_df()
         print(insert_res)
 
-        res = db_obj.drop_table("test_batch_insert", ConflictType.Error)
+        res = db_obj.drop_table("test_batch_insert"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_zero_column(self):
+    def _test_insert_zero_column(self, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_zero_column", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_zero_column", {
+        db_obj.drop_table("test_insert_zero_column"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_zero_column"+suffix, {
             "c1": {"type": "int"}}, ConflictType.Error)
 
         with pytest.raises(InfinityException) as e:
@@ -487,18 +488,18 @@ class TestInfinity:
         assert e.type == InfinityException
         # assert e.value.args[0] == ErrorCode.INSERT_WITHOUT_VALUES
 
-        res = db_obj.drop_table("test_insert_zero_column", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_zero_column"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_sparse(self):
+    def _test_insert_sparse(self, suffix):
         """
         target: test insert sparse column
         method: create table with sparse column
         expected: ok
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_sparse", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_sparse", {"c1": {"type": "sparse,100,float,int"}},
+        db_obj.drop_table("test_insert_sparse"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_sparse"+suffix, {"c1": {"type": "sparse,100,float,int"}},
                                         ConflictType.Error)
         assert table_obj
         res = table_obj.insert([{"c1": {"indices": [10, 20, 30], "values": [1.1, 2.2, 3.3]}}])
@@ -517,19 +518,19 @@ class TestInfinity:
                 {"indices": [70, 80, 90], "values": [7.7, 8.8, 9.9]},
                 {"indices": [70, 80, 90], "values": [-7.7, -8.8, -9.9]})}))
 
-        res = db_obj.drop_table("test_insert_sparse", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_sparse"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
         pass
 
-    def _test_insert_tensor(self):
+    def _test_insert_tensor(self, suffix):
         """
         target: test insert tensor column
         method: create table with tensor column
         expected: ok
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_tensor", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_tensor", {"c1": {"type": "tensor,3,int"}}, ConflictType.Error)
+        db_obj.drop_table("test_insert_tensor"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_tensor"+suffix, {"c1": {"type": "tensor,3,int"}}, ConflictType.Error)
         assert table_obj
         res = table_obj.insert([{"c1": [1, 2, 3]}])
         assert res.error_code == ErrorCode.OK
@@ -547,12 +548,12 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame({'c1': ([[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]],
                                                                 [[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9], [-7, -8, -9]])}))
 
-        res = db_obj.drop_table("test_insert_tensor", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_tensor"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-        db_obj.drop_table("test_insert_tensor_2", ConflictType.Ignore)
-        db_obj.create_table("test_insert_tensor_2", {"c1": {"type": "tensor,3,float"}}, ConflictType.Error)
-        table_obj = db_obj.get_table("test_insert_tensor_2")
+        db_obj.drop_table("test_insert_tensor_2"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_insert_tensor_2"+suffix, {"c1": {"type": "tensor,3,float"}}, ConflictType.Error)
+        table_obj = db_obj.get_table("test_insert_tensor_2"+suffix)
         assert table_obj
         res = table_obj.insert([{"c1": [1.1, 2.2, 3.3]}])
         assert res.error_code == ErrorCode.OK
@@ -565,18 +566,18 @@ class TestInfinity:
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ([[1.1, 2.2, 3.3]], [[4.4, 5.5, 6.6]], [[7.7, 8.8, 9.9], [-7.7, -8.8, -9.9]])}))
 
-        res = db_obj.drop_table("test_insert_tensor_2", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_tensor_2"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def _test_insert_tensor_array(self):
+    def _test_insert_tensor_array(self, suffix):
         """
         target: test insert tensor_array column
         method: create table with tensor_array column
         expected: ok
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_tensor_array", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_tensor_array", {"c1": {"type": "tensorarray,2,int"}},
+        db_obj.drop_table("test_insert_tensor_array"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_tensor_array"+suffix, {"c1": {"type": "tensorarray,2,int"}},
                                         ConflictType.Error)
         assert table_obj
         res = table_obj.insert([{"c1": [[[1, 2], [3, 4]], [[5, 6]]]}])
@@ -589,29 +590,29 @@ class TestInfinity:
         print(res)
         pd.testing.assert_frame_equal(res, pd.DataFrame(
             {'c1': ([[[1, 2], [3, 4]], [[5, 6]]], [[[7, 8]], [[9, 10], [11, 12]]], [[[13, 14], [15, 16], [17, 18]]])}))
-        res = db_obj.drop_table("test_insert_tensor_array", ConflictType.Error)
+        res = db_obj.drop_table("test_insert_tensor_array"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    def test_insert(self):
+    def test_insert(self, suffix):
         # self.test_infinity_obj._test_version()
-        self._test_insert_basic()
-        self._test_insert_bool()
-        self._test_insert_float16_bfloat16()
-        self._test_insert_varchar()
-        self._test_insert_big_varchar()
-        self._test_insert_embedding()
-        self._test_insert_big_embedding()
-        self._test_insert_big_embedding_float()
-        self._test_insert_exceed_block_size()
-        self._test_insert_data_into_non_existent_table()
-        self._test_insert_data_into_index_created_table()
-        self._test_insert_table_with_10000_columns()
-        self._test_read_after_shutdown()
-        self._test_batch_insert()
-        self._test_insert_zero_column()
-        self._test_insert_sparse()
-        self._test_insert_tensor()
-        self._test_insert_tensor_array()
+        self._test_insert_basic(suffix)
+        self._test_insert_bool(suffix)
+        self._test_insert_float16_bfloat16(suffix)
+        self._test_insert_varchar(suffix)
+        self._test_insert_big_varchar(suffix)
+        self._test_insert_embedding(suffix)
+        self._test_insert_big_embedding(suffix)
+        self._test_insert_big_embedding_float(suffix)
+        self._test_insert_exceed_block_size(suffix)
+        self._test_insert_data_into_non_existent_table(suffix)
+        self._test_insert_data_into_index_created_table(suffix)
+        self._test_insert_table_with_10000_columns(suffix)
+        self._test_read_after_shutdown(suffix)
+        self._test_batch_insert(suffix)
+        self._test_insert_zero_column(suffix)
+        self._test_insert_sparse(suffix)
+        self._test_insert_tensor(suffix)
+        self._test_insert_tensor_array(suffix)
 
     @pytest.mark.parametrize("types", ["vector,16384,int", "vector,16384,float"])
     @pytest.mark.parametrize("types_examples", [[{"c1": [1] * 16384}],
@@ -620,27 +621,27 @@ class TestInfinity:
                                                 [{"c1": [1.1] * 16384}],
                                                 [{"c1": [-9999999.988] * 16384}],
                                                 ])
-    def test_insert_big_embedding_various_type(self, types, types_examples):
+    def test_insert_big_embedding_various_type(self, types, types_examples, suffix):
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
-            "test_insert_big_embedding_various_type", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_big_embedding_various_type", {
+            "test_insert_big_embedding_various_type"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_big_embedding_various_type"+suffix, {
             "c1": {"type": types}}, ConflictType.Error)
         res = table_obj.insert(types_examples)
         assert res.error_code == ErrorCode.OK
 
         res = db_obj.drop_table(
-            "test_insert_big_embedding_various_type", ConflictType.Error)
+            "test_insert_big_embedding_various_type"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     # insert primitive data type not aligned with table definition
     @pytest.mark.parametrize("types", common_values.types_array)
     @pytest.mark.parametrize("types_example", common_values.types_example_array)
-    def test_insert_data_not_aligned_with_table_definition(self, types, types_example):
+    def test_insert_data_not_aligned_with_table_definition(self, types, types_example, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_data_not_aligned_with_table_definition", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_data_not_aligned_with_table_definition",
+        db_obj.drop_table("test_insert_data_not_aligned_with_table_definition"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_data_not_aligned_with_table_definition"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": types}}, ConflictType.Error)
 
         # insert
@@ -650,15 +651,15 @@ class TestInfinity:
         print(insert_res)
 
         res = db_obj.drop_table(
-            "test_insert_data_not_aligned_with_table_definition", ConflictType.Error)
+            "test_insert_data_not_aligned_with_table_definition"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("types", common_values.types_array)
-    def test_insert_empty_into_table(self, types):
+    def test_insert_empty_into_table(self, types, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_empty_into_table", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_empty_into_table",
+        db_obj.drop_table("test_insert_empty_into_table"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_empty_into_table"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": types}}, ConflictType.Error)
 
         # insert
@@ -673,16 +674,16 @@ class TestInfinity:
         print(insert_res)
 
         res = db_obj.drop_table(
-            "test_insert_empty_into_table", ConflictType.Error)
+            "test_insert_empty_into_table"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("values", [[{"c1": 1}], [{"c1": 1, "c2": 1, "c3": 1}]])
-    def test_insert_with_not_matched_columns(self, values):
+    def test_insert_with_not_matched_columns(self, values, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
-            "test_insert_with_not_matched_columns", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_with_not_matched_columns",
+            "test_insert_with_not_matched_columns"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_with_not_matched_columns"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": "int"}}, ConflictType.Error)
 
         # insert
@@ -692,16 +693,16 @@ class TestInfinity:
         print(insert_res)
 
         res = db_obj.drop_table(
-            "test_insert_with_not_matched_columns", ConflictType.Error)
+            "test_insert_with_not_matched_columns"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("values", [[{"c1": pow(2, 63) - 1, "c2": pow(2, 63) - 1}]])
-    def test_insert_with_exceeding_invalid_value_range(self, values):
+    def test_insert_with_exceeding_invalid_value_range(self, values, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
-            "test_insert_with_exceeding_invalid_value_range", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_with_exceeding_invalid_value_range",
+            "test_insert_with_exceeding_invalid_value_range"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_with_exceeding_invalid_value_range"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": "int32"}}, ConflictType.Error)
 
         # insert
@@ -710,17 +711,17 @@ class TestInfinity:
         print(insert_res)
 
         res = db_obj.drop_table(
-            "test_insert_with_exceeding_invalid_value_range", ConflictType.Error)
+            "test_insert_with_exceeding_invalid_value_range"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     # batch insert, within limit
     @pytest.mark.parametrize("batch", [10, 1024, 2048, 8192])
-    def test_batch_insert_within_limit(self, batch):
+    def test_batch_insert_within_limit(self, batch, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_batch_insert_within_limit",
+        db_obj.drop_table("test_batch_insert_within_limit"+suffix,
                           ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_batch_insert_within_limit",
+        table_obj = db_obj.create_table("test_batch_insert_within_limit"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": "int"}},
                                         ConflictType.Error)
 
@@ -731,17 +732,17 @@ class TestInfinity:
         print(insert_res)
 
         res = db_obj.drop_table(
-            "test_batch_insert_within_limit", ConflictType.Error)
+            "test_batch_insert_within_limit"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("batch", [10, 1024])
     @pytest.mark.parametrize("types", [(1, False), (1.1, False), ("1#$@!adf", False), ([1, 2, 3], True)])
-    def test_insert_with_invalid_data_type(self, batch, types):
+    def test_insert_with_invalid_data_type(self, batch, types, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
-            "test_insert_with_invalid_data_type", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_with_invalid_data_type",
+            "test_insert_with_invalid_data_type"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_with_invalid_data_type"+suffix,
                                         {"c1": {"type": "int"}, "c2": {"type": "vector,3,int"}}, ConflictType.Error)
 
         # insert
@@ -759,16 +760,16 @@ class TestInfinity:
         print(insert_res)
 
         res = db_obj.drop_table(
-            "test_insert_with_invalid_data_type", ConflictType.Error)
+            "test_insert_with_invalid_data_type"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize("batch", [10, 1024])
-    def test_batch_insert_with_invalid_column_count(self, batch):
+    def test_batch_insert_with_invalid_column_count(self, batch, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
         db_obj.drop_table(
-            "test_insert_with_invalid_column_count", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_with_invalid_column_count", {
+            "test_insert_with_invalid_column_count"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_with_invalid_column_count"+suffix, {
             "c1": {"type": "int"}}, ConflictType.Error)
 
         # insert
@@ -780,20 +781,20 @@ class TestInfinity:
         print(insert_res)
 
         res = db_obj.drop_table(
-            "test_insert_with_invalid_column_count", ConflictType.Error)
+            "test_insert_with_invalid_column_count"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.parametrize('column_types', ["varchar"])
     @pytest.mark.parametrize('column_types_example', [[1, 2, 3], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]])
-    def test_various_insert_types(self, column_types, column_types_example):
+    def test_various_insert_types(self, column_types, column_types_example, suffix):
         # connect
 
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_various_insert_types", ConflictType.Ignore)
-        db_obj.create_table("test_various_insert_types", {
+        db_obj.drop_table("test_various_insert_types"+suffix, ConflictType.Ignore)
+        db_obj.create_table("test_various_insert_types"+suffix, {
             "c1": {"type": column_types}}, ConflictType.Error)
 
-        table_obj = db_obj.get_table("test_various_insert_types")
+        table_obj = db_obj.get_table("test_various_insert_types"+suffix)
 
         values = [{"c1": column_types_example} for _ in range(5)]
         table_obj.insert(values)
@@ -802,7 +803,7 @@ class TestInfinity:
         print(insert_res)
 
         res = db_obj.drop_table(
-            "test_various_insert_types", ConflictType.Error)
+            "test_various_insert_types"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
     @pytest.mark.complex
@@ -819,11 +820,11 @@ class TestInfinity:
         # (1, "adsf"),
         # {"1": 1}
     ])
-    def test_insert_no_match_column(self, column_name):
+    def test_insert_no_match_column(self, column_name, suffix):
         # connect
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_insert_no_match_column", ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_insert_no_match_column", {
+        db_obj.drop_table("test_insert_no_match_column"+suffix, ConflictType.Ignore)
+        table_obj = db_obj.create_table("test_insert_no_match_column"+suffix, {
             "c1": {"type": "int"}}, ConflictType.Error)
 
         with pytest.raises(InfinityException) as e:
@@ -835,5 +836,5 @@ class TestInfinity:
         assert e.value.args[0] == ErrorCode.COLUMN_NOT_EXIST
 
         res = db_obj.drop_table(
-            "test_insert_no_match_column", ConflictType.Error)
+            "test_insert_no_match_column"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK

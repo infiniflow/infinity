@@ -472,7 +472,7 @@ void PersistenceManager::Cleanup(const String &file_path) {
     auto it = local_path_obj_.find(local_path);
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("Failed to find object {}", local_path);
-        UnrecoverableError(error_message);
+        LOG_WARN(error_message);
     }
     CleanupNoLock(it->second);
     local_path_obj_.erase(it);

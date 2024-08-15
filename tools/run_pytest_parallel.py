@@ -6,7 +6,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 commands = [
     "python3 tools/run_pysdk_remote_infinity_test.py",
     "python3 tools/run_parallel_test.py",
-    # "python3 tools/run_http_api.py",
+    "python3 tools/run_http_api.py",
     "python3 tools/sqllogictest.py"
 ]
 
