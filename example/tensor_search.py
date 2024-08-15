@@ -61,8 +61,10 @@ try:
             },
         ]
     )
-
-    result = table_instance.output(["num", "vec", "_score"]).match_tensor("vec", [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]], 'float', 'maxsim', 'topn=2').to_pl()
+    result = table_instance.output(["num", "vec", "_score"]).match_tensor(column_name="vec", topn=2,
+                                                                          query_data=[[0.9, 0.0, 0.0, 0.0],
+                                                                                      [1.1, 0.0, 0.0, 0.0]],
+                                                                          query_data_type='float').to_pl()
     print(result)
     infinity_instance.disconnect()
 

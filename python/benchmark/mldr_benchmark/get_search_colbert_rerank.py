@@ -24,8 +24,7 @@ from mldr_common_tools import FakeJScoredDoc, get_queries_and_qids, save_result
 from mldr_common_tools import query_yields, apply_funcs
 from transformers import HfArgumentParser
 import infinity
-from infinity.common import LOCAL_HOST, CommonMatchTensorExpr
-from infinity.remote_thrift.types import make_match_tensor_expr
+from infinity.common import LOCAL_HOST
 
 
 @dataclass
@@ -40,9 +39,10 @@ class RerankOption:
 
 
 def apply_colbert_rerank(result_table, rerank_tensor, max_hits: int, rerank_option):
-    colbert_rerank_column_name = {'colbert': 'colbert_col', 'colbert_bit': 'colbert_bit_col'}
-    rerank_expr = CommonMatchTensorExpr(colbert_rerank_column_name[rerank_option], rerank_tensor, 'float', 'maxsim')
-    return result_table.fusion('match_tensor', f'topn={max_hits}', rerank_expr)
+    colbert_rerank_column_names = {'colbert': 'colbert_col', 'colbert_bit': 'colbert_bit_col'}
+    query_column_name = colbert_rerank_column_names[rerank_option]
+    return result_table.fusion(method='match_tensor', topn=max_hits,
+                               fusion_params={"field": query_column_name, "data": rerank_tensor, "data_type": "float"})
 
 
 def powerset_above_2(s: list):
@@ -80,7 +80,7 @@ class InfinityClientForSearch:
         result_table = self.infinity_table.output(["docid_col", "_score"])
         for query_target, apply_func in zip(query_targets_list, apply_funcs_list):
             result_table = apply_func(result_table, query_target, max_hits)
-        result_table = result_table.fusion('rrf', options_text=f'topn={max_hits}')
+        result_table = result_table.fusion(method='rrf', topn=max_hits)
         result_table = apply_colbert_rerank(result_table, rerank_target, max_hits, rerank_option)
         result = result_table.to_pl()
         return result['docid_col'], result['SCORE']

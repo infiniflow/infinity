@@ -17,7 +17,6 @@ This example is to connect local infinity instance, create table, insert data, s
 """
 
 import infinity
-from infinity.common import CommonMatchTensorExpr
 
 try:
     # open a local directory to store the data
@@ -84,7 +83,7 @@ try:
     )
 
     # TODO: dense vector + sparse vector + full-text + structured data filter + tensor reranker
-    # result = table_instance.output(["num", "body"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).match("body", "blooms","topn=1").fusion("rrf").to_pl()
+    # result = table_instance.output(["num", "body"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 3).match("body", "blooms","topn=1").fusion(method="rrf").to_pl()
 
     result = (
         table_instance.output(
@@ -97,14 +96,9 @@ try:
         .match("body", "blooms", "topn=10")
         .filter("year < 2024")
         .fusion(
-            "match_tensor",
-            "topn=2",
-            CommonMatchTensorExpr(
-                "tensor",
-                [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]],
-                "float",
-                "maxsim",
-            ),
+            method="match_tensor", topn=2,
+            fusion_params={"field": "tensor", "data_type": "float",
+                           "data": [[0.9, 0.0, 0.0, 0.0], [1.1, 0.0, 0.0, 0.0]]}
         )
         .to_pl()
     )

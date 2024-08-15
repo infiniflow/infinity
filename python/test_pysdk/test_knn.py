@@ -10,9 +10,7 @@ import infinity
 from infinity.remote_thrift.infinity import RemoteThriftInfinityConnection
 import infinity.index as index
 from infinity.errors import ErrorCode
-from infinity.common import ConflictType, InfinityException, CommonMatchTensorExpr
-from infinity.remote_thrift.types import make_match_tensor_expr as remote_make_match_tensor_expr
-from infinity.local_infinity.types import make_match_tensor_expr as local_make_match_tensor_expr
+from infinity.common import ConflictType, InfinityException
 from common.utils import copy_data, generate_commas_enwiki
 import pandas as pd
 from numpy import dtype
@@ -729,7 +727,7 @@ class TestInfinity:
                .output(["*"])
                .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
                .match(match_param_1, "black", "topn=1")
-               .fusion('rrf')
+               .fusion(method='rrf', topn=10)
                .to_pl())
         print(res)
 
@@ -776,7 +774,7 @@ class TestInfinity:
                    .output(["*"])
                    .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
                    .match(match_param_1, "black", "topn=1")
-                   .fusion('rrf')
+                   .fusion(method='rrf', topn=10)
                    .to_pl())
             print(res)
 
@@ -818,7 +816,7 @@ class TestInfinity:
                .output(["*"])
                .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
                .match("doctitle,num,body^5", match_param_2, "topn=1")
-               .fusion('rrf')
+               .fusion(method='rrf', topn=10)
                .to_pl())
         print(res)
 
@@ -866,7 +864,7 @@ class TestInfinity:
                    .output(["*"])
                    .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
                    .match("doctitle,num,body^5", match_param_2, "topn=1")
-                   .fusion('rrf')
+                   .fusion(method='rrf', topn=10)
                    .to_pl())
             print(res)
 
@@ -909,7 +907,7 @@ class TestInfinity:
                .output(["*"])
                .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
                .match("doctitle,num,body^5", "word", match_param_3)
-               .fusion('rrf')
+               .fusion(method='rrf', topn=10)
                .to_pl())
         print(res)
 
@@ -956,7 +954,7 @@ class TestInfinity:
                    .output(["*"])
                    .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
                    .match("doctitle,num,body^5", "word", match_param_3)
-                   .fusion('rrf')
+                   .fusion(method='rrf', topn=10)
                    .to_pl())
             print(res)
 
@@ -985,12 +983,12 @@ class TestInfinity:
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
         res = (table_obj
                .output(["*", "_row_id", "_score"])
-               .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], query_elem_t, 'maxsim', 'topn=3')
+               .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], query_elem_t, 3)
                .to_pl())
         print(res)
         pd.testing.assert_frame_equal(
             table_obj.output(["title"]).match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]],
-                                                     query_elem_t, 'maxsim', 'topn=3').to_df(),
+                                                     query_elem_t, 3).to_df(),
             pd.DataFrame({'title': ["test22", "test55", "test66"]}))
         res = db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -1062,14 +1060,14 @@ class TestInfinity:
             copy_data("tensor_maxsim.csv")
         test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
         table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
-        match_tensor_expr = CommonMatchTensorExpr('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float',
-                                                  'maxsim')
         res = (table_obj
                .output(["*", "_row_id", "_score"])
                .match('body', 'off', 'topn=4')
-               .match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 'maxsim', 'topn=2')
-               .fusion('rrf')
-               .fusion('match_tensor', 'topn=2', match_tensor_expr)
+               .match_tensor('t', [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0]], 'float', 2)
+               .fusion(method='rrf', topn=10)
+               .fusion(method='match_tensor', topn=2, fusion_params={'field': 't', 'data_type': 'float',
+                                                                     'data': [[0.0, -10.0, 0.0, 0.7],
+                                                                              [9.2, 45.6, -55.8, 3.5]]})
                .to_pl())
         print(res)
 
@@ -1249,7 +1247,7 @@ class TestInfinity:
                .output(["*"])
                .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 1)
                .match(fields_and_matching_text[0], fields_and_matching_text[1], "topn=1")
-               .fusion('rrf')
+               .fusion(method='rrf', topn=10)
                .to_pl())
         print(res)
 
@@ -1285,38 +1283,7 @@ class TestInfinity:
         with pytest.raises(Exception):
             res = (table_obj
                    .output(["*", "_row_id", "_score"])
-                   .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], data_type, 'maxsim', 'topn=2')
-                   .to_pl())
-
-        res = db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Error)
-        assert res.error_code == ErrorCode.OK
-
-    @pytest.mark.parametrize("method_type", ['invalid method type',
-                                             pytest.param(1),
-                                             pytest.param(1.1),
-                                             pytest.param([]),
-                                             pytest.param({}),
-                                             pytest.param(()),
-                                             pytest.param("@#$!#@$SDasdf3!@#$")
-                                             ])
-    @pytest.mark.parametrize("check_data", [{"file_name": "tensor_maxsim.csv",
-                                             "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
-    def test_tensor_scan_with_invalid_method_type(self, check_data, method_type, suffix):
-        db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Ignore)
-        table_obj = db_obj.create_table("test_tensor_scan"+suffix,
-                                        {"title": {"type": "varchar"},
-                                         "num": {"type": "int"},
-                                         "t": {"type": "tensor, 4, float"},
-                                         "body": {"type": "varchar"}})
-        if not check_data:
-            copy_data("tensor_maxsim.csv")
-        test_csv_dir = common_values.TEST_TMP_DIR + "tensor_maxsim.csv"
-        table_obj.import_data(test_csv_dir, import_options={"delimiter": ","})
-        with pytest.raises(Exception):
-            res = (table_obj
-                   .output(["*", "_row_id", "_score"])
-                   .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], 'float', method_type, 'topn=2')
+                   .match_tensor('t', [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]], data_type, 2)
                    .to_pl())
 
         res = db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Error)
@@ -1369,7 +1336,7 @@ class TestInfinity:
         with pytest.raises(Exception):
             res = (table_obj
                    .output(["*", "_row_id", "_score"])
-                   .match_tensor('t', [[], []], 'float', 'maxsim', 'topn=2')
+                   .match_tensor('t', [[], []], 'float', 2)
                    .to_pl())
 
         res = db_obj.drop_table("test_tensor_scan"+suffix, ConflictType.Error)
@@ -1390,7 +1357,7 @@ class TestInfinity:
 
         res = (table_obj
                .output(["*", "_row_id", "_score"])
-               .match_tensor('t', [[[0.0] * dim] * dim] * dim, 'float', 'maxsim', 'topn=5')
+               .match_tensor('t', [[[0.0] * dim] * dim] * dim, 'float', 5)
                .to_pl())
         print(res)
 
