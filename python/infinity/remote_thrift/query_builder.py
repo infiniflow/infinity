@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN, CommonMatchTensorExpr
+from infinity.common import VEC, SPARSE, InfinityException
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -223,49 +223,51 @@ class InfinityThriftQueryBuilder(ABC):
 
     def match_tensor(
         self,
-        vector_column_name: str,
-        embedding_data: VEC,
-        embedding_data_type: str,
-        method_type: str,
-        extra_option: str,
+        column_name: str,
+        query_data: VEC,
+        query_data_type: str,
+        topn: int,
+        extra_option: Optional[dict] = None,
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
             self._search.match_exprs = list()
+        option_str = f"topn={topn}"
+        if extra_option is not None:
+            for k, v in extra_option.items():
+                option_str += f";{k}={v}"
         match_tensor_expr = make_match_tensor_expr(
-            vector_column_name,
-            embedding_data,
-            embedding_data_type,
-            method_type,
-            extra_option,
+            vector_column_name=column_name,
+            embedding_data=query_data,
+            embedding_data_type=query_data_type,
+            method_type="maxsim",
+            extra_option=option_str,
         )
         generic_match_expr = GenericMatchExpr(match_tensor_expr=match_tensor_expr)
         self._search.match_exprs.append(generic_match_expr)
         return self
 
-    def fusion(
-        self,
-        method: str,
-        options_text: str = "",
-        match_tensor_expr: CommonMatchTensorExpr = None,
-    ) -> InfinityThriftQueryBuilder:
+    def fusion(self, method: str, topn: int, fusion_params: Optional[dict]) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
         if self._search.fusion_exprs is None:
             self._search.fusion_exprs = list()
         fusion_expr = FusionExpr()
         fusion_expr.method = method
-        fusion_expr.options_text = options_text
-        if match_tensor_expr is not None:
+        final_option_text = f"topn={topn}"
+        if method in ["rrf", "weighted_sum"]:
+            if isinstance(fusion_params, dict):
+                for k, v in fusion_params.items():
+                    if k == "topn":
+                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, "topn is not allowed in fusion params")
+                    final_option_text += f";{k}={v}"
+        elif method in ["match_tensor"]:
             fusion_expr.optional_match_tensor_expr = make_match_tensor_expr(
-                match_tensor_expr.vector_column_name,
-                match_tensor_expr.embedding_data,
-                match_tensor_expr.embedding_data_type,
-                match_tensor_expr.method_type,
-                match_tensor_expr.extra_option
-            )
-        elif fusion_expr.method == "match_tensor":
-            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Match tensor expression is required")
+                vector_column_name=fusion_params["field"], embedding_data=fusion_params["data"],
+                embedding_data_type=fusion_params["data_type"], method_type="maxsim", extra_option=None)
+        else:
+            raise InfinityException(ErrorCode.INVALID_EXPRESSION, "Invalid fusion method")
+        fusion_expr.options_text = final_option_text
         self._search.fusion_exprs.append(fusion_expr)
         return self
 

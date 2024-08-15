@@ -47,14 +47,5 @@ class InfinityException(Exception):
         self.error_code = error_code
         self.error_message = error_message
 
-class CommonMatchTensorExpr:
-    def __init__(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str,
-                 method_type: str, extra_option: str = None):
-        self.vector_column_name = vector_column_name
-        self.embedding_data = embedding_data
-        self.embedding_data_type = embedding_data_type
-        self.method_type = method_type
-        self.extra_option = extra_option
-
 DEFAULT_MATCH_VECTOR_TOPN = 10
 DEFAULT_MATCH_SPARSE_TOPN = 10

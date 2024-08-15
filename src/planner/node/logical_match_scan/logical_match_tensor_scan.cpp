@@ -39,17 +39,7 @@ void LogicalMatchTensorScan::InitExtraOptions() {
     auto match_tensor_expr = static_cast<MatchTensorExpression *>(query_expression_.get());
     SearchOptions options(match_tensor_expr->options_text_);
     // topn option
-    auto top_n_it = options.options_.find("topn");
-    if (top_n_it == options.options_.end()) {
-        top_n_it = options.options_.find("top_n");
-        if (top_n_it == options.options_.end()) {
-            top_n_it = options.options_.find("topk");
-            if (top_n_it == options.options_.end()) {
-                top_n_it = options.options_.find("top_k");
-            }
-        }
-    }
-    if (top_n_it != options.options_.end()) {
+    if (auto top_n_it = options.options_.find("topn"); top_n_it != options.options_.end()) {
         const int top_n_option = std::stoi(top_n_it->second);
         if (top_n_option <= 0) {
             Status status = Status::SyntaxError("topn must be a positive integer");

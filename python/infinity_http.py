@@ -4,9 +4,10 @@ import requests
 import logging
 import os
 from test_pysdk.common.common_data import *
-from infinity.common import ConflictType, InfinityException, CommonMatchTensorExpr
+from infinity.common import ConflictType, InfinityException
 from test_pysdk.common import common_values
 import infinity
+from typing import Optional
 from infinity.errors import ErrorCode
 import numpy as np
 import pandas as pd
@@ -514,17 +515,17 @@ class infinity_http:
         self._match["operator"] = operator
         return self
 
-    def match_tensor(self, vector_column_name, tensor_data, tensor_data_type, method_type="maxsim",extra_option = "top=10"):
+    def match_tensor(self, column_name: str, query_data, query_data_type: str, topn: int):
         self._match_tensor = {}
-        self._match_tensor["search_method"] = method_type
-        if isinstance(vector_column_name, list):
+        self._match_tensor["search_method"] = "maxsim"
+        if isinstance(column_name, list):
             pass
         else:
-            vector_column_name = [vector_column_name]
-        self._match_tensor["fields"] = vector_column_name
-        self._match_tensor["query_tensor"] = tensor_data
-        self._match_tensor["options"] = extra_option
-        self._match_tensor["element_type"] = type_transfrom[tensor_data_type]
+            column_name = [column_name]
+        self._match_tensor["fields"] = column_name
+        self._match_tensor["query_tensor"] = query_data
+        self._match_tensor["options"] = f"topn={topn}"
+        self._match_tensor["element_type"] = type_transfrom[query_data_type]
         return self
 
     def match_sparse(self, vector_column_name, sparse_data, distance_type="ip", topn=10, opt_params = {"alpha": "1.0", "beta": "1.0"}):
@@ -556,25 +557,27 @@ class infinity_http:
                 self._knn[key] = opt_params[key]
         return self
 
-    def fusion(self, method="", option="", optional_match_tensor: CommonMatchTensorExpr = None):
-        _fusion = {}
-        _fusion["method"] = method
-        if len(option) :
-            _fusion["option"] = option
+    def fusion(self, method: str, topn: int, fusion_params: Optional[dict] = None):
+        _fusion = {"method": method}
+        fusion_option_str = f"topn={topn}"
         if method == "match_tensor":
             _fusion["optional_match_tensor"] = {}
-            vector_column_name = optional_match_tensor.vector_column_name
+            vector_column_name = fusion_params["field"]
             if isinstance(vector_column_name, list):
                 pass
             else:
                 vector_column_name = [vector_column_name]
             _fusion["optional_match_tensor"]["fields"] = vector_column_name
-            _fusion["optional_match_tensor"]["query_tensor"] = optional_match_tensor.embedding_data
-            if optional_match_tensor.extra_option:
-                _fusion["optional_match_tensor"]["options"] = optional_match_tensor.extra_option
-            _fusion["optional_match_tensor"]["element_type"] = type_transfrom[optional_match_tensor.embedding_data_type]
-            _fusion["optional_match_tensor"]["search_method"] = optional_match_tensor.method_type
-
+            _fusion["optional_match_tensor"]["query_tensor"] = fusion_params["data"]
+            _fusion["optional_match_tensor"]["element_type"] = type_transfrom[fusion_params["data_type"]]
+            _fusion["optional_match_tensor"]["search_method"] = "maxsim"
+        else:
+            if isinstance(fusion_params, dict):
+                for k, v in fusion_params.items():
+                    if k == "topn":
+                        raise InfinityException(ErrorCode.INVALID_EXPRESSION, "topn is not allowed in fusion params")
+                    fusion_option_str += f";{k}={v}"
+        _fusion["option"] = fusion_option_str
         self._fusion.append(_fusion)
         return self
 

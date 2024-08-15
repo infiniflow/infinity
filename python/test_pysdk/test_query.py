@@ -78,7 +78,7 @@ class TestInfinity:
         query_builder.output(["num", "body"])
         query_builder.knn('vec', [3.0] * 5, 'float', 'ip', 2)
         query_builder.match('body', 'harmful', 'topn=2')
-        query_builder.fusion('rrf')
+        query_builder.fusion(method='rrf', topn=10, fusion_params=None)
         res = query_builder.to_df()
         print(res)
         res = table.drop_index("my_index", ConflictType.Error)
