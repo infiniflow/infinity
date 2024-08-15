@@ -99,7 +99,7 @@ class TestInfinity:
 
         db_names = []
         for db in res.db_names:
-            if db == "default_db" or "test_pysdk" in db:
+            if db == "default_db" or db == db_name:
                 db_names.append(db)
 
         db_names.sort()
@@ -175,7 +175,7 @@ class TestInfinity:
         res_dbs = []
         for db_name in dbs.db_names:
             print('db name: ' + db_name)
-            if db_name.startswith("test_pysdk") or db_name == "default_db":
+            if (db_name.startswith("test_pysdk") and db_name.endswith(suffix)) or db_name == "default_db":
                 res_dbs.append(db_name)
         assert len(res_dbs) == (db_count + 1)
         # 4. drop 1m database
