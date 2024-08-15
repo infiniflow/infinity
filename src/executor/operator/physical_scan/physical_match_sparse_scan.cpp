@@ -370,14 +370,8 @@ void PhysicalMatchSparseScan::ExecuteInnerT(DistFunc *dist_func,
 
     auto get_ele = [](const ColumnVector &column_vector, SizeT idx) -> SparseVecRef<typename DistFunc::DataT, typename DistFunc::IndexT> {
         const auto *ele = reinterpret_cast<const SparseT *>(column_vector.data()) + idx;
-        const auto &[nnz, chunk_id, chunk_offset] = *ele;
-        if (nnz == 0) {
-            return SparseVecRef<typename DistFunc::DataT, typename DistFunc::IndexT>(0, nullptr, nullptr);
-        }
-        const char *sparse_ptr = column_vector.buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-        const auto *indices = reinterpret_cast<const typename DistFunc::IndexT *>(sparse_ptr);
-        const auto *data = reinterpret_cast<const typename DistFunc::DataT *>(sparse_ptr + nnz * sizeof(typename DistFunc::IndexT));
-        return SparseVecRef<typename DistFunc::DataT, typename DistFunc::IndexT>(nnz, indices, data);
+        const auto &[nnz, file_offset] = *ele;
+        return column_vector.buffer_->template GetSparse<typename DistFunc::DataT, typename DistFunc::IndexT>(file_offset, nnz);
     };
 
     auto task_id = block_ids_idx;

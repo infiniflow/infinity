@@ -34,8 +34,7 @@ public:
 
     static EmbeddingDataType GetIndexType(size_t dimension);
 
-    static std::shared_ptr<SparseInfo>
-    Make(EmbeddingDataType data_type, size_t dimension, SparseStoreType store_type);
+    static std::shared_ptr<SparseInfo> Make(EmbeddingDataType data_type, size_t dimension, SparseStoreType store_type);
 
     static std::shared_ptr<SparseInfo> Make(EmbeddingDataType data_type, EmbeddingDataType idx_type, size_t dimension, SparseStoreType store_type) {
         return std::make_shared<SparseInfo>(data_type, idx_type, dimension, store_type);
@@ -58,6 +57,24 @@ public:
             return 0;
         }
         return EmbeddingType::EmbeddingSize(data_type_, nnz);
+    }
+
+    template <typename DataT, typename IdxT>
+    static size_t SparseSize(size_t nnz) {
+        return IndiceSize<IdxT>(nnz) + DataSize<DataT>(nnz);
+    }
+
+    template <typename IdxT>
+    static size_t IndiceSize(size_t nnz) {
+        return sizeof(IdxT) * nnz;
+    }
+
+    template <typename DataT>
+    static size_t DataSize(size_t nnz) {
+        if constexpr (std::is_same_v<DataT, bool>) {
+            return 0;
+        }
+        return sizeof(DataT) * nnz;
     }
 
     [[nodiscard]] inline std::string ToString() const override {

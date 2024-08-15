@@ -308,7 +308,7 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
         {
             // varchar is vector
             SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->var_buffer_mgr_->Get(source.vector_.file_offset_, varchar_len);
+            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
 
             auto [ptr, ec] = std::from_chars(data, data + varchar_len, target);
             if (ec != std::errc()) {
@@ -341,7 +341,7 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
             // varchar is vector
             SizeT varchar_len = source.length_;
 
-            const char *data = source_vector->buffer_->var_buffer_mgr_->Get(source.vector_.file_offset_, varchar_len);
+            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
             String varchar_ptr(data, varchar_len);
 
             // Used in libc++
@@ -381,7 +381,7 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
         {
             // varchar is vector
             SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->var_buffer_mgr_->Get(source.vector_.file_offset_, varchar_len);
+            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
 
             String varchar_ptr(data, varchar_len);
 
@@ -423,7 +423,7 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
         {
             // varchar is vector
             SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->var_buffer_mgr_->Get(source.vector_.file_offset_, varchar_len);
+            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
 
             String varchar_ptr(data, varchar_len);
 
@@ -464,7 +464,7 @@ inline bool TryCastVarcharVector::Run(const VarcharT &source, ColumnVector* sour
         {
             // varchar is vector
             SizeT varchar_len = source.length_;
-            const char *data = source_vector->buffer_->var_buffer_mgr_->Get(source.vector_.file_offset_, varchar_len);
+            const char *data = source_vector->buffer_->GetVarchar(source.vector_.file_offset_, varchar_len);
 
             String varchar_ptr(data, varchar_len);
 

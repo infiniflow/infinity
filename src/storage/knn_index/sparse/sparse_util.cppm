@@ -35,9 +35,18 @@ struct SparseVecRef {
 
     SparseVecRef(i32 nnz, const IdxT *indices, const DataT *data) : nnz_(nnz), indices_(indices), data_(data) {}
 
-    i32 nnz_;
-    const IdxType *indices_;
-    const DataType *data_;
+    i32 nnz_ = 0;
+    const IdxType *indices_ = nullptr;
+    const DataType *data_ = nullptr;
+};
+
+export template <typename DataT, typename IdxT>
+struct SparseVec {
+    i32 nnz_ = 0;
+    UniquePtr<IdxT[]> indices_;
+    UniquePtr<DataT[]> data_;
+
+    SparseVecRef<DataT, IdxT> ToRef() const { return {nnz_, indices_.get(), data_.get()}; }
 };
 
 export template <typename DataType, typename IdxType>

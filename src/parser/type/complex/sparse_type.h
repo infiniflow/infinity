@@ -72,8 +72,7 @@ struct SparseType {
     }
 
     int64_t nnz_ = 0;
-    uint32_t chunk_id_ = 0;
-    uint32_t chunk_offset_ = 0;
+    int64_t file_offset_ = 0;
 
     static std::string
     Sparse2String(const char *data_ptr, const char *indice_ptr, EmbeddingDataType data_type, EmbeddingDataType indice_type, size_t nnz) {

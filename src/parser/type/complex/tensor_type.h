@@ -21,6 +21,8 @@ namespace infinity {
 #pragma pack(1)
 
 struct TensorType {
+    // uint64_t tensor_num_ : 16 = 0;
+    // uint64_t file_offset_ : 48 = 0;
     uint16_t embedding_num_ = 0;
     uint16_t chunk_id_ = 0;
     uint32_t chunk_offset_ = 0;
