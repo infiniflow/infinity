@@ -2340,29 +2340,21 @@ void InfinityThriftService::HandlePodType(infinity_thrift_rpc::ColumnField &outp
 void InfinityThriftService::HandleVarcharType(infinity_thrift_rpc::ColumnField &output_column_field,
                                               SizeT row_count,
                                               const SharedPtr<ColumnVector> &column_vector) {
-    String dst;
-    SizeT total_varchar_data_size = 0;
+    SizeT all_size = 0;
+    Vector<Pair<const char *, SizeT>> raw_data;
     for (SizeT index = 0; index < row_count; ++index) {
-        VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
-        total_varchar_data_size += varchar.length_;
+        Span<const char> data = column_vector->GetVarchar(index);
+        all_size += sizeof(i32) + data.size();
+        raw_data.emplace_back(data.data(), data.size());
     }
-
-    auto all_size = total_varchar_data_size + row_count * sizeof(i32);
+    String dst;
     dst.resize(all_size);
-
-    i32 current_offset = 0;
-    for (SizeT index = 0; index < row_count; ++index) {
-        VarcharT &varchar = ((VarcharT *)column_vector->data())[index];
-        i32 length = varchar.length_;
-        if (varchar.IsInlined()) {
-            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-            std::memcpy(dst.data() + current_offset + sizeof(i32), varchar.short_.data_, varchar.length_);
-        } else {
-            const auto *data = column_vector->buffer_->GetVarchar(varchar.vector_.file_offset_, length);
-            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-            std::memcpy(dst.data() + current_offset + sizeof(i32), data, varchar.length_);
-        }
-        current_offset += sizeof(i32) + varchar.length_;
+    SizeT current_offset = 0;
+    for (const auto [data_ptr, data_size] : raw_data) {
+        i32 length = data_size;
+        std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
+        std::memcpy(dst.data() + current_offset + sizeof(i32), data_ptr, data_size);
+        current_offset += sizeof(i32) + length;
     }
 
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -2383,25 +2375,22 @@ void InfinityThriftService::HandleEmbeddingType(infinity_thrift_rpc::ColumnField
 void InfinityThriftService::HandleTensorType(infinity_thrift_rpc::ColumnField &output_column_field,
                                              SizeT row_count,
                                              const SharedPtr<ColumnVector> &column_vector) {
-    String dst;
-    SizeT total_tensor_embedding_num = 0;
+    SizeT all_size = 0;
+    Vector<Pair<const char *, SizeT>> tensor_data(row_count);
     for (SizeT index = 0; index < row_count; ++index) {
-        TensorT &tensor = ((TensorT *)column_vector->data())[index];
-        total_tensor_embedding_num += tensor.embedding_num_;
+        Span<const char> raw_data = column_vector->GetTensorRaw(index).first;
+        all_size += sizeof(i32) + raw_data.size();
+        tensor_data[index] = {raw_data.data(), raw_data.size()};
     }
-    const auto embedding_info = static_cast<const EmbeddingInfo *>(column_vector->data_type()->type_info().get());
-    const auto unit_embedding_byte_size = embedding_info->Size();
-    dst.resize(total_tensor_embedding_num * unit_embedding_byte_size + row_count * sizeof(i32));
+    String dst;
+    dst.resize(all_size);
 
     i32 current_offset = 0;
     for (SizeT index = 0; index < row_count; ++index) {
-        TensorT &tensor = ((TensorT *)column_vector->data())[index];
-        i32 length = tensor.embedding_num_ * unit_embedding_byte_size;
+        const auto &[data, length] = tensor_data[index];
         std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-        current_offset += sizeof(i32);
-        const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_->GetRawPtrFromChunk(tensor.chunk_id_, tensor.chunk_offset_);
-        std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
-        current_offset += length;
+        std::memcpy(dst.data() + current_offset + sizeof(i32), data, length);
+        current_offset += sizeof(i32) + length;
     }
 
     output_column_field.column_vectors.emplace_back(std::move(dst));
@@ -2411,39 +2400,30 @@ void InfinityThriftService::HandleTensorType(infinity_thrift_rpc::ColumnField &o
 void InfinityThriftService::HandleTensorArrayType(infinity_thrift_rpc::ColumnField &output_column_field,
                                                   SizeT row_count,
                                                   const SharedPtr<ColumnVector> &column_vector) {
-    const auto embedding_info = static_cast<const EmbeddingInfo *>(column_vector->data_type()->type_info().get());
-    const auto unit_embedding_byte_size = embedding_info->Size();
-    Vector<Vector<TensorT>> tensors_v(row_count);
-    SizeT expect_offset = 0;
+    SizeT all_size = 0;
+    Vector<Vector<Pair<const char *, SizeT>>> tensor_array_data;
     for (SizeT index = 0; index < row_count; ++index) {
-        const auto &tensorarray = ((const TensorArrayT *)column_vector->data())[index];
-        const i32 tensor_num = tensorarray.tensor_num_;
-        expect_offset += sizeof(i32);
-        Vector<TensorT> &tensors = tensors_v[index];
-        tensors.resize(tensor_num);
-        column_vector->buffer_->fix_heap_mgr_->ReadFromHeap(reinterpret_cast<char *>(tensors.data()),
-                                                            tensorarray.chunk_id_,
-                                                            tensorarray.chunk_offset_,
-                                                            tensor_num * sizeof(TensorT));
-        for (const auto &tensor : tensors) {
-            expect_offset += sizeof(i32) + tensor.embedding_num_ * unit_embedding_byte_size;
+        all_size += sizeof(i32);
+        Vector<Pair<const char *, SizeT>> tensor_data;
+        Vector<Pair<Span<const char>, SizeT>> array_data = column_vector->GetTensorArrayRaw(index);
+        for (const auto [raw_data, embedding_num] : array_data) {
+            all_size += sizeof(i32) + raw_data.size();
+            tensor_data.emplace_back(raw_data.data(), raw_data.size());
         }
+        tensor_array_data.push_back(std::move(tensor_data));
     }
     String dst;
-    dst.resize(expect_offset);
+    dst.resize(all_size);
 
     i32 current_offset = 0;
-    for (Vector<TensorT> &tensors : tensors_v) {
-        const i32 tensor_num = tensors.size();
+    for (const auto &tensor_data : tensor_array_data) {
+        i32 tensor_num = tensor_data.size();
         std::memcpy(dst.data() + current_offset, &tensor_num, sizeof(i32));
         current_offset += sizeof(i32);
-        for (const auto &tensor : tensors) {
-            i32 length = tensor.embedding_num_ * unit_embedding_byte_size;
-            std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-            current_offset += sizeof(i32);
-            const auto raw_data_ptr = column_vector->buffer_->fix_heap_mgr_1_->GetRawPtrFromChunk(tensor.chunk_id_, tensor.chunk_offset_);
-            std::memcpy(dst.data() + current_offset, raw_data_ptr, length);
-            current_offset += length;
+        for (const auto [raw_data, size] : tensor_data) {
+            std::memcpy(dst.data() + current_offset, &size, sizeof(i32));
+            std::memcpy(dst.data() + current_offset + sizeof(i32), raw_data, size);
+            current_offset += sizeof(i32) + size;
         }
     }
 
@@ -2454,28 +2434,24 @@ void InfinityThriftService::HandleTensorArrayType(infinity_thrift_rpc::ColumnFie
 void InfinityThriftService::HandleSparseType(infinity_thrift_rpc::ColumnField &output_column_field,
                                              SizeT row_count,
                                              const SharedPtr<ColumnVector> &column_vector) {
-    const auto sparse_info = static_cast<const SparseInfo *>(column_vector->data_type()->type_info().get());
-    SizeT total_length = 0;
+    SizeT all_size = 0;
+    Vector<Tuple<Span<const char>, Span<const char>, SizeT>> raw_data;
     for (SizeT index = 0; index < row_count; ++index) {
-        SparseT &sparse = reinterpret_cast<SparseT *>(column_vector->data())[index];
-        total_length += sparse_info->SparseSize(sparse.nnz_) + sizeof(i32);
+        auto [data_span, index_span, nnz_size_t] = column_vector->GetSparseRaw(index);
+        all_size += sizeof(i32) + data_span.size() + index_span.size();
+        raw_data.emplace_back(data_span, index_span, nnz_size_t);
     }
     String dst;
-    dst.resize(total_length);
-
-    i32 current_offset = 0;
-    for (SizeT index = 0; index < row_count; ++index) {
-        SparseT &sparse = reinterpret_cast<SparseT *>(column_vector->data())[index];
-        i32 nnz = sparse.nnz_;
+    dst.resize(all_size);
+    SizeT current_offset = 0;
+    for (const auto [data_span, index_span, nnz_size_t] : raw_data) {
+        i32 nnz = nnz_size_t;
         std::memcpy(dst.data() + current_offset, &nnz, sizeof(i32));
         current_offset += sizeof(i32);
-        SizeT data_size = sparse_info->DataSize(sparse.nnz_);
-        SizeT idx_size = sparse_info->IndiceSize(sparse.nnz_);
-        auto [raw_data_ptr, raw_idx_ptr] = column_vector->buffer_->GetSparseRaw(sparse.file_offset_, nnz, sparse_info);
-        std::memcpy(dst.data() + current_offset, raw_idx_ptr, idx_size);
-        current_offset += idx_size;
-        std::memcpy(dst.data() + current_offset, raw_data_ptr, data_size);
-        current_offset += data_size;
+        std::memcpy(dst.data() + current_offset, index_span.data(), index_span.size());
+        current_offset += index_span.size();
+        std::memcpy(dst.data() + current_offset, data_span.data(), data_span.size());
+        current_offset += data_span.size();
     }
 
     output_column_field.column_vectors.emplace_back(std::move(dst));

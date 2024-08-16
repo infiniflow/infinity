@@ -371,9 +371,7 @@ AddBlockEntryOp::AddBlockEntryOp(BlockEntry *block_entry, TxnTimeStamp commit_ts
 
 AddColumnEntryOp::AddColumnEntryOp(BlockColumnEntry *column_entry, TxnTimeStamp commit_ts)
     : CatalogDeltaOperation(CatalogDeltaOpType::ADD_COLUMN_ENTRY, column_entry, commit_ts) {
-    for (u32 layer = 0; layer < 2; ++layer) {
-        outline_infos_.emplace_back(column_entry->OutlineBufferCount(layer), column_entry->LastChunkOff(layer));
-    }
+    outline_info_ = {column_entry->OutlineBufferCount(0), column_entry->LastChunkOff(0)};
     local_paths_.push_back(column_entry->FilePath());
 }
 
@@ -491,12 +489,9 @@ UniquePtr<AddBlockEntryOp> AddBlockEntryOp::ReadAdv(char *&ptr) {
 UniquePtr<AddColumnEntryOp> AddColumnEntryOp::ReadAdv(char *&ptr) {
     auto add_column_op = MakeUnique<AddColumnEntryOp>();
     add_column_op->ReadAdvBase(ptr);
-    const auto outline_infos_size = ReadBufAdv<u32>(ptr);
-    add_column_op->outline_infos_.resize(outline_infos_size);
-    for (auto &[outline_buffer_count, last_chunk_offset] : add_column_op->outline_infos_) {
-        outline_buffer_count = ReadBufAdv<u32>(ptr);
-        last_chunk_offset = ReadBufAdv<u64>(ptr);
-    }
+    auto &[outline_buffer_count, last_chunk_offset] = add_column_op->outline_info_;
+    outline_buffer_count = ReadBufAdv<u32>(ptr);
+    last_chunk_offset = ReadBufAdv<u64>(ptr);
     return add_column_op;
 }
 
@@ -583,7 +578,7 @@ SizeT AddBlockEntryOp::GetSizeInBytes() const {
 
 SizeT AddColumnEntryOp::GetSizeInBytes() const {
     auto total_size = sizeof(CatalogDeltaOpType) + GetBaseSizeInBytes();
-    total_size += sizeof(u32) + outline_infos_.size() * (sizeof(u32) + sizeof(u64));
+    total_size += (sizeof(u32) + sizeof(u64));
     return total_size;
 }
 
@@ -671,12 +666,9 @@ void AddBlockEntryOp::WriteAdv(char *&buf) const {
 void AddColumnEntryOp::WriteAdv(char *&buf) const {
     WriteBufAdv(buf, this->type_);
     WriteAdvBase(buf);
-    const u32 outline_infos_size = outline_infos_.size();
-    WriteBufAdv(buf, outline_infos_size);
-    for (const auto &[outline_buffer_count, last_chunk_offset] : outline_infos_) {
-        WriteBufAdv(buf, outline_buffer_count);
-        WriteBufAdv(buf, last_chunk_offset);
-    }
+    const auto &[outline_buffer_count, last_chunk_offset] = outline_info_;
+    WriteBufAdv(buf, outline_buffer_count);
+    WriteBufAdv(buf, last_chunk_offset);
 }
 
 void AddTableIndexEntryOp::WriteAdv(char *&buf) const {
@@ -757,13 +749,8 @@ const String AddBlockEntryOp::ToString() const {
 const String AddColumnEntryOp::ToString() const {
     std::ostringstream oss;
     oss << fmt::format("AddColumnEntryOp {} outline_infos: [", CatalogDeltaOperation::ToString());
-    for (u32 i = 0; i < outline_infos_.size(); ++i) {
-        const auto &[outline_buffer_count, last_chunk_offset] = outline_infos_[i];
-        oss << fmt::format("outline_buffer_group_{} : [outline_buffer_count: {}, last_chunk_offset: {}]", i, outline_buffer_count, last_chunk_offset);
-        if (i != outline_infos_.size() - 1) {
-            oss << ", ";
-        }
-    }
+    const auto &[outline_buffer_count, last_chunk_offset] = outline_info_;
+    oss << fmt::format("outline_buffer_count: {}, last_chunk_offset: {}", outline_buffer_count, last_chunk_offset);
     oss << "]";
     return std::move(oss).str();
 }
@@ -831,7 +818,7 @@ bool AddBlockEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
 
 bool AddColumnEntryOp::operator==(const CatalogDeltaOperation &rhs) const {
     auto *rhs_op = dynamic_cast<const AddColumnEntryOp *>(&rhs);
-    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && outline_infos_ == rhs_op->outline_infos_;
+    return rhs_op != nullptr && CatalogDeltaOperation::operator==(rhs) && outline_info_ == rhs_op->outline_info_;
 }
 
 bool AddTableIndexEntryOp::operator==(const CatalogDeltaOperation &rhs) const {

@@ -25,6 +25,7 @@ import var_buffer;
 import data_type;
 import sparse_util;
 import sparse_info;
+import internal_types;
 
 namespace infinity {
 
@@ -34,22 +35,17 @@ class BlockColumnEntry;
 export enum class VectorBufferType {
     kInvalid,
     kStandard,
-    kHeap, // varchar, can be stored across multiple chunks
+    kHeap,
     kCompactBit,
-    kTensorHeap, // tensor, should be stored in one chunk
-
     kVarBuffer, // new varchar
 };
 
 export class VectorBuffer {
 public:
-    static SharedPtr<VectorBuffer> Make(SizeT data_type_size, SizeT capacity, Pair<VectorBufferType, VectorBufferType> buffer_types);
+    static SharedPtr<VectorBuffer> Make(SizeT data_type_size, SizeT capacity, VectorBufferType buffer_type);
 
-    static SharedPtr<VectorBuffer> Make(BufferManager *buffer_mgr,
-                                        BlockColumnEntry *block_column_entry,
-                                        SizeT data_type_size,
-                                        SizeT capacity,
-                                        Pair<VectorBufferType, VectorBufferType> buffer_types);
+    static SharedPtr<VectorBuffer>
+    Make(BufferManager *buffer_mgr, BlockColumnEntry *block_column_entry, SizeT data_type_size, SizeT capacity, VectorBufferType buffer_types);
 
 public:
     explicit VectorBuffer() {
@@ -114,15 +110,12 @@ private:
 
 public:
     VectorBufferType buffer_type_{VectorBufferType::kInvalid};
-    VectorBufferType buffer_type_1_{VectorBufferType::kInvalid};
 
     UniquePtr<FixHeapManager> fix_heap_mgr_{nullptr};
-    UniquePtr<FixHeapManager> fix_heap_mgr_1_{nullptr};
 
 public:
     void Reset() {
         fix_heap_mgr_ = nullptr;
-        fix_heap_mgr_1_ = nullptr;
         var_buffer_mgr_ = nullptr;
     }
 
@@ -145,6 +138,14 @@ public:
 
     template <typename DataType, typename IdxType>
     SizeT AppendSparse(const SparseVecRef<DataType, IdxType> &sparse_vec);
+
+    const char *GetTensorRaw(SizeT offset, SizeT size) const;
+
+    SizeT AppendTensorRaw(const char *raw_data, SizeT size);
+
+    const TensorT *GetTensorArrayMeta(SizeT offset, SizeT array_num) const;
+
+    SizeT AppendTensorArrayMeta(Span<const TensorT> tensor_metas) const;
 
 private:
     UniquePtr<VarBufferManager> var_buffer_mgr_{nullptr};
