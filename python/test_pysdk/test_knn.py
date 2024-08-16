@@ -1013,7 +1013,6 @@ class TestInfinity:
         res = db_obj.drop_table("test_sparse_scan"+suffix, ConflictType.Error)
         assert res.error_code == ErrorCode.OK
 
-    @pytest.mark.usefixtures("skip_if_http")
     @pytest.mark.parametrize("check_data", [{"file_name": "sparse_knn.csv",
                                              "data_dir": common_values.TEST_TMP_DIR}], indirect=True)
     def test_sparse_knn_with_index(self, check_data, suffix):

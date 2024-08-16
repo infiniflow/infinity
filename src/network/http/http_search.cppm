@@ -38,6 +38,12 @@ public:
                         const String &input_json,
                         HTTPStatus &http_status,
                         nlohmann::json &response);
+    static void Explain(Infinity *infinity_ptr,
+                        const String &db_name,
+                        const String &table_name,
+                        const String &input_json,
+                        HTTPStatus &http_status,
+                        nlohmann::json &response);
 
     static ParsedExpr *ParseFilter(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);
     static Vector<ParsedExpr *> *ParseOutput(const nlohmann::json &json_object, HTTPStatus &http_status, nlohmann::json &response);

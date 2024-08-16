@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pyarrow as pa
-
+from infinity.table import ExplainType
 
 
 class infinity_http:
@@ -393,6 +393,16 @@ class infinity_http:
         self.index_list = index_list
         return self
 
+    def optimize(self, index_name = "", optimize_options = {}):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
+        h = self.set_up_header(
+            ["accept", "content-type"],
+        )
+        opt_opt = {"optimize_options": optimize_options}
+        r = self.request(url, "put", h, opt_opt)
+        self.raise_exception(r)
+        return self
+
     def insert(self,values=[]):
         if isinstance(values, list):
             pass
@@ -493,6 +503,41 @@ class infinity_http:
         else:
             self.output_res = []
         return self
+
+    def explain(self, ExplainType = ExplainType.Physical):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/meta"
+        h = self.set_up_header(["accept", "content-type"])
+        tmp = {}
+        if len(self._filter):
+            tmp.update({"filter": self._filter})
+        if len(self._fusion):
+            tmp.update({"fusion": self._fusion})
+        if len(self._knn):
+            tmp.update({"knn": self._knn})
+        if len(self._match):
+            tmp.update({"match": self._match})
+        if len(self._match_tensor):
+            tmp.update({"match_tensor": self._match_tensor})
+        if len(self._match_sparse):
+            tmp.update({"match_sparse": self._match_sparse})
+        if len(self._output):
+            tmp.update({"output": self._output})
+        tmp.update({"explain_type":ExplainType_transfrom(ExplainType)})
+        # print(tmp)
+        d = self.set_up_data([], tmp)
+        r = self.request(url, "get", h, d)
+        self.raise_exception(r)
+        message = ""
+        sign = 0
+        for res in r.json()["output"]:
+            for k in res:
+                if sign == 0:
+                    message = message + k + "\n"
+                    message = message + res[k] + "\n"
+                    sign = 1
+                else:
+                    message = message + res[k] + "\n"
+        return message
 
     def output(
         self,
