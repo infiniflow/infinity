@@ -298,7 +298,6 @@ nlohmann::json BlockColumnEntry::Serialize() {
         std::shared_lock lock(mutex_);
         json_res["next_outline_idx"] = outline_buffers_.size();
         json_res["last_chunk_offset"] = this->LastChunkOff(0);
-        json_res["last_chunk_offset_1"] = this->LastChunkOff(1);
     }
 
     json_res["commit_ts"] = TxnTimeStamp(this->commit_ts_);
