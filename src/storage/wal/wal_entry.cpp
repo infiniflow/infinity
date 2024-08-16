@@ -72,7 +72,7 @@ i32 WalBlockInfo::GetSizeInBytes() const {
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
         pm_size_ = pm->GetSizeInBytes(paths_);
-        size_ += pm_size_;
+        size += pm_size_;
     }
     return size;
 }

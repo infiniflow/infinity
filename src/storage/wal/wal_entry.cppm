@@ -79,7 +79,7 @@ export struct WalBlockInfo {
     Vector<Pair<u32, u64>> outline_infos_;
     Vector<String> paths_;
 
-    SizeT pm_size_{}; // for test
+    mutable SizeT pm_size_{}; // tmp member for test
 
     WalBlockInfo() = default;
 
