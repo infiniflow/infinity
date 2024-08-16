@@ -34,6 +34,8 @@ export struct ObjAddr {
 
     void Deserialize(const nlohmann::json &obj);
 
+    SizeT GetSizeInBytes() const;
+
     void WriteBufAdv(char *&buf) const;
 
     void ReadBufAdv(char *&buf);
@@ -60,6 +62,8 @@ export struct ObjStat {
     nlohmann::json Serialize() const;
 
     void Deserialize(const nlohmann::json &obj);
+
+    SizeT GetSizeInBytes() const;
 
     void WriteBufAdv(char *&buf) const;
 
