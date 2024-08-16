@@ -120,7 +120,7 @@ class InfinityClientForSearch:
         result_table = self.infinity_table.output(["docid_col", "_score"])
         for query_target, apply_func in zip(query_targets_list, apply_funcs_list):
             result_table = apply_func(result_table, query_target, max_hits)
-        result_table = result_table.fusion('rrf', options_text=f'topn={max_hits}')
+        result_table = result_table.fusion(method='rrf', topn=max_hits)
         result = result_table.to_pl()
         return result['docid_col'], result['SCORE']
 

@@ -337,26 +337,12 @@ void PhysicalFusion::ExecuteMatchTensor(QueryContext *query_context,
     }
     // prepare topn
     u32 topn = DEFAULT_MATCH_TENSOR_OPTION_TOP_N;
-    {
-        // find topn
-        if (fusion_expr_->options_.get() != nullptr) {
-            const auto &options = fusion_expr_->options_->options_;
-            auto topn_it = options.end();
-            if (topn_it = options.find("topn"); topn_it == options.end()) {
-                if (topn_it = options.find("top_n"); topn_it == options.end()) {
-                    if (topn_it = options.find("topk"); topn_it == options.end()) {
-                        if (topn_it = options.find("top_k"); topn_it == options.end()) {
-                            if (topn_it = options.find("topN"); topn_it == options.end()) {
-                                topn_it = options.find("top_N");
-                            }
-                        }
-                    }
-                }
-            }
-            if (topn_it != options.end()) {
-                if (const int topn_int = std::stoi(topn_it->second); topn_int > 0) {
-                    topn = topn_int;
-                }
+    // find topn
+    if (fusion_expr_->options_.get() != nullptr) {
+        const auto &options = fusion_expr_->options_->options_;
+        if (auto topn_it = options.find("topn"); topn_it != options.end()) {
+            if (const int topn_int = std::stoi(topn_it->second); topn_int > 0) {
+                topn = topn_int;
             }
         }
     }
