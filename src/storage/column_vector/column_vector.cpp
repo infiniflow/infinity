@@ -52,7 +52,7 @@ import block_column_entry;
 
 namespace infinity {
 
-Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
+VectorBufferType ColumnVector::InitializeHelper(ColumnVectorType vector_type, SizeT capacity) {
     if (initialized) {
         String error_message = "Column vector is already initialized.";
         UnrecoverableError(error_message);
@@ -80,8 +80,7 @@ Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVe
 
     tail_index_ = 0;
     data_type_size_ = data_type_->Size();
-    Pair<VectorBufferType, VectorBufferType> result = {VectorBufferType::kInvalid, VectorBufferType::kInvalid};
-    VectorBufferType &vector_buffer_type = result.first;
+    VectorBufferType vector_buffer_type = VectorBufferType::kInvalid;
     switch (data_type_->type()) {
             //        case LogicalType::kBlob:
             //        case LogicalType::kBitmap:
@@ -92,17 +91,10 @@ Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVe
             break;
         }
         case LogicalType::kSparse:
-        case LogicalType::kVarchar: {
-            vector_buffer_type = VectorBufferType::kVarBuffer;
-            break;
-        }
-        case LogicalType::kTensor: {
-            vector_buffer_type = VectorBufferType::kTensorHeap;
-            break;
-        }
+        case LogicalType::kVarchar:
+        case LogicalType::kTensor:
         case LogicalType::kTensorArray: {
-            vector_buffer_type = VectorBufferType::kHeap;
-            result.second = VectorBufferType::kTensorHeap;
+            vector_buffer_type = VectorBufferType::kVarBuffer;
             break;
         }
         case LogicalType::kInvalid:
@@ -115,24 +107,24 @@ Pair<VectorBufferType, VectorBufferType> ColumnVector::InitializeHelper(ColumnVe
             vector_buffer_type = VectorBufferType::kStandard;
         }
     }
-    return result;
+    return vector_buffer_type;
 }
 
 void ColumnVector::Initialize(ColumnVectorType vector_type, SizeT capacity) {
-    Pair<VectorBufferType, VectorBufferType> vector_buffer_types = InitializeHelper(vector_type, capacity);
+    VectorBufferType vector_buffer_type = InitializeHelper(vector_type, capacity);
 
     if (buffer_.get() == nullptr) {
         if (vector_type_ == ColumnVectorType::kConstant) {
-            buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_types);
+            buffer_ = VectorBuffer::Make(data_type_size_, 1, vector_buffer_type);
             nulls_ptr_ = Bitmask::Make(8);
         } else {
-            buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_types);
+            buffer_ = VectorBuffer::Make(data_type_size_, capacity_, vector_buffer_type);
             nulls_ptr_ = Bitmask::Make(std::bit_ceil(capacity_));
         }
         data_ptr_ = buffer_->GetDataMut();
     } else {
         // Initialize after reset will come to this branch
-        buffer_->ResetToInit(vector_buffer_types.first);
+        buffer_->ResetToInit(vector_buffer_type);
     }
 }
 
@@ -142,7 +134,7 @@ void ColumnVector::Initialize(BufferManager *buffer_mgr,
                               ColumnVectorTipe vector_tipe,
                               ColumnVectorType vector_type,
                               SizeT capacity) {
-    Pair<VectorBufferType, VectorBufferType> vector_buffer_types = InitializeHelper(vector_type, capacity);
+    VectorBufferType vector_buffer_type = InitializeHelper(vector_type, capacity);
 
     if (buffer_.get() != nullptr) {
         String error_message = "Column vector is already initialized.";
@@ -150,10 +142,10 @@ void ColumnVector::Initialize(BufferManager *buffer_mgr,
     }
 
     if (vector_type_ == ColumnVectorType::kConstant) {
-        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, 1, vector_buffer_types);
+        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, 1, vector_buffer_type);
         nulls_ptr_ = Bitmask::Make(8);
     } else {
-        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_types);
+        buffer_ = VectorBuffer::Make(buffer_mgr, block_column_entry, data_type_size_, capacity_, vector_buffer_type);
         nulls_ptr_ = Bitmask::Make(capacity_);
     }
     switch (vector_tipe) {
@@ -731,15 +723,8 @@ String ColumnVector::ToString(SizeT row_index) const {
             RecoverableError(status);
         }
         case kVarchar: {
-            VarcharT &varchar_ref = ((VarcharT *)data_ptr_)[row_index];
-            if (varchar_ref.IsInlined()) {
-                return {varchar_ref.short_.data_, varchar_ref.length_};
-            } else {
-                // Must be vector type
-                const char *data = buffer_->GetVarchar(varchar_ref.vector_.file_offset_, varchar_ref.length_);
-                String result_str(data, varchar_ref.length_);
-                return result_str;
-            }
+            Span<const char> data = this->GetVarchar(row_index);
+            return {data.data(), data.size()};
         }
         case kDate: {
             return ((DateT *)data_ptr_)[row_index].ToString();
@@ -816,9 +801,8 @@ String ColumnVector::ToString(SizeT row_index) const {
                 UnrecoverableError(error_message);
             }
             const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
-            const auto &[embedding_num, chunk_id, chunk_offset] = reinterpret_cast<TensorT *>(data_ptr_)[row_index];
-            const char *raw_data_ptr = buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-            return TensorT::Tensor2String(const_cast<char *>(raw_data_ptr), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
+            auto [raw_data, embedding_num] = GetTensorRaw(row_index);
+            return TensorT::Tensor2String(raw_data.data(), embedding_info->Type(), embedding_info->Dimension(), embedding_num);
         }
         case kTensorArray: {
             if (data_type_->type_info()->type() != TypeInfoType::kEmbedding) {
@@ -826,26 +810,8 @@ String ColumnVector::ToString(SizeT row_index) const {
                 UnrecoverableError(error_message);
             }
             const EmbeddingInfo *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
-            auto embedding_data_type = embedding_info->Type();
-            auto unit_embedding_dimension = embedding_info->Dimension();
-            const auto &[tensor_num, tensor_array_chunk_id, tensor_array_chunk_offset] = reinterpret_cast<const TensorArrayT *>(data_ptr_)[row_index];
-            Vector<TensorT> tensor_array(tensor_num);
-            buffer_->fix_heap_mgr_->ReadFromHeap(reinterpret_cast<char *>(tensor_array.data()),
-                                                 tensor_array_chunk_id,
-                                                 tensor_array_chunk_offset,
-                                                 tensor_num * sizeof(TensorT));
-            OStringStream oss;
-            oss << '[';
-            for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
-                const auto &[embedding_num, chunk_id, chunk_offset] = tensor_array[tensor_id];
-                const char *raw_data_ptr = buffer_->fix_heap_mgr_1_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-                oss << TensorT::Tensor2String(const_cast<char *>(raw_data_ptr), embedding_data_type, unit_embedding_dimension, embedding_num);
-                if (tensor_id != tensor_num - 1) {
-                    oss << ',';
-                }
-            }
-            oss << ']';
-            return std::move(oss).str();
+            Vector<Pair<Span<const char>, SizeT>> raw_data = GetTensorArrayRaw(row_index);
+            return TensorArrayT::TensorArray2String(raw_data, embedding_info->Type(), embedding_info->Dimension());
         }
         case kSparse: {
             if (data_type_->type_info()->type() != TypeInfoType::kSparse) {
@@ -853,16 +819,8 @@ String ColumnVector::ToString(SizeT row_index) const {
                 UnrecoverableError(error_message);
             }
             const auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
-            const auto &[nnz, file_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[row_index];
-            if (nnz == 0) {
-                return SparseT::Sparse2String(nullptr, nullptr, sparse_info->DataType(), sparse_info->IndexType(), 0);
-            }
-            auto [raw_data_ptr, raw_index_ptr] = buffer_->GetSparseRaw(file_offset, nnz, sparse_info);
-            auto res = SparseT::Sparse2String(raw_data_ptr, raw_index_ptr, sparse_info->DataType(), sparse_info->IndexType(), nnz);
-            if (res.empty()) {
-                String error_message = "Cannot convert sparse to string";
-                UnrecoverableError(error_message);
-            }
+            const auto [data_span, index_span, nnz] = this->GetSparseRaw(row_index);
+            auto res = SparseT::Sparse2String(data_span.data(), index_span.data(), sparse_info->DataType(), sparse_info->IndexType(), nnz);
             return res;
         }
         case kRowID: {
@@ -932,13 +890,8 @@ Value ColumnVector::GetValue(SizeT index) const {
             return Value::MakeDecimal(((DecimalT *)data_ptr_)[index], data_type_->type_info());
         }
         case kVarchar: {
-            VarcharT &varchar = ((VarcharT *)data_ptr_)[index];
-            if (varchar.IsInlined()) {
-                return Value::MakeVarchar(((VarcharT *)data_ptr_)[index]);
-            } else {
-                const char *data_ptr = buffer_->GetVarchar(varchar.vector_.file_offset_, varchar.length_);
-                return Value::MakeVarchar(data_ptr, varchar.length_);
-            }
+            Span<const char> data = this->GetVarchar(index);
+            return Value::MakeVarchar(data.data(), data.size());
         }
         case kDate: {
             return Value::MakeDate(((DateT *)data_ptr_)[index]);
@@ -990,34 +943,20 @@ Value ColumnVector::GetValue(SizeT index) const {
             return Value::MakeEmbedding(ptr, data_type_->type_info());
         }
         case kTensor: {
-            auto &[embedding_num, chunk_id, chunk_offset] = reinterpret_cast<TensorT *>(data_ptr_)[index];
-            const char *raw_data_ptr = buffer_->fix_heap_mgr_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-            const auto single_embedding_size = data_type_->type_info()->Size();
-            const auto tensor_size = embedding_num * single_embedding_size;
-            Value value = Value::MakeTensor(raw_data_ptr, tensor_size, data_type_->type_info());
-            return value;
+            auto [raw_data, embedding_num] = this->GetTensorRaw(index);
+            return Value::MakeTensor(raw_data.data(), raw_data.size(), data_type_->type_info());
         }
         case kTensorArray: {
-            const auto unit_embedding_bytes = data_type_->type_info()->Size();
-            const auto &[tensor_num, tensor_array_chunk_id, tensor_array_chunk_offset] = reinterpret_cast<const TensorArrayT *>(data_ptr_)[index];
-            Vector<TensorT> tensor_array(tensor_num);
-            buffer_->fix_heap_mgr_->ReadFromHeap(reinterpret_cast<char *>(tensor_array.data()),
-                                                 tensor_array_chunk_id,
-                                                 tensor_array_chunk_offset,
-                                                 tensor_num * sizeof(TensorT));
+            auto raw_datas = this->GetTensorArrayRaw(index);
             Value value = Value::MakeTensorArray(data_type_->type_info());
-            for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
-                const auto &[embedding_num, chunk_id, chunk_offset] = tensor_array[tensor_id];
-                const char *raw_data_ptr = buffer_->fix_heap_mgr_1_->GetRawPtrFromChunk(chunk_id, chunk_offset);
-                value.AppendToTensorArray(raw_data_ptr, embedding_num * unit_embedding_bytes);
+            for (const auto &[raw_data, embedding_num] : raw_datas) {
+                value.AppendToTensorArray(raw_data.data(), raw_data.size());
             }
             return value;
         }
         case kSparse: {
-            const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
-            const auto &[nnz, file_offset] = reinterpret_cast<const SparseT *>(data_ptr_)[index];
-            auto [raw_data_ptr, raw_idx_ptr] = buffer_->GetSparseRaw(file_offset, nnz, sparse_info);
-            return Value::MakeSparse(raw_data_ptr, raw_idx_ptr, nnz, data_type_->type_info());
+            auto [data_span, index_span, nnz] = this->GetSparseRaw(index);
+            return Value::MakeSparse(data_span.data(), index_span.data(), nnz, data_type_->type_info());
         }
         case kRowID: {
             return Value::MakeRow(((RowID *)data_ptr_)[index]);
@@ -1166,75 +1105,32 @@ void ColumnVector::SetValue(SizeT index, const Value &value) {
             break;
         }
         case kVarchar: {
-            // Copy string
-            const String &src_str = value.GetVarchar();
-            u64 varchar_len = src_str.size();
-            VarcharT &target_ref = ((VarcharT *)data_ptr_)[index];
-            target_ref.is_value_ = false;
-            target_ref.length_ = varchar_len;
-            if (varchar_len <= VARCHAR_INLINE_LEN) {
-                // Only prefix is enough to contain all string data.
-                std::memcpy(target_ref.short_.data_, src_str.c_str(), varchar_len);
-            } else {
-                std::memcpy(target_ref.vector_.prefix_, src_str.c_str(), VARCHAR_PREFIX_LEN);
-                SizeT file_offset = buffer_->AppendVarchar(src_str.c_str(), varchar_len);
-                target_ref.vector_.file_offset_ = file_offset;
-            }
+            const String &data = value.GetVarchar();
+            this->AppendVarcharInner({data.data(), data.size()}, index);
             break;
         }
         case kTensor: {
-            const auto embedding_size_unit = data_type_->type_info()->Size();
             Span<char> data_span = value.GetEmbedding();
-            const_ptr_t src_ptr = data_span.data();
-            SizeT src_size = data_span.size();
-            if (src_size == 0 or (src_size % embedding_size_unit) != 0) {
-                String error_message = fmt::format("Attempt to store a tensor with total size {} which is not a multiple of embedding size {}",
-                                                   src_size,
-                                                   embedding_size_unit);
-                UnrecoverableError(error_message);
-            }
-            auto &[embedding_num, chunk_id, chunk_offset] = reinterpret_cast<TensorT *>(data_ptr_)[index];
-            embedding_num = src_size / embedding_size_unit;
-            std::tie(chunk_id, chunk_offset) = this->buffer_->fix_heap_mgr_->AppendToHeap(src_ptr, src_size);
+            TensorT &target_tensor = reinterpret_cast<TensorT *>(data_ptr_)[index];
+            const auto *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            ColumnVector::SetTensor(target_tensor, buffer_.get(), data_span, embedding_info);
             break;
         }
         case kTensorArray: {
-            auto &[tensor_num, tensor_array_chunk_id, tensor_array_chunk_offset] = reinterpret_cast<TensorArrayT *>(data_ptr_)[index];
-            const auto embedding_size_unit = data_type_->type_info()->Size();
+            TensorArrayT &target_tensor_array = reinterpret_cast<TensorArrayT *>(data_ptr_)[index];
             const auto &value_tensor_array = value.GetTensorArray();
-            tensor_num = value_tensor_array.size();
-            Vector<TensorT> tensor_array_data(tensor_num);
-            for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
-                auto &[embedding_num, tensor_chunk_id, tensor_chunk_offset] = tensor_array_data[tensor_id];
-                Span<char> tensor_data_span = value_tensor_array[tensor_id]->GetData();
-                const_ptr_t tensor_data_ptr = tensor_data_span.data();
-                SizeT tensor_data_bytes = tensor_data_span.size();
-                if (tensor_data_bytes == 0 or (tensor_data_bytes % embedding_size_unit) != 0) {
-                    String error_message = fmt::format("Attempt to store a tensor with total size {} which is not a multiple of embedding size {}",
-                                                       tensor_data_bytes,
-                                                       data_type_->Size());
-                    UnrecoverableError(error_message);
-                }
-                embedding_num = tensor_data_bytes / embedding_size_unit;
-                std::tie(tensor_chunk_id, tensor_chunk_offset) = this->buffer_->fix_heap_mgr_1_->AppendToHeap(tensor_data_ptr, tensor_data_bytes);
+            Vector<Span<const char>> data;
+            for (auto &tensor_data : value_tensor_array) {
+                Span<const char> raw_data = tensor_data->GetData();
+                data.emplace_back(raw_data);
             }
-            std::tie(tensor_array_chunk_id, tensor_array_chunk_offset) =
-                this->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tensor_array_data.data()), tensor_num * sizeof(TensorT));
+            const auto *embedding_info = static_cast<EmbeddingInfo *>(data_type_->type_info().get());
+            ColumnVector::SetTensorArray(target_tensor_array, buffer_.get(), data, embedding_info);
             break;
         }
         case kSparse: {
-            const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
-            auto &[target_nnz, target_file_offset] = reinterpret_cast<SparseT *>(data_ptr_)[index];
             auto [source_nnz, source_indice, source_data] = value.GetSparse();
-            target_nnz = source_nnz;
-
-            if (source_nnz == 0) {
-                target_file_offset = -1;
-            } else {
-                const auto *source_data_ptr = source_data.empty() ? nullptr : source_data.data();
-                const auto *source_indice_ptr = source_indice.data();
-                target_file_offset = buffer_->AppendSparseRaw(source_data_ptr, source_indice_ptr, target_nnz, sparse_info);
-            }
+            AppendSparseRaw(source_data.data(), source_indice.data(), source_nnz, index);
             break;
         }
         case kEmbedding: {
@@ -1641,43 +1537,43 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             SizeT dst_off = index;
             switch (embedding_info->Type()) {
                 case kElemBit: {
-                    AppendTensor<BooleanT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensor<BooleanT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemUInt8: {
-                    AppendTensor<u8>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensor<u8>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemInt8: {
-                    AppendTensor<TinyIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensor<TinyIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemInt16: {
-                    AppendTensor<SmallIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensor<SmallIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemInt32: {
-                    AppendTensor<IntegerT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensor<IntegerT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemInt64: {
-                    AppendTensor<BigIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensor<BigIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemFloat: {
-                    AppendTensor<FloatT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensor<FloatT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemDouble: {
-                    AppendTensor<DoubleT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensor<DoubleT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemFloat16: {
-                    AppendTensor<Float16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensor<Float16T>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemBFloat16: {
-                    AppendTensor<BFloat16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensor<BFloat16T>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemInvalid: {
@@ -1704,43 +1600,43 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             SizeT dst_off = index;
             switch (embedding_info->Type()) {
                 case kElemBit: {
-                    AppendTensorArray<BooleanT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensorArray<BooleanT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemUInt8: {
-                    AppendTensorArray<u8>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensorArray<u8>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemInt8: {
-                    AppendTensorArray<TinyIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensorArray<TinyIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemInt16: {
-                    AppendTensorArray<SmallIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensorArray<SmallIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemInt32: {
-                    AppendTensorArray<IntegerT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensorArray<IntegerT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemInt64: {
-                    AppendTensorArray<BigIntT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensorArray<BigIntT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemFloat: {
-                    AppendTensorArray<FloatT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensorArray<FloatT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemDouble: {
-                    AppendTensorArray<DoubleT>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensorArray<DoubleT>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemFloat16: {
-                    AppendTensorArray<Float16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensorArray<Float16T>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemBFloat16: {
-                    AppendTensorArray<BFloat16T>(ele_str_views, dst_off, unit_embedding_dim);
+                    AppendTensorArray<BFloat16T>(ele_str_views, dst_off, embedding_info);
                     break;
                 }
                 case kElemInvalid: {
@@ -1751,16 +1647,7 @@ void ColumnVector::AppendByStringView(std::string_view sv) {
             break;
         }
         case kVarchar: {
-            auto &varchar = (reinterpret_cast<VarcharT *>(data_ptr_))[index];
-            varchar.is_value_ = false;
-            varchar.length_ = sv.size();
-            if (sv.size() <= VARCHAR_INLINE_LEN) {
-                std::memcpy(varchar.short_.data_, sv.data(), sv.size());
-            } else {
-                std::memcpy(varchar.vector_.prefix_, sv.data(), VARCHAR_PREFIX_LEN);
-                SizeT file_offset = buffer_->AppendVarchar(sv.data(), sv.size());
-                varchar.vector_.file_offset_ = file_offset;
-            }
+            this->AppendVarcharInner(sv, index);
             break;
         }
         case kSparse: {
@@ -1918,21 +1805,22 @@ void ColumnVector::AppendWith(const ColumnVector &other, SizeT from, SizeT count
         case kTensor: {
             auto *base_src_ptr = (TensorT *)(other.data_ptr_);
             TensorT *base_dst_ptr = ((TensorT *)(data_ptr_)) + this->tail_index_;
-            const u32 embedding_size_unit = data_type_->type_info()->Size();
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
             for (SizeT idx = 0; idx < count; ++idx) {
                 const TensorT &src_ref = base_src_ptr[from + idx];
                 TensorT &dst_ref = base_dst_ptr[idx];
-                CopyTensor(dst_ref, buffer_->fix_heap_mgr_.get(), src_ref, other.buffer_->fix_heap_mgr_.get(), embedding_size_unit);
+                CopyTensor(dst_ref, buffer_.get(), src_ref, other.buffer_.get(), embedding_info);
             }
             break;
         }
         case kTensorArray: {
             auto *base_src_ptr = (TensorArrayT *)(other.data_ptr_);
             TensorArrayT *base_dst_ptr = ((TensorArrayT *)(data_ptr_)) + this->tail_index_;
+            const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
             for (SizeT idx = 0; idx < count; ++idx) {
                 const TensorArrayT &src_ref = base_src_ptr[from + idx];
                 TensorArrayT &dst_ref = base_dst_ptr[idx];
-                CopyTensorArray(dst_ref, buffer_.get(), src_ref, other.buffer_.get(), data_type_->type_info()->Size());
+                CopyTensorArray(dst_ref, buffer_.get(), src_ref, other.buffer_.get(), embedding_info);
             }
             break;
         }
@@ -2129,19 +2017,10 @@ bool ColumnVector::operator==(const ColumnVector &other) const {
         return false;
     if (data_type_->type() == kVarchar) {
         for (SizeT i = 0; i < this->tail_index_; i++) {
-            const VarcharT *lhs = reinterpret_cast<const VarcharT *>(this->data_ptr_ + i * this->data_type_size_);
-            const VarcharT *rhs = reinterpret_cast<const VarcharT *>(other.data_ptr_ + i * this->data_type_size_);
-            if (lhs->length_ != rhs->length_) {
+            Span<const char> data1 = this->GetVarchar(i);
+            Span<const char> data2 = other.GetVarchar(i);
+            if (data1.size() != data2.size() || std::strncmp(data1.data(), data2.data(), data1.size())) {
                 return false;
-            }
-            if (lhs->IsInlined()) {
-                if (0 != memcmp(lhs->short_.data_, rhs->short_.data_, lhs->length_))
-                    return false;
-            } else {
-                const char *data1 = buffer_->GetVarchar(lhs->vector_.file_offset_, lhs->length_);
-                const char *data2 = other.buffer_->GetVarchar(rhs->vector_.file_offset_, rhs->length_);
-                if (0 != memcmp(data1, data2, lhs->length_))
-                    return false;
             }
         }
     } else if (data_type_->type() == LogicalType::kBoolean) {
@@ -2241,6 +2120,139 @@ SharedPtr<ColumnVector> ColumnVector::ReadAdv(char *&ptr, i32 maxbytes) {
     return column_vector;
 }
 
+//////////////////////////////tensor////////////////////////////////////
+
+void ColumnVector::SetTensor(TensorT &dest_tensor, VectorBuffer *dest_buffer, Span<const char> data, const EmbeddingInfo *embedding_info) {
+    SizeT unit_embedding_bytes = embedding_info->Size();
+    if (data.size() % unit_embedding_bytes != 0) {
+        String error_message = fmt::format("Data size {} is not a multiple of embedding size {}", data.size(), unit_embedding_bytes);
+        UnrecoverableError(error_message);
+    }
+    SizeT embedding_num = data.size() / unit_embedding_bytes;
+    dest_tensor.embedding_num_ = embedding_num;
+    dest_tensor.file_offset_ = dest_buffer->AppendTensorRaw(data.data(), data.size());
+}
+
+Pair<Span<const char>, SizeT>
+ColumnVector::GetTensor(const TensorT &src_tensor, const VectorBuffer *src_buffer, const EmbeddingInfo *embedding_info) {
+    SizeT tensor_bytes = src_tensor.embedding_num_ * embedding_info->Size();
+    const char *raw_data = src_buffer->GetTensorRaw(src_tensor.file_offset_, tensor_bytes);
+    return {Span<const char>(raw_data, tensor_bytes), src_tensor.embedding_num_};
+}
+
+void ColumnVector::SetTensorArrayMeta(TensorArrayT &dest_tensor_array, VectorBuffer *dest_buffer, Span<const TensorT> tensors) {
+    dest_tensor_array.tensor_num_ = tensors.size();
+    dest_tensor_array.file_offset_ = dest_buffer->AppendTensorArrayMeta(tensors);
+}
+
+Span<const TensorT> ColumnVector::GetTensorArrayMeta(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer) {
+    SizeT tensor_num = src_tensor_array.tensor_num_;
+    const TensorT *data = src_buffer->GetTensorArrayMeta(src_tensor_array.file_offset_, tensor_num);
+    return {data, tensor_num};
+}
+
+void ColumnVector::SetTensorArray(TensorArrayT &dest_tensor_array,
+                                  VectorBuffer *dest_buffer,
+                                  const Vector<Span<const char>> &data,
+                                  const EmbeddingInfo *embedding_info) {
+    SizeT tensor_num = data.size();
+    Vector<TensorT> tensor_array_meta(tensor_num);
+    for (SizeT i = 0; i < tensor_num; ++i) {
+        const auto &raw_data = data[i];
+        TensorT &target_tensor = tensor_array_meta[i];
+        ColumnVector::SetTensor(target_tensor, dest_buffer, raw_data, embedding_info);
+    }
+    dest_tensor_array.tensor_num_ = tensor_num;
+    dest_tensor_array.file_offset_ = dest_buffer->AppendTensorArrayMeta(tensor_array_meta);
+}
+
+Vector<Pair<Span<const char>, SizeT>>
+ColumnVector::GetTensorArray(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer, const EmbeddingInfo *embedding_info) {
+    SizeT array_num = src_tensor_array.tensor_num_;
+    const TensorT *array_meta = src_buffer->GetTensorArrayMeta(src_tensor_array.file_offset_, array_num);
+    Vector<Pair<Span<const char>, SizeT>> res;
+    res.reserve(array_num);
+    for (SizeT i = 0; i < array_num; ++i) {
+        const TensorT &tensor = array_meta[i];
+        auto [raw_data, embedding_num] = ColumnVector::GetTensor(tensor, src_buffer, embedding_info);
+        res.emplace_back(raw_data, tensor.embedding_num_);
+    }
+    return res;
+}
+
+Pair<Span<const char>, SizeT> ColumnVector::GetTensorRaw(SizeT idx) const {
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
+    const TensorT &src_tensor = reinterpret_cast<const TensorT *>(data_ptr_)[idx];
+    return ColumnVector::GetTensor(src_tensor, buffer_.get(), embedding_info);
+}
+
+Vector<Pair<Span<const char>, SizeT>> ColumnVector::GetTensorArrayRaw(SizeT idx) const {
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
+    const TensorArrayT &src_tensor_array = reinterpret_cast<const TensorArrayT *>(data_ptr_)[idx];
+    return ColumnVector::GetTensorArray(src_tensor_array, buffer_.get(), embedding_info);
+}
+
+//////////////////////////////tensor end////////////////////////////////////
+
+void ColumnVector::AppendSparseRaw(const char *raw_data_ptr, const char *raw_index_ptr, SizeT nnz, SizeT dst_off) {
+    auto &sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
+    sparse.nnz_ = nnz;
+    if (nnz == 0) {
+        sparse.file_offset_ = -1;
+        return;
+    }
+    const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+    sparse.file_offset_ = buffer_->AppendSparseRaw(raw_data_ptr, raw_index_ptr, nnz, sparse_info);
+}
+
+Tuple<Span<const char>, Span<const char>, SizeT> ColumnVector::GetSparseRaw(SizeT index) const {
+    const auto &sparse = reinterpret_cast<const SparseT *>(data_ptr_)[index];
+    SizeT nnz = sparse.nnz_;
+    if (nnz == 0) {
+        return {Span<const char>(), Span<const char>(), 0};
+    }
+    const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+    SizeT data_size = sparse_info->DataSize(nnz);
+    SizeT idx_size = sparse_info->IndiceSize(nnz);
+    auto [raw_data_ptr, raw_idx_ptr] = buffer_->GetSparseRaw(sparse.file_offset_, nnz, sparse_info);
+    return {Span<const char>(raw_data_ptr, data_size), Span<const char>(raw_idx_ptr, idx_size), nnz};
+}
+
+void ColumnVector::AppendVarcharInner(Span<const char> data, VarcharT &varchar) {
+    varchar.length_ = data.size();
+    if (varchar.IsInlined()) {
+        std::memcpy(varchar.short_.data_, data.data(), data.size());
+    } else {
+        varchar.vector_.file_offset_ = buffer_->AppendVarchar(data.data(), data.size());
+    }
+}
+
+void ColumnVector::AppendVarcharInner(Span<const char> data, SizeT dst_off) {
+    auto &varchar = reinterpret_cast<VarcharT *>(data_ptr_)[dst_off];
+    AppendVarcharInner(data, varchar);
+}
+
+void ColumnVector::AppendVarchar(Span<const char> data) {
+    SizeT dst_off = tail_index_++;
+    AppendVarcharInner(data, dst_off);
+}
+
+Span<const char> ColumnVector::GetVarcharInner(const VarcharT &varchar) const {
+    i32 length = varchar.length_;
+    const char *data = nullptr;
+    if (varchar.IsInlined()) {
+        data = varchar.short_.data_;
+    } else {
+        data = buffer_->GetVarchar(varchar.vector_.file_offset_, length);
+    }
+    return {data, static_cast<SizeT>(length)};
+}
+
+Span<const char> ColumnVector::GetVarchar(SizeT index) const {
+    const auto &varchar = reinterpret_cast<const VarcharT *>(data_ptr_)[index];
+    return GetVarcharInner(varchar);
+}
+
 void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT &src_ref, const VectorBuffer *src_vec_buffer) {
     const u32 varchar_len = src_ref.length_;
     dst_ref.is_value_ = 0;
@@ -2256,37 +2268,25 @@ void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT
 }
 
 void CopyTensor(TensorT &dst_ref,
-                FixHeapManager *dst_fix_heap_mgr,
+                VectorBuffer *dst_vec_buffer,
                 const TensorT &src_ref,
-                FixHeapManager *src_fix_heap_mgr,
-                const u32 unit_embedding_bytes) {
-    const u32 embedding_num = src_ref.embedding_num_;
-    dst_ref.embedding_num_ = embedding_num;
-    const auto tensor_bytes = embedding_num * unit_embedding_bytes;
-    std::tie(dst_ref.chunk_id_, dst_ref.chunk_offset_) =
-        dst_fix_heap_mgr->AppendToHeap(src_fix_heap_mgr, src_ref.chunk_id_, src_ref.chunk_offset_, tensor_bytes);
+                const VectorBuffer *src_vec_buffer,
+                const EmbeddingInfo *embedding_info) {
+    auto [raw_data, embedding_num] = ColumnVector::GetTensor(src_ref, src_vec_buffer, embedding_info);
+    ColumnVector::SetTensor(dst_ref, dst_vec_buffer, raw_data, embedding_info);
 }
 
 void CopyTensorArray(TensorArrayT &dst_ref,
                      VectorBuffer *dst_buffer,
                      const TensorArrayT &src_ref,
                      const VectorBuffer *src_buffer,
-                     const u32 unit_embedding_bytes) {
-    const u32 tensor_num = src_ref.tensor_num_;
-    dst_ref.tensor_num_ = tensor_num;
-    Vector<TensorT> src_tensor_data(tensor_num);
-    Vector<TensorT> dst_tensor_data(tensor_num);
-    src_buffer->fix_heap_mgr_->ReadFromHeap(reinterpret_cast<char *>(src_tensor_data.data()),
-                                            src_ref.chunk_id_,
-                                            src_ref.chunk_offset_,
-                                            tensor_num * sizeof(TensorT));
-    for (u32 tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
-        const TensorT &src_tensor_ref = src_tensor_data[tensor_id];
-        TensorT &dst_tensor_ref = dst_tensor_data[tensor_id];
-        CopyTensor(dst_tensor_ref, dst_buffer->fix_heap_mgr_1_.get(), src_tensor_ref, src_buffer->fix_heap_mgr_1_.get(), unit_embedding_bytes);
+                     const EmbeddingInfo *embedding_info) {
+    auto data = ColumnVector::GetTensorArray(src_ref, src_buffer, embedding_info);
+    Vector<Span<const char>> data_vec;
+    for (const auto &[raw_data, embedding_num] : data) {
+        data_vec.push_back(raw_data);
     }
-    std::tie(dst_ref.chunk_id_, dst_ref.chunk_offset_) =
-        dst_buffer->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(dst_tensor_data.data()), tensor_num * sizeof(TensorT));
+    ColumnVector::SetTensorArray(dst_ref, dst_buffer, data_vec, embedding_info);
 }
 
 void CopySparse(SparseT &dst_sparse,

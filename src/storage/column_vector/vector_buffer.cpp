@@ -30,12 +30,10 @@ import serialize;
 
 namespace infinity {
 
-SharedPtr<VectorBuffer>
-VectorBuffer::Make(const SizeT data_type_size, const SizeT capacity, const Pair<VectorBufferType, VectorBufferType> buffer_types) {
+SharedPtr<VectorBuffer> VectorBuffer::Make(const SizeT data_type_size, const SizeT capacity, VectorBufferType buffer_type) {
     SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
-    buffer_ptr->buffer_type_ = buffer_types.first;
-    buffer_ptr->buffer_type_1_ = buffer_types.second;
-    switch (buffer_types.first) {
+    buffer_ptr->buffer_type_ = buffer_type;
+    switch (buffer_type) {
         case VectorBufferType::kCompactBit: {
             buffer_ptr->InitializeCompactBit(capacity);
             break;
@@ -52,11 +50,10 @@ SharedPtr<VectorBuffer> VectorBuffer::Make(BufferManager *buffer_mgr,
                                            BlockColumnEntry *block_column_entry,
                                            const SizeT data_type_size,
                                            const SizeT capacity,
-                                           const Pair<VectorBufferType, VectorBufferType> buffer_types) {
+                                           const VectorBufferType buffer_type) {
     SharedPtr<VectorBuffer> buffer_ptr = MakeShared<VectorBuffer>();
-    buffer_ptr->buffer_type_ = buffer_types.first;
-    buffer_ptr->buffer_type_1_ = buffer_types.second;
-    switch (buffer_types.first) {
+    buffer_ptr->buffer_type_ = buffer_type;
+    switch (buffer_type) {
         case VectorBufferType::kCompactBit: {
             buffer_ptr->InitializeCompactBit(buffer_mgr, block_column_entry, capacity);
             break;
@@ -94,16 +91,6 @@ void VectorBuffer::Initialize(SizeT type_size, SizeT capacity) {
     }
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_ = MakeUnique<VarBufferManager>();
-    } else if (buffer_type_ == VectorBufferType::kHeap) {
-        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, DEFAULT_FIXLEN_CHUNK_SIZE, true);
-    } else if (buffer_type_ == VectorBufferType::kTensorHeap) {
-        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE, false);
-    }
-    if (buffer_type_1_ == VectorBufferType::kTensorHeap) {
-        fix_heap_mgr_1_ = MakeUnique<FixHeapManager>(1, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE, false);
-    } else if (buffer_type_1_ != VectorBufferType::kInvalid) {
-        String error_message = "Unexpected buffer type for fix_heap_mgr_1_.";
-        UnrecoverableError(error_message);
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -149,16 +136,6 @@ void VectorBuffer::Initialize(BufferManager *buffer_mgr, BlockColumnEntry *block
     ptr_ = buffer_obj->Load();
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_ = MakeUnique<VarBufferManager>(block_column_entry, buffer_mgr);
-    } else if (buffer_type_ == VectorBufferType::kHeap) {
-        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, buffer_mgr, block_column_entry, DEFAULT_FIXLEN_CHUNK_SIZE, true);
-    } else if (buffer_type_ == VectorBufferType::kTensorHeap) {
-        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, buffer_mgr, block_column_entry, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE, false);
-    }
-    if (buffer_type_1_ == VectorBufferType::kTensorHeap) {
-        fix_heap_mgr_1_ = MakeUnique<FixHeapManager>(1, buffer_mgr, block_column_entry, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE, false);
-    } else if (buffer_type_1_ != VectorBufferType::kInvalid) {
-        String error_message = "Unexpected buffer type for fix_heap_mgr_1_.";
-        UnrecoverableError(error_message);
     }
     initialized_ = true;
     data_size_ = data_size;
@@ -171,25 +148,10 @@ void VectorBuffer::ResetToInit(VectorBufferType type) {
             String error_message = "Vector heap should be null.";
             UnrecoverableError(error_message);
         }
-    } else if (type == VectorBufferType::kHeap || type == VectorBufferType::kTensorHeap) {
-        if (fix_heap_mgr_.get() != nullptr or fix_heap_mgr_1_.get() != nullptr) {
-            String error_message = "Vector heap should be null.";
-            UnrecoverableError(error_message);
-        }
     }
 
     if (buffer_type_ == VectorBufferType::kVarBuffer) {
         var_buffer_mgr_ = MakeUnique<VarBufferManager>();
-    } else if (buffer_type_ == VectorBufferType::kHeap) {
-        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, DEFAULT_FIXLEN_CHUNK_SIZE, true);
-    } else if (buffer_type_ == VectorBufferType::kTensorHeap) {
-        fix_heap_mgr_ = MakeUnique<FixHeapManager>(0, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE, false);
-    }
-    if (buffer_type_1_ == VectorBufferType::kTensorHeap) {
-        fix_heap_mgr_1_ = MakeUnique<FixHeapManager>(1, DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE, false);
-    } else if (buffer_type_1_ != VectorBufferType::kInvalid) {
-        String error_message = "Unexpected buffer type for fix_heap_mgr_1_.";
-        UnrecoverableError(error_message);
     }
 }
 
@@ -327,19 +289,14 @@ void VectorBuffer::CopyCompactBits(u8 *dst_ptr_u8, const u8 *src_ptr_u8, SizeT d
 
 SizeT VectorBuffer::TotalSize(const DataType *data_type) const {
     SizeT size = 0;
-    if (const auto data_t = data_type->type(); data_t == kVarchar || data_t == kSparse) {
+    if (const auto data_t = data_type->type(); data_t == kVarchar || data_t == kSparse || data_t == kTensor or data_t == kTensorArray) {
         size += sizeof(i32) + var_buffer_mgr_->TotalSize();
-    } else if (data_t == kTensor or data_t == kTensorArray) {
-        size += sizeof(i32) + fix_heap_mgr_->total_size();
-    }
-    if (const auto data_t = data_type->type(); data_t == kTensorArray) {
-        size += sizeof(i32) + fix_heap_mgr_1_->total_size();
     }
     return size;
 }
 
 void VectorBuffer::WriteAdv(char *&ptr, const DataType *data_type) const {
-    if (const auto data_t = data_type->type(); data_t == kVarchar || data_t == kSparse) {
+    if (const auto data_t = data_type->type(); data_t == kVarchar || data_t == kSparse || data_t == kTensor or data_t == kTensorArray) {
         SizeT heap_len = var_buffer_mgr_->TotalSize();
         WriteBufAdv<i32>(ptr, heap_len);
         SizeT write_n = var_buffer_mgr_->Write(ptr);
@@ -348,44 +305,14 @@ void VectorBuffer::WriteAdv(char *&ptr, const DataType *data_type) const {
             UnrecoverableError(error_message);
         }
         ptr += heap_len;
-    } else if (data_t == kTensor or data_t == kTensorArray) {
-        i32 heap_len = fix_heap_mgr_->total_size();
-        WriteBufAdv<i32>(ptr, heap_len);
-        fix_heap_mgr_->ReadFromHeap(ptr, 0, 0, heap_len);
-        ptr += heap_len;
-    }
-    if (const auto data_t = data_type->type(); data_t == kTensorArray) {
-        i32 heap_len_1 = fix_heap_mgr_1_->total_size();
-        WriteBufAdv<i32>(ptr, heap_len_1);
-        fix_heap_mgr_1_->ReadFromHeap(ptr, 0, 0, heap_len_1);
-        ptr += heap_len_1;
     }
 }
 
 void VectorBuffer::ReadAdv(char *&ptr, const DataType *data_type) {
-    if (const auto data_t = data_type->type(); data_t == kVarchar || data_t == kSparse) {
+    if (const auto data_t = data_type->type(); data_t == kVarchar || data_t == kSparse || data_t == kTensor or data_t == kTensorArray) {
         SizeT heap_len = ReadBufAdv<i32>(ptr);
         [[maybe_unused]] SizeT offset = this->AppendVarchar(ptr, heap_len);
         ptr += heap_len;
-    } else if (data_t == kTensor or data_t == kTensorArray) {
-        i32 heap_len = ReadBufAdv<i32>(ptr);
-        const i32 one_chunk_size = fix_heap_mgr_->current_chunk_size();
-        while (heap_len > 0) {
-            const i32 real_append_size = std::min(heap_len, one_chunk_size);
-            fix_heap_mgr_->AppendToHeap(ptr, real_append_size);
-            ptr += real_append_size;
-            heap_len -= real_append_size;
-        }
-    }
-    if (const auto data_t = data_type->type(); data_t == kTensorArray) {
-        i32 heap_len_1 = ReadBufAdv<i32>(ptr);
-        const i32 one_chunk_size = fix_heap_mgr_1_->current_chunk_size();
-        while (heap_len_1 > 0) {
-            const i32 real_append_size = std::min(heap_len_1, one_chunk_size);
-            fix_heap_mgr_1_->AppendToHeap(ptr, real_append_size);
-            ptr += real_append_size;
-            heap_len_1 -= real_append_size;
-        }
     }
 }
 
@@ -415,6 +342,20 @@ SizeT VectorBuffer::AppendSparseRaw(const char *raw_data, const char *raw_idx, S
         var_buffer_mgr_->Append(raw_data, data_size);
     }
     return file_offset;
+}
+
+const char *VectorBuffer::GetTensorRaw(SizeT offset, SizeT size) const { return var_buffer_mgr_->Get(offset, size); }
+
+SizeT VectorBuffer::AppendTensorRaw(const char *raw_data, SizeT size) { return var_buffer_mgr_->Append(raw_data, size); }
+
+const TensorT *VectorBuffer::GetTensorArrayMeta(SizeT offset, SizeT array_num) const {
+    SizeT bytes = array_num * sizeof(TensorT);
+    return reinterpret_cast<const TensorT *>(var_buffer_mgr_->Get(offset, bytes));
+}
+
+SizeT VectorBuffer::AppendTensorArrayMeta(Span<const TensorT> tensor_metas) const {
+    SizeT tensor_meta_size = tensor_metas.size() * sizeof(TensorT);
+    return var_buffer_mgr_->Append(reinterpret_cast<const char *>(tensor_metas.data()), tensor_meta_size);
 }
 
 } // namespace infinity

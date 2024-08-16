@@ -67,12 +67,6 @@ export enum class ColumnVectorType : i8 {
     kHeterogeneous, // May have missing
 };
 
-template <typename T>
-void WriteToTensor(TensorT &target_tensor,
-                   FixHeapManager *target_fix_heap_manager,
-                   const Vector<std::string_view> &ele_str_views,
-                   const SizeT unit_embedding_dim);
-
 // Basic unit of column data vector
 export struct ColumnVector {
 public:
@@ -199,7 +193,7 @@ public:
     }
 
 private:
-    Pair<VectorBufferType, VectorBufferType> InitializeHelper(ColumnVectorType vector_type, SizeT capacity);
+    VectorBufferType InitializeHelper(ColumnVectorType vector_type, SizeT capacity);
 
 public:
     void Initialize(ColumnVectorType vector_type = ColumnVectorType::kFlat, SizeT capacity = DEFAULT_VECTOR_SIZE);
@@ -259,180 +253,81 @@ public:
     // Read from a serialized version
     static SharedPtr<ColumnVector> ReadAdv(char *&ptr, i32 maxbytes);
 
+public:
+    static void SetTensor(TensorT &dest_tensor, VectorBuffer *dest_buffer, Span<const char> data, const EmbeddingInfo *embedding_info);
+
+    static Pair<Span<const char>, SizeT> GetTensor(const TensorT &tensor, const VectorBuffer *buffer, const EmbeddingInfo *embedding_info);
+
+    static void SetTensorArrayMeta(TensorArrayT &dest_tensor_array, VectorBuffer *dest_buffer, Span<const TensorT> tensors);
+
+    static Span<const TensorT> GetTensorArrayMeta(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer);
+
+    static void SetTensorArray(TensorArrayT &dest_tensor_array,
+                               VectorBuffer *dest_buffer,
+                               const Vector<Span<const char>> &data,
+                               const EmbeddingInfo *embedding_info);
+
+    static Vector<Pair<Span<const char>, SizeT>>
+    GetTensorArray(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer, const EmbeddingInfo *embedding_info);
+
+    Pair<Span<const char>, SizeT> GetTensorRaw(SizeT idx) const;
+
+    Vector<Pair<Span<const char>, SizeT>> GetTensorArrayRaw(SizeT idx) const;
+
 private:
     template <typename T>
-    static void CopyValue(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
-        auto *src_ptr = (T *)(src.data_ptr_);
-        T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_];
-        if (src.vector_type() == ColumnVectorType::kConstant && src.tail_index_ == 1) {
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[from];
-            }
-        } else {
-            for (SizeT idx = 0; idx < count; ++idx) {
-                dst_ptr[idx] = src_ptr[from + idx];
-            }
-        }
-    }
+    static void CopyValue(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count);
 
     template <typename T>
-    void AppendEmbedding(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
-        for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
-            T value = DataType::StringToValue<T>(ele_str_view);
-            ((T *)(data_ptr_ + dst_off))[i] = value;
-            ++i;
-        }
-    }
+    void AppendEmbedding(const Vector<std::string_view> &ele_str_views, SizeT dst_off);
 
     template <>
-    void AppendEmbedding<BooleanT>(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
-        const auto bit_bytes = (ele_str_views.size() + 7) / 8;
-        auto data_ptr = reinterpret_cast<u8 *>(data_ptr_ + dst_off);
-        std::fill_n(data_ptr, bit_bytes, 0);
-        for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
-            if (const auto value = DataType::StringToValue<float>(ele_str_view); value) {
-                data_ptr[i / 8] |= (1u << (i % 8));
-            }
-            ++i;
-        }
-    }
+    void AppendEmbedding<BooleanT>(const Vector<std::string_view> &ele_str_views, SizeT dst_off);
 
     template <typename T>
-    void AppendTensor(const Vector<std::string_view> &ele_str_views, SizeT dst_off, SizeT unit_embedding_dim) {
-        TensorT &target_tensor = ((TensorT *)data_ptr_)[dst_off];
-        WriteToTensor<T>(target_tensor, buffer_->fix_heap_mgr_.get(), ele_str_views, unit_embedding_dim);
-    }
+    void AppendTensor(const Vector<std::string_view> &ele_str_views, SizeT dst_off, const EmbeddingInfo *embedding_info);
 
     template <typename T>
-    void AppendTensorArray(const Vector<Vector<std::string_view>> &ele_str_views, SizeT dst_off, SizeT unit_embedding_dim) {
-        const auto total_tensor_count = ele_str_views.size();
-        Vector<TensorT> tensors(total_tensor_count);
-        for (u32 i = 0; i < total_tensor_count; ++i) {
-            WriteToTensor<T>(tensors[i], buffer_->fix_heap_mgr_1_.get(), ele_str_views[i], unit_embedding_dim);
-        }
-        auto &[tensor_num, chunk_id, chunk_offset] = ((TensorArrayT *)data_ptr_)[dst_off];
-        tensor_num = total_tensor_count;
-        std::tie(chunk_id, chunk_offset) =
-            buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(tensors.data()), tensors.size() * sizeof(TensorT));
-    }
+    void AppendTensorArray(const Vector<Vector<std::string_view>> &ele_str_views, SizeT dst_off, const EmbeddingInfo *embedding_info);
+
+    template <typename T>
+    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off);
+
+    template <typename DataT, typename IdxT>
+    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off);
 
 public:
     template <typename DataT, typename IdxT>
-    void AppendSparse(SizeT nnz, DataT *data, IdxT *index) {
+    void AppendSparseInner(SizeT nnz, const DataT *data, const IdxT *index, SparseT &sparse);
+
+    template <typename DataT, typename IdxT>
+    void AppendSparseInner(SizeT nnz, const DataT *data, const IdxT *index, SizeT dst_off) {
+        auto &sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
+        AppendSparseInner(nnz, data, index, sparse);
+    }
+
+    template <typename DataT, typename IdxT>
+    void AppendSparse(SizeT nnz, const DataT *data, const IdxT *index) {
         SizeT dst_off = tail_index_++;
         AppendSparseInner(nnz, data, index, dst_off);
     }
 
+    void AppendSparseRaw(const char *raw_data_ptr, const char *raw_index_ptr, SizeT nnz, SizeT dst_off);
+
+    Tuple<Span<const char>, Span<const char>, SizeT> GetSparseRaw(SizeT index) const;
+
+public:
+    void AppendVarcharInner(Span<const char> data, VarcharT &varchar);
+
+    void AppendVarcharInner(Span<const char> data, SizeT dst_off);
+
+    void AppendVarchar(Span<const char> data);
+
+    Span<const char> GetVarcharInner(const VarcharT &varchar) const;
+
+    Span<const char> GetVarchar(SizeT index) const;
+
 private:
-    template <typename T>
-    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
-        const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
-        switch (sparse_info->IndexType()) {
-            case kElemInt8: {
-                AppendSparse<T, TinyIntT>(ele_str_views, dst_off);
-                break;
-            }
-            case kElemInt16: {
-                AppendSparse<T, SmallIntT>(ele_str_views, dst_off);
-                break;
-            }
-            case kElemInt32: {
-                AppendSparse<T, IntegerT>(ele_str_views, dst_off);
-                break;
-            }
-            case kElemInt64: {
-                AppendSparse<T, BigIntT>(ele_str_views, dst_off);
-                break;
-            }
-            default: {
-                String error_message = "Unsupported sparse index type.";
-                UnrecoverableError(error_message);
-            }
-        }
-    }
-
-    template <typename DataT, typename IdxT>
-    void AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
-        SizeT total_element_count = ele_str_views.size();
-        Vector<IdxT> index_vec;
-        index_vec.reserve(total_element_count);
-        if constexpr (std::is_same_v<DataT, BooleanT>) {
-            for (u32 i = 0; i < total_element_count; ++i) {
-                auto index = DataType::StringToValue<IdxT>(ele_str_views[i]);
-                if (index < 0) {
-                    RecoverableError(Status::InvalidDataType());
-                }
-                index_vec.push_back(index);
-            }
-            AppendSparseInner(total_element_count, static_cast<DataT *>(nullptr), index_vec.data(), dst_off);
-        } else {
-            Vector<DataT> data_vec;
-            data_vec.reserve(total_element_count);
-            for (u32 i = 0; i < total_element_count; ++i) {
-                auto [index, value] = DataType::StringToSparseValue<DataT, IdxT>(ele_str_views[i]);
-                if (index < 0) {
-                    RecoverableError(Status::InvalidDataType());
-                }
-                index_vec.push_back(index);
-                data_vec.push_back(value);
-            }
-            AppendSparseInner(total_element_count, data_vec.data(), index_vec.data(), dst_off);
-        }
-    }
-
-    template <typename DataT, typename IdxT>
-    void AppendSparseInner(SizeT nnz, DataT *data, IdxT *index, SizeT dst_off) {
-        auto &target_sparse = reinterpret_cast<SparseT *>(data_ptr_)[dst_off];
-        target_sparse.nnz_ = nnz;
-        if (nnz == 0) {
-            target_sparse.file_offset_ = -1;
-            return;
-        }
-        bool to_sort = true;
-        auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
-        if (sparse_info->StoreType() == SparseStoreType::kSorted) {
-            to_sort = false;
-        }
-
-        if constexpr (std::is_same_v<DataT, BooleanT>) {
-            if (data != nullptr) {
-                RecoverableError(Status::InvalidDataType());
-                return;
-            }
-            if (to_sort) {
-                auto *index_end = index + nnz;
-                std::sort(index, index_end);
-                auto *index_end1 = std::unique(index, index_end);
-                if (index_end1 != index_end) {
-                    RecoverableError(Status::InvalidDataType());
-                    return;
-                }
-            }
-            SparseVecRef<DataT, IdxT> sparse_vec_ref(nnz, index, nullptr);
-            target_sparse.file_offset_ = buffer_->AppendSparse(sparse_vec_ref);
-        } else {
-            if (to_sort) {
-                auto *index_end = index + nnz;
-                Vector<Pair<IdxT, DataT>> index_value_pairs(nnz);
-                for (u32 i = 0; i < nnz; ++i) {
-                    index_value_pairs[i] = {index[i], data[i]};
-                }
-                std::sort(index_value_pairs.begin(), index_value_pairs.end(), [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
-                for (u32 i = 0; i < nnz; ++i) {
-                    index[i] = index_value_pairs[i].first;
-                    data[i] = index_value_pairs[i].second;
-                }
-                auto *index_end1 = std::unique(index, index_end);
-                if (index_end1 != index_end) {
-                    RecoverableError(Status::InvalidDataType());
-                    return;
-                }
-            }
-            SparseVecRef<DataT, IdxT> sparse_vec_ref(nnz, index, data);
-            target_sparse.file_offset_ = buffer_->AppendSparse(sparse_vec_ref);
-        }
-    }
-
     // Used by Append by Ptr
     void SetByRawPtr(SizeT index, const_ptr_t raw_ptr);
 
@@ -461,60 +356,219 @@ public:
 };
 
 template <typename T>
-void WriteToTensor(TensorT &target_tensor,
-                   FixHeapManager *target_fix_heap_manager,
-                   const Vector<std::string_view> &ele_str_views,
-                   const SizeT unit_embedding_dim) {
-    const auto total_element_count = ele_str_views.size();
-    const auto input_bytes = total_element_count * sizeof(T);
-    if (input_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
-        Status status = Status::SyntaxError("Tensor size exceeds the limit.");
-        RecoverableError(status);
+void ColumnVector::CopyValue(ColumnVector &dst, const ColumnVector &src, SizeT from, SizeT count) {
+    auto *src_ptr = (T *)(src.data_ptr_);
+    T *dst_ptr = &((T *)(dst.data_ptr_))[dst.tail_index_];
+    if (src.vector_type() == ColumnVectorType::kConstant && src.tail_index_ == 1) {
+        for (SizeT idx = 0; idx < count; ++idx) {
+            dst_ptr[idx] = src_ptr[from];
+        }
+    } else {
+        for (SizeT idx = 0; idx < count; ++idx) {
+            dst_ptr[idx] = src_ptr[from + idx];
+        }
     }
-    auto tmp_data = MakeUniqueForOverwrite<T[]>(total_element_count);
-    for (u32 i = 0; i < total_element_count; ++i) {
-        tmp_data[i] = DataType::StringToValue<T>(ele_str_views[i]);
+}
+
+template <typename T>
+void ColumnVector::AppendEmbedding(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+    for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+        T value = DataType::StringToValue<T>(ele_str_view);
+        ((T *)(data_ptr_ + dst_off))[i] = value;
+        ++i;
     }
-    target_tensor.embedding_num_ = total_element_count / unit_embedding_dim;
-    std::tie(target_tensor.chunk_id_, target_tensor.chunk_offset_) =
-        target_fix_heap_manager->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), input_bytes);
 }
 
 template <>
-void WriteToTensor<bool>(TensorT &target_tensor,
-                         FixHeapManager *target_fix_heap_manager,
-                         const Vector<std::string_view> &ele_str_views,
-                         const SizeT unit_embedding_dim) {
-    const auto total_element_count = ele_str_views.size();
-    const auto bit_bytes = (total_element_count + 7) / 8;
-    if (bit_bytes > DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE) {
-        Status status = Status::SyntaxError("Tensor size exceeds the limit.");
-        RecoverableError(status);
+void ColumnVector::AppendEmbedding<BooleanT>(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+    const auto bit_bytes = (ele_str_views.size() + 7) / 8;
+    auto data_ptr = reinterpret_cast<u8 *>(data_ptr_ + dst_off);
+    std::fill_n(data_ptr, bit_bytes, 0);
+    for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+        if (const auto value = DataType::StringToValue<float>(ele_str_view); value) {
+            data_ptr[i / 8] |= (1u << (i % 8));
+        }
+        ++i;
     }
-    auto tmp_data = MakeUnique<u8[]>(bit_bytes);
-    for (u32 i = 0; i < total_element_count; ++i) {
-        if (const auto value = DataType::StringToValue<float>(ele_str_views[i]); value) {
+}
+
+template <typename T>
+Pair<UniquePtr<char[]>, SizeT> StrToTensor(const Vector<std::string_view> &ele_str_views, const EmbeddingInfo *embedding_info) {
+    SizeT total_element_count = ele_str_views.size();
+    auto tmp_data = MakeUniqueForOverwrite<char[]>(total_element_count * sizeof(T));
+    auto *ptr = reinterpret_cast<T *>(tmp_data.get());
+    for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+        ptr[i] = DataType::StringToValue<T>(ele_str_view);
+        ++i;
+    }
+    return {std::move(tmp_data), total_element_count * sizeof(T)};
+}
+
+template <>
+Pair<UniquePtr<char[]>, SizeT> StrToTensor<bool>(const Vector<std::string_view> &ele_str_views, const EmbeddingInfo *embedding_info) {
+    SizeT total_element_count = ele_str_views.size();
+    SizeT bit_bytes = (total_element_count + 7) / 8;
+    auto tmp_data = MakeUnique<char[]>(bit_bytes);
+    for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
+        if (const auto value = DataType::StringToValue<float>(ele_str_view); value) {
             tmp_data[i / 8] |= (1u << (i % 8));
         }
+        ++i;
     }
-    target_tensor.embedding_num_ = total_element_count / unit_embedding_dim;
-    std::tie(target_tensor.chunk_id_, target_tensor.chunk_offset_) =
-        target_fix_heap_manager->AppendToHeap(reinterpret_cast<const char *>(tmp_data.get()), bit_bytes);
+    return {std::move(tmp_data), bit_bytes};
+}
+
+template <typename T>
+void ColumnVector::AppendTensor(const Vector<std::string_view> &ele_str_views, SizeT dst_off, const EmbeddingInfo *embedding_info) {
+    TensorT &target_tensor = reinterpret_cast<TensorT *>(data_ptr_)[dst_off];
+    auto [data, data_bytes] = StrToTensor<T>(ele_str_views, embedding_info);
+    Span<const char> data_span(data.get(), data_bytes);
+    ColumnVector::SetTensor(target_tensor, buffer_.get(), data_span, embedding_info);
+}
+
+template <typename T>
+void ColumnVector::AppendTensorArray(const Vector<Vector<std::string_view>> &ele_str_views, SizeT dst_off, const EmbeddingInfo *embedding_info) {
+    TensorArrayT &target_tensor_array = reinterpret_cast<TensorArrayT *>(data_ptr_)[dst_off];
+    SizeT total_tensor_count = ele_str_views.size();
+    Vector<UniquePtr<char[]>> tensors(total_tensor_count);
+    Vector<Span<const char>> tensor_spans(total_tensor_count);
+    for (SizeT i = 0; i < total_tensor_count; ++i) {
+        auto [data, data_bytes] = StrToTensor<T>(ele_str_views[i], embedding_info);
+        tensors[i] = std::move(data);
+        tensor_spans[i] = Span<const char>(tensors[i].get(), data_bytes);
+    }
+    ColumnVector::SetTensorArray(target_tensor_array, buffer_.get(), tensor_spans, embedding_info);
+}
+
+template <typename T>
+void ColumnVector::AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+    const auto *sparse_info = static_cast<const SparseInfo *>(data_type_->type_info().get());
+    switch (sparse_info->IndexType()) {
+        case kElemInt8: {
+            AppendSparse<T, TinyIntT>(ele_str_views, dst_off);
+            break;
+        }
+        case kElemInt16: {
+            AppendSparse<T, SmallIntT>(ele_str_views, dst_off);
+            break;
+        }
+        case kElemInt32: {
+            AppendSparse<T, IntegerT>(ele_str_views, dst_off);
+            break;
+        }
+        case kElemInt64: {
+            AppendSparse<T, BigIntT>(ele_str_views, dst_off);
+            break;
+        }
+        default: {
+            String error_message = "Unsupported sparse index type.";
+            UnrecoverableError(error_message);
+        }
+    }
+}
+
+template <typename DataT, typename IdxT>
+void ColumnVector::AppendSparse(const Vector<std::string_view> &ele_str_views, SizeT dst_off) {
+    SizeT total_element_count = ele_str_views.size();
+    Vector<IdxT> index_vec;
+    index_vec.reserve(total_element_count);
+    if constexpr (std::is_same_v<DataT, BooleanT>) {
+        for (u32 i = 0; i < total_element_count; ++i) {
+            auto index = DataType::StringToValue<IdxT>(ele_str_views[i]);
+            if (index < 0) {
+                RecoverableError(Status::InvalidDataType());
+            }
+            index_vec.push_back(index);
+        }
+        AppendSparseInner(total_element_count, static_cast<DataT *>(nullptr), index_vec.data(), dst_off);
+    } else {
+        Vector<DataT> data_vec;
+        data_vec.reserve(total_element_count);
+        for (u32 i = 0; i < total_element_count; ++i) {
+            auto [index, value] = DataType::StringToSparseValue<DataT, IdxT>(ele_str_views[i]);
+            if (index < 0) {
+                RecoverableError(Status::InvalidDataType());
+            }
+            index_vec.push_back(index);
+            data_vec.push_back(value);
+        }
+        AppendSparseInner(total_element_count, data_vec.data(), index_vec.data(), dst_off);
+    }
+}
+
+template <typename DataT, typename IdxT>
+void ColumnVector::AppendSparseInner(SizeT nnz, const DataT *data, const IdxT *index, SparseT &target_sparse) {
+    target_sparse.nnz_ = nnz;
+    if (nnz == 0) {
+        target_sparse.file_offset_ = -1;
+        return;
+    }
+    bool to_sort = true;
+    auto *sparse_info = static_cast<SparseInfo *>(data_type_->type_info().get());
+    if (sparse_info->StoreType() == SparseStoreType::kSorted) {
+        to_sort = false;
+    }
+
+    if constexpr (std::is_same_v<DataT, BooleanT>) {
+        if (data != nullptr) {
+            RecoverableError(Status::InvalidDataType());
+            return;
+        }
+        UniquePtr<IdxT[]> tmp_index;
+        if (to_sort) {
+            tmp_index = MakeUniqueForOverwrite<IdxT[]>(nnz);
+            std::copy(index, index + nnz, tmp_index.get());
+            std::sort(tmp_index.get(), tmp_index.get() + nnz);
+            auto *index_end = std::unique(tmp_index.get(), tmp_index.get() + nnz);
+            if (index_end != tmp_index.get() + nnz) {
+                RecoverableError(Status::InvalidDataType());
+                return;
+            }
+            index = tmp_index.get();
+        }
+        SparseVecRef<DataT, IdxT> sparse_vec_ref(nnz, index, nullptr);
+        target_sparse.file_offset_ = buffer_->AppendSparse(sparse_vec_ref);
+    } else {
+        UniquePtr<IdxT[]> tmp_index;
+        UniquePtr<DataT[]> tmp_data;
+        if (to_sort) {
+            tmp_index = MakeUniqueForOverwrite<IdxT[]>(nnz);
+            tmp_data = MakeUniqueForOverwrite<DataT[]>(nnz);
+            Vector<Pair<IdxT, DataT>> index_value_pairs(nnz);
+            for (u32 i = 0; i < nnz; ++i) {
+                index_value_pairs[i] = {index[i], data[i]};
+            }
+            std::sort(index_value_pairs.begin(), index_value_pairs.end(), [](const auto &lhs, const auto &rhs) { return lhs.first < rhs.first; });
+            for (u32 i = 0; i < nnz; ++i) {
+                tmp_index[i] = index_value_pairs[i].first;
+                tmp_data[i] = index_value_pairs[i].second;
+            }
+            auto *index_end = std::unique(tmp_index.get(), tmp_index.get() + nnz);
+            if (index_end != tmp_index.get() + nnz) {
+                RecoverableError(Status::InvalidDataType());
+                return;
+            }
+            index = tmp_index.get();
+            data = tmp_data.get();
+        }
+        SparseVecRef<DataT, IdxT> sparse_vec_ref(nnz, index, data);
+        target_sparse.file_offset_ = buffer_->AppendSparse(sparse_vec_ref);
+    }
 }
 
 void CopyVarchar(VarcharT &dst_ref, VectorBuffer *dst_vec_buffer, const VarcharT &src_ref, const VectorBuffer *src_vec_buffer);
 
 void CopyTensor(TensorT &dst_ref,
-                FixHeapManager *dst_fix_heap_mgr,
+                VectorBuffer *dst_vec_buffer,
                 const TensorT &src_ref,
-                FixHeapManager *src_fix_heap_mgr,
-                u32 unit_embedding_bytes);
+                const VectorBuffer *src_vec_buffer,
+                const EmbeddingInfo *embedding_info);
 
 void CopyTensorArray(TensorArrayT &dst_ref,
                      VectorBuffer *dst_buffer,
                      const TensorArrayT &src_ref,
                      const VectorBuffer *src_buffer,
-                     u32 unit_embedding_bytes);
+                     const EmbeddingInfo *embedding_info);
 
 void CopySparse(SparseT &dst_sparse,
                 VectorBuffer *dst_vec_buffer,
@@ -583,12 +637,12 @@ inline void ColumnVector::CopyFrom<TensorT>(const VectorBuffer *__restrict src_b
                                             const Selection &input_select) {
     const_ptr_t src = src_buf->GetData();
     ptr_t dst = dst_buf->GetDataMut();
-    const u32 unit_embedding_bytes = data_type()->type_info()->Size();
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
         TensorT *dst_ptr = &(((TensorT *)dst)[idx]);
         const TensorT *src_ptr = &(((const TensorT *)src)[row_id]);
-        CopyTensor(*dst_ptr, dst_buf->fix_heap_mgr_.get(), *src_ptr, src_buf->fix_heap_mgr_.get(), unit_embedding_bytes);
+        CopyTensor(*dst_ptr, dst_buf, *src_ptr, src_buf, embedding_info);
     }
 }
 
@@ -599,12 +653,12 @@ inline void ColumnVector::CopyFrom<TensorArrayT>(const VectorBuffer *__restrict 
                                                  const Selection &input_select) {
     const_ptr_t src = src_buf->GetData();
     ptr_t dst = dst_buf->GetDataMut();
-    const u32 unit_embedding_bytes = data_type()->type_info()->Size();
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
     for (SizeT idx = 0; idx < count; ++idx) {
         SizeT row_id = input_select[idx];
         TensorArrayT *dst_ptr = &(((TensorArrayT *)dst)[idx]);
         const TensorArrayT *src_ptr = &(((const TensorArrayT *)src)[row_id]);
-        CopyTensorArray(*dst_ptr, dst_buf, *src_ptr, src_buf, unit_embedding_bytes);
+        CopyTensorArray(*dst_ptr, dst_buf, *src_ptr, src_buf, embedding_info);
     }
 }
 
@@ -788,11 +842,11 @@ inline void ColumnVector::CopyFrom<TensorT>(const VectorBuffer *__restrict src_b
     const_ptr_t src = src_buf->GetData();
     ptr_t dst = dst_buf->GetDataMut();
     SizeT source_end_idx = source_start_idx + count;
-    const u32 unit_embedding_bytes = data_type()->type_info()->Size();
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
         const TensorT &src_tensor = ((const TensorT *)src)[idx];
         TensorT &dst_tensor = ((TensorT *)dst)[dest_start_idx];
-        CopyTensor(dst_tensor, dst_buf->fix_heap_mgr_.get(), src_tensor, src_buf->fix_heap_mgr_.get(), unit_embedding_bytes);
+        CopyTensor(dst_tensor, dst_buf, src_tensor, src_buf, embedding_info);
         ++dest_start_idx;
     }
 }
@@ -806,11 +860,11 @@ inline void ColumnVector::CopyFrom<TensorArrayT>(const VectorBuffer *__restrict 
     const_ptr_t src = src_buf->GetData();
     ptr_t dst = dst_buf->GetDataMut();
     SizeT source_end_idx = source_start_idx + count;
-    const u32 unit_embedding_bytes = data_type()->type_info()->Size();
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
     for (SizeT idx = source_start_idx; idx < source_end_idx; ++idx) {
         const TensorArrayT &src_ref = ((const TensorArrayT *)src)[idx];
         TensorArrayT &dst_ref = ((TensorArrayT *)dst)[dest_start_idx];
-        CopyTensorArray(dst_ref, dst_buf, src_ref, src_buf, unit_embedding_bytes);
+        CopyTensorArray(dst_ref, dst_buf, src_ref, src_buf, embedding_info);
         ++dest_start_idx;
     }
 }
@@ -986,8 +1040,8 @@ ColumnVector::CopyRowFrom<TensorT>(const VectorBuffer *__restrict src_buf, SizeT
     ptr_t dst = dst_buf->GetDataMut();
     const TensorT &src_tensor = ((const TensorT *)src)[src_idx];
     TensorT &dst_tensor = ((TensorT *)dst)[dst_idx];
-    const u32 unit_embedding_bytes = data_type()->type_info()->Size();
-    CopyTensor(dst_tensor, dst_buf->fix_heap_mgr_.get(), src_tensor, src_buf->fix_heap_mgr_.get(), unit_embedding_bytes);
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
+    CopyTensor(dst_tensor, dst_buf, src_tensor, src_buf, embedding_info);
 }
 
 template <>
@@ -997,8 +1051,8 @@ ColumnVector::CopyRowFrom<TensorArrayT>(const VectorBuffer *__restrict src_buf, 
     ptr_t dst = dst_buf->GetDataMut();
     const TensorArrayT &src_ref = ((const TensorArrayT *)src)[src_idx];
     TensorArrayT &dst_ref = ((TensorArrayT *)dst)[dst_idx];
-    const u32 unit_embedding_bytes = data_type()->type_info()->Size();
-    CopyTensorArray(dst_ref, dst_buf, src_ref, src_buf, unit_embedding_bytes);
+    const auto *embedding_info = static_cast<const EmbeddingInfo *>(data_type_->type_info().get());
+    CopyTensorArray(dst_ref, dst_buf, src_ref, src_buf, embedding_info);
 }
 
 template <>
@@ -1173,8 +1227,7 @@ class ColumnVectorPtrAndIdx<VarcharT> {
     using IteratorType = ColumnVectorPtrAndIdx<VarcharT>;
 
 public:
-    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col)
-        : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), vec_buffer_(col->buffer_.get()) {}
+    explicit ColumnVectorPtrAndIdx(const SharedPtr<ColumnVector> &col) : data_ptr_(reinterpret_cast<const VarcharT *>(col->data())), col_(col) {}
     auto &SetIndex(u32 index) {
         idx_ = index;
         return *this;
@@ -1182,42 +1235,20 @@ public:
     auto &operator[](u32 index) { return SetIndex(index); }
     // Does not check type.
     friend std::strong_ordering ThreeWayCompareReaderValue(const IteratorType &left, const IteratorType &right) {
-        const VarcharT &left_value = left.data_ptr_[left.idx_];
-        const VarcharT &right_value = right.data_ptr_[right.idx_];
-        auto left_length = static_cast<u32>(left_value.length_);
-        auto right_length = static_cast<u32>(right_value.length_);
-        const char *left_data = left_value.short_.data_;
-        if (!left_value.IsInlined()) {
-            left_data = left.vec_buffer_->GetVarchar(left_value.vector_.file_offset_, left_value.length_);
-        }
-        const char *right_data = right_value.short_.data_;
-        if (!right_value.IsInlined()) {
-            right_data = right.vec_buffer_->GetVarchar(right_value.vector_.file_offset_, right_value.length_);
-        }
-        return CompareCharArray(left_data, left_length, right_data, right_length);
+        Span<const char> left_v = left.col_->GetVarchar(left.idx_);
+        Span<const char> right_v = right.col_->GetVarchar(right.idx_);
+        return CompareCharArray(left_v.data(), left_v.size(), right_v.data(), right_v.size());
     }
     friend bool CheckReaderValueEquality(const IteratorType &left, const IteratorType &right) {
-        const VarcharT &left_value = left.data_ptr_[left.idx_];
-        const VarcharT &right_value = right.data_ptr_[right.idx_];
-        auto left_length = static_cast<u32>(left_value.length_);
-        auto right_length = static_cast<u32>(right_value.length_);
-        if (left_length != right_length) {
-            return false;
-        }
-        const auto *left_data = left_value.short_.data_;
-        if (!left_value.IsInlined()) {
-            left_data = left.vec_buffer_->GetVarchar(left_value.vector_.file_offset_, left_length);
-        }
-        const auto *right_data = right_value.short_.data_;
-        if (!right_value.IsInlined()) {
-            right_data = right.vec_buffer_->GetVarchar(right_value.vector_.file_offset_, right_length);
-        }
-        return std::strncmp(left_data, right_data, left_length) == 0;
+        Span<const char> left_v = left.col_->GetVarchar(left.idx_);
+        Span<const char> right_v = right.col_->GetVarchar(right.idx_);
+        return left_v.size() == right_v.size() && std::strncmp(left_v.data(), right_v.data(), left_v.size()) == 0;
     }
 
 private:
     const VarcharT *data_ptr_ = nullptr;
-    VectorBuffer *vec_buffer_ = nullptr;
+    // VectorBuffer *vec_buffer_ = nullptr;
+    SharedPtr<ColumnVector> col_;
     u32 idx_ = {};
 
     static std::strong_ordering CompareCharArray(const char *left_data, u32 left_len, const char *right_data, u32 right_len) {

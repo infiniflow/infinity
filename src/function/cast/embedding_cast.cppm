@@ -214,7 +214,8 @@ struct EmbeddingTryCastToFixlen {
             }
             return true;
         } else {
-            String error_message = fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>());
+            String error_message =
+                fmt::format("Not support to cast from {} to {}", DataType::TypeToString<SourceElemType>(), DataType::TypeToString<TargetElemType>());
             UnrecoverableError(error_message);
             return false;
         }
@@ -246,50 +247,31 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
     LOG_TRACE(fmt::format("EmbeddingInfo Dimension: {}", embedding_info->Dimension()));
 
     String res = EmbeddingT::Embedding2String(source, embedding_info->Type(), embedding_info->Dimension());
-    target.length_ = static_cast<u64>(res.size());
-    target.is_value_ = false;
-    if (target.IsInlined()) {
-        // inline varchar
-        std::memcpy(target.short_.data_, res.c_str(), target.length_);
-    } else {
-        if (vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
-            String error_message = fmt::format("Varchar column vector should use VarBuffer.");
-            UnrecoverableError(error_message);
-        }
-
-        // Set varchar prefix
-        std::memcpy(target.vector_.prefix_, res.c_str(), VARCHAR_PREFIX_LEN);
-
-        SizeT offset = vector_ptr->buffer_->AppendVarchar(res.c_str(), target.length_);
-        target.vector_.file_offset_ = offset;
-    }
+    vector_ptr->AppendVarcharInner({res.data(), res.size()}, target);
 
     return true;
 }
 
 template <typename TargetValueType, typename SourceValueType>
 void EmbeddingTryCastToTensorImpl(const EmbeddingT &source, const SizeT source_embedding_dim, TensorT &target, ColumnVector *target_vector_ptr) {
+    const auto *target_info = static_cast<const EmbeddingInfo *>(target_vector_ptr->data_type()->type_info().get());
     if constexpr (std::is_same_v<TargetValueType, SourceValueType>) {
         const auto source_size =
             std::is_same_v<SourceValueType, BooleanT> ? (source_embedding_dim + 7) / 8 : source_embedding_dim * sizeof(SourceValueType);
-        const auto [chunk_id, chunk_offset] = target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(source.ptr, source_size);
-        target.chunk_id_ = chunk_id;
-        target.chunk_offset_ = chunk_offset;
+        Span<const char> tensor_data = {source.ptr, source_size};
+        ColumnVector::SetTensor(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
     } else if constexpr (std::is_same_v<TargetValueType, BooleanT>) {
         static_assert(sizeof(bool) == 1);
-        const SizeT target_ptr_n = (source_embedding_dim + 7) / 8;
-        const auto target_size = target_ptr_n;
-        auto target_tmp_ptr = MakeUnique<u8[]>(target_size);
+        const auto target_size = (source_embedding_dim + 7) / 8;
+        auto target_tmp_ptr = MakeUnique<char[]>(target_size);
         auto src_ptr = reinterpret_cast<const SourceValueType *>(source.ptr);
         for (SizeT i = 0; i < source_embedding_dim; ++i) {
             if (src_ptr[i]) {
                 target_tmp_ptr[i / 8] |= (1u << (i % 8));
             }
         }
-        const auto [chunk_id, chunk_offset] =
-            target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
-        target.chunk_id_ = chunk_id;
-        target.chunk_offset_ = chunk_offset;
+        Span<const char> tensor_data = {target_tmp_ptr.get(), target_size};
+        ColumnVector::SetTensor(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
     } else {
         const auto target_size = source_embedding_dim * sizeof(TargetValueType);
         auto target_tmp_ptr = MakeUniqueForOverwrite<TargetValueType[]>(source_embedding_dim);
@@ -301,10 +283,8 @@ void EmbeddingTryCastToTensorImpl(const EmbeddingT &source, const SizeT source_e
                                                DataType::TypeToString<TargetValueType>());
             UnrecoverableError(error_message);
         }
-        const auto [chunk_id, chunk_offset] =
-            target_vector_ptr->buffer_->fix_heap_mgr_->AppendToHeap(reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size);
-        target.chunk_id_ = chunk_id;
-        target.chunk_offset_ = chunk_offset;
+        Span<const char> tensor_data = {reinterpret_cast<const char *>(target_tmp_ptr.get()), target_size};
+        ColumnVector::SetTensor(target, target_vector_ptr->buffer_.get(), tensor_data, target_info);
     }
 }
 
@@ -443,8 +423,8 @@ inline bool EmbeddingTryCastToVarlen::Run(const EmbeddingT &source,
         RecoverableError(status);
     }
     target.embedding_num_ = target_tensor_num;
-    if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kTensorHeap) {
-        String error_message = fmt::format("Tensor column vector should use kTensorHeap VectorBuffer.");
+    if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
+        String error_message = fmt::format("Tensor column vector should use kVarBuffer VectorBuffer.");
         UnrecoverableError(error_message);
     }
     EmbeddingTryCastToTensor(source, embedding_info->Type(), source_embedding_dim, target, target_embedding_info->Type(), target_vector_ptr);
@@ -476,8 +456,7 @@ void EmbeddingTryCastToSparseImpl(const EmbeddingT &source,
 
     target.nnz_ = source_dim;
     if constexpr (std::is_same_v<IdxT, SourceType>) {
-        SparseVecRef<bool, IdxT> sparse_vec_ref(source_dim, reinterpret_cast<const IdxT *>(source.ptr), nullptr);
-        target.file_offset_ = target_vector_ptr->buffer_->AppendSparse(sparse_vec_ref);
+        target_vector_ptr->AppendSparseInner(source_dim, static_cast<const bool *>(nullptr), reinterpret_cast<const IdxT *>(source.ptr), target);
     } else {
         auto target_tmp_ptr = MakeUniqueForOverwrite<IdxT[]>(source_dim);
         if (!EmbeddingTryCastToFixlen::Run(reinterpret_cast<const SourceType *>(source.ptr), target_tmp_ptr.get(), source_dim)) {
@@ -486,8 +465,7 @@ void EmbeddingTryCastToSparseImpl(const EmbeddingT &source,
                                                DataType::TypeToString<IdxT>());
             UnrecoverableError(error_message);
         }
-        SparseVecRef<bool, IdxT> sparse_vec_ref(source_dim, target_tmp_ptr.get(), nullptr);
-        target.file_offset_ = target_vector_ptr->buffer_->AppendSparse(sparse_vec_ref);
+        target_vector_ptr->AppendSparseInner(source_dim, static_cast<const bool *>(nullptr), target_tmp_ptr.get(), target);
     }
 }
 

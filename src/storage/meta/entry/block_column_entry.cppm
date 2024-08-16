@@ -50,11 +50,9 @@ public:
     static UniquePtr<BlockColumnEntry> NewReplayBlockColumnEntry(const BlockEntry *block_entry,
                                                                  ColumnID column_id,
                                                                  BufferManager *buffer_manager,
-                                                                 u32 next_outline_idx_0,
-                                                                 u32 next_outline_idx_1,
-                                                                 u64 last_chunk_offset_0,
-                                                                 u64 last_chunk_offset_1,
-                                                                 TxnTimeStamp commit_ts);
+                                                                 const u32 next_outline_idx,
+                                                                 const u64 last_chunk_offset,
+                                                                 const TxnTimeStamp commit_ts);
 
     nlohmann::json Serialize();
 
@@ -111,10 +109,8 @@ private:
     SharedPtr<String> file_name_{};
 
     mutable std::shared_mutex mutex_{};
-    Vector<BufferObj *> outline_buffers_group_0_;
-    Vector<BufferObj *> outline_buffers_group_1_;
-    u64 last_chunk_offset_0_{};
-    u64 last_chunk_offset_1_{};
+    Vector<BufferObj *> outline_buffers_;
+    u64 last_chunk_offset_{};
 };
 
 } // namespace infinity
