@@ -30,7 +30,7 @@ Infinity, also available as a Python module, eliminates the need for a separate 
    table_object.insert([{"num": 1, "body": "unnecessary and harmful", "vec": [1.0, 1.2, 0.8, 0.9]}])
    table_object.insert([{"num": 2, "body": "Office for Harmful Blooms", "vec": [4.0, 4.2, 4.3, 4.5]}])
    res = table_object.output(["*"])
-                     .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
+                     .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 2)
                      .to_pl()
    print(res)
    ```

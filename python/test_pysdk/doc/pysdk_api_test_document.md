@@ -54,8 +54,8 @@
 
 ### query_builder.output
 ### query_builder.filter
-### query_builder.knn
-### query_builder.match
+### query_builder.match_dense
+### query_builder.match_text
 ### query_builder.fusion
 ### query_builder.to_result
 ### query_builder.to_df
