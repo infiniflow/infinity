@@ -232,7 +232,6 @@ class TestInsert(HttpTest):
             "type": "HNSW",
             "M": "16",
             "ef_construction": "50",
-            "ef": "50",
             "metric": "l2"
         })
 

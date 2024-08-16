@@ -137,7 +137,6 @@ class TestIndexParallel(TestSdk):
                                                      {
                                                          "M": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": index_distance_type
                                                      }), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -234,7 +233,6 @@ class TestIndexParallel(TestSdk):
                                                      {
                                                          "M": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": index_distance_type
                                                      }), ConflictType.Error)
         assert res.error_code == ErrorCode.OK

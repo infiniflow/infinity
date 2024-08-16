@@ -548,7 +548,6 @@ class TestKnn(HttpTest):
                 "type": "HNSW",
                 "M": "16",
                 "ef_construction": "50",
-                "ef": "50",
                 "metric": "l2"
             })
             for k in knn_column_name:
@@ -623,7 +622,6 @@ class TestKnn(HttpTest):
                 "type": "HNSW",
                 "M": "16",
                 "ef_construction": "50",
-                "ef": "50",
                 "metric": "l2"
             })
         self.drop_table(db_name, table_name)

@@ -687,7 +687,6 @@ table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector
 # Create an HNSW index named "my_index" on column "c1" with default parameter settings:
 # - "M": "16", 
 # - "ef_construction": "50",
-# - "ef": "50", 
 # - "encode": "plain"
 # Only the "metric" parameter (required) is explicitly set to L2 distance. 
 table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, [InitParameter("metric", "l2")]), None)
