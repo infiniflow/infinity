@@ -185,7 +185,7 @@ def one_thread(rounds, query_path, ground_truth_path, ef: int, limit: int, remot
         for idx, query_vec in enumerate(queries):
 
             start = time.time()
-            #query_builder.knn('col1', query_vec, 'float', 'l2', 100, {'ef': str(ef)})
+            #query_builder.match_dense('col1', query_vec, 'float', 'l2', 100, {'ef': str(ef)})
             res_list = client.search(
                 collection_name="sift_benchmark_collection",
                 data=[query_vec],

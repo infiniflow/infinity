@@ -17,7 +17,7 @@ from tqdm import tqdm
 from mldr_common_tools import load_corpus, fvecs_read_yield, read_mldr_sparse_embedding_yield, get_all_part_begin_ends
 import infinity
 import infinity.index as index
-from infinity.common import ConflictType, LOCAL_HOST
+from infinity.common import ConflictType, LOCAL_HOST, SparseVector
 from infinity.errors import ErrorCode
 
 
@@ -83,7 +83,7 @@ class InfinityClientForInsert:
                 if int(docid_str.split('-')[-1]) >= 189796:
                     continue
                 insert_dict = {"docid_col": docid_str, "fulltext_col": corpus_text_list[row_pos],
-                               "dense_col": insert_dense_data, "sparse_col": insert_sparse_data}
+                               "dense_col": insert_dense_data, "sparse_col": SparseVector(**insert_sparse_data)}
                 buffer.append(insert_dict)
             if len(buffer) > 0:
                 self.infinity_table.insert(buffer)

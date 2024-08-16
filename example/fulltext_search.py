@@ -86,7 +86,7 @@ try:
     for question in questions:
         qb_result = (
             table_instance.output(["num", "body", "_score"])
-            .match("body", question, "topn=10")
+            .match_text("body", question, 10)
             .to_pl()
         )
         print(f"question: {question}")

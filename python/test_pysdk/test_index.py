@@ -565,8 +565,8 @@ class TestInfinity:
                               "docdate": data["docdate"][i], "body": data["body"][i]})
             table_obj.insert(value)
         time.sleep(5)
-        res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match(
-            "body^5", "harmful chemical", "topn=3").to_pl()
+        res = table_obj.output(["doctitle", "docdate", "_row_id", "_score"]).match_text(
+            "body^5", "harmful chemical", 3).to_pl()
         assert not res.is_empty()
         print(res)
 

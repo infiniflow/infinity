@@ -84,13 +84,13 @@ def read_out_data():
 
 
 def search_fulltext(table_obj: Table):
-    res = table_obj.output(["index", "body", "other_vector", "_row_id", "_score"]).match(
-        "body^5", "harmful chemical", "topn=3").to_pl()
+    res = table_obj.output(["index", "body", "other_vector", "_row_id", "_score"]).match_text(
+        "body^5", "harmful chemical", 3).to_pl()
     print(res)
 
 
 def search_vector(table_obj: Table):
-    res = table_obj.output(["*"]).knn("other_vector", [2] * 4, "float", "l2", 3).to_pl()
+    res = table_obj.output(["*"]).match_dense("other_vector", [2] * 4, "float", "l2", 3).to_pl()
     print(res)
 
 
