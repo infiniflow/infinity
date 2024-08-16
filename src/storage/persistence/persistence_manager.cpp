@@ -473,6 +473,7 @@ void PersistenceManager::Cleanup(const String &file_path) {
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("Failed to find object {}", local_path);
         LOG_WARN(error_message);
+        return;
     }
     CleanupNoLock(it->second);
     local_path_obj_.erase(it);
