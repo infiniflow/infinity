@@ -4,7 +4,7 @@ import requests
 import logging
 import os
 from test_pysdk.common.common_data import *
-from infinity.common import ConflictType, InfinityException
+from infinity.common import ConflictType, InfinityException, SparseVector
 from test_pysdk.common import common_values
 import infinity
 from typing import Optional
@@ -419,6 +419,8 @@ class infinity_http:
                         for idx in range(len(value[key])):
                             if isinstance(value[key][idx], np.ndarray):
                                 value[key][idx] = value[key][idx].tolist()
+                    if isinstance(value[key], SparseVector):
+                        value[key] = value[key].to_dict()
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.set_up_header(["accept", "content-type"])
