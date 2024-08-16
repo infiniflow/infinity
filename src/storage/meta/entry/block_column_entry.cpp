@@ -88,10 +88,8 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewBlockColumnEntry(const BlockEnt
 UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const BlockEntry *block_entry,
                                                                         ColumnID column_id,
                                                                         BufferManager *buffer_manager,
-                                                                        const u32 next_outline_idx_0,
-                                                                        const u32 next_outline_idx_1,
-                                                                        const u64 last_chunk_offset_0,
-                                                                        const u64 last_chunk_offset_1,
+                                                                        const u32 next_outline_idx,
+                                                                        const u64 last_chunk_offset,
                                                                         const TxnTimeStamp commit_ts) {
     SharedPtr<String> full_path = MakeShared<String>(fmt::format("{}/{}", *block_entry->base_dir_, *block_entry->block_dir()));
     UniquePtr<BlockColumnEntry> column_entry = MakeUnique<BlockColumnEntry>(block_entry, column_id, full_path);
@@ -106,44 +104,13 @@ UniquePtr<BlockColumnEntry> BlockColumnEntry::NewReplayBlockColumnEntry(const Bl
 
     column_entry->buffer_ = buffer_manager->GetBufferObject(std::move(file_worker));
 
-    if (column_type->type() == LogicalType::kVarchar) {
-        SizeT buffer_size = last_chunk_offset_0;
+    if (next_outline_idx > 0) {
+        SizeT buffer_size = last_chunk_offset;
         auto outline_buffer_file_worker = MakeUnique<VarFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(0, 0), buffer_size);
         auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker));
-        column_entry->outline_buffers_group_0_.push_back(buffer_obj);
-    } else {
-        column_entry->outline_buffers_group_0_.reserve(next_outline_idx_0);
-        for (u32 outline_idx = 0; outline_idx < next_outline_idx_0; ++outline_idx) {
-            // FIXME: not use default value
-            SizeT buffer_size = 0;
-            if (column_type->type() == LogicalType::kTensor) {
-                buffer_size = DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE;
-            } else {
-                buffer_size = DEFAULT_FIXLEN_CHUNK_SIZE;
-            }
-            auto outline_buffer_file_worker =
-                MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(0, outline_idx), buffer_size);
-            auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker));
-            column_entry->outline_buffers_group_0_.push_back(buffer_obj);
-        }
+        column_entry->outline_buffers_.push_back(buffer_obj);
     }
-    column_entry->outline_buffers_group_1_.reserve(next_outline_idx_1);
-    for (u32 outline_idx = 0; outline_idx < next_outline_idx_1; ++outline_idx) {
-        // FIXME: not use default value
-        SizeT buffer_size = 0;
-        if (column_type->type() == LogicalType::kTensorArray) {
-            buffer_size = DEFAULT_FIXLEN_TENSOR_CHUNK_SIZE;
-        } else {
-            String error_message = "unexpected data type";
-            UnrecoverableError(error_message);
-        }
-        auto outline_buffer_file_worker =
-            MakeUnique<DataFileWorker>(column_entry->base_dir_, column_entry->OutlineFilename(1, outline_idx), buffer_size);
-        auto *buffer_obj = buffer_manager->GetBufferObject(std::move(outline_buffer_file_worker));
-        column_entry->outline_buffers_group_1_.push_back(buffer_obj);
-    }
-    column_entry->last_chunk_offset_0_ = last_chunk_offset_0;
-    column_entry->last_chunk_offset_1_ = last_chunk_offset_1;
+    column_entry->last_chunk_offset_ = last_chunk_offset;
 
     return column_entry;
 }
@@ -181,9 +148,7 @@ SharedPtr<String> BlockColumnEntry::OutlineFilename(const u32 buffer_group_id, c
 void BlockColumnEntry::AppendOutlineBuffer(const u32 buffer_group_id, BufferObj *buffer) {
     std::unique_lock lock(mutex_);
     if (buffer_group_id == 0) {
-        outline_buffers_group_0_.push_back(buffer);
-    } else if (buffer_group_id == 1) {
-        outline_buffers_group_1_.push_back(buffer);
+        outline_buffers_.push_back(buffer);
     } else {
         String error_message = "Invalid buffer group id";
         UnrecoverableError(error_message);
@@ -193,9 +158,7 @@ void BlockColumnEntry::AppendOutlineBuffer(const u32 buffer_group_id, BufferObj 
 BufferObj *BlockColumnEntry::GetOutlineBuffer(const u32 buffer_group_id, const SizeT idx) const {
     std::shared_lock lock(mutex_);
     if (buffer_group_id == 0) {
-        return outline_buffers_group_0_.empty() ? nullptr : outline_buffers_group_0_[idx];
-    } else if (buffer_group_id == 1) {
-        return outline_buffers_group_1_.empty() ? nullptr : outline_buffers_group_1_[idx];
+        return outline_buffers_.empty() ? nullptr : outline_buffers_[idx];
     } else {
         String error_message = "Invalid buffer group id";
         UnrecoverableError(error_message);
@@ -206,9 +169,7 @@ BufferObj *BlockColumnEntry::GetOutlineBuffer(const u32 buffer_group_id, const S
 SizeT BlockColumnEntry::OutlineBufferCount(const u32 buffer_group_id) const {
     std::shared_lock lock(mutex_);
     if (buffer_group_id == 0) {
-        return outline_buffers_group_0_.size();
-    } else if (buffer_group_id == 1) {
-        return outline_buffers_group_1_.size();
+        return outline_buffers_.size();
     } else {
         String error_message = "Invalid buffer group id";
         UnrecoverableError(error_message);
@@ -218,9 +179,7 @@ SizeT BlockColumnEntry::OutlineBufferCount(const u32 buffer_group_id) const {
 
 u64 BlockColumnEntry::LastChunkOff(const u32 buffer_group_id) const {
     if (buffer_group_id == 0) {
-        return last_chunk_offset_0_;
-    } else if (buffer_group_id == 1) {
-        return last_chunk_offset_1_;
+        return last_chunk_offset_;
     } else {
         String error_message = "Invalid buffer group id";
         UnrecoverableError(error_message);
@@ -230,9 +189,7 @@ u64 BlockColumnEntry::LastChunkOff(const u32 buffer_group_id) const {
 
 void BlockColumnEntry::SetLastChunkOff(const u32 buffer_group_id, const u64 offset) {
     if (buffer_group_id == 0) {
-        last_chunk_offset_0_ = offset;
-    } else if (buffer_group_id == 1) {
-        last_chunk_offset_1_ = offset;
+        last_chunk_offset_ = offset;
     } else {
         String error_message = "Invalid buffer group id";
         UnrecoverableError(error_message);
@@ -295,12 +252,7 @@ void BlockColumnEntry::Flush(BlockColumnEntry *block_column_entry, SizeT start_r
             LOG_TRACE(fmt::format("Saved column {}", block_column_entry->column_id()));
 
             std::shared_lock lock(block_column_entry->mutex_);
-            for (auto *outline_buffer : block_column_entry->outline_buffers_group_0_) {
-                if (outline_buffer != nullptr) {
-                    outline_buffer->Save();
-                }
-            }
-            for (auto *outline_buffer : block_column_entry->outline_buffers_group_1_) {
+            for (auto *outline_buffer : block_column_entry->outline_buffers_) {
                 if (outline_buffer != nullptr) {
                     outline_buffer->Save();
                 }
@@ -332,12 +284,7 @@ void BlockColumnEntry::Cleanup() {
     if (buffer_ != nullptr) {
         buffer_->PickForCleanup();
     }
-    for (auto *outline_buffer : outline_buffers_group_0_) {
-        if (outline_buffer) {
-            outline_buffer->PickForCleanup();
-        }
-    }
-    for (auto *outline_buffer : outline_buffers_group_1_) {
+    for (auto *outline_buffer : outline_buffers_) {
         if (outline_buffer) {
             outline_buffer->PickForCleanup();
         }
@@ -349,9 +296,8 @@ nlohmann::json BlockColumnEntry::Serialize() {
     json_res["column_id"] = this->column_id_;
     {
         std::shared_lock lock(mutex_);
-        json_res["next_outline_idx"] = outline_buffers_group_0_.size();
+        json_res["next_outline_idx"] = outline_buffers_.size();
         json_res["last_chunk_offset"] = this->LastChunkOff(0);
-        json_res["next_outline_idx_1"] = outline_buffers_group_1_.size();
         json_res["last_chunk_offset_1"] = this->LastChunkOff(1);
     }
 
@@ -365,24 +311,10 @@ UniquePtr<BlockColumnEntry>
 BlockColumnEntry::Deserialize(const nlohmann::json &column_data_json, BlockEntry *block_entry, BufferManager *buffer_mgr) {
     const ColumnID column_id = column_data_json["column_id"];
     const TxnTimeStamp commit_ts = column_data_json["commit_ts"];
-    const u32 next_outline_idx_0 = column_data_json["next_outline_idx"];
-    const u64 last_chunk_offset_0 = column_data_json["last_chunk_offset"];
-    u32 next_outline_idx_1 = 0;
-    u64 last_chunk_offset_1 = 0;
-    if (auto it = column_data_json.find("next_outline_idx_1"); it != column_data_json.end()) {
-        next_outline_idx_1 = *it;
-    }
-    if (auto it = column_data_json.find("last_chunk_offset_1"); it != column_data_json.end()) {
-        last_chunk_offset_1 = *it;
-    }
-    UniquePtr<BlockColumnEntry> block_column_entry = NewReplayBlockColumnEntry(block_entry,
-                                                                               column_id,
-                                                                               buffer_mgr,
-                                                                               next_outline_idx_0,
-                                                                               next_outline_idx_1,
-                                                                               last_chunk_offset_0,
-                                                                               last_chunk_offset_1,
-                                                                               commit_ts);
+    const u32 next_outline_idx = column_data_json["next_outline_idx"];
+    const u64 last_chunk_offset = column_data_json["last_chunk_offset"];
+    UniquePtr<BlockColumnEntry> block_column_entry =
+        NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx, last_chunk_offset, commit_ts);
     block_column_entry->begin_ts_ = column_data_json["begin_ts"];
     block_column_entry->txn_id_ = column_data_json["txn_id"];
 

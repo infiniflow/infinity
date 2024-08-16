@@ -796,21 +796,14 @@ void Catalog::LoadFromEntryDelta(TxnTimeStamp max_commit_ts, BufferManager *buff
                 std::from_chars(decodes[3].begin(), decodes[3].end(), block_id);
                 ColumnID column_id = 0;
                 std::from_chars(decodes[4].begin(), decodes[4].end(), column_id);
-                const auto [next_outline_idx_0, last_chunk_offset_0] = add_column_entry_op->outline_infos_[0];
-                const auto [next_outline_idx_1, last_chunk_offset_1] = add_column_entry_op->outline_infos_[1];
+                const auto [next_outline_idx, last_chunk_offset] = add_column_entry_op->outline_info_;
                 auto *db_entry = this->GetDatabaseReplay(db_name, txn_id, begin_ts);
                 auto *table_entry = db_entry->GetTableReplay(table_name, txn_id, begin_ts);
                 auto *segment_entry = table_entry->segment_map_.at(segment_id).get();
                 auto *block_entry = segment_entry->GetBlockEntryByID(block_id).get();
-                block_entry->AddColumnReplay(BlockColumnEntry::NewReplayBlockColumnEntry(block_entry,
-                                                                                         column_id,
-                                                                                         buffer_mgr,
-                                                                                         next_outline_idx_0,
-                                                                                         next_outline_idx_1,
-                                                                                         last_chunk_offset_0,
-                                                                                         last_chunk_offset_1,
-                                                                                         commit_ts),
-                                             column_id);
+                block_entry->AddColumnReplay(
+                    BlockColumnEntry::NewReplayBlockColumnEntry(block_entry, column_id, buffer_mgr, next_outline_idx, last_chunk_offset, commit_ts),
+                    column_id);
                 break;
             }
 
