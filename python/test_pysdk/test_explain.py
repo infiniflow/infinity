@@ -15,6 +15,7 @@ from infinity_http import infinity_http
 
 @pytest.mark.usefixtures("local_infinity")
 @pytest.mark.usefixtures("http")
+@pytest.mark.usefixtures("suffix")
 class TestInfinity:
     @pytest.fixture(autouse=True)
     def setup(self, local_infinity, http):
@@ -31,7 +32,7 @@ class TestInfinity:
         res = self.infinity_obj.disconnect()
         assert res.error_code == ErrorCode.OK
 
-    def test_explain(self):
+    def test_explain(self, suffix):
         """
             # Analyze = 1
             # Ast = 2
@@ -42,8 +43,8 @@ class TestInfinity:
             # Fragment = 7
         """
         db_obj = self.infinity_obj.get_database("default_db")
-        db_obj.drop_table("test_explain_default", ConflictType.Ignore)
-        table = db_obj.create_table("test_explain_default", {
+        db_obj.drop_table("test_explain_default"+suffix, ConflictType.Ignore)
+        table = db_obj.create_table("test_explain_default"+suffix, {
             "c1": {"type": "varchar", "constraints": ["primary key"]}, "c2": {"type": "float"}}, ConflictType.Error)
         assert table
 
@@ -77,4 +78,4 @@ class TestInfinity:
                 res = table.output(["*"]).explain(ExplainType.Analyze)
                 print(res)
 
-        db_obj.drop_table("test_explain_default", ConflictType.Error)
+        db_obj.drop_table("test_explain_default"+suffix, ConflictType.Error)
