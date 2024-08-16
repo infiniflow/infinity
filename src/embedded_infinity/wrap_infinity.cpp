@@ -873,19 +873,19 @@ void HandlePodType(ColumnField &output_column_field, SizeT row_count, const Shar
 
 void HandleVarcharType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
     SizeT all_size = 0;
-    Vector<Span<const char>> varchar_data(row_count);
+    Vector<Pair<const char *, SizeT>> raw_data;
     for (SizeT index = 0; index < row_count; ++index) {
         Span<const char> data = column_vector->GetVarchar(index);
-        all_size += data.size() + sizeof(i32);
+        all_size += sizeof(i32) + data.size();
+        raw_data.emplace_back(data.data(), data.size());
     }
-
     String dst;
     dst.resize(all_size);
     SizeT current_offset = 0;
-    for (const auto &data : varchar_data) {
-        i32 length = data.size();
+    for (const auto [data_ptr, data_size] : raw_data) {
+        i32 length = data_size;
         std::memcpy(dst.data() + current_offset, &length, sizeof(i32));
-        std::memcpy(dst.data() + current_offset + sizeof(i32), data.data(), length);
+        std::memcpy(dst.data() + current_offset + sizeof(i32), data_ptr, data_size);
         current_offset += sizeof(i32) + length;
     }
 
@@ -955,19 +955,18 @@ void HandleTensorArrayType(ColumnField &output_column_field, SizeT row_count, co
 }
 
 void HandleSparseType(ColumnField &output_column_field, SizeT row_count, const SharedPtr<ColumnVector> &column_vector) {
-    const auto sparse_info = static_cast<const SparseInfo *>(column_vector->data_type()->type_info().get());
-    SizeT total_length = 0;
-    Vector<Tuple<Span<const char>, Span<const char>, SizeT>> sparse_raw_data(row_count);
-    i32 current_offset = 0;
+    SizeT all_size = 0;
+    Vector<Tuple<Span<const char>, Span<const char>, SizeT>> raw_data;
     for (SizeT index = 0; index < row_count; ++index) {
         auto [data_span, index_span, nnz_size_t] = column_vector->GetSparseRaw(index);
-        i32 nnz = nnz_size_t;
-        total_length += sizeof(i32) + sparse_info->SparseSize(nnz);
-        sparse_raw_data[index] = {index_span, data_span, nnz};
+        all_size += sizeof(i32) + data_span.size() + index_span.size();
+        raw_data.emplace_back(data_span, index_span, nnz_size_t);
     }
     String dst;
-    dst.resize(total_length);
-    for (const auto &[index_span, data_span, nnz] : sparse_raw_data) {
+    dst.resize(all_size);
+    SizeT current_offset = 0;
+    for (const auto [data_span, index_span, nnz_size_t] : raw_data) {
+        i32 nnz = nnz_size_t;
         std::memcpy(dst.data() + current_offset, &nnz, sizeof(i32));
         current_offset += sizeof(i32);
         std::memcpy(dst.data() + current_offset, index_span.data(), index_span.size());
