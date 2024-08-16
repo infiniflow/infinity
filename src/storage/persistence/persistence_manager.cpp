@@ -459,6 +459,8 @@ void PersistenceManager::SaveObjStat(const ObjAddr &obj_addr, const ObjStat &obj
 String PersistenceManager::RemovePrefix(const String &path) {
     if (path.starts_with(local_data_dir_)) {
         return path.substr(local_data_dir_.length());
+    } else if (!path.starts_with("/")) {
+        return path;
     }
     return "";
 }
