@@ -14,6 +14,7 @@ import infinity.index as index
 from numpy import dtype
 import ast
 from enum import Enum
+from infinity.table import ExplainType
 
 default_url = "http://localhost:23820/"
 
@@ -91,6 +92,27 @@ def type_to_dtype(type):
             return dtype('str')
         case _:
             return object
+
+def  ExplainType_transfrom(ExplainType):
+    if ExplainType == ExplainType.Ast:
+        return "ast"
+    elif ExplainType == ExplainType.UnOpt:
+        return "unopt"
+    elif ExplainType == ExplainType.UnOpt:
+        return "unopt"
+    elif ExplainType == ExplainType.Opt:
+        return "opt"
+    elif ExplainType == ExplainType.Physical:
+        return "physical"
+    elif ExplainType == ExplainType.Pipeline:
+        return "pipeline"
+    elif ExplainType == ExplainType.Fragment:
+        return "fragment"
+    elif ExplainType == ExplainType.Analyze:
+        return "analyze"
+    else:
+        return "invalid"
+
 
 def is_float(str):
     try:

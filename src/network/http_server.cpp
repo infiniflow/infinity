@@ -2381,6 +2381,25 @@ public:
     }
 };
 
+class ExplainHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        String data_body = request->readBodyToString();
+
+        nlohmann::json json_response;
+        HTTPStatus http_status;
+
+        HTTPSearch::Explain(infinity.get(), database_name, table_name, data_body, http_status, json_response);
+
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class ListTableIndexesHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -3298,6 +3317,7 @@ void HTTPServer::Start(u16 port) {
 
     // DQL
     router->route("GET", "/databases/{database_name}/tables/{table_name}/docs", MakeShared<SelectHandler>());
+    router->route("GET", "/databases/{database_name}/tables/{table_name}/meta", MakeShared<ExplainHandler>());
 
     // index
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes", MakeShared<ListTableIndexesHandler>());

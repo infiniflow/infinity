@@ -39,6 +39,7 @@ import query_result;
 import data_block;
 import value;
 import physical_import;
+import explain_statement;
 
 namespace infinity {
 
@@ -208,6 +209,229 @@ void HTTPSearch::Process(Infinity *infinity_ptr,
             search_exprs = nullptr;
         }
         const QueryResult result = infinity_ptr->Search(db_name, table_name, search_expr, filter, output_columns);
+
+        output_columns = nullptr;
+        filter = nullptr;
+        search_expr = nullptr;
+        if (result.IsOk()) {
+            SizeT block_rows = result.result_table_->DataBlockCount();
+            for (SizeT block_id = 0; block_id < block_rows; ++block_id) {
+                DataBlock *data_block = result.result_table_->GetDataBlockById(block_id).get();
+                auto row_count = data_block->row_count();
+                auto column_cnt = result.result_table_->ColumnCount();
+
+                for (int row = 0; row < row_count; ++row) {
+                    nlohmann::json json_result_row;
+                    for (SizeT col = 0; col < column_cnt; ++col) {
+                        Value value = data_block->GetValue(col, row);
+                        const String &column_name = result.result_table_->GetColumnNameById(col);
+                        const String &column_value = value.ToString();
+                        json_result_row[column_name] = column_value;
+                    }
+                    response["output"].push_back(json_result_row);
+                }
+            }
+
+            response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            response["error_code"] = result.ErrorCode();
+            response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+    } catch (nlohmann::json::exception &e) {
+        response["error_code"] = ErrorCode::kInvalidJsonFormat;
+        response["error_message"] = e.what();
+    }
+    return;
+}
+
+void HTTPSearch::Explain(Infinity *infinity_ptr,
+                         const String &db_name,
+                         const String &table_name,
+                         const String &input_json_str,
+                         HTTPStatus &http_status,
+                         nlohmann::json &response) {
+    http_status = HTTPStatus::CODE_500;
+    try {
+        nlohmann::json input_json = nlohmann::json::parse(input_json_str);
+        if (!input_json.is_object()) {
+            response["error_code"] = ErrorCode::kInvalidJsonFormat;
+            response["error_message"] = "HTTP Body isn't json object";
+        }
+
+        SizeT match_expr_count = 0;
+        SizeT fusion_expr_count = 0;
+        Vector<ParsedExpr *> *output_columns{nullptr};
+        Vector<ParsedExpr *> *search_exprs{nullptr};
+        ParsedExpr *filter{nullptr};
+        SearchExpr *search_expr{nullptr};
+        DeferFn defer_fn([&]() {
+            if (output_columns != nullptr) {
+                for (auto &expr : *output_columns) {
+                    delete expr;
+                }
+                delete output_columns;
+                output_columns = nullptr;
+            }
+            if (filter != nullptr) {
+                delete filter;
+                filter = nullptr;
+            }
+            if (search_expr != nullptr) {
+                delete search_expr;
+                search_expr = nullptr;
+            }
+            if (search_exprs != nullptr) {
+                for (auto &expr : *search_exprs) {
+                    delete expr;
+                    expr = nullptr;
+                }
+                delete search_exprs;
+                search_exprs = nullptr;
+            }
+        });
+
+        search_exprs = new Vector<ParsedExpr *>();
+        ExplainType explain_type  = ExplainType::kInvalid;
+        for (const auto &elem : input_json.items()) {
+            String key = elem.key();
+            ToLower(key);
+            if (IsEqual(key, "output")) {
+                if (output_columns != nullptr) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one output field.";
+                    return;
+                }
+                auto &output_list = elem.value();
+                if (!output_list.is_array()) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "Output field should be array";
+                    return;
+                }
+
+                output_columns = ParseOutput(output_list, http_status, response);
+                if (output_columns == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "filter")) {
+
+                if (filter != nullptr) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "More than one output field.";
+                    return;
+                }
+
+                auto &filter_json = elem.value();
+                if (!filter_json.is_string()) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "Filter field should be string";
+                    return;
+                }
+
+                filter = ParseFilter(filter_json, http_status, response);
+                if (filter == nullptr) {
+                    return;
+                }
+            } else if (IsEqual(key, "fusion")) {
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
+                }
+                auto &fusion_json_list = elem.value();
+                if (fusion_json_list.type() != nlohmann::json::value_t::array) {
+                    response["error_code"] = ErrorCode::kInvalidExpression;
+                    response["error_message"] = "Fusion field should be list";
+                    return;
+                }
+                for (auto &fusion_json : fusion_json_list) {
+                    const auto fusion_expr = ParseFusion(fusion_json, http_status, response);
+                    if (fusion_expr == nullptr) {
+                        return;
+                    }
+                    search_exprs->push_back(fusion_expr);
+                    ++fusion_expr_count;
+                }
+            } else if (IsEqual(key, "knn")) {
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
+                }
+                auto &knn_json = elem.value();
+                const auto knn_expr = ParseKnn(knn_json, http_status, response);
+                if (knn_expr == nullptr) {
+                    return;
+                }
+                search_exprs->push_back(knn_expr);
+                ++match_expr_count;
+            } else if (IsEqual(key, "match")) {
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
+                }
+                auto &match_json = elem.value();
+                const auto match_expr = ParseMatch(match_json, http_status, response);
+                if (match_expr == nullptr) {
+                    return;
+                }
+                search_exprs->push_back(match_expr);
+                ++match_expr_count;
+            } else if (IsEqual(key, "match_tensor")) {
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
+                }
+                auto &match_json = elem.value();
+                const auto match_expr = ParseMatchTensor(match_json, http_status, response);
+                if (match_expr == nullptr) {
+                    return;
+                }
+                search_exprs->push_back(match_expr);
+                ++match_expr_count;
+            } else if (IsEqual(key, "match_sparse")) {
+                if (search_expr == nullptr) {
+                    search_expr = new SearchExpr();
+                }
+                auto &match_json = elem.value();
+                const auto match_expr = ParseMatchSparse(match_json, http_status, response);
+                if (match_expr == nullptr) {
+                    return;
+                }
+                search_exprs->push_back(match_expr);
+                ++match_expr_count;
+            } else if (IsEqual(key, "explain_type")) {
+                String type = elem.value();
+                if (IsEqual(type, "analyze")) {
+                    explain_type = ExplainType::kAnalyze;
+                } else if (IsEqual(type, "ast")) {
+                    explain_type = ExplainType::kAst;
+                } else if (IsEqual(type, "physical")) {
+                    explain_type = ExplainType::kPhysical;
+                } else if (IsEqual(type, "pipeline")) {
+                    explain_type = ExplainType::kPipeline;
+                } else if (IsEqual(type, "unopt")) {
+                    explain_type = ExplainType::kUnOpt;
+                } else if (IsEqual(type, "opt")) {
+                    explain_type = ExplainType::kOpt;
+                } else if (IsEqual(type, "fragment")) {
+                    explain_type = ExplainType::kFragment;
+                } else {
+                    explain_type = ExplainType::kInvalid;
+                }
+            } else {
+                response["error_code"] = ErrorCode::kInvalidExpression;
+                response["error_message"] = "Unknown expression: " + key;
+                return;
+            }
+        }
+
+        if (match_expr_count > 1 && fusion_expr_count == 0) {
+            response["error_code"] = ErrorCode::kInvalidExpression;
+            response["error_message"] = "More than one knn or match experssion with no fusion experssion!";
+            return;
+        }
+
+        if (search_exprs != nullptr && !search_exprs->empty()) {
+            search_expr->SetExprs(search_exprs);
+            search_exprs = nullptr;
+        }
+        const QueryResult result = infinity_ptr->Explain(db_name, table_name, explain_type, search_expr, filter, output_columns);
 
         output_columns = nullptr;
         filter = nullptr;
