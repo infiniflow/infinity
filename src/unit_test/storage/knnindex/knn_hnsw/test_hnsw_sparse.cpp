@@ -66,13 +66,13 @@ protected:
                 hnsw_index->Check();
             }
 
-            hnsw_index->SetEf(50);
+            KnnSearchOption search_option{.ef_ = 50};
             for (SizeT i = 0; i < element_size; ++i) {
                 SparseVecRef<f32, IdxT> query = dataset.at(i);
                 if (gt_score[i] == 0.0 || query.nnz_ == 0) {
                     continue;
                 }
-                Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1);
+                Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
                 if (int(res[0].second) != gt_idx[i]) {
                     std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
                     std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;
@@ -96,13 +96,13 @@ protected:
             }
 
             auto hnsw_index = Hnsw::Load(*file_handler);
-            hnsw_index->SetEf(50);
+            KnnSearchOption search_option{.ef_ = 50};
             for (SizeT i = 0; i < element_size; ++i) {
                 SparseVecRef<f32, IdxT> query = dataset.at(i);
                 if (gt_score[i] == 0.0 || query.nnz_ == 0) {
                     continue;
                 }
-                Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1);
+                Vector<Pair<f32, LabelT>> res = hnsw_index->KnnSearchSorted(query, 1, search_option);
                 if (int(res[0].second) != gt_idx[i]) {
                     std::cout << (fmt::format("{}, {}", res[0].second, gt_idx[i])) << std::endl;
                     std::cout << (fmt::format("{}, {}", -res[0].first, gt_score[i])) << std::endl;

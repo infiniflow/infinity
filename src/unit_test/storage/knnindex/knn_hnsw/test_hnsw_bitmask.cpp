@@ -85,8 +85,9 @@ TEST_F(HnswAlgBitmaskTest, test1) {
 
     Vector<f32> distance_array(top_k);
     Vector<u64> id_array(top_k);
+    KnnSearchOption search_option{.ef_ = 2ul * top_k};
     {
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, search_option);
 
         EXPECT_NEAR(result[0].first, 0, error);
         EXPECT_NEAR(result[0].second, 0, error);
@@ -106,7 +107,7 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter, search_option);
 
         EXPECT_NEAR(result[0].first, 0, error);
         EXPECT_NEAR(result[0].second, 0, error);
@@ -122,7 +123,7 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter, search_option);
 
         EXPECT_NEAR(result[0].first, 0.08, error);
         EXPECT_NEAR(result[0].second, 2, error);
@@ -135,7 +136,7 @@ TEST_F(HnswAlgBitmaskTest, test1) {
     --top_k;
     {
         BitmaskFilter<LabelT> filter(*p_bitmask);
-        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter);
+        auto result = hnsw_index->KnnSearchSorted(query_embedding.get(), top_k, filter, search_option);
 
         EXPECT_NEAR(result[0].first, 0.2, error);
         EXPECT_NEAR(result[0].second, 3, error);

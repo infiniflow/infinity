@@ -24,7 +24,6 @@ vector_index_option = [[index.InitParameter("centroids_count", "128"), index.Ini
                        [
                            index.InitParameter("M", "16"),
                            index.InitParameter("ef_construction", "50"),
-                           index.InitParameter("ef", "50"),
                            index.InitParameter("metric", "l2")
                        ]]
 

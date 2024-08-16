@@ -62,7 +62,6 @@ SharedPtr<IndexBase>
 IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<String> column_names, const Vector<InitParameter *> &index_param_list) {
     SizeT M = HNSW_M;
     SizeT ef_construction = HNSW_EF_CONSTRUCTION;
-    SizeT ef = HNSW_EF;
     SizeT block_size = HNSW_BLOCK_SIZE;
     MetricType metric_type = MetricType::kInvalid;
     HnswEncodeType encode_type = HnswEncodeType::kPlain;
@@ -71,8 +70,6 @@ IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<St
             M = std::stoi(param->param_value_);
         } else if (param->param_name_ == "ef_construction") {
             ef_construction = std::stoi(param->param_value_);
-        } else if (param->param_name_ == "ef") {
-            ef = std::stoi(param->param_value_);
         } else if (param->param_name_ == "metric") {
             metric_type = StringToMetricType(param->param_value_);
         } else if (param->param_name_ == "encode") {
@@ -95,7 +92,7 @@ IndexHnsw::Make(SharedPtr<String> index_name, const String &file_name, Vector<St
         RecoverableError(status);
     }
 
-    return MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, ef, block_size);
+    return MakeShared<IndexHnsw>(index_name, file_name, std::move(column_names), metric_type, encode_type, M, ef_construction, block_size);
 }
 
 bool IndexHnsw::operator==(const IndexHnsw &other) const {
@@ -103,7 +100,7 @@ bool IndexHnsw::operator==(const IndexHnsw &other) const {
         return false;
     }
     return metric_type_ == other.metric_type_ && encode_type_ == other.encode_type_ && M_ == other.M_ && ef_construction_ == other.ef_construction_ &&
-           ef_ == other.ef_ && block_size_ == other.block_size_;
+           block_size_ == other.block_size_;
 }
 
 bool IndexHnsw::operator!=(const IndexHnsw &other) const { return !(*this == other); }
@@ -114,7 +111,6 @@ i32 IndexHnsw::GetSizeInBytes() const {
     size += sizeof(encode_type_);
     size += sizeof(M_);
     size += sizeof(ef_construction_);
-    size += sizeof(ef_);
     size += sizeof(block_size_);
     return size;
 }
@@ -125,21 +121,19 @@ void IndexHnsw::WriteAdv(char *&ptr) const {
     WriteBufAdv(ptr, encode_type_);
     WriteBufAdv(ptr, M_);
     WriteBufAdv(ptr, ef_construction_);
-    WriteBufAdv(ptr, ef_);
     WriteBufAdv(ptr, block_size_);
 }
 
 String IndexHnsw::ToString() const {
     std::stringstream ss;
-    ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << M_ << ", " << ef_construction_ << ", " << ef_ << ", "
-       << block_size_;
+    ss << IndexBase::ToString() << ", " << MetricTypeToString(metric_type_) << ", " << M_ << ", " << ef_construction_ << ", " << block_size_;
     return ss.str();
 }
 
 String IndexHnsw::BuildOtherParamsString() const {
     std::stringstream ss;
     ss << "metric = " << MetricTypeToString(metric_type_) << ", encode_type = " << HnswEncodeTypeToString(encode_type_) << ", M = " << M_
-       << ", ef_construction = " << ef_construction_ << ", ef = " << ef_ << ", block_size = " << block_size_;
+       << ", ef_construction = " << ef_construction_ << ", block_size = " << block_size_;
     return ss.str();
 }
 
@@ -149,7 +143,6 @@ nlohmann::json IndexHnsw::Serialize() const {
     res["encode_type"] = HnswEncodeTypeToString(encode_type_);
     res["M"] = M_;
     res["ef_construction"] = ef_construction_;
-    res["ef"] = ef_;
     res["block_size"] = block_size_;
     return res;
 }

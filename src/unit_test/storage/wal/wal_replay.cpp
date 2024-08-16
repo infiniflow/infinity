@@ -940,7 +940,6 @@ TEST_P(WalReplayTest, wal_replay_create_index_hnsw) {
             parameters1.emplace_back(new InitParameter("encode", "plain"));
             parameters1.emplace_back(new InitParameter("m", "16"));
             parameters1.emplace_back(new InitParameter("ef_construction", "200"));
-            parameters1.emplace_back(new InitParameter("ef", "200"));
 
             SharedPtr<String> index_name = MakeShared<String>("hnsw_index");
             auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);

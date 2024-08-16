@@ -23,8 +23,11 @@ class TestMemIdx:
         )
         res = table_obj.create_index(
             "idx1",
-            index.IndexInfo("c2", index.IndexType.Hnsw,
-                            {"M": "16", "ef_construction": "20", "ef": "20", "metric": "l2", "block_size": "1"})
+            index.IndexInfo(
+                "c2",
+                index.IndexType.Hnsw,
+                {"M": "16", "ef_construction": "20", "metric": "l2", "block_size": "1"},
+            ),
         )
         assert res.error_code == infinity.ErrorCode.OK
 

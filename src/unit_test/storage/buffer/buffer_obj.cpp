@@ -560,7 +560,6 @@ TEST_F(BufferObjTest, test_hnsw_index_buffer_obj_shutdown) {
         parameters1.emplace_back(new InitParameter("encode", "plain"));
         parameters1.emplace_back(new InitParameter("m", "16"));
         parameters1.emplace_back(new InitParameter("ef_construction", "200"));
-        parameters1.emplace_back(new InitParameter("ef", "200"));
 
         auto index_base_hnsw = IndexHnsw::Make(index_name, "hnsw_index_test_hnsw", columns1, parameters1);
         for (auto *init_parameter : parameters1) {

@@ -135,7 +135,6 @@ int main(int argc, char *argv[]) {
             auto index_param_list = new std::vector<InitParameter *>();
             index_param_list->emplace_back(new InitParameter("m", std::to_string(16)));
             index_param_list->emplace_back(new InitParameter("ef_construction", std::to_string(200)));
-            index_param_list->emplace_back(new InitParameter("ef", std::to_string(200)));
             index_param_list->emplace_back(new InitParameter("metric", "l2"));
             index_param_list->emplace_back(new InitParameter("encode", "lvq"));
             index_info->index_param_list_ = index_param_list;
