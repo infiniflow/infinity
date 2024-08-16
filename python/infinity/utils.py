@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import warnings
 from infinity.common import InfinityException
 from infinity.errors import ErrorCode
 
@@ -45,3 +46,6 @@ def binary_exp_to_paser_exp(binary_expr_key) -> str:
         return "%"
     else:
         raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"unknown binary expression: {binary_expr_key}")
+
+def deprecated_api(message):
+    warnings.warn(message, DeprecationWarning, stacklevel=2)

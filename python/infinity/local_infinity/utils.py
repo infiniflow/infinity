@@ -20,7 +20,7 @@ import polars as pl
 import sqlglot.expressions as exp
 import numpy as np
 from infinity.errors import ErrorCode
-from infinity.common import InfinityException
+from infinity.common import InfinityException, SparseVector
 from infinity.local_infinity.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
 from infinity.embedded_infinity_ext import WrapParsedExpr, WrapFunctionExpr, WrapColumnExpr, WrapSearchExpr, WrapConstantExpr, ParsedExprType, LiteralType
@@ -195,14 +195,14 @@ def get_local_constant_expr_from_python_value(value) -> WrapConstantExpr:
         case [[[float(), *_], *_], *_]:
             constant_expression.literal_type = LiteralType.kSubArrayArray
             constant_expression.f64_tensor_array_value = value
-        case {"indices": [int(), *_], "values": [int(), *_]}:
+        case SparseVector([int(), *_] as indices, [int(), *_] as values):
             constant_expression.literal_type = LiteralType.kLongSparseArray
-            constant_expression.i64_array_idx = value["indices"]
-            constant_expression.i64_array_value = value["values"]
-        case {"indices": [int(), *_], "values": [float(), *_]}:
+            constant_expression.i64_array_idx = indices
+            constant_expression.i64_array_value = values
+        case SparseVector([int(), *_] as indices, [float(), *_] as values):
             constant_expression.literal_type = LiteralType.kDoubleSparseArray
-            constant_expression.i64_array_idx = value["indices"]
-            constant_expression.f64_array_value = value["values"]
+            constant_expression.i64_array_idx = indices
+            constant_expression.f64_array_value = values
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
     return constant_expression

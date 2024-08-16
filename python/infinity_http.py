@@ -9,6 +9,7 @@ from test_pysdk.common import common_values
 import infinity
 from typing import Optional
 from infinity.errors import ErrorCode
+from infinity.utils import deprecated_api
 import numpy as np
 import pandas as pd
 import polars as pl
@@ -553,12 +554,20 @@ class infinity_http:
         self._match_sparse = {}
         return self
 
-    def match(self, fields, query, operator="top=10"):
+    def match_text(self, fields: str, query: str, topn: int, opt_params: Optional[dict] = None):
         self._match = {}
         self._match["fields"] = fields
         self._match["query"] = query
-        self._match["operator"] = operator
+        operator_str = f"topn={topn}"
+        if opt_params is not None:
+            for k, v in opt_params.items():
+                operator_str += f";{k}={v}"
+        self._match["operator"] = operator_str
         return self
+
+    def match(self, *args, **kwargs):
+        deprecated_api("match is deprecated, please use match_text instead")
+        return self.match_text(*args, **kwargs)
 
     def match_tensor(self, column_name: str, query_data, query_data_type: str, topn: int):
         self._match_tensor = {}
@@ -580,7 +589,7 @@ class infinity_http:
         else:
             vector_column_name = [vector_column_name]
         self._match_sparse["fields"] = vector_column_name
-        self._match_sparse["query_sparse"] = sparse_data
+        self._match_sparse["query_sparse"] = sparse_data.to_dict()
         self._match_sparse["metric_type"] = distance_type
         self._match_sparse["topn"] = topn
         self._match_sparse["opt_params"] = opt_params
@@ -590,7 +599,7 @@ class infinity_http:
         self._filter = filter
         return self
 
-    def knn(self, fields, query_vector, element_type, metric_type, top_k, opt_params : {} = None):
+    def match_dense(self, fields, query_vector, element_type, metric_type, top_k, opt_params : {} = None):
         self._knn = {}
         self._knn["fields"] = [fields]
         self._knn["query_vector"] = query_vector
@@ -601,6 +610,10 @@ class infinity_http:
             for key in opt_params:
                 self._knn[key] = opt_params[key]
         return self
+
+    def knn(self, *args, **kwargs):
+        deprecated_api("knn is deprecated, please use match_dense instead")
+        return self.match_dense(*args, **kwargs)
 
     def fusion(self, method: str, topn: int, fusion_params: Optional[dict] = None):
         _fusion = {"method": method}

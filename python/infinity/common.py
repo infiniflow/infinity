@@ -13,7 +13,7 @@
 # limitations under the License.
 from pathlib import Path
 from typing import Union
-
+from dataclasses import dataclass
 import numpy as np
 
 
@@ -26,15 +26,40 @@ class NetworkAddress:
         return f'IP: {self.ip}, Port: {self.port}'
 
 
+@dataclass
+class SparseVector:
+    indices: list[int]
+    values: Union[list[float], list[int], None] = None
+
+    def __post_init__(self):
+        assert (self.values is None) or (len(self.indices) == len(self.values))
+
+    def to_dict(self):
+        d = {"indices": self.indices}
+        if self.values is not None:
+            d["values"] = self.values
+        return d
+
+    @staticmethod
+    def from_dict(d):
+        return SparseVector(d["indices"], d.get("values"))
+
+    def __str__(self):
+        return f"SparseVector(indices={self.indices}{'' if self.values is None else f', values={self.values}'})"
+
+    def __repr__(self):
+        return str(self)
+
+
 URI = Union[NetworkAddress, Path]
 VEC = Union[list, np.ndarray]
-SPARSE = dict[str, Union[list[int], list[float]]]
-INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SPARSE]
+INSERT_DATA = dict[str, Union[str, int, float, list[Union[int, float]]], SparseVector]
 
 LOCAL_HOST = NetworkAddress("127.0.0.1", 23817)
 
 # test embedded_infinity
 LOCAL_INFINITY_PATH = "/var/infinity"
+
 
 class ConflictType(object):
     Ignore = 0
@@ -46,6 +71,7 @@ class InfinityException(Exception):
     def __init__(self, error_code=0, error_message=None):
         self.error_code = error_code
         self.error_message = error_message
+
 
 DEFAULT_MATCH_VECTOR_TOPN = 10
 DEFAULT_MATCH_SPARSE_TOPN = 10
