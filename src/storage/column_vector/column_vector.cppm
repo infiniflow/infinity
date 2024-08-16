@@ -396,8 +396,9 @@ template <typename T>
 Pair<UniquePtr<char[]>, SizeT> StrToTensor(const Vector<std::string_view> &ele_str_views, const EmbeddingInfo *embedding_info) {
     SizeT total_element_count = ele_str_views.size();
     auto tmp_data = MakeUniqueForOverwrite<char[]>(total_element_count * sizeof(T));
+    auto *ptr = reinterpret_cast<T *>(tmp_data.get());
     for (SizeT i = 0; auto &ele_str_view : ele_str_views) {
-        tmp_data[i] = DataType::StringToValue<T>(ele_str_view);
+        ptr[i] = DataType::StringToValue<T>(ele_str_view);
         ++i;
     }
     return {std::move(tmp_data), total_element_count * sizeof(T)};

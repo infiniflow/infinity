@@ -217,7 +217,7 @@ bool TensorArrayTryCastToTensorArray::Run<TensorArrayT, TensorArrayT>(const Tens
     if (source_embedding_dim != target_embedding_dim) {
         RecoverableError(Status::DataTypeMismatch(source_type.ToString(), target_type.ToString()));
     }
-    if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kHeap) {
+    if (target_vector_ptr->buffer_->buffer_type_ != VectorBufferType::kVarBuffer) {
         String error_message = fmt::format("TensorArray column vector should use kHeap VectorBuffer.");
         UnrecoverableError(error_message);
     }

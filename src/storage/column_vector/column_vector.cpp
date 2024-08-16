@@ -2133,7 +2133,8 @@ void ColumnVector::SetTensor(TensorT &dest_tensor, VectorBuffer *dest_buffer, Sp
     dest_tensor.chunk_offset_ = dest_buffer->AppendTensorRaw(data.data(), data.size());
 }
 
-Pair<Span<const char>, SizeT> ColumnVector::GetTensor(const TensorT &src_tensor, const VectorBuffer *src_buffer, const EmbeddingInfo *embedding_info) {
+Pair<Span<const char>, SizeT>
+ColumnVector::GetTensor(const TensorT &src_tensor, const VectorBuffer *src_buffer, const EmbeddingInfo *embedding_info) {
     SizeT tensor_bytes = src_tensor.embedding_num_ * embedding_info->Size();
     const char *raw_data = src_buffer->GetTensorRaw(src_tensor.chunk_offset_, tensor_bytes);
     return {Span<const char>(raw_data, tensor_bytes), src_tensor.embedding_num_};
@@ -2145,15 +2146,15 @@ void ColumnVector::SetTensorArrayMeta(TensorArrayT &dest_tensor_array, VectorBuf
 }
 
 Span<const TensorT> ColumnVector::GetTensorArrayMeta(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer) {
-    SizeT array_bytes = src_tensor_array.tensor_num_ * sizeof(TensorT);
-    const TensorT *data = src_buffer->GetTensorArrayMeta(src_tensor_array.chunk_offset_, array_bytes);
-    return {data, src_tensor_array.tensor_num_};
+    SizeT tensor_num = src_tensor_array.tensor_num_;
+    const TensorT *data = src_buffer->GetTensorArrayMeta(src_tensor_array.chunk_offset_, tensor_num);
+    return {data, tensor_num};
 }
 
 void ColumnVector::SetTensorArray(TensorArrayT &dest_tensor_array,
-                                 VectorBuffer *dest_buffer,
-                                 const Vector<Span<const char>> &data,
-                                 const EmbeddingInfo *embedding_info) {
+                                  VectorBuffer *dest_buffer,
+                                  const Vector<Span<const char>> &data,
+                                  const EmbeddingInfo *embedding_info) {
     SizeT tensor_num = data.size();
     Vector<TensorT> tensor_array_meta(tensor_num);
     for (SizeT i = 0; i < tensor_num; ++i) {
@@ -2167,11 +2168,11 @@ void ColumnVector::SetTensorArray(TensorArrayT &dest_tensor_array,
 
 Vector<Pair<Span<const char>, SizeT>>
 ColumnVector::GetTensorArray(const TensorArrayT &src_tensor_array, const VectorBuffer *src_buffer, const EmbeddingInfo *embedding_info) {
-    SizeT array_bytes = src_tensor_array.tensor_num_ * sizeof(TensorT);
-    const TensorT *array_meta = src_buffer->GetTensorArrayMeta(src_tensor_array.chunk_offset_, array_bytes);
+    SizeT array_num = src_tensor_array.tensor_num_;
+    const TensorT *array_meta = src_buffer->GetTensorArrayMeta(src_tensor_array.chunk_offset_, array_num);
     Vector<Pair<Span<const char>, SizeT>> res;
-    res.reserve(src_tensor_array.tensor_num_);
-    for (SizeT i = 0; i < src_tensor_array.tensor_num_; ++i) {
+    res.reserve(array_num);
+    for (SizeT i = 0; i < array_num; ++i) {
         const TensorT &tensor = array_meta[i];
         auto [raw_data, embedding_num] = ColumnVector::GetTensor(tensor, src_buffer, embedding_info);
         res.emplace_back(raw_data, tensor.embedding_num_);
