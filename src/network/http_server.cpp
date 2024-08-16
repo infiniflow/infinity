@@ -2227,9 +2227,8 @@ public:
                     }
                     case nlohmann::json::value_t::string: {
                         infinity::ConstantExpr *const_expr = new ConstantExpr(LiteralType::kString);
-                        auto str_value = value.template get<std::string>();
-                        const_expr->str_value_ = new char[str_value.size() + 1]{0};
-                        memcpy(const_expr->str_value_, str_value.c_str(), str_value.size());
+                        String str_value = value.template get<String>();
+                        const_expr->str_value_ = strdup(str_value.c_str());
                         update_expr->value = const_expr;
                         const_expr = nullptr;
                         break;
