@@ -393,6 +393,16 @@ class infinity_http:
         self.index_list = index_list
         return self
 
+    def optimize(self, index_name = "", optimize_options = {}):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
+        h = self.set_up_header(
+            ["accept", "content-type"],
+        )
+        opt_opt = {"optimize_options": optimize_options}
+        r = self.request(url, "put", h, opt_opt)
+        self.raise_exception(r)
+        return self
+
     def insert(self,values=[]):
         if isinstance(values, list):
             pass

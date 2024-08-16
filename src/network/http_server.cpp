@@ -2716,6 +2716,56 @@ public:
     }
 };
 
+class OptimizeIndexHandler final : public HttpRequestHandler {
+public:
+    SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
+        auto infinity = Infinity::RemoteConnect();
+        DeferFn defer_fn([&]() { infinity->RemoteDisconnect(); });
+
+        auto database_name = request->getPathVariable("database_name");
+        auto table_name = request->getPathVariable("table_name");
+        auto index_name = request->getPathVariable("index_name");
+
+        String body_info_str = request->readBodyToString();
+        nlohmann::json body_info_json = nlohmann::json::parse(body_info_str);
+
+        nlohmann::json json_response;
+        json_response["error_code"] = 0;
+        HTTPStatus http_status;
+        http_status = HTTPStatus::CODE_200;
+
+        OptimizeOptions optimize_options;
+        optimize_options.index_name_ = index_name;
+        if (body_info_json.contains("optimize_options")) {
+            if(body_info_json["optimize_options"].type() != nlohmann::json::value_t::object) {
+                json_response["error_code"] = ErrorCode::kInvalidParameterValue;
+                json_response["error_message"] = "Optimize options should be key value pairs!";
+                http_status = HTTPStatus::CODE_500;
+                return ResponseFactory::createResponse(http_status, json_response.dump());
+            }
+            for(const auto &option : body_info_json["optimize_options"].items()) {
+                const auto &key = option.key();
+                const auto &value = option.value();
+                auto *init_param = new InitParameter();
+                init_param->param_name_ = key;
+                init_param->param_value_ = value;
+                optimize_options.opt_params_.emplace_back(init_param);
+            }
+        }
+
+        const QueryResult result = infinity->Optimize(database_name, table_name, std::move(optimize_options));
+        if (result.IsOk()) {
+            json_response["error_code"] = 0;
+            http_status = HTTPStatus::CODE_200;
+        } else {
+            json_response["error_code"] = result.ErrorCode();
+            json_response["error_message"] = result.ErrorMsg();
+            http_status = HTTPStatus::CODE_500;
+        }
+        return ResponseFactory::createResponse(http_status, json_response.dump());
+    }
+};
+
 class ShowSegmentDetailHandler final : public HttpRequestHandler {
 public:
     SharedPtr<OutgoingResponse> handle(const SharedPtr<IncomingRequest> &request) final {
@@ -3256,6 +3306,7 @@ void HTTPServer::Start(u16 port) {
     router->route("GET", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}/segment/{segment_id}/chunk/{chunk_id}", MakeShared<ShowTableIndexChunkHandler>());
     router->route("DELETE", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<DropIndexHandler>());
     router->route("POST", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<CreateIndexHandler>());
+    router->route("PUT", "/databases/{database_name}/tables/{table_name}/indexes/{index_name}", MakeShared<OptimizeIndexHandler>());
 
     // segment
     router->route("GET", "/databases/{database_name}/tables/{table_name}/segments/{segment_id}", MakeShared<ShowSegmentDetailHandler>());
