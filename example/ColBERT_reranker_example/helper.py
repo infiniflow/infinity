@@ -15,9 +15,7 @@
 from typing import Union
 # NOTICE: please check which infinity you are using, local or remote
 # this statement is for local infinity
-from infinity.local_infinity.types import make_match_tensor_expr
 # enable the following import statement to use remote infinity
-# from infinity.remote_thrift.types import make_match_tensor_expr
 # from infinity.common import LOCAL_HOST
 
 
@@ -142,8 +140,7 @@ class InfinityHelperForColBERT:
             raise ValueError("Dimension error.")
         query_result = self.colbert_test_table.output(output_columns).match_tensor(target_col_name,
                                                                                    query_tensor.numpy(force=True),
-                                                                                   'float', 'maxsim',
-                                                                                   f'topn={top_n}').to_pl()
+                                                                                   'float', top_n).to_pl()
         print(query_result)
         return query_result
 
@@ -164,10 +161,11 @@ class InfinityHelperForColBERT:
         query_tensor = self.ckpt.queryFromText([query_str])[0]
         if query_tensor.dim() != 2 or query_tensor.size(1) != 128:
             raise ValueError("Dimension error.")
-        rerank_expr = make_match_tensor_expr(target_col_name, query_tensor.numpy(force=True), 'float', 'maxsim')
         query_result = self.colbert_test_table.output(output_columns).match(self.inner_col_txt, query_str,
                                                                             f'topn={first_stage_top_n}').fusion(
-            'match_tensor', f'topn={final_top_n}', match_tensor_expr=rerank_expr).to_pl()
+            method='match_tensor', topn=final_top_n,
+            fusion_params={"field": target_col_name, "data": query_tensor.numpy(force=True),
+                           "data_type": "float"}).to_pl()
         print(query_result)
         return query_result
 

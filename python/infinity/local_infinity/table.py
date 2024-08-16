@@ -21,7 +21,7 @@ from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.embedded_infinity_ext import WrapIndexInfo, ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
-from infinity.common import INSERT_DATA, VEC, SPARSE, InfinityException, CommonMatchTensorExpr
+from infinity.common import INSERT_DATA, VEC, SPARSE, InfinityException
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
@@ -333,15 +333,14 @@ class LocalTable(Table, ABC):
         return self
 
     @params_type_check
-    def match_tensor(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, method_type: str,
-                     extra_option: str):
-        self.query_builder.match_tensor(vector_column_name, embedding_data, embedding_data_type, method_type,
-                                        extra_option)
+    def match_tensor(self, column_name: str, query_data: VEC, query_data_type: str, topn: int,
+                     extra_option: Optional[dict] = None):
+        self.query_builder.match_tensor(column_name, query_data, query_data_type, topn, extra_option)
         return self
 
     @params_type_check
-    def fusion(self, method: str, options_text: str = '', match_tensor_expr: CommonMatchTensorExpr=None):
-        self.query_builder.fusion(method, options_text, match_tensor_expr)
+    def fusion(self, method: str, topn: int, fusion_params: Optional[dict] = None):
+        self.query_builder.fusion(method, topn, fusion_params)
         return self
 
     def output(self, columns: Optional[List[str]]):
