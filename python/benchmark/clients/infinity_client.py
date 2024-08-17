@@ -18,6 +18,7 @@ import requests
 import infinity
 import infinity.index as index
 from infinity import NetworkAddress
+from infinity.common import SparseVector
 from infinity.remote_thrift.query_builder import InfinityThriftQueryBuilder
 from .base_client import BaseClient
 
@@ -166,7 +167,7 @@ class InfinityClient(BaseClient):
         if self.data_mode == "vector":
             res, _ = (
                 table_obj.output(["_row_id"])
-                .knn(
+                .match_dense(
                     self.data["vector_name"],
                     query,
                     "float",
@@ -179,10 +180,11 @@ class InfinityClient(BaseClient):
         elif self.data_mode == "fulltext":
             res, _ = (
                 table_obj.output(["_row_id", "_score"])
-                .match(
+                .match_text(
                     "",
                     query,
-                    f"topn={self.data['topK']};default_field=body",
+                    self.data['topK'],
+                    {"default_field": "body"}
                 )
                 .to_result()
             )
@@ -193,7 +195,7 @@ class InfinityClient(BaseClient):
             query_builder.output(["_row_id"])
             query_builder.match_sparse(
                 list(self.data["schema"].keys())[0],#vector column name:col1
-                {"indices": indices, "values": values},
+                SparseVector(**{"indices": indices, "values": values}),
                 self.data["metric_type"],#ip
                 self.data["topK"],
                 {"alpha": str(self.data["alpha"]), "beta": str(self.data["beta"])},

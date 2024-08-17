@@ -116,5 +116,5 @@ end = time.time()
 print("Time to index geonames: ", end - start)
 
 start = time.time()
-table_obj.output(["name"]).match("name", "Sankt Georgen").to_pl()
+table_obj.output(["name"]).match_text("name", "Sankt Georgen", 10).to_pl()
 end = time.time()

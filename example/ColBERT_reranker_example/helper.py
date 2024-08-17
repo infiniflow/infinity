@@ -125,8 +125,8 @@ class InfinityHelperForColBERT:
             output_columns.append('_row_id')
         if '_score' not in output_columns:
             output_columns.append('_score')
-        query_result = self.colbert_test_table.output(output_columns).match(self.inner_col_txt, query_str,
-                                                                            f'topn={top_n}').to_pl()
+        query_result = self.colbert_test_table.output(output_columns).match_text(self.inner_col_txt, query_str,
+                                                                                 top_n).to_pl()
         print(query_result)
         return query_result
 
@@ -161,8 +161,8 @@ class InfinityHelperForColBERT:
         query_tensor = self.ckpt.queryFromText([query_str])[0]
         if query_tensor.dim() != 2 or query_tensor.size(1) != 128:
             raise ValueError("Dimension error.")
-        query_result = self.colbert_test_table.output(output_columns).match(self.inner_col_txt, query_str,
-                                                                            f'topn={first_stage_top_n}').fusion(
+        query_result = self.colbert_test_table.output(output_columns).match_text(self.inner_col_txt, query_str,
+                                                                                 first_stage_top_n).fusion(
             method='match_tensor', topn=final_top_n,
             fusion_params={"field": target_col_name, "data": query_tensor.numpy(force=True),
                            "data_type": "float"}).to_pl()

@@ -14,10 +14,10 @@
 
 import struct
 import numpy as np
-from infinity.common import VEC, SPARSE, InfinityException
+from infinity.common import VEC, SparseVector, InfinityException
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from collections import defaultdict
-from typing import Any, Tuple, Dict, List
+from typing import Any, Tuple, Dict, List, Optional
 
 import polars as pl
 from numpy import dtype
@@ -399,7 +399,7 @@ def parse_sparse_bytes(column_data_type: ttypes.DataType, column_vector):
             case _:
                 raise NotImplementedError(f"Unsupported type {element_type}")
         # print("indices: {}, values: {}".format(indices, values))
-        res.append({"indices": indices, "values": values})
+        res.append(SparseVector(list(indices), values).to_dict())
     return res
 
 
@@ -476,20 +476,27 @@ def make_match_tensor_expr(vector_column_name: str, embedding_data: VEC, embeddi
     match_tensor_expr.embedding_data = data
     return match_tensor_expr
 
-def make_match_sparse_expr(vector_column_name: str, sparse_data: SPARSE, metric_type: str, topn: int, opt_params: {} = None):
+
+def make_match_sparse_expr(vector_column_name: str, sparse_data: SparseVector, metric_type: str, topn: int,
+                           opt_params: Optional[dict] = None):
     column_expr = ColumnExpr(column_name=[vector_column_name], star=False)
 
     query_sparse_expr = ConstantExpr()
-    if isinstance(sparse_data["values"][0], int):
-        query_sparse_expr.literal_type = LiteralType.SparseIntegerArray
-        query_sparse_expr.i64_array_idx = sparse_data["indices"]
-        query_sparse_expr.i64_array_value = sparse_data["values"]
-    elif isinstance(sparse_data["values"][0], float):
-        query_sparse_expr.literal_type = LiteralType.SparseDoubleArray
-        query_sparse_expr.i64_array_idx = sparse_data["indices"]
-        query_sparse_expr.f64_array_value = sparse_data["values"]
-    else:
-        raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE, f"Invalid sparse data {sparse_data['values'][0]} type")
+
+    match sparse_data:
+        case SparseVector([int(), *_] as indices, [int(), *_] as values):
+            query_sparse_expr.literal_type = LiteralType.SparseIntegerArray
+            query_sparse_expr.i64_array_idx = indices
+            query_sparse_expr.i64_array_value = values
+        case SparseVector([int(), *_] as indices, [float(), *_] as values):
+            query_sparse_expr.literal_type = LiteralType.SparseDoubleArray
+            query_sparse_expr.i64_array_idx = indices
+            query_sparse_expr.f64_array_value = values
+        case SparseVector([int(), *_], None):
+            raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE,
+                                    f"No values! Sparse data does not support bool value type now")
+        case _:
+            raise InfinityException(ErrorCode.INVALID_CONSTANT_TYPE, f"Invalid sparse data type {type(sparse_data)}")
 
     match_sparse_options = []
     if opt_params is not None:

@@ -21,7 +21,7 @@ from typing import Optional, Union, List, Any
 from sqlglot import condition
 
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
-from infinity.common import INSERT_DATA, VEC, InfinityException
+from infinity.common import INSERT_DATA, VEC, InfinityException, SparseVector
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.remote_thrift.query_builder import Query, InfinityThriftQueryBuilder, ExplainQuery
@@ -30,6 +30,7 @@ from infinity.remote_thrift.utils import traverse_conditions, name_validity_chec
 from infinity.remote_thrift.utils import get_remote_constant_expr_from_python_value
 from infinity.table import Table, ExplainType
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
+from infinity.utils import deprecated_api
 
 
 class RemoteTable(Table, ABC):
@@ -330,16 +331,24 @@ class RemoteTable(Table, ABC):
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
-    def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int = DEFAULT_MATCH_VECTOR_TOPN, knn_params: {} = None):
-        self.query_builder.knn(
+    def match_dense(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
+                    topn: int = DEFAULT_MATCH_VECTOR_TOPN, knn_params: {} = None):
+        self.query_builder.match_dense(
             vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
         return self
 
+    def knn(self, *args, **kwargs):
+        deprecated_api("knn is deprecated, please use match_dense instead")
+        return self.match_dense(*args, **kwargs)
+
     @params_type_check
-    def match(self, fields: str, matching_text: str, options_text: str = ''):
-        self.query_builder.match(fields, matching_text, options_text)
+    def match_text(self, fields: str, matching_text: str, topn: int, extra_options: Optional[dict] = None):
+        self.query_builder.match_text(fields, matching_text, topn, extra_options)
         return self
+
+    def match(self, *args, **kwargs):
+        deprecated_api("match is deprecated, please use match_text instead")
+        return self.match_text(*args, **kwargs)
 
     @params_type_check
     def match_tensor(self, column_name: str, query_data: VEC, query_data_type: str, topn: int,
@@ -347,7 +356,8 @@ class RemoteTable(Table, ABC):
         self.query_builder.match_tensor(column_name, query_data, query_data_type, topn, extra_option)
         return self
 
-    def match_sparse(self, vector_column_name: str, sparse_data, distance_type: str, topn: int, opt_params: {} = None):
+    def match_sparse(self, vector_column_name: str, sparse_data: SparseVector, distance_type: str, topn: int,
+                     opt_params: Optional[dict] = None):
         self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
         return self
 
