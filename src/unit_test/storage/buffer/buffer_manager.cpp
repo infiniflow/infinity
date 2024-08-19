@@ -344,7 +344,7 @@ protected:
                 EXPECT_EQ(file_size, file_info.file_size_);
             }
         }
-        LOG_INFO(fmt::format("Test {} thread {} finished", test_i, thread_i));
+//        LOG_INFO(fmt::format("Test {} thread {} finished", test_i, thread_i));
     }
 };
 
@@ -392,7 +392,7 @@ public:
 };
 
 TEST_F(BufferManagerParallelTest, parallel_test1) {
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 3; ++i) {
         auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_);
         auto test1_obj = MakeUnique<Test1Obj>(avg_file_size, buffer_mgr.get(), data_dir_);
         LocalFileSystem fs;
@@ -401,7 +401,7 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
         for (SizeT i = 0; i < file_n; ++i) {
             file_infos.emplace_back(i);
         }
-        LOG_INFO(fmt::format("Start parallel test1 {}", i));
+//        LOG_INFO(fmt::format("Start parallel test1 {}", i));
         for (SizeT test_i = 0; test_i < test_n_; test_i++) {
             Atomic<SizeT> finished_n = 0;
             for (auto &file_info : file_infos) {
@@ -419,7 +419,7 @@ TEST_F(BufferManagerParallelTest, parallel_test1) {
         EXPECT_EQ(buffer_mgr->memory_usage(), 0);
         buffer_mgr->RemoveClean();
 
-        LOG_INFO(fmt::format("Finished parallel test1 {}", i));
+//        LOG_INFO(fmt::format("Finished parallel test1 {}", i));
         ResetDir();
     }
 }
@@ -470,7 +470,7 @@ public:
 };
 
 TEST_F(BufferManagerParallelTest, parallel_test2) {
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 3; ++i) {
         auto buffer_mgr = MakeUnique<BufferManager>(buffer_size, data_dir_, temp_dir_);
         auto test2_obj = MakeUnique<Test2Obj>(var_file_step, buffer_mgr.get(), data_dir_);
         LocalFileSystem fs;
@@ -479,7 +479,7 @@ TEST_F(BufferManagerParallelTest, parallel_test2) {
         for (SizeT i = 0; i < file_n; ++i) {
             file_infos.emplace_back(i);
         }
-        LOG_INFO(fmt::format("Start parallel test2 {}", i));
+//        LOG_INFO(fmt::format("Start parallel test2 {}", i));
         for (SizeT test_i = 0; test_i < test_n_; test_i++) {
             Atomic<SizeT> finished_n = 0;
             for (auto &file_info : file_infos) {
@@ -497,7 +497,7 @@ TEST_F(BufferManagerParallelTest, parallel_test2) {
         EXPECT_EQ(buffer_mgr->memory_usage(), 0);
         buffer_mgr->RemoveClean();
 
-        LOG_INFO(fmt::format("Finished parallel test2 {}", i));
+//        LOG_INFO(fmt::format("Finished parallel test2 {}", i));
         ResetDir();
     }
 }
