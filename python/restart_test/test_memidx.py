@@ -94,3 +94,4 @@ class TestMemIdx:
 
         infinity_obj.disconnect()
         infinity_runner.uninit()
+        time.sleep(1)

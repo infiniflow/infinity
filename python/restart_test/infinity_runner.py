@@ -20,7 +20,12 @@ class InfinityRunner:
         if config_path is None:
             config_path = self.default_config_path
         cmd = f"{self.infinity_path} --config={config_path} > restart_test.log.{self.i} 2>&1"
-        self.process = subprocess.Popen(cmd, shell=True)
+
+        # unset env LD_PRELOAD, ASAN_OPTIONS
+        my_env = os.environ.copy()
+        my_env['LD_PRELOAD'] = ''
+        my_env['ASAN_OPTIONS'] = ''
+        self.process = subprocess.Popen(cmd, shell=True, env=my_env)
         self.i += 1
 
     def uninit(self):
