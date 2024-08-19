@@ -23,12 +23,7 @@ import sparse_test_util;
 
 using namespace infinity;
 
-class LinScanAlgTest : public BaseTest {
-protected:
-    void SetUp() override {}
-
-    void TearDown() override {}
-};
+class LinScanAlgTest : public BaseTest {};
 
 TEST_F(LinScanAlgTest, accurate_scan) {
     u32 nrow = 1000;

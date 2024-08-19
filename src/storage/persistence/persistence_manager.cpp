@@ -44,9 +44,7 @@ void ObjAddr::Deserialize(const nlohmann::json &obj) {
     part_size_ = obj["part_size"];
 }
 
-SizeT ObjAddr::GetSizeInBytes() const {
-    return sizeof(int32_t) + obj_key_.size() + sizeof(SizeT) + sizeof(SizeT);
-}
+SizeT ObjAddr::GetSizeInBytes() const { return sizeof(int32_t) + obj_key_.size() + sizeof(SizeT) + sizeof(SizeT); }
 
 void ObjAddr::WriteBufAdv(char *&buf) const {
     ::infinity::WriteBufAdv(buf, obj_key_);
@@ -63,6 +61,7 @@ void ObjAddr::ReadBufAdv(char *&buf) {
 nlohmann::json ObjStat::Serialize() const {
     nlohmann::json obj;
     obj["obj_size"] = obj_size_;
+    obj["parts"] = parts_;
     obj["deleted_size"] = deleted_size_;
     obj["deleted_ranges"] = nlohmann::json::array();
     for (auto &range : deleted_ranges_) {
@@ -75,15 +74,10 @@ nlohmann::json ObjStat::Serialize() const {
 }
 
 void ObjStat::Deserialize(const nlohmann::json &obj) {
-    obj_size_ = 0;
     ref_count_ = 0;
-    deleted_size_ = 0;
-    if (obj.contains("obj_size")) {
-        obj_size_ = 0;
-    }
-    if (obj.contains("deleted_size")) {
-        deleted_size_ = 0;
-    }
+    obj_size_ = obj["obj_size"];
+    parts_ = obj["parts"];
+    deleted_size_ = obj["deleted_size"];
     if (obj.contains("deleted_ranges")) {
         SizeT start = 0;
         SizeT end = 0;
@@ -100,13 +94,14 @@ void ObjStat::Deserialize(const nlohmann::json &obj) {
 }
 
 SizeT ObjStat::GetSizeInBytes() const {
-    SizeT size = sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT);
+    SizeT size = sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT);
     size += (sizeof(SizeT) + sizeof(SizeT)) * deleted_ranges_.size();
     return size;
 }
 
 void ObjStat::WriteBufAdv(char *&buf) const {
     ::infinity::WriteBufAdv(buf, obj_size_);
+    ::infinity::WriteBufAdv(buf, parts_);
     ::infinity::WriteBufAdv(buf, deleted_size_);
     ::infinity::WriteBufAdv(buf, deleted_ranges_.size());
     for (auto &range : deleted_ranges_) {
@@ -117,6 +112,7 @@ void ObjStat::WriteBufAdv(char *&buf) const {
 
 void ObjStat::ReadBufAdv(char *&buf) {
     obj_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
+    parts_ = ::infinity::ReadBufAdv<SizeT>(buf);
     ref_count_ = 0;
     deleted_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
 
@@ -133,6 +129,7 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
     : workspace_(workspace), local_data_dir_(data_dir), object_size_limit_(object_size_limit) {
     current_object_key_ = ObjCreate();
     current_object_size_ = 0;
+    current_object_parts_ = 0;
 
     if (local_data_dir_.empty() || local_data_dir_.back() != '/') {
         local_data_dir_ += '/';
@@ -146,7 +143,7 @@ PersistenceManager::PersistenceManager(const String &workspace, const String &da
 
 PersistenceManager::~PersistenceManager() {
     [[maybe_unused]] SizeT sum_ref_count = 0;
-    for (auto& [key, obj_stat] : objects_) {
+    for (auto &[key, obj_stat] : objects_) {
         if (obj_stat.ref_count_ > 0) {
             LOG_ERROR(fmt::format("Object {} still has ref count {}", key, obj_stat.ref_count_));
         }
@@ -155,8 +152,7 @@ PersistenceManager::~PersistenceManager() {
     assert(sum_ref_count == 0);
 }
 
-
-ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose) {
+ObjAddr PersistenceManager::Persist(const String &file_path) {
     std::error_code ec;
     fs::path src_fp = file_path;
     SizeT src_size = fs::file_size(src_fp, ec);
@@ -164,7 +160,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
         String error_message = fmt::format("Failed to get file size of {}.", file_path);
         UnrecoverableError(error_message);
     }
-    if (src_size >= object_size_limit_ || !allow_compose) {
+    if (src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
         fs::path dst_fp = workspace_;
         dst_fp.append(obj_key);
@@ -175,7 +171,7 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
         }
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(src_size, 0, 0));
+        objects_.emplace(obj_key, ObjStat(src_size, 1, 0));
 
         String local_path = RemovePrefix(file_path);
         if (local_path.empty()) {
@@ -202,9 +198,9 @@ ObjAddr PersistenceManager::Persist(const String &file_path, bool allow_compose)
     }
 }
 
-ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size, bool allow_compose) {
+ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size) {
     fs::path dst_fp = workspace_;
-    if (src_size >= object_size_limit_ || !allow_compose) {
+    if (src_size >= object_size_limit_) {
         String obj_key = ObjCreate();
         dst_fp.append(obj_key);
         std::ofstream outFile(dst_fp, std::ios::app);
@@ -216,7 +212,7 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size, bool allow
         outFile.close();
         ObjAddr obj_addr(obj_key, 0, src_size);
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(src_size, 0, 0));
+        objects_.emplace(obj_key, ObjStat(src_size, 1, 0));
         return obj_addr;
     } else {
         dst_fp.append(current_object_key_);
@@ -231,19 +227,26 @@ ObjAddr PersistenceManager::Persist(const char *data, SizeT src_size, bool allow
             UnrecoverableError(error_message);
         }
         outFile.write(data, src_size);
-        outFile.close();
         current_object_size_ += src_size;
+        current_object_parts_++;
         if (current_object_size_ >= object_size_limit_) {
-            objects_.emplace(current_object_key_, ObjStat(src_size, 0, 0));
+            if (current_object_parts_ > 1) {
+                // Add footer to composed object -- format version 1
+                const u32 compose_format = 1;
+                outFile.write((char *)&compose_format, sizeof(u32));
+            }
+
+            objects_.emplace(current_object_key_, ObjStat(src_size, current_object_parts_, 0));
             current_object_key_ = ObjCreate();
             current_object_size_ = 0;
+            current_object_parts_ = 0;
         }
+        outFile.close();
         return obj_addr;
     }
 }
 
 // TODO:
-// - Add a 4-byte pad CRC32 checksum of the whole object to detect Silent Data Corruption.
 // - Upload the finalized object to object store in background.
 void PersistenceManager::CurrentObjFinalize() {
     std::lock_guard<std::mutex> lock(mtx_);
@@ -252,9 +255,24 @@ void PersistenceManager::CurrentObjFinalize() {
 
 void PersistenceManager::CurrentObjFinalizeNoLock() {
     if (current_object_size_ > 0) {
-        objects_.emplace(current_object_key_, ObjStat(current_object_size_, 0, 0));
+        if (current_object_parts_ > 1) {
+            // Add footer to composed object -- format version 1
+            fs::path dst_fp = workspace_;
+            dst_fp.append(current_object_key_);
+            std::ofstream outFile(dst_fp, std::ios::app);
+            if (!outFile.is_open()) {
+                String error_message = fmt::format("Failed to open file {}.", dst_fp.string());
+                UnrecoverableError(error_message);
+            }
+            const u32 compose_format = 1;
+            outFile.write((char *)&compose_format, sizeof(u32));
+            outFile.close();
+        }
+
+        objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, 0));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
+        current_object_parts_ = 0;
     }
 }
 
@@ -311,11 +329,14 @@ void PersistenceManager::PutObjCache(const String &file_path) {
         return;
     }
 
+    assert(oit->second.ref_count_ > 0);
     oit->second.ref_count_--;
     // For large files linked, fill in the file size when putting to ensure obj valid
-    if ( it->second.part_size_ == 0 && it->second.part_offset_ == 0) {
+    if (it->second.part_size_ == 0 && it->second.part_offset_ == 0) {
+        // There's no footer in dedicated objects.
         String obj_full_path = fs::path(workspace_).append(it->second.obj_key_).string();
         oit->second.obj_size_ = fs::file_size(obj_full_path);
+        oit->second.parts_ = 1;
         it->second.part_size_ = oit->second.obj_size_;
     }
 }
@@ -327,7 +348,7 @@ ObjAddr PersistenceManager::ObjCreateRefCount(const String &file_path) {
     ObjAddr obj_addr = ObjAddr(obj_key, 0, 0);
     {
         std::lock_guard<std::mutex> lock(mtx_);
-        objects_.emplace(obj_key, ObjStat(0, 1, 0));
+        objects_.emplace(obj_key, ObjStat(0, 1, 1));
     }
 
     fs::path src_fp = workspace_;
@@ -374,13 +395,21 @@ void PersistenceManager::CurrentObjAppendNoLock(const String &file_path, SizeT f
     }
     dstFile.write(buffer, srcFile.gcount());
     srcFile.close();
-    dstFile.close();
     current_object_size_ += file_size;
+    current_object_parts_++;
     if (current_object_size_ >= object_size_limit_) {
-        objects_.emplace(current_object_key_, ObjStat(current_object_size_, 0, 0));
+        if (current_object_parts_ > 1) {
+            // Add footer to composed object -- format version 1
+            const u32 compose_format = 1;
+            dstFile.write((char *)&compose_format, sizeof(u32));
+        }
+
+        objects_.emplace(current_object_key_, ObjStat(current_object_size_, current_object_parts_, 0));
         current_object_key_ = ObjCreate();
         current_object_size_ = 0;
+        current_object_parts_ = 0;
     }
+    dstFile.close();
 }
 
 void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
@@ -396,21 +425,50 @@ void PersistenceManager::CleanupNoLock(const ObjAddr &object_addr) {
         }
     }
     Range range(object_addr.part_offset_, object_addr.part_offset_ + object_addr.part_size_);
-    auto target_range = it->second.deleted_ranges_.lower_bound(range);
+    auto inst_it = it->second.deleted_ranges_.lower_bound(range);
 
-    if (target_range != it->second.deleted_ranges_.end() && target_range->HasIntersection(range)) {
-        String error_message =
-            fmt::format("ObjAddr {} offset {} size {} already been deleted.", object_addr.obj_key_, object_addr.part_offset_, object_addr.part_size_);
+    if (inst_it != it->second.deleted_ranges_.begin()) {
+        // Check intersection with next range
+        auto inst_it_prev = std::prev(inst_it);
+        if (inst_it_prev->HasIntersection(range)) {
+            String error_message = fmt::format("ObjAddr {} range to delete [{}, {}) intersects with prev one [{}, {})",
+                                               object_addr.obj_key_,
+                                               range.start_,
+                                               range.end_,
+                                               inst_it_prev->start_,
+                                               inst_it_prev->end_);
+            UnrecoverableError(error_message);
+        }
+        // Try merge with prev range
+        if (range.start_ == inst_it_prev->end_) {
+            range.start_ = inst_it_prev->start_;
+            it->second.deleted_ranges_.erase(inst_it_prev);
+        }
+    }
+
+    if (inst_it != it->second.deleted_ranges_.end()) {
+        // Check intersection with next range
+        if (inst_it->HasIntersection(range)) {
+            String error_message = fmt::format("ObjAddr {} range to delete [{}, {}) intersects with next one [{}, {})",
+                                               object_addr.obj_key_,
+                                               range.start_,
+                                               range.end_,
+                                               inst_it->start_,
+                                               inst_it->end_);
+            UnrecoverableError(error_message);
+        }
+        // Try merge with next range
+        if (range.end_ == inst_it->start_) {
+            range.end_ = inst_it->end_;
+            it->second.deleted_ranges_.erase(inst_it);
+        }
+    }
+    auto [_, ok] = it->second.deleted_ranges_.insert(range);
+    if (!ok) {
+        String error_message = fmt::format("Failed to delete ObjAddr {} range [{}, {})", object_addr.obj_key_, range.start_, range.end_);
         UnrecoverableError(error_message);
     }
 
-    if (target_range != it->second.deleted_ranges_.begin() && std::prev(target_range)->HasIntersection(range)) {
-        String error_message =
-            fmt::format("ObjAddr {} offset {} size {} already been deleted.", object_addr.obj_key_, object_addr.part_offset_, object_addr.part_size_);
-        UnrecoverableError(error_message);
-    }
-
-    it->second.deleted_ranges_.insert(range);
     it->second.deleted_size_ += object_addr.part_size_;
     assert(it->second.deleted_size_ <= it->second.obj_size_);
     if (it->second.deleted_size_ == it->second.obj_size_ && object_addr.obj_key_ != current_object_key_) {
@@ -463,14 +521,6 @@ String PersistenceManager::RemovePrefix(const String &path) {
         return path;
     }
     return "";
-}
-
-SizeT PersistenceManager::SumRefCounts() {
-    SizeT ref_counts = 0;
-    for (auto& [key, obj_stat] : objects_) {
-        ref_counts += obj_stat.ref_count_;
-    }
-    return ref_counts;
 }
 
 void PersistenceManager::Cleanup(const String &file_path) {

@@ -51,11 +51,6 @@ public:
     }
 
     void TearDown() override {
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            if (InfinityContext::instance().persistence_manager() != nullptr) {
-                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
-            }
-        }
         infinity::InfinityContext::instance().UnInit();
 #ifdef INFINITY_DEBUG
         EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);

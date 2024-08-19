@@ -5218,6 +5218,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
         MakeShared<ColumnDef>(0, varchar_type, "name", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(1, bigint_type, "reference_count", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(2, bigint_type, "size", std::set<ConstraintType>()),
+        MakeShared<ColumnDef>(2, bigint_type, "parts", std::set<ConstraintType>()),
         MakeShared<ColumnDef>(3, bigint_type, "deleted_size", std::set<ConstraintType>()),
     };
 
@@ -5226,6 +5227,7 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
     // create data block for output state
     Vector<SharedPtr<DataType>> column_types{
         varchar_type,
+        bigint_type,
         bigint_type,
         bigint_type,
         bigint_type,
@@ -5267,10 +5269,16 @@ void PhysicalShow::ExecuteShowPersistenceObjects(QueryContext *query_context, Sh
             value_expr.AppendToChunk(output_block_ptr->column_vectors[2]);
         }
         {
+            // parts
+            Value value = Value::MakeBigInt(object_pair.second.parts_);
+            ValueExpression value_expr(value);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+        }
+        {
             // delete size
             Value value = Value::MakeBigInt(object_pair.second.deleted_size_);
             ValueExpression value_expr(value);
-            value_expr.AppendToChunk(output_block_ptr->column_vectors[3]);
+            value_expr.AppendToChunk(output_block_ptr->column_vectors[4]);
         }
 
         ++row_count;
