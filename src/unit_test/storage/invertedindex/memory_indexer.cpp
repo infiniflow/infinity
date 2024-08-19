@@ -92,15 +92,6 @@ public:
         expected_postings_ = {{"fst", {0, 1, 2}, {4, 2, 2}}, {"automaton", {0, 3}, {2, 5}}, {"transducer", {0, 4}, {1, 4}}};
     }
 
-    void TearDown() override {
-        if (config_path_ != BaseTestParamStr::NULL_CONFIG_PATH) {
-            if (InfinityContext::instance().persistence_manager() != nullptr) {
-                ASSERT_TRUE(InfinityContext::instance().persistence_manager()->SumRefCounts() == 0);
-            }
-            infinity::InfinityContext::instance().UnInit();
-        }
-    }
-
     void Check(ColumnIndexReader &reader) {
         for (SizeT i = 0; i < expected_postings_.size(); ++i) {
             const ExpectedPosting &expected = expected_postings_[i];

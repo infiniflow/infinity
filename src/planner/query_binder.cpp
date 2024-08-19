@@ -982,15 +982,15 @@ UniquePtr<BoundDeleteStatement> QueryBinder::BindDelete(const DeleteStatement &s
     UniquePtr<BoundDeleteStatement> bound_delete_statement = BoundDeleteStatement::Make(bind_context_ptr_);
     SharedPtr<BaseTableRef> base_table_ref = GetTableRef(statement.schema_name_, statement.table_name_);
 
-    bound_delete_statement->table_ref_ptr_ = base_table_ref;
     if (base_table_ref.get() == nullptr) {
         Status status = Status::SyntaxError(fmt::format("Cannot bind {}.{} to a table", statement.schema_name_, statement.table_name_));
         RecoverableError(status);
     }
+    bound_delete_statement->table_ref_ptr_ = base_table_ref;
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
-    auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
     if (statement.where_expr_ != nullptr) {
+        auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
         if(where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());
@@ -1013,8 +1013,8 @@ UniquePtr<BoundUpdateStatement> QueryBinder::BindUpdate(const UpdateStatement &s
     }
 
     SharedPtr<BindAliasProxy> bind_alias_proxy = MakeShared<BindAliasProxy>();
-    auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
     if (statement.where_expr_ != nullptr) {
+        auto where_binder = MakeShared<WhereBinder>(this->query_context_ptr_, bind_alias_proxy);
         SharedPtr<BaseExpression> where_expr = where_binder->Bind(*statement.where_expr_, this->bind_context_ptr_.get(), 0, true);
         if(where_expr->Type().type() != LogicalType::kBoolean) {
             Status status = Status::InvalidFilterExpression(where_expr->Type().ToString());

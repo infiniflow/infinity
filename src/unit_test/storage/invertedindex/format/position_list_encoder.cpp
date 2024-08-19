@@ -20,7 +20,6 @@ public:
     PositionListEncoderTest() {}
 
     void SetUp() override { file_ = String(GetFullTmpDir()) + "/position"; }
-    void TearDown() override {}
 
 protected:
     String file_;

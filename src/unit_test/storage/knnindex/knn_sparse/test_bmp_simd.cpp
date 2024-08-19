@@ -20,11 +20,7 @@ import stl;
 
 using namespace infinity;
 
-class BMPSIMDTest : public BaseTest {
-    void SetUp() override {}
-
-    void TearDown() override {}
-};
+class BMPSIMDTest : public BaseTest {};
 
 TEST_F(BMPSIMDTest, test1) {
     std::default_random_engine rng;

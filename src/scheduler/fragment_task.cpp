@@ -118,7 +118,7 @@ void FragmentTask::OnExecute() {
 
 u64 FragmentTask::FragmentId() const {
     auto *fragment_context = static_cast<FragmentContext *>(fragment_context_);
-    return fragment_context->fragment_ptr()->FragmentID();
+    return fragment_context->plan_fragment_ptr()->FragmentID();
 }
 
 // Finished **OR** Error

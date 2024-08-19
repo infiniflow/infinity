@@ -20,12 +20,7 @@ import infinity_exception;
 
 using namespace infinity;
 
-class VarBufferTest : public BaseTest {
-protected:
-    void SetUp() override {}
-
-    void TearDown() override {}
-};
+class VarBufferTest : public BaseTest {};
 
 TEST_F(VarBufferTest, test1) {
     VarBuffer var_buffer;

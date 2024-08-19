@@ -86,16 +86,17 @@ infinity_object = infinity.connect(infinity.NetworkAddress("192.168.1.101", 2381
 infinity_object.disconnect()
 ```
 
-Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is imported as a Python module.
+Disconnects the client from the Infinity server in client-server mode, or destructs the Infinity object and releases all associated resources when Infinity is imported as a Python module.
 
 ### Returns
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -119,20 +120,20 @@ Creates a database with a specified name.
 
 A non-empty string indicating the name of the database, which must adhere to the following requirements:
 
-- Maximum 65,535 characters.
-- Case-insensitive.
-- Must begin with an English letter or underscore.
 - Permitted characters include:
   - English letters (a-z, A-Z)
   - Digits (0-9)
   - "_" (underscore)
+- Must begin with an English letter or underscore.
+- Maximum 65,535 characters.
+- Case-insensitive.
 
 #### conflict_type: `ConflictType`, *Optional*
 
 Conflict policy in `enum` for handling situations where a database with the same name exists.
 
 - `Error`: Raise an error if a database with the same name exists.
-- `Ignore`: Ignore the database creation requrest and keep the existing database with the same name.
+- `Ignore`: Ignore the database creation request and keep the existing database with the same name.
 
 :::tip NOTE
 You may want to import the `infinity.common` package to set `ConflictType`:
@@ -214,10 +215,11 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -255,10 +257,11 @@ Retrieves a list of all available databases within the Infinity system.
 A structure containing the following attributes:
 
 - `db_names`: `list[str]` A list of strings indicating the names of all available databases.
-- `error_code`: `int` An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` A message providing additional details about the error.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -272,7 +275,7 @@ print(res.db_names) # ['my_database', 'database_1']
 ## get_database
 
 ```python
-Infinity.get_database(db_name)
+Infinity.get_database(database_name)
 ```
 
 Retrieves a database object by its name.
@@ -312,13 +315,13 @@ Creates a table with a specified name and defined columns.
 
 A non-empty string indicating the name of the table, which must adhere to the following requirements:
 
-- Maximum 65,535 characters.
-- Case-insensitive.
-- Must begin with an English letter or underscore.
 - Permitted characters include:
   - English letters (a-z, A-Z)
   - Digits (0-9)
   - "_" (underscore)
+- Must begin with an English letter or underscore.
+- Maximum 65,535 characters.
+- Case-insensitive.
 
 #### columns_definition: `dict[str, dict[str, Any]]`, *Required*
 
@@ -475,10 +478,11 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -544,10 +548,11 @@ Retrieves a list of all available tables within the current database.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 - `table_names`: `list[str]` - A list of strings indicating the names of all available tables in the current database.
 
 ### Examples
@@ -573,13 +578,13 @@ Creates index on a specified column.
 
 A non-empty string indicating the name of the index, which must adhere to the following requirements:
 
-- Maximum 65,535 characters.
-- Case-insensitive.
-- Must begin with an English letter or underscore.
 - Permitted characters include:
   - English letters (a-z, A-Z)
   - Digits (0-9)
   - "_" (underscore)
+- Must begin with an English letter or underscore.
+- Maximum 65,535 characters.
+- Case-insensitive.
 
 #### index_info: `IndexInfo()`, *Required*
 
@@ -671,10 +676,11 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing these attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.  
-  - `0`: The operation succeeds.  
-  - A non-zero value indicating a specific error condition.  
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.  
+- `error_code`: `int`
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -911,11 +917,11 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing these attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.  
-  - `0`: The operation succeeds.  
-  - A non-zero value indicating a specific error condition.  
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.  
-
+- `error_code`: `int`  
+  - `0`: The operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.  
 
 ### Examples
 
@@ -937,10 +943,11 @@ Retrieves a list of all available indexes built on the current table.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 - `table_names`: `list[str]` - A list of strings indicating the names of all available indexes.
 
 ### Examples
@@ -979,10 +986,11 @@ For information about setting default column values, see `create_table()`.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`  
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` - A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1096,10 +1104,11 @@ Example: `{"header":True, "delimiter": "\t", file_type}`
 
 A structure containing the following attributes:
 
-- `error_code`: `int` An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1168,10 +1177,11 @@ Columns to export to the output file, for example, `["num", "name", "score"]`. I
 
 A structure containing the following attributes:
 
-- `error_code`: `int` An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1213,10 +1223,11 @@ A non-empty string that defines the condition for selecting rows to delete. The 
 
 A structure containing the following attributes:
 
-- `error_code`: `int` An error code indicating the result of the operation.
+- `error_code`: `int`  
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1279,10 +1290,11 @@ A non-empty list of dictionaries where each key indicates a column name and each
 
 A structure containing the following attributes:
 
-- `error_code`: `int` An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
-  - A non-zero value indicating a specific error condition.
-- `error_msg`: `str` A message providing additional details about the error. It is an empty string if the operation succeeds.
+  - A non-zero value indicates a specific error condition.
+- `error_msg`: `str`
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 

@@ -106,7 +106,8 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
     Vector<GlobalBlockID> *block_ids = table_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT> &column_ids = table_scan_function_data_ptr->column_ids_;
     u64 &block_ids_idx = table_scan_function_data_ptr->current_block_ids_idx_;
-    if (block_ids_idx >= block_ids->size()) {
+    SizeT block_ids_count = block_ids->size();
+    if (block_ids_idx >= block_ids_count) {
         // No data or all data is read
         table_scan_operator_state->SetComplete();
         return;
@@ -115,17 +116,18 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     SizeT &read_offset = table_scan_function_data_ptr->current_read_offset_;
 
-    {
-        String out;
-        for (auto &global_block_id : *block_ids) {
-            out += fmt::format("({},{}) ", global_block_id.segment_id_, global_block_id.block_id_);
-        }
-        LOG_TRACE(fmt::format("TableScan: block_ids: {}", out));
-    }
+//    This part has performance issue
+//    {
+//        String out;
+//        for (auto &global_block_id : *block_ids) {
+//            out += fmt::format("({},{}) ", global_block_id.segment_id_, global_block_id.block_id_);
+//        }
+//        LOG_TRACE(fmt::format("TableScan: block_ids: {}", out));
+//    }
 
     // Here we assume output is a fresh data block, we have never written anything into it.
     auto write_capacity = output_ptr->available_capacity();
-    while (block_ids_idx < block_ids->size()) {
+    while (block_ids_idx < block_ids_count) {
         u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
         u16 block_id = block_ids->at(block_ids_idx).block_id_;
 
@@ -137,13 +139,13 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                 // skip this block
                 LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, skipped after apply FastRoughFilter",
                                       block_ids_idx,
-                                      block_ids->size()));
+                                      block_ids_count));
                 ++block_ids_idx;
                 continue;
             } else {
                 LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",
                                       block_ids_idx,
-                                      block_ids->size()));
+                                      block_ids_count));
             }
         }
         auto [row_begin, row_end] = current_block_entry->GetVisibleRange(begin_ts, read_offset);
@@ -191,9 +193,15 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         read_offset += write_size;
     }
 
-    LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}", block_ids_idx, block_ids->size()));
+    LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}", block_ids_idx, block_ids_count));
 
-    if (block_ids_idx >= block_ids->size()) {
+    if (block_ids_idx >= block_ids_count) {
+        table_scan_operator_state->SetComplete();
+    }
+
+    LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}", block_ids_idx, block_ids_count));
+
+    if (block_ids_idx >= block_ids_count) {
         table_scan_operator_state->SetComplete();
     }
 
