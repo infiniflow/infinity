@@ -46,7 +46,7 @@ import infinity_context;
 namespace infinity {
 
 WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
-    : block_id_(block_entry->block_id_), row_count_(block_entry->row_count_), row_capacity_(block_entry->row_capacity_) {
+    : block_id_(block_entry->block_id_), row_count_(block_entry->block_row_count_), row_capacity_(block_entry->row_capacity_) {
     outline_infos_.resize(block_entry->columns_.size());
     for (SizeT i = 0; i < block_entry->columns_.size(); i++) {
         auto &col_i_outline_info = outline_infos_[i];

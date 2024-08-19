@@ -110,7 +110,7 @@ public:
     // Getter
     inline const SegmentEntry *GetSegmentEntry() const { return segment_entry_; }
 
-    inline SizeT row_count() const { return row_count_; }
+    inline SizeT row_count() const { return block_row_count_; }
 
     inline SizeT row_capacity() const { return row_capacity_; }
 
@@ -170,8 +170,8 @@ public:
     ColumnVector GetDeleteTSVector(BufferManager *buffer_mgr, SizeT offset, SizeT size) const;
 
 public:
-    // Setter
-    inline void IncreaseRowCount(SizeT increased_row_count) { row_count_ += increased_row_count; }
+    // Setter, Used in import, segment append block, and block append block in compact
+    inline void IncreaseRowCount(SizeT increased_row_count) { block_row_count_ += increased_row_count; }
 
 private:
     void FlushDataNoLock(SizeT start_row_count, SizeT checkpoint_row_count);
@@ -185,11 +185,10 @@ protected:
     BlockID block_id_{};
     SharedPtr<String> block_dir_{};
 
-    u16 row_count_{};
+    u16 block_row_count_{};
     u16 row_capacity_{};
 
-    // UniquePtr<BlockVersion> block_version_{};
-    BufferObj *block_version_{};
+    BufferObj *version_buffer_object_{};
 
     // check if a value must not exist in the block
     FastRoughFilter fast_rough_filter_;
