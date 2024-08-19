@@ -20,7 +20,6 @@ import buffer_handle;
 import buffer_manager;
 import infinity_exception;
 import logger;
-import var_file_worker;
 import third_party;
 import logger;
 import file_worker_type;
@@ -240,14 +239,12 @@ bool BufferObj::AddBufferSize(SizeT add_size) {
     if (file_worker_->Type() != FileWorkerType::kVarFile) {
         UnrecoverableError("Invalid file worker type");
     }
-    auto *var_file_worker = static_cast<VarFileWorker *>(file_worker_.get());
 
     bool free_success = buffer_mgr_->RequestSpace(add_size);
     if (!free_success) {
         String warn_msg = fmt::format("Request memory {} failed, current memory usage: {}", add_size, buffer_mgr_->memory_usage());
         LOG_WARN(warn_msg);
     }
-    var_file_worker->AddBufferSize(add_size);
     return free_success;
 }
 

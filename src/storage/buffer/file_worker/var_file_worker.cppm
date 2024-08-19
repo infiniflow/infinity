@@ -32,13 +32,11 @@ public:
 public:
     void SetBufferObj(BufferObj *buffer_obj) { buffer_obj_ = buffer_obj; }
 
-    void AddBufferSize(SizeT add_size) { buffer_size_ += add_size; }
-
     void AllocateInMemory() override;
 
     void FreeInMemory() override;
 
-    SizeT GetMemoryCost() const override { return buffer_size_; }
+    SizeT GetMemoryCost() const override;
 
     FileWorkerType Type() const override { return FileWorkerType::kVarFile; }
 
