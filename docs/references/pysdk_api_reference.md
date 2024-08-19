@@ -10,7 +10,7 @@ slug: /python_api_reference
 infinity.connect(uri)
 ```
 
-Connects to the Infinity server and gets an Infinity object.
+Connects to the local directory or the Infinity server, and gets an Infinity object.
 
 ### Parameters
 
@@ -18,7 +18,7 @@ Connects to the Infinity server and gets an Infinity object.
 
 The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
 
-- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is installed as a Python module.
+- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is imported as a Python module.
 - `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A `NetworkAddress` object comprises two fields:
   - `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
   - `<PORT>`: `int` - The SDK port number on which the Infinity server listens. Defaults to `23817`.
@@ -32,6 +32,7 @@ When connecting to Infinity in client-server mode, ensure that the client versio
 | v0.1.1             | v0.1.1             |
 | v0.2.0             | v0.2.0             |
 | v0.2.1             | v0.2.1             |
+| v0.3.0.dev5        | v0.3.0.dev5        |
 
 If the versions do not match, please update your client or server to ensure compatibility.
 
@@ -58,7 +59,7 @@ This allows for bug fixes without requiring changes to the configuration file.
 
 ### Examples
 
-#### Connect to Python module Infinity
+#### Connect to the local directory of Infinity
 
 From v0.2.1 onwards, Infinity also gives you the option to connect to the Infinity service just like calling a Python module. If you have installed Infinity via `pip install infinity-sdk==<v0.2.1_OR_HIGHER>`, you can connect to Infinity and save all related data in a local directory:
 
@@ -74,7 +75,7 @@ If you have deployed Infinity as a separate server, connect to it via its IP add
 ```python
 import infinity
 # If Infinity is deployed on the local machine, use infinity.LOCAL_HOST to replace <SERVER_IP_ADDRESS>
-infinity_object = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>", 23817)) 
+infinity_object = infinity.connect(infinity.NetworkAddress("192.168.1.101", 23817)) 
 ```
 
 ---
@@ -85,7 +86,7 @@ infinity_object = infinity.connect(infinity.NetworkAddress("<SERVER_IP_ADDRESS>"
 infinity_object.disconnect()
 ```
 
-Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is installed as a Python module.
+Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is imported as a Python module.
 
 ### Returns
 
@@ -599,7 +600,6 @@ An `IndexInfo` structure contains three fields,`column_name`, `index_type`, and 
   - Parameter settings for an HNSW index:
     - `"M"`: *Optional* - Defaults to`"16"`.
     - `"ef_construction"`: *Optional* - Defaults to`"50"`.
-    - `"ef"`: *Optional* - Defaults to `"50"`.
     - `"metric"` *Required* - The distance metric to use in similarity search.
       - `"ip"`: Inner product.
       - `"l2"`: Euclidean distance.
@@ -687,7 +687,6 @@ table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector
 # Create an HNSW index named "my_index" on column "c1" with default parameter settings:
 # - "M": "16", 
 # - "ef_construction": "50",
-# - "ef": "50", 
 # - "encode": "plain"
 # Only the "metric" parameter (required) is explicitly set to L2 distance. 
 table_object.create_index("my_index",IndexInfo("c1", IndexType.Hnsw, [InitParameter("metric", "l2")]), None)
@@ -698,7 +697,7 @@ from infinity.index import IndexInfo, IndexType, InitParameter
 # Create a table named "test_index_hnsw" with a 1024-dimensional float vector column "c1"
 table_object = db_object.create_table("test_index_hnsw", {"c1": {"type": "vector,1024,float"}}, None)
 # Create an HNSW index named "my_index" on column "c1"
-# Settings for "M", "ef_construction", "ef", and "metric" are the same as above, except:
+# Settings for "M", "ef_construction", and "metric" are the same as above, except:
 # "encoding" is set to "lvq" 
 table_object.create_index(
     "my_index",
@@ -708,7 +707,6 @@ table_object.create_index(
             [
                 InitParameter("M", "16"),
                 InitParameter("ef_construction", "50"),
-                InitParameter("ef", "50"),
                 InitParameter("metric", "l2"),
                 InitParameter("encode", "lvq") # "lvq" applies to float vector element only
             ]
@@ -1201,9 +1199,9 @@ Deletes rows from the table based on the specified condition.
 
 ### Parameters
 
-#### cond: `str` (non-empty), *Optional*
+#### cond: `str`, *Optional*
 
-A condition or filter that determines which rows to delete from the table. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
+A non-empty string that defines the condition for selecting rows to delete. The parameter can be an expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be deleted. If `cond` is not specified or set to `None`, the method will delete all rows in the table.
 
 :::tip NOTE
 
@@ -1273,9 +1271,9 @@ Searches for rows that match the specified condition and updates them accordingl
 
 A non-empty string that defines the condition for selecting rows to update. It represents a logical expression, a function, or any other form of conditional logic that evaluates to `True` for the rows that should be updated.
 
-#### data: `list[dict[str, Any]]]` (non-empty), *Required*
+#### data: `list[dict[str, Any]]]`, *Required*
 
-A list of dictionaries where each key indicates a column name and each value indicates the new value for the corresponding cell. This list must not be empty.
+A non-empty list of dictionaries where each key indicates a column name and each value indicates the new value for the corresponding cell.
 
 ### Returns
 
@@ -1319,7 +1317,7 @@ A non-empty list of strings specifying the columns to include in the output. Eac
 - A special system column: system-generated columns include:
   - `_row_id`:  An automatically generated, unique identifier for each row in the table. It serves as a unique key for each row but does not necessarily correspond to the actual row number. When the data in a row is updated, the `_row_id` for that row is also changed to reflect the update.
   - `_score`: A BM25 score used in full-text search.
-  - `_similarity`: Used by IP and cosine metric in dense or sparse vector search.
+  - `_similarity`: Used by IP and cosine metrics in dense or sparse vector search.
   - `_distance`: Used by L2 metric in dense vector search.
 - An aggregation function: Apply an aggregation operation on specified columns. Supported aggragation functions include:
   - `count`
@@ -1486,7 +1484,12 @@ An integer indicating the number of nearest neighbours to return.
 
 #### knn_params: `dict[str, str]`, *Optional*
 
-A dictionary representing additional parameters for the KNN or ANN search.
+A dictionary representing additional KNN or ANN search parameters. Currently only `"ef"` is supported.
+
+- `"ef"`: `str`, Recommended value: one to ten times the value of `topn`.  
+  - For example, if you set `topn` to `10`, you can set `"ef"` to `"50"`.
+  - If you set `"ef"` too high, search performance may worsen.  
+  - If you do not set `"ef"` or set it to a value lower than `topn`, the search uses the `topn` value as the value for `"ef"`.
 
 ### Returns
 
@@ -1503,7 +1506,7 @@ A dictionary representing additional parameters for the KNN or ANN search.
 # Find the 100 nearest neighbors using Euclidean distance
 # If no vector index is created on the column being queried, then the vector search defaults to a brute-force search.
 # In such case, set `knn_params` to `None` or leave it blank.
-table_object.match_dense("vec", [0.1,0.2,0.3], "float", "l2", 100)
+table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "l2", 100).to_pl()
 ```
 
 :::caution NOTE
@@ -1512,27 +1515,26 @@ table_object.match_dense("vec", [0.1,0.2,0.3], "float", "l2", 100)
 
 #### Perform a vector search in HNSW
 
-1. Ensure that you have successfully built an HNSW index. If you are uncertain, you can rebuild the index, setting `ConflictType` to `Ignore`.
+1. Ensure that you have successfully built an HNSW index. If uncertain, you can rebuild the index, setting `ConflictType` to `Ignore`.
 2. Set the `ef` value as follows:
 
 ```python
 from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")]))
+table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50")]))
 # Find the 2 nearest neighbors using cosine distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
-# If you leave `knn_params` blank, the search takes the `"ef"` value set in `create_index()`.
-table_object.match_dense("vec", [1, 2, 3], "uint8", "cosine", 2)
+# If you leave `knn_params` blank, the search uses the `topn` value as the value for `"ef"`.
+table_object.output(["*"]).match_dense("vec", [1, 2, 3], "uint8", "cosine", 2).to_pl()
 ```
 
 ```python
 from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50"), InitParameter("ef", "50")]))
+table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitParameter("ef_construction", "50")]))
 # Find the 2 nearest neighbors using inner product distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
-# You can specify the value of `"ef"` in `knn_params`, which overrides the value set in `create_index()`
-table_object.match_dense("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"})
+table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"}).to_pl()
 ```
 
 :::tip NOTE
@@ -1615,7 +1617,7 @@ A dictionary representing additional parameters for the sparse vector search. Fo
 # If no sparse vector index is created on the column being queried, then the search defaults to a brute-force search.
 # In such case, set `opt_params` to `None` or leave it blank.
 from infinity.common import SparseVector
-table_object.match_sparse('sparse', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100)
+table_object.output(["*"]).match_sparse('sparse', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100).to_df()
 ```
 
 :::caution NOTE
@@ -1632,7 +1634,7 @@ table_object.create_index("my_index", [IndexInfo("sparse", IndexType.BMP)])
 # regardless of whether `opt_params` is set.
 # If you leave `opt_params` blank, the search takes the default settings for `"alpha"` and `"beta"`.
 from infinity.common import SparseVector
-table_object.match_sparse('sparse', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
+table_object.output(["*"]).match_sparse('sparse', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
 ```
 
 ```python
@@ -1643,7 +1645,7 @@ table_object.create_index("my_index", IndexInfo("sparse", IndexType.BMP))
 # regardless of whether `opt_params` is set.
 # You can set the values of `"alpha"` or `"beta"` in `opt_params`, which overrides the default settings.
 from infinity.common import SparseVector
-table_object.match_sparse('sparse', SparseVector([0, 10, 20], [8, 10, 66]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"})
+table_object.output(["*"]).match_sparse('sparse', SparseVector([0, 10, 20], [8, 10, 66]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
 ```
 
 ---
@@ -1738,8 +1740,8 @@ questions = [
     r'title:(quick OR brown) AND body:foobar', # search `(quick OR brown)` in the `title` field. keep fields empty.
 ]
 for question in questions:
-    table_object.match_text('body', question, 2)
-    table_object.match_text('', question, 2, {'default_field': 'body'})
+    table_object.output(["*"]).match_text('body', question, 2).to_df()
+    table_object.output(["*"]).match_text('', question, 2, {'default_field': 'body'}).to_df()
 ```
 
 ---
@@ -1936,9 +1938,7 @@ A `polas.DataFrame` object.
 
 ```python
 # Format a vector search result into a Polas DataFrame. 
-res = table_object.output(["*"])
-               .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10)
-               .to_pl()
+res = table_object.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10).to_pl()
 ```
 
 ## to_arrow
@@ -1961,9 +1961,7 @@ A `pyarrow.Table` object.
 
 ```python
 # Format the current table object into an Apache Arrow Table. 
-res = table_object.output(["*"])
-               .filter("score >= 90")
-               .to_pl()
+res = table_object.output(["*"]).filter("score >= 90").to_arrow()
 ```
 
 ---
