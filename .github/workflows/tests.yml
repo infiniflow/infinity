@@ -184,14 +184,14 @@ jobs:
         if: ${{ !cancelled() && !failure() }}
         run: sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 uninstall -y infinity-sdk && pip3 install . -v --config-settings=cmake.build-type='RelWithDebInfo' --config-settings=build-dir='cmake-build-release'"
     
-    #   - name: Run restart test
-    #     if: ${{ !cancelled() && !failure() }}
-    #     run : sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt && python3 tools/run_restart_test.py --infinity_path=cmake-build-release/src/infinity"
+      - name: Run restart test
+        if: ${{ !cancelled() && !failure() }}
+        run : sudo docker exec ${BUILDER_CONTAINER} bash -c "cd /infinity/ && pip3 install -r python/restart_test/requirements.txt && python3 tools/run_restart_test.py --infinity_path=cmake-build-release/src/infinity"
 
-    #   - name: Collect restart test output
-    #     if: ${{ !cancelled() }} # always run this step even if previous steps failed
-    #     # find all log file like [debug.log.*] in directory, and cat to stdout
-    #     run: find . -name "restart_test.log.*" -exec cat {} \;
+      - name: Collect restart test output
+        if: ${{ !cancelled() }} # always run this step even if previous steps failed
+        # find all log file like [debug.log.*] in directory, and cat to stdout
+        run: find . -name "restart_test.log.*" -exec cat {} \;
 
       - name: Test embedded infinity for Python 3.10
         if: ${{ !cancelled() && !failure() }}
