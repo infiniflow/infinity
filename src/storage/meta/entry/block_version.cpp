@@ -144,12 +144,30 @@ void BlockVersion::GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) cons
     }
 }
 
-// void BlockVersion::Cleanup(const String &version_path) {
-//     LocalFileSystem fs;
+void BlockVersion::GetDeleteTS(SizeT offset, SizeT size, ColumnVector &res) const {
+    for (SizeT i = offset; i < offset + size; ++i) {
+        res.AppendByPtr(reinterpret_cast<const char *>(&deleted_[i]));
+    }
+}
 
-//     if (fs.Exists(version_path)) {
-//         fs.DeleteFile(version_path);
-//     }
-// }
+void BlockVersion::Append(TxnTimeStamp commit_ts, i32 row_count) {
+    created_.emplace_back(commit_ts, row_count);
+    latest_change_ts_ = commit_ts;
+}
+
+void BlockVersion::Delete(i32 offset, TxnTimeStamp commit_ts) {
+    if (deleted_[offset] != 0) {
+        UnrecoverableError(fmt::format("Delete twice at offset: {}, commit_ts: {}, old_ts: {}", offset, commit_ts, deleted_[offset]));
+    }
+    deleted_[offset] = commit_ts;
+    latest_change_ts_ = commit_ts;
+}
+
+bool BlockVersion::CheckDelete(i32 offset, TxnTimeStamp check_ts) const {
+    if (SizeT(offset) >= deleted_.size()) {
+        return false;
+    }
+    return deleted_[offset] != 0 && deleted_[offset] <= check_ts;
+}
 
 } // namespace infinity

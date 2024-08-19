@@ -59,11 +59,22 @@ export struct BlockVersion {
 
     void GetCreateTS(SizeT offset, SizeT size, ColumnVector &res) const;
 
-    // void Cleanup(const String &version_path);
+    void GetDeleteTS(SizeT offset, SizeT size, ColumnVector &res) const;
 
+    void Append(TxnTimeStamp commit_ts, i32 row_count);
+
+    void Delete(i32 offset, TxnTimeStamp commit_ts);
+
+    bool CheckDelete(i32 offset, TxnTimeStamp check_ts) const;
+
+    TxnTimeStamp latest_change_ts() const { return latest_change_ts_; }
+
+private:
     Vector<CreateField> created_{}; // second field width is same as timestamp, otherwise Valgrind will issue BlockVersion::SaveToFile has
                                     // risk to write uninitialized buffer. (ts, rows)
     Vector<TxnTimeStamp> deleted_{};
+
+    TxnTimeStamp latest_change_ts_{};
 };
 
 } // namespace infinity

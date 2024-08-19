@@ -57,10 +57,10 @@ INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
 
 TEST_P(BlockVersionTest, SaveAndLoad) {
     BlockVersion block_version(8192);
-    block_version.created_.emplace_back(10, 3);
-    block_version.created_.emplace_back(20, 6);
-    block_version.deleted_[2] = 30;
-    block_version.deleted_[5] = 40;
+    block_version.Append(10, 3);
+    block_version.Append(20, 6);
+    block_version.Delete(2, 30);
+    block_version.Delete(5, 40);
     String version_path = String(GetFullDataDir()) + "/block_version_test";
     LocalFileSystem fs;
 
@@ -98,10 +98,10 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
             auto block_version_handle = buffer_obj->Load();
             auto *block_version = static_cast<BlockVersion *>(block_version_handle.GetDataMut());
 
-            block_version->created_.emplace_back(10, 3);
-            block_version->created_.emplace_back(20, 6);
-            block_version->deleted_[2] = 30;
-            block_version->deleted_[5] = 40;
+            block_version->Append(10, 3);
+            block_version->Append(20, 6);
+            block_version->Delete(2, 30);
+            block_version->Delete(5, 40);
         }
         {
             auto *file_worker = static_cast<VersionFileWorker *>(buffer_obj->file_worker());
@@ -117,7 +117,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
 
         {
             BlockVersion block_version1(8192);
-            block_version1.created_.emplace_back(10, 3);
+            block_version1.Append(10, 3);
 
             auto block_version_handle = buffer_obj->Load();
             {
@@ -125,9 +125,9 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
                 ASSERT_EQ(block_version1, *block_version);
             }
             auto *block_version = static_cast<BlockVersion *>(block_version_handle.GetDataMut());
-            block_version->created_.emplace_back(20, 6);
-            block_version->deleted_[2] = 30;
-            block_version->deleted_[5] = 40;
+            block_version->Append(20, 6);
+            block_version->Delete(2, 30);
+            block_version->Delete(5, 40);
         }
         {
             auto *file_worker = static_cast<VersionFileWorker *>(buffer_obj->file_worker());
@@ -143,9 +143,9 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
 
         {
             BlockVersion block_version1(8192);
-            block_version1.created_.emplace_back(10, 3);
-            block_version1.created_.emplace_back(20, 6);
-            block_version1.deleted_[2] = 30;
+            block_version1.Append(10, 3);
+            block_version1.Append(20, 6);
+            block_version1.Delete(2, 30);
 
             auto block_version_handle = buffer_obj->Load();
             const auto *block_version = static_cast<const BlockVersion *>(block_version_handle.GetData());
