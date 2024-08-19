@@ -1032,7 +1032,12 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
     delta_catalog_name = CatalogFile::DeltaCheckpointFilename(max_commit_ts);
     String full_path = fmt::format("{}/{}", *catalog_dir_, CatalogFile::DeltaCheckpointFilename(max_commit_ts));
 
-    LOG_DEBUG(fmt::format("Save delta catalog commit ts:{}, checkpoint max commit ts:{}.", flush_delta_entry->commit_ts(), max_commit_ts));
+    if(flush_delta_entry->commit_ts() != max_commit_ts) {
+        String error_message = "Expect flush_delta_entry->commit_ts() == max_commit_ts";
+        UnrecoverableError(error_message);
+    }
+
+    LOG_TRACE(fmt::format("Save delta catalog commit ts:{}.", max_commit_ts));
 
     for (auto &op : flush_delta_entry->operations()) {
         switch (op->GetType()) {
@@ -1051,6 +1056,7 @@ bool Catalog::SaveDeltaCatalog(TxnTimeStamp last_ckp_ts, TxnTimeStamp &max_commi
                 break;
             }
             default:
+                LOG_TRACE(fmt::format("Ignore delta op: {}", op->ToString()));
                 break;
         }
     }

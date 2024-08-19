@@ -442,7 +442,7 @@ TxnTimeStamp Txn::Commit() {
 
     this->SetTxnCommitting(commit_ts);
 
-    txn_store_.PrepareCommit1();
+    txn_store_.PrepareCommit1(); // Only for import and compact, pre-commit segment
     // LOG_INFO(fmt::format("Txn {} commit ts: {}", txn_id_, commit_ts));
 
     if (txn_mgr_->CheckConflict(this)) {
