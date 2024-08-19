@@ -33,7 +33,7 @@ namespace infinity {
 
 FileWorker::~FileWorker() = default;
 
-void FileWorker::WriteToFile(bool to_spill) {
+bool FileWorker::WriteToFile(bool to_spill, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
         String error_message = "No data will be written.";
         UnrecoverableError(error_message);
@@ -64,7 +64,7 @@ void FileWorker::WriteToFile(bool to_spill) {
         file_handler_ = nullptr;
     });
 
-    WriteToFileImpl(to_spill, prepare_success);
+    bool all_save = WriteToFileImpl(to_spill, prepare_success, ctx);
     if (prepare_success) {
         if (to_spill) {
             LOG_TRACE(fmt::format("Write to spill file {} finished. success {}", write_path, prepare_success));
@@ -78,6 +78,7 @@ void FileWorker::WriteToFile(bool to_spill) {
         obj_addr_ = InfinityContext::instance().persistence_manager()->Persist(write_path);
         fs.DeleteFile(write_path);
     }
+    return all_save;
 }
 
 void FileWorker::ReadFromFile(bool from_spill) {

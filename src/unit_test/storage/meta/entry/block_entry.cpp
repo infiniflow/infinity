@@ -105,8 +105,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
         }
         {
             auto *file_worker = static_cast<VersionFileWorker *>(buffer_obj->file_worker());
-            file_worker->SetCheckpointTS(15);
-            buffer_obj->Save();
+            buffer_obj->Save(VersionFileWorkerSaveCtx{.checkpoint_ts_ = 15});
         }
     }
     {
@@ -131,8 +130,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
         }
         {
             auto *file_worker = static_cast<VersionFileWorker *>(buffer_obj->file_worker());
-            file_worker->SetCheckpointTS(35);
-            buffer_obj->Save();
+            buffer_obj->Save(VersionFileWorkerSaveCtx{.checkpoint_ts_ = 35});
         }
     }
     {

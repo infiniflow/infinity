@@ -55,14 +55,13 @@ void VarFileWorker::FreeInMemory() {
 
 SizeT VarFileWorker::GetMemoryCost() const {
     if (data_ == nullptr) {
-        String error_message = "Data is already freed.";
-        UnrecoverableError(error_message);
+        return buffer_size_;
     }
     auto *buffer = static_cast<VarBuffer *>(data_);
     return buffer->TotalSize();
 }
 
-void VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
+bool VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success, const FileWorkerSaveCtx &ctx) {
     if (data_ == nullptr) {
         String error_message = "Data is not allocated.";
         UnrecoverableError(error_message);
@@ -81,6 +80,7 @@ void VarFileWorker::WriteToFileImpl(bool to_spill, bool &prepare_success) {
     }
     prepare_success = true;
     buffer_size_ = data_size;
+    return true;
 }
 
 void VarFileWorker::ReadFromFileImpl(SizeT file_size) {

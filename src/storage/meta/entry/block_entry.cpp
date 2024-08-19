@@ -379,17 +379,7 @@ bool BlockEntry::FlushVersionNoLock(TxnTimeStamp checkpoint_ts) {
         return false;
     }
 
-    auto block_version_handle = version_buffer_object_->Load();
-    auto *version_file_worker = static_cast<VersionFileWorker *>(version_buffer_object_->file_worker());
-    version_file_worker->SetCheckpointTS(checkpoint_ts);
-    version_buffer_object_->Save();
-    LOG_TRACE(fmt::format("FlushVersionNoLock: block_id: {}, ckp ts: {} create {}, delete: {}, before_ckp_row_count {}, row_count {}",
-                          block_id_,
-                          checkpoint_ts,
-                          block_version->created_.size(),
-                          block_version->deleted_.size(),
-                          checkpoint_row_count_,
-                          block_row_count_));
+    version_buffer_object_->Save(VersionFileWorkerSaveCtx(checkpoint_ts));
     return true;
 }
 
