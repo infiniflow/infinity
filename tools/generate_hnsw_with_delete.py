@@ -117,7 +117,7 @@ def generate(generate_if_exists: bool, copy: bool):
 
         slt_file.write("statement ok\n")
         slt_file.write(
-            "CREATE INDEX {} ON {}(c1) USING HNSW WITH (M = 100, ef_construction = 100, ef = 100, metric = l2);\n".format(
+            "CREATE INDEX {} ON {}(c1) USING HNSW WITH (M = 100, ef_construction = 100, metric = l2);\n".format(
                 index_name, table_name
             )
         )

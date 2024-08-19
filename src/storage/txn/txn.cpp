@@ -320,8 +320,10 @@ Txn::CreateIndexPrepare(TableIndexEntry *table_index_entry, BaseTableRef *table_
 // TODO: use table ref instead of table entry
 Status Txn::CreateIndexDo(BaseTableRef *table_ref, const String &index_name, HashMap<SegmentID, atomic_u64> &create_index_idxes) {
     auto *table_entry = table_ref->table_entry_ptr_;
+    const auto &db_name = *table_entry->GetDBName();
+    const auto &table_name = *table_entry->GetTableName();
 
-    auto [table_index_entry, status] = this->GetIndexByName(db_name_, *table_entry->GetTableName(), index_name);
+    auto [table_index_entry, status] = this->GetIndexByName(db_name, table_name, index_name);
     if (!status.ok()) {
         return status;
     }

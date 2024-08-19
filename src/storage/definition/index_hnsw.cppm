@@ -49,10 +49,9 @@ public:
               HnswEncodeType encode_type,
               SizeT M,
               SizeT ef_construction,
-              SizeT ef,
               SizeT block_size)
         : IndexBase(IndexType::kHnsw, index_name, file_name, std::move(column_names)), metric_type_(metric_type), encode_type_(encode_type), M_(M),
-          ef_construction_(ef_construction), ef_(ef), block_size_(block_size) {}
+          ef_construction_(ef_construction), block_size_(block_size) {}
 
     ~IndexHnsw() final = default;
 
@@ -80,7 +79,6 @@ public:
     HnswEncodeType encode_type_{HnswEncodeType::kInvalid};
     const SizeT M_{};
     const SizeT ef_construction_{};
-    const SizeT ef_{};
     const SizeT block_size_{};
 };
 

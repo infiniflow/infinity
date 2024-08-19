@@ -109,7 +109,6 @@ def create_index(table_obj, m: int, ef_construction: int, remote: bool):
             {
                 "m": str(m),
                 "ef_construction": str(ef_construction),
-                "ef": str(ef_construction),
                 "metric": "l2",
                 "encode": "lvq"
             },

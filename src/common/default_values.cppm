@@ -158,7 +158,6 @@ export {
     // default hnsw parameter
     constexpr SizeT HNSW_M = 16;
     constexpr SizeT HNSW_EF_CONSTRUCTION = 200;
-    constexpr SizeT HNSW_EF = 200;
     constexpr SizeT HNSW_BLOCK_SIZE = 8192;
 
     constexpr SizeT BMP_BLOCK_SIZE = 16;

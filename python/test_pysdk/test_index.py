@@ -80,7 +80,6 @@ class TestInfinity:
                                                      {
                                                          "m": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "l2"
                                                      }), ConflictType.Error)
 
@@ -681,7 +680,6 @@ class TestInfinity:
                                                      {
                                                          "m": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "l2"
                                                      }), conflict_type)
 
@@ -715,7 +713,6 @@ class TestInfinity:
                                                    {
                                                        "m": "16",
                                                        "ef_construction": "50",
-                                                       "ef": "50",
                                                        "metric": "l2"
                                                    }), conflict_type)
 
@@ -743,7 +740,6 @@ class TestInfinity:
                                                          {
                                                              "m": "16",
                                                              "ef_construction": "50",
-                                                             "ef": "50",
                                                              "metric": "l2"
                                                          }), conflict_type)
 
@@ -777,7 +773,6 @@ class TestInfinity:
                                                      {
                                                          "m": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "l2"
                                                      }), conflict_type)
         assert res.error_code == ErrorCode.OK
@@ -790,7 +785,6 @@ class TestInfinity:
                                                        {
                                                            "m": "16",
                                                            "ef_construction": "50",
-                                                           "ef": "50",
                                                            "metric": "l2"
                                                        }), conflict_type)
 
@@ -827,7 +821,6 @@ class TestInfinity:
                                                    {
                                                        "m": "16",
                                                        "ef_construction": "50",
-                                                       "ef": "50",
                                                        "metric": "l2"
                                                    }), conflict_type)
 
@@ -842,7 +835,6 @@ class TestInfinity:
                                                        {
                                                            "m": "16",
                                                            "ef_construction": "50",
-                                                           "ef": "50",
                                                            "metric": "l2"
                                                        }), conflict_type)
 
@@ -867,7 +859,6 @@ class TestInfinity:
                                                          {
                                                              "m": "16",
                                                              "ef_construction": "50",
-                                                             "ef": "50",
                                                              "metric": "l2"
                                                          }), ConflictType.Error)
             assert res.error_code == ErrorCode.OK
@@ -896,7 +887,6 @@ class TestInfinity:
                                                      {
                                                          "m": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "l2"
                                                      }), ConflictType.Error)
         assert res.error_code == ErrorCode.OK
@@ -934,7 +924,6 @@ class TestInfinity:
                                                          {
                                                              "m": "16",
                                                              "ef_construction": "50",
-                                                             "ef": "50",
                                                              "metric": "l2"
                                                          }), ConflictType.Error)
             assert res.error_code == ErrorCode.OK
@@ -959,7 +948,6 @@ class TestInfinity:
                                                          {
                                                              "m": "16",
                                                              "ef_construction": "50",
-                                                             "ef": "50",
                                                              "metric": "l2"
                                                          }), ConflictType.Error)
             assert res.error_code == ErrorCode.OK
@@ -994,7 +982,6 @@ class TestInfinity:
                                                      {
                                                          "m": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "l2"
                                                      }), ConflictType.Error)
 
@@ -1028,7 +1015,6 @@ class TestInfinity:
                                                      {
                                                          "m": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "l2"
                                                      }), ConflictType.Error)
 
@@ -1061,7 +1047,6 @@ class TestInfinity:
                                                      {
                                                          "m": "16",
                                                          "ef_construction": "50",
-                                                         "ef": "50",
                                                          "metric": "l2"
                                                      }), ConflictType.Error)
 
@@ -1092,7 +1077,6 @@ class TestInfinity:
                                                    {
                                                        "m": "16",
                                                        "ef_construction": "50",
-                                                       "ef": "50",
                                                        "metric": index_distance_type
                                                    }), ConflictType.Error)
 
@@ -1168,7 +1152,6 @@ class TestInfinity:
                                                          {
                                                              "m": "16",
                                                              "EF_CONSTRUCTION": "50",
-                                                             "EF": "50",
                                                              "METRIC": "l2"
                                                          }), ConflictType.Error)
 
@@ -1266,7 +1249,6 @@ class TestInfinity:
                                                          {
                                                              "M": "16",
                                                              "ef_construction": "50",
-                                                             "ef": "50",
                                                              "metric": "L2"
                                                          }), ConflictType.Error)
 

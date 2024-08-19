@@ -413,7 +413,6 @@ curl --request POST \
         "type": "HNSW",
         "M": "16",
         "ef_construction": "50",
-        "ef": "50",
         "metric": "l2"
     },
      "create_option": {

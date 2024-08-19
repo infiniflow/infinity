@@ -63,6 +63,7 @@ import block_entry;
 import segment_entry;
 import abstract_hnsw;
 import physical_match_tensor_scan;
+import hnsw_alg;
 
 namespace infinity {
 
@@ -341,11 +342,11 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
     TableEntry *table_entry = base_table_ref_->table_entry_ptr_;
     Map<u32, SharedPtr<SegmentIndexEntry>> index_entry_map;
 
-    if(knn_expression_->ignore_index_) {
+    if (knn_expression_->ignore_index_) {
         LOG_TRACE("Not use index"); // No index need to check
     } else {
         auto map_guard = table_entry->IndexMetaMap();
-        if(knn_expression_->using_index_.empty()) {
+        if (knn_expression_->using_index_.empty()) {
             LOG_TRACE("Try to find a index to use");
             for (auto &[index_name, table_index_meta] : *map_guard) {
                 auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
@@ -374,12 +375,12 @@ void PhysicalKnnScan::PlanWithIndex(QueryContext *query_context) { // TODO: retu
         } else {
             LOG_TRACE(fmt::format("Use index: {}", knn_expression_->using_index_));
             auto iter = (*map_guard).find(knn_expression_->using_index_);
-            if(iter == (*map_guard).end()) {
+            if (iter == (*map_guard).end()) {
                 Status status = Status::IndexNotExist(knn_expression_->using_index_);
                 RecoverableError(std::move(status));
             }
 
-            auto& table_index_meta = iter->second;
+            auto &table_index_meta = iter->second;
 
             auto [table_index_entry, status] = table_index_meta->GetEntryNolock(txn_id, begin_ts);
             if (!status.ok()) {
@@ -617,10 +618,11 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                     } else {
                         auto hnsw_search = [&](auto *hnsw_index, bool with_lock) {
                             bool rerank = false;
+                            KnnSearchOption search_option;
                             for (const auto &opt_param : knn_scan_shared_data->opt_params_) {
                                 if (opt_param.param_name_ == "ef") {
                                     u64 ef = std::stoull(opt_param.param_value_);
-                                    hnsw_index->SetEf(ef);
+                                    search_option.ef_ = ef;
                                 } else if (opt_param.param_name_ == "rerank") {
                                     rerank = true;
                                 }
@@ -640,21 +642,27 @@ void PhysicalKnnScan::ExecuteInternalByColumnDataTypeAndQueryDataType(QueryConte
                                         std::tie(result_n1, d_ptr, l_ptr) =
                                             hnsw_index->template KnnSearch<BitmaskFilter<SegmentOffset>, true>(query,
                                                                                                                knn_scan_shared_data->topk_,
-                                                                                                               filter);
+                                                                                                               filter,
+                                                                                                               search_option);
                                     } else {
                                         std::tie(result_n1, d_ptr, l_ptr) =
                                             hnsw_index->template KnnSearch<BitmaskFilter<SegmentOffset>, false>(query,
                                                                                                                 knn_scan_shared_data->topk_,
-                                                                                                                filter);
+                                                                                                                filter,
+                                                                                                                search_option);
                                     }
                                 } else {
                                     SegmentOffset max_segment_offset = block_index->GetSegmentOffset(segment_id);
                                     if (!with_lock) {
-                                        std::tie(result_n1, d_ptr, l_ptr) = hnsw_index->template KnnSearch<false>(query, knn_scan_shared_data->topk_);
+                                        std::tie(result_n1, d_ptr, l_ptr) =
+                                            hnsw_index->template KnnSearch<false>(query, knn_scan_shared_data->topk_, search_option);
                                     } else {
                                         AppendFilter filter(max_segment_offset);
                                         std::tie(result_n1, d_ptr, l_ptr) =
-                                            hnsw_index->template KnnSearch<AppendFilter, true>(query, knn_scan_shared_data->topk_, filter);
+                                            hnsw_index->template KnnSearch<AppendFilter, true>(query,
+                                                                                               knn_scan_shared_data->topk_,
+                                                                                               filter,
+                                                                                               search_option);
                                     }
                                 }
 

@@ -107,7 +107,6 @@ class InfinityClientForInsert:
                                                                              {
                                                                                  "m": "16",
                                                                                  "ef_construction": "1000",
-                                                                                 "ef": "1000",
                                                                                  "metric": "ip",
                                                                                  "encode": "lvq"
                                                                              }),
