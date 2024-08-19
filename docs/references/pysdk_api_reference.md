@@ -86,13 +86,13 @@ infinity_object = infinity.connect(infinity.NetworkAddress("192.168.1.101", 2381
 infinity_object.disconnect()
 ```
 
-Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is imported as a Python module.
+Disconnects the client from the Infinity server in client-server mode, or destructs the Infinity object and releases all associated resources when Infinity is imported as a Python module.
 
 ### Returns
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
@@ -216,7 +216,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
@@ -259,7 +259,7 @@ Retrieves a list of all available databases within the Infinity system.
 A structure containing the following attributes:
 
 - `db_names`: `list[str]` A list of strings indicating the names of all available databases.
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
@@ -481,7 +481,7 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
@@ -552,12 +552,11 @@ Retrieves a list of all available tables within the current database.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 - `table_names`: `list[str]` - A list of strings indicating the names of all available tables in the current database.
 
 ### Examples
@@ -681,12 +680,11 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing these attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -923,12 +921,11 @@ If `ConflictType` is not set, it defaults to `Error`.
 
 A structure containing these attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`  
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.  
 
 ### Examples
 
@@ -950,12 +947,11 @@ Retrieves a list of all available indexes built on the current table.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 - `table_names`: `list[str]` - A list of strings indicating the names of all available indexes.
 
 ### Examples
@@ -994,12 +990,11 @@ For information about setting default column values, see `create_table()`.
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`  
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1113,12 +1108,11 @@ Example: `{"header":True, "delimiter": "\t", file_type}`
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1187,12 +1181,11 @@ Columns to export to the output file, for example, `["num", "name", "score"]`. I
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1234,12 +1227,11 @@ A non-empty string that defines the condition for selecting rows to delete. The 
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`  
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
-- `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -1302,12 +1294,11 @@ A non-empty list of dictionaries where each key indicates a column name and each
 
 A structure containing the following attributes:
 
-- `error_code`: `int` - An error code indicating the result of the operation.
+- `error_code`: `int`
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 

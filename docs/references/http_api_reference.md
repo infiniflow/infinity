@@ -20,15 +20,15 @@ Creates a database by its name. If the database already exists, the behavior is 
   - `Content-Type: application/json`
 - Body:
 
-  ```json
+  ```shell
   {
-    "create_option": "<option>"
+      "create_option": "<option>"
   }
   ```
 
 #### Request example
 
-```json
+```shell
 curl --request POST \
      --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
@@ -61,36 +61,32 @@ curl --request POST \
 
 A `200` HTTP status code indicates success. The response includes a JSON object like the following:
 
-```json
+```shell
 {
     "error_code": 0 
 }
 ```
 
-- `error_code`: `int` - An error code indicating the result of the operation.  
+- `error_code`: `int`  
   `0`: The operation succeeds.
-- `error_msg`: `str`
+- `error_msg`: `str`  
   When `error_code` is `0`, `error_msg` is an empty string.  
 
 #### Status code 500
 
-A `500` HTTP status code indicates that an error occurs with the Infinity server. The response includes a JSON object like the following:
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following:
 
-```json
+```shell
 {
     "error_code": 3016,
     "error_message": "Duplicate database: {database_name}."
 }
 ```
 
-- `error_code`: `int` - An error code indicating the result of the operation.  
+- `error_code`: `int`  
   A non-zero value indicates a specific error condition.
 - `error_msg`: `str`  
   When `error_code` is non-zero, `error_msg` provides additional details about the error.
-
-#### Status code 404
-
-A `404` HTTP status code indicates that an error occurs with the information provided. No JSON object is returned with this status code.
 
 ---
 
@@ -109,15 +105,15 @@ Deletes a database by its name. If the database does not exist, the behavior is 
   - `Content-Type: application/json`
 - Body:
 
-  ```json
+  ```shell
   {
-    "drop_option": "<option>"
+      "drop_option": "<option>"
   }
   ```
 
 #### Request example
 
-```json
+```shell
 curl --request DELETE \
      --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
@@ -143,7 +139,7 @@ curl --request DELETE \
 
 A `200` HTTP status code indicates success. The response includes a JSON object like the following:
 
-```json
+```shell
 {
     "error_code": 0
 }
@@ -151,18 +147,14 @@ A `200` HTTP status code indicates success. The response includes a JSON object 
 
 #### Status code 500
 
-A `500` HTTP status code indicates that an error occurs with the Infinity server. The response includes a JSON object like the following: 
+A `500` HTTP status code indicates an error condition. The response includes a JSON object like the following: 
 
-```json
+```shell
 {
     "error_code": 3021,
     "error_message": "{database_name} doesn't exist."
 }
 ```
-
-#### Status code 404
-
-A `404` HTTP status code indicates that an error occurs with the information provided. No JSON object is returned with this status code.
 
 ---
 
@@ -179,7 +171,6 @@ Shows detailed information of a specified database.
 - Headers:
   - `Accept: application/json`
   - `Content-Type: application/json`
-- Body: `None`
 
 #### Request example
 
