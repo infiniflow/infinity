@@ -493,12 +493,29 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
                 }
                 break;
             }
+            case LogicalType::kMultiVector:
             case LogicalType::kTensor:
             case LogicalType::kTensorArray:
             case LogicalType::kSparse: {
                 break;
             }
-            default: {
+            case LogicalType::kHugeInt:
+            case LogicalType::kDecimal:
+            case LogicalType::kInterval:
+            case LogicalType::kArray:
+            case LogicalType::kTuple:
+            case LogicalType::kPoint:
+            case LogicalType::kLine:
+            case LogicalType::kLineSeg:
+            case LogicalType::kBox:
+            case LogicalType::kCircle:
+            case LogicalType::kUuid:
+            case LogicalType::kRowID:
+            case LogicalType::kMixed:
+            case LogicalType::kNull:
+            case LogicalType::kMissing:
+            case LogicalType::kEmptyArray:
+            case LogicalType::kInvalid: {
                 return Status::NotSupport(fmt::format("Not supported data type: {}", data_type->ToString()));
             }
         }
@@ -525,7 +542,7 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
         }
     }
 
-    SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>(create_table_info->table_name_), columns);
+    SharedPtr<TableDef> table_def_ptr = TableDef::Make(MakeShared<String>("default_db"), MakeShared<String>(create_table_info->table_name_), std::move(columns));
     for (HashSet<String> visited_param_names; auto *property_ptr : create_table_info->properties_) {
         auto &[param_name, param_value] = *property_ptr;
         if (auto [_, success] = visited_param_names.insert(param_name); !success) {
@@ -555,8 +572,8 @@ Status LogicalPlanner::BuildCreateTable(const CreateStatement *statement, Shared
             std::sort(bloom_filter_columns.begin(), bloom_filter_columns.end());
             bloom_filter_columns.erase(std::unique(bloom_filter_columns.begin(), bloom_filter_columns.end()), bloom_filter_columns.end());
             // check if bloom filter can be created for the column
-            for (Vector<SharedPtr<ColumnDef>> &columns = table_def_ptr->columns(); ColumnID column_id : bloom_filter_columns) {
-                if (auto &def = columns[column_id]; def->type()->SupportBloomFilter()) {
+            for (ColumnID column_id : bloom_filter_columns) {
+                if (auto &def = table_def_ptr->columns()[column_id]; def->type()->SupportBloomFilter()) {
                     def->build_bloom_filter_ = true;
                 } else {
                     return Status::SyntaxError(

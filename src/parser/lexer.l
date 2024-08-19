@@ -135,6 +135,7 @@ MINUTE          { return MINUTE; }
 MINUTES         { return MINUTES; }
 MONTH           { return MONTH; }
 MONTHS          { return MONTHS; }
+MULTIVECTOR     { return MULTIVECTOR; }
 NATURAL         { return NATURAL; }
 NULL            { return NULLABLE; }
 NOT             { return NOT; }
