@@ -253,8 +253,6 @@ public:
                     }
                 });
 
-                write_thread2.detach();
-
                 std::atomic<i32> idx = start_i;
                 std::vector<std::thread> worker_threads;
                 for (int i = 0; i < 4; ++i) {
@@ -272,6 +270,7 @@ public:
                 for (int i = 0; i < 4; ++i) {
                     worker_threads[i].join();
                 }
+                write_thread2.join();
             }
             stop.store(true);
         });
