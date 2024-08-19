@@ -20,8 +20,6 @@ public:
         system(("mkdir -p " + file_dir_).c_str());
         pm_ = MakeUnique<PersistenceManager>(workspace_, file_dir_, ObjSizeLimit);
     }
-    void TearDown() override {}
-
     void CheckObjData(const String& obj_addr, const String& data);
 
 protected:

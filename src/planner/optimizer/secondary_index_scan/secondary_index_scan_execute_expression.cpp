@@ -27,6 +27,7 @@ import secondary_index_data;
 import secondary_index_scan_middle_expression;
 import third_party;
 import logical_type;
+import status;
 
 namespace infinity {
 
@@ -87,7 +88,7 @@ private:
                     result.SetIntervalRange<VarcharT>(value, compare_type);
                 } else {
                     String error_message = "SaveToResult(): VarcharT only support kEqual compare type.";
-                    UnrecoverableError(error_message);
+                    RecoverableError(Status::SyntaxError(error_message));
                 }
                 break;
             }

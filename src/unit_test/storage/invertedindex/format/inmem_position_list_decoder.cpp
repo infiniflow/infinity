@@ -18,9 +18,6 @@ class InMemPositionListDecoderTest : public BaseTest {
 public:
     InMemPositionListDecoderTest() {}
 
-    void SetUp() override {}
-    void TearDown() override {}
-
 protected:
     void TestDecodeWithOptionFlag(const optionflag_t flag, tf_t tf, pos_t *pos_list, bool need_flush) {
         PostingFormatOption option(flag);

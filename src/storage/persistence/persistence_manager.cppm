@@ -54,10 +54,15 @@ export struct Range {
 };
 
 export struct ObjStat {
-    SizeT obj_size_{};
-    int ref_count_{};
+    SizeT obj_size_{}; // footer (if present) is excluded
+    SizeT parts_{};    // an object attribute
+    SizeT ref_count_{}; // the number of user (R and W) of some part of this object
     SizeT deleted_size_{};
     Set<Range> deleted_ranges_{};
+
+    ObjStat() = default;
+
+    ObjStat(SizeT obj_size, SizeT parts, SizeT ref_count) : obj_size_(obj_size), parts_(parts), ref_count_(ref_count) {}
 
     nlohmann::json Serialize() const;
 
@@ -77,33 +82,42 @@ public:
 
     ~PersistenceManager();
 
+    /**
+     * For composed objects
+     */
     // Create new object or append to current object, and returns the location.
-    ObjAddr Persist(const String &file_path, bool allow_compose = true);
+    ObjAddr Persist(const String &file_path);
 
     // Create new object or append to current object, and returns the location.
-    ObjAddr Persist(const char *data, SizeT len, bool allow_compose = true);
+    ObjAddr Persist(const char *data, SizeT len);
 
     // Force finalize current object. Subsequent append on the finalized object is forbidden.
     void CurrentObjFinalize();
 
+    /**
+     * For dedicated objects
+     */
+    ObjAddr ObjCreateRefCount(const String &file_path);
+
+    /**
+     * For composed and dedicated objects
+     */
     // Download the whole object from object store if it's not in cache. Increase refcount and return the cached object file path.
     String GetObjCache(const String &local_path);
 
     ObjAddr GetObjFromLocalPath(const String &file_path);
 
-    // Decrease refcount
     void PutObjCache(const String &file_path);
-
-    ObjAddr ObjCreateRefCount(const String &file_path);
 
     void Cleanup(const String &file_path);
 
+    /**
+     * Utils
+     */
     nlohmann::json Serialize();
 
     void Deserialize(const nlohmann::json &obj);
 
-    SizeT SumRefCounts();
-  
     void WriteBufAdv(char *&buf, const Vector<String> &local_paths);
 
     void ReadBufAdv(char *&buf);
@@ -147,5 +161,6 @@ private:
     // Current unsealed object key
     String current_object_key_;
     SizeT current_object_size_;
+    SizeT current_object_parts_;
 };
 } // namespace infinity
