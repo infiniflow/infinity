@@ -86,6 +86,7 @@ protected:
         i32 edge_n1 = edge_n / m;
         Vector<Vector<i32>> fwd = GenerateFwd(data_n1, query_n, edge_n1);
         assert((i32)fwd.size() == data_n1);
+        fwd.reserve(m);
         for (i32 i = 1; i < m; ++i) {
             for (i32 j = 0; j < data_n1; ++j) {
                 fwd.push_back(fwd[j]);
@@ -117,6 +118,7 @@ protected:
             data_indices.clear();
         }
 
+        fwd.reserve(data_n);
         for (i32 i = 0; i < data_n; ++i) {
             i32 qn = data_indices[i + 1] - data_indices[i];
             Vector<i32> posting = GetRandomNoRepeat(qn, 0, query_n);
@@ -154,7 +156,7 @@ TEST_F(BPReorderingTest, test1) {
     i64 old_cost = cost_func(data_n, query_n, fwd);
     i64 new_cost = cost_func(data_n, query_n, fwd, reorder);
 
-    std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
+//    std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
     ASSERT_LE(new_cost, old_cost);
 }
 
@@ -175,6 +177,7 @@ TEST_F(BPReorderingTest, test2) {
     for (i32 row_id = 0; row_id < data_n; ++row_id) {
         auto vec = dataset.at(row_id);
         // std::cout << fmt::format("Doc {}: ", row_id);
+        fwd[row_id].reserve(vec.nnz_);
         for (i32 i = 0; i < vec.nnz_; ++i) {
             fwd[row_id].push_back(vec.indices_[i]);
             // std::cout << fmt::format("{} ", vec.indices_[i]);
@@ -193,6 +196,6 @@ TEST_F(BPReorderingTest, test2) {
     Vector<i32> reorder = bp();
     i64 new_cost = cost_func(data_n, dataset.ncol_, fwd, reorder);
 
-    std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
+//    std::cout << fmt::format("old_cost: {}, new_cost: {}\n", old_cost, new_cost);
     EXPECT_LE(new_cost, old_cost);
 }

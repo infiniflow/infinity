@@ -274,10 +274,10 @@ TEST_F(WalEntryTest, WalEntryIterator) {
             if (wal_entry == nullptr) {
                 break;
             }
-            Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
-            for (const auto &cmd : wal_entry->cmds_) {
-                Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-            }
+//            Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
+//            for (const auto &cmd : wal_entry->cmds_) {
+//                Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+//            }
         }
     }
 
@@ -300,8 +300,8 @@ TEST_F(WalEntryTest, WalEntryIterator) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 catalog_path = checkpoint_cmd->catalog_path_;
 
-                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
-                Println("Catalog Path: {}", catalog_path);
+//                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
+//                Println("Catalog Path: {}", catalog_path);
                 break;
             }
         }
@@ -319,13 +319,13 @@ TEST_F(WalEntryTest, WalEntryIterator) {
     }
 
     // phase 3: replay the entries
-    Println("Start to replay the entries", "");
-    for (const auto &entry : replay_entries) {
-        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
-        for (const auto &cmd : entry->cmds_) {
-            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-        }
-    }
+//    Println("Start to replay the entries", "");
+//    for (const auto &entry : replay_entries) {
+//        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
+//        for (const auto &cmd : entry->cmds_) {
+//            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+//        }
+//    }
     EXPECT_EQ(max_commit_ts, 123ul);
     EXPECT_EQ(catalog_path, String(GetFullDataDir()) + "/catalog");
     EXPECT_EQ(replay_entries.size(), 1u);
@@ -349,10 +349,10 @@ TEST_F(WalEntryTest, WalListIterator) {
         if (wal_entry.get() == nullptr) {
             break;
         }
-        Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
-        for (const auto &cmd : wal_entry->cmds_) {
-            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-        }
+//        Println("WAL ENTRY COMMIT TS:", std::to_string(wal_entry->commit_ts_));
+//        for (const auto &cmd : wal_entry->cmds_) {
+//            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+//        }
     }
 
     Vector<SharedPtr<WalEntry>> replay_entries;
@@ -374,8 +374,8 @@ TEST_F(WalEntryTest, WalListIterator) {
                 max_commit_ts = checkpoint_cmd->max_commit_ts_;
                 catalog_path = checkpoint_cmd->catalog_path_;
 
-                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
-                Println("Catalog Path: {}", catalog_path);
+//                Println("Checkpoint Max Commit Ts: {}", std::to_string(max_commit_ts));
+//                Println("Catalog Path: {}", catalog_path);
                 break;
             }
         }
@@ -393,13 +393,13 @@ TEST_F(WalEntryTest, WalListIterator) {
     }
 
     // phase 3: replay the entries
-    Println("Start to replay the entries", "");
-    for (const auto &entry : replay_entries) {
-        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
-        for (const auto &cmd : entry->cmds_) {
-            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
-        }
-    }
+//    Println("Start to replay the entries", "");
+//    for (const auto &entry : replay_entries) {
+//        Println("WAL ENTRY COMMIT TS:", std::to_string(entry->commit_ts_));
+//        for (const auto &cmd : entry->cmds_) {
+//            Println("  WAL CMD: ", WalCmd::WalCommandTypeToString(cmd->GetType()));
+//        }
+//    }
     EXPECT_EQ(max_commit_ts, 123ul);
     EXPECT_EQ(catalog_path, ckp_file_path);
     EXPECT_EQ(replay_entries.size(), 1u);
