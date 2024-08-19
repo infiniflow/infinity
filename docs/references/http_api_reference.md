@@ -7,11 +7,28 @@ slug: /http_api_reference
 
 ## Create database
 
-Creates a database by its name.
+**POST** `/databases/{database_name}`
 
-#### Request
+Creates a database by its name. If the database already exists, the behavior is determined by the `create_option` parameter.
 
-```
+### Request
+
+- Method: POST
+- URL: `database/{database_name}`
+- Headers:
+  - `Accept: application/json`
+  - `Content-Type: application/json`
+- Body:
+
+  ```json
+  {
+    "create_option": "<option>"
+  }
+  ```
+
+#### Request example
+
+```json
 curl --request POST \
      --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
@@ -19,37 +36,88 @@ curl --request POST \
      --data ' \
 {
     "create_option": "ignore_if_exists"
-} '
+} ' 
 ```
 
-#### Response
+#### Request parameter
 
-- 200 Success.
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the database, which must adhere to the following requirements:  
+  - Permitted characters include:
+    - English letters (a-z, A-Z)
+    - Digits (0-9)
+    - "_" (underscore)
+  - Must begin with an English letter or underscore.
+  - Maximum 65,535 characters.
+  - Case-insensitive.
+- `create_option`: (*Body parameter*), `enum<string>`, *Optional*  
+  Conflict policy in `enum<string>` for handling situations where a database with the same name exists.
+  - `"error"`: (Default) Raise an error if a database with the same name exists.
+  - `"ignore_if_exist"`: Ignore the database creation requrest and keep the existing database with the same name.
 
-```
+### Response
+
+#### Status code 200
+
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```json
 {
-    "error_code": 0
+    "error_code": 0 
 }
 ```
 
-- 500 Error.
+- `error_code`: `int` - An error code indicating the result of the operation.  
+  `0`: The operation succeeds.
+- `error_msg`: `str`
+  When `error_code` is `0`, `error_msg` is an empty string.  
 
-```
+#### Status code 500
+
+A `500` HTTP status code indicates that an error occurs with the Infinity server. The response includes a JSON object like the following:
+
+```json
 {
     "error_code": 3016,
     "error_message": "Duplicate database: {database_name}."
 }
 ```
 
+- `error_code`: `int` - An error code indicating the result of the operation.  
+  A non-zero value indicates a specific error condition.
+- `error_msg`: `str`  
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
+
+#### Status code 404
+
+A `404` HTTP status code indicates that an error occurs with the information provided. No JSON object is returned with this status code.
+
 ---
 
 ## Drop database
 
-Deletes a database by its name.
+**DELETE** `/databases/{database_name}`
 
-#### Request
+Deletes a database by its name. If the database does not exist, the behavior is determined by the `drop_option` parameter.
 
-```
+### Request
+
+- Method: DELETE
+- URL: `database/{database_name}`
+- Headers:
+  - `Accept: application/json`
+  - `Content-Type: application/json`
+- Body:
+
+  ```json
+  {
+    "drop_option": "<option>"
+  }
+  ```
+
+#### Request example
+
+```json
 curl --request DELETE \
      --url localhost:23820/databases/{database_name} \
      --header 'accept: application/json' \
@@ -60,32 +128,60 @@ curl --request DELETE \
 } '
 ```
 
-#### Response
+#### Request parameter
 
-- 200 Success.
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the database to delete.
+- `drop_option`: (*Body parameter*), `enum<string>`, *Optional*  
+  Conflict policy in `enum<string>` for handling situations where a database with the specified name does not exist.
+  - `"error"`: (Default) Raise an error if the specified database does not exist.
+  - `"ignore_if_not exists"`: Ignore the operation and proceed regardless, if the specified database does not exist.
 
-```
+### Response
+
+#### Status code 200
+
+A `200` HTTP status code indicates success. The response includes a JSON object like the following:
+
+```json
 {
     "error_code": 0
 }
 ```
 
-- 500 Error.
+#### Status code 500
 
-```
+A `500` HTTP status code indicates that an error occurs with the Infinity server. The response includes a JSON object like the following: 
+
+```json
 {
     "error_code": 3021,
     "error_message": "{database_name} doesn't exist."
 }
 ```
 
+#### Status code 404
+
+A `404` HTTP status code indicates that an error occurs with the information provided. No JSON object is returned with this status code.
+
 ---
 
 ## Show database
 
+**GET** `/databases/{database_name}`
+
 Shows detailed information of a specified database.
 
-#### Request
+### Request
+
+- Method: GET
+- URL: `database/{database_name}`
+- Headers:
+  - `Accept: application/json`
+  - `Content-Type: application/json`
+- Body: `None`
+
+#### Request example
 
 ```
 curl --request GET \
@@ -93,7 +189,12 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+#### Request parameter
+
+- `database_name`: (*Path parameter*), `string`, *Required*  
+  A non-empty string indicating the name of the database to retrieve.
+
+### Response
 
 - 200 Success.
 
@@ -121,7 +222,7 @@ curl --request GET \
 
 Retrieves all databases in the system.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -129,7 +230,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -149,7 +250,7 @@ curl --request GET \
 
 Creates a table in a specified database.
 
-#### Request
+### Request
 
 ```
 curl --request POST \
@@ -197,7 +298,7 @@ curl --request POST \
 } '
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -222,7 +323,7 @@ curl --request POST \
 
 Deletes a table from a specified database.
 
-#### Request
+### Request
 
 ```
 curl --request DELETE \
@@ -235,7 +336,7 @@ curl --request DELETE \
 } '
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -260,7 +361,7 @@ curl --request DELETE \
 
 Lists all tables in a specified database.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -268,7 +369,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -305,7 +406,7 @@ curl --request GET \
 
 Shows detailed information of a specified table.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -313,7 +414,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -344,7 +445,7 @@ curl --request GET \
 
 Shows the column information of a specific table in a specified database.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -352,7 +453,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -394,7 +495,7 @@ curl --request GET \
 
 Creates an index on a specified table.
 
-#### Request
+### Request
 
 ```
 curl --request POST \
@@ -422,7 +523,7 @@ curl --request POST \
 
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -447,7 +548,7 @@ curl --request POST \
 
 Drop an index.
 
-#### Request
+### Request
 
 ```
 curl --request DELETE \
@@ -460,7 +561,7 @@ curl --request DELETE \
 } '
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -485,7 +586,7 @@ curl --request DELETE \
 
 Show detailed information of a specified index.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -493,7 +594,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -527,7 +628,7 @@ curl --request GET \
 
 Show detailed information of a specified index segment.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -535,7 +636,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -564,7 +665,7 @@ curl --request GET \
 
 Show detailed information of a index chunk of specified index chunk.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -572,7 +673,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -601,7 +702,7 @@ curl --request GET \
 
 Lists all indexes of a specified table.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -609,7 +710,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -638,7 +739,7 @@ curl --request GET \
 
 Imports data into a specified table.
 
-#### Request
+### Request
 
 ```
 curl --request PUT \
@@ -654,7 +755,7 @@ curl --request PUT \
 } '
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -679,7 +780,7 @@ curl --request PUT \
 
 Exports data into a specified table.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -695,7 +796,7 @@ curl --request GET \
 } '
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -720,7 +821,7 @@ curl --request GET \
 
 Inserts data into a specified table.
 
-#### Request
+### Request
 
 ```
 curl --request POST \
@@ -742,7 +843,7 @@ curl --request POST \
 ] '
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -767,7 +868,7 @@ curl --request POST \
 
 Deletes data in a specified table.
 
-#### Request
+### Request
 
 ```
 curl --request DELETE \
@@ -780,7 +881,7 @@ curl --request DELETE \
 } '
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -806,7 +907,7 @@ curl --request DELETE \
 
 Updates data in a specified table.
 
-#### Request
+### Request
 
 ```
 curl --request PUT \
@@ -823,7 +924,7 @@ curl --request PUT \
 } '
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -849,7 +950,7 @@ curl --request PUT \
 
 Searches data in a specified table.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -885,7 +986,7 @@ curl --request GET \
 } '
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -916,7 +1017,7 @@ curl --request GET \
 
 Shows all segments of a specified table.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -924,7 +1025,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -957,7 +1058,7 @@ curl --request GET \
 
 Shows details of a specified segment. 
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -965,7 +1066,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -1000,7 +1101,7 @@ curl --request GET \
 
 Shows all blocks of specified segment.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -1008,7 +1109,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -1041,7 +1142,7 @@ curl --request GET \
 
 Shows details of a specified block.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -1049,7 +1150,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -1082,7 +1183,7 @@ curl --request GET \
 
 Shows details of a specified column in a specific block.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -1090,7 +1191,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -1120,7 +1221,7 @@ curl --request GET \
 
 Gets all global variables.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -1128,7 +1229,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -1158,7 +1259,7 @@ curl --request GET \
 
 Gets a global variable.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -1166,7 +1267,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -1192,7 +1293,7 @@ curl --request GET \
 
 Sets a variable with value.
 
-#### Request
+### Request
 
 ```
 curl --request POST \
@@ -1202,7 +1303,7 @@ curl --request POST \
      --data ' { "profile_record_capacity" : 120 } '
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -1227,7 +1328,7 @@ curl --request POST \
 
 Gets all configs.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -1235,7 +1336,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -1279,7 +1380,7 @@ curl --request GET \
 
 Gets a config.
 
-#### Request
+### Request
 
 ```
 curl --request GET \
@@ -1287,7 +1388,7 @@ curl --request GET \
      --header 'accept: application/json'
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
@@ -1313,7 +1414,7 @@ curl --request GET \
 
 Sets a config with value.
 
-#### Request
+### Request
 
 ```
 curl --request POST \
@@ -1323,7 +1424,7 @@ curl --request POST \
      --data ' { "log_level" : "trace" } '
 ```
 
-#### Response
+### Response
 
 - 200 Success.
 
