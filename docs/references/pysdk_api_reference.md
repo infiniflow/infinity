@@ -96,8 +96,7 @@ A structure containing the following attributes:
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -220,8 +219,7 @@ A structure containing the following attributes:
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -263,8 +261,7 @@ A structure containing the following attributes:
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
@@ -485,8 +482,7 @@ A structure containing the following attributes:
   - `0`: The operation succeeds.
   - A non-zero value indicates a specific error condition.
 - `error_msg`: `str`
-  - When `error_code` is `0`, `error_msg` is an empty string.
-  - When `error_code` is non-zero, `error_msg` provides additional details about the error.
+  When `error_code` is non-zero, `error_msg` provides additional details about the error.
 
 ### Examples
 
