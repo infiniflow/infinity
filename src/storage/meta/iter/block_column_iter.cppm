@@ -137,14 +137,10 @@ public:
         if (cur_ == end_) {
             return None;
         }
-        const void *ret = column_vector_->data() + cur_ * ele_size_;
-        const auto *v_ptr = reinterpret_cast<const SparseT *>(ret);
-        if (v_ptr->nnz_ == 0) {
-            SparseVecRef<DataType, IdxType> sparse_vec_ref(0, nullptr, nullptr);
-            return std::make_pair(sparse_vec_ref, block_offset_ + cur_++);
-        }
-        SparseVecRef<DataType, IdxType> sparse_vec_ref = column_vector_->buffer_->GetSparse<DataType, IdxType>(v_ptr->file_offset_, v_ptr->nnz_);
-        return std::make_pair(sparse_vec_ref, block_offset_ + cur_++);
+        auto [data_span, index_span, nnz] = column_vector_->GetSparseRaw(cur_++);
+        auto *data_ptr = reinterpret_cast<const DataType *>(data_span.data());
+        auto *index_ptr = reinterpret_cast<const IdxType *>(index_span.data());
+        return std::make_pair(SparseVecRef<DataType, IdxType>(nnz, index_ptr, data_ptr), block_offset_ + cur_ - 1);
     }
 
 private:

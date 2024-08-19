@@ -12,27 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "tensor_array_type.h"
 #include "tensor_type.h"
-#include <iostream>
 #include <sstream>
 
 namespace infinity {
-
-std::string TensorType::Tensor2String(const char *tensor_p, const EmbeddingDataType type, const size_t embedding_dimension, const size_t embedding_num) {
-    auto *tensor_ptr = const_cast<char *>(tensor_p);
-    const size_t embedding_size = EmbeddingType::EmbeddingSize(type, embedding_dimension);
+std::string TensorArrayType::TensorArray2String(const std::vector<std::pair<std::span<const char>, size_t>> &raw_data,
+                                                EmbeddingDataType type,
+                                                size_t embedding_dimension) {
     std::ostringstream oss;
-    // first embedding
-    EmbeddingType embedding(nullptr, false);
-    embedding.ptr = tensor_ptr;
-    oss << '[' << EmbeddingType::Embedding2String(embedding, type, embedding_dimension);
-    for (size_t i = 1; i < embedding_num; ++i) {
-        // next embedding
-        embedding.ptr = tensor_ptr + i * embedding_size;
-        oss << ',' << EmbeddingType::Embedding2String(embedding, type, embedding_dimension);
+    oss << '[';
+    size_t tensor_num = raw_data.size();
+    for (size_t tensor_id = 0; tensor_id < tensor_num; ++tensor_id) {
+        const auto &[data, embedding_num] = raw_data[tensor_id];
+        oss << TensorType::Tensor2String(data.data(), type, embedding_dimension, embedding_num);
+        if (tensor_id != tensor_num - 1) {
+            oss << ',';
+        }
     }
     oss << ']';
     return std::move(oss).str();
 }
-
 } // namespace infinity

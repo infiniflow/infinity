@@ -294,20 +294,6 @@ void PhysicalAggregate::GroupByInputTable(const SharedPtr<DataTable> &input_tabl
                         case kVarchar: {
                             String error_message = "Not implement: data shuffle.";
                             UnrecoverableError(error_message);
-                            //                            VarcharT &dst_ref = ((VarcharT
-                            //                            *)(output_datablock->column_vectors[column_id]->data()))[output_row_idx]; VarcharT &src_ref
-                            //                            = ((VarcharT
-                            //                            *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset]; if
-                            //                            (src_ref.IsInlined()) {
-                            //                                std::memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
-                            //                            } else {
-                            //                                dst_ref.length = src_ref.length;
-                            //                                std::memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
-                            //
-                            //                                dst_ref.ptr =
-                            //                                output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
-                            //                                std::memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
-                            //                            }
                             break;
                         }
                         case kDate: {
@@ -447,19 +433,6 @@ void PhysicalAggregate::GenerateGroupByResult(const SharedPtr<DataTable> &input_
                     String error_message = "Not implement: data shuffle.";
                     UnrecoverableError(error_message);
                     break;
-                    //                    VarcharT &dst_ref = ((VarcharT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx];
-                    //                    VarcharT &src_ref = ((VarcharT
-                    //                    *)(input_datablocks[input_block_id]->column_vectors[column_id]->data()))[input_offset]; if
-                    //                    (src_ref.IsInlined()) {
-                    //                        std::memcpy((char *)&dst_ref, (char *)&src_ref, sizeof(VarcharT));
-                    //                    } else {
-                    //                        dst_ref.length = src_ref.length;
-                    //                        std::memcpy(dst_ref.prefix, src_ref.prefix, VarcharT::PREFIX_LENGTH);
-                    //
-                    //                        dst_ref.ptr =
-                    //                        output_datablock->column_vectors[column_id]->buffer_->fix_heap_mgr_->Allocate(src_ref.length);
-                    //                        std::memcpy(dst_ref.ptr, src_ref.ptr, src_ref.length);
-                    //                    }
                 }
                 case kDate: {
                     ((DateT *)(output_datablock->column_vectors[column_id]->data()))[block_row_idx] =

@@ -24,7 +24,7 @@ import pyarrow as pa
 from pyarrow import Table
 from sqlglot import condition, maybe_parse
 
-from infinity.common import VEC, SPARSE, InfinityException
+from infinity.common import VEC, SparseVector, InfinityException
 from infinity.errors import ErrorCode
 from infinity.remote_thrift.infinity_thrift_rpc.ttypes import *
 from infinity.remote_thrift.types import (
@@ -83,7 +83,7 @@ class InfinityThriftQueryBuilder(ABC):
         self._limit = None
         self._offset = None
 
-    def knn(
+    def match_dense(
         self,
         vector_column_name: str,
         embedding_data: VEC,
@@ -191,10 +191,10 @@ class InfinityThriftQueryBuilder(ABC):
     def match_sparse(
         self,
         vector_column_name: str,
-        sparse_data: SPARSE,
+        sparse_data: SparseVector,
         metric_type: str,
         topn: int,
-        opt_params: {} = None,
+        opt_params: Optional[dict] = None,
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
@@ -207,8 +207,8 @@ class InfinityThriftQueryBuilder(ABC):
         self._search.match_exprs.append(generic_match_expr)
         return self
 
-    def match(
-        self, fields: str, matching_text: str, options_text: str = ""
+    def match_text(
+        self, fields: str, matching_text: str, topn: int, extra_options: Optional[dict]
     ) -> InfinityThriftQueryBuilder:
         if self._search is None:
             self._search = SearchExpr()
@@ -216,6 +216,10 @@ class InfinityThriftQueryBuilder(ABC):
         match_expr = MatchExpr()
         match_expr.fields = fields
         match_expr.matching_text = matching_text
+        options_text = f"topn={topn}"
+        if extra_options is not None:
+            for k, v in extra_options.items():
+                options_text += f";{k}={v}"
         match_expr.options_text = options_text
         generic_match_expr = GenericMatchExpr(match_text_expr=match_expr)
         self._search.match_exprs.append(generic_match_expr)

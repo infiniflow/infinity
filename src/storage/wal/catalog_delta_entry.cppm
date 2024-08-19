@@ -246,7 +246,7 @@ public:
     Vector<String> GetFilePaths() const override { return local_paths_; }
 
 public:
-    Vector<Pair<u32, u64>> outline_infos_;
+    Pair<u32, u64> outline_info_;
     Vector<String> local_paths_;
 };
 

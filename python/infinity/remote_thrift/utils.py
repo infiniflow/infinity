@@ -22,7 +22,7 @@ import numpy as np
 import infinity.remote_thrift.infinity_thrift_rpc.ttypes as ttypes
 from infinity.remote_thrift.types import build_result, logic_type_to_dtype
 from infinity.utils import binary_exp_to_paser_exp
-from infinity.common import InfinityException
+from infinity.common import InfinityException, SparseVector
 from infinity.errors import ErrorCode
 
 
@@ -221,16 +221,16 @@ def get_remote_constant_expr_from_python_value(value) -> ttypes.ConstantExpr:
         case [[[float(), *_], *_], *_]:
             constant_expression = ttypes.ConstantExpr(literal_type=ttypes.LiteralType.DoubleTensorArray,
                                                       f64_tensor_array_value=value)
-        case {"indices": [int(), *_], "values": [int(), *_]}:
+        case SparseVector([int(), *_] as indices, [int(), *_] as values):
             constant_expression = ttypes.ConstantExpr(
                 literal_type=ttypes.LiteralType.SparseIntegerArray,
-                i64_array_value=value["values"],
-                i64_array_idx=value["indices"])
-        case {"indices": [int(), *_], "values": [float(), *_]}:
+                i64_array_idx=indices,
+                i64_array_value=values)
+        case SparseVector([int(), *_] as indices, [float(), *_] as values):
             constant_expression = ttypes.ConstantExpr(
                 literal_type=ttypes.LiteralType.SparseDoubleArray,
-                f64_array_value=value["values"],
-                i64_array_idx=value["indices"])
+                i64_array_idx=indices,
+                f64_array_value=values)
         case _:
             raise InfinityException(ErrorCode.INVALID_EXPRESSION, f"Invalid constant type: {type(value)}")
     return constant_expression

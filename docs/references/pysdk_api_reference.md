@@ -1441,10 +1441,10 @@ table_object.output(["*"]).filter("c2 = 3").to_pl()
 
 ---
 
-## knn
+## match_dense
 
 ```python
-table_object.knn(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
+table_object.match_dense(vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params = None)
 ```
 
 Creates a dense vector search expression to identify the top n closest rows to the given dense vector. Suitable for working with dense vectors (dense embeddings).
@@ -1506,7 +1506,7 @@ A dictionary representing additional KNN or ANN search parameters. Currently onl
 # Find the 100 nearest neighbors using Euclidean distance
 # If no vector index is created on the column being queried, then the vector search defaults to a brute-force search.
 # In such case, set `knn_params` to `None` or leave it blank.
-table_object.output(["*"]).knn("vec", [0.1,0.2,0.3], "float", "l2", 100).to_pl()
+table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "l2", 100).to_pl()
 ```
 
 :::caution NOTE
@@ -1525,7 +1525,7 @@ table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitPara
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
 # If you leave `knn_params` blank, the search uses the `topn` value as the value for `"ef"`.
-table_object.output(["*"]).knn("vec", [1, 2, 3], "uint8", "cosine", 2).to_pl()
+table_object.output(["*"]).match_dense("vec", [1, 2, 3], "uint8", "cosine", 2).to_pl()
 ```
 
 ```python
@@ -1534,7 +1534,7 @@ table_object.create_index("my_index", IndexInfo("vec", IndexType.Hnsw, [InitPara
 # Find the 2 nearest neighbors using inner product distance
 # If an HNSW index is successfully built on the column being queried, then the vector search uses this index,
 # regardless of whether `knn_params` is set.
-table_object.output(["*"]).knn("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"}).to_pl()
+table_object.output(["*"]).match_dense("vec", [0.1,0.2,0.3], "float", "ip", 2, {"ef": "100"}).to_pl()
 ```
 
 :::tip NOTE
@@ -1561,12 +1561,23 @@ To display your query results, you must chain this method with `output(columns)`
 
 A non-empty string indicating the name of the column to query on.
 
-#### sparse_data: `dict[str, list[int | float]]`, *Required*
+#### sparse_data: `SparseVector(list[int], list[int] | list[float])`, *Required*
 
-The query sparse vector data to compare against. The `sparse_data` parameter should be provided as a dictionary like `{"indices": list[int], "values": list[int | float]}`:
+The query sparse vector data to compare against. The `sparse_data` parameter should be provided as a SparseVector object, which has two members:
 
-- `"indices"`: A list of the indices, each corresponding to a non-zero value in the sparse vector.
-- `"values"`: A list of non-zero values in the sparse vector.
+- `indices`: A list of the indices, each corresponding to a non-zero value in the sparse vector.
+- `values`: A list of the corresponding values for each index in the `indices` list.
+
+:::tip NOTE
+If you have a dictionary of indices and values, you can create a SparseVector object using the `SparseVector` class. For example:
+
+```python
+from infinity.common import SparseVector
+dic_sparse_vector = {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}
+sparse_vector = SparseVector(**dic_sparse_vector)
+```
+
+:::
 
 #### distance_type: `str`, *Required*
 
@@ -1599,13 +1610,14 @@ A dictionary representing additional parameters for the sparse vector search. Fo
 ```python
 # As demonstrated in the following example:
 # The sparse vector search is performed on column "sparse_column" to find the 100 nearest neighbors using inner product
-# {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]} represents the sparse vector to compare against:
+# SparseVector(**{"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}) represents the sparse vector to compare against:
 # - 0: the index of 0.1
 # - 10: the index of 0.2
 # - 20: the index of 0.3
 # If no sparse vector index is created on the column being queried, then the search defaults to a brute-force search.
 # In such case, set `opt_params` to `None` or leave it blank.
-table_object.output(["*"]).match_sparse('sparse', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100).to_df()
+from infinity.common import SparseVector
+table_object.output(["*"]).match_sparse('sparse', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100).to_df()
 ```
 
 :::caution NOTE
@@ -1616,30 +1628,32 @@ table_object.output(["*"]).match_sparse('sparse', {"indices": [0, 10, 20], "valu
 
 ```python
 from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", [IndexInfo("sparse", IndexType.BMP, [])])
+table_object.create_index("my_index", [IndexInfo("sparse", IndexType.BMP)])
 # Find the 100 nearest neighbors using inner product
 # If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
 # regardless of whether `opt_params` is set.
 # If you leave `opt_params` blank, the search takes the default settings for `"alpha"` and `"beta"`.
-table_object.output(["*"]).match_sparse('sparse', {"indices": [0, 10, 20], "values": [0.1, 0.2, 0.3]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
+from infinity.common import SparseVector
+table_object.output(["*"]).match_sparse('sparse', SparseVector([0, 10, 20], [0.1, 0.2, 0.3]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
 ```
 
 ```python
 from infinity.index import IndexInfo, IndexType, InitParameter
-table_object.create_index("my_index", IndexInfo("sparse", IndexType.BMP, []))
+table_object.create_index("my_index", IndexInfo("sparse", IndexType.BMP))
 # Find the 100 nearest neighbors using inner product
 # If a BMP index is successfully built on the column being queried, then the sparse vector search uses this index,
 # regardless of whether `opt_params` is set.
 # You can set the values of `"alpha"` or `"beta"` in `opt_params`, which overrides the default settings.
-table_object.output(["*"]).match_sparse('sparse', {"indices": [0, 10, 20], "values": [8, 10, 66]}, 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
+from infinity.common import SparseVector
+table_object.output(["*"]).match_sparse('sparse', SparseVector([0, 10, 20], [8, 10, 66]), 'ip', 100, {"alpha": "1.0", "beta": "1.0"}).to_df()
 ```
 
 ---
 
-## match
+## match_text
 
 ```python
-table_object.match(fields, matching_text, distance_type, options_text)
+table_object.match_text(fields, matching_text, topn, extra_options)
 ```
 
 Creates a full-text search expression on the specified field(s)/column(s) to identify the most relevant rows.
@@ -1667,30 +1681,42 @@ To display your query results, you must chain this method with `output(columns)`
 A non-empty text string to search for. You can use various search options within the matching text, including:
 
 - Single terms: `"blooms"`
-- OR multiple terms: `"Bloom filter"`
+- OR multiple terms: `"Bloom OR filter"`, `"Bloom || filter"` or just `"Bloom filter"`
 - Phrase search: `'"Bloom filter"'`
-- AND multiple terms: "space efficient"
-- Escaping reserved characters: "space\-efficient"
-- Sloppy phrase search: "harmful chemical"~10
-- Field-specific search: title:(quick OR brown) AND body:foobar
+- AND multiple terms: `"space AND efficient"`, `"space && efficient"` or `"space + efficient"`
+- Escaping reserved characters: `"space\-efficient"`
+- Sloppy phrase search: `'"harmful chemical"~10'`
+- Field-specific search: `"title:(quick OR brown) AND body:foobar"`
 
-#### options_text: `str`, *Required*
+#### topn: `int`, *Required*
 
-A non-empty string specifying the following search options:
+Specifies the number of the most relevant rows to retrieve, e.g., assign `10` to obtain the ten most relevant rows.
 
-- **"topn"**: `str`, *Required*  
-  Specifies the number of the most relevant rows to retrieve, e.g., `"topn=10"` to obtain the ten most relevant rows.
+#### extra_options: `dict`, *Optional*
+
+An optional dictionary specifying the following search options:
+
+- **"default_field"**: `str`, *Optional*
+  - If `"fields"` is an empty string, this parameter specifies the default field to search on.
 - **"operator"**: `str`, *Optional*
-  - If not specified, the search follows Infinity's full-text search syntax, meaning that logical and arithmetic operators and escape characters will function as full-text search operators, such as:
-    - `&&`, `+`, `||`, `!`, `NOT`, `AND`, `OR` `-`, `(`, `)`, `~`, `^`, `:`, `"`.
-    - Escape characters like `\`, `\t`, and more.
+  - If not specified, the search follows Infinity's full-text search syntax, meaning that logical and arithmetic operators, quotation marks and escape characters will function as full-text search operators, such as:
+    - AND operator: `AND`, `&&`, `+`
+    - OR operator: `OR`, `||`
+    - NOT operator: `NOT`, `!`, `-`
+    - PAREN operator: `(`, `)`, need to appear in pairs, and can be nested.
+    - COLON operator: `:`: Used to specify field-specific search, e.g., `body:foobar` searches for `foobar` in the `body` field.
+    - CARAT operator: `^`: Used to boost the importance of a term, e.g., `quick^2 brown` boosts the importance of `quick` by a factor of 2, making it twice as important as `brown`.
+    - TILDE operator: `~`: Used for sloppy phrase search, e.g., `"harmful chemical"~10` searches for the phrase `"harmful chemical"` within a tolerable distance of 10 words.
+    - SINGLE_QUOTED_STRING: Used to search for a phrase, e.g., `'Bloom filter'`.
+    - DOUBLE_QUOTED_STRING: Used to search for a phrase, e.g., `"Bloom filter"`.
+    - Escape characters: Used to escape reserved characters, e.g., `space\-efficient`. Starting with a backslash `\` will escape the following characters:   
+      `' '`, `'+'`, `'-'`, `'='`, `'&'`, `'|'`, `'!'`, `'('`, `')'`, `'{'`, `'}'`, `'['`, `']'`, `'^'`, `'"'`, `'~'`, `'*'`, `'?'`, `':'`, `'\'`, `'/'`
   - If specified, Infinity's full-text search syntax will not take effect, and the specified operator will be interpolated into `matching_text`.
-    - `"operator=OR"`/`"operator=or"`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.
-    - `"operator=AND"`/`"operator=and"`: Interpolates the `AND` operator between words in `matching_text` to create a new search text. Useful for searching text including code numbers like `"A01-233:BC"`, resulting in `"A01" AND "-233" AND "BC"`.
-  
-:::tip NOTE
-If both `"topn"` and `"operator"` options are specified, separate them with a semicolon, e.g., `"topn=100;operator=OR"`
-:::
+    Useful for searching text including code numbers like `"A01-233:BC"`.
+    - `{"operator": "or"}`: Interpolates the `OR` operator between words in `matching_text` to create a new search text.
+      For example, reinterprets `"A01-233:BC"` as `'"A01" OR "-233" OR "BC"'`.
+    - `{"operator": "and"}`: Interpolates the `AND` operator between words in `matching_text` to create a new search text.
+      For example, reinterprets `"A01-233:BC"` as `'"A01" AND "-233" AND "BC"'`.
 
 ### Returns
 
@@ -1714,7 +1740,8 @@ questions = [
     r'title:(quick OR brown) AND body:foobar', # search `(quick OR brown)` in the `title` field. keep fields empty.
 ]
 for question in questions:
-    table_object.output(["*"]).match('body', question, 'topn=2').to_df()
+    table_object.output(["*"]).match_text('body', question, 2).to_df()
+    table_object.output(["*"]).match_text('', question, 2, {'default_field': 'body'}).to_df()
 ```
 
 ---
@@ -1798,20 +1825,22 @@ The following code snippets illustrate the use of fused reranking in a three-way
 #### Use RRF for reranking
 
 ```python {6}
+from infinity.common import SparseVector
 table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
-            .match("body", "blooms", "topn=10")
+            .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_text("body", "blooms", 10)
             .filter("year < 2024")
             .fusion("rrf", 2)
             .to_pl()
 ```
 
 ```python {6}
+from infinity.common import SparseVector
 table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
-            .match("body", "blooms", "topn=10")
+            .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_text("body", "blooms", 10)
             .filter("year < 2024")
             .fusion("rrf", 2, {"rank_constant": 30})
             .to_pl()
@@ -1820,10 +1849,11 @@ table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"]
 #### Use Weighted Sum for reranking
 
 ```python {6}
+from infinity.common import SparseVector
 table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
-            .match("body", "blooms", "topn=10")
+            .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_text("body", "blooms", 10)
             .filter("year < 2024")
             .fusion("weighted_sum", 2, {"weights": "1,2,0.5"})
             .to_pl()
@@ -1832,10 +1862,11 @@ table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"]
 #### Use tensor reranking
 
 ```python {8}
+from infinity.common import SparseVector
 table_object.output(["num", "body", "vec", "sparse", "year", "tensor", "_score"])
-            .knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
-            .match_sparse("sparse", {"indices": [0, 20, 80], "values": [1.0, 2.0, 3.0]}, "ip", 3)
-            .match("body", "blooms", "topn=10")
+            .match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "cosine", 3)
+            .match_sparse("sparse", SparseVector([0, 20, 80], [1.0, 2.0, 3.0]), "ip", 3)
+            .match_text("body", "blooms", 10)
             .filter("year < 2024")
             .fusion("match_tensor", 2, {"field": "tensor", "data_type": "float", "data": [[0.0, -10.0, 0.0, 0.7], [9.2, 45.6, -55.8, 3.5]]})
             .to_pl()
@@ -1907,7 +1938,7 @@ A `polas.DataFrame` object.
 
 ```python
 # Format a vector search result into a Polas DataFrame. 
-res = table_object.output(["*"]).knn("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10).to_pl()
+res = table_object.output(["*"]).match_dense("vec", [3.0, 2.8, 2.7, 3.1], "float", "ip", 10).to_pl()
 ```
 
 ## to_arrow

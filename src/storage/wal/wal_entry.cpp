@@ -51,9 +51,7 @@ WalBlockInfo::WalBlockInfo(BlockEntry *block_entry)
     for (SizeT i = 0; i < block_entry->columns_.size(); i++) {
         auto &col_i_outline_info = outline_infos_[i];
         auto *column = block_entry->columns_[i].get();
-        for (u32 layer_n = 0; layer_n < 2; ++layer_n) {
-            col_i_outline_info.emplace_back(column->OutlineBufferCount(layer_n), column->LastChunkOff(layer_n));
-        }
+        col_i_outline_info = {column->OutlineBufferCount(0), column->LastChunkOff(0)};
         paths_.push_back(column->FilePath());
     }
     String file_dir = fmt::format("{}/{}", *block_entry->base_dir(), *block_entry->block_dir());
@@ -68,15 +66,13 @@ bool WalBlockInfo::operator==(const WalBlockInfo &other) const {
 
 i32 WalBlockInfo::GetSizeInBytes() const {
     i32 size = sizeof(BlockID) + sizeof(row_count_) + sizeof(row_capacity_);
-    size += sizeof(i32);
-    for (const auto &v : outline_infos_) {
-        size += sizeof(i32) + v.size() * (sizeof(u32) + sizeof(u64));
-    }
+    size += sizeof(i32) + outline_infos_.size() * (sizeof(u32) + sizeof(u64));
 
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
-        size += pm->GetSizeInBytes(paths_);
+        pm_size_ = pm->GetSizeInBytes(paths_);
+        size += pm_size_;
     }
     return size;
 }
@@ -86,17 +82,20 @@ void WalBlockInfo::WriteBufferAdv(char *&buf) const {
     WriteBufAdv(buf, row_count_);
     WriteBufAdv(buf, row_capacity_);
     WriteBufAdv(buf, static_cast<i32>(outline_infos_.size()));
-    for (const auto &outline_info : outline_infos_) {
-        WriteBufAdv(buf, static_cast<i32>(outline_info.size()));
-        for (const auto &[idx, off] : outline_info) {
-            WriteBufAdv(buf, idx);
-            WriteBufAdv(buf, off);
-        }
+    for (const auto &[idx, off] : outline_infos_) {
+        WriteBufAdv(buf, idx);
+        WriteBufAdv(buf, off);
     }
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
     if (use_object_cache) {
+        char *start = buf;
         pm->WriteBufAdv(buf, paths_);
+        SizeT pm_size = buf - start;
+        if (pm_size != pm_size_) {
+            String error_message = fmt::format("PersistenceManager size mismatch: expected {}, actual {}", pm_size_, pm_size);
+            UnrecoverableError(error_message);
+        }
     }
 }
 
@@ -109,13 +108,9 @@ WalBlockInfo WalBlockInfo::ReadBufferAdv(char *&ptr) {
     block_info.outline_infos_.resize(count);
     for (i32 i = 0; i < count; i++) {
         auto &outline_info = block_info.outline_infos_[i];
-        const i32 info_count = ReadBufAdv<i32>(ptr);
-        outline_info.resize(info_count);
-        for (i32 j = 0; j < info_count; j++) {
-            const auto buffer_cnt = ReadBufAdv<u32>(ptr);
-            const auto last_chunk_offset = ReadBufAdv<u64>(ptr);
-            outline_info[j] = {buffer_cnt, last_chunk_offset};
-        }
+        const auto buffer_cnt = ReadBufAdv<u32>(ptr);
+        const auto last_chunk_offset = ReadBufAdv<u64>(ptr);
+        outline_info = {buffer_cnt, last_chunk_offset};
     }
     PersistenceManager *pm = InfinityContext::instance().persistence_manager();
     bool use_object_cache = pm != nullptr;
@@ -130,16 +125,9 @@ String WalBlockInfo::ToString() const {
     ss << "block_id: " << block_id_ << ", row_count: " << row_count_ << ", row_capacity: " << row_capacity_;
     ss << ", next_outline_idxes: [";
     for (SizeT i = 0; i < outline_infos_.size(); i++) {
-        ss << "outline_buffer_group_" << i << ": [";
-        const auto &outline_info = outline_infos_[i];
-        for (SizeT j = 0; j < outline_info.size(); ++j) {
-            auto &[idx, off] = outline_info[j];
-            ss << "(" << idx << ", " << off << ")";
-            if (j != outline_info.size() - 1) {
-                ss << ", ";
-            }
-        }
-        ss << "]";
+        ss << "outline_buffer_group_" << i << ": (";
+        const auto &[idx, off] = outline_infos_[i];
+        ss << idx << ", " << off << ")";
         if (i != outline_infos_.size() - 1) {
             ss << ", ";
         }
@@ -1223,11 +1211,11 @@ String WalEntry::ToString() const {
 String WalEntry::CompactInfo() const {
     std::stringstream ss;
     SizeT cmd_size = cmds_.size();
-    for(SizeT idx = 0; idx < cmd_size - 1; ++ idx) {
-        auto& cmd = cmds_[idx];
+    for (SizeT idx = 0; idx < cmd_size - 1; ++idx) {
+        auto &cmd = cmds_[idx];
         ss << cmd->CompactInfo() << std::endl;
     }
-    if(cmds_.size() > 0) {
+    if (cmds_.size() > 0) {
         ss << cmds_.back()->CompactInfo();
     }
     return ss.str();

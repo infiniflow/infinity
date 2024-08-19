@@ -4,16 +4,17 @@ import requests
 import logging
 import os
 from test_pysdk.common.common_data import *
-from infinity.common import ConflictType, InfinityException
+from infinity.common import ConflictType, InfinityException, SparseVector
 from test_pysdk.common import common_values
 import infinity
 from typing import Optional
 from infinity.errors import ErrorCode
+from infinity.utils import deprecated_api
 import numpy as np
 import pandas as pd
 import polars as pl
 import pyarrow as pa
-
+from infinity.table import ExplainType
 
 
 class infinity_http:
@@ -393,6 +394,16 @@ class infinity_http:
         self.index_list = index_list
         return self
 
+    def optimize(self, index_name = "", optimize_options = {}):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/indexes/{index_name}"
+        h = self.set_up_header(
+            ["accept", "content-type"],
+        )
+        opt_opt = {"optimize_options": optimize_options}
+        r = self.request(url, "put", h, opt_opt)
+        self.raise_exception(r)
+        return self
+
     def insert(self,values=[]):
         if isinstance(values, list):
             pass
@@ -408,6 +419,8 @@ class infinity_http:
                         for idx in range(len(value[key])):
                             if isinstance(value[key][idx], np.ndarray):
                                 value[key][idx] = value[key][idx].tolist()
+                    if isinstance(value[key], SparseVector):
+                        value[key] = value[key].to_dict()
 
         url = f"databases/{self.database_name}/tables/{self.table_name}/docs"
         h = self.set_up_header(["accept", "content-type"])
@@ -494,6 +507,41 @@ class infinity_http:
             self.output_res = []
         return self
 
+    def explain(self, ExplainType = ExplainType.Physical):
+        url = f"databases/{self.database_name}/tables/{self.table_name}/meta"
+        h = self.set_up_header(["accept", "content-type"])
+        tmp = {}
+        if len(self._filter):
+            tmp.update({"filter": self._filter})
+        if len(self._fusion):
+            tmp.update({"fusion": self._fusion})
+        if len(self._knn):
+            tmp.update({"knn": self._knn})
+        if len(self._match):
+            tmp.update({"match": self._match})
+        if len(self._match_tensor):
+            tmp.update({"match_tensor": self._match_tensor})
+        if len(self._match_sparse):
+            tmp.update({"match_sparse": self._match_sparse})
+        if len(self._output):
+            tmp.update({"output": self._output})
+        tmp.update({"explain_type":ExplainType_transfrom(ExplainType)})
+        # print(tmp)
+        d = self.set_up_data([], tmp)
+        r = self.request(url, "get", h, d)
+        self.raise_exception(r)
+        message = ""
+        sign = 0
+        for res in r.json()["output"]:
+            for k in res:
+                if sign == 0:
+                    message = message + k + "\n"
+                    message = message + res[k] + "\n"
+                    sign = 1
+                else:
+                    message = message + res[k] + "\n"
+        return message
+
     def output(
         self,
         output=[],
@@ -508,12 +556,20 @@ class infinity_http:
         self._match_sparse = {}
         return self
 
-    def match(self, fields, query, operator="top=10"):
+    def match_text(self, fields: str, query: str, topn: int, opt_params: Optional[dict] = None):
         self._match = {}
         self._match["fields"] = fields
         self._match["query"] = query
-        self._match["operator"] = operator
+        operator_str = f"topn={topn}"
+        if opt_params is not None:
+            for k, v in opt_params.items():
+                operator_str += f";{k}={v}"
+        self._match["operator"] = operator_str
         return self
+
+    def match(self, *args, **kwargs):
+        deprecated_api("match is deprecated, please use match_text instead")
+        return self.match_text(*args, **kwargs)
 
     def match_tensor(self, column_name: str, query_data, query_data_type: str, topn: int):
         self._match_tensor = {}
@@ -535,7 +591,7 @@ class infinity_http:
         else:
             vector_column_name = [vector_column_name]
         self._match_sparse["fields"] = vector_column_name
-        self._match_sparse["query_sparse"] = sparse_data
+        self._match_sparse["query_sparse"] = sparse_data.to_dict()
         self._match_sparse["metric_type"] = distance_type
         self._match_sparse["topn"] = topn
         self._match_sparse["opt_params"] = opt_params
@@ -545,7 +601,7 @@ class infinity_http:
         self._filter = filter
         return self
 
-    def knn(self, fields, query_vector, element_type, metric_type, top_k, opt_params : {} = None):
+    def match_dense(self, fields, query_vector, element_type, metric_type, top_k, opt_params : {} = None):
         self._knn = {}
         self._knn["fields"] = [fields]
         self._knn["query_vector"] = query_vector
@@ -556,6 +612,10 @@ class infinity_http:
             for key in opt_params:
                 self._knn[key] = opt_params[key]
         return self
+
+    def knn(self, *args, **kwargs):
+        deprecated_api("knn is deprecated, please use match_dense instead")
+        return self.match_dense(*args, **kwargs)
 
     def fusion(self, method: str, topn: int, fusion_params: Optional[dict] = None):
         _fusion = {"method": method}

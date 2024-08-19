@@ -24,7 +24,7 @@ table.insert([{"num": 1, "body": "undesirable, unnecessary, and harmful", "vec":
 table.insert([{"num": 2, "body": "publisher=US National Office for Harmful Algal Blooms", "vec": [4.0] * 5}])
 table.insert([{"num": 3, "body": "in the case of plants, growth and chemical", "vec": [7.0] * 5}])
 
-res = table.output(["*"]).knn("vec", [3.0] * 5, "float", "ip", 2).to_pl()
+res = table.output(["*"]).match_dense("vec", [3.0] * 5, "float", "ip", 2).to_pl()
 print(res)
 
 ```

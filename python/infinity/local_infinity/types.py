@@ -18,7 +18,7 @@ from typing import Any, Tuple, Dict, List
 import polars as pl
 import numpy as np
 from numpy import dtype
-from infinity.common import VEC, SPARSE, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
+from infinity.common import VEC, SparseVector, InfinityException, DEFAULT_MATCH_VECTOR_TOPN
 from infinity.embedded_infinity_ext import *
 from infinity.errors import ErrorCode
 
@@ -304,7 +304,7 @@ def parse_sparse_bytes(column_data_type, column_vector):
                 pass
             case _:
                 raise NotImplementedError(f"Unsupported type {element_type}")
-        res.append({"indices": indices, "values": values})
+        res.append(SparseVector(list(indices), values).to_dict())
     return res
 
 

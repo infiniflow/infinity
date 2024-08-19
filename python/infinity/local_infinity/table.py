@@ -21,7 +21,7 @@ from infinity.embedded_infinity_ext import ConflictType as LocalConflictType
 from infinity.embedded_infinity_ext import WrapIndexInfo, ImportOptions, CopyFileType, WrapParsedExpr, \
     ParsedExprType, WrapUpdateExpr, ExportOptions, WrapOptimizeOptions
 from infinity.common import ConflictType, DEFAULT_MATCH_VECTOR_TOPN
-from infinity.common import INSERT_DATA, VEC, SPARSE, InfinityException
+from infinity.common import INSERT_DATA, VEC, SparseVector, InfinityException
 from infinity.errors import ErrorCode
 from infinity.index import IndexInfo
 from infinity.local_infinity.query_builder import Query, InfinityLocalQueryBuilder, ExplainQuery
@@ -32,6 +32,7 @@ from infinity.remote_thrift.utils import name_validity_check
 from infinity.table import Table, ExplainType
 import infinity.index as index
 from infinity.index import InitParameter
+from infinity.utils import deprecated_api
 from sqlglot import condition
 
 
@@ -317,20 +318,29 @@ class LocalTable(Table, ABC):
         else:
             raise InfinityException(res.error_code, res.error_msg)
 
-    def knn(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
-            topn: int = DEFAULT_MATCH_VECTOR_TOPN, knn_params: {} = None):
-        self.query_builder.knn(
+    def match_dense(self, vector_column_name: str, embedding_data: VEC, embedding_data_type: str, distance_type: str,
+                    topn: int = DEFAULT_MATCH_VECTOR_TOPN, knn_params: {} = None):
+        self.query_builder.match_dense(
             vector_column_name, embedding_data, embedding_data_type, distance_type, topn, knn_params)
         return self
 
-    def match_sparse(self, vector_column_name: str, sparse_data: SPARSE, distance_type: str, topn: int, opt_params: {} = None):
+    def knn(self, *args, **kwargs):
+        deprecated_api("knn is deprecated, please use match_dense instead")
+        return self.match_dense(*args, **kwargs)
+
+    def match_sparse(self, vector_column_name: str, sparse_data: SparseVector, distance_type: str, topn: int,
+                     opt_params: {} = None):
         self.query_builder.match_sparse(vector_column_name, sparse_data, distance_type, topn, opt_params)
         return self
 
     @params_type_check
-    def match(self, fields: str, matching_text: str, options_text: str = ''):
-        self.query_builder.match(fields, matching_text, options_text)
+    def match_text(self, fields: str, matching_text: str, topn: int, extra_options: Optional[dict] = None):
+        self.query_builder.match_text(fields, matching_text, topn, extra_options)
         return self
+
+    def match(self, *args, **kwargs):
+        deprecated_api("match is deprecated, please use match_text instead")
+        return self.match_text(*args, **kwargs)
 
     @params_type_check
     def match_tensor(self, column_name: str, query_data: VEC, query_data_type: str, topn: int,

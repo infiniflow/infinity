@@ -44,6 +44,10 @@ void ObjAddr::Deserialize(const nlohmann::json &obj) {
     part_size_ = obj["part_size"];
 }
 
+SizeT ObjAddr::GetSizeInBytes() const {
+    return sizeof(int32_t) + obj_key_.size() + sizeof(SizeT) + sizeof(SizeT);
+}
+
 void ObjAddr::WriteBufAdv(char *&buf) const {
     ::infinity::WriteBufAdv(buf, obj_key_);
     ::infinity::WriteBufAdv(buf, part_offset_);
@@ -93,6 +97,12 @@ void ObjStat::Deserialize(const nlohmann::json &obj) {
             deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
         }
     }
+}
+
+SizeT ObjStat::GetSizeInBytes() const {
+    SizeT size = sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT);
+    size += (sizeof(SizeT) + sizeof(SizeT)) * deleted_ranges_.size();
+    return size;
 }
 
 void ObjStat::WriteBufAdv(char *&buf) const {
@@ -473,6 +483,7 @@ void PersistenceManager::Cleanup(const String &file_path) {
     if (it == local_path_obj_.end()) {
         String error_message = fmt::format("Failed to find object {}", local_path);
         LOG_WARN(error_message);
+        return;
     }
     CleanupNoLock(it->second);
     local_path_obj_.erase(it);
@@ -558,11 +569,16 @@ void PersistenceManager::ReadBufAdv(char *&buf) {
 SizeT PersistenceManager::GetSizeInBytes(const Vector<String> &local_paths) {
     SizeT size = sizeof(SizeT);
     for (auto &path : local_paths) {
-        ObjAddr obj_addr = GetObjFromLocalPath(path);
-        ObjStat obj_stat = GetObjStatByObjAddr(obj_addr);
         size += sizeof(i32) + path.size();
-        size += sizeof(i32) + obj_addr.obj_key_.size() + sizeof(SizeT) + sizeof(SizeT);
-        size += sizeof(SizeT) + sizeof(SizeT) + sizeof(SizeT) + obj_stat.deleted_ranges_.size() * (2 * sizeof(SizeT));
+        ObjAddr obj_addr = GetObjFromLocalPath(path);
+        size += obj_addr.GetSizeInBytes();
+        if (!obj_addr.Valid()) {
+            ObjStat invalid_stat;
+            size += invalid_stat.GetSizeInBytes();
+        } else {
+            ObjStat obj_stat = GetObjStatByObjAddr(obj_addr);
+            size += obj_stat.GetSizeInBytes();
+        }
     }
     return size;
 }
