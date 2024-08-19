@@ -46,6 +46,7 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 
     u64 residual = all_block_count % parallel_count;
 
     Vector<GlobalBlockID> global_blocks;
+    global_blocks.reserve(all_block_count);
     for (const auto &[segment_id, segment_info] : block_index->segment_block_index_) {
         for (const auto *block_entry : segment_info.block_map_) {
             global_blocks.emplace_back(segment_id, block_entry->block_id());
@@ -54,11 +55,14 @@ Vector<SharedPtr<Vector<GlobalBlockID>>> PhysicalScanBase::PlanBlockEntries(i64 
     Vector<SharedPtr<Vector<GlobalBlockID>>> result(parallel_count, nullptr);
     for (SizeT task_id = 0, global_block_id = 0, residual_idx = 0; (i64)task_id < parallel_count; ++task_id) {
         result[task_id] = MakeShared<Vector<GlobalBlockID>>();
+        auto& task_result = result[task_id];
+        task_result->reserve(block_per_task);
+
         for (u64 block_id_in_task = 0; block_id_in_task < block_per_task; ++block_id_in_task) {
-            result[task_id]->push_back(global_blocks[global_block_id++]);
+            task_result->push_back(global_blocks[global_block_id++]);
         }
         if (residual_idx < residual) {
-            result[task_id]->push_back(global_blocks[global_block_id++]);
+            task_result->push_back(global_blocks[global_block_id++]);
             ++residual_idx;
         }
     }

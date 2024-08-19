@@ -100,10 +100,10 @@ public:
 
 export class FragmentContext {
 public:
-    static void BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *fragment_ptr, Notifier *notifier);
+    static void BuildTask(QueryContext *query_context, FragmentContext *parent_context, PlanFragment *plan_fragment_ptr, Notifier *notifier);
 
 public:
-    explicit FragmentContext(PlanFragment *fragment_ptr, QueryContext *query_context, Notifier *notifier);
+    explicit FragmentContext(PlanFragment *plan_fragment_ptr, QueryContext *query_context, Notifier *notifier);
 
     virtual ~FragmentContext() = default;
 
@@ -144,7 +144,7 @@ public:
 
     inline QueryContext *query_context() { return query_context_; }
 
-    inline PlanFragment *fragment_ptr() { return fragment_ptr_; }
+    inline PlanFragment *plan_fragment_ptr() { return plan_fragment_ptr_; }
 
     [[nodiscard]] inline FragmentType ContextType() const { return fragment_type_; }
 
@@ -173,7 +173,7 @@ protected:
 protected:
     Notifier *notifier_{};
 
-    PlanFragment *fragment_ptr_{};
+    PlanFragment *plan_fragment_ptr_{};
 
     QueryContext *query_context_{};
 
@@ -189,8 +189,8 @@ protected:
 
 export class SerialMaterializedFragmentCtx final : public FragmentContext {
 public:
-    explicit inline SerialMaterializedFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context, Notifier *notifier)
-        : FragmentContext(fragment_ptr, query_context, notifier) {}
+    explicit inline SerialMaterializedFragmentCtx(PlanFragment *plan_fragment_ptr, QueryContext *query_context, Notifier *notifier)
+        : FragmentContext(plan_fragment_ptr, query_context, notifier) {}
 
     ~SerialMaterializedFragmentCtx() final = default;
 
@@ -206,8 +206,8 @@ public:
 
 export class ParallelMaterializedFragmentCtx final : public FragmentContext {
 public:
-    explicit inline ParallelMaterializedFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context, Notifier *notifier)
-        : FragmentContext(fragment_ptr, query_context, notifier) {}
+    explicit inline ParallelMaterializedFragmentCtx(PlanFragment *plan_fragment_ptr, QueryContext *query_context, Notifier *notifier)
+        : FragmentContext(plan_fragment_ptr, query_context, notifier) {}
 
     ~ParallelMaterializedFragmentCtx() final = default;
 
@@ -227,8 +227,8 @@ protected:
 
 export class ParallelStreamFragmentCtx final : public FragmentContext {
 public:
-    explicit inline ParallelStreamFragmentCtx(PlanFragment *fragment_ptr, QueryContext *query_context, Notifier *notifier)
-        : FragmentContext(fragment_ptr, query_context, notifier) {}
+    explicit inline ParallelStreamFragmentCtx(PlanFragment *plan_fragment_ptr, QueryContext *query_context, Notifier *notifier)
+        : FragmentContext(plan_fragment_ptr, query_context, notifier) {}
 
     ~ParallelStreamFragmentCtx() final = default;
 

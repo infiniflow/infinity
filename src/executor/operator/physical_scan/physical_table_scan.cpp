@@ -115,21 +115,27 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
     TxnTimeStamp begin_ts = query_context->GetTxn()->BeginTS();
     SizeT &read_offset = table_scan_function_data_ptr->current_read_offset_;
 
-    {
-        String out;
-        for (auto &global_block_id : *block_ids) {
-            out += fmt::format("({},{}) ", global_block_id.segment_id_, global_block_id.block_id_);
-        }
-        LOG_TRACE(fmt::format("TableScan: block_ids: {}", out));
-    }
+//    This part has performance issue
+//    {
+//        String out;
+//        for (auto &global_block_id : *block_ids) {
+//            out += fmt::format("({},{}) ", global_block_id.segment_id_, global_block_id.block_id_);
+//        }
+//        LOG_TRACE(fmt::format("TableScan: block_ids: {}", out));
+//    }
 
     // Here we assume output is a fresh data block, we have never written anything into it.
     auto write_capacity = output_ptr->available_capacity();
-    while (block_ids_idx < block_ids->size()) {
-        u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
-        u16 block_id = block_ids->at(block_ids_idx).block_id_;
+    u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
+    u16 block_id = block_ids->at(block_ids_idx).block_id_;
+    BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
 
-        BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
+    while (block_ids_idx < block_ids->size()) {
+        if (write_capacity == 0) {
+            // output is full
+            break;
+        }
+
         if (read_offset == 0) {
             // new block, check FastRoughFilter
             const auto &fast_rough_filter = *current_block_entry->GetFastRoughFilter();
@@ -139,6 +145,9 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                                       block_ids_idx,
                                       block_ids->size()));
                 ++block_ids_idx;
+                segment_id = block_ids->at(block_ids_idx).segment_id_;
+                block_id = block_ids->at(block_ids_idx).block_id_;
+                current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 continue;
             } else {
                 LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",
@@ -150,13 +159,13 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         if (row_begin == row_end) {
             // we have read all data from current block, move to next block
             ++block_ids_idx;
+            segment_id = block_ids->at(block_ids_idx).segment_id_;
+            block_id = block_ids->at(block_ids_idx).block_id_;
+            current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
             read_offset = 0;
             continue;
         }
-        if (write_capacity == 0) {
-            // output is full
-            break;
-        }
+
         auto write_size = std::min(write_capacity, SizeT(row_end - row_begin));
 
         read_offset = row_begin;
