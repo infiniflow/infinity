@@ -106,7 +106,8 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
     Vector<GlobalBlockID> *block_ids = table_scan_function_data_ptr->global_block_ids_.get();
     const Vector<SizeT> &column_ids = table_scan_function_data_ptr->column_ids_;
     u64 &block_ids_idx = table_scan_function_data_ptr->current_block_ids_idx_;
-    if (block_ids_idx >= block_ids->size()) {
+    SizeT block_ids_count = block_ids->size();
+    if (block_ids_idx >= block_ids_count) {
         // No data or all data is read
         table_scan_operator_state->SetComplete();
         return;
@@ -126,16 +127,11 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
 
     // Here we assume output is a fresh data block, we have never written anything into it.
     auto write_capacity = output_ptr->available_capacity();
-    u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
-    u16 block_id = block_ids->at(block_ids_idx).block_id_;
-    BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
+    while (block_ids_idx < block_ids_count) {
+        u32 segment_id = block_ids->at(block_ids_idx).segment_id_;
+        u16 block_id = block_ids->at(block_ids_idx).block_id_;
 
-    while (block_ids_idx < block_ids->size()) {
-        if (write_capacity == 0) {
-            // output is full
-            break;
-        }
-
+        BlockEntry *current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
         if (read_offset == 0) {
             // new block, check FastRoughFilter
             const auto &fast_rough_filter = *current_block_entry->GetFastRoughFilter();
@@ -143,29 +139,26 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
                 // skip this block
                 LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, skipped after apply FastRoughFilter",
                                       block_ids_idx,
-                                      block_ids->size()));
+                                      block_ids_count));
                 ++block_ids_idx;
-                segment_id = block_ids->at(block_ids_idx).segment_id_;
-                block_id = block_ids->at(block_ids_idx).block_id_;
-                current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
                 continue;
             } else {
                 LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}, not skipped after apply FastRoughFilter",
                                       block_ids_idx,
-                                      block_ids->size()));
+                                      block_ids_count));
             }
         }
         auto [row_begin, row_end] = current_block_entry->GetVisibleRange(begin_ts, read_offset);
         if (row_begin == row_end) {
             // we have read all data from current block, move to next block
             ++block_ids_idx;
-            segment_id = block_ids->at(block_ids_idx).segment_id_;
-            block_id = block_ids->at(block_ids_idx).block_id_;
-            current_block_entry = block_index->GetBlockEntry(segment_id, block_id);
             read_offset = 0;
             continue;
         }
-
+        if (write_capacity == 0) {
+            // output is full
+            break;
+        }
         auto write_size = std::min(write_capacity, SizeT(row_end - row_begin));
 
         read_offset = row_begin;
@@ -200,9 +193,15 @@ void PhysicalTableScan::ExecuteInternal(QueryContext *query_context, TableScanOp
         read_offset += write_size;
     }
 
-    LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}", block_ids_idx, block_ids->size()));
+    LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}", block_ids_idx, block_ids_count));
 
-    if (block_ids_idx >= block_ids->size()) {
+    if (block_ids_idx >= block_ids_count) {
+        table_scan_operator_state->SetComplete();
+    }
+
+    LOG_TRACE(fmt::format("TableScan: block_ids_idx: {}, block_ids.size(): {}", block_ids_idx, block_ids_count));
+
+    if (block_ids_idx >= block_ids_count) {
         table_scan_operator_state->SetComplete();
     }
 
