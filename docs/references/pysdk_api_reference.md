@@ -18,7 +18,7 @@ Connects to the local directory or the Infinity server, and gets an Infinity obj
 
 The `uri` here can be either a local directory in `str` format or a `NetworkAddress` object:  
 
-- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is installed as a Python module.
+- `"/path/to/save/to"`: `str` - A local directory storing the Infinity data. Used when Infinity is imported as a Python module.
 - `NetworkAddress`: Used in client-server mode, when you have deployed Infinity as a separate server and wish to connect to it remotely. A `NetworkAddress` object comprises two fields:
   - `"<SERVER_IP_ADDRESS>"`: `str` - The IP address of the Infinity server.  
   - `<PORT>`: `int` - The SDK port number on which the Infinity server listens. Defaults to `23817`.
@@ -86,7 +86,7 @@ infinity_object = infinity.connect(infinity.NetworkAddress("192.168.1.101", 2381
 infinity_object.disconnect()
 ```
 
-Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is installed as a Python module.
+Disconnects the client from the Infinity server in client-server mode or destructs the Infinity object and releases all associated resources when Infinity is imported as a Python module.
 
 ### Returns
 
