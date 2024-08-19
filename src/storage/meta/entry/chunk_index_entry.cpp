@@ -127,13 +127,13 @@ SharedPtr<ChunkIndexEntry> ChunkIndexEntry::NewSecondaryIndexChunkIndexEntry(Chu
         auto secondary_index_file_name = MakeShared<String>(IndexFileName(segment_id, chunk_id));
         const auto &index_base = segment_index_entry->table_index_entry()->table_index_def();
         const auto &column_def = segment_index_entry->table_index_entry()->column_def();
-        SharedPtr<String> full_dir = MakeShared<String>(fmt::format("{}/{}", *chunk_index_entry->base_dir_, *index_dir));
+        const auto full_dir = MakeShared<String>(fmt::format("{}/{}", *chunk_index_entry->base_dir_, *index_dir));
         auto file_worker = MakeUnique<SecondaryIndexFileWorker>(full_dir, secondary_index_file_name, index_base, column_def, row_count);
         chunk_index_entry->buffer_obj_ = buffer_mgr->AllocateBufferObject(std::move(file_worker));
         const u32 part_cnt = (row_count + 8191) / 8192;
         for (u32 i = 0; i < part_cnt; ++i) {
             auto part_name = MakeShared<String>(fmt::format("{}_part{}", *secondary_index_file_name, i));
-            auto part_file_worker = MakeUnique<SecondaryIndexFileWorkerParts>(full_dir, part_name, index_base, column_def, row_count, i);
+            auto part_file_worker = MakeUnique<SecondaryIndexFileWorkerParts>(full_dir, std::move(part_name), index_base, column_def, row_count, i);
             BufferObj *part_ptr = buffer_mgr->AllocateBufferObject(std::move(part_file_worker));
             chunk_index_entry->part_buffer_objs_.push_back(part_ptr);
         }
@@ -338,6 +338,7 @@ void ChunkIndexEntry::SaveIndexFile() {
 
 void ChunkIndexEntry::LoadPartsReader(BufferManager *buffer_mgr) {
     const auto &index_dir = segment_index_entry_->index_dir();
+    const auto full_dir = MakeShared<String>(fmt::format("{}/{}", *base_dir_, *index_dir));
     SegmentID segment_id = segment_index_entry_->segment_id();
     String secondary_index_file_name = IndexFileName(segment_id, chunk_id_);
     const auto &index_base = segment_index_entry_->table_index_entry()->table_index_def();
@@ -347,7 +348,7 @@ void ChunkIndexEntry::LoadPartsReader(BufferManager *buffer_mgr) {
     part_buffer_objs_.reserve(part_cnt);
     for (u32 i = 0; i < part_cnt; ++i) {
         auto part_name = MakeShared<String>(fmt::format("{}_part{}", secondary_index_file_name, i));
-        auto part_file_worker = MakeUnique<SecondaryIndexFileWorkerParts>(index_dir, std::move(part_name), index_base, column_def, row_count_, i);
+        auto part_file_worker = MakeUnique<SecondaryIndexFileWorkerParts>(full_dir, std::move(part_name), index_base, column_def, row_count_, i);
         BufferObj *part_ptr = buffer_mgr->GetBufferObject(std::move(part_file_worker));
         part_buffer_objs_.push_back(part_ptr);
     }
