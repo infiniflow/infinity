@@ -52,8 +52,7 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(TestWithDifferentParams,
                          BlockVersionTest,
-                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH,
-                                           BaseTestParamStr::VFS_CONFIG_PATH));
+                         ::testing::Values(BaseTestParamStr::NULL_CONFIG_PATH, BaseTestParamStr::VFS_CONFIG_PATH));
 
 TEST_P(BlockVersionTest, SaveAndLoad) {
     BlockVersion block_version(8192);
@@ -66,7 +65,7 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
 
     {
         auto [file_handler, status] = fs.OpenFile(version_path, FileFlags::WRITE_FLAG | FileFlags::CREATE_FLAG, FileLockType::kNoLock);
-        if(!status.ok()) {
+        if (!status.ok()) {
             UnrecoverableError(status.message());
         }
         block_version.SpillToFile(*file_handler);
@@ -74,7 +73,7 @@ TEST_P(BlockVersionTest, SaveAndLoad) {
 
     {
         auto [file_handler, status] = fs.OpenFile(version_path, FileFlags::READ_FLAG, FileLockType::kNoLock);
-        if(!status.ok()) {
+        if (!status.ok()) {
             UnrecoverableError(status.message());
         }
         auto block_version2 = BlockVersion::LoadFromFile(*file_handler);
@@ -104,8 +103,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
             block_version->Delete(5, 40);
         }
         {
-            auto *file_worker = static_cast<VersionFileWorker *>(buffer_obj->file_worker());
-            buffer_obj->Save(VersionFileWorkerSaveCtx{.checkpoint_ts_ = 15});
+            buffer_obj->Save(VersionFileWorkerSaveCtx(15));
         }
     }
     {
@@ -129,8 +127,7 @@ TEST_P(BlockVersionTest, SaveAndLoad2) {
             block_version->Delete(5, 40);
         }
         {
-            auto *file_worker = static_cast<VersionFileWorker *>(buffer_obj->file_worker());
-            buffer_obj->Save(VersionFileWorkerSaveCtx{.checkpoint_ts_ = 35});
+            buffer_obj->Save(VersionFileWorkerSaveCtx(35));
         }
     }
     {
