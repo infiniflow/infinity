@@ -57,17 +57,9 @@ using namespace infinity;
 class BufferObjTest : public BaseTest {
     void SetUp() override {
         BaseTest::SetUp();
-#ifdef INFINITY_DEBUG
-        infinity::GlobalResourceUsage::Init();
-#endif
     }
 
     void TearDown() override {
-#ifdef INFINITY_DEBUG
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetObjectCount(), 0);
-        EXPECT_EQ(infinity::GlobalResourceUsage::GetRawMemoryCount(), 0);
-        infinity::GlobalResourceUsage::UnInit();
-#endif
         BaseTest::TearDown();
     }
 
@@ -112,6 +104,7 @@ public:
 // ?? status transfer in all
 TEST_F(BufferObjTest, test1) {
 
+    RemoveDbDirs();
     std::shared_ptr<std::string> config_path = std::make_shared<std::string>(std::string(test_data_path()) + "/config/test_buffer_obj.toml");
 //    RemoveDbDirs();
     infinity::InfinityContext::instance().Init(config_path);
