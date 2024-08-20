@@ -52,10 +52,12 @@ void ObjAddr::WriteBufAdv(char *&buf) const {
     ::infinity::WriteBufAdv(buf, part_size_);
 }
 
-void ObjAddr::ReadBufAdv(char *&buf) {
-    obj_key_ = ::infinity::ReadBufAdv<String>(buf);
-    part_offset_ = ::infinity::ReadBufAdv<SizeT>(buf);
-    part_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
+ObjAddr ObjAddr::ReadBufAdv(char *&buf) {
+    ObjAddr ret;
+    ret.obj_key_ = ::infinity::ReadBufAdv<String>(buf);
+    ret.part_offset_ = ::infinity::ReadBufAdv<SizeT>(buf);
+    ret.part_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
+    return ret;
 }
 
 nlohmann::json ObjStat::Serialize() const {
@@ -110,19 +112,21 @@ void ObjStat::WriteBufAdv(char *&buf) const {
     }
 }
 
-void ObjStat::ReadBufAdv(char *&buf) {
-    obj_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
-    parts_ = ::infinity::ReadBufAdv<SizeT>(buf);
-    ref_count_ = 0;
-    deleted_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
+ObjStat ObjStat::ReadBufAdv(char *&buf) {
+    ObjStat ret;
+    ret.obj_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
+    ret.parts_ = ::infinity::ReadBufAdv<SizeT>(buf);
+    ret.ref_count_ = 0;
+    ret.deleted_size_ = ::infinity::ReadBufAdv<SizeT>(buf);
 
     SizeT start, end;
     SizeT len = ::infinity::ReadBufAdv<SizeT>(buf);
     for (SizeT i = 0; i < len; ++i) {
         start = ::infinity::ReadBufAdv<SizeT>(buf);
         end = ::infinity::ReadBufAdv<SizeT>(buf);
-        deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
+        ret.deleted_ranges_.emplace(Range{.start_ = start, .end_ = end});
     }
+    return ret;
 }
 
 PersistenceManager::PersistenceManager(const String &workspace, const String &data_dir, SizeT object_size_limit)
@@ -589,52 +593,6 @@ void PersistenceManager::Deserialize(const nlohmann::json &obj) {
     }
 }
 
-void PersistenceManager::WriteBufAdv(char *&buf, const Vector<String> &local_paths) {
-    ::infinity::WriteBufAdv(buf, local_paths.size());
-    for (auto &path : local_paths) {
-        ObjAddr obj_addr = GetObjFromLocalPath(path);
-        ::infinity::WriteBufAdv(buf, path);
-        obj_addr.WriteBufAdv(buf);
-        if (!obj_addr.Valid()) {
-            ObjStat invalid_stat;
-            invalid_stat.WriteBufAdv(buf);
-        } else {
-            ObjStat obj_stat = GetObjStatByObjAddr(obj_addr);
-            obj_stat.WriteBufAdv(buf);
-        }
-    }
-}
-
-void PersistenceManager::ReadBufAdv(char *&buf) {
-    SizeT size = ::infinity::ReadBufAdv<SizeT>(buf);
-    for (SizeT i = 0; i < size; ++i) {
-        String path = ::infinity::ReadBufAdv<String>(buf);
-        ObjAddr obj_addr;
-        ObjStat obj_stat;
-        obj_addr.ReadBufAdv(buf);
-        obj_stat.ReadBufAdv(buf);
-        SaveLocalPath(path, obj_addr);
-        SaveObjStat(obj_addr, obj_stat);
-    }
-}
-
-SizeT PersistenceManager::GetSizeInBytes(const Vector<String> &local_paths) {
-    SizeT size = sizeof(SizeT);
-    for (auto &path : local_paths) {
-        size += sizeof(i32) + path.size();
-        ObjAddr obj_addr = GetObjFromLocalPath(path);
-        size += obj_addr.GetSizeInBytes();
-        if (!obj_addr.Valid()) {
-            ObjStat invalid_stat;
-            size += invalid_stat.GetSizeInBytes();
-        } else {
-            ObjStat obj_stat = GetObjStatByObjAddr(obj_addr);
-            size += obj_stat.GetSizeInBytes();
-        }
-    }
-    return size;
-}
-
 HashMap<String, ObjStat> PersistenceManager::GetAllObjects() const {
     std::lock_guard<std::mutex> lock(mtx_);
     return objects_;
@@ -643,6 +601,51 @@ HashMap<String, ObjStat> PersistenceManager::GetAllObjects() const {
 HashMap<String, ObjAddr> PersistenceManager::GetAllFiles() const {
     std::lock_guard<std::mutex> lock(mtx_);
     return local_path_obj_;
+}
+
+SizeT AddrSerializer::GetSizeInBytes(PersistenceManager *pm, const Vector<String> &path) const {
+    for (const String &path : path) {
+        ObjAddr obj_addr = pm->GetObjFromLocalPath(path);
+        obj_addrs_.push_back(obj_addr);
+        if (!obj_addr.Valid()) {
+            ObjStat invaild_stat;
+            obj_stats_.push_back(invaild_stat);
+        } else {
+            ObjStat obj_stat = pm->GetObjStatByObjAddr(obj_addr);
+            obj_stats_.push_back(obj_stat);
+        }
+    }
+    SizeT size = sizeof(SizeT);
+    for (SizeT i = 0; i < path.size(); ++i) {
+        size += sizeof(i32) + path[i].size();
+        size += obj_addrs_[i].GetSizeInBytes();
+        size += obj_stats_[i].GetSizeInBytes();
+    }
+    return size;
+}
+
+void AddrSerializer::WriteBufAdv(PersistenceManager *pm, char *&buf, const Vector<String> &path) const {
+    ::infinity::WriteBufAdv(buf, path.size());
+    for (SizeT i = 0; i < path.size(); ++i) {
+        ::infinity::WriteBufAdv(buf, path[i]);
+        obj_addrs_[i].WriteBufAdv(buf);
+        obj_stats_[i].WriteBufAdv(buf);
+    }
+}
+
+Vector<String> AddrSerializer::ReadBufAdv(PersistenceManager *pm, char *&ptr) {
+    SizeT path_count = ::infinity::ReadBufAdv<SizeT>(ptr);
+    Vector<String> paths;
+    for (SizeT i = 0; i < path_count; ++i) {
+        paths.push_back(::infinity::ReadBufAdv<String>(ptr));
+        obj_addrs_.push_back(ObjAddr::ReadBufAdv(ptr));
+        obj_stats_.push_back(ObjStat::ReadBufAdv(ptr));
+    }
+    for (SizeT i = 0; i < path_count; ++i) {
+        pm->SaveLocalPath(paths[i], obj_addrs_[i]);
+        pm->SaveObjStat(obj_addrs_[i], obj_stats_[i]);
+    }
+    return paths;
 }
 
 } // namespace infinity
